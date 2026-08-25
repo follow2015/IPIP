@@ -15,11 +15,16 @@ from app.persistence.base import SQLAlchemyRepository
 logger = get_logger(__name__)
 
 class LinkAggregationRepository(SQLAlchemyRepository):
+    """链路聚合组 Repository
+
+    提供链路聚合组相关的数据访问方法。
+    """
 
     def __init__(self, session=None):
         super().__init__(LinkAggregationGroup, session)
 
     def find_by_device(self, device_id: int) -> List[LinkAggregationGroup]:
+        """按设备查询聚合组（含 member_port_list 预加载，避免 N+1 查询）"""
         return (
             self.session.query(LinkAggregationGroup)
             .options(joinedload(LinkAggregationGroup.member_port_list))
@@ -28,9 +33,19 @@ class LinkAggregationRepository(SQLAlchemyRepository):
         )
 
     def find_by_device_and_name(self, device_id: int, lag_name: str) -> Optional[LinkAggregationGroup]:
+        """按设备和聚合组名查询"""
         return self.find_one(filters={'device_id': device_id, 'lag_name': lag_name})
 
     def find_all_with_device_info(self, room_id: int = None, device_id: int = None) -> List[Dict[str, Any]]:
+        """查询所有聚合组，关联设备名称和机房
+
+        Args:
+            room_id: 可选机房ID筛选
+            device_id: 可选设备ID筛选
+
+        Returns:
+            包含设备信息的聚合组字典列表
+        """
         from app.models.device import Device
         from app.models.switch_credentials import SwitchCredentials
         from app.models.cabinet import Cabinet
@@ -83,6 +98,18 @@ class LinkAggregationRepository(SQLAlchemyRepository):
         self, page: int = 1, per_page: int = 20,
         search: str = None, room_id: int = None, device_id: int = None,
     ) -> Dict[str, Any]:
+        """查询所有聚合组（分页），关联设备名称和机房
+
+        Args:
+            page: 页码
+            per_page: 每页数量
+            search: 模糊搜索（匹配聚合组名称）
+            room_id: 可选机房ID筛选
+            device_id: 可选设备ID筛选
+
+        Returns:
+            Dict: {"items": [...], "total": int}
+        """
         from app.models.device import Device
         from app.models.switch_credentials import SwitchCredentials
         from app.models.cabinet import Cabinet
@@ -140,12 +167,29 @@ class LinkAggregationRepository(SQLAlchemyRepository):
         return {"items": items, "total": total_count}
 
     def update_member_count(self, lag_id: int, count: int) -> bool:
+        """更新聚合组成员数量
+
+        Args:
+            lag_id: 聚合组 ID
+            count: 新的成员数量
+
+        Returns:
+            bool: 是否更新成功
+        """
         result = self.session.query(LinkAggregationGroup).filter_by(id=lag_id).update(
             {"member_count": count}, synchronize_session=False,
         )
         return result > 0
 
     def delete_by_device_id(self, device_id: int) -> int:
+        """删除指定设备的所有链路聚合组
+
+        Args:
+            device_id: 设备 ID
+
+        Returns:
+            int: 删除行数
+        """
         return self.session.query(LinkAggregationGroup).filter_by(device_id=device_id).delete(
             synchronize_session=False,
         )

@@ -16,7 +16,6 @@ interface VlanConfigModalProps {
   onSubmit: (values: VlanConfigValues) => void;
 }
 
-
 export function VlanConfigModal({
   open,
   onClose,
@@ -43,7 +42,6 @@ export function VlanConfigModal({
         allowed_vlans: values.allowed_vlans as string | undefined
       });
     } catch {
-      
     }
   };
 

@@ -41,7 +41,6 @@ import {
   GpuSpecFields
 } from './ComponentSpecFields';
 
-
 const CATEGORY_LABELS: Record<string, string> = {
   cpu: 'CPU',
   memory: '内存',
@@ -50,7 +49,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   gpu: '显卡'
 };
 
-
 const CATEGORY_OPTIONS = [
   { label: 'CPU', key: 'cpu' },
   { label: '内存', key: 'memory' },
@@ -58,7 +56,6 @@ const CATEGORY_OPTIONS = [
   { label: '网卡', key: 'nic' },
   { label: '显卡', key: 'gpu' }
 ];
-
 
 function specSummary(category: string, spec: Record<string, unknown>): string {
   if (!spec || typeof spec !== 'object') return '-';
@@ -93,7 +90,6 @@ function specSummary(category: string, spec: Record<string, unknown>): string {
   return parts.length > 0 ? parts.join(' / ') : '-';
 }
 
-
 interface TemplateFormValues {
   category: 'cpu' | 'memory' | 'disk' | 'nic' | 'gpu';
   customer_id: number | null;
@@ -109,15 +105,12 @@ function ComponentTemplateManager() {
   const message = useMessage();
   const [form] = Form.useForm<TemplateFormValues>();
 
-  
   const [activeCategory, setActiveCategory] = useState<string>('cpu');
   const filterTable = useTable();
 
-  
   const [modalOpen, setModalOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<ComponentTemplate | null>(null);
 
-  
   const { data: templates, isLoading } = useComponentTemplates(
     activeCategory,
     filterTable.filters.customer_id ? Number(filterTable.filters.customer_id) : null,
@@ -129,20 +122,17 @@ function ComponentTemplateManager() {
   const updateTemplate = useUpdateTemplate();
   const deleteTemplate = useDeleteTemplate();
 
-  
   const customerSelectOptions = useMemo(
     () => (customerOptions ?? []).map((o) => ({ label: o.label, value: o.value as number })),
     [customerOptions]
   );
 
-  
   const allocatableCustomerSelectOptions = useMemo(
     () =>
       (allocatableCustomerOptions ?? []).map((o) => ({ label: o.label, value: o.value as number })),
     [allocatableCustomerOptions]
   );
 
-  
   const handleAdd = () => {
     setEditRecord(null);
     form.resetFields();
@@ -159,7 +149,6 @@ function ComponentTemplateManager() {
     setModalOpen(true);
   };
 
-  
   const handleEdit = (record: ComponentTemplate) => {
     setEditRecord(record);
     form.setFieldsValue({
@@ -175,7 +164,6 @@ function ComponentTemplateManager() {
     setModalOpen(true);
   };
 
-  
   const handleDelete = async (id: number) => {
     try {
       await deleteTemplate.mutateAsync(id);
@@ -185,7 +173,6 @@ function ComponentTemplateManager() {
     }
   };
 
-  
   const handleFormSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -204,10 +191,8 @@ function ComponentTemplateManager() {
     }
   };
 
-  
   const modalCategory = Form.useWatch('category', form) ?? activeCategory;
 
-  
   const columns: ColumnsType<ComponentTemplate> = [
     {
       title: 'ID',
@@ -271,7 +256,7 @@ function ComponentTemplateManager() {
 
   return (
     <div style={{ padding: 0 }}>
-      {}
+      {/* 顶部筛选栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <FilterBar
           filters={[
@@ -290,7 +275,7 @@ function ComponentTemplateManager() {
         </Button>
       </div>
 
-      {}
+      {/* 类别 Tabs + Table */}
       <Tabs
         activeKey={activeCategory}
         onChange={(key) => setActiveCategory(key)}
@@ -310,7 +295,7 @@ function ComponentTemplateManager() {
         }))}
       />
 
-      {}
+      {/* 新增/编辑弹窗 */}
       <Modal
         title={editRecord ? '编辑配件模板' : '新增配件模板'}
         open={modalOpen}
@@ -341,7 +326,7 @@ function ComponentTemplateManager() {
             <Input />
           </Form.Item>
 
-          {}
+          {/* 动态 spec 字段 */}
           {modalCategory === 'cpu' && <CpuSpecFields prefix={['spec']} />}
           {modalCategory === 'memory' && <MemorySpecFields prefix={['spec']} />}
           {modalCategory === 'disk' && <DiskSpecFields prefix={['spec']} />}

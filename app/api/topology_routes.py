@@ -36,6 +36,7 @@ _topology_service = TopologyService()
     responses={200: {"description": "网络层拓扑数据（交换机 + N2N 互联 + uplink 逻辑链路）"}},
 )
 def get_network_topology():
+    """获取网络层拓扑"""
     room_id = request.args.get("room_id", type=int)
     virtual_room_id = request.args.get("virtual_room_id", type=int)
     layer = request.args.get("layer", type=int)
@@ -65,6 +66,7 @@ def get_network_topology():
     responses={200: {"description": "设备层拓扑数据（交换机 + 服务器 + N2N + D2N）"}},
 )
 def get_device_topology():
+    """获取设备层拓扑"""
     room_id = request.args.get("room_id", type=int)
     virtual_room_id = request.args.get("virtual_room_id", type=int)
     cabinet_id = request.args.get("cabinet_id", type=int)
@@ -89,6 +91,7 @@ def get_device_topology():
     responses={200: {"description": "推断结果（dry_run=true时不写入DB）"}},
 )
 def auto_detect_topology():
+    """基于 N2N 连接自动推断 switch_role / layer / uplink_device_id / core_device_id"""
     data = request.get_json(silent=True) or {}
     room_id = data.get("room_id")
     dry_run = data.get("dry_run", True)

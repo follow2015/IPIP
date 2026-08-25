@@ -10,12 +10,10 @@ import { unwrapNested } from './service-utils';
 import { queryKeys } from './query-keys';
 import type { SwitchPort } from '@/types/models';
 
-
 async function fetchNetworkPorts(deviceId: number) {
   const res = await get<{ ports: SwitchPort[] }>(`/devices/${deviceId}/ports`);
   return unwrapNested(res, 'ports');
 }
-
 
 export function useNetworkPorts(deviceId: number, options?: { enabled?: boolean }) {
   return useQuery({
@@ -28,7 +26,6 @@ export function useNetworkPorts(deviceId: number, options?: { enabled?: boolean 
   });
 }
 
-
 interface CreatePortRequest {
   port_name: string;
   port_type?: string;
@@ -36,7 +33,6 @@ interface CreatePortRequest {
   usage_status?: string;
   description?: string;
 }
-
 
 export function useCreateNetworkPort(deviceId: number) {
   const queryClient = useQueryClient();
@@ -47,7 +43,6 @@ export function useCreateNetworkPort(deviceId: number) {
     }
   });
 }
-
 
 export function useBatchCreateNetworkPorts(deviceId: number) {
   const queryClient = useQueryClient();
@@ -63,7 +58,6 @@ export function useBatchCreateNetworkPorts(deviceId: number) {
   });
 }
 
-
 interface UpdatePortRequest {
   port_name?: string;
   port_type?: string;
@@ -77,7 +71,6 @@ interface UpdatePortRequest {
   customer_id?: number | null;
 }
 
-
 export function useUpdateNetworkPort(deviceId: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -89,7 +82,6 @@ export function useUpdateNetworkPort(deviceId: number) {
   });
 }
 
-
 export function useDeleteNetworkPort(deviceId: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -99,7 +91,6 @@ export function useDeleteNetworkPort(deviceId: number) {
     }
   });
 }
-
 
 export function useUpdatePortUsageStatus(deviceId: number) {
   const queryClient = useQueryClient();
@@ -114,14 +105,10 @@ export function useUpdatePortUsageStatus(deviceId: number) {
 
 
 export interface DevicePortSyncEnabled {
-  
   port_sync_enabled: boolean | null;
-  
   global_enabled: boolean;
-  
   effective_enabled: boolean;
 }
-
 
 export function useDevicePortSyncEnabled(deviceId: number) {
   return useQuery({
@@ -133,7 +120,6 @@ export function useDevicePortSyncEnabled(deviceId: number) {
     enabled: deviceId > 0
   });
 }
-
 
 export function useSetDevicePortSyncEnabled(deviceId: number) {
   const queryClient = useQueryClient();

@@ -47,9 +47,17 @@ _DISK_EVENT_KEYWORDS = (
 def _ipmi_get_power_status(
     credential: dict, bmc_ip: str
 ) -> tuple[bool, str | None, str | None]:
+    """通过 pyghmi 取 BMC 上报的 chassis 电源状态（`chassis power status`）。
+
+    返回 `(success, power_state_or_None, error_or_None)`。
+    success 为 False 时，error 为简短错误标记（如 "timeout" / "ipmi_error"）。
+    任何异常都被内部吞掉，绝不向上抛出——保证单测可稳定 patch。
+
+    `pyghmi` 采用惰性 import，因此即使依赖未安装也不会破坏模块加载。
+    """
     try:
         from pyghmi.ipmi.command import Command
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover - 仅在依赖缺失时触发
         logger.debug("pyghmi 不可用: %s", exc)
         return False, None, f"import_error:{exc}"
 
@@ -72,7 +80,7 @@ def _ipmi_get_power_status(
         if cmd is not None:
             try:
                 cmd.ipmi_session.logout()
-            except Exception as exc:
+            except Exception as exc:  # pragma: no cover - 兜底，logout 异常不应掩盖业务结果
                 logger.debug("IPMI logout 异常 %s: %s", bmc_ip, exc)
 
     state = result.get("powerstate") if isinstance(result, dict) else None
@@ -82,10 +90,19 @@ def _ipmi_get_power_status(
 
 
 def _ipmi_collect_metrics(credential: dict, bmc_ip: str, timeout: int) -> dict:
+    """同步采集 IPMI 指标（温度传感器 + SEL 磁盘/存储事件）。
+
+    返回 ``{metric_key: {index: value}}``，其中：
+    - temperature：``{sensor_name: sensor_value}``（gauge，单位 Celsius）
+    - raid_failure / disk_failure：``{sel_record_id: 描述}``（event 型，出现即告警）
+
+    复用 `_ipmi_get_power_status` 的会话释放模式：单次建立 Command 会话，
+    同时采集传感器与 SEL，finally 中 logout 释放，避免 BMC 会话累积。
+    """
     result: dict = {}
     try:
         from pyghmi.ipmi.command import Command
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover - 依赖缺失
         return result
 
     username = credential.get("username", "")
@@ -155,18 +172,19 @@ def _ipmi_collect_metrics(credential: dict, bmc_ip: str, timeout: int) -> dict:
         if raid_fail:
             result["raid_failure"] = raid_fail
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - 采集失败静默降级
         logger.warning("IPMI 指标采集异常 %s: %s", bmc_ip, exc)
     finally:
         if cmd is not None:
             try:
                 cmd.ipmi_session.logout()
-            except Exception:
+            except Exception:  # pragma: no cover - 释放兜底
                 logger.warning("IPMI session logout 失败", exc_info=True)
     return result
 
 
 class IPMIAdapter(MonitorAdapter):
+    """IPMI 协议适配器（服务器 / BMC，Redfish 兜底）。"""
 
     protocol = MonitorProtocolCode.IPMI
 
@@ -174,6 +192,11 @@ class IPMIAdapter(MonitorAdapter):
         return self.resolve_target_ip(device)
 
     def collect_metrics(self, device, credential, templates: list) -> dict:
+        """按指标模板采集 IPMI 指标（温度 / SEL 磁盘/RAID 故障）。
+
+        只处理 source=ipmi 的模板（temperature / disk_failure / raid_failure）。
+        返回 ``{metric_key: {index: value}}``；采集失败返回空 dict，不抛出。
+        """
         needed = {t["metric_key"] for t in templates if t.get("source") == "ipmi"}
         if not needed:
             return {}

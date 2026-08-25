@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState, useMemo } from 'react';
 import { Table, Button, Space, Form, InputNumber, Input, Select, Modal } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SyncOutlined } from '@ant-design/icons';
@@ -23,26 +22,20 @@ import type { VLAN, SwitchPort } from '@/types/models';
 
 interface VlanTabProps {
   deviceId: number;
-  
   hasSsh?: boolean;
 }
-
 
 function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
   const { data: vlans, isLoading } = useVLANsByDevice(deviceId);
   const createVLAN = useCreateDeviceVLAN(deviceId);
   const updateVLAN = useUpdateDeviceVLAN(deviceId);
   const deleteVLAN = useDeleteVLAN();
-  
   const updateVLANMembers = useUpdateVLANMembers(deviceId);
-  
   const syncMembers = useSyncMembers();
   const queryClient = useQueryClient();
-  
   const { data: ports } = useNetworkPorts(deviceId);
   const message = useMessage();
 
-  
   useDeviceEvents(
     deviceId,
     'vlans',
@@ -54,7 +47,6 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
     hasSsh
   );
 
-  
   const portMap = useMemo(() => {
     const map = new Map<string, SwitchPort>();
     for (const p of ports ?? []) {
@@ -66,14 +58,12 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingVlan, setEditingVlan] = useState<VLAN | null>(null);
-  
   const [memberModalOpen, setMemberModalOpen] = useState(false);
   const [editingMemberVlan, setEditingMemberVlan] = useState<VLAN | null>(null);
   const [memberForm] = Form.useForm();
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
 
-  
   const handleAdd = async () => {
     try {
       const values = await addForm.validateFields();
@@ -86,7 +76,6 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
     }
   };
 
-  
   const handleEdit = (vlan: VLAN) => {
     setEditingVlan(vlan);
     editForm.setFieldsValue({
@@ -98,7 +87,6 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
     setEditModalOpen(true);
   };
 
-  
   const handleEditSubmit = async () => {
     if (!editingVlan) return;
     try {
@@ -115,7 +103,6 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
     }
   };
 
-  
   const handleDelete = (vlan: VLAN) => {
     confirm({
       title: '确认删除 VLAN',
@@ -128,10 +115,8 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
     });
   };
 
-  
   const handleEditMembers = (vlan: VLAN) => {
     setEditingMemberVlan(vlan);
-    
     const initialPortIds = (vlan.member_ports ?? [])
       .map((name) => portMap.get(name)?.id)
       .filter((id): id is number => id != null);
@@ -141,7 +126,6 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
     setMemberModalOpen(true);
   };
 
-  
   const handleMemberSubmit = async () => {
     if (!editingMemberVlan) return;
     try {
@@ -158,7 +142,6 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
     }
   };
 
-  
   const portOptions = (ports ?? []).map((p) => ({
     label: p.port_name,
     value: p.id
@@ -220,7 +203,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
 
   return (
     <div>
-      {}
+      {/* 图例 */}
       <PortLegend />
 
       <div style={{ marginBottom: 12, textAlign: 'right' }}>
@@ -238,7 +221,6 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
                     await syncMembers.mutateAsync(deviceId);
                     message.info('成员端口同步已提交，完成后将通过消息通知您');
                   } catch {
-                    
                   }
                 }
               });
@@ -263,7 +245,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         size="small"
       />
 
-      {}
+      {/* 新增 VLAN 弹窗 */}
       <Modal
         title="新增 VLAN"
         open={addModalOpen}
@@ -291,7 +273,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         </Form>
       </Modal>
 
-      {}
+      {/* 编辑 VLAN 弹窗 */}
       <Modal
         title="编辑 VLAN"
         open={editModalOpen}
@@ -322,7 +304,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         </Form>
       </Modal>
 
-      {}
+      {/* hasSsh=false 模式：成员端口编辑弹窗 */}
       {!hasSsh && (
         <Modal
           title={`编辑成员端口 - VLAN ${editingMemberVlan?.vlan_id ?? ''}`}

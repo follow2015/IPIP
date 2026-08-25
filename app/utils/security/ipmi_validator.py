@@ -14,6 +14,19 @@ logger = get_logger(__name__)
 
 
 def scan_plaintext_passwords(session) -> Dict[str, List[Dict]]:
+    """扫描数据库中所有 IPMI 密码，检测明文存储
+
+    Args:
+        session: SQLAlchemy 数据库会话
+
+    Returns:
+        Dict: {
+            "plaintext": [{"id": int, "device_id": int, "ipmi_address": str}, ...],
+            "encrypted": [{"id": int, "device_id": int}, ...],
+            "empty": [{"id": int, "device_id": int}, ...],
+            "total_scanned": int,
+        }
+    """
     from app.models.device_hardware import DeviceHardware
 
     result = {"plaintext": [], "encrypted": [], "empty": [], "total_scanned": 0}
@@ -56,6 +69,15 @@ def scan_plaintext_passwords(session) -> Dict[str, List[Dict]]:
 
 
 def migrate_plaintext_to_encrypted(session, dry_run: bool = True) -> Tuple[int, List[Dict]]:
+    """将明文 IPMI 密码批量加密
+
+    Args:
+        session: SQLAlchemy 数据库会话
+        dry_run: True 仅检测不修改，False 执行加密
+
+    Returns:
+        Tuple[int, List[Dict]]: (迁移数量, 迁移详情列表)
+    """
     from app.models.device_hardware import DeviceHardware
 
     migrated = 0
@@ -104,6 +126,21 @@ def migrate_plaintext_to_encrypted(session, dry_run: bool = True) -> Tuple[int, 
 
 
 def validate_ipmi_password_on_write(password: str) -> str:
+    """写入前校验并自动加密 IPMI 密码
+
+    如果传入明文密码，自动加密后返回。
+    如果已是加密格式，直接返回。
+    如果为空，直接返回。
+
+    Args:
+        password: 待写入的密码值
+
+    Returns:
+        str: 加密后的密码（或原值如果已加密/为空）
+
+    Raises:
+        ValueError: 加密失败
+    """
     if not password:
         return password
 
@@ -115,6 +152,14 @@ def validate_ipmi_password_on_write(password: str) -> str:
 
 
 def run_startup_check(session) -> None:
+    """应用启动时执行 IPMI 密码安全检查
+
+    扫描所有 IPMI 密码，如果发现明文则记录 WARNING 日志。
+    在生产环境中，建议配合告警系统使用。
+
+    Args:
+        session: SQLAlchemy 数据库会话
+    """
     logger.info("执行 IPMI 密码安全启动检查...")
     scan_result = scan_plaintext_passwords(session)
 

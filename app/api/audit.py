@@ -21,7 +21,10 @@ audit_bp = Blueprint("audit", __name__)
 _audit_service = AuditService()
 
 
+
+
 class AuditLogQuerySchema(Schema):
+    """审计日志查询参数"""
     user_id = fields.Int(load_default=None)
     action = fields.Str(load_default=None)
     resource = fields.Str(load_default=None)
@@ -30,12 +33,24 @@ class AuditLogQuerySchema(Schema):
     per_page = fields.Int(load_default=20, validate=validate.Range(min=1, max=100))
 
 
+
+
 @audit_bp.route("/logs", methods=["GET"])
 @doc(summary="查询审计日志", tags=["审计"], responses={200: "AuditLogResponse", 401: "ApiError"})
 @login_required
 @permission_required("audit:view")
 @rate_limit_api
 def get_audit_logs():
+    """查询审计日志
+
+    Query Parameters:
+        user_id (int): 操作人ID（可选）
+        action (str): 操作类型（可选）
+        resource (str): 资源类型（可选）
+        resource_id (int): 资源ID（可选）
+        page (int): 页码，默认 1
+        per_page (int): 每页数量，默认 20，最大 100
+    """
     schema = AuditLogQuerySchema()
     params = schema.load(request.args)
 

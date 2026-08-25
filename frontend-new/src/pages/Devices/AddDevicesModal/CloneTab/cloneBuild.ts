@@ -9,7 +9,6 @@ import type { CreateDeviceRequest } from '@/services/device';
 import type { DeviceBatchRow } from '../shared';
 import { DeviceType } from '@/types/enums';
 
-
 export const CLONE_EXCLUDE_KEYS = new Set<string>([
   'id',
   'device_name',
@@ -24,7 +23,6 @@ export const CLONE_EXCLUDE_KEYS = new Set<string>([
   'updated_at',
   'deleted_at',
   'ipmi_address',
-  
   'cabinet_number',
   'status_name',
   'customer_name',
@@ -51,7 +49,9 @@ export interface BuildCloneOptions {
   selectedChassis?: Device | null;
 }
 
-
+/**
+ * 节点模式位置冲突预检查：存在重复或缺失的节点位置返回 true
+ */
 export function checkNodePositionConflict(
   diffRows: DeviceBatchRow[],
   selectedChassis?: Device | null
@@ -66,25 +66,24 @@ export function checkNodePositionConflict(
   return usedPositions.size < diffRows.length;
 }
 
-
+/**
+ * 从模板 + 差异行构造克隆创建请求数组
+ */
 export function buildCloneRequests(
   templateDetail: Device,
   diffRows: DeviceBatchRow[],
   opts: BuildCloneOptions
 ): CreateDeviceRequest[] {
-  
   const baseClone: Partial<CreateDeviceRequest> = {};
   for (const [k, v] of Object.entries(templateDetail as any)) {
     if (!CLONE_EXCLUDE_KEYS.has(k) && v != null) {
       (baseClone as Record<string, unknown>)[k] = v;
     }
   }
-  
   if (opts.targetCabinetId) {
     baseClone.cabinet_id = opts.targetCabinetId;
   }
 
-  
   if (
     templateDetail.storage_items &&
     Array.isArray(templateDetail.storage_items) &&
@@ -115,7 +114,6 @@ export function buildCloneRequests(
     }));
   }
 
-  
   if (templateDetail.device_type === DeviceType.NETWORK && templateDetail.switch_credential) {
     const sc: any = templateDetail.switch_credential;
     baseClone.switch_config = {
@@ -139,7 +137,6 @@ export function buildCloneRequests(
       status: row.status
     };
 
-    
     if (
       opts.isNodeTemplate &&
       row.parent_device_id &&
@@ -156,7 +153,6 @@ export function buildCloneRequests(
       item.node_col = row.node_col;
       return item as CreateDeviceRequest;
     }
-    
     if (opts.isChassisTemplate) {
       item.height_u = templateDetail.height_u;
       item.u_position = row.u_position ?? undefined;
@@ -170,7 +166,6 @@ export function buildCloneRequests(
       item.auto_create_nodes = true;
       return item as CreateDeviceRequest;
     }
-    
     item.height_u = templateDetail.height_u;
     item.u_position = row.u_position ?? undefined;
     return item as CreateDeviceRequest;

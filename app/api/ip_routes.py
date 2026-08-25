@@ -34,9 +34,14 @@ router = Blueprint("ip", __name__, url_prefix="/api/ip")
 @login_required
 @permission_required("ip:update")
 def ban_ip_endpoint():
+    """封禁 IP（通过交换机黑洞路由）
+
+    请求体: {"ip_address": "10.10.1.100"}
+    room_id 可选，为空时自动查找该IP所在机房
+    """
     data = request.get_json()
     ip_address = data.get("ip_address")
-    room_id = data.get("room_id")
+    room_id = data.get("room_id")  # 可选
 
     if not ip_address:
         return APIResponse.error("缺少 ip_address", ErrorCode.VALIDATION_ERROR, 400)
@@ -71,9 +76,14 @@ def ban_ip_endpoint():
 @login_required
 @permission_required("ip:update")
 def unban_ip_endpoint():
+    """解封 IP（撤销交换机黑洞路由/静态ARP）
+
+    请求体: {"ip_address": "10.10.1.100", "room_id": 3}
+    room_id 可选，为空时自动查找该IP所在机房
+    """
     data = request.get_json()
     ip_address = data.get("ip_address")
-    room_id = data.get("room_id")
+    room_id = data.get("room_id")  # 可选
 
     if not ip_address:
         return APIResponse.error("缺少 ip_address", ErrorCode.VALIDATION_ERROR, 400)
@@ -108,9 +118,14 @@ def unban_ip_endpoint():
 @login_required
 @permission_required("ip:update")
 def batch_ban_endpoint():
+    """批量封禁 IP
+
+    请求体: {"ip_list": ["10.10.1.100", "10.10.1.101"]}
+    room_id 可选，为空时逐IP自动查找所在机房
+    """
     data = request.get_json()
     ip_list = data.get("ip_list", [])
-    room_id = data.get("room_id")
+    room_id = data.get("room_id")  # 可选
 
     if not ip_list:
         return APIResponse.error("缺少 ip_list", ErrorCode.VALIDATION_ERROR, 400)
@@ -146,6 +161,11 @@ def batch_ban_endpoint():
 @login_required
 @permission_required("ip:update")
 def batch_unban_endpoint():
+    """批量解封 IP
+
+    请求体: {"ip_list": ["10.10.1.100", "10.10.1.101"], "room_id": 3}
+    room_id 可选，为空时自动查找每个IP所在机房
+    """
     data = request.get_json()
     ip_list = data.get("ip_list", [])
     room_id = data.get("room_id")
@@ -183,6 +203,10 @@ def batch_unban_endpoint():
 @doc(summary="查询IP封禁状态", tags=["IP"], responses={200: "IPAddressResponse", 400: "ApiError", 404: "ApiError"})
 @login_required
 def check_ban_status(ip_address):
+    """查询 IP 封禁状态
+
+    查询参数: room_id
+    """
     room_id = request.args.get("room_id", type=int)
     if room_id is None:
         return APIResponse.error("缺少 room_id 参数", ErrorCode.VALIDATION_ERROR, 400)
@@ -205,6 +229,10 @@ def check_ban_status(ip_address):
 @login_required
 @permission_required("ip:scan")
 def detect_ip_endpoint(ip_address):
+    """检测 IP 在线状态
+
+    执行 ping + 端口扫描，返回检测结果。
+    """
     try:
         ipaddress.ip_address(ip_address)
     except ValueError:
@@ -222,6 +250,11 @@ def detect_ip_endpoint(ip_address):
 @doc(summary="查询IP列表（分页）", tags=["IP"], responses={200: "IPAddressResponse", 401: "ApiError"})
 @login_required
 def list_ips():
+    """查询 IP 列表（分页，含关联信息）
+
+    支持按机房、状态、客户过滤，支持IP/MAC地址搜索。
+    返回数据包含 switch_name, port, customer_name, room_name, mac_address。
+    """
     room_id = request.args.get("room_id", type=int)
     status = request.args.get("status", type=int)
     customer_id = request.args.get("customer_id", type=int)
@@ -256,6 +289,7 @@ def list_ips():
 @permission_required("ip:update")
 @transactional
 def update_ip_customer(ip_address):
+    """更新IP客户关联"""
     from app.services.ip_crud_service import IPRudService
     data = request.get_json()
     customer_id = data.get("customer_id")
@@ -271,6 +305,7 @@ def update_ip_customer(ip_address):
 @doc(summary="获取IP备注", tags=["IP"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def get_ip_notes(ip_address):
+    """获取IP备注"""
     from app.services.ip_crud_service import IPRudService
     room_id = request.args.get("room_id", type=int)
     service = IPRudService(IPManagerRepository())
@@ -284,6 +319,7 @@ def get_ip_notes(ip_address):
 @permission_required("ip:update")
 @transactional
 def update_ip_notes(ip_address):
+    """更新IP备注"""
     from app.services.ip_crud_service import IPRudService
     data = request.get_json()
     notes = data.get("notes", "")
@@ -301,6 +337,11 @@ def update_ip_notes(ip_address):
 @permission_required("ip:update")
 @transactional
 def batch_update_ip_customer():
+    """批量更新IP客户关联
+
+    请求体: {"ip_list": ["10.10.1.100", ...], "customer_id": 1, "room_id": 9(可选)}
+    room_id 可选，不传则跨机房按 ip_address 更新。
+    """
     data = request.get_json()
     ip_list = data.get("ip_list", [])
     customer_id = data.get("customer_id")
@@ -333,6 +374,11 @@ def batch_update_ip_customer():
 @permission_required("ip:update")
 @transactional
 def batch_update_ip_notes():
+    """批量更新IP备注
+
+    请求体: {"ip_list": ["10.10.1.100", ...], "notes": "备注文本", "room_id": 9(可选)}
+    room_id 可选，不传则跨机房按 ip_address 更新。
+    """
     data = request.get_json()
     ip_list = data.get("ip_list", [])
     notes = data.get("notes", "")
@@ -350,6 +396,10 @@ def batch_update_ip_notes():
 @doc(summary="获取IP详细信息", tags=["IP"], responses={200: "IPAddressDetailResponse", 404: "ApiError"})
 @login_required
 def get_ip_detail(ip_address):
+    """获取IP详细信息（含5表JOIN关联数据）
+
+    返回 switch_name, switch_ip, port, customer_name, room_name, mac_address 等关联字段。
+    """
     room_id = request.args.get("room_id", type=int)
     repo = IPManagerRepository()
     detail = repo.get_detail_with_relations(ip_address, room_id)
@@ -363,6 +413,7 @@ def get_ip_detail(ip_address):
 @login_required
 @permission_required("ip:scan")
 def ping_ip(ip_address):
+    """Ping检测"""
     from app.services.ip_crud_service import IPRudService
     service = IPRudService(IPManagerRepository())
     result = service.ping_ip(ip_address)
@@ -374,6 +425,7 @@ def ping_ip(ip_address):
 @login_required
 @permission_required("ip:scan")
 def scan_ports(ip_address):
+    """端口扫描"""
     from app.services.ip_crud_service import IPRudService
     data = request.get_json(silent=True) or {}
     ports = data.get("ports")
@@ -387,6 +439,11 @@ def scan_ports(ip_address):
 @login_required
 @permission_required("ip:view")
 def scan_network():
+    """异步扫描网段内所有IP状态
+
+    请求体: {"ip_network": "10.10.1.0/24", "room_id": 1}
+    异步并发检测网段内每个IP的在线状态，立即返回，后台执行。
+    """
     data = request.get_json()
     ip_network = data.get("ip_network")
     room_id = data.get("room_id")
@@ -406,6 +463,7 @@ def scan_network():
     user_id = g.current_user["user_id"] if hasattr(g, 'current_user') else None
 
     def _async_scan():
+        """后台执行网段扫描"""
         try:
             with app_ref.app_context():
                 from app.services.ip_status_service import batch_detect_network_status
@@ -477,6 +535,11 @@ def scan_network():
 @doc(summary="获取IP状态统计", tags=["IP"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def ip_statistics():
+    """获取IP状态统计
+
+    查询参数: room_id (可选), search (可选，IP地址或CIDR)
+    返回各状态(在线/离线/封禁/未使用)的IP数量，支持按机房和搜索条件过滤。
+    """
     room_id = request.args.get("room_id", type=int)
     search = request.args.get("search")
 

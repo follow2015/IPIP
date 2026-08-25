@@ -69,7 +69,6 @@ export default function MetricTemplatesPage() {
   const { data: vendorBrands } = useVendorBrands();
   const message = useMessage();
 
-  
   const vendorLabelMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const v of vendorBrands?.items ?? []) {
@@ -85,7 +84,6 @@ export default function MetricTemplatesPage() {
   const [form] = Form.useForm<MetricTemplateFormValues>();
   const table = useTable({ initialPerPage: 20 });
 
-  
   const [search, setSearch] = useState('');
   const [filterDeviceType, setFilterDeviceType] = useState<string | undefined>(undefined);
   const [filterSource, setFilterSource] = useState<string | undefined>(undefined);
@@ -93,13 +91,11 @@ export default function MetricTemplatesPage() {
 
   const allItems: MetricTemplateItem[] = data?.items ?? [];
 
-  
   const batch = useBatchSelection<MetricTemplateItem>({
     dataSource: allItems,
     getRowKey: (r) => String(r.id ?? '')
   });
 
-  
   const stats = useMemo(() => {
     const total = allItems.length;
     const enabled = allItems.filter((i) => i.enabled).length;
@@ -111,7 +107,6 @@ export default function MetricTemplatesPage() {
     return { total, enabled, byDeviceType };
   }, [allItems]);
 
-  
   const filteredItems = useMemo(() => {
     const kw = search.trim().toLowerCase();
     return allItems.filter((i) => {
@@ -132,7 +127,6 @@ export default function MetricTemplatesPage() {
     });
   }, [allItems, search, filterDeviceType, filterSource, filterEnabled]);
 
-  
   const openCreate = () => {
     setEditingRecord(null);
     form.resetFields();
@@ -145,7 +139,6 @@ export default function MetricTemplatesPage() {
     setModalOpen(true);
   };
 
-  
   const openEdit = (record: MetricTemplateItem) => {
     setEditingRecord(record);
     form.setFieldsValue({
@@ -173,14 +166,12 @@ export default function MetricTemplatesPage() {
     setModalOpen(true);
   };
 
-  
   const closeModal = () => {
     setModalOpen(false);
     setEditingRecord(null);
     form.resetFields();
   };
 
-  
   const handleToggleEnabled = async (record: MetricTemplateItem, enabled: boolean) => {
     try {
       await upsert.mutateAsync({
@@ -208,7 +199,6 @@ export default function MetricTemplatesPage() {
     }
   };
 
-  
   const handleDelete = async (templateId: number) => {
     try {
       await deleteMutation.mutateAsync(templateId);
@@ -218,7 +208,6 @@ export default function MetricTemplatesPage() {
     }
   };
 
-  
   const handleBatchDelete = () => {
     confirm({
       title: `确认删除选中的 ${batch.count} 个指标模板？`,
@@ -237,7 +226,6 @@ export default function MetricTemplatesPage() {
     });
   };
 
-  
   const handleBatchToggleEnabled = (enabled: boolean) => {
     confirm({
       title: `确认${enabled ? '启用' : '停用'}选中的 ${batch.count} 个指标模板？`,

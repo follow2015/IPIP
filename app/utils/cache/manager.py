@@ -28,6 +28,11 @@ _MAX_KEY_LOCKS = 4096
 
 
 class UnifiedCacheManager(CacheManager):
+    """统一缓存管理器
+    
+    提供多级缓存、策略管理等高级功能。
+    线程安全实现，支持并发访问。
+    """
     
     def __init__(self, 
                  primary_storage: CacheStorage = None,
@@ -36,6 +41,16 @@ class UnifiedCacheManager(CacheManager):
                  strategy: CacheStrategy = None,
                  enable_monitoring: bool = True,
                  enable_advanced_strategies: bool = True):
+        """初始化统一缓存管理器
+        
+        Args:
+            primary_storage: 主缓存存储（通常是Redis）
+            secondary_storage: 辅助缓存存储（通常是内存）
+            key_generator: 缓存键生成器
+            strategy: 缓存策略
+            enable_monitoring: 是否启用监控
+            enable_advanced_strategies: 是否启用高级策略
+        """
         self.primary_storage = primary_storage or RedisCacheStorage()
         self.secondary_storage = secondary_storage or MemoryCacheStorage()
         self.key_generator = key_generator or StandardCacheKeyGenerator()
@@ -46,8 +61,8 @@ class UnifiedCacheManager(CacheManager):
             self.strategy = strategy or TTLCacheStrategy()
         
         self.cache_levels = {
-            "L1": self.secondary_storage,
-            "L2": self.primary_storage,
+            "L1": self.secondary_storage,  # 内存缓存（最快）
+            "L2": self.primary_storage,    # Redis缓存（持久化）
         }
         
         self._lock = ReadWriteLock()
@@ -83,6 +98,11 @@ class UnifiedCacheManager(CacheManager):
         logger.info("统一缓存管理器初始化完成")
     
     def get(self, key: str, default: Any = None) -> Any:
+        """获取缓存值（支持多级缓存和监控）
+
+        使用哨兵值 _CACHE_MISS 区分"缓存不存在"和"缓存值为 None"，
+        避免 None 值被误判为未命中导致缓存穿透。
+        """
         start_time = time.time()
 
         try:
@@ -98,7 +118,7 @@ class UnifiedCacheManager(CacheManager):
             if value is not _CACHE_MISS:
                 ttl = self.primary_storage.get_ttl(key)
                 if ttl > 0:
-                    self.secondary_storage.set(key, value, min(ttl, 300))
+                    self.secondary_storage.set(key, value, min(ttl, 300))  # L1缓存最多5分钟
 
                 execution_time = time.time() - start_time
                 self.strategy.on_hit(key, value)
@@ -118,6 +138,7 @@ class UnifiedCacheManager(CacheManager):
             return default
     
     def set(self, key: str, value: Any, ttl: int = None, level: str = None) -> bool:
+        """设置缓存值（支持多级缓存和监控）"""
         start_time = time.time()
         
         try:
@@ -135,7 +156,7 @@ class UnifiedCacheManager(CacheManager):
                     logger.warning(f"L2缓存设置失败: {key}")
             
             if level is None or level == "L1":
-                l1_ttl = min(actual_ttl or 300, 300) if actual_ttl else 300
+                l1_ttl = min(actual_ttl or 300, 300) if actual_ttl else 300  # L1缓存最多5分钟
                 if not self.secondary_storage.set(key, value, l1_ttl):
                     logger.warning(f"L1缓存设置失败: {key}")
             
@@ -153,6 +174,7 @@ class UnifiedCacheManager(CacheManager):
             return False
     
     def delete(self, key: str) -> bool:
+        """删除缓存（所有级别，支持智能失效）"""
         start_time = time.time()
         
         try:
@@ -183,6 +205,7 @@ class UnifiedCacheManager(CacheManager):
             return False
     
     def invalidate_pattern(self, pattern: str) -> int:
+        """根据模式失效缓存"""
         count_l1 = self.secondary_storage.delete_pattern(pattern)
         count_l2 = self.primary_storage.delete_pattern(pattern)
         
@@ -193,6 +216,11 @@ class UnifiedCacheManager(CacheManager):
         return total_count
 
     def _get_key_lock(self, key: str) -> threading.Lock:
+        """获取 per-key 锁（singleflight 模式，防止缓存击穿）
+
+        使用有界 OrderedDict：新建/访问的锁移到末尾，超出容量时淘汰最久未用的锁，
+        防止动态 key 场景下 _key_locks 无限增长（内存泄漏）。
+        """
         with self._key_locks_lock:
             lock = self._key_locks.get(key)
             if lock is None:
@@ -204,6 +232,11 @@ class UnifiedCacheManager(CacheManager):
             return lock
 
     def get_or_set(self, key: str, callback: Callable, ttl: int = None) -> Any:
+        """获取缓存值，不存在则通过回调函数设置
+
+        使用哨兵值判断缓存是否真正不存在，避免 None 值穿透。
+        使用 per-key 锁防止缓存击穿（多请求同时回源）。
+        """
         value = self.get(key, _CACHE_MISS)
         if value is not _CACHE_MISS:
             return value
@@ -223,6 +256,7 @@ class UnifiedCacheManager(CacheManager):
                 return None
     
     def remember(self, key: str, ttl: int = None):
+        """缓存装饰器"""
         def decorator(func: Callable) -> Callable:
             @wraps(func)
             def wrapper(*args, **kwargs):
@@ -240,9 +274,11 @@ class UnifiedCacheManager(CacheManager):
         return decorator
     
     def forget(self, key: str) -> bool:
+        """忘记缓存（别名：delete）"""
         return self.delete(key)
     
     def flush(self, namespace: str = None) -> bool:
+        """清空缓存"""
         if namespace:
             pattern = f"{namespace}:*"
             return self.invalidate_pattern(pattern) > 0
@@ -252,34 +288,40 @@ class UnifiedCacheManager(CacheManager):
             return success_l1 or success_l2
     
     def get_storage(self, level: str = None) -> CacheStorage:
+        """获取指定级别的缓存存储"""
         if level is None:
             return self.primary_storage
         
         return self.cache_levels.get(level, self.primary_storage)
     
     def get_key_generator(self) -> CacheKeyGenerator:
+        """获取缓存键生成器"""
         return self.key_generator
     
     def exists(self, key: str) -> bool:
+        """检查缓存是否存在"""
         return (self.secondary_storage.exists(key) or 
                 self.primary_storage.exists(key))
     
     def get_ttl(self, key: str) -> int:
+        """获取缓存剩余过期时间"""
         ttl = self.primary_storage.get_ttl(key)
-        if ttl > -2:
+        if ttl > -2:  # 存在于L2缓存
             return ttl
         
         return self.secondary_storage.get_ttl(key)
     
     def increment(self, key: str, amount: int = 1) -> Optional[int]:
+        """增加计数器"""
         result = self.primary_storage.increment(key, amount)
         
         if result is not None:
-            self.secondary_storage.set(key, result, 300)
+            self.secondary_storage.set(key, result, 300)  # L1缓存5分钟
         
         return result
     
     def get_many(self, keys: list) -> Dict[str, Any]:
+        """批量获取缓存"""
         result = {}
         missing_keys = []
         
@@ -300,6 +342,7 @@ class UnifiedCacheManager(CacheManager):
         return result
     
     def set_many(self, mapping: Dict[str, Any], ttl: int = None) -> bool:
+        """批量设置缓存"""
         filtered_mapping = {}
         for key, value in mapping.items():
             if self.strategy.should_cache(key, value):
@@ -319,6 +362,7 @@ class UnifiedCacheManager(CacheManager):
     
     def _record_event(self, event_type: str, key: str, cache_level: str = 'unknown', 
                      execution_time: float = 0.0, value: Any = None, error_message: str = "") -> None:
+        """记录缓存事件到监控系统"""
         if not self.monitoring_enabled or not self.monitor:
             return
         
@@ -343,6 +387,7 @@ class UnifiedCacheManager(CacheManager):
             logger.warning(f"记录缓存事件失败: {e}")
     
     def _estimate_data_size(self, value: Any) -> int:
+        """估算数据大小"""
         try:
             import sys
             return sys.getsizeof(value)
@@ -351,27 +396,63 @@ class UnifiedCacheManager(CacheManager):
     
     
     def add_cache_dependency(self, key: str, depends_on: List[str]) -> None:
+        """添加缓存依赖关系（智能失效）
+        
+        Args:
+            key: 缓存键
+            depends_on: 依赖的其他缓存键列表
+        """
         if self.smart_invalidation:
             self.smart_invalidation.add_dependency(key, depends_on)
             logger.debug(f"添加缓存依赖: {key} -> {depends_on}")
     
     def add_cache_tags(self, key: str, tags: List[str]) -> None:
+        """为缓存键添加标签（智能失效）
+        
+        Args:
+            key: 缓存键
+            tags: 标签列表
+        """
         if self.smart_invalidation:
             self.smart_invalidation.add_tag(key, tags)
             logger.debug(f"添加缓存标签: {key} -> {tags}")
     
     def register_warmup_task(self, key_pattern: str, data_loader: Callable[[], Any],
                            priority: int = 1, schedule: str = "startup") -> None:
+        """注册缓存预热任务
+        
+        Args:
+            key_pattern: 缓存键模式
+            data_loader: 数据加载函数
+            priority: 优先级
+            schedule: 调度时机
+        """
         if self.warmup_strategy:
             self.warmup_strategy.register_warmup_task(key_pattern, data_loader, priority, schedule)
             logger.info(f"注册缓存预热任务: {key_pattern}")
     
     def execute_warmup(self, schedule: str = "startup") -> Dict[str, Any]:
+        """执行缓存预热
+        
+        Args:
+            schedule: 调度时机
+            
+        Returns:
+            Dict: 执行结果
+        """
         if self.warmup_strategy:
             return self.warmup_strategy.execute_warmup(schedule)
         return {'error': '预热策略未启用'}
     
     def invalidate_by_tags(self, tags: List[str]) -> int:
+        """根据标签失效缓存
+        
+        Args:
+            tags: 标签列表
+            
+        Returns:
+            int: 失效的缓存数量
+        """
         if not self.smart_invalidation:
             return 0
         
@@ -386,6 +467,7 @@ class UnifiedCacheManager(CacheManager):
         return total_invalidated
     
     def get_stats(self) -> Dict[str, Any]:
+        """获取缓存统计信息"""
         l1_stats = self.secondary_storage.get_stats()
         l2_stats = self.primary_storage.get_stats()
         
@@ -401,6 +483,7 @@ class UnifiedCacheManager(CacheManager):
         return stats
 
     def get_cache_metrics(self) -> Dict[str, Any]:
+        """获取缓存指标"""
         metrics = {}
         
         metrics['basic_stats'] = self.get_stats()
@@ -419,6 +502,14 @@ class UnifiedCacheManager(CacheManager):
         return metrics
     
     def get_monitoring_report(self, hours: int = 1) -> Dict[str, Any]:
+        """获取监控报告
+        
+        Args:
+            hours: 报告时间范围（小时）
+            
+        Returns:
+            Dict: 监控报告
+        """
         if not self.monitoring_enabled or not self.monitor:
             return {'error': '监控系统未启用'}
         
@@ -428,6 +519,14 @@ class UnifiedCacheManager(CacheManager):
         return self.monitor.generate_report(start_time, end_time)
     
     def get_cache_alerts(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """获取缓存告警
+        
+        Args:
+            limit: 返回数量限制
+            
+        Returns:
+            List: 告警列表
+        """
         if not self.monitoring_enabled or not self.monitor:
             return []
         
@@ -436,14 +535,21 @@ class UnifiedCacheManager(CacheManager):
     
     
     def cache_user(self, user_id: int, user_data: Dict[str, Any], ttl: int = None) -> bool:
+        """缓存用户数据"""
         key = self.key_generator.user_key(user_id)
         return self.set(key, user_data, ttl)
     
     def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """获取用户缓存"""
         key = self.key_generator.user_key(user_id)
         return self.get(key)
     
     def invalidate_user(self, user_id: int) -> int:
+        """失效用户相关缓存
+
+        同时失效顶层键 user:{id}（cache_user 写入的位置）及其所有子键
+        user:{id}:*，避免只删子键导致顶层用户缓存残留。
+        """
         total = self.invalidate_pattern(self.key_generator.user_key(user_id))
         total += self.invalidate_pattern(
             self.key_generator.get_user_invalidation_pattern(user_id)
@@ -451,26 +557,32 @@ class UnifiedCacheManager(CacheManager):
         return total
     
     def cache_token(self, token: str, token_data: Dict[str, Any], ttl: int = None) -> bool:
+        """缓存令牌数据"""
         key = self.key_generator.token_key(token)
         return self.set(key, token_data, ttl)
     
     def revoke_token(self, token: str, ttl: int = None) -> bool:
+        """撤销令牌"""
         key = self.key_generator.token_revoked_key(token)
         return self.set(key, True, ttl)
     
     def is_token_revoked(self, token: str) -> bool:
+        """检查令牌是否被撤销"""
         key = self.key_generator.token_revoked_key(token)
         return self.exists(key)
     
     def cache_qr_login(self, scene_id: str, qr_data: Dict[str, Any], ttl: int = None) -> bool:
+        """缓存二维码登录数据"""
         key = self.key_generator.qr_login_key(scene_id)
         return self.set(key, qr_data, ttl)
     
     def get_qr_login(self, scene_id: str) -> Optional[Dict[str, Any]]:
+        """获取二维码登录缓存"""
         key = self.key_generator.qr_login_key(scene_id)
         return self.get(key)
     
     def delete_qr_login(self, scene_id: str) -> bool:
+        """删除二维码登录缓存"""
         key = self.key_generator.qr_login_key(scene_id)
         return self.delete(key)
 
@@ -479,10 +591,16 @@ from app.utils.concurrency.locks import singleton
 
 @singleton
 class GlobalCacheManager(UnifiedCacheManager):
+    """全局缓存管理器单例"""
     pass
 
 
 def get_cache_manager() -> UnifiedCacheManager:
+    """获取全局缓存管理器实例
+    
+    Returns:
+        UnifiedCacheManager: 缓存管理器实例
+    """
     return GlobalCacheManager()
 
 
@@ -490,4 +608,17 @@ cache_manager = get_cache_manager()
 
 
 def cached(key_pattern: str = None, ttl: int = None):
+    """缓存装饰器（向后兼容）
+    
+    自动缓存函数返回值。
+    
+    Args:
+        key_pattern: 缓存键模式，可以使用{arg_name}引用参数
+        ttl: 过期时间（秒）
+    
+    Example:
+        @cached(key_pattern='room:{room_id}', ttl=3600)
+        def get_room(room_id):
+            return Room.query.get(room_id)
+    """
     return cache_manager.remember(key_pattern or "cached_func", ttl)

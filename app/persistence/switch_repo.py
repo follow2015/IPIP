@@ -29,12 +29,25 @@ logger = get_logger(__name__)
 
 
 class SwitchRepository(BaseRepository):
+    """SwitchCredentials / Device 数据访问层
+
+    统一使用 device_id（devices.id）作为交换机标识，
+    所有查询/操作方法均按 device_id 过滤，与 switch_port_status / switch_port_ips 等表保持一致。
+    """
 
     def __init__(self, session=None):
         super().__init__(SwitchCredentials, session or db.session)
         self.device_model = Device
 
     def find_by_device_id(self, device_id: int) -> Optional[SwitchCredentials]:
+        """根据 device_id 查找交换机（统一入口）
+
+        Args:
+            device_id: 设备ID（devices.id）
+
+        Returns:
+            Optional[SwitchCredentials]: 交换机凭据对象，不存在则返回None
+        """
         try:
             return self.session.query(SwitchCredentials).filter_by(
                 device_id=device_id
@@ -46,6 +59,15 @@ class SwitchRepository(BaseRepository):
     def get_by_room(
         self, room_id: int, status: Optional[int] = None,
     ) -> List[SwitchCredentials]:
+        """查询机房内交换机列表
+
+        Args:
+            room_id: 机房ID
+            status: 可选状态过滤（SwitchStatus.CORE/ACCESS）
+
+        Returns:
+            List[SwitchCredentials]: 交换机凭据列表
+        """
         query = (
             self.session.query(SwitchCredentials)
             .join(Device, SwitchCredentials.device_id == Device.id)
@@ -62,6 +84,14 @@ class SwitchRepository(BaseRepository):
     def get_by_device_ids(
         self, device_ids: List[int],
     ) -> List[SwitchCredentials]:
+        """根据 device_id 列表查询交换机凭据
+
+        Args:
+            device_ids: 设备ID列表
+
+        Returns:
+            List[SwitchCredentials]: 交换机凭据列表
+        """
         return (
             self.session.query(SwitchCredentials)
             .join(Device, SwitchCredentials.device_id == Device.id)
@@ -73,11 +103,33 @@ class SwitchRepository(BaseRepository):
         )
 
     def get_core_switches(self, room_id: int) -> List[SwitchCredentials]:
+        """获取机房内核心交换机列表
+
+        Args:
+            room_id: 机房ID
+
+        Returns:
+            List[SwitchCredentials]: 核心交换机列表
+        """
         return self.get_by_room(room_id, status=SwitchStatus.CORE)
 
     def name_ip_exists(
         self, name: str, ip: str, exclude_id: Optional[int] = None,
     ) -> bool:
+        """检查交换机名称或IP是否已存在
+
+        名称检查 Device.device_name，IP 检查 SwitchCredentials.ip。
+        exclude_id 为 SwitchCredentials.id（更新时排除自身）。
+        空字符串视为未提供，跳过对应检查。
+
+        Args:
+            name: 交换机名称
+            ip: 管理IP
+            exclude_id: 排除的ID
+
+        Returns:
+            bool: 存在返回True
+        """
         if ip:
             ip_query = self.session.query(SwitchCredentials.id).filter(
                 SwitchCredentials.ip == ip
@@ -110,6 +162,18 @@ class SwitchRepository(BaseRepository):
         switch_data: dict,
         ext_data: Optional[dict] = None,
     ) -> SwitchCredentials:
+        """原子创建交换机：Device + SwitchCredentials + DeviceSwitchExt
+
+        将三表写入封装在 Repository 层，API 层不再直接使用 db.session。
+
+        Args:
+            device_data: Device 字段（device_name, device_type, device_model, cabinet_id 等）
+            switch_data: SwitchCredentials 字段（ip, port, username 等，含 device_id）
+            ext_data: DeviceSwitchExt 拓扑字段（uplink_device_id, core_device_id 等），可选
+
+        Returns:
+            SwitchCredentials: 创建的交换机凭据对象
+        """
         device = Device(**device_data)
         self.session.add(device)
         self.session.flush()
@@ -136,6 +200,14 @@ class SwitchRepository(BaseRepository):
         return switch
 
     def has_ports(self, switch_id: int) -> bool:
+        """检查交换机是否有关联端口（删除前校验）
+
+        Args:
+            switch_id: 交换机 device_id
+
+        Returns:
+            bool: 有关联端口返回True
+        """
         return self.session.query(
             self.session.query(NetworkPort.id)
             .filter(NetworkPort.device_id == switch_id)
@@ -143,6 +215,7 @@ class SwitchRepository(BaseRepository):
         ).scalar()
 
     def find_room_switch_ids(self, room_id: int) -> List[int]:
+        """查找同机房交换机 device_id 列表"""
         rows = self.session.query(SwitchCredentials.device_id).join(
             Device, SwitchCredentials.device_id == Device.id
         ).join(
@@ -153,9 +226,11 @@ class SwitchRepository(BaseRepository):
         return [r[0] for r in rows]
 
     def find_all_switches(self) -> List[SwitchCredentials]:
+        """获取所有交换机"""
         return self.find_all()
 
     def check_ip_exists(self, ip_address: str) -> bool:
+        """检查IP是否存在"""
         return self.session.query(SwitchCredentials.id).filter(
             SwitchCredentials.ip == ip_address,
         ).first() is not None
@@ -166,6 +241,11 @@ class SwitchRepository(BaseRepository):
         cabinet_id: int = None,
         page: int = 1, page_size: int = 20,
     ) -> dict:
+        """过滤+分页查询网络设备（以 Device 为查询起点，outerjoin SwitchCredentials）
+
+        V2.0: 查询起点从 SwitchCredentials 改为 Device(device_type='network')，
+        确保所有网络设备都显示（包括没有 SSH 凭据的设备）。
+        """
         query = self.session.query(Device).options(
             joinedload(Device.cabinet).joinedload(Cabinet.room),
             contains_eager(Device.switch_credential),
@@ -300,6 +380,7 @@ class SwitchRepository(BaseRepository):
 
 
     def get_switch_ports_list(self, switch_id: int) -> List[str]:
+        """获取端口名称列表"""
         rows = self.session.query(NetworkPort.port_name).filter(
             NetworkPort.device_id == switch_id,
         ).all()
@@ -308,6 +389,7 @@ class SwitchRepository(BaseRepository):
     def update_port_status_vlan(
         self, switch_id: int, port: str, vlan: int,
     ) -> None:
+        """更新端口VLAN（network_ports表）"""
         stmt = update(NetworkPort).where(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
@@ -316,6 +398,15 @@ class SwitchRepository(BaseRepository):
         self.session.flush()
 
     def get_ports_by_vlan(self, switch_id: int, vlan: int) -> List[str]:
+        """查询设备上所有 vlan=指定值的端口名称（只读，不修改 DB）
+
+        Args:
+            switch_id: 设备ID
+            vlan: VLAN ID
+
+        Returns:
+            端口名称列表
+        """
         affected = self.session.query(NetworkPort.port_name).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.vlan == vlan,
@@ -323,6 +414,16 @@ class SwitchRepository(BaseRepository):
         return [r[0] for r in affected]
 
     def reset_ports_vlan(self, switch_id: int, old_vlan: int, new_vlan: int = 1) -> List[str]:
+        """将设备上所有 vlan=old_vlan 的端口重置为 new_vlan（删除 VLAN 后调用）
+
+        Args:
+            switch_id: 设备ID
+            old_vlan: 被删除的 VLAN ID
+            new_vlan: 重置后的 VLAN ID（默认为 1）
+
+        Returns:
+            被重置的端口名称列表（用于 SSE 事件广播）
+        """
         affected = self.session.query(NetworkPort.port_name).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.vlan == old_vlan,
@@ -340,6 +441,16 @@ class SwitchRepository(BaseRepository):
         return port_names
 
     def get_port_vlan(self, switch_id: int, port: str) -> Optional[int]:
+        """读取端口VLAN值，用于判断端口二层/三层模式
+
+        有VLAN值 → 二层模式（portswitch），无VLAN → 三层模式
+
+        注意：NetworkPort.vlan 列类型为 String(200)，但本方法统一返回 int，
+        确保调用方的数值比较（如 current_vlan != 1）不会因类型不一致而误判。
+
+        Returns:
+            Optional[int]: VLAN值（整数），端口不存在或无VLAN时返回None
+        """
         info = self.session.query(NetworkPort.vlan).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
@@ -354,6 +465,7 @@ class SwitchRepository(BaseRepository):
     def update_port_customer(
         self, switch_id: int, port: str, customer_id: int,
     ) -> None:
+        """更新端口客户归属"""
         stmt = update(NetworkPort).where(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
@@ -364,6 +476,7 @@ class SwitchRepository(BaseRepository):
     def update_port_description(
         self, switch_id: int, port: str, description: str,
     ) -> None:
+        """更新端口描述"""
         stmt = update(NetworkPort).where(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
@@ -374,6 +487,13 @@ class SwitchRepository(BaseRepository):
     def update_port_status(
         self, switch_id: int, port: str, status: str,
     ) -> None:
+        """更新端口链路状态，同时根据链路状态推导占用状态
+
+        Args:
+            switch_id: 交换机 device_id
+            port:      端口名称
+            status:    链路状态字符串（up / down / admin_down）
+        """
         usage_status = NetworkPort.derive_usage_status(status, port)
         stmt = update(NetworkPort).where(
             NetworkPort.device_id == switch_id,
@@ -383,6 +503,7 @@ class SwitchRepository(BaseRepository):
         self.session.flush()
 
     def get_port_ips(self, switch_id: int, port: str) -> List[dict]:
+        """获取端口IP列表"""
         rows = self.session.query(SwitchPortIP).filter(
             SwitchPortIP.device_id == switch_id,
             SwitchPortIP.port_name == port,
@@ -393,6 +514,7 @@ class SwitchRepository(BaseRepository):
         self, switch_id: int, port: str, ip_address: str,
         subnet_mask: str = "255.255.255.0", is_primary: bool = True,
     ) -> None:
+        """新增端口IP"""
         record = SwitchPortIP(
             device_id=switch_id, port_name=port,
             ip_address=ip_address, subnet_mask=subnet_mask,
@@ -404,6 +526,7 @@ class SwitchRepository(BaseRepository):
     def delete_port_ip(
         self, switch_id: int, port: str, ip_address: str, subnet_mask: str = None,
     ) -> None:
+        """删除端口IP"""
         stmt = delete(SwitchPortIP).where(
             SwitchPortIP.device_id == switch_id,
             SwitchPortIP.port_name == port,
@@ -415,6 +538,7 @@ class SwitchRepository(BaseRepository):
     def sync_port_ips(
         self, switch_id: int, port: str, ip_list: List[dict],
     ) -> None:
+        """同步端口IP（全量替换）"""
         stmt = delete(SwitchPortIP).where(
             SwitchPortIP.device_id == switch_id,
             SwitchPortIP.port_name == port,
@@ -425,7 +549,7 @@ class SwitchRepository(BaseRepository):
                 device_id=switch_id, port_name=port,
                 ip_address=ip_data["ip_address"],
                 subnet_mask=ip_data.get("subnet_mask", "255.255.255.0"),
-                prefix=ip_data.get("prefix"),
+                prefix=ip_data.get("prefix"),  # CR-PREFIX-UNIFY: 写入prefix
                 is_primary=ip_data.get("is_primary", True),
                 vlan=ip_data.get("vlan"),
             )
@@ -435,10 +559,25 @@ class SwitchRepository(BaseRepository):
     def check_ip_subnet_conflict(
         self, device_id: int, ip_address: str, subnet_mask: str, port: str,
     ) -> Optional[dict]:
+        """检查同一设备上 IP 网段是否已被其他端口使用
+
+        同一交换机上，同一 IP 网段只能被分配一次。
+        例如端口 A 已配置 192.168.1.1/24，端口 B 不能再配置 192.168.1.2/24。
+
+        Args:
+            device_id:   设备 ID
+            ip_address:  待配置的 IP 地址
+            subnet_mask: 子网掩码（如 "255.255.255.0"）
+            port:        当前端口名（排除自身已有的同网段 IP）
+
+        Returns:
+            None 表示无冲突；dict 包含冲突信息：
+            {"port": "GE1/0/2", "ip": "192.168.1.1", "subnet": "192.168.1.0/24"}
+        """
         try:
             new_net = ipaddress.IPv4Network(f"{ip_address}/{subnet_mask}", strict=False)
         except (ValueError, TypeError):
-            return None
+            return None  # 无法解析网段，跳过检查
 
         rows = self.session.query(
             SwitchPortIP.port_name, SwitchPortIP.ip_address, SwitchPortIP.subnet_mask,
@@ -465,6 +604,7 @@ class SwitchRepository(BaseRepository):
     def get_port_info_cache(
         self, switch_id: int, port: str,
     ) -> Optional[dict]:
+        """读取端口缓存"""
         info = self.session.query(NetworkPort).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
@@ -473,6 +613,11 @@ class SwitchRepository(BaseRepository):
 
     @staticmethod
     def _parse_port_info_text(raw: str) -> str:
+        """将 raw_info 字段解析为可读配置文本。
+
+        存储格式为 JSON: {"port_info": "interface ..."}
+        解析失败时返回原始字符串。
+        """
         if not raw:
             return raw
         try:
@@ -484,6 +629,11 @@ class SwitchRepository(BaseRepository):
             return raw
 
     def get_port_config_text(self, switch_id: int, port: str) -> Optional[str]:
+        """读取 network_ports.raw_info 字段（端口配置文本）
+
+        raw_info 存储格式为 JSON: {"port_info": "interface ..."}
+        返回解析后的纯文本配置。
+        """
         row = self.session.query(NetworkPort.raw_info).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
@@ -495,6 +645,11 @@ class SwitchRepository(BaseRepository):
     def get_port_config_with_time(
         self, switch_id: int, port: str,
     ) -> Optional[dict]:
+        """读取 raw_info 的配置文本和更新时间
+
+        Returns:
+            dict: {"port_config": str, "updated_at": str} 或 None
+        """
         row = self.session.query(
             NetworkPort.raw_info, NetworkPort.updated_at,
         ).filter(
@@ -512,6 +667,7 @@ class SwitchRepository(BaseRepository):
     def upsert_port_info_cache(
         self, switch_id: int, port: str, data: dict,
     ) -> None:
+        """写入端口缓存（network_ports 表）"""
         info = self.session.query(NetworkPort).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
@@ -528,6 +684,15 @@ class SwitchRepository(BaseRepository):
     def upsert_port_config(
         self, switch_id: int, port: str, config_text: str,
     ) -> None:
+        """写入端口配置文本到 network_ports.raw_info
+
+        将配置文本以 JSON 格式存储，与旧版 sw_port_info 格式保持一致。
+
+        Args:
+            switch_id: 交换机 device_id
+            port: 端口名称
+            config_text: 端口配置文本（display current-configuration interface 的输出）
+        """
         port_info_json = json.dumps(
             {"port_info": config_text}, ensure_ascii=False,
         )
@@ -545,6 +710,7 @@ class SwitchRepository(BaseRepository):
         self.session.flush()
 
     def delete_port_config(self, switch_id: int, port: str) -> None:
+        """删除 network_ports 中指定端口的配置缓存"""
         row = self.session.query(NetworkPort).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
@@ -554,6 +720,15 @@ class SwitchRepository(BaseRepository):
             self.session.flush()
 
     def update_vlan_trunk_info(self, switch_id: int, port: str) -> None:
+        """确保 network_ports 中存在指定端口记录（upsert）
+
+        创建 VLANIF 或 Eth-Trunk 时调用，确保表中有对应记录，
+        以便端口列表和详情页能展示这些逻辑接口。
+
+        Args:
+            switch_id: 交换机 device_id
+            port: 端口名称（如 Vlanif100、Eth-Trunk1）
+        """
         existing = self.session.query(NetworkPort).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
@@ -563,6 +738,15 @@ class SwitchRepository(BaseRepository):
             self.session.flush()
 
     def delete_vlan_trunk_info(self, switch_id: int, port: str) -> None:
+        """从 network_ports 删除指定端口记录
+
+        删除 VLAN 或 Eth-Trunk 时调用，清理逻辑接口记录。
+        switch_port_ips 行由 FK CASCADE 自动级联删除。
+
+        Args:
+            switch_id: 交换机 device_id
+            port: 端口名称（如 Vlanif100、Eth-Trunk1）
+        """
         self.session.query(NetworkPort).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
@@ -570,16 +754,18 @@ class SwitchRepository(BaseRepository):
         self.session.flush()
 
     def get_most_common_mac(self, switch_id: int) -> Optional[str]:
+        """获取交换机最常见MAC地址"""
         result = self.session.query(
             NetworkPort.mac, func.count(NetworkPort.mac),
         ).filter(
             NetworkPort.device_id == switch_id,
-            NetworkPort.mac != None,
+            NetworkPort.mac != None,  # noqa: E711
             NetworkPort.mac != "",
         ).group_by(NetworkPort.mac).order_by(func.count(NetworkPort.mac).desc()).first()
         return result[0] if result else None
 
     def get_ports_with_customer(self, switch_id: int) -> List[dict]:
+        """获取端口+客户信息"""
         ports = self.session.query(NetworkPort).filter(
             NetworkPort.device_id == switch_id,
         ).all()
@@ -587,27 +773,72 @@ class SwitchRepository(BaseRepository):
 
 
     def find_vlan_by_device_and_id(self, device_id: int, vlan_id: int):
+        """根据 device_id + vlan_id 查找 VLAN 记录
+
+        Args:
+            device_id: 设备ID
+            vlan_id: VLAN ID (1-4094)
+
+        Returns:
+            VLAN 对象或 None
+        """
         from app.models.vlan import VLAN
         return self.session.query(VLAN).filter_by(
             device_id=device_id, vlan_id=vlan_id,
         ).first()
 
     def delete_vlan_record(self, vlan_row) -> None:
+        """删除 VLAN 记录（由 Service 在事务中调用）
+
+        Args:
+            vlan_row: VLAN ORM 对象
+        """
         self.session.delete(vlan_row)
 
     def upsert_vlan_record(self, device_id: int, vlan_id: int,
                            room_id: int = None):
+        """确保 vlans 表中存在指定 VLAN 记录（upsert）
+
+        委托 VLANService.ensure_vlan() 统一入口，
+        避免分散逻辑导致字段填充不一致。
+
+        Args:
+            device_id: 设备ID
+            vlan_id: VLAN ID (1-4094)
+            room_id: 机房ID
+
+        Returns:
+            VLAN 对象或 None
+        """
         from app.services.vlan_service import VLANService
         from app.persistence.vlan_repository import VLANRepository
         return VLANService(VLANRepository()).ensure_vlan(device_id, vlan_id, room_id=room_id)
 
     def find_lag_by_device_and_name(self, device_id: int, lag_name: str):
+        """根据 device_id + lag_name 查找 LAG 记录
+
+        Args:
+            device_id: 设备ID
+            lag_name: LAG 名称（如 Eth-Trunk10）
+
+        Returns:
+            LinkAggregationGroup 对象或 None
+        """
         from app.models.link_aggregation import LinkAggregationGroup
         return self.session.query(LinkAggregationGroup).filter_by(
             device_id=device_id, lag_name=lag_name,
         ).first()
 
     def upsert_lag_record(self, device_id: int, lag_name: str):
+        """查找或创建 LAG 记录，返回 (lag_row, created)
+
+        Args:
+            device_id: 设备ID
+            lag_name: LAG 名称（如 Eth-Trunk10）
+
+        Returns:
+            tuple: (LinkAggregationGroup 对象, 是否新建)
+        """
         from app.models.link_aggregation import LinkAggregationGroup
         lag_row = self.session.query(LinkAggregationGroup).filter_by(
             device_id=device_id, lag_name=lag_name,
@@ -623,6 +854,12 @@ class SwitchRepository(BaseRepository):
         return lag_row, False
 
     def delete_lag_record(self, device_id: int, lag_name: str) -> None:
+        """删除 link_aggregation_groups 记录
+
+        Args:
+            device_id: 设备ID
+            lag_name: LAG 名称
+        """
         from app.models.link_aggregation import LinkAggregationGroup
         lag_row = self.session.query(LinkAggregationGroup).filter_by(
             device_id=device_id, lag_name=lag_name,
@@ -631,15 +868,36 @@ class SwitchRepository(BaseRepository):
             self.session.delete(lag_row)
 
     def delete_lag_record_by_obj(self, lag_row) -> None:
+        """删除 LAG 记录（通过 ORM 对象）
+
+        Args:
+            lag_row: LinkAggregationGroup ORM 对象
+        """
         self.session.delete(lag_row)
 
     def find_port_by_device_and_name(self, device_id: int, port_name: str):
+        """根据 device_id + port_name 查找端口记录
+
+        Args:
+            device_id: 设备ID
+            port_name: 端口名称
+
+        Returns:
+            NetworkPort 对象或 None
+        """
         return self.session.query(NetworkPort).filter_by(
             device_id=device_id, port_name=port_name,
         ).first()
 
     def set_port_lag_group(self, device_id: int, port_name: str,
                            lag_group_id: int) -> None:
+        """设置端口的 lag_group_id
+
+        Args:
+            device_id: 设备ID
+            port_name: 端口名称
+            lag_group_id: LAG 组 ID
+        """
         port_row = self.session.query(NetworkPort).filter_by(
             device_id=device_id, port_name=port_name,
         ).first()
@@ -648,6 +906,15 @@ class SwitchRepository(BaseRepository):
             self.session.flush()
 
     def clear_port_lag_group(self, device_id: int, port_name: str) -> Optional[int]:
+        """清除端口的 lag_group_id，返回原 lag_group_id
+
+        Args:
+            device_id: 设备ID
+            port_name: 端口名称
+
+        Returns:
+            原 lag_group_id（可能为 None）
+        """
         port_row = self.session.query(NetworkPort).filter_by(
             device_id=device_id, port_name=port_name,
         ).first()
@@ -659,11 +926,24 @@ class SwitchRepository(BaseRepository):
         return lag_id
 
     def count_lag_members(self, lag_group_id: int) -> int:
+        """统计 LAG 组成员数
+
+        Args:
+            lag_group_id: LAG 组 ID
+
+        Returns:
+            成员端口数量
+        """
         return self.session.query(NetworkPort).filter_by(
             lag_group_id=lag_group_id,
         ).count()
 
     def sync_lag_member_count(self, lag_group_id: int) -> None:
+        """同步 LAG 组的 member_count 字段
+
+        Args:
+            lag_group_id: LAG 组 ID
+        """
         from app.models.link_aggregation import LinkAggregationGroup
         actual_count = self.session.query(NetworkPort).filter_by(
             lag_group_id=lag_group_id,
@@ -674,11 +954,25 @@ class SwitchRepository(BaseRepository):
             self.session.flush()
 
     def delete_port_ips_by_vlan(self, device_id: int, vlan_id: int) -> None:
+        """清理 switch_port_ips 中引用该 VLAN 的记录（将 vlan 置空）
+
+        Args:
+            device_id: 设备ID
+            vlan_id: VLAN ID
+        """
         SwitchPortIP.query.filter_by(
             device_id=device_id, vlan=vlan_id,
         ).update({SwitchPortIP.vlan: None}, synchronize_session=False)
 
     def clear_connection_vlan_refs(self, device_id: int, vlan_id: int) -> None:
+        """清理 device_connections / network_connections 中引用该 VLAN 的记录
+
+        将相关连接的 vlan_id 置空，断开 VLAN 引用。
+
+        Args:
+            device_id: 设备ID
+            vlan_id: VLAN ID
+        """
         from app.models.device_connection import DeviceConnection
         from app.models.network_connection import NetworkConnection
 
@@ -698,6 +992,18 @@ class SwitchRepository(BaseRepository):
     def update_vlan_member_relation(self, device_id: int, port_name: str,
                                     vlan_id: int, mode: str,
                                     room_id: int = None) -> None:
+        """端口设置 VLAN 后，更新 vlan_port_members 关联表
+
+        将物理端口加入对应 VLAN 的成员列表。
+        若 VLAN 记录不存在则通过 ensure_vlan 创建。
+
+        Args:
+            device_id: 设备ID
+            port_name: 端口名称
+            vlan_id: VLAN ID
+            mode: 端口模式（access/trunk/hybrid）
+            room_id: 机房ID
+        """
         from app.models.vlan_port_member import VLANPortMember
         from app.services.vlan_service import VLANService
         from app.persistence.vlan_repository import VLANRepository
@@ -727,6 +1033,16 @@ class SwitchRepository(BaseRepository):
 
     def update_lag_member_relation(self, device_id: int, port_name: str,
                                    channel_id: int, device_type: str = None) -> None:
+        """端口加入 Eth-Trunk 后，更新 lag_group_id 和 member_count
+
+        查找或创建 link_aggregation_groups 记录，设置端口的 lag_group_id。
+
+        Args:
+            device_id: 设备ID
+            port_name: 端口名称
+            channel_id: Eth-Trunk ID
+            device_type: 设备类型（huawei/h3c/cisco），用于生成厂商正确的 trunk 名称
+        """
         from app.utils.port_name_utils import get_trunk_name
         trunk_name = get_trunk_name(device_type, channel_id) if device_type else f"Eth-Trunk{channel_id}"
         lag_row, _ = self.upsert_lag_record(device_id, trunk_name)
@@ -745,6 +1061,12 @@ class SwitchRepository(BaseRepository):
         self.session.flush()
 
     def clear_lag_member_relation(self, device_id: int, port_name: str) -> None:
+        """端口离开 Eth-Trunk 后，清除 lag_group_id 并同步 member_count
+
+        Args:
+            device_id: 设备ID
+            port_name: 端口名称
+        """
         port_row = self.session.query(NetworkPort).filter_by(
             device_id=device_id, port_name=port_name,
         ).first()
@@ -764,6 +1086,15 @@ class SwitchRepository(BaseRepository):
             self.session.flush()
 
     def sync_vlan_members(self, device_id: int, port: str, members: list) -> None:
+        """将 VLAN 成员端口列表写入 vlans 表
+
+        根据 device_id + vlan_id 查找或创建记录，更新 member_ports 字段。
+
+        Args:
+            device_id: 设备ID
+            port: VLANIF 端口名称（如 Vlanif100）
+            members: 成员端口名称列表
+        """
         import re
         from app.models.vlan import VLAN
         from app.models.vlan_port_member import VLANPortMember
@@ -796,7 +1127,7 @@ class SwitchRepository(BaseRepository):
                     VLAN.vlan_id == vlan_id,
                 ).first()
                 if not row:
-                    raise
+                    raise  # 非预期：冲突后仍找不到，重新抛出
 
         self.session.query(VLANPortMember).filter(
             VLANPortMember.vlan_id == row.id,
@@ -819,6 +1150,16 @@ class SwitchRepository(BaseRepository):
         self.session.flush()
 
     def sync_trunk_members(self, device_id: int, port: str, members: list) -> None:
+        """将 Eth-Trunk 成员端口列表写入 link_aggregation_groups 表
+
+        根据 device_id + lag_name 查找或创建记录，
+        通过 NetworkPort.lag_group_id FK 建立成员端口关联。
+
+        Args:
+            device_id: 设备ID
+            port: Eth-Trunk 端口名称（如 Eth-Trunk1）
+            members: 成员端口名称列表
+        """
         from app.models.link_aggregation import LinkAggregationGroup
 
         row = self.session.query(LinkAggregationGroup).filter(
@@ -857,6 +1198,16 @@ class SwitchRepository(BaseRepository):
     def get_port_ips_by_device_ids(
         self, device_ids: list[int],
     ) -> list[tuple[int, str, str, int | None]]:
+        """批量查询多台交换机的端口 IP（prefix 非空）
+
+        供扫描编排器 Phase 0c 加载端口 IP 索引到 Redis。
+
+        Args:
+            device_ids: 设备ID列表
+
+        Returns:
+            list[tuple[device_id, port_name, ip_address, prefix]]
+        """
         if not device_ids:
             return []
         from sqlalchemy import text, bindparam
@@ -873,6 +1224,16 @@ class SwitchRepository(BaseRepository):
     def get_port_ips_by_device_id(
         self, device_id: int,
     ) -> list[tuple[int, str, str, int | None]]:
+        """查询单台交换机的端口 IP（prefix 非空）
+
+        供 scan_switch Phase 0c 加载端口 IP 索引到 Redis。
+
+        Args:
+            device_id: 设备ID
+
+        Returns:
+            list[tuple[device_id, port_name, ip_address, prefix]]
+        """
         rows = self.session.execute(
             text(
                 "SELECT device_id, port_name, ip_address, prefix "

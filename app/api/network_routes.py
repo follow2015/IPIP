@@ -26,6 +26,11 @@ router = Blueprint("network", __name__, url_prefix="/api/network")
 @doc(summary="查询路由列表", tags=["网段"], responses={200: "IPNetworkResponse", 401: "ApiError"})
 @login_required
 def list_routes():
+    """查询路由列表
+
+    支持按交换机、机房、路由类型过滤。
+    route_type 已迁移至 switch_routes 表，需通过子查询过滤并补充字段。
+    """
     switch_id = request.args.get("switch_id", type=int)
     room_id = request.args.get("room_id", type=int)
     route_type = request.args.get("route_type", type=int)
@@ -41,7 +46,7 @@ def list_routes():
     if route_type_val is not None:
         matching_ids = repo.find_network_ids_by_route_type(route_type_val)
         if not matching_ids:
-            return APIResponse.success(data=[])
+            return APIResponse.success(data=[])  # 无匹配路由类型，直接返回空
         filters["id"] = matching_ids
 
     routes = repo.find_all(filters)
@@ -64,6 +69,10 @@ def list_routes():
 @doc(summary="查询网段详细信息", tags=["网段"], responses={200: "IPNetworkResponse", 400: "ApiError", 401: "ApiError"})
 @login_required
 def network_info():
+    """查询网段详细信息
+
+    查询参数: cidr (如 10.10.1.0/24)
+    """
     cidr = request.args.get("cidr")
     if not cidr:
         return APIResponse.error("缺少 cidr 参数", ErrorCode.VALIDATION_ERROR, 400)
@@ -79,6 +88,13 @@ def network_info():
 @doc(summary="查询网段使用率", tags=["网段"], responses={200: "IPNetworkResponse", 400: "ApiError", 401: "ApiError"})
 @login_required
 def network_usage():
+    """查询网段使用率
+
+    查询参数: cidr
+    返回字段对齐前端: total_ips, used_ips, available_ips, usage_rate(小数0~1)
+    直接对 ip_addresses 表做 SUM(CASE WHEN) 聚合统计，与 IP 管理页面数据源一致。
+    IP 可能分散在不同机房，因此只按 CIDR 范围统计，不限制 room_id。
+    """
     import ipaddress as _ipaddress
 
     cidr = request.args.get("cidr")
@@ -95,7 +111,7 @@ def network_usage():
     stats = ip_repo.get_status_statistics_by_cidr(cidr)
 
     used_count = stats["active"] + stats["blocked"]
-    total_ips = max(1, net.num_addresses - 2)
+    total_ips = max(1, net.num_addresses - 2)  # 减去网络地址和广播地址
     usage_rate = round(used_count / total_ips, 4)
 
     return APIResponse.success(data={
@@ -114,6 +130,7 @@ def network_usage():
 @doc(summary="分页获取网段列表", tags=["网段"], responses={200: "IPNetworkResponse", 401: "ApiError"})
 @login_required
 def get_networks():
+    """分页获取网段列表"""
     from app.services.network_service import NetworkService
     filters = {
         "room_id": request.args.get("room_id", type=int),
@@ -135,6 +152,7 @@ def get_networks():
 @permission_required("network:delete")
 @transactional
 def delete_network(ip_network):
+    """删除网段"""
     from app.services.network_service import NetworkService
     data = request.get_json(silent=True) or {}
     network_id = data.get("network_id")
@@ -159,6 +177,7 @@ def delete_network(ip_network):
 @permission_required("network:update")
 @transactional
 def update_network_customer(ip_network):
+    """更新网段客户"""
     from app.services.network_service import NetworkService
     data = request.get_json()
     network_id = data.get("network_id")
@@ -183,6 +202,7 @@ def update_network_customer(ip_network):
 @doc(summary="分页获取IP网段", tags=["网段"], responses={200: "IPNetworkResponse", 401: "ApiError"})
 @login_required
 def get_ip_networks():
+    """分页获取IP网段"""
     from app.services.network_service import NetworkService
     filters = {
         "room_id": request.args.get("room_id", type=int),
@@ -199,6 +219,14 @@ def get_ip_networks():
 @doc(summary="获取网段详情（含IP列表和状态统计）", tags=["网段"], responses={200: "IPNetworkResponse", 400: "ApiError", 401: "ApiError"})
 @login_required
 def get_network_detail(ip_network):
+    """获取网段详情（含基本信息+IP列表+状态统计+路由关联信息）
+
+    返回结构对齐前端 NetworkDetailResponse：
+    - network_info: 网段CIDR计算信息（子网掩码/网关/可用IP数等）
+    - ip_addresses: 网段内IP列表（含关联字段 switch_name/port/customer_name 等）
+    - ip_status_count: 各状态IP数量统计
+    - network_info_list: 该网段在 ip_networks 表中的路由关联信息
+    """
     import ipaddress as _ipaddress
     from app.persistence.room_repository import RoomRepository
     from app.persistence.customer_repository import CustomerRepository
@@ -337,11 +365,14 @@ def get_network_detail(ip_network):
     })
 
 
+
+
 @router.route("/scan/<int:room_id>", methods=["POST"])
 @doc(summary="触发全量扫描（异步）", tags=["网段"], responses={200: "ApiResponse", 400: "ApiError"})
 @login_required
 @permission_required("network:scan")
 def trigger_full_scan(room_id):
+    """触发全量扫描（异步），含重入保护"""
     from flask import current_app
     from app.services.network_scanner_service import ScanOrchestrator
     from app.services.scan_redis import ScanRedis
@@ -424,6 +455,7 @@ def trigger_full_scan(room_id):
 @doc(summary="查询扫描进度", tags=["网段"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def get_scan_status(room_id):
+    """查询扫描进度"""
     from app.services.scan_redis import ScanRedis
     try:
         from app.utils.cache import cache_manager
@@ -437,10 +469,13 @@ def get_scan_status(room_id):
     return APIResponse.success({"phase": "unknown", "detail": ""})
 
 
+
+
 @router.route("/no-auth-fallback/<int:room_id>", methods=["GET"])
 @doc(summary="查询降级映射", tags=["网段"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def get_no_auth_fallback(room_id):
+    """查询当前所有降级映射"""
     from app.services.scan_redis import ScanRedis
     try:
         from app.utils.cache import cache_manager
@@ -460,6 +495,7 @@ def get_no_auth_fallback(room_id):
 @login_required
 @permission_required("system:config")
 def rebuild_no_auth_fallback():
+    """手动触发从数据库重建 Redis 映射"""
     from app.services.scan_redis import ScanRedis
     from app.persistence.switch_ext_repository import SwitchExtRepository
     from app.persistence.switch_repo import SwitchRepository

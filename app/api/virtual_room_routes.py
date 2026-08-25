@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 """虚拟机房 API 路由"""
 from app.utils.logging import get_logger
 
@@ -20,19 +20,31 @@ virtual_room_bp = Blueprint("virtual_rooms", __name__)
 _service = VirtualRoomService(VirtualRoomRepository())
 
 
+
+
 class VirtualRoomCreateSchema(Schema):
+    """虚拟机房创建参数
+
+    device_ids 允许为空（支持"先建空壳，后续通过 /members 接口添加成员"的工作流）。
+    full_scan 对空成员有 early return（status=skipped, reason=no_switches），
+    不会产生无意义的 Redis key 和进度记录。
+    """
     name = fields.Str(required=True, validate=validate.Length(min=1, max=255))
     description = fields.Str(validate=validate.Length(max=500), load_default="")
     device_ids = fields.List(fields.Int(), load_default=[])
 
 
 class VirtualRoomUpdateSchema(Schema):
+    """虚拟机房更新参数"""
     name = fields.Str(validate=validate.Length(min=1, max=255))
     description = fields.Str(validate=validate.Length(max=500))
 
 
 class VirtualRoomMembersSchema(Schema):
+    """虚拟机房成员更新参数"""
     device_ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1))
+
+
 
 
 @virtual_room_bp.route("/", methods=["GET"])
@@ -40,6 +52,7 @@ class VirtualRoomMembersSchema(Schema):
 @login_required
 @permission_required("switch:view")
 def list_virtual_rooms():
+    """查询虚拟机房列表"""
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
     items, total = _service.get_paginated(page=page, per_page=per_page)
@@ -51,6 +64,7 @@ def list_virtual_rooms():
 @login_required
 @permission_required("switch:view")
 def get_virtual_room(virtual_room_id):
+    """查询虚拟机房详情"""
     vr = _service.get_by_id(virtual_room_id)
     if not vr:
         return APIResponse.error("虚拟机房不存在", error_code="NOT_FOUND", status_code=404)
@@ -63,6 +77,7 @@ def get_virtual_room(virtual_room_id):
 @permission_required("switch:create")
 @transactional
 def create_virtual_room():
+    """创建虚拟机房"""
     schema = VirtualRoomCreateSchema()
     data = schema.load(request.get_json())
     try:
@@ -78,6 +93,7 @@ def create_virtual_room():
 @permission_required("switch:update")
 @transactional
 def update_virtual_room(virtual_room_id):
+    """更新虚拟机房基本信息"""
     schema = VirtualRoomUpdateSchema()
     data = schema.load(request.get_json())
     try:
@@ -93,6 +109,7 @@ def update_virtual_room(virtual_room_id):
 @permission_required("switch:delete")
 @transactional
 def delete_virtual_room(virtual_room_id):
+    """删除虚拟机房"""
     try:
         _service.delete(virtual_room_id)
         return APIResponse.success(message="虚拟机房删除成功")
@@ -106,6 +123,7 @@ def delete_virtual_room(virtual_room_id):
 @permission_required("switch:update")
 @transactional
 def update_virtual_room_members(virtual_room_id):
+    """更新虚拟机房成员（全量替换）"""
     schema = VirtualRoomMembersSchema()
     data = schema.load(request.get_json())
     try:
@@ -115,11 +133,14 @@ def update_virtual_room_members(virtual_room_id):
         return APIResponse.error(str(e), error_code="UPDATE_FAILED", status_code=400)
 
 
+
+
 @virtual_room_bp.route("/<int:virtual_room_id>/scan", methods=["POST"])
 @doc(summary="触发虚拟机房扫描", tags=["虚拟机房"], responses={200: "ApiResponse", 400: "ApiError"})
 @login_required
 @permission_required("switch:config")
 def scan_virtual_room(virtual_room_id):
+    """触发虚拟机房扫描（异步）"""
     vr = _service.get_by_id(virtual_room_id)
     if not vr:
         return APIResponse.error("虚拟机房不存在", error_code="NOT_FOUND", status_code=404)
@@ -306,6 +327,7 @@ def scan_virtual_room(virtual_room_id):
 @doc(summary="查询虚拟机房扫描进度", tags=["虚拟机房"], responses={200: "ApiResponse"})
 @login_required
 def scan_virtual_room_progress(virtual_room_id):
+    """查询虚拟机房扫描进度"""
     scope = f"vr:{virtual_room_id}"
     from app.services.network_scanner_service import get_scan_progress
     progress = get_scan_progress(scope)

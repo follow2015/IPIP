@@ -16,6 +16,11 @@ from extensions import db
 
 
 class DeviceSwitchExt(db.Model):
+    """交换机扩展表（1:1 扩展 devices）
+
+    仅交换机(device_type='switch')使用。
+    device_id 为主键兼外键，与 devices 表 1:1 关联。
+    """
 
     __tablename__ = "device_switch_ext"
     __table_args__ = (
@@ -79,6 +84,7 @@ class DeviceSwitchExt(db.Model):
     )
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化"""
         return {
             "device_id": self.device_id,
             "switch_role": self.switch_role,

@@ -33,6 +33,7 @@ qr_manager = QRCodeManager()
 
 
 def _mask_openid(openid: str) -> str:
+    """脱敏 openid，仅保留前8位"""
     if not openid or len(openid) <= 8:
         return (openid or "") + "***"
     return openid[:8] + "***"
@@ -42,6 +43,19 @@ def _mask_openid(openid: str) -> str:
 @doc(summary="获取微信JS-SDK配置", tags=["认证"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def get_js_sdk_config():
+    """获取微信JS-SDK配置
+
+    用于在网页中调用微信JS-SDK功能。
+
+    Query Parameters:
+        url: 当前页面的完整URL（必需）
+
+    Returns:
+        JSON: 包含appId、timestamp、nonceStr、signature等配置
+
+    Example:
+        GET /api/wechat/js-sdk-config?url=https://example.com/page
+    """
     try:
         url = request.args.get("url")
         if not url:
@@ -64,6 +78,24 @@ def get_js_sdk_config():
 @wechat_bp.route("/miniprogram-login", methods=["POST"])
 @public(summary="微信小程序登录", tags=["认证"], responses={200: "ApiResponse", 400: "ApiError"})
 def miniprogram_login():
+    """微信小程序登录
+
+    使用微信小程序的code换取openid，然后进行用户认证。
+
+    Request Body:
+        {
+            "code": "微信小程序登录凭证"
+        }
+
+    Returns:
+        JSON: 包含token和用户信息
+
+    Example:
+        POST /api/wechat/miniprogram-login
+        {
+            "code": "0x1a2b3c4d"
+        }
+    """
     try:
         data = request.get_json()
         if not data or "code" not in data:
@@ -125,6 +157,13 @@ def miniprogram_login():
 @wechat_bp.route("/web-auth", methods=["GET"])
 @public(summary="微信网页授权登录", tags=["认证"], responses={200: "ApiResponse"})
 def web_auth():
+    """微信网页授权登录（第一步）
+
+    重定向到微信授权页面获取code。
+
+    Returns:
+        Redirect: 重定向到微信授权页面
+    """
     try:
         redirect_uri = request.url_root.rstrip("/") + "/api/wechat/web-auth-callback"
 
@@ -154,6 +193,17 @@ def web_auth():
 @wechat_bp.route("/web-auth-callback", methods=["GET"])
 @public(summary="微信网页授权回调", tags=["认证"], responses={200: "ApiResponse", 400: "ApiError"})
 def web_auth_callback():
+    """微信网页授权回调（第二步）
+
+    接收微信返回的code，换取access_token和openid，然后进行用户认证。
+
+    Query Parameters:
+        code: 微信授权码
+        state: 状态参数
+
+    Returns:
+        Redirect: 重定向到前端页面，并在URL中携带token
+    """
     try:
         code = request.args.get("code")
         state = request.args.get("state")
@@ -221,6 +271,13 @@ def web_auth_callback():
 @doc(summary="清除微信相关缓存", tags=["认证"], responses={200: "ApiResponse", 403: "ApiError"})
 @login_required
 def invalidate_cache():
+    """清除微信相关缓存
+
+    需要管理员权限。用于强制刷新access_token和jsapi_ticket。
+
+    Returns:
+        JSON: 操作结果
+    """
     try:
         if g.current_user.get("role") != "admin":
             return APIResponse.error(message="权限不足", status_code=403)
@@ -236,10 +293,29 @@ def invalidate_cache():
         return APIResponse.error(message="操作失败", status_code=500)
 
 
+
 @wechat_bp.route("/qrcode", methods=["POST"])
 @doc(summary="生成二维码", tags=["认证"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def generate_qrcode():
+    """生成二维码（任务 7.1）
+    
+    生成用于微信扫码登录的二维码。
+    
+    Returns:
+        JSON响应，包含二维码数据和场景ID
+        
+    Example Response:
+        {
+            "success": true,
+            "data": {
+                "scene_id": "1234567890123456",
+                "qr_code": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+                "expires_at": 1234567890
+            },
+            "message": "二维码生成成功"
+        }
+    """
     try:
         logger.info("收到二维码生成请求")
         
@@ -293,6 +369,30 @@ def generate_qrcode():
 @doc(summary="查询二维码状态", tags=["认证"], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
 def get_qrcode_status(scene_id: str):
+    """查询二维码状态（任务 7.2）
+    
+    查询指定场景ID的二维码状态。
+    
+    Args:
+        scene_id: 场景ID
+        
+    Returns:
+        JSON响应，包含二维码状态和相关信息
+        
+    Example Response:
+        {
+            "success": true,
+            "data": {
+                "status": "waiting",  # waiting/scanned/confirmed/expired
+                "scene_id": "1234567890123456",
+                "expires_at": 1234567890,
+                "user": {...},  # 仅在 confirmed 状态时返回
+                "access_token": "...",  # 仅在 confirmed 状态时返回
+                "refresh_token": "..."  # 仅在 confirmed 状态时返回
+            },
+            "message": "查询成功"
+        }
+    """
     try:
         logger.info("查询二维码状态: scene_id=%s", scene_id)
         
@@ -368,6 +468,30 @@ def get_qrcode_status(scene_id: str):
 @login_required
 @transactional
 def confirm_qrcode():
+    """确认二维码（任务 7.3）
+    
+    微信端扫码后调用此接口确认登录。
+    
+    Request Body:
+        {
+            "scene_id": "1234567890123456",
+            "openid": "oABC123...",
+            "action": "scan" | "confirm"  # scan=已扫码，confirm=确认登录
+        }
+        
+    Returns:
+        JSON响应，包含操作结果
+        
+    Example Response:
+        {
+            "success": true,
+            "data": {
+                "status": "confirmed",
+                "scene_id": "1234567890123456"
+            },
+            "message": "登录确认成功"
+        }
+    """
     try:
         data = request.get_json()
         
@@ -380,7 +504,7 @@ def confirm_qrcode():
         
         scene_id = data.get('scene_id')
         openid = data.get('openid')
-        action = data.get('action', 'confirm')
+        action = data.get('action', 'confirm')  # 默认为 confirm
         
         if not scene_id or not openid:
             return APIResponse.error(
@@ -488,6 +612,33 @@ def confirm_qrcode():
 @login_required
 @transactional
 def auto_confirm_qrcode():
+    """自动确认二维码（任务 7.4 - 仅测试环境）
+    
+    自动将二维码状态更新为 confirmed，用于测试环境快速测试。
+    生产环境此端点将被禁用。
+    
+    Request Body:
+        {
+            "scene_id": "1234567890123456",
+            "test_user_id": 1  # 可选，指定测试用户ID，默认使用第一个用户
+        }
+        
+    Returns:
+        JSON响应，包含操作结果和令牌
+        
+    Example Response:
+        {
+            "success": true,
+            "data": {
+                "status": "confirmed",
+                "scene_id": "1234567890123456",
+                "user": {...},
+                "access_token": "...",
+                "refresh_token": "..."
+            },
+            "message": "自动确认成功（测试环境）"
+        }
+    """
     try:
         if config.ENV not in ['development', 'testing']:
             logger.warning("尝试在生产环境使用自动确认功能: env=%s", config.ENV)

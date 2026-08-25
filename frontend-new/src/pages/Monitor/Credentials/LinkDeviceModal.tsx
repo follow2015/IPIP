@@ -11,7 +11,6 @@ import { useMessage } from '@/hooks/useMessage';
 
 const { Text } = Typography;
 
-
 interface DeviceOption {
   device_id: number;
   device_name: string;
@@ -40,7 +39,6 @@ export default function LinkDeviceModal({
   const [deviceOptions, setDeviceOptions] = useState<DeviceOption[]>([]);
   const [deviceSearchLoading, setDeviceSearchLoading] = useState(false);
 
-  
   const searchDevices = useCallback(async (keyword: string) => {
     setDeviceSearchLoading(true);
     try {
@@ -57,7 +55,6 @@ export default function LinkDeviceModal({
     }
   }, []);
 
-  
   useEffect(() => {
     if (open) {
       setLinkDeviceIds([]);
@@ -65,7 +62,6 @@ export default function LinkDeviceModal({
     }
   }, [open, searchDevices]);
 
-  
   const handleConfirmLink = async () => {
     if (linkDeviceIds.length === 0) {
       msg.warning('请选择至少一台设备');

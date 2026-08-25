@@ -8,14 +8,13 @@ import { Form, Input, Divider, Row, Col, Switch } from 'antd';
 import { parseIPAddressString, type ParsedIPEntry } from '@/utils/ip';
 
 interface NetworkInfoFieldsProps {
-  
   isNetwork: boolean;
 }
 
 export default function NetworkInfoFields({ isNetwork }: NetworkInfoFieldsProps) {
   return (
     <>
-      {}
+      {/* ── 网络信息区块 ── */}
       <Divider plain>网络信息</Divider>
       <Row gutter={16}>
         <Col span={8}>
@@ -56,7 +55,7 @@ export default function NetworkInfoFields({ isNetwork }: NetworkInfoFieldsProps)
           </Form.Item>
         </Col>
       </Row>
-      {}
+      {/* 管理权限开关（仅网络设备显示） */}
       {isNetwork && (
         <Row gutter={16}>
           <Col span={8}>

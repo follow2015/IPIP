@@ -45,13 +45,11 @@ import {
 
 const { Title, Text } = Typography;
 
-
 const SSL_MODE_MAP = {
   tls: { label: 'STARTTLS', color: 'blue' },
   ssl: { label: 'SSL', color: 'green' },
   none: { label: '无加密', color: 'default' },
 } as const;
-
 
 const PROVIDERS = [
   { label: '腾讯企业邮', server: 'smtp.exmail.qq.com', port: 465, mode: 'ssl' as const },
@@ -76,7 +74,6 @@ const MailConfigPage: React.FC = () => {
 
   const hasConfig = config && config.mail_server;
 
-  
   const initFormValues = useCallback(
     (cfg: MailConfig) => {
       const mode = cfg.mail_use_ssl ? 'ssl' : cfg.mail_use_tls ? 'tls' : 'none';
@@ -94,7 +91,6 @@ const MailConfigPage: React.FC = () => {
     [form],
   );
 
-  
   React.useEffect(() => {
     if (config) {
       initFormValues(config);
@@ -144,13 +140,11 @@ const MailConfigPage: React.FC = () => {
     }
   }, [deleteMutation, messageApi]);
 
-  
   const openTestModal = useCallback(() => {
     testForm.resetFields();
     setTestModalOpen(true);
   }, [testForm]);
 
-  
   const handleTestSend = useCallback(async () => {
     try {
       const values = await testForm.validateFields();
@@ -162,7 +156,6 @@ const MailConfigPage: React.FC = () => {
         messageApi.error(result.message);
       }
     } catch (err: unknown) {
-      
       if (err && typeof err === 'object' && 'message' in err) {
         messageApi.error((err as { message: string }).message || '测试请求失败');
       }
@@ -187,7 +180,6 @@ const MailConfigPage: React.FC = () => {
     return <Card loading style={{ maxWidth: 720 }} />;
   }
 
-  
   const testModal = (
     <Modal
       title="发送测试邮件"
@@ -220,7 +212,6 @@ const MailConfigPage: React.FC = () => {
     </Modal>
   );
 
-  
   if (hasConfig && !editing) {
     const mode = config.mail_use_ssl ? 'ssl' : config.mail_use_tls ? 'tls' : 'none';
     const modeInfo = SSL_MODE_MAP[mode];
@@ -291,7 +282,6 @@ const MailConfigPage: React.FC = () => {
     );
   }
 
-  
   return (
     <>
       {contextHolder}
@@ -324,7 +314,7 @@ const MailConfigPage: React.FC = () => {
           layout="vertical"
           onFinish={handleSave}
         >
-          {}
+          {/* ─── 服务器连接 ──────────────────────────────────────── */}
           <Title level={5} style={{ marginBottom: 16 }}>服务器连接</Title>
 
           <Form.Item
@@ -384,7 +374,7 @@ const MailConfigPage: React.FC = () => {
 
           <Divider />
 
-          {}
+          {/* ─── 认证信息 ──────────────────────────────────────── */}
           <Title level={5} style={{ marginBottom: 16 }}>
             <LockOutlined style={{ marginRight: 8 }} />
             认证信息
@@ -426,7 +416,7 @@ const MailConfigPage: React.FC = () => {
 
           <Divider />
 
-          {}
+          {/* ─── 常见服务商快捷配置 ──────────────────────────────── */}
           <Title level={5} style={{ marginBottom: 16 }}>
             <SafetyCertificateOutlined style={{ marginRight: 8 }} />
             常见服务商快捷配置

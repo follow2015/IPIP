@@ -49,7 +49,7 @@ const ChassisConfigPanel: React.FC<ChassisConfigPanelProps> = ({ form }) => {
       >
         <Checkbox>创建时自动按行×列规格生成所有子节点</Checkbox>
       </Form.Item>
-      {}
+      {/* 勾选生成子节点后，显示硬件配置和网卡配置 */}
       {autoCreate !== false && (
         <>
           <HardwareConfigFields form={form} />

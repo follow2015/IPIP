@@ -30,7 +30,6 @@ interface BasicInfoFieldsProps {
   onGenerateName: () => void;
 }
 
-
 export default function BasicInfoFields({
   typeOptions,
   subtypeOptions,
@@ -45,24 +44,19 @@ export default function BasicInfoFields({
   showNodeAssoc,
   onGenerateName
 }: BasicInfoFieldsProps) {
-  
   const { data: vendorBrands } = useVendorBrands();
   const formInstance = Form.useFormInstance();
   const watchDeviceType = Form.useWatch('device_type', formInstance) ?? '';
   const watchBrand = Form.useWatch('brand', formInstance) as string | undefined;
-  
-  
   const vendorOptions: { key: string | number; label: string; value: string }[] = (
     vendorBrands?.items ?? []
   )
     .filter((v) => v.enabled && (!watchDeviceType || v.device_type === watchDeviceType))
     .map((v) => ({ key: v.id, label: v.label, value: v.enterprise_no }));
-  
   if (watchBrand && !vendorOptions.some((o) => o.value === watchBrand)) {
     vendorOptions.push({ key: `__fallback__${watchBrand}`, label: watchBrand, value: watchBrand });
   }
 
-  
   const { data: groups, isLoading: groupsLoading } = useMetricTemplateGroups();
   const templateGroupOptions = (groups ?? [])
     .filter((g) => !watchDeviceType || g.device_type === watchDeviceType)
@@ -71,7 +65,7 @@ export default function BasicInfoFields({
 
   return (
     <>
-      {}
+      {/* ── 设备基本信息 ── */}
       <Row gutter={16}>
         <Col span={16}>
           <Form.Item
@@ -124,7 +118,6 @@ export default function BasicInfoFields({
               allowClear
               showSearch
               optionFilterProp="label"
-              
               fieldNames={{ label: 'label', value: 'value' }}
             />
           </Form.Item>
@@ -212,7 +205,7 @@ export default function BasicInfoFields({
         </Col>
       </Row>
 
-      {}
+      {/* ── 节点关联区块（子节点特有） ── */}
       {showNodeAssoc && (
         <>
           <Divider plain>节点关联</Divider>

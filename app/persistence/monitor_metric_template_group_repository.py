@@ -21,6 +21,7 @@ from app.models.monitor_metric_template_group import (
 
 
 class MonitorMetricTemplateGroupRepository:
+    """指标模板组仓库"""
 
     def __init__(self, session=None):
         self.session = session or db.session
@@ -43,6 +44,11 @@ class MonitorMetricTemplateGroupRepository:
     def find_enabled_by_device_type(
         self, device_type: str, source: str, vendor: Optional[str] = None
     ) -> List[MonitorMetricTemplateGroup]:
+        """返回某设备类型 + 来源（可选厂商）下启用的组（按 display_order 排序）。
+
+        设备自动匹配时：若设备有品牌，优先匹配 vendor 一致的组；vendor 为空的
+        通用组始终可匹配（KISS：组 vendor 可空表示不约束厂商）。
+        """
         q = self.session.query(MonitorMetricTemplateGroup).filter(
             MonitorMetricTemplateGroup.device_type == device_type,
             MonitorMetricTemplateGroup.source == source,
@@ -94,6 +100,7 @@ class MonitorMetricTemplateGroupRepository:
         )
 
     def list_templates_in_group(self, group_id: int) -> List[MonitorMetricTemplate]:
+        """返回组内全部模板（按 id 排序）。"""
         items = self.list_items(group_id)
         ids = [it.template_id for it in items]
         if not ids:

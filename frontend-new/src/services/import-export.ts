@@ -6,13 +6,10 @@ import { useMutation } from '@tanstack/react-query';
 import { ImportExportType, DeviceType } from '@/types/enums';
 import apiClient from './api-client';
 
-
 export interface DownloadTemplateParams {
   type: ImportExportType;
-  
   deviceTemplateType?: DeviceType;
 }
-
 
 async function downloadTemplate(params: DownloadTemplateParams) {
   const templatePaths: Record<ImportExportType, string> = {
@@ -29,7 +26,6 @@ async function downloadTemplate(params: DownloadTemplateParams) {
   return res;
 }
 
-
 async function importData(type: ImportExportType, file: File) {
   const importPaths: Record<ImportExportType, string> = {
     [ImportExportType.DEVICE]: '/devices/batch-import',
@@ -45,7 +41,6 @@ async function importData(type: ImportExportType, file: File) {
   return res;
 }
 
-
 async function exportData(type: ImportExportType, params?: Record<string, unknown>) {
   const exportPaths: Record<ImportExportType, string> = {
     [ImportExportType.DEVICE]: '/devices/export',
@@ -57,18 +52,15 @@ async function exportData(type: ImportExportType, params?: Record<string, unknow
   return res;
 }
 
-
 export function useDownloadTemplate() {
   return useMutation({ mutationFn: downloadTemplate });
 }
-
 
 export function useImportData() {
   return useMutation({
     mutationFn: ({ type, file }: { type: ImportExportType; file: File }) => importData(type, file)
   });
 }
-
 
 export function useExportData() {
   return useMutation({

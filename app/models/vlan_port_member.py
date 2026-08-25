@@ -7,6 +7,7 @@ from extensions import db
 
 
 class VLANPortMember(BaseModel):
+    """VLAN 成员端口关联表 — vlan_port_members"""
     __tablename__ = "vlan_port_members"
     __table_args__ = (
         UniqueConstraint("vlan_id", "port_id", name="uk_vpm_vlan_port"),
@@ -37,6 +38,7 @@ class VLANPortMember(BaseModel):
     port = relationship("NetworkPort", foreign_keys=[port_id])
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化VLAN端口成员关联"""
         result = super().to_dict(exclude=exclude)
         result["port_name"] = self.port.port_name if self.port else None
         return result

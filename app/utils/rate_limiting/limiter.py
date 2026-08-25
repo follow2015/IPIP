@@ -22,10 +22,23 @@ config = get_config()
 
 
 class UnifiedRateLimiter(RateLimiter):
+    """统一频率限制器
+    
+    整合了原有的两个频率限制器的功能，提供统一的接口。
+    支持多种存储后端和限制策略。
+    """
     
     def __init__(self, storage: Optional[RateLimitStorage] = None,
                  strategy: Optional[RateLimitStrategy] = None,
                  fail_close: bool = True):
+        """初始化统一频率限制器
+
+        Args:
+            storage: 存储后端，如果为None则自动选择
+            strategy: 限制策略，如果为None则使用滑动窗口策略
+            fail_close: 异常时是否拒绝请求（True=安全优先，False=可用性优先）
+                默认 True：Redis 不可用时拒绝请求，防止暴力破解绕过限流
+        """
         self.enabled = getattr(config, 'RATELIMIT_ENABLED', True)
         self.fail_close = fail_close
         
@@ -41,6 +54,13 @@ class UnifiedRateLimiter(RateLimiter):
                    f"strategy={strategy.get_strategy_name()}, enabled={self.enabled}")
     
     def _create_default_storage(self) -> RateLimitStorage:
+        """创建默认存储后端
+        
+        优先使用Redis，如果不可用则降级到内存存储。
+        
+        Returns:
+            RateLimitStorage: 存储后端实例
+        """
         try:
             redis_storage = RedisRateLimitStorage()
             redis_storage.redis_client.ping()
@@ -51,6 +71,16 @@ class UnifiedRateLimiter(RateLimiter):
             return MemoryRateLimitStorage()
     
     def is_allowed(self, key: str, limit: int, window: int) -> Tuple[bool, Dict[str, Any]]:
+        """检查请求是否被允许
+        
+        Args:
+            key: 限制键（通常是IP地址或用户标识）
+            limit: 时间窗口内允许的最大请求数
+            window: 时间窗口大小（秒）
+            
+        Returns:
+            Tuple[bool, Dict[str, Any]]: (是否允许, 限制信息)
+        """
         if not self.enabled:
             return True, {
                 'allowed': True,
@@ -95,6 +125,14 @@ class UnifiedRateLimiter(RateLimiter):
             }
     
     def reset(self, key: str) -> bool:
+        """重置指定键的限制
+        
+        Args:
+            key: 限制键
+            
+        Returns:
+            bool: 重置成功返回True
+        """
         try:
             return self.storage.reset_limit(key)
         except Exception as e:
@@ -102,6 +140,16 @@ class UnifiedRateLimiter(RateLimiter):
             return False
     
     def get_limit_info(self, key: str, limit: int, window: int) -> Dict[str, Any]:
+        """获取限制信息
+        
+        Args:
+            key: 限制键
+            limit: 限制数量
+            window: 时间窗口
+            
+        Returns:
+            Dict[str, Any]: 限制信息
+        """
         try:
             current_count = self.storage.get_current_count(key)
             remaining = self.storage.get_remaining_count(key, limit)
@@ -132,12 +180,20 @@ class UnifiedRateLimiter(RateLimiter):
             }
     
     def parse_limit_string(self, limit_string: str) -> Tuple[int, int]:
+        """解析限制字符串
+        
+        Args:
+            limit_string: 限制字符串，如 "100 per minute"
+            
+        Returns:
+            Tuple[int, int]: (请求数量, 时间窗口秒数)
+        """
         patterns = [
             r'(\d+)\s+per\s+(second|minute|hour|day)',
-            r'(\d+)/(\d+)s',
-            r'(\d+)/(\d+)m',
-            r'(\d+)/(\d+)h',
-            r'(\d+)/(\d+)d',
+            r'(\d+)/(\d+)s',  # 100/60s
+            r'(\d+)/(\d+)m',  # 100/1m  
+            r'(\d+)/(\d+)h',  # 100/1h
+            r'(\d+)/(\d+)d',  # 100/1d
         ]
         
         limit_string = limit_string.lower().strip()
@@ -174,6 +230,14 @@ class UnifiedRateLimiter(RateLimiter):
         raise ValueError(f"无效的限制字符串格式: {limit_string}")
     
     def get_client_identifier(self, request_context: Any = None) -> str:
+        """获取客户端标识符
+        
+        Args:
+            request_context: 请求上下文
+            
+        Returns:
+            str: 客户端标识符
+        """
         if hasattr(g, 'current_user') and g.current_user:
             user_id = g.current_user.get('user_id')
             if user_id:
@@ -205,6 +269,16 @@ class UnifiedRateLimiter(RateLimiter):
     def limit_decorator(self, limit_string: str, 
                        key_func: Optional[Callable] = None,
                        error_handler: Optional[Callable] = None):
+        """频率限制装饰器
+        
+        Args:
+            limit_string: 限制字符串
+            key_func: 自定义键生成函数
+            error_handler: 自定义错误处理函数
+            
+        Returns:
+            装饰器函数
+        """
         def decorator(f):
             @wraps(f)
             def decorated_function(*args, **kwargs):
@@ -251,6 +325,16 @@ class UnifiedRateLimiter(RateLimiter):
     
     def is_rate_limited(self, key: str, max_attempts: int = 5, 
                        window_seconds: int = 300) -> Tuple[bool, Optional[int]]:
+        """检查是否触发频率限制（兼容原rate_limiter.py的API）
+        
+        Args:
+            key: 限制键
+            max_attempts: 最大尝试次数
+            window_seconds: 时间窗口（秒）
+            
+        Returns:
+            Tuple[bool, Optional[int]]: (是否触发限制, 剩余等待时间)
+        """
         allowed, limit_info = self.is_allowed(key, max_attempts, window_seconds)
         
         if allowed:
@@ -259,13 +343,47 @@ class UnifiedRateLimiter(RateLimiter):
             return True, limit_info.get('retry_after', window_seconds)
     
     def reset_limit(self, key: str) -> bool:
+        """重置频率限制计数（兼容原rate_limiter.py的API）
+        
+        Args:
+            key: 限制键
+            
+        Returns:
+            bool: 操作是否成功
+        """
         return self.reset(key)
     
     def get_remaining_attempts(self, key: str, max_attempts: int = 5) -> int:
+        """获取剩余尝试次数（兼容原rate_limiter.py的API）
+        
+        Args:
+            key: 限制键
+            max_attempts: 最大尝试次数
+            
+        Returns:
+            int: 剩余尝试次数
+        """
         return self.storage.get_remaining_count(key, max_attempts)
     
     def get_reset_time(self, key: str) -> Optional[int]:
+        """获取限制重置时间（兼容原rate_limiter.py的API）
+        
+        Args:
+            key: 限制键
+            
+        Returns:
+            Optional[int]: 重置时间的Unix时间戳
+        """
         return self.storage.get_reset_time(key)
     
     def limit(self, limit_string: str, key_func: Optional[Callable] = None):
+        """频率限制装饰器（兼容原rate_limit.py的API）
+        
+        Args:
+            limit_string: 限制字符串
+            key_func: 自定义键生成函数
+            
+        Returns:
+            装饰器函数
+        """
         return self.limit_decorator(limit_string, key_func)

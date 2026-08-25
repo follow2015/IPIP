@@ -8,10 +8,14 @@ from extensions import db
 
 
 class DeviceConfigBackup(db.Model):
+    """设备配置备份
+
+    只追加备份表，不继承 BaseModel（无 updated_at 字段）。
+    """
     __tablename__ = "device_config_backups"
     __table_args__ = (
         Index("idx_config_device", "device_id"),
-        Index("idx_config_device_time", "device_id", "created_at"),
+        Index("idx_config_device_time", "device_id", "created_at"),  # 按设备查备份历史+时间排序
         Index("idx_config_hash", "config_hash"),
         Index("idx_config_created", "created_at"),
         {"comment": "设备配置备份"},
@@ -29,6 +33,7 @@ class DeviceConfigBackup(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.now(), comment="创建时间")
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化"""
         return {
             'id': self.id,
             'device_id': self.device_id,
@@ -41,6 +46,10 @@ class DeviceConfigBackup(db.Model):
 
 
 class DeviceConfigChange(db.Model):
+    """设备配置变更审批
+
+    不继承 BaseModel（自定义 id/created_at/updated_at）。
+    """
     __tablename__ = "device_config_changes"
     __table_args__ = (
         Index("idx_change_device", "device_id"),
@@ -65,6 +74,7 @@ class DeviceConfigChange(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, server_default=func.now(), onupdate=func.now(), comment="更新时间")
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化"""
         return {
             'id': self.id,
             'device_id': self.device_id,

@@ -20,6 +20,10 @@ logger = get_logger(__name__)
 
 
 class QueryMonitor:
+    """查询监控器
+    
+    监控SQL查询的执行情况，检测N+1查询问题。
+    """
     
     def __init__(self):
         self.queries: List[Dict[str, Any]] = []
@@ -28,10 +32,18 @@ class QueryMonitor:
         self.n_plus_1_patterns: Set[str] = set()
         self._lock = threading.Lock()
         self.enabled = True
-        self.slow_query_threshold = 0.1
+        self.slow_query_threshold = 0.1  # 100ms
         
     def record_query(self, statement: str, parameters: Any, duration: float, 
                     context: Optional[str] = None):
+        """记录查询执行信息
+        
+        Args:
+            statement: SQL语句
+            parameters: 查询参数
+            duration: 执行时间（秒）
+            context: 执行上下文
+        """
         if not self.enabled:
             return
             
@@ -56,6 +68,7 @@ class QueryMonitor:
             self._detect_n_plus_1(normalized_query)
     
     def _normalize_query(self, statement: str) -> str:
+        """标准化查询语句，移除参数值"""
         import re
         normalized = re.sub(r'\b\d+\b', '?', statement)
         normalized = re.sub(r"'[^']*'", '?', normalized)
@@ -63,12 +76,14 @@ class QueryMonitor:
         return normalized.strip()
     
     def _detect_n_plus_1(self, normalized_query: str):
+        """检测N+1查询模式"""
         if self.query_counts[normalized_query] > 5:
             if normalized_query not in self.n_plus_1_patterns:
                 self.n_plus_1_patterns.add(normalized_query)
                 logger.warning(f"可能的N+1查询: {normalized_query}")
     
     def get_statistics(self) -> Dict[str, Any]:
+        """获取查询统计信息"""
         with self._lock:
             total_queries = len(self.queries)
             total_time = sum(q['duration'] for q in self.queries)
@@ -87,11 +102,12 @@ class QueryMonitor:
                 'slow_queries_count': len(self.slow_queries),
                 'n_plus_1_patterns_count': len(self.n_plus_1_patterns),
                 'frequent_queries': frequent_queries,
-                'slow_queries': self.slow_queries[-10:],
+                'slow_queries': self.slow_queries[-10:],  # 最近10个慢查询
                 'n_plus_1_patterns': list(self.n_plus_1_patterns)
             }
     
     def reset(self):
+        """重置监控数据"""
         with self._lock:
             self.queries.clear()
             self.query_counts.clear()
@@ -99,9 +115,11 @@ class QueryMonitor:
             self.n_plus_1_patterns.clear()
     
     def enable(self):
+        """启用监控"""
         self.enabled = True
     
     def disable(self):
+        """禁用监控"""
         self.enabled = False
 
 
@@ -109,9 +127,25 @@ query_monitor = QueryMonitor()
 
 
 class QueryOptimizer:
+    """查询优化器
+    
+    提供查询优化建议和自动优化功能。
+    """
     
     @staticmethod
     def optimize_pagination_query(query: Query, page: int, page_size: int) -> Tuple[List[Any], int]:
+        """优化分页查询
+        
+        使用窗口函数或子查询优化分页性能。
+        
+        Args:
+            query: SQLAlchemy查询对象
+            page: 页码
+            page_size: 每页大小
+            
+        Returns:
+            Tuple[List[Any], int]: (数据列表, 总数)
+        """
         offset = (page - 1) * page_size
         
         count_query = query.statement.with_only_columns([query.statement.c.id]).alias()
@@ -125,6 +159,15 @@ class QueryOptimizer:
     
     @staticmethod
     def add_eager_loading(query: Query, relationships: List[str]) -> Query:
+        """为查询添加预加载关系
+        
+        Args:
+            query: SQLAlchemy查询对象
+            relationships: 要预加载的关系列表
+            
+        Returns:
+            Query: 优化后的查询对象
+        """
         from sqlalchemy.orm import joinedload, selectinload
         
         for relationship in relationships:
@@ -137,6 +180,18 @@ class QueryOptimizer:
     
     @staticmethod
     def optimize_exists_query(session: Session, model_class: Any, filters: Dict[str, Any]) -> bool:
+        """优化存在性查询
+        
+        使用EXISTS而不是COUNT来检查记录是否存在。
+        
+        Args:
+            session: 数据库会话
+            model_class: 模型类
+            filters: 过滤条件
+            
+        Returns:
+            bool: 记录是否存在
+        """
         query = session.query(model_class)
         
         for key, value in filters.items():
@@ -148,6 +203,16 @@ class QueryOptimizer:
     @staticmethod
     def batch_load_relationships(session: Session, entities: List[Any], 
                                 relationship_name: str) -> Dict[Any, List[Any]]:
+        """批量加载关系数据，避免N+1查询
+        
+        Args:
+            session: 数据库会话
+            entities: 实体列表
+            relationship_name: 关系名称
+            
+        Returns:
+            Dict: 实体ID到关系数据的映射
+        """
         if not entities:
             return {}
         
@@ -170,6 +235,7 @@ class QueryOptimizer:
 
 
 def monitor_query_performance(func):
+    """查询性能监控装饰器"""
     @wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
@@ -196,6 +262,7 @@ def monitor_query_performance(func):
 
 @contextmanager
 def query_performance_context(context_name: str):
+    """查询性能监控上下文管理器"""
     start_time = time.time()
     
     try:
@@ -211,6 +278,11 @@ def query_performance_context(context_name: str):
 
 
 def setup_sqlalchemy_monitoring(engine: Engine):
+    """设置SQLAlchemy查询监控
+    
+    Args:
+        engine: SQLAlchemy引擎
+    """
     @event.listens_for(engine, "before_cursor_execute")
     def receive_before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         context._query_start_time = time.time()
@@ -228,9 +300,22 @@ def setup_sqlalchemy_monitoring(engine: Engine):
 
 
 class QueryAnalyzer:
+    """查询分析器
+    
+    分析查询模式并提供优化建议。
+    """
     
     @staticmethod
     def analyze_n_plus_1_risk(model_class: Any, relationships: List[str]) -> Dict[str, Any]:
+        """分析N+1查询风险
+        
+        Args:
+            model_class: 模型类
+            relationships: 关系列表
+            
+        Returns:
+            Dict: 分析结果
+        """
         risks = []
         recommendations = []
         
@@ -257,6 +342,15 @@ class QueryAnalyzer:
     
     @staticmethod
     def suggest_indexes(model_class: Any, frequent_filters: List[str]) -> List[str]:
+        """建议索引
+        
+        Args:
+            model_class: 模型类
+            frequent_filters: 常用过滤字段
+            
+        Returns:
+            List[str]: 索引建议
+        """
         suggestions = []
         
         for field in frequent_filters:

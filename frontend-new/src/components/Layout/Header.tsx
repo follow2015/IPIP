@@ -28,12 +28,10 @@ interface HeaderProps {
 
 const { Header: AntHeader } = Layout;
 
-
 function Header({ sidebarCollapsed, onToggleSidebar, theme: themeMode, onToggleTheme, user, onLogout }: HeaderProps) {
   const { token } = theme.useToken();
   const navigate = useNavigate();
 
-  
   const userMenuItems = [
     {
       key: 'profile',

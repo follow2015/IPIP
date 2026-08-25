@@ -51,6 +51,7 @@ def _row_to_dict(r: DeviceMonitorProbeEvents) -> Dict[str, Any]:
 
 
 class MonitorTimeseriesRepository(SQLAlchemyRepository):
+    """设备监控时序仓储（events 明细 + hourly 预聚合 + 分区/归档管理）"""
 
     def __init__(self, session=None):
         super().__init__(DeviceMonitorProbeEvents, session)
@@ -69,6 +70,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         extra: Optional[dict],
         probed_at,
     ) -> DeviceMonitorProbeEvents:
+        """写入一行探测历史（由调用方事务提交）。"""
         row = DeviceMonitorProbeEvents(
             device_id=device_id,
             protocol=protocol,
@@ -93,6 +95,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         protocol: Optional[str] = None,
         limit: int = 500,
     ) -> List[Dict[str, Any]]:
+        """返回时间升序的探测历史明细（已序列化为 dict）。"""
         q = self.session.query(DeviceMonitorProbeEvents).filter(
             DeviceMonitorProbeEvents.device_id == device_id
         )
@@ -117,6 +120,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         to_: Optional[Any] = None,
         protocol: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """聚合统计（供趋势卡片）：总数 / 可达 / 不可达 / uptime% / 延迟统计 / 不可达周期数。"""
         M = DeviceMonitorProbeEvents
         q = self.session.query(M).filter(M.device_id == device_id)
         if protocol:
@@ -184,6 +188,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         to_: Optional[Any] = None,
         protocol: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """从预聚合表聚合（事件分区表已清理的 >90 天窗口）；down_episodes/p95 为近似值。"""
         H = DeviceMonitorTimeseriesHourly
         q = self.session.query(H).filter(H.device_id == device_id)
         if from_ is not None:
@@ -229,6 +234,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         return bind is not None and bind.dialect.name == "mysql"
 
     def _list_event_partitions(self) -> List[Tuple[str, Optional[date]]]:
+        """返回 [(partition_name, upper_bound_date), ...]；upper_bound_date 为 None 表示兜底分区。"""
         rows = self.session.execute(
             text(
                 "SELECT PARTITION_NAME, PARTITION_DESCRIPTION "
@@ -249,6 +255,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         return result
 
     def downsample_to_hourly(self, cutoff_days: int = DOWNSAMPLE_CUTOFF_DAYS) -> int:
+        """将 >cutoff_days 天的事件数据按小时聚合写入预聚合表（幂等 upsert）。仅 MySQL。"""
         if not self._is_mysql():
             return 0
         cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=cutoff_days)
@@ -309,6 +316,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
     def drop_expired_event_partitions(
         self, retention_days: int = EVENT_RETENTION_DAYS
     ) -> List[str]:
+        """DROP 超过 retention_days 天的事件分区（瞬间完成，无逐行删除开销）。仅 MySQL。"""
         if not self._is_mysql():
             return []
         cutoff = date.today() - timedelta(days=retention_days)
@@ -332,6 +340,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
     def add_future_event_partitions(
         self, future_days: int = PARTITION_FUTURE_DAYS
     ) -> List[str]:
+        """预创建未来 future_days 天的事件分区（幂等）。仅 MySQL。"""
         if not self._is_mysql():
             return []
         existing = {n for n, _ in self._list_event_partitions()}
@@ -359,6 +368,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         return added
 
     def cleanup_hourly(self, retention_days: int = HOURLY_RETENTION_DAYS) -> int:
+        """清理预聚合表中 >retention_days 天的数据（跨方言；SQLite 测试亦可安全执行）。"""
         cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=retention_days)
         deleted = (
             self.session.query(DeviceMonitorTimeseriesHourly)
@@ -370,6 +380,11 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
 
 
     def downsample_to_daily(self, cutoff_days: int = DAILY_DOWNSAMPLE_CUTOFF_DAYS) -> int:
+        """将 >cutoff_days 天的 hourly 数据按天聚合写入 daily 表（幂等 upsert）。仅 MySQL。
+
+        reachable：当天 24 个小时桶的 avg/min/max（小时可达占比的统计）。
+        latency_ms：当天所有小时桶的 avg/min/max。
+        """
         if not self._is_mysql():
             return 0
         cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=cutoff_days)
@@ -403,6 +418,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         return 0
 
     def cleanup_daily(self, retention_days: int = DAILY_RETENTION_DAYS) -> int:
+        """清理 daily 表中 >retention_days 天的数据（跨方言）。"""
         cutoff = date.today() - timedelta(days=retention_days)
         deleted = (
             self.session.query(DeviceMonitorTimeseriesDaily)

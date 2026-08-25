@@ -41,51 +41,40 @@ export interface SelectOption {
   value: string | number;
 }
 
-
 export interface CrudConfig<T, TCreate extends object, TUpdate extends { id: number }> {
-  
   basePath: string;
-  
   queryKey: readonly unknown[];
-  
   createPath?: string;
-  
   getId?: (data: TUpdate) => number;
-  
   toUpdatePayload?: (data: TUpdate) => object;
-  
   optionsConfig?: {
-    
     path?: string;
-    
     paginated?: boolean;
-    
     labelKey?: keyof T;
-    
     valueKey?: keyof T;
   };
 }
 
-
+/**
+ * CRUD 工厂产出
+ *
+ * @typeParam T       - 实体模型
+ * @typeParam TCreate - 创建请求体
+ * @typeParam TUpdate - 更新请求体（必须含 id）
+ * @typeParam TParams - useList 支持的查询参数（默认 PaginationParams，可扩展为资源专属参数类型）
+ */
 export interface CrudHooks<
   T,
   TCreate extends object,
   TUpdate extends { id: number },
   TParams extends PaginationParams = PaginationParams,
 > {
-  
   useList: (params?: TParams) => UseQueryResult<PaginatedData<T>, Error>;
-  
   useDetail: (id: number, options?: { enabled?: boolean }) => UseQueryResult<T, Error>;
-  
   useSuspenseDetail: (id: number) => UseSuspenseQueryResult<T, Error>;
-  
   useCreate: () => UseMutationResult<ApiResponse<T>, Error, TCreate, unknown>;
-  
   useUpdate: () => UseMutationResult<ApiResponse<T>, Error, TUpdate, unknown>;
-  
   useDelete: () => UseMutationResult<ApiResponse<void>, Error, number, unknown>;
-  
   useOptions: () => UseQueryResult<SelectOption[], Error>;
 }
 
@@ -94,13 +83,29 @@ function defaultGetId<T extends { id: number }>(data: T): number {
   return data.id;
 }
 
-
 function defaultToUpdatePayload<T extends { id: number }>(data: T): object {
   const { id, ...rest } = data;
   return rest;
 }
 
 
+/**
+ * 创建标准 CRUD Hooks
+ *
+ * @param config - 声明式配置，描述资源的 API 路径和 Query Key
+ * @returns 全套 CRUD Hooks（useList / useDetail / useCreate / useUpdate / useDelete / useOptions）
+ *
+ * @example 基础用法（TParams 默认为 PaginationParams）
+ * ```ts
+ * const roomHooks = createCrudHooks<Room, CreateRoomRequest, UpdateRoomRequest>({ ... });
+ * ```
+ *
+ * @example 扩展查询参数（传入资源专属 QueryParams 类型）
+ * ```ts
+ * const deviceHooks = createCrudHooks<Device, CreateDeviceRequest, UpdateDeviceRequest, DeviceQueryParams>({ ... });
+ * // useDeviceList 现在可以接收 search / room_id / status 等过滤字段
+ * ```
+ */
 export function createCrudHooks<
   T extends object,
   TCreate extends object,
@@ -116,7 +121,6 @@ export function createCrudHooks<
     optionsConfig,
   } = config;
 
-  
   function useList(params?: TParams) {
     return useQuery({
       queryKey: [...queryKey, 'list', params],
@@ -127,7 +131,6 @@ export function createCrudHooks<
     });
   }
 
-  
   function useDetail(id: number, options?: { enabled?: boolean }) {
     return useQuery({
       queryKey: [...queryKey, id],
@@ -139,7 +142,6 @@ export function createCrudHooks<
     });
   }
 
-  
   function useSuspenseDetail(id: number) {
     return useSuspenseQuery({
       queryKey: [...queryKey, id],
@@ -150,7 +152,6 @@ export function createCrudHooks<
     });
   }
 
-  
   function useCreate() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -161,7 +162,6 @@ export function createCrudHooks<
     });
   }
 
-  
   function useUpdate() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -176,7 +176,6 @@ export function createCrudHooks<
     });
   }
 
-  
   function useDelete() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -187,7 +186,6 @@ export function createCrudHooks<
     });
   }
 
-  
   function useOptions() {
     const optPath = optionsConfig?.path ?? `${basePath}/all`;
     const paginated = optionsConfig?.paginated ?? false;

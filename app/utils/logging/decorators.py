@@ -12,6 +12,7 @@ from app.utils.logging.manager import get_logger
 
 
 def _get_current_user_id():
+    """延迟导入避免循环依赖: auth → logging → decorators → auth"""
     from app.utils.auth import get_current_user_id
     return get_current_user_id()
 
@@ -23,6 +24,18 @@ def log_function_call(
     log_execution_time: bool = True,
     level: str = 'INFO'
 ) -> Callable:
+    """记录函数调用的装饰器
+    
+    Args:
+        logger_name: 日志记录器名称
+        log_args: 是否记录函数参数
+        log_result: 是否记录函数返回值
+        log_execution_time: 是否记录执行时间
+        level: 日志级别
+        
+    Returns:
+        装饰器函数
+    """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -92,6 +105,15 @@ def log_database_operation(
     operation_type: str,
     logger_name: Optional[str] = None
 ) -> Callable:
+    """记录数据库操作的装饰器
+    
+    Args:
+        operation_type: 操作类型 (CREATE, READ, UPDATE, DELETE)
+        logger_name: 日志记录器名称
+        
+    Returns:
+        装饰器函数
+    """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -136,6 +158,15 @@ def log_cache_operation(
     operation_type: str,
     logger_name: Optional[str] = None
 ) -> Callable:
+    """记录缓存操作的装饰器
+    
+    Args:
+        operation_type: 操作类型 (GET, SET, DELETE)
+        logger_name: 日志记录器名称
+        
+    Returns:
+        装饰器函数
+    """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -185,6 +216,17 @@ def log_api_endpoint(
     log_request_data: bool = False,
     log_response_data: bool = False
 ) -> Callable:
+    """记录API端点调用的装饰器
+    
+    Args:
+        endpoint_name: 端点名称
+        logger_name: 日志记录器名称
+        log_request_data: 是否记录请求数据
+        log_response_data: 是否记录响应数据
+        
+    Returns:
+        装饰器函数
+    """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -254,6 +296,15 @@ def log_authentication_attempt(
     auth_type: str = 'login',
     logger_name: Optional[str] = None
 ) -> Callable:
+    """记录认证尝试的装饰器
+    
+    Args:
+        auth_type: 认证类型
+        logger_name: 日志记录器名称
+        
+    Returns:
+        装饰器函数
+    """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -318,6 +369,16 @@ def log_security_event(
     severity: str = 'medium',
     logger_name: Optional[str] = None
 ) -> Callable:
+    """记录安全事件的装饰器
+    
+    Args:
+        event_type: 事件类型
+        severity: 严重程度 (low, medium, high, critical)
+        logger_name: 日志记录器名称
+        
+    Returns:
+        装饰器函数
+    """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -373,6 +434,15 @@ def log_performance_critical(
     threshold_seconds: float = 1.0,
     logger_name: Optional[str] = None
 ) -> Callable:
+    """记录性能关键操作的装饰器
+    
+    Args:
+        threshold_seconds: 性能阈值（秒）
+        logger_name: 日志记录器名称
+        
+    Returns:
+        装饰器函数
+    """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):

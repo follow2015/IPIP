@@ -17,48 +17,62 @@ from typing import List
 
 
 class IPStatus(IntEnum):
-    ACTIVE = 0
-    INACTIVE = 1
-    BANNED = 2
-    UNUSED = 3
-    PENDING_BAN = 4
-    PENDING_UNBAN = 5
+    """IP地址状态枚举"""
+    ACTIVE = 0        # 活跃(在线)
+    INACTIVE = 1      # 非活跃(离线)
+    BANNED = 2        # 封禁(黑洞路由/静态ARP已生效)
+    UNUSED = 3        # 未使用
+    PENDING_BAN = 4   # 封禁中(SSH执行前/中，等待交换机确认)
+    PENDING_UNBAN = 5 # 解封中(SSH执行前/中，等待交换机确认)
 
 
 class UserStatus(IntEnum):
-    ACTIVE = 0
-    INACTIVE = 1
+    """用户状态枚举"""
+    ACTIVE = 0     # 活跃
+    INACTIVE = 1   # 禁用
 
 
 class RouteNotes(IntEnum):
-    DEFAULT = 0
-    INTERCONNECT = 1
-    SUBNET = 2
-    NETWORK = 3
-    BLACKHOLE = 4
-    GATEWAY = 5
-    NEXTHOP = 6
+    """路由类型枚举"""
+    DEFAULT = 0          # 默认路由
+    INTERCONNECT = 1     # 互联地址(/30, /31, /32直连)
+    SUBNET = 2           # 子网路由
+    NETWORK = 3          # 网络路由
+    BLACKHOLE = 4        # 黑洞路由(封禁IP对应此类型)
+    GATEWAY = 5          # 网关地址
+    NEXTHOP = 6          # 主机路由(下一跳)
 
 
 class SwitchStatus(IntEnum):
-    CORE = 0
-    ACCESS = 1
+    """交换机角色枚举（前端称 SWITCH_ROLE_MAP）"""
+    CORE = 0     # 核心交换机
+    ACCESS = 1   # 接入交换机
 
 TOMBSTONE = "__tombstone__"
 
 
 class SeverityLevel(str, Enum):
+    """通知严重级别枚举（字符串值，仅后端使用，不生成前端映射）
+
+    仅包含 notification.severity 字段实际存储的三个级别。
+    告警源（CacheAlert / RateLimit）的 severity（low/medium/high/critical）
+    由 ops_alert_bridge.SEVERITY_MAP 映射到本枚举后再传入通知链路。
+    """
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
 
 
 class ChannelType(str, Enum):
-    INBOX = "inbox"
-    EMAIL = "email"
-    WECHAT_WORK = "wechat_work"
-    FEISHU = "feishu"
-    CUSTOM = "custom"
+    """通知渠道枚举（字符串值，前后端共用，不生成前端映射）
+
+    统一 notification_service / webhook / ops_alert_bridge 中的渠道标识。
+    """
+    INBOX = "inbox"             # 站内信（个人渠道，始终开启）
+    EMAIL = "email"             # 邮件（个人渠道）
+    WECHAT_WORK = "wechat_work"  # 企业微信（广播渠道，群机器人）
+    FEISHU = "feishu"           # 飞书（广播渠道，群机器人）
+    CUSTOM = "custom"           # 自定义 Webhook（广播渠道）
 
 
 PERSONAL_CHANNELS = (ChannelType.INBOX, ChannelType.EMAIL)
@@ -67,21 +81,28 @@ BROADCAST_CHANNELS = (ChannelType.WECHAT_WORK, ChannelType.FEISHU, ChannelType.C
 
 
 class DataSource:
+    """数据来源标记（仅后端使用，不生成前端映射）"""
     MANUAL = "manual"
     AUTO = "auto"
     HYBRID = "hybrid"
 
 
 class DeviceStatus:
+    """设备状态枚举
 
-    SCRAPPED = 0
-    AVAILABLE = 1
-    ONLINE = 2
-    OFFLINE = 3
-    MAINTENANCE = 4
-    RESERVED = 5
-    PENDING_ONLINE = 6
-    TESTING = 7
+    注意：SCRAPPED = 0 表示已报废，不作为软删除标记。
+    查询"有效设备"时应过滤 status != DeviceStatus.SCRAPPED。
+    Phase 2 扩展：新增 PENDING_ONLINE(6) 和 TESTING(7)。
+    """
+
+    SCRAPPED = 0      # 已报废
+    AVAILABLE = 1     # 可用（已采购未上架）
+    ONLINE = 2        # 在线（已上架运行中）
+    OFFLINE = 3       # 离线（已上架但未运行）
+    MAINTENANCE = 4   # 维护中
+    RESERVED = 5      # 预留（已分配客户但未上架）
+    PENDING_ONLINE = 6  # 待上线（已配置等待部署）
+    TESTING = 7        # 测试中（测试环境使用）
 
     ALLOWED_TRANSITIONS = {
         AVAILABLE:       [RESERVED, ONLINE, PENDING_ONLINE, MAINTENANCE, SCRAPPED],
@@ -107,27 +128,38 @@ class DeviceStatus:
 
     @classmethod
     def can_transition(cls, from_status: int, to_status: int) -> bool:
+        """检查状态转换是否允许"""
         return to_status in cls.ALLOWED_TRANSITIONS.get(from_status, [])
 
     @classmethod
     def active_statuses(cls) -> List[int]:
+        """返回所有"有效"状态列表（即非报废状态）"""
         return [cls.AVAILABLE, cls.ONLINE, cls.OFFLINE, cls.MAINTENANCE,
                 cls.RESERVED, cls.PENDING_ONLINE, cls.TESTING]
 
 
 class VLANStatus(IntEnum):
-    INACTIVE = 0
-    ACTIVE = 1
-    RESERVED = 2
+    """VLAN 状态枚举（后端编码：1=活跃 0=停用，见 app/models/vlan.py）
+
+    状态 2(预留) 为前端扩展，后端字段仅 0/1。
+    """
+    INACTIVE = 0   # 停用 / 禁用
+    ACTIVE = 1     # 活跃 / 正常
+    RESERVED = 2   # 预留（前端扩展）
 
 
 class LAGStatus(IntEnum):
-    INACTIVE = 0
-    ACTIVE = 1
-    DEGRADED = 2
+    """链路聚合(LAG)状态枚举（后端编码：1=活跃 0=停用，见 app/models/link_aggregation.py）
+
+    状态 2(降级) 为前端扩展，后端字段仅 0/1。
+    """
+    INACTIVE = 0   # 停用 / 禁用
+    ACTIVE = 1     # 活跃 / 正常
+    DEGRADED = 2   # 降级（前端扩展）
 
 
 class CustomerStatus(IntEnum):
+    """客户状态枚举（见 app/models/customer.py：0-活跃 1-停用 2-待审核 3-终止）"""
     ACTIVE = 0
     DISABLED = 1
     PENDING = 2
@@ -135,11 +167,13 @@ class CustomerStatus(IntEnum):
 
 
 class RoomStatus(IntEnum):
+    """机房状态枚举（见 app/models/room.py：0-正常 1-停用）"""
     NORMAL = 0
     DISABLED = 1
 
 
 class CabinetStatus(IntEnum):
+    """机柜状态枚举（见 app/models/cabinet.py：0-禁用 1-可用 2-使用中 3-维护中 4-已预留）"""
     DISABLED = 0
     AVAILABLE = 1
     IN_USE = 2
@@ -148,13 +182,18 @@ class CabinetStatus(IntEnum):
 
 
 class NotificationTypeCode(str, Enum):
+    """通知类型枚举（字符串值，前后端共用，生成前端映射）
+
+    用于 notification.type 字段、WebhookConfig.applicable_types 过滤、
+    用户偏好 subscribed_types 订阅。
+    """
     DEVICE_UNREACHABLE = "device_unreachable"
     DEVICE_RECOVERED = "device_recovered"
-    TEMPERATURE_ALERT = "temperature_alert"
-    DISK_FAILURE_ALERT = "disk_failure_alert"
-    PORT_STATUS_CHANGED = "port_status_changed"
-    MONITOR_INTERRUPTED = "monitor_interrupted"
-    RAID_FAILURE_ALERT = "raid_failure_alert"
+    TEMPERATURE_ALERT = "temperature_alert"        # 温度超阈值
+    DISK_FAILURE_ALERT = "disk_failure_alert"      # 硬盘故障
+    PORT_STATUS_CHANGED = "port_status_changed"    # 交换机指定端口 up/down
+    MONITOR_INTERRUPTED = "monitor_interrupted"    # 设备监控中断（心跳超时）
+    RAID_FAILURE_ALERT = "raid_failure_alert"      # 服务器 RAID 故障
     BATCH_CREATE_DEVICES = "batch_create_devices"
     BATCH_BAN_IP = "batch_ban_ip"
     BATCH_UNBAN_IP = "batch_unban_ip"
@@ -170,26 +209,34 @@ class NotificationTypeCode(str, Enum):
 
 
 class ProbeErrorCode(str, Enum):
-    TIMEOUT = "timeout"
-    PROBE_TIMEOUT = "probe_timeout"
-    PROBE_ERROR = "probe_error"
-    NO_MANAGEMENT_IP = "no_management_ip"
-    DNS_RESOLVE_TIMEOUT = "dns_resolve_timeout"
-    AUTH_FAILED = "auth_failed"
-    AUTH_ERROR = "auth_error"
-    CONNECTION_REFUSED = "connection_refused"
-    CONNECTION_ERROR = "connection_error"
-    NETWORK_ERROR = "network_error"
-    SSL_ERROR = "ssl_error"
-    TLS_INCOMPATIBLE = "tls_incompatible"
-    IPMI_ERROR = "ipmi_error"
-    IPMI_NO_DATA = "no_data"
-    UNKNOWN = "unknown"
-    NO_HOST_REF = "no_host_ref"
-    NO_API_URL = "no_api_url"
-    ZABBIX_API_ERROR = "zabbix_api_error"
-    ZABBIX_EMPTY_HOST_LIST = "zabbix_empty_host_list"
-    HOST_NOT_IN_ZABBIX = "host_not_in_zabbix"
+    """探测错误码枚举（字符串值，前后端共用，生成前端映射）
+
+    适配器（SNMP/Redfish/IPMI/Zabbix）与 MonitorService 统一使用本枚举
+    作为 ProbeResult.error 的规范值。前端据此翻译为中文标签。
+    动态异常消息（如 Python traceback 片段）不应作为 error 值，
+    应归入 ProbeResult.extra["raw_error"] 供调试。
+    """
+    TIMEOUT = "timeout"                  # 协议级超时（SNMP 内层协程 / Redfish HTTP / IPMI 请求）
+    PROBE_TIMEOUT = "probe_timeout"      # 线程级超时（base_adapter.run_with_timeout 守卫）
+    PROBE_ERROR = "probe_error"          # 线程级异常（适配器内部未分类异常）
+    NO_MANAGEMENT_IP = "no_management_ip"  # 设备无管理 IP
+    DNS_RESOLVE_TIMEOUT = "dns_resolve_timeout"  # DNS 解析超时
+    AUTH_FAILED = "auth_failed"          # 认证失败（SNMP community/Redfish token/IPMI 密码错误）
+    AUTH_ERROR = "auth_error"            # Redfish HTTP 401 认证失败
+    CONNECTION_REFUSED = "connection_refused"  # 连接被拒绝
+    CONNECTION_ERROR = "connection_error"  # 连接错误（TCP 层面）
+    NETWORK_ERROR = "network_error"      # 网络不可达 / 路由不通
+    SSL_ERROR = "ssl_error"              # SSL/TLS 握手失败
+    TLS_INCOMPATIBLE = "tls_incompatible"  # TLS 版本/密码套件不兼容（老旧 BMC）
+    IPMI_ERROR = "ipmi_error"            # IPMI 协议错误
+    IPMI_NO_DATA = "no_data"             # IPMI 返回空数据
+    UNKNOWN = "unknown"                  # 未分类错误
+    NO_HOST_REF = "no_host_ref"          # Zabbix 凭据无主机引用
+    NO_API_URL = "no_api_url"            # Zabbix 无 API URL
+    ZABBIX_API_ERROR = "zabbix_api_error"  # Zabbix API 调用失败
+    ZABBIX_EMPTY_HOST_LIST = "zabbix_empty_host_list"  # Zabbix 主机列表为空
+    HOST_NOT_IN_ZABBIX = "host_not_in_zabbix"  # 主机不在 Zabbix 中
+
 
 
 STATUS_DISPLAY = {
@@ -348,7 +395,15 @@ NOTIFICATION_TYPE_LABELS = {
 }
 
 
+
 class DeviceSubtypeCode(str, Enum):
+    """设备子类型枚举（字符串值，前端对应 DeviceSubtype）
+
+    按 DeviceTypeCode 分组：
+    - server: standalone / chassis / node / storage / gpu
+    - network: switch / router / firewall
+    - other: pdu / ups / other
+    """
     STANDALONE = "standalone"
     CHASSIS = "chassis"
     NODE = "node"
@@ -363,21 +418,34 @@ class DeviceSubtypeCode(str, Enum):
 
 
 class SwitchDeviceTypeCode(str, Enum):
+    """交换机驱动类型枚举（字符串值，前端对应 SwitchDeviceType / SWITCH_DEVICE_TYPE_OPTIONS）
+
+    用于 SSH 自动化驱动的厂商识别，adapter_factory 依据此枚举路由适配器。
+    """
     HUAWEI = "huawei"
     H3C = "h3c"
     CISCO = "cisco"
 
 
 class SSHProtocolCode(str, Enum):
+    """SSH 连接协议枚举（字符串值，前端对应 SSHProtocol）"""
     SSH = "ssh"
     TELNET = "telnet"
 
 
 class MonitorProtocolCode(str, Enum):
+    """设备监控协议枚举（字符串值，仅后端使用，不生成前端映射）
+
+    各适配器（snmp/ipmi/zabbix/ping）与 MonitorService 统一引用本枚举；
+    base_adapter 从本模块导入并透出 MonitorProtocolCode。
+
+    注：Redfish 适配器已停用并归档（见 archive/monitoring/redfish/），
+    服务器兜底统一走 IPMI；连通性触发源统一走 PING（复用 ip_status_service）。
+    """
     SNMP = "snmp"
     IPMI = "ipmi"
-    ZABBIX = "zabbix"
-    PING = "ping"
+    ZABBIX = "zabbix"  # Zabbix 集中式拉取（作为直连探测的 fallback 源，见 protocol_registry）
+    PING = "ping"  # 连通性触发源（复用 ip_status_service 的 ping + TCP 端口探测）
 
 
 DEVICE_IMPORT_CN_TO_EN = {

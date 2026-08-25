@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState, useCallback, useMemo } from 'react';
 import { Button, Space, Select, Tag, Input, Popconfirm, Typography, Alert, Modal } from 'antd';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
@@ -25,7 +24,6 @@ import { DEVICE_TYPE_MAP, DeviceType } from '@/types/enums';
 
 const { Text } = Typography;
 
-
 interface DeletedDeviceListData {
   devices: Device[];
   total: number;
@@ -33,7 +31,6 @@ interface DeletedDeviceListData {
   page_size: number;
   total_pages: number;
 }
-
 
 interface RestoreResult {
   restored: boolean;
@@ -44,7 +41,6 @@ interface RestoreResult {
   original_u_position?: number;
   auto_assigned_u_position?: number | null;
 }
-
 
 interface BatchResult {
   success: number[];
@@ -58,6 +54,7 @@ const deviceTypeOptions = Object.entries(DEVICE_TYPE_MAP).map(([value, { label }
 }));
 
 
+ 
 function buildColumns(handlers: {
   onRestore: (r: Device) => void;
   onPermanentDelete: (r: Device) => void;
@@ -149,7 +146,6 @@ export default function DeviceRecycleBin() {
   });
   const msg = useMessage();
 
-  
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [restoringDevice, setRestoringDevice] = useState<Device | null>(null);
   const [restoreCabinetId, setRestoreCabinetId] = useState<number | undefined>();
@@ -157,19 +153,16 @@ export default function DeviceRecycleBin() {
   const [locationConflict, setLocationConflict] = useState(false);
   const [conflictMsg, setConflictMsg] = useState('');
 
-  
   const [batchRestoreModalOpen, setBatchRestoreModalOpen] = useState(false);
   const [batchRestoreCabinetId, setBatchRestoreCabinetId] = useState<number | undefined>();
   const [batchRestoreUPosition, setBatchRestoreUPosition] = useState<number | undefined>();
 
-  
   const roomOptions = useRoomOptions();
   const cabinetOptions = useCabinetOptions(
     table.filters.room_id ? Number(table.filters.room_id) : undefined,
     true
   );
 
-  
   const dateRangeFilter = table.filters.date_range as string | undefined;
   const [startDate, endDate] = dateRangeFilter
     ? dateRangeFilter.split('~')
@@ -193,16 +186,13 @@ export default function DeviceRecycleBin() {
   const permanentDeleteMutation = usePermanentDeleteDevice();
   const batchPermanentDeleteMutation = useBatchPermanentDeleteDevices();
 
-  
   const listData = data as unknown as DeletedDeviceListData | undefined;
 
-  
   const batch = useBatchSelection<Device>({
     dataSource: listData?.devices ?? [],
     getRowKey: (r) => String(r.id ?? '')
   });
 
-  
   const handleRestore = useCallback((record: Device) => {
     setRestoringDevice(record);
     setRestoreCabinetId(undefined);
@@ -212,11 +202,9 @@ export default function DeviceRecycleBin() {
     setRestoreModalOpen(true);
   }, []);
 
-  
   const doRestore = useCallback(() => {
     if (!restoringDevice) return;
     const isChildNode = !!restoringDevice.deleted_location_snapshot?.parent_device_id;
-    
     if (locationConflict && !restoreCabinetId && !isChildNode) {
       msg.warning('原U位有冲突，请选择目标机柜（可不填U位，系统将自动分配）');
       return;
@@ -259,14 +247,12 @@ export default function DeviceRecycleBin() {
     );
   }, [restoringDevice, restoreCabinetId, restoreUPosition, locationConflict, restoreMutation, msg]);
 
-  
   const handleBatchRestore = useCallback(() => {
     setBatchRestoreCabinetId(undefined);
     setBatchRestoreUPosition(undefined);
     setBatchRestoreModalOpen(true);
   }, []);
 
-  
   const doBatchRestore = useCallback(() => {
     batchRestoreMutation.mutate(
       {
@@ -286,7 +272,6 @@ export default function DeviceRecycleBin() {
     );
   }, [batch, batchRestoreCabinetId, batchRestoreUPosition, batchRestoreMutation, msg]);
 
-  
   const handlePermanentDelete = useCallback(
     (record: Device) => {
       permanentDeleteMutation.mutate(record.id, {
@@ -297,7 +282,6 @@ export default function DeviceRecycleBin() {
     [permanentDeleteMutation, msg]
   );
 
-  
   const handleBatchPermanentDelete = useCallback(() => {
     confirm({
       title: '批量永久删除',
@@ -325,13 +309,11 @@ export default function DeviceRecycleBin() {
     });
   }, [batch, batchPermanentDeleteMutation, msg]);
 
-  
   const columns = useMemo(
     () => buildColumns({ onRestore: handleRestore, onPermanentDelete: handlePermanentDelete }),
     [handleRestore, handlePermanentDelete]
   );
 
-  
   const toolbar = (
     <FilterBar
       filters={[
@@ -367,7 +349,6 @@ export default function DeviceRecycleBin() {
     />
   );
 
-  
   const batchToolbar = (
     <BatchActionBar count={batch.count} unit="台设备" onClear={batch.clear}>
       <Button
@@ -404,7 +385,7 @@ export default function DeviceRecycleBin() {
         rowSelection={batch.rowSelection}
       />
 
-      {}
+      {/* 恢复弹窗 */}
       <Modal
         title="恢复设备"
         open={restoreModalOpen}
@@ -503,7 +484,7 @@ export default function DeviceRecycleBin() {
           })()}
       </Modal>
 
-      {}
+      {/* 批量恢复弹窗 */}
       <Modal
         title="批量恢复"
         open={batchRestoreModalOpen}

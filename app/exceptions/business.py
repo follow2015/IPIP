@@ -10,6 +10,10 @@ from .base import BaseAppException
 
 
 class BusinessLogicError(BaseAppException):
+    """业务逻辑异常基类
+    
+    当业务规则验证失败或业务逻辑错误时抛出此类异常。
+    """
     
     def __init__(
         self,
@@ -18,6 +22,14 @@ class BusinessLogicError(BaseAppException):
         details: Optional[Dict[str, Any]] = None,
         status_code: int = 400
     ):
+        """初始化业务逻辑异常
+        
+        Args:
+            message: 异常消息
+            code: 异常代码
+            details: 异常详情
+            status_code: HTTP状态码
+        """
         super().__init__(
             message=message,
             code=code or "BUSINESS_LOGIC_ERROR",
@@ -27,12 +39,22 @@ class BusinessLogicError(BaseAppException):
 
 
 class UserNotFoundError(BusinessLogicError):
+    """用户不存在异常
+    
+    当查找的用户不存在时抛出此异常。
+    """
     
     def __init__(
         self,
         user_identifier: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化用户不存在异常
+        
+        Args:
+            user_identifier: 用户标识符（ID、用户名等）
+            message: 自定义异常消息
+        """
         if not message:
             if user_identifier:
                 message = f"用户不存在：{user_identifier}"
@@ -52,6 +74,10 @@ class UserNotFoundError(BusinessLogicError):
 
 
 class DuplicateUserError(BusinessLogicError):
+    """用户重复异常
+    
+    当尝试创建已存在的用户时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -59,6 +85,13 @@ class DuplicateUserError(BusinessLogicError):
         value: str,
         message: Optional[str] = None
     ):
+        """初始化用户重复异常
+        
+        Args:
+            field: 重复的字段名（如username、email）
+            value: 重复的值
+            message: 自定义异常消息
+        """
         if not message:
             field_names = {
                 "username": "用户名",
@@ -77,6 +110,10 @@ class DuplicateUserError(BusinessLogicError):
 
 
 class InsufficientPermissionError(BusinessLogicError):
+    """权限不足异常
+    
+    当用户没有足够权限执行操作时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -84,6 +121,13 @@ class InsufficientPermissionError(BusinessLogicError):
         resource: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化权限不足异常
+        
+        Args:
+            required_permission: 所需权限
+            resource: 相关资源
+            message: 自定义异常消息
+        """
         if not message:
             if required_permission and resource:
                 message = f"权限不足，需要 {required_permission} 权限访问 {resource}"
@@ -107,6 +151,10 @@ class InsufficientPermissionError(BusinessLogicError):
 
 
 class InvalidOperationError(BusinessLogicError):
+    """无效操作异常
+    
+    当尝试执行无效或不允许的操作时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -114,6 +162,13 @@ class InvalidOperationError(BusinessLogicError):
         reason: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化无效操作异常
+        
+        Args:
+            operation: 操作名称
+            reason: 无效的原因
+            message: 自定义异常消息
+        """
         if not message:
             if reason:
                 message = f"无效操作 {operation}：{reason}"
@@ -132,6 +187,10 @@ class InvalidOperationError(BusinessLogicError):
 
 
 class ResourceConflictError(BusinessLogicError):
+    """资源冲突异常
+    
+    当资源处于冲突状态时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -140,6 +199,14 @@ class ResourceConflictError(BusinessLogicError):
         conflict_reason: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化资源冲突异常
+        
+        Args:
+            resource_type: 资源类型
+            resource_id: 资源ID
+            conflict_reason: 冲突原因
+            message: 自定义异常消息
+        """
         if not message:
             if resource_id and conflict_reason:
                 message = f"{resource_type} {resource_id} 冲突：{conflict_reason}"
@@ -163,6 +230,10 @@ class ResourceConflictError(BusinessLogicError):
 
 
 class BusinessRuleViolationError(BusinessLogicError):
+    """业务规则违反异常
+    
+    当违反业务规则时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -170,6 +241,13 @@ class BusinessRuleViolationError(BusinessLogicError):
         rule_description: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化业务规则违反异常
+        
+        Args:
+            rule_name: 规则名称
+            rule_description: 规则描述
+            message: 自定义异常消息
+        """
         if not message:
             if rule_description:
                 message = f"违反业务规则 {rule_name}：{rule_description}"
@@ -188,46 +266,60 @@ class BusinessRuleViolationError(BusinessLogicError):
 
 
 class DeviceNotSupported(BusinessLogicError):
+    """设备不支持异常
+    
+    当尝试对不支持的设备类型执行操作时抛出。
+    """
     
     def __init__(self, device_type: str = "", message: Optional[str] = None):
+        """初始化设备不支持异常"""
         if not message:
             message = f"不支持的设备类型：{device_type}" if device_type else "不支持的设备类型"
         super().__init__(message=message, code="DEVICE_NOT_SUPPORTED", details={"device_type": device_type})
 
 
 class IPAlreadyBannedException(BusinessLogicError):
+    """IP 已被封禁异常"""
     
     def __init__(self, ip_address: str = "", message: Optional[str] = None):
+        """初始化 IP 已封禁异常"""
         if not message:
             message = f"IP {ip_address} 已处于封禁状态" if ip_address else "IP 已处于封禁状态"
         super().__init__(message=message, code="IP_ALREADY_BANNED", status_code=409)
 
 
 class IPNotBannedException(BusinessLogicError):
+    """IP 未被封禁异常"""
     
     def __init__(self, ip_address: str = "", message: Optional[str] = None):
+        """初始化 IP 未封禁异常"""
         if not message:
             message = f"IP {ip_address} 未处于封禁状态" if ip_address else "IP 未处于封禁状态"
         super().__init__(message=message, code="IP_NOT_BANNED")
 
 
 class NoCoreSwitch(BusinessLogicError):
+    """无核心交换机异常"""
     
     def __init__(self, room_id: Optional[int] = None, message: Optional[str] = None):
+        """初始化无核心交换机异常"""
         if not message:
             message = f"机房 {room_id} 无可用核心交换机" if room_id else "无可用核心交换机"
         super().__init__(message=message, code="NO_CORE_SWITCH")
 
 
 class BanCommandFailed(BusinessLogicError):
+    """封禁命令执行失败异常"""
 
     def __init__(self, reason: str = "", message: Optional[str] = None):
+        """初始化封禁命令失败异常"""
         if not message:
             message = f"封禁命令执行失败：{reason}" if reason else "封禁命令执行失败"
         super().__init__(message=message, code="BAN_COMMAND_FAILED")
 
 
 class BanConfigNotFoundError(BusinessLogicError):
+    """解封时交换机配置不存在（路由/ARP条目已消失），视为已通过其他方式解封"""
 
     def __init__(self, reason: str = "", message: Optional[str] = None):
         if not message:
@@ -236,6 +328,12 @@ class BanConfigNotFoundError(BusinessLogicError):
 
 
 class ServiceError(BusinessLogicError):
+    """Service 层统一异常
+
+    当 Service 层捕获底层异常（如 DataAccessError）后，
+    转换为此异常抛出，避免上层直接暴露 data access 层异常细节。
+    原始异常通过 __cause__ 链保留，便于日志追踪。
+    """
 
     def __init__(
         self,
@@ -244,6 +342,14 @@ class ServiceError(BusinessLogicError):
         details: Optional[Dict[str, Any]] = None,
         status_code: int = 500,
     ):
+        """初始化 Service 层异常
+
+        Args:
+            message: 异常消息
+            code: 异常代码
+            details: 异常详情
+            status_code: HTTP状态码
+        """
         super().__init__(
             message=message,
             code=code or "SERVICE_ERROR",

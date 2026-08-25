@@ -47,14 +47,12 @@ import { formatDateTime } from '@/utils/format';
 
 const { Text } = Typography;
 
-
 interface OverrideFormValues {
   device_id: number;
   metric_key: string;
   metric_type: string;
   enabled: boolean;
   note?: string;
-  
   warn?: number;
   crit?: number;
   expected?: string;
@@ -74,7 +72,6 @@ export default function ThresholdOverridesPage() {
 
   const items: DeviceMetricOverride[] = data?.items ?? [];
 
-  
   const metricTypeMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const t of templatesData?.items ?? []) {
@@ -111,7 +108,6 @@ export default function ThresholdOverridesPage() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      
       const formValues = {
         device_type: '',
         source: 'snmp',
@@ -213,7 +209,6 @@ export default function ThresholdOverridesPage() {
     }
   ];
 
-  
   const currentMetricType = Form.useWatch('metric_type', form) ?? 'gauge';
 
   return (
@@ -277,7 +272,7 @@ export default function ThresholdOverridesPage() {
             <Select options={METRIC_TYPE_OPTIONS} />
           </Form.Item>
 
-          {}
+          {/* 结构化阈值：按 metric_type 动态渲染（复用 MetricTemplateModal 模式） */}
           {(currentMetricType === 'gauge' || currentMetricType === 'counter') && (
             <Row gutter={16}>
               <Col span={12}>

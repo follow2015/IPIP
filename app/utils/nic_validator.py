@@ -14,6 +14,7 @@ from typing import Dict, List, Tuple
 
 
 class NicValidator:
+    """网卡配置校验器"""
 
     MIN_NIC_COUNT = 1
     MAX_NIC_COUNT = 8
@@ -22,20 +23,28 @@ class NicValidator:
     MAX_PORT_COUNT = 16
 
     VALID_PORT_TYPES = [
-        'RJ45',
-        'SFP',
-        'SFP+',
-        'SFP28',
-        'QSFP+',
-        'QSFP28',
-        'QSFP56',
-        'QSFP-DD',
+        'RJ45',        # 电口（铜缆双绞线）
+        'SFP',         # 光口（1G SFP）
+        'SFP+',        # 光口（10G SFP+）
+        'SFP28',       # 光口（25G SFP28）
+        'QSFP+',       # 光口（40G QSFP+）
+        'QSFP28',      # 光口（100G QSFP28）
+        'QSFP56',      # 光口（200G QSFP56）
+        'QSFP-DD',     # 光口（400G QSFP-DD）
     ]
 
     VALID_PORT_SPEEDS = ['100M', '1G', '10G', '25G', '40G', '100G', '400G']
 
     @staticmethod
     def validate_nic_config(nics: List[Dict]) -> Tuple[bool, str]:
+        """校验网卡配置的合法性
+
+        Args:
+            nics: 网卡配置列表
+
+        Returns:
+            (is_valid, error_message)
+        """
         if not nics:
             return (False, "至少需要配置一个网卡")
 
@@ -61,6 +70,7 @@ class NicValidator:
 
     @staticmethod
     def validate_single_nic(nic: Dict) -> Tuple[bool, str]:
+        """校验单个网卡的配置"""
         nic_number = nic.get('nic_number', '未知')
         ports = nic.get('ports', [])
 
@@ -105,6 +115,7 @@ class NicValidator:
 
     @staticmethod
     def validate_port_info(port_type: str, port_speed: str) -> Tuple[bool, str]:
+        """校验端口类型和速率的合法性"""
         if port_type not in NicValidator.VALID_PORT_TYPES:
             return (False, f"非法的端口类型: {port_type}")
         if port_speed not in NicValidator.VALID_PORT_SPEEDS:
@@ -113,6 +124,15 @@ class NicValidator:
 
     @staticmethod
     def prepare_ports_for_db(device_id: int, nics: List[Dict]) -> List[Dict]:
+        """将网卡配置转换为数据库记录格式
+
+        Args:
+            device_id: 设备ID
+            nics: 网卡配置列表
+
+        Returns:
+            可直接插入 device_nics_port 表的记录列表
+        """
         ports_data = []
 
         for nic in nics:

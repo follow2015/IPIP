@@ -21,7 +21,6 @@ export default function CreateCredentialModal({ open, form, onClose }: CreateCre
   const createLink = useCreateAndLinkCredential();
   const msg = useMessage();
 
-  
   const handleSubmitForm = async () => {
     let values: Record<string, unknown>;
     try {

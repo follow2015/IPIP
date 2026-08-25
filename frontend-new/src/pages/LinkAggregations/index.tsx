@@ -31,14 +31,12 @@ function LinkAggregations() {
   const table = useTable();
   const { data: roomOptions } = useRoomOptions();
 
-  
   useEffect(() => {
     if (!table.filters.room_id && roomOptions && roomOptions.length > 0) {
       table.updateFilter('room_id', roomOptions[0].value as number);
     }
   }, [roomOptions, table.filters.room_id]);
 
-  
   const {
     data: lagData,
     isLoading,
@@ -50,10 +48,8 @@ function LinkAggregations() {
     room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined
   });
 
-  
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  
   const deleteLag = useDeleteLinkAggregationGroup();
   const handleDelete = useCallback(
     async (record: LinkAggregationGroupWithDevice) => {
@@ -68,7 +64,6 @@ function LinkAggregations() {
     [deleteLag, message, refetch]
   );
 
-  
   const goToLagTab = useCallback(
     (deviceId: number) => {
       navigate(`/devices/${deviceId}#lag`);
@@ -76,7 +71,6 @@ function LinkAggregations() {
     [navigate]
   );
 
-  
   const columns = useMemo(
     () => [
       {
@@ -210,7 +204,7 @@ function LinkAggregations() {
         />
       </Card>
 
-      {}
+      {/* 创建链路聚合组弹窗 */}
       <LAGForm
         open={createModalOpen}
         onCancel={() => setCreateModalOpen(false)}

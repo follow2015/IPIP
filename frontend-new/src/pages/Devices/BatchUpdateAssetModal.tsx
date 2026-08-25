@@ -10,7 +10,6 @@ import { useBatchUpdateDeviceAsset, type BatchUpdateAssetRequest } from '@/servi
 import { useMessage } from '@/hooks/useMessage';
 import AssetInfoFields from '@/components/AssetInfoFields';
 
-
 const ASSET_DATE_FIELDS = [
   'purchase_date',
   'warranty_start',
@@ -18,7 +17,6 @@ const ASSET_DATE_FIELDS = [
   'online_date',
   'offline_date'
 ] as const;
-
 
 function serializeAssetDate(value: unknown): unknown {
   if (dayjs.isDayjs(value)) {
@@ -42,7 +40,6 @@ function BatchUpdateAssetModal({ open, deviceIds, onClose }: BatchUpdateAssetMod
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      
       const serialized: Record<string, unknown> = { ...values };
       for (const f of ASSET_DATE_FIELDS) {
         if (f in serialized) serialized[f] = serializeAssetDate(serialized[f]);

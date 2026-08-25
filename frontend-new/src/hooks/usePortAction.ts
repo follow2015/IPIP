@@ -16,7 +16,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { DeviceChangeEvent } from '@/hooks/useDeviceEvents';
 import { queryKeys } from '@/services/query-keys';
 
-
 const ACTION_LABELS: Record<string, string> = {
   enable_port: '启用端口',
   disable_port: '关闭端口',
@@ -34,26 +33,25 @@ const ACTION_LABELS: Record<string, string> = {
   delete_vlan: '删除VLAN'
 };
 
-
 const FALLBACK_POLL_INTERVAL = 5_000;
-
 const FALLBACK_POLL_MAX = 3;
 
 interface UsePortActionOptions {
-  
   switchId: number;
-  
   onRefresh?: () => void;
-  
   hasSsh?: boolean;
 }
 
-
+/**
+ * 异步端口操作 Hook
+ *
+ * 提交操作到后台线程，通过 SSE 接收结果驱动缓存刷新。
+ * 操作结果由站内信承载，不再弹出 notification 卡片。
+ */
 export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortActionOptions) {
   const message = useMessage();
   const queryClient = useQueryClient();
 
-  
   const pendingRef = useRef<
     Map<
       string,
@@ -64,10 +62,8 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
     >
   >(new Map());
 
-  
   const pollTimersRef = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
 
-  
   useEffect(() => {
     return () => {
       pendingRef.current.clear();
@@ -76,7 +72,6 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
     };
   }, []);
 
-  
   const handleSseEvent = useCallback(
     (event: DeviceChangeEvent) => {
       if (event.op_type !== 'port_action_result' || !event.task_id) return;
@@ -87,7 +82,6 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
 
       pending.delete(event.task_id);
 
-      
       queryClient.invalidateQueries({ queryKey: ['switches', switchId, 'ports'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.vlans.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.linkAggregation.all });
@@ -96,7 +90,6 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
     [switchId, queryClient, onRefresh]
   );
 
-  
   const onEvent = useCallback(
     (event: DeviceChangeEvent) => {
       handleSseEvent(event);
@@ -104,13 +97,11 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
     [handleSseEvent]
   );
 
-  
   const submitAction = useCallback(
     async (action: string, port: string, params: Record<string, unknown> = {}) => {
       const label = ACTION_LABELS[action] || action;
 
       try {
-        
         if (!hasSsh) {
           const res = await post<{
             action: string;
@@ -124,7 +115,6 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
           } else {
             message.error(result?.error || `${label}失败`);
           }
-          
           queryClient.invalidateQueries({ queryKey: ['switches', switchId, 'ports'] });
           queryClient.invalidateQueries({ queryKey: queryKeys.vlans.all });
           queryClient.invalidateQueries({ queryKey: queryKeys.linkAggregation.all });
@@ -132,7 +122,6 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
           return;
         }
 
-        
         const res = await post<{
           task_id: string;
           action: string;
@@ -142,12 +131,10 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
         const task_id = res.data?.task_id;
         if (!task_id) return;
 
-        
         message.info(`${label}已提交，完成后将通过消息通知您`);
 
         pendingRef.current.set(task_id, { action, port });
 
-        
         if (onRefresh) {
           let count = 0;
           const pollTimer = setInterval(() => {

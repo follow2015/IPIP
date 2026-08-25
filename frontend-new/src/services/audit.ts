@@ -10,9 +10,12 @@ import type { AuditLog } from '@/types/models';
 import type { PaginatedData, PaginationParams } from '@/types/api';
 import type { AuditLogQuery } from '@/types/api-bridge';
 
-
+/**
+ * 审计日志查询参数
+ * 基于 OpenAPI AuditLogQuery Schema，将 required nullable 字段转为 optional
+ * （后端 Schema 用 default=null 标记，OpenAPI 生成 required，但前端传参时为 optional）
+ */
 export type AuditLogQueryParams = Partial<AuditLogQuery> & PaginationParams;
-
 
 export function useAuditLogs(params?: AuditLogQueryParams) {
   return useQuery({

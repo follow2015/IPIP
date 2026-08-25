@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, Spin, Button, Space, Tag, Dropdown, Descriptions, Result } from 'antd';
@@ -38,7 +37,6 @@ import MetricsTab from './MetricsTab';
 import { getCategoryConfig } from '../shared/categoryConfig';
 import type { TabKey } from '../shared/categoryConfig';
 
-
 function DeviceDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -58,7 +56,6 @@ function DeviceDetail() {
   return <DeviceDetailContent deviceId={deviceId} />;
 }
 
-
 function DeviceDetailContent({ deviceId }: { deviceId: number }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -67,20 +64,16 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
   const updateStatus = useUpdateDeviceStatus();
   const message = useMessage();
 
-  
   const hashTabKey = location.hash.replace('#', '') || undefined;
   const [activeTabKey, setActiveTabKey] = useState<string>(hashTabKey ?? 'basic');
 
-  
   useEffect(() => {
     setActiveTabKey(hashTabKey ?? 'basic');
   }, [hashTabKey]);
 
   const isNetworkDevice = device?.device_type === DeviceType.NETWORK;
-  
   const hasSsh = !!device.switch_credential?.has_ssh;
 
-  
   useDeviceEvents(
     deviceId,
     'ports',
@@ -95,7 +88,6 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
     isNetworkDevice
   );
 
-  
   const syncSwitchInfo = useSyncSwitchInfo();
   const handleRefreshDeviceInfo = () => {
     confirm({
@@ -106,20 +98,17 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
           await syncSwitchInfo.mutateAsync(deviceId);
           message.info('刷新设备信息已提交，完成后将通过消息通知您');
         } catch {
-          
         }
       }
     });
   };
 
-  
   const [formOpen, setFormOpen] = useState(false);
 
   if (!device) {
     return <div>设备不存在</div>;
   }
 
-  
   const handleDelete = () => {
     confirm({
       title: '确认删除',
@@ -139,7 +128,6 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
     });
   };
 
-  
   const handleStatusChange = async (newStatus: number) => {
     try {
       await updateStatus.mutateAsync({ id: device.id, status: newStatus });
@@ -150,12 +138,9 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
     }
   };
 
-  
   const category = getCategoryConfig(device.device_type as DeviceType);
 
-  
   const renderTab = (key: TabKey) => {
-    
     const hasSsh = !!device.switch_credential?.has_ssh;
     switch (key) {
       case 'basic':
@@ -201,7 +186,6 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
 
   const statusInfo = DEVICE_STATUS_MAP[device.status as DeviceStatusCode];
 
-  
   const statusMenuItems = Object.entries(DEVICE_STATUS_MAP)
     .filter(([k]) => Number(k) !== device.status)
     .map(([k, v]) => ({
@@ -209,7 +193,6 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
       label: v.label
     }));
 
-  
   const subtypeTag = device.device_subtype ? (
     <Tag color={DEVICE_SUBTYPE_COLORS[device.device_subtype as DeviceSubtype] ?? 'default'}>
       {DEVICE_SUBTYPE_LABELS[device.device_subtype as DeviceSubtype] ?? device.device_subtype}
@@ -218,7 +201,7 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
 
   return (
     <div>
-      {}
+      {/* 顶部导航栏 */}
       <div
         style={{
           display: 'flex',
@@ -254,7 +237,7 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
         </Space>
       </div>
 
-      {}
+      {/* 设备概要 */}
       <Descriptions column={3} size="small" style={{ marginBottom: 16 }}>
         <Descriptions.Item label="设备名称">
           <strong style={{ fontSize: 16 }}>{device.device_name}</strong>
@@ -281,7 +264,7 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
         items={tabItems}
       />
 
-      {}
+      {/* 编辑表单 */}
       <DeviceForm
         open={formOpen}
         editRecord={device}

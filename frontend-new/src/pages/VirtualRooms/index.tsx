@@ -30,7 +30,6 @@ import { useMessage } from '@/hooks/useMessage';
 import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
 import type { GlobalEvent } from '@/hooks/useGlobalEvents';
 
-
 function VirtualRooms() {
   const [membersOpen, setMembersOpen] = useState(false);
   const [membersRecord, setMembersRecord] = useState<VirtualRoom | null>(null);
@@ -57,7 +56,6 @@ function VirtualRooms() {
     editRecord
   } = crud;
 
-  
   useGlobalEventListener(
     useCallback(
       (event: GlobalEvent) => {
@@ -74,16 +72,13 @@ function VirtualRooms() {
     )
   );
 
-  
   const { data: progressData } = useVirtualRoomScanProgress(scanningId ?? 0, scanningId !== null);
   const scanProgress = progressData?.progress;
 
-  
   const lastFailedRef = useRef<number | null>(null);
   useEffect(() => {
     if (!scanProgress || !scanningId) return;
     if (scanProgress.phase === 'failed') {
-      
       if (lastFailedRef.current === scanningId) return;
       lastFailedRef.current = scanningId;
       setScanningId(null);
@@ -91,13 +86,11 @@ function VirtualRooms() {
     }
   }, [scanProgress, scanningId, refetch]);
 
-  
   const handleMembers = (record: VirtualRoom) => {
     setMembersRecord(record);
     setMembersOpen(true);
   };
 
-  
   const handleScan = async (record: VirtualRoom) => {
     try {
       await scanVirtualRoom.mutateAsync(record.id);
@@ -111,7 +104,6 @@ function VirtualRooms() {
     }
   };
 
-  
   const columns = [
     {
       title: '虚拟机房名称',

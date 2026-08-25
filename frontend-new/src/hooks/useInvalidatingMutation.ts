@@ -11,19 +11,23 @@
  */
 import { useMutation, useQueryClient, type UseMutationOptions } from '@tanstack/react-query';
 
-
 export type InvalidateKeysArg<TData, TVariables> =
   | readonly unknown[]
   | ((data: TData, variables: TVariables, context: unknown) => Array<readonly unknown[]>);
 
-
+/**
+ * 执行 mutation 后自动失效指定 query key
+ *
+ * @param mutationFn - mutation 函数
+ * @param invalidateKeys - 成功后需要失效的 query key（静态数组，或根据 data/variables 动态计算）
+ * @param options - 额外的 useMutation 选项（不含 mutationFn；调用方传入的 onSuccess 会与自动失效逻辑合并执行，不会被覆盖）
+ */
 export function useInvalidatingMutation<TData, TError, TVariables>(
   mutationFn: (vars: TVariables) => Promise<TData>,
   invalidateKeys: InvalidateKeysArg<TData, TVariables>,
   options?: Omit<UseMutationOptions<TData, TError, TVariables>, 'mutationFn'>
 ) {
   const queryClient = useQueryClient();
-  
   const { onSuccess: callerOnSuccess, ...restOptions } = options ?? {};
   return useMutation({
     mutationFn,

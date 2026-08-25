@@ -1,6 +1,5 @@
 import { confirm } from '@/utils/confirm';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Button, Space, Tag, Popover, Segmented, Collapse, Table, Card, Input } from 'antd';
 import {
@@ -34,7 +33,6 @@ import { useBatchSelection } from '@/hooks/useBatchSelection';
 import { useMessage } from '@/hooks/useMessage';
 import { useGlobalEventListener, type GlobalEvent } from '@/hooks/useGlobalEvents';
 
-
 const SCAN_TIMEOUT = 5 * 60_000;
 
 function Switches() {
@@ -43,14 +41,10 @@ function Switches() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<Switch | null>(null);
-  
   const [deviceFormOpen, setDeviceFormOpen] = useState(false);
   const [deviceEditRecord, setDeviceEditRecord] = useState<Device | null>(null);
-  
   const [groupMode, setGroupMode] = useState<'group' | 'flat'>('group');
-  
   const [batchUpdateOpen, setBatchUpdateOpen] = useState(false);
-  
   const deleteSwitch = useDeleteSwitch();
   const scanRoom = useScanRoom();
   const message = useMessage();
@@ -66,22 +60,17 @@ function Switches() {
       typeof table.filters.device_type === 'string' ? table.filters.device_type : undefined
   });
 
-  
   const [scanningRoomId, setScanningRoomId] = useState<number | null>(null);
 
-  
   const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  
   useEffect(() => {
     return () => {
       if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
     };
   }, []);
 
-  
   const handleGlobalEvent = useCallback((event: GlobalEvent) => {
-    
     if (event.event_type === 'room_scan_complete') {
       const payload = event.payload as Record<string, unknown>;
       const roomId = payload.room_id as number | undefined;
@@ -101,7 +90,6 @@ function Switches() {
     const roomId = progress.room_id;
     if (!roomId) return;
 
-    
     if (progress.phase === 'failed' || progress.phase === '完成') {
       setScanningRoomId(null);
       if (scanTimeoutRef.current) {
@@ -111,10 +99,8 @@ function Switches() {
     }
   }, []);
 
-  
   useGlobalEventListener(handleGlobalEvent);
 
-  
   const handleScanRoom = () => {
     const roomId = table.filters.room_id ? Number(table.filters.room_id) : undefined;
     if (!roomId) {
@@ -129,7 +115,6 @@ function Switches() {
           await scanRoom.mutateAsync(roomId);
           setScanningRoomId(roomId);
           message.info('机房扫描已提交，完成后将通过消息通知您');
-          
           scanTimeoutRef.current = setTimeout(() => {
             scanTimeoutRef.current = null;
             setScanningRoomId(null);
@@ -141,26 +126,19 @@ function Switches() {
     });
   };
 
-  
   const handleAdd = () => {
     setDeviceEditRecord(null);
     setDeviceFormOpen(true);
   };
-  
   const handleEdit = (r: Switch) => {
     setEditRecord(r);
     setFormOpen(true);
   };
-  
   const handleFullEdit = (r: Switch) => {
-    
-    
     setDeviceEditRecord({ id: r.device_id } as Device);
     setDeviceFormOpen(true);
   };
-  
   const handleDetail = (r: Switch) => navigate(`/switches/${r.device_id}`);
-  
   const confirmAction = useConfirmAction();
   const handleDelete = (r: Switch) => {
     confirmAction({
@@ -173,13 +151,11 @@ function Switches() {
     });
   };
 
-  
   const handleCopy = (r: Switch) => {
     const text = `名称: ${r.name}\nIP: ${r.ip_address}\n类型: ${SWITCH_ROLE_MAP[r.switch_role as SwitchRoleCode]?.label ?? '-'}\n型号: ${r.device_model ?? '-'}\n机房: ${r.room_name ?? '-'}\n协议: ${r.protocol ?? '-'}\n设备类型: ${r.device_type ?? '-'}`;
     navigator.clipboard.writeText(text).then(() => message.success('已复制'));
   };
 
-  
   const handleExport = useCallback(() => {
     const items = data?.items ?? [];
     if (!items.length) {
@@ -282,7 +258,6 @@ function Switches() {
       key: 'protocol',
       render: (v: string | null) => v ?? '-'
     },
-    
     {
       title: '关联设备',
       dataIndex: 'connected_device_count',
@@ -328,7 +303,6 @@ function Switches() {
     }
   ];
 
-  
   const switchList = data?.items ?? [];
 
   const batch = useBatchSelection<Switch>({
@@ -339,7 +313,6 @@ function Switches() {
   const managedSwitches = useMemo(() => switchList.filter((s) => s.has_ssh), [switchList]);
   const unmanagedSwitches = useMemo(() => switchList.filter((s) => !s.has_ssh), [switchList]);
 
-  
   const filterAndActions = (
     <FilterBar
       filters={[
@@ -400,16 +373,14 @@ function Switches() {
     />
   );
 
-  
   const selectedSwitches = batch.selectedRows;
 
-  
   const rowSelection = batch.rowSelection;
 
   return (
     <div>
       {groupMode === 'flat' ? (
-        
+        /* 平铺模式：DataTable 完整渲染（搜索+工具栏+表格+分页） */
         <DataTable<Switch>
           columns={columns}
           dataSource={switchList}
@@ -429,7 +400,7 @@ function Switches() {
           rowSelection={rowSelection}
         />
       ) : (
-        
+        /* 分组模式：手动渲染搜索栏+工具栏，表格替换为 Collapse 按 has_ssh 分组 */
         <Card>
           <div
             style={{
@@ -497,7 +468,7 @@ function Switches() {
           refetch();
         }}
       />
-      {}
+      {/* DeviceForm：新增交换机 + 完整编辑 */}
       <DeviceForm
         open={deviceFormOpen}
         editRecord={null}
@@ -509,7 +480,7 @@ function Switches() {
           refetch();
         }}
       />
-      {}
+      {/* 批量修改远程信息 */}
       <BatchUpdateSwitchModal
         open={batchUpdateOpen}
         selectedSwitches={selectedSwitches}

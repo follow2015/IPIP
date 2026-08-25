@@ -13,9 +13,15 @@ from extensions import db
 
 
 class Device(BaseModel):
+    """设备模型
+
+    管理设备的核心信息：身份、位置、状态。
+    硬件规格 → DeviceHardware（1:1）
+    资产台账 → DeviceAsset（1:1）
+    """
 
     __tablename__ = "devices"
-    __soft_delete__ = True
+    __soft_delete__ = True  # 启用软删除，DELETE 改为设置 deleted_at
     __table_args__ = (
         Index("idx_device_type_subtype", "device_type", "device_subtype"),
         Index("idx_device_status_cabinet", "status", "cabinet_id"),
@@ -101,7 +107,7 @@ class Device(BaseModel):
     switch_connections = relationship(
         "DeviceConnection", foreign_keys="DeviceConnection.switch_device_id",
         back_populates="switch_device", lazy="select",
-        cascade="save-update, merge",
+        cascade="save-update, merge",   # ← 去掉 delete-orphan
     )
 
     storage_devices = relationship(
@@ -114,13 +120,20 @@ class Device(BaseModel):
     )
 
 
+
     def _ensure_server_ext(self):
+        """确保 server_ext 记录存在，不存在则自动创建
+
+        不传 device_id，由 ORM relationship 在 flush 时自动填充。
+        显式传 device_id=self.id 在 self.id=None 时会写入错误主键。
+        """
         if not self.server_ext:
             from app.models.device_server_ext import DeviceServerExt
             self.server_ext = DeviceServerExt()
 
     @property
     def parent_device_id(self) -> Optional[int]:
+        """父设备ID（代理自 DeviceServerExt.parent_device_id）"""
         return self.server_ext.parent_device_id if self.server_ext else None
 
     @parent_device_id.setter
@@ -130,6 +143,7 @@ class Device(BaseModel):
 
     @property
     def is_chassis(self) -> Optional[bool]:
+        """是否为机箱（代理自 DeviceServerExt.is_chassis）"""
         return self.server_ext.is_chassis if self.server_ext else None
 
     @is_chassis.setter
@@ -139,6 +153,7 @@ class Device(BaseModel):
 
     @property
     def node_position(self) -> Optional[int]:
+        """节点位置（代理自 DeviceServerExt.node_position）"""
         return self.server_ext.node_position if self.server_ext else None
 
     @node_position.setter
@@ -148,6 +163,7 @@ class Device(BaseModel):
 
     @property
     def node_row(self) -> Optional[int]:
+        """节点行号（代理自 DeviceServerExt.node_row）"""
         return self.server_ext.node_row if self.server_ext else None
 
     @node_row.setter
@@ -157,6 +173,7 @@ class Device(BaseModel):
 
     @property
     def node_col(self) -> Optional[int]:
+        """节点列号（代理自 DeviceServerExt.node_col）"""
         return self.server_ext.node_col if self.server_ext else None
 
     @node_col.setter
@@ -166,6 +183,7 @@ class Device(BaseModel):
 
     @property
     def total_nodes(self) -> Optional[int]:
+        """机箱总节点数（代理自 DeviceServerExt.total_nodes）"""
         return self.server_ext.total_nodes if self.server_ext else None
 
     @total_nodes.setter
@@ -175,6 +193,7 @@ class Device(BaseModel):
 
     @property
     def node_rows(self) -> Optional[int]:
+        """节点行数（代理自 DeviceServerExt.node_rows）"""
         return self.server_ext.node_rows if self.server_ext else None
 
     @node_rows.setter
@@ -184,6 +203,7 @@ class Device(BaseModel):
 
     @property
     def node_cols(self) -> Optional[int]:
+        """节点列数（代理自 DeviceServerExt.node_cols）"""
         return self.server_ext.node_cols if self.server_ext else None
 
     @node_cols.setter
@@ -193,6 +213,7 @@ class Device(BaseModel):
 
     @property
     def node_naming_pattern(self) -> Optional[str]:
+        """节点命名模式（代理自 DeviceServerExt.node_naming_pattern）"""
         return self.server_ext.node_naming_pattern if self.server_ext else None
 
     @node_naming_pattern.setter
@@ -201,12 +222,17 @@ class Device(BaseModel):
         self.server_ext.node_naming_pattern = value
 
     def _ensure_switch_ext(self):
+        """确保 switch_ext 记录存在，不存在则自动创建
+
+        不传 device_id，由 ORM relationship 在 flush 时自动填充。
+        """
         if not self.switch_ext:
             from app.models.device_switch_ext import DeviceSwitchExt
             self.switch_ext = DeviceSwitchExt()
 
     @property
     def switch_role(self) -> Optional[int]:
+        """交换机角色（代理自 DeviceSwitchExt.switch_role）"""
         return self.switch_ext.switch_role if self.switch_ext else None
 
     @switch_role.setter
@@ -216,6 +242,7 @@ class Device(BaseModel):
 
     @property
     def layer(self) -> Optional[int]:
+        """网络层级（代理自 DeviceSwitchExt.layer）"""
         return self.switch_ext.layer if self.switch_ext else None
 
     @layer.setter
@@ -225,61 +252,74 @@ class Device(BaseModel):
 
     @property
     def uplink_device_id(self) -> Optional[int]:
+        """上行设备ID（代理自 DeviceSwitchExt.uplink_device_id）"""
         return self.switch_ext.uplink_device_id if self.switch_ext else None
 
     @property
     def uplink_port_ids(self) -> Optional[list]:
+        """本机上行端口ID列表（代理自 DeviceSwitchExt.uplink_port_ids）"""
         return self.switch_ext.uplink_port_ids if self.switch_ext else None
 
     @property
     def core_device_id(self) -> Optional[int]:
+        """核心交换机ID（代理自 DeviceSwitchExt.core_device_id）"""
         return self.switch_ext.core_device_id if self.switch_ext else None
 
     @property
     def port_num(self) -> Optional[int]:
+        """端口数量（代理自 DeviceSwitchExt.port_num）"""
         return self.switch_ext.port_num if self.switch_ext else None
 
     @property
     def is_active(self) -> bool:
+        """设备是否为有效状态（未报废）"""
         return self.status != DeviceStatus.SCRAPPED
 
     @property
     def status_name(self) -> str:
+        """获取状态名称"""
         return DeviceStatus.STATUS_NAMES.get(self.status, "未知")
 
     @property
     def cabinet_number(self) -> Optional[str]:
+        """通过关联获取机柜编号"""
         if self.cabinet_id and self.cabinet:
             return self.cabinet.cabinet_number
         return None
 
     def get_ip_list(self) -> str:
+        """获取IP地址列表（逗号分隔，从 hardware 扩展表）"""
         if self.hardware and self.hardware.ip_address:
             return self.hardware.get_ip_list()
         return ""
 
     def set_ip_list(self, ip_string: str) -> None:
+        """从逗号分隔字符串设置IP地址列表"""
         if not self.hardware:
             from app.models.device_hardware import DeviceHardware
             self.hardware = DeviceHardware(device_id=self.id)
         self.hardware.set_ip_list(ip_string)
 
     def get_primary_ip(self) -> Optional[str]:
+        """获取主IP地址"""
         if self.hardware:
             return self.hardware.get_primary_ip()
         return None
 
     def _ensure_hardware(self):
+        """确保 hardware 记录存在"""
         if not self.hardware:
             from app.models.device_hardware import DeviceHardware
             self.hardware = DeviceHardware(device_id=self.id)
 
     def _ensure_asset(self):
+        """确保 asset 记录存在"""
         if not self.asset:
             from app.models.device_asset import DeviceAsset
             self.asset = DeviceAsset(device_id=self.id)
 
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> Dict[str, Any]:
+        """转换为字典，自动聚合 hardware/asset 字段"""
         data = super().to_dict(exclude=exclude)
 
         if self.hardware:
@@ -395,6 +435,11 @@ class Device(BaseModel):
         return data
 
     def to_dict_with_parent(self, parent_name: str = None) -> Dict[str, Any]:
+        """转换为字典，包含父设备名称
+        
+        Args:
+            parent_name: 父设备名称（由调用方提供，避免额外查询）
+        """
         data = self.to_dict()
         if parent_name:
             data["parent_device_name"] = parent_name

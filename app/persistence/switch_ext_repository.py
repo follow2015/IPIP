@@ -14,13 +14,44 @@ from extensions import db
 
 
 class SwitchExtRepository:
+    """SwitchCredentials 扩展信息数据访问层
+
+    封装 switch_credentials 表的扩展字段 CRUD 操作，
+    与 devices 表 1:1 关联。
+    """
 
     def get_by_device_id(self, device_id: int) -> SwitchCredentials | None:
+        """根据 device_id 查询扩展信息
+
+        Args:
+            device_id: devices.id（即 switch_credentials.device_id）
+
+        Returns:
+            SwitchCredentials | None: 扩展信息记录，不存在返回 None
+        """
         return SwitchCredentials.query.filter_by(device_id=device_id).first()
 
     get_by_switch_id = get_by_device_id
 
     def upsert(self, device_id: int, **fields) -> SwitchCredentials:
+        """创建或更新扩展信息
+
+        若 device_id 对应的记录不存在则创建，存在则更新指定字段。
+
+        字段路由：
+        - has_ssh → SwitchCredentials（凭据表）
+        - layer, switch_role, uplink_device_id, core_device_id, uplink_port_ids → Device（已迁移）
+
+        注意：is_core / uplink_sw_id / core_sw_id 为旧字段名兼容映射，
+        调用方应迁移至 switch_role / uplink_device_id / core_device_id。
+
+        Args:
+            device_id: devices.id
+            **fields: 需要更新的字段
+
+        Returns:
+            SwitchCredentials: 创建或更新后的记录
+        """
         import warnings
 
         device_fields = {}
@@ -62,6 +93,14 @@ class SwitchExtRepository:
         return ext
 
     def get_all_by_room(self, room_id: int) -> list[SwitchCredentials]:
+        """获取机房内所有交换机扩展信息
+
+        Args:
+            room_id: 机房ID
+
+        Returns:
+            list[SwitchCredentials]: 该机房所有交换机的扩展信息列表
+        """
         return SwitchCredentials.query.join(
             Device, SwitchCredentials.device_id == Device.id
         ).join(
@@ -71,6 +110,16 @@ class SwitchExtRepository:
         ).all()
 
     def get_no_auth_switches(self, room_id: int) -> list[SwitchCredentials]:
+        """返回 has_ssh=False 的所有交换机（含 uplink 信息）
+
+        用于降级映射重建，获取所有无 SSH 权限的交换机及其上联信息。
+
+        Args:
+            room_id: 机房ID
+
+        Returns:
+            list[SwitchCredentials]: 无权限交换机的扩展信息列表
+        """
         return SwitchCredentials.query.join(
             Device, SwitchCredentials.device_id == Device.id
         ).join(
@@ -81,6 +130,16 @@ class SwitchExtRepository:
         ).all()
 
     def get_no_auth_switches_by_device_ids(self, device_ids: list[int]) -> list[SwitchCredentials]:
+        """返回指定设备中 has_ssh=False 的所有交换机（含 uplink 信息）
+
+        用于虚拟机房降级映射重建，获取成员中无 SSH 权限的交换机。
+
+        Args:
+            device_ids: 设备ID列表
+
+        Returns:
+            list[SwitchCredentials]: 无权限交换机的扩展信息列表
+        """
         if not device_ids:
             return []
         return SwitchCredentials.query.filter(
@@ -89,6 +148,7 @@ class SwitchExtRepository:
         ).all()
 
     def get_device_name_map_by_ids(self, device_ids: list[int]) -> dict[int, str]:
+        """批量查询 SwitchCredentials + Device，返回 device_id -> device_name 映射。"""
         if not device_ids:
             return {}
         from sqlalchemy.orm import joinedload
@@ -100,6 +160,14 @@ class SwitchExtRepository:
         return {sc.device_id: sc.device.device_name if sc.device else None for sc in rows}
 
     def get_has_ssh_map(self, device_ids: list[int]) -> dict[int, bool]:
+        """批量获取设备的 has_ssh 映射。
+
+        Args:
+            device_ids: 设备ID列表
+
+        Returns:
+            dict[int, bool]: device_id → has_ssh 映射
+        """
         if not device_ids:
             return {}
         rows = SwitchCredentials.query.filter(

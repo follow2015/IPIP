@@ -11,6 +11,12 @@ logger = get_logger(__name__)
 
 
 def list_vendor_brands(device_type: str | None = None, only_enabled: bool = True):
+    """列出厂商品牌（按 sort_order 排序）。
+
+    Args:
+        device_type: 按设备类型过滤；None=全部
+        only_enabled: 仅返回启用的
+    """
     from app.persistence.monitor_vendor_brand_repository import MonitorVendorBrandRepository
     repo = MonitorVendorBrandRepository()
     rows = repo.list_all(device_type=device_type, only_enabled=only_enabled)

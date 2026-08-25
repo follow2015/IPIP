@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Table, Button, Form, Tag, Alert } from 'antd';
@@ -38,7 +37,6 @@ import type {
 } from '@/types/models';
 import { isPhysicalPort } from '@/utils/portType';
 
-
 const CONNECTION_TYPE_OPTIONS = [
   { label: '以太网', value: 'ethernet' },
   { label: '光纤', value: 'fiber' },
@@ -54,12 +52,9 @@ interface ConnectionTabProps {
   device: Device;
 }
 
-
 function ConnectionTab({ device }: ConnectionTabProps) {
   const deviceId = device.id;
-  
   const isNetworkDevice = device.device_type === DeviceType.NETWORK;
-  
   const {
     data: deviceConnections,
     isLoading,
@@ -70,14 +65,12 @@ function ConnectionTab({ device }: ConnectionTabProps) {
     isLoading: isPortLinksLoading,
     isError: isPortLinksError
   } = usePortLinks(isNetworkDevice ? deviceId : 0);
-  
   const {
     data: switchConnections,
     isLoading: isSwitchConnsLoading,
     isError: isSwitchConnsError
   } = useSwitchConnections(isNetworkDevice ? deviceId : 0);
 
-  
   const connections = useMemo(() => {
     if (isNetworkDevice) {
       const n2n = (portLinks ?? []) as (DeviceConnection | PortLink)[];
@@ -90,7 +83,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
   const isLoadingConnections = isNetworkDevice
     ? isPortLinksLoading || isSwitchConnsLoading
     : isLoading;
-  
   const isErrorConnections = isNetworkDevice ? isPortLinksError || isSwitchConnsError : isError;
   const createConnection = useCreateConnection(deviceId);
   const deleteConnection = useDeleteConnection(deviceId);
@@ -99,10 +91,8 @@ function ConnectionTab({ device }: ConnectionTabProps) {
   const updateConnection = useUpdateConnection();
   const message = useMessage();
 
-  
   useDeviceEvents(deviceId, 'connections');
 
-  
   const d2nSwitchIds = useMemo(() => {
     if (isNetworkDevice) return [];
     return Array.from(
@@ -121,22 +111,18 @@ function ConnectionTab({ device }: ConnectionTabProps) {
   const [editForm] = Form.useForm();
   const [form] = Form.useForm();
 
-  
   const selectedRoomId = Form.useWatch('room_id', form);
   const selectedCabinetId = Form.useWatch('cabinet_id', form);
   const selectedSwitchId = Form.useWatch('switch_device_id', form);
 
-  
   const { data: roomOptions } = useRoomOptions();
 
-  
   const { data: cabinetList } = useRoomCabinets(selectedRoomId ?? 0);
   const cabinetOptions = useMemo(() => {
     const cabinets = cabinetList ?? [];
     return cabinets.map((c) => ({ label: c.cabinet_number, value: c.id }));
   }, [cabinetList]);
 
-  
   const switchQueryParams = useMemo(() => {
     const params: Record<string, unknown> = { device_type: 'network', per_page: 999 };
     if (selectedRoomId) {
@@ -149,21 +135,18 @@ function ConnectionTab({ device }: ConnectionTabProps) {
   }, [selectedRoomId, selectedCabinetId]);
   const { data: switchData } = useDeviceList(switchQueryParams);
 
-  
   const switchOptions = useMemo(() => {
     const devices = switchData?.items ?? [];
     return devices
-      .filter((d) => d.id !== deviceId) 
+      .filter((d) => d.id !== deviceId) // N2N 模式下排除本机设备
       .map((d) => ({
         label: `${d.device_name} (${d.management_ip || d.device_model || '-'})`,
         value: d.id
       }));
   }, [switchData, deviceId]);
 
-  
   const { data: peerPorts } = useNetworkPorts(selectedSwitchId ?? 0);
 
-  
   const peerPortOptions = useMemo(() => {
     const ports: SwitchPort[] = peerPorts ?? [];
     return ports
@@ -175,10 +158,8 @@ function ConnectionTab({ device }: ConnectionTabProps) {
       }));
   }, [peerPorts]);
 
-  
   const { data: nics } = useDeviceNics(deviceId);
 
-  
   const nicPortOptions = useMemo(() => {
     const ports: DeviceNicPort[] = nics ?? [];
     return ports
@@ -189,10 +170,8 @@ function ConnectionTab({ device }: ConnectionTabProps) {
       }));
   }, [nics]);
 
-  
   const { data: localPorts } = useNetworkPorts(deviceId);
 
-  
   const localPortOptions = useMemo(() => {
     const ports: SwitchPort[] = localPorts ?? [];
     return ports
@@ -204,7 +183,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
       }));
   }, [localPorts]);
 
-  
   const { data: deviceVlans } = useVLANsByDevice(deviceId);
   const vlanOptions = useMemo(
     () =>
@@ -215,7 +193,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
     [deviceVlans]
   );
 
-  
   const { data: deviceLags } = useLinkAggregationGroups(deviceId);
   const lagOptions = useMemo(
     () =>
@@ -226,7 +203,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
     [deviceLags]
   );
 
-  
   const vlanMap = useMemo(
     () => new Map((deviceVlans ?? []).map((v: VLAN) => [v.vlan_id, v])),
     [deviceVlans]
@@ -236,15 +212,12 @@ function ConnectionTab({ device }: ConnectionTabProps) {
     [deviceLags]
   );
 
-  
   const linkTypeOptions = isNetworkDevice
     ? [{ label: '网络→网络', value: LinkType.NETWORK_TO_NETWORK }]
     : [{ label: '设备→网络', value: LinkType.DEVICE_TO_NETWORK }];
 
-  
   const handleAdd = () => {
     form.resetFields();
-    
     const defaultLinkType = isNetworkDevice
       ? LinkType.NETWORK_TO_NETWORK
       : LinkType.DEVICE_TO_NETWORK;
@@ -254,7 +227,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
     setFormOpen(true);
   };
 
-  
   const handleDelete = useCallback(
     (connId: number, switchDeviceId?: number) => {
       confirm({
@@ -273,7 +245,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
     [deleteConnection, message]
   );
 
-  
   const handleDeletePortLink = useCallback(
     (portId: number) => {
       confirm({
@@ -292,11 +263,9 @@ function ConnectionTab({ device }: ConnectionTabProps) {
     [disconnectPortLink, message]
   );
 
-  
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      
       const { room_id, cabinet_id, ...payload } = values;
       await createConnection.mutateAsync(payload);
       message.success('创建成功');
@@ -306,7 +275,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
     }
   };
 
-  
   const handleEdit = useCallback(
     (record: DeviceConnection | PortLink) => {
       setEditRecord(record);
@@ -324,19 +292,16 @@ function ConnectionTab({ device }: ConnectionTabProps) {
     [editForm]
   );
 
-  
   const handleEditSubmit = async () => {
     if (!editRecord) return;
     try {
       const values = await editForm.validateFields();
       if (editRecord.link_type === 'network_to_network') {
-        
         await updatePortLink.mutateAsync({
           connectionId: editRecord.id,
           data: values as PortLinkUpdateRequest
         });
       } else {
-        
         await updateConnection.mutateAsync({
           connId: editRecord.id,
           data: {
@@ -382,7 +347,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
                 : (record as DeviceConnection).switch_port_name) || '-'
             );
           }
-          
           if (isNetworkDevice) {
             return (record as DeviceConnection).switch_port_name || '-';
           }
@@ -405,7 +369,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
             }
             return displayName;
           }
-          
           const d2n = record as DeviceConnection;
           if (isNetworkDevice) {
             const displayName = d2n.device_name || '-';
@@ -428,7 +391,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
           if (record.link_type === 'network_to_network') {
             return record.peer_port_name || '-';
           }
-          
           if (isNetworkDevice) {
             return (record as DeviceConnection).source_port_display || '-';
           }
@@ -476,7 +438,6 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         title: '操作',
         key: 'action',
         render: (_: unknown, record: DeviceConnection | PortLink) => {
-          
           if (record.link_type === 'network_to_network') {
             return (
               <>
@@ -564,7 +525,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         nicPortOptions={nicPortOptions}
       />
 
-      {}
+      {/* ── 编辑连接 Modal ── */}
       <ConnectionEditModal
         open={editFormOpen}
         onOk={handleEditSubmit}

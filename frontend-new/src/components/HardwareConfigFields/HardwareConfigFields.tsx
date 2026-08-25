@@ -20,7 +20,6 @@ import type { FormInstance } from 'antd';
 import { useComponentTemplates } from '@/services/component-template';
 import type { ComponentTemplate } from '@/services/component-template';
 
-
 export interface StorageItem {
   count?: number;
   capacity?: string;
@@ -29,29 +28,19 @@ export interface StorageItem {
   template_id?: number;
 }
 
-
 export interface HardwareConfigFieldsProps {
-  
   form: FormInstance;
-  
   customerId?: number | null;
-  
   showIpmi?: boolean;
-  
   showIpmiAddress?: boolean;
-  
   prefix?: string;
-  
   storageListName?: string;
-  
   storageOnly?: boolean;
 }
-
 
 function prefixedName(prefix: string | undefined, field: string): string | (string | number)[] {
   return prefix ? [prefix, field] : field;
 }
-
 
 function formatCapacity(capacityGb?: number): string {
   if (!capacityGb) return '';
@@ -62,7 +51,6 @@ function formatCapacity(capacityGb?: number): string {
   return `${capacityGb}GB`;
 }
 
-
 export default function HardwareConfigFields({
   form,
   customerId,
@@ -72,13 +60,11 @@ export default function HardwareConfigFields({
   storageListName = 'storage_items',
   storageOnly = false
 }: HardwareConfigFieldsProps) {
-  
   const { data: cpuTemplates = [] } = useComponentTemplates('cpu', customerId);
   const { data: memoryTemplates = [] } = useComponentTemplates('memory', customerId);
   const { data: diskTemplates = [] } = useComponentTemplates('disk', customerId);
   const { data: gpuTemplates = [] } = useComponentTemplates('gpu', customerId);
 
-  
   const setFields = (values: Record<string, unknown>) => {
     const mapped: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(values)) {
@@ -87,7 +73,6 @@ export default function HardwareConfigFields({
     form.setFieldsValue(mapped);
   };
 
-  
   const getField = (field: string) => {
     return form.getFieldValue(prefixedName(prefix, field));
   };
@@ -98,7 +83,7 @@ export default function HardwareConfigFields({
 
       {!storageOnly && (
         <>
-          {}
+          {/* ── CPU 配置 ── */}
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item name={prefixedName(prefix, 'cpu_template_id')} label="CPU型号">
@@ -141,7 +126,7 @@ export default function HardwareConfigFields({
             </Col>
           </Row>
 
-          {}
+          {/* ── 内存配置 ── */}
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item name={prefixedName(prefix, 'memory_template_id')} label="内存型号">
@@ -158,7 +143,6 @@ export default function HardwareConfigFields({
                     const tpl = memoryTemplates.find((t) => t.id === id);
                     if (tpl?.spec) {
                       setFields({ memory: `${tpl.brand} ${tpl.model}` });
-                      
                       const dimmCount = getField('memory_dimm_count');
                       if (tpl.spec.capacity_gb && dimmCount) {
                         form.setFieldValue(
@@ -216,7 +200,7 @@ export default function HardwareConfigFields({
             </Col>
           </Row>
 
-          {}
+          {/* ── GPU 配置 ── */}
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item name={prefixedName(prefix, 'gpu_template_id')} label="显卡型号">
@@ -263,7 +247,7 @@ export default function HardwareConfigFields({
             </Col>
           </Row>
 
-          {}
+          {/* ── IPMI 管理（可选） ── */}
           {showIpmi && (
             <Row gutter={16}>
               {showIpmiAddress && (
@@ -288,7 +272,7 @@ export default function HardwareConfigFields({
         </>
       )}
 
-      {}
+      {/* ── 存储配置（模板选择 + 数量） ── */}
       <div style={{ marginBottom: 8 }}>
         <div style={{ marginBottom: 4, fontWeight: 500, fontSize: 14 }}>存储配置</div>
         <Form.List
@@ -406,7 +390,6 @@ export default function HardwareConfigFields({
   );
 }
 
-
 export function buildStorageSummary(items?: StorageItem[]): string {
   if (!items?.length) return '';
   return items
@@ -417,7 +400,6 @@ export function buildStorageSummary(items?: StorageItem[]): string {
     )
     .join(' + ');
 }
-
 
 export function buildStorageList(
   items?: StorageItem[]
@@ -430,7 +412,6 @@ export function buildStorageList(
     interface_type?: string;
   }[] = [];
   for (const it of items) {
-    
     if (!it.template_id && (!it.capacity || !it.storage_type)) continue;
     if (!it.capacity && !it.storage_type && !it.template_id) continue;
     const count = it.count ?? 1;

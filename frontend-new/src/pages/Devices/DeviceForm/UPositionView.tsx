@@ -8,9 +8,7 @@
 import { useMemo } from 'react';
 import { Tooltip } from 'antd';
 
-
 type UBlockStatus = 'available' | 'occupied' | 'current';
-
 
 export default function UPositionView({ layout, currentU, currentHeightU }: {
   layout: {
@@ -25,12 +23,9 @@ export default function UPositionView({ layout, currentU, currentHeightU }: {
       power: number | null;
     }>;
   } | null | undefined;
-  
   currentU?: number | null;
-  
   currentHeightU?: number | null;
 }) {
-  
   const currentUSet = useMemo(() => {
     const set = new Set<number>();
     if (currentU && currentHeightU) {
@@ -44,14 +39,12 @@ export default function UPositionView({ layout, currentU, currentHeightU }: {
   if (!layout) return null;
   const { total_u, u_map } = layout;
 
-  
   const getBlockStatus = (u: number): UBlockStatus => {
     if (currentUSet.has(u)) return 'current';
     if (u_map[u]) return 'occupied';
     return 'available';
   };
 
-  
   const statusColors: Record<UBlockStatus, { bg: string; border: string; text: string }> = {
     available: { bg: '#f6ffed', border: '#b7eb8f', text: '#52c41a' },
     occupied: { bg: '#fff1f0', border: '#ffa39e', text: '#f5222d' },
@@ -66,7 +59,7 @@ export default function UPositionView({ layout, currentU, currentHeightU }: {
       borderRadius: 6,
       border: '1px solid #f0f0f0',
     }}>
-      {}
+      {/* 图例 */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 12, alignItems: 'center' }}>
         <span style={{ color: '#8c8c8c' }}>U位视图：</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -83,7 +76,7 @@ export default function UPositionView({ layout, currentU, currentHeightU }: {
         </span>
       </div>
 
-      {}
+      {/* 方块网格：从 U1 开始逐行排列 */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
         {Array.from({ length: total_u }, (_, i) => i + 1).map(u => {
           const status = getBlockStatus(u);

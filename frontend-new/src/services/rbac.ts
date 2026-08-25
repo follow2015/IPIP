@@ -12,13 +12,11 @@ import { toSelectOptions } from './service-utils';
 import type { Role, RoleDetail, Permission } from '@/types/models';
 import type { PaginatedData, PaginationParams } from '@/types/api';
 
-
 export interface CreateRoleRequest {
   name: string;
   display_name: string;
   description?: string;
 }
-
 
 export interface UpdateRoleRequest {
   id: number;
@@ -50,7 +48,6 @@ export function usePermissionList(params?: PaginationParams) {
   });
 }
 
-
 export function usePermissionCategories() {
   return useQuery({
     queryKey: queryKeys.rbac.categories,
@@ -60,7 +57,6 @@ export function usePermissionCategories() {
     },
   });
 }
-
 
 export function useRolePermissions(roleId: number) {
   return useQuery({
@@ -73,7 +69,6 @@ export function useRolePermissions(roleId: number) {
   });
 }
 
-
 export function useUserRoles(userId: number) {
   return useQuery({
     queryKey: queryKeys.rbac.userRoles(userId),
@@ -84,7 +79,6 @@ export function useUserRoles(userId: number) {
     enabled: userId > 0,
   });
 }
-
 
 export function useSetRolePermissions() {
   const queryClient = useQueryClient();
@@ -97,7 +91,6 @@ export function useSetRolePermissions() {
   });
 }
 
-
 export function useSetUserRoles() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -108,7 +101,6 @@ export function useSetUserRoles() {
     },
   });
 }
-
 
 export function useRoleOptions() {
   return useQuery({

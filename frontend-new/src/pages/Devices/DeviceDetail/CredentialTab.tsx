@@ -51,7 +51,6 @@ interface CredCandidate {
 
 export default function CredentialTab({ device }: { device: Device }) {
   const deviceId = device.id;
-  
   const { data: status } = useDeviceMonitorStatus(deviceId);
   const { data: creds = [] } = useMonitorCredentials();
   const createLink = useCreateAndLinkCredential();
@@ -62,7 +61,6 @@ export default function CredentialTab({ device }: { device: Device }) {
   const [protocol, setProtocol] = useState<string>('snmp');
   const [selectedCredId, setSelectedCredId] = useState<number | undefined>(undefined);
 
-  
   const [editOpen, setEditOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<{ protocol: string; credentialId: number } | null>(
     null
@@ -71,15 +69,12 @@ export default function CredentialTab({ device }: { device: Device }) {
   const updateDeviceCred = useUpdateCredentialPayload(deviceId, editTarget?.credentialId ?? 0);
   const toggleMonitor = useToggleDeviceMonitor();
 
-  
   const updateDevice = useUpdateDevice();
   const { data: groups, isLoading: groupsLoading } = useMetricTemplateGroups();
   const [selectedGroupId, setSelectedGroupId] = useState<number | null | undefined>(undefined);
 
-  
   const currentGroupId = device.metric_template_group_id ?? null;
   const effectiveGroupId = selectedGroupId === undefined ? currentGroupId : selectedGroupId;
-  
   const candidateGroups =
     groups
       ?.filter((g) => !device.device_type || g.device_type === device.device_type)
@@ -88,12 +83,10 @@ export default function CredentialTab({ device }: { device: Device }) {
 
   const configured = status?.configured_protocols ?? [];
 
-  
   const linkedCredentialIds = new Set(
     (status?.credentials ?? []).map((c) => c.credential_id).filter((id): id is number => id != null)
   );
 
-  
   const candidates: CredCandidate[] = (creds as MonitorCredentialListItem[]).filter(
     (c): c is CredCandidate => c.id != null && !!c.protocol && !linkedCredentialIds.has(c.id)
   );
@@ -103,7 +96,6 @@ export default function CredentialTab({ device }: { device: Device }) {
       message.warning('请选择要关联的共享凭据');
       return;
     }
-    
     if (configured.length > 0) {
       confirm({
         title: '关联新协议将替换旧协议',
@@ -143,7 +135,6 @@ export default function CredentialTab({ device }: { device: Device }) {
     }
   };
 
-  
   const handleToggleMonitorEnabled = async (enabled: boolean) => {
     try {
       await toggleMonitor.mutateAsync({ deviceId, enabled });
@@ -153,7 +144,6 @@ export default function CredentialTab({ device }: { device: Device }) {
     }
   };
 
-  
   const handleSaveGroup = async () => {
     const groupId = effectiveGroupId;
     const isClearing = groupId === null && currentGroupId !== null;
@@ -185,7 +175,6 @@ export default function CredentialTab({ device }: { device: Device }) {
   };
 
   const handleCreateAndLink = async (values: Record<string, unknown>) => {
-    
     const p = (values.protocol as string) || protocol;
     const payload: Record<string, unknown> = {};
     if (p === 'snmp') {
@@ -223,13 +212,11 @@ export default function CredentialTab({ device }: { device: Device }) {
     }
   };
 
-  
   const handleOpenEdit = (p: string, credentialId: number) => {
     setEditTarget({ protocol: p, credentialId });
     setEditOpen(true);
   };
 
-  
   const editInitialValues = (() => {
     if (!editTarget) return { snmp_version: 'v2c' };
     const linked = (creds as MonitorCredentialListItem[]).find(
@@ -263,7 +250,7 @@ export default function CredentialTab({ device }: { device: Device }) {
     }
     const payload: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(values)) {
-      if (v === undefined || v === null || v === '') continue; 
+      if (v === undefined || v === null || v === '') continue; // 留空保持不变
       payload[k] = v;
     }
     try {
@@ -278,7 +265,7 @@ export default function CredentialTab({ device }: { device: Device }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {}
+      {/* 0. 设备级监控启停（P1-6，仅影响本设备） */}
       <Card title="设备监控开关">
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
           <Space orientation="vertical" size={0}>
@@ -295,7 +282,7 @@ export default function CredentialTab({ device }: { device: Device }) {
         </Space>
       </Card>
 
-      {}
+      {/* 0.5 指标模板组关联 */}
       <Card title="指标模板组">
         <Space direction="vertical" style={{ width: '100%' }} size={12}>
           <Space align="center" size={8}>
@@ -347,7 +334,7 @@ export default function CredentialTab({ device }: { device: Device }) {
         </Space>
       </Card>
 
-      {}
+      {/* 1. 本机已关联凭据 */}
       <Card title="本机已关联凭据">
         {configured.length === 0 ? (
           <Empty description="本机尚未关联任何监控凭据" />
@@ -385,7 +372,7 @@ export default function CredentialTab({ device }: { device: Device }) {
         )}
       </Card>
 
-      {}
+      {/* 2. 关联已有共享凭据 */}
       <Card title="关联已有共享凭据">
         {configured.length > 0 && (
           <Alert
@@ -422,7 +409,7 @@ export default function CredentialTab({ device }: { device: Device }) {
         )}
       </Card>
 
-      {}
+      {/* 3. 新建共享凭据并关联本机（复用共享结构化表单） */}
       <Card title="新建共享凭据并关联本机">
         {configured.length > 0 && (
           <Alert
@@ -442,7 +429,7 @@ export default function CredentialTab({ device }: { device: Device }) {
         />
       </Card>
 
-      {}
+      {/* 4. 本机编辑密文弹窗（P0-2 设备级） */}
       <Modal
         title={`编辑本机凭据密文（${editTarget?.protocol ?? ''}）`}
         open={editOpen}
@@ -479,7 +466,6 @@ export default function CredentialTab({ device }: { device: Device }) {
   );
 }
 
-
 function NewCredentialForm({
   protocol,
   setProtocol,
@@ -497,7 +483,6 @@ function NewCredentialForm({
 
   const handleFinish = (values: Record<string, unknown>) => {
     const newProtocol = (values.protocol as string) || protocol;
-    
     if (configuredProtocols.length > 0 && !configuredProtocols.includes(newProtocol)) {
       confirm({
         title: '关联新协议将替换旧协议',

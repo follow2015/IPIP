@@ -1,6 +1,5 @@
 import type { RackDeviceType, NodeStatus } from './types';
 
-
 export const ROW_GAP = 2;
 
 export const TYPE_CONFIG: Record<
@@ -69,7 +68,6 @@ export const NODE_STATUS_COLOR: Record<NodeStatus, string> = {
   inactive: '#C0C0C0',
   fault: '#E24B4A'
 };
-
 
 export function pctColor(pct: number): string {
   return pct > 85 ? '#E24B4A' : pct > 65 ? '#BA7517' : '#1D9E75';

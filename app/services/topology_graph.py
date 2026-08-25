@@ -18,44 +18,62 @@ UNREACHABLE_DEPTH = 999
 
 @dataclass
 class SwitchNode:
+    """拓扑图中的交换机节点"""
     sw_id: int
     room_id: int
     layer: int
     is_core: bool
-    management_ip: str | None
-    gateway_ips: set[str] = field(default_factory=set)
+    management_ip: str | None       # SSH 管理 IP（仅用于登录，非网关）
+    gateway_ips: set[str] = field(default_factory=set)   # 该交换机配置的所有网关IP（VLAN SVI地址）
     lag_members: dict[str, set[str]] = field(default_factory=dict)
     _member_to_lag: dict[str, str] = field(default_factory=dict, repr=False)
 
     def add_lag(self, lag_name: str, member_ports: set[str]) -> None:
+        """添加一个 LAG 组及其成员端口"""
         self.lag_members[lag_name] = member_ports
         for p in member_ports:
             self._member_to_lag[p] = lag_name
 
     def resolve_lag_port(self, port: str) -> str:
+        """将成员端口名归并到 Eth-Trunk 逻辑口名
+
+        如果 port 是某个 LAG 的成员端口，返回对应的 lag_name；
+        否则原样返回 port。
+        """
         return self._member_to_lag.get(port, port)
 
 
 @dataclass
 class TopologyLink:
+    """两台交换机之间的物理连接（一条边）"""
     sw_a: int
     port_a: str
     sw_b: int
     port_b: str
-    is_trunk: bool
-    lag_group_id: int | None = None
+    is_trunk: bool                   # 是否为 Trunk 链路（承载多VLAN）
+    lag_group_id: int | None = None  # 所属 LAG 组 ID（同一 LAG 组的成员端口合并为一条逻辑边）
 
 
 @dataclass
 class LocationResult:
+    """IP 定位结果"""
     sw_id: int | None
     port: str | None
     room_id: int | None
-    kind: str
-    confidence: str
+    kind: str          # management_ip / gateway_ip / terminal_exact / terminal_via_trunk_trace / segment_estimate / mac_index_fallback / arp_fallback / unresolved
+    confidence: str    # exact / high / medium / low / none
 
 
 class TopologyGraph:
+    """单次扫描范围（scope）内的交换机拓扑图
+
+    构建数据来源：
+    - SwitchNode: devices + switch_credentials + cabinets（机房归属）+ 路由表中识别出的网关IP
+    - TopologyLink: NetworkConnection（N2N连接表，运维已手工/自动维护的物理连接关系）
+
+    不依赖 MAC 表评分或 Vlan 接口启发式判断 —— 拓扑关系是配置数据，
+    应该来自确定性来源（连接表），不应该靠扫描时反向猜测。
+    """
 
     def __init__(self):
         self.nodes: dict[int, SwitchNode] = {}
@@ -81,12 +99,22 @@ class TopologyGraph:
         self._depth_cache = None
 
     def add_gateway_ip(self, sw_id: int, ip: str) -> None:
+        """向指定交换机节点添加网关IP，同步更新反向索引
+
+        供 RouteSync 在路由同步阶段调用，替代直接操作 node.gateway_ips.add()。
+        """
         node = self.nodes.get(sw_id)
         if node and ip not in node.gateway_ips:
             node.gateway_ips.add(ip)
             self._gateway_ip_map[ip] = node
 
     def get_uplink_ports(self, sw_id: int) -> set[str]:
+        """返回某交换机上所有"连向其他交换机"的端口（即上联/互联端口）
+
+        这是确定性的，来自连接表，不依赖 MAC 密度统计猜测。
+        包含 LAG 逻辑口名和其成员端口名，确保 MAC 候选中的
+        物理端口名和 Eth-Trunk 逻辑口名都能被正确识别为互联端口。
+        """
         ports = set()
         node = self.nodes.get(sw_id)
         for link in self._adjacency.get(sw_id, []):
@@ -106,6 +134,7 @@ class TopologyGraph:
         return ports
 
     def get_peer(self, sw_id: int, port: str) -> tuple[int, str] | None:
+        """给定交换机+端口，返回连接对端的 (sw_id, port)，非互联端口返回 None"""
         for link in self._adjacency.get(sw_id, []):
             if link.sw_a == sw_id and link.port_a == port:
                 return link.sw_b, link.port_b
@@ -114,17 +143,28 @@ class TopologyGraph:
         return None
 
     def find_gateway_owner(self, ip: str) -> SwitchNode | None:
+        """给定一个IP，如果它是某交换机的网关地址，直接返回该交换机节点
+
+        网关归属是配置数据（哪台交换机配了这个VLAN SVI），不需要遍历推断。
+        """
         return self._gateway_ip_map.get(ip)
 
     def find_management_owner(self, ip: str) -> SwitchNode | None:
+        """给定一个IP，如果它是某交换机的SSH管理IP，直接返回该交换机节点
+
+        管理IP与网关IP是两类完全不同的语义，绝不应该用同一套"网段直连"
+        逻辑去猜测归属——管理IP就是这台交换机本身，没有任何遍历空间。
+        """
         return self._management_ip_map.get(ip)
 
     def depth_from_core(self, sw_id: int) -> int:
+        """获取某交换机距离最近核心节点的跳数（预计算，O(1) 查找）"""
         if self._depth_cache is None:
             self._depth_cache = self._compute_depth_map()
         return self._depth_cache.get(sw_id, UNREACHABLE_DEPTH)
 
     def _compute_depth_map(self) -> dict[int, int]:
+        """从所有核心节点出发 BFS，一次性计算所有节点的深度"""
         core_ids = {n.sw_id for n in self.nodes.values() if n.is_core}
         depth_map: dict[int, int] = {}
         if not core_ids:
@@ -150,11 +190,35 @@ class TopologyGraph:
 
 
 def _is_interconnect_port(port: str, sw_id: int, graph: TopologyGraph) -> bool:
+    """判断端口是否为互联端口
+
+    判定依据：端口是否出现在拓扑图的连接边中（来自 NetworkConnection 配置数据）。
+    不再使用 MAC 密度阈值猜测 —— 该判断会把终端密集端口（小型交换机/Hub
+    下挂多个设备）误判为互联端口，导致大量合法终端IP无法定位。
+
+    互联关系是配置数据，缺失的连接记录应该通过完善 N2N 连接表解决，
+    而不是用统计阈值去猜测、进而误伤正常场景。
+
+    Args:
+        port: 端口名
+        sw_id: 交换机 device_id
+        graph: 拓扑图
+
+    Returns:
+        bool: 是否为互联端口
+    """
     return port in graph.get_uplink_ports(sw_id)
 
 
 def resolve_terminal_ip(ip: str, mac: str, graph: TopologyGraph,
                         candidates: list[tuple[int, str]]) -> LocationResult:
+    """终端IP定位：图遍历版本
+
+    逻辑：
+    1. 过滤出非互联端口的候选，选距核心最远的（最可能是接入交换机）
+    2. 所有候选都是互联端口时，返回 segment_estimate（低置信度）
+    3. LAG 感知：如果候选端口是 LAG 成员端口，归并到 Eth-Trunk 逻辑口
+    """
     if not candidates:
         return LocationResult(sw_id=None, port=None, room_id=None,
                                kind="unresolved", confidence="none")
@@ -177,7 +241,7 @@ def resolve_terminal_ip(ip: str, mac: str, graph: TopologyGraph,
         sw_id, port = c
         depth = graph.depth_from_core(sw_id)
         is_lag = 1 if ("eth-trunk" in port.lower() or "port-channel" in port.lower()) else 0
-        return (depth, -is_lag)
+        return (depth, -is_lag)  # 深度降序，非LAG优先
 
     best = max(candidates, key=_segment_sort_key)
     sw_id, port = best
@@ -191,6 +255,22 @@ def resolve_terminal_ip(ip: str, mac: str, graph: TopologyGraph,
 def resolve_terminal_ip_with_redis(ip: str, mac: str, graph: TopologyGraph,
                                     initial_candidates: list[tuple[int, str]],
                                     mac_index_lookup) -> LocationResult:
+    """终端IP定位：生产版（带 Redis MAC 索引查询的下游追溯）
+
+    在 resolve_terminal_ip 基础上增加：
+    - 当所有初始候选都是互联端口时，通过 mac_index_lookup 查询下游交换机的MAC记录
+    - 能发现"核心trunk口学到的MAC，实际来自下游接入交换机非上联口"的场景
+
+    Args:
+        ip: IP 地址
+        mac: MAC 地址
+        graph: 拓扑图
+        initial_candidates: 初始 MAC 候选列表 [(sw_id, port), ...]
+        mac_index_lookup: 回调函数 (scope, mac) -> [(sw_id, port), ...]
+
+    Returns:
+        LocationResult: 定位结果
+    """
     result = resolve_terminal_ip(ip, mac, graph, initial_candidates)
 
     if result.kind == "terminal_exact":
@@ -211,6 +291,15 @@ def _search_deeper_for_mac_with_redis(graph: TopologyGraph,
                                        current_candidates: list[tuple[int, str]],
                                        mac: str,
                                        mac_index_lookup) -> tuple[int, str] | None:
+    """沿拓扑图从当前候选向下游遍历，通过 Redis MAC 索引查询下游交换机MAC记录
+
+    优化：在 BFS 前一次性查询 MAC 索引并缓存，避免每个节点重复查询。
+
+    两阶段策略：
+    1. 沿拓扑图边 BFS 遍历下游交换机（确定性路径）
+    2. 若 BFS 未找到，直接扫描 MAC 索引中所有交换机（兜底，
+       应对拓扑图缺少 Eth-Trunk 链路导致 BFS 不可达的场景）
+    """
     all_mac_candidates = mac_index_lookup(graph.scope, mac)
     mac_by_sw: dict[int, list[tuple[int, str]]] = {}
     for s, p in all_mac_candidates:
@@ -233,7 +322,7 @@ def _search_deeper_for_mac_with_redis(graph: TopologyGraph,
                     if not _is_interconnect_port(p, s, graph):
                         ds_node = graph.nodes.get(s)
                         resolved_p = ds_node.resolve_lag_port(p) if ds_node else p
-                        return s, resolved_p
+                        return s, resolved_p  # 找到下游的非互联端口记录
                 next_frontier.append(downstream_sw)
         frontier = next_frontier
 
@@ -257,6 +346,7 @@ def _search_deeper_for_mac_with_redis(graph: TopologyGraph,
 
 def resolve_ip_location(ip: str, mac: str | None, graph: TopologyGraph,
                         mac_candidates: list[tuple[int, str]]) -> LocationResult:
+    """统一的IP定位入口，按确定性优先级查询，不使用评分启发式"""
     owner = graph.find_management_owner(ip)
     if owner:
         return LocationResult(sw_id=owner.sw_id, port=None, room_id=owner.room_id,
@@ -275,6 +365,23 @@ def resolve_ip_location(ip: str, mac: str | None, graph: TopologyGraph,
 
 
 def build_topology_graph(scope: str, switch_metas: list, db_session) -> TopologyGraph:
+    """从数据库构建本次扫描范围内的拓扑图
+
+    数据来源：
+    - SwitchNode: switch_metas（已采集的交换机基本信息）+ devices/cabinets（机房归属）
+    - gateway_ips: 本次采集的路由表中，分类为 GATEWAY/SUBNET 且接口为 Vlanif 的直连路由网关地址
+    - management_ip: switch_credentials.ip（这是登录用的管理地址，与网关地址完全独立的字段）
+    - TopologyLink: NetworkConnection 表（已有的N2N连接记录，运维维护的确定性拓扑数据）
+    - LAG 感知: link_aggregation_groups + network_ports.lag_group_id，合并同一 LAG 组的重复边
+
+    Args:
+        scope: 扫描范围标识
+        switch_metas: 本次扫描涉及的交换机元数据列表
+        db_session: 数据库 session
+
+    Returns:
+        TopologyGraph: 构建完成的拓扑图
+    """
     from app.models.network_connection import NetworkConnection
     from app.models.network_port import NetworkPort
     from app.models.link_aggregation import LinkAggregationGroup
@@ -341,7 +448,7 @@ def build_topology_graph(scope: str, switch_metas: list, db_session) -> Topology
                     room_id=room_id or 0,
                     layer=ext.layer if ext and ext.layer else 3,
                     is_core=(ext.switch_role == 0) if ext and ext.switch_role is not None else False,
-                    management_ip=None,
+                    management_ip=None,  # 外部节点不参与管理IP匹配
                     gateway_ips=set(),
                 ))
             logger.info("拓扑图添加 %d 个外部节点（虚拟机房跨机房连接对端）",

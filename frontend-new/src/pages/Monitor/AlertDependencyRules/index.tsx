@@ -38,7 +38,6 @@ import {
 
 const { Text } = Typography;
 
-
 const ALERT_TYPE_OPTIONS = [
   { label: 'device_unreachable', value: 'device_unreachable' },
   { label: 'device_recovered', value: 'device_recovered' },

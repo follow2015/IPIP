@@ -26,7 +26,6 @@ import { DEVICE_SUBTYPE_LABELS } from '@/types/enums';
 
 interface BatchUpdateMonitorModalProps {
   open: boolean;
-  
   devices: Device[];
   onClose: (refresh?: boolean) => void;
 }
@@ -46,7 +45,6 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
       firstDevice.device_subtype)
     : (firstDevice?.device_type ?? '');
 
-  
   const hasNetworkDevice = devices.some((d) => d.device_type === 'network');
   const nonNetworkCount = devices.filter((d) => d.device_type !== 'network').length;
 
@@ -55,9 +53,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
   const watchConfigureGroup = Form.useWatch('configure_group', form);
   const watchConfigurePortSync = Form.useWatch('configure_port_sync', form);
 
-  
   const { data: groups, isLoading: groupsLoading } = useMetricTemplateGroups();
-  
   const candidateGroups =
     groups
       ?.filter((g) => !firstDevice?.device_type || g.device_type === firstDevice.device_type)
@@ -67,7 +63,6 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
     const values = await form.validateFields();
     const deviceIds = devices.map((d) => d.id);
 
-    
     if (values.monitor_enabled !== undefined) {
       try {
         const result = await batchToggle.mutateAsync({
@@ -83,7 +78,6 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
       }
     }
 
-    
     if (values.configure_credential && values.protocol) {
       const p = values.protocol as string;
       const payload: Record<string, unknown> = {};
@@ -124,9 +118,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
       }
     }
 
-    
     if (values.configure_group) {
-      
       const groupId = values.metric_template_group_id ?? null;
       try {
         const result = await batchUpdateGroup.mutateAsync({
@@ -144,9 +136,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
       }
     }
 
-    
     if (values.configure_port_sync) {
-      
       const mode = (values.port_sync_mode as string) || 'global';
       const portSyncEnabled = mode === 'on' ? true : mode === 'off' ? false : null;
       try {
@@ -155,7 +145,6 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           portSyncEnabled
         });
         const modeLabel = mode === 'on' ? '强制开启' : mode === 'off' ? '强制关闭' : '跟随全局';
-        
         const parts: string[] = [`已${modeLabel} ${result.updated} 台网络设备的端口同步开关`];
         if (result.with_credential > 0) {
           parts.push(`${result.with_credential} 台有监控凭据可立即生效`);
@@ -215,7 +204,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           snmp_version: 'v2c'
         }}
       >
-        {}
+        {/* 监控开关 */}
         <Divider plain>监控开关</Divider>
         <Form.Item name="monitor_enabled" label="监控状态" valuePropName="checked">
           <Switch checkedChildren="启用" unCheckedChildren="暂停" />
@@ -231,7 +220,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           }
         />
 
-        {}
+        {/* 凭据配置 */}
         <Divider plain>监控凭据</Divider>
         <Form.Item name="configure_credential" label="配置凭据" valuePropName="checked">
           <Switch checkedChildren="配置" unCheckedChildren="跳过" />
@@ -267,7 +256,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           <Alert type="info" showIcon message="跳过凭据配置，仅修改监控开关状态" />
         )}
 
-        {}
+        {/* 指标模板组 */}
         <Divider plain>指标模板组</Divider>
         <Form.Item name="configure_group" label="配置指标模板组" valuePropName="checked">
           <Switch checkedChildren="配置" unCheckedChildren="跳过" />
@@ -310,7 +299,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           </>
         )}
 
-        {}
+        {/* 端口同步开关（仅网络设备显示） */}
         {hasNetworkDevice && (
           <>
             <Divider plain>端口同步开关</Divider>

@@ -5,7 +5,6 @@
  */
 import { Form, InputNumber, Select, Input } from 'antd';
 
-
 export function CpuSpecFields({ prefix }: { prefix?: (string | number)[] }) {
   const name = (field: string) => prefix ? [...prefix, field] : field;
   return (
@@ -28,7 +27,6 @@ export function CpuSpecFields({ prefix }: { prefix?: (string | number)[] }) {
     </>
   );
 }
-
 
 export function MemorySpecFields({ prefix }: { prefix?: (string | number)[] }) {
   const name = (field: string) => prefix ? [...prefix, field] : field;
@@ -53,7 +51,6 @@ export function MemorySpecFields({ prefix }: { prefix?: (string | number)[] }) {
   );
 }
 
-
 export function DiskSpecFields({ prefix }: { prefix?: (string | number)[] }) {
   const name = (field: string) => prefix ? [...prefix, field] : field;
   return (
@@ -76,7 +73,6 @@ export function DiskSpecFields({ prefix }: { prefix?: (string | number)[] }) {
     </>
   );
 }
-
 
 export function NicSpecFields({ prefix }: { prefix?: (string | number)[] }) {
   const name = (field: string) => prefix ? [...prefix, field] : field;
@@ -106,7 +102,6 @@ export function NicSpecFields({ prefix }: { prefix?: (string | number)[] }) {
     </>
   );
 }
-
 
 export function GpuSpecFields({ prefix }: { prefix?: (string | number)[] }) {
   const name = (field: string) => prefix ? [...prefix, field] : field;

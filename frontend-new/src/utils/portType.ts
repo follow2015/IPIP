@@ -38,7 +38,6 @@ export const PORT_TYPE_RULES: [RegExp, string][] = [
   [/^NULL/i, 'NULL']
 ];
 
-
 export function classifyPortType(name: string): string {
   for (const [regex, type] of PORT_TYPE_RULES) {
     if (regex.test(name)) return type;
@@ -46,9 +45,7 @@ export function classifyPortType(name: string): string {
   return '其他';
 }
 
-
 const PHYSICAL_PORT_TYPES = new Set(['100GE', '40GE', '25GE', '10GE', 'XGE', 'GE', '100M']);
-
 
 export function isPhysicalPort(portName: string): boolean {
   const type = classifyPortType(portName);
@@ -75,7 +72,6 @@ export const PORT_TYPE_ORDER = [
   'NULL',
   '其他'
 ];
-
 
 export const PORT_TYPE_SORT_WEIGHT: Record<string, number> = {
   '100GE': 0,
@@ -107,7 +103,6 @@ export function extractPortIndex(name: string): number {
   return match ? parseInt(match[1], 10) : 0;
 }
 
-
 export function getShortPortNum(name: string): string {
   if (!name) return '';
   const parts = name.split('/');
@@ -138,7 +133,6 @@ export const PORT_TYPE_TAG_COLOR: Record<string, string> = {
   其他: 'default'
 };
 
-
 export const PORT_TYPE_BAR_COLOR: Record<string, string> = {
   '100GE': '#eb2f96',
   '40GE': '#722ed1',
@@ -152,12 +146,12 @@ export const PORT_TYPE_BAR_COLOR: Record<string, string> = {
 };
 
 
+
 export function getBlockWidth(shortNum: string): number {
   if (shortNum.length <= 2) return 28;
   if (shortNum.length === 3) return 34;
   return 40;
 }
-
 
 export function getBlockFontSize(shortNum: string): number {
   if (shortNum.length <= 2) return 9;

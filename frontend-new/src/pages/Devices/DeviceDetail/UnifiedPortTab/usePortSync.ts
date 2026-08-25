@@ -16,9 +16,7 @@ interface UsePortSyncArgs {
   deviceId: number;
   refetch: () => void;
   setHighlightPort: (port: string | null) => void;
-  
   scheduleClearHighlight: () => void;
-  
   hasSsh?: boolean;
 }
 
@@ -31,7 +29,6 @@ export function usePortSync({
 }: UsePortSyncArgs) {
   const message = useMessage();
   const syncSwitchPorts = useSyncSwitchPorts();
-  
   const cancelPollingRef = useRef<(() => void) | null>(null);
 
   const { submitAction, onEvent: onPortActionEvent } = usePortAction({
@@ -40,14 +37,12 @@ export function usePortSync({
     hasSsh
   });
 
-  
   useEffect(() => {
     return () => {
       cancelPollingRef.current?.();
     };
   }, []);
 
-  
   useDeviceEvents(deviceId, 'ports', (event) => {
     onPortActionEvent(event);
     if (event.op_type === 'info_refresh') {
@@ -92,7 +87,6 @@ export function usePortSync({
     }
   });
 
-  
   const handleSync = () => {
     confirm({
       title: '确认同步',
@@ -104,7 +98,6 @@ export function usePortSync({
           cancelPollingRef.current?.();
           cancelPollingRef.current = startPolling(() => refetch(), 5000, 3);
         } catch {
-          
         }
       }
     });

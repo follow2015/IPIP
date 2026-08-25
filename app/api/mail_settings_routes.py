@@ -23,6 +23,7 @@ router = Blueprint("mail_settings", __name__, url_prefix="/api/settings/mail")
 
 
 def _require_admin():
+    """检查当前用户是否为管理员"""
     from app.services.user_service import UserService
     from app.persistence.user_repository import UserRepository
     from app.persistence.user_log_repository import UserLogRepository
@@ -34,11 +35,16 @@ def _require_admin():
 
 
 def _get_db_config() -> dict:
+    """从数据库读取邮件配置（密码脱敏），供 API 返回"""
     from app.models.mail_setting import MailSetting
     return MailSetting.get_all()
 
 
 def _get_smtp_params(data: dict | None = None) -> dict:
+    """组装 SMTP 连接参数，优先使用请求体中的临时值，否则从数据库读取。
+
+    用于测试端点：允许用未保存的配置测试连通性。
+    """
     from app.services.channels.email import get_mail_config_from_db
 
     db_values = get_mail_config_from_db()
@@ -70,6 +76,7 @@ def _get_smtp_params(data: dict | None = None) -> dict:
 @doc(summary="获取邮件服务器配置", tags=["邮件配置"], responses={200: "ApiResponse"})
 @login_required
 def get_mail_config():
+    """获取当前邮件服务器配置（管理员），密码脱敏。"""
     if not _require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
@@ -81,6 +88,7 @@ def get_mail_config():
 @login_required
 @transactional
 def update_mail_config():
+    """更新邮件服务器配置（管理员），写入数据库。"""
     if not _require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
@@ -132,6 +140,7 @@ def update_mail_config():
 @login_required
 @transactional
 def delete_mail_config():
+    """删除邮件服务器配置（管理员），清空数据库中的所有配置项。"""
     if not _require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
@@ -150,6 +159,12 @@ def delete_mail_config():
 @doc(summary="测试邮件服务器连通性", tags=["邮件配置"], responses={200: "ApiResponse"})
 @login_required
 def test_mail_config():
+    """测试邮件服务器连通性（管理员），发送一封测试邮件。
+
+    请求体参数：
+    - recipient: 收件人邮箱地址（必填）
+    - 其余字段用于测试未保存的配置（可选）
+    """
     if not _require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 

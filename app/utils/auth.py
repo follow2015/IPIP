@@ -20,14 +20,23 @@ from config import get_config
 logger = get_logger(__name__)
 config = get_config()
 
-RBAC_CACHE_TTL = 300
+RBAC_CACHE_TTL = 300  # RBAC 权限缓存有效期（秒），原 1800(30min) 过长，权限变更最长 5min 生效
 
 
 def _stable_hash(obj) -> str:
+    """生成跨进程稳定的哈希键（内置 hash() 受 PYTHONHASHSEED 影响不稳定）"""
     return hashlib.sha256(repr(obj).encode("utf-8")).hexdigest()
 
 
 def get_current_user_id() -> Optional[int]:
+    """获取当前请求的认证用户ID
+
+    统一从 g.current_user 读取 user_id，避免各处直接访问
+    g.user_id（从未被设置）或 g.current_user["user_id"]（分散重复）。
+
+    Returns:
+        int | None: 用户ID，未认证或信息缺失时返回 None
+    """
     current_user = getattr(g, 'current_user', None)
     if isinstance(current_user, dict):
         return current_user.get('user_id')
@@ -35,8 +44,13 @@ def get_current_user_id() -> Optional[int]:
 
 
 class AuthenticationManager:
+    """认证管理器
+
+    提供用户认证、令牌生成和验证功能。
+    """
 
     def __init__(self):
+        """初始化认证管理器"""
         self.secret_key = config.JWT_SECRET_KEY
         self.algorithm = config.JWT_ALGORITHM
         self.access_token_expires = config.JWT_ACCESS_TOKEN_EXPIRES
@@ -44,9 +58,26 @@ class AuthenticationManager:
         self.password_manager = password_manager
 
     def hash_password(self, password: str) -> str:
+        """加密密码
+
+        Args:
+            password: 明文密码
+
+        Returns:
+            str: 加密后的密码
+        """
         return self.password_manager.hash_password(password)
 
     def verify_password(self, password: str, hashed_password: str) -> bool:
+        """验证密码
+
+        Args:
+            password: 明文密码
+            hashed_password: 加密后的密码
+
+        Returns:
+            bool: 密码正确返回True
+        """
         return self.password_manager.verify_password(password, hashed_password)
 
     def generate_token(
@@ -58,6 +89,19 @@ class AuthenticationManager:
         auth_type: str = "web",
         openid: str = None,
     ) -> str:
+        """生成JWT令牌
+
+        Args:
+            user_id: 用户ID
+            username: 用户名（微信登录时可为None）
+            roles: 用户角色列表
+            token_type: 令牌类型（access或refresh）
+            auth_type: 认证类型（web或wx）
+            openid: 微信OpenID（微信登录时必需）
+
+        Returns:
+            str: JWT令牌
+        """
         import uuid
 
         if token_type == "refresh":
@@ -127,6 +171,21 @@ class AuthenticationManager:
         return token
 
     def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """验证JWT令牌
+
+        验证流程（按顺序）：
+        1. 检查令牌是否在撤销列表中
+        2. 验证令牌签名
+        3. 检查令牌是否过期
+
+        被撤销的令牌会立即返回 None，不进行后续验证。
+
+        Args:
+            token: JWT令牌
+
+        Returns:
+            Optional[Dict]: 令牌payload，验证失败返回None
+        """
         try:
             if cache_manager.is_token_revoked(token):
                 token_preview = token[:20] + "..." \
@@ -160,6 +219,14 @@ class AuthenticationManager:
             return None
 
     def refresh_token(self, refresh_token: str) -> Optional[Dict[str, str]]:
+        """刷新访问令牌
+
+        Args:
+            refresh_token: 刷新令牌
+
+        Returns:
+            Optional[Dict]: 包含新的访问令牌和刷新令牌，失败返回None
+        """
         payload = self.verify_token(refresh_token)
         if not payload:
             return None
@@ -212,7 +279,7 @@ class AuthenticationManager:
                 rkey = f"user_refresh_tokens:{user_id}"
                 r.srem(rkey, refresh_token)
         except Exception:
-            pass
+            pass  # 非关键操作，失败不影响主流程
 
         return {
             "access_token": new_access_token,
@@ -220,12 +287,23 @@ class AuthenticationManager:
         }
 
     def revoke_token(self, token: str) -> bool:
+        """撤销令牌
+
+        将令牌加入撤销列表，TTL 设置为令牌的剩余有效时间。
+        如果令牌已过期，则不需要撤销（返回 True 表示操作成功）。
+
+        Args:
+            token: JWT令牌
+
+        Returns:
+            bool: 撤销成功返回True，失败返回False
+        """
         try:
             payload = jwt.decode(
                 token,
                 self.secret_key,
                 algorithms=[self.algorithm],
-                options={"verify_exp": False},
+                options={"verify_exp": False},  # 不验证过期时间，因为我们需要处理已过期的令牌
             )
 
             user_id = payload.get("user_id")
@@ -289,6 +367,16 @@ class AuthenticationManager:
     def authenticate_password(
         self, username: str, password: str, user_service
     ) -> Optional[Dict[str, Any]]:
+        """认证用户（用户名密码方式）
+
+        Args:
+            username: 用户名
+            password: 密码
+            user_service: 用户服务实例
+
+        Returns:
+            Optional[Dict]: 认证成功返回用户信息和令牌，失败返回None
+        """
         try:
             user = user_service.get_by_username(username)
             if not user:
@@ -337,6 +425,10 @@ class AuthenticationManager:
             return None
 
     def logout(self, token: str) -> bool:
+        """用户登出 — 撤销当前令牌及该用户的所有刷新令牌
+
+        即使 access_token 已过期，仍需撤销 refresh_token 以防被盗用。
+        """
         try:
             payload = self.verify_token(token)
             if payload:
@@ -369,6 +461,7 @@ class AuthenticationManager:
             return False
 
     def _revoke_all_refresh_tokens(self, user_id: int) -> None:
+        """撤销指定用户的所有刷新令牌"""
         try:
             from app.services.switch_events import _get_redis
             r = _get_redis()
@@ -386,11 +479,30 @@ class AuthenticationManager:
     def authenticate(
         self, username: str, password: str, user_service
     ) -> Optional[Dict[str, Any]]:
+        """认证用户（用户名密码方式）— 委托给 authenticate_password
+
+        Args:
+            username: 用户名
+            password: 密码
+            user_service: 用户服务实例
+
+        Returns:
+            Optional[Dict]: 认证成功返回用户信息和令牌，失败返回None
+        """
         return self.authenticate_password(username, password, user_service)
 
     def authenticate_wechat(
         self, openid: str, user_service
     ) -> Optional[Dict[str, Any]]:
+        """认证用户（微信方式）
+
+        Args:
+            openid: 微信OpenID
+            user_service: 用户服务实例
+
+        Returns:
+            Optional[Dict]: 认证成功返回用户信息和令牌，失败返回None
+        """
         try:
             user = user_service.get_by_openid(openid)
             if not user:
@@ -429,6 +541,10 @@ class AuthenticationManager:
 
 
 class PermissionManager:
+    """权限管理器
+
+    提供基于角色的访问控制（RBAC）功能。
+    """
 
     ROLES = {
         "admin": "管理员",
@@ -628,12 +744,22 @@ class PermissionManager:
 
     @classmethod
     def _normalize_role(cls, role: str) -> str:
+        """标准化角色名称，处理数字角色"""
         if role in cls.NUMERIC_ROLE_MAP:
             return cls.NUMERIC_ROLE_MAP[role]
         return role
 
     @classmethod
     def has_permission(cls, role: str, permission: str) -> bool:
+        """检查角色是否拥有指定权限（从数据库 role_permissions 表动态读取）
+
+        Args:
+            role: 用户角色名称
+            permission: 权限标识
+
+        Returns:
+            bool: 拥有权限返回True
+        """
         normalized_role = cls._normalize_role(role)
 
         cache_key = f"permission:{normalized_role}:{permission}"
@@ -668,6 +794,14 @@ class PermissionManager:
 
     @classmethod
     def get_role_permissions(cls, role: str) -> List[str]:
+        """获取角色的所有权限（从数据库 role_permissions 表动态读取）
+
+        Args:
+            role: 用户角色名称
+
+        Returns:
+            List[str]: 权限编码列表
+        """
         normalized_role = cls._normalize_role(role)
 
         cache_key = f"role_permissions:{normalized_role}"
@@ -705,6 +839,15 @@ class PermissionManager:
         cls, role: str,
         required_permissions: List[str]
     ) -> bool:
+        """检查角色是否拥有所有必需权限
+
+        Args:
+            role: 用户角色
+            required_permissions: 必需权限列表
+
+        Returns:
+            bool: 拥有所有权限返回True
+        """
         normalized_role = cls._normalize_role(role)
 
         permissions_hash = _stable_hash(tuple(sorted(required_permissions)))
@@ -727,6 +870,15 @@ class PermissionManager:
         cls, user,
         required_permissions: List[str]
     ) -> bool:
+        """检查用户是否拥有所有必需权限（基于用户的所有角色）
+
+        Args:
+            user: 用户对象
+            required_permissions: 必需权限列表
+
+        Returns:
+            bool: 拥有所有权限返回True
+        """
         user_id = user.id if hasattr(user, 'id') else \
             getattr(user, 'user_id', 0)
         sorted_perms = tuple(sorted(required_permissions))
@@ -759,6 +911,16 @@ permission_manager = PermissionManager()
 
 
 def login_required(f):
+    """要求登录的装饰器
+
+    支持Web和微信两种认证方式。
+    仅接受 access token，拒绝 refresh token。
+
+    使用方法:
+        @login_required
+        def my_view():
+            pass
+    """
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -800,6 +962,17 @@ def login_required(f):
 
 
 def sse_login_required(f):
+    """SSE 端点专用认证装饰器
+
+    EventSource API 不支持自定义 HTTP 头，因此同时支持：
+    1. Authorization 请求头（常规方式）
+    2. ?token=xxx URL 查询参数（SSE 专用方式）
+
+    使用方法:
+        @sse_login_required
+        def sse_view():
+            pass
+    """
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -843,6 +1016,13 @@ def sse_login_required(f):
 
 
 def permission_required(*permissions):
+    """要求特定权限的装饰器
+
+    使用方法:
+        @permission_required('room:create', 'room:update')
+        def my_view():
+            pass
+    """
 
     def decorator(f):
         @wraps(f)
@@ -870,6 +1050,13 @@ def permission_required(*permissions):
 
 
 def role_required(*roles):
+    """要求特定角色的装饰器
+
+    使用方法:
+        @role_required('admin', 'operator')
+        def my_view():
+            pass
+    """
 
     def decorator(f):
         @wraps(f)

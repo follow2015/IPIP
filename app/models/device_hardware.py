@@ -15,6 +15,7 @@ from extensions import db
 
 
 class DeviceHardware(BaseModel):
+    """设备硬件规格（1:1 扩展）"""
 
     __tablename__ = "device_hardware"
     __table_args__ = (
@@ -64,7 +65,7 @@ class DeviceHardware(BaseModel):
     device = relationship(
         "Device",
         back_populates="hardware",
-        lazy="select",
+        lazy="select",     # ← 原 "joined"，改为 "select"
     )
 
     cpu_template    = relationship('ComponentTemplate',
@@ -75,6 +76,7 @@ class DeviceHardware(BaseModel):
                         foreign_keys=[gpu_template_id], lazy='select')
 
     def get_ip_list(self) -> str:
+        """获取IP地址列表（逗号分隔）"""
         if not self.ip_address:
             return ""
         if isinstance(self.ip_address, list):
@@ -85,6 +87,7 @@ class DeviceHardware(BaseModel):
         return str(self.ip_address)
 
     def set_ip_list(self, ip_string: str) -> None:
+        """从逗号分隔字符串设置IP地址列表"""
         if not ip_string:
             self.ip_address = None
             return
@@ -92,6 +95,7 @@ class DeviceHardware(BaseModel):
         self.ip_address = [{"ip": ip, "is_primary": (i == 0)} for i, ip in enumerate(ips)]
 
     def get_primary_ip(self) -> Optional[str]:
+        """获取主IP地址"""
         if not self.ip_address:
             return None
         if isinstance(self.ip_address, list):

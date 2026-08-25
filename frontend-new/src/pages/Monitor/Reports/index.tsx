@@ -71,7 +71,6 @@ export default function MonitorReportsPage() {
     return `${(mttrSeconds / 3600).toFixed(2)} 小时`;
   }, [mttrSeconds]);
 
-  
   const severityPieData = useMemo(
     () =>
       (data?.by_severity ?? []).map((x) => ({
@@ -96,13 +95,11 @@ export default function MonitorReportsPage() {
     [data]
   );
 
-  
   const densityData = useMemo(
     () => (data?.density ?? []).map((x) => ({ time: x.bucket_start ?? '', count: x.count ?? 0 })),
     [data]
   );
 
-  
   const topDeviceColumns = [
     {
       title: '排名',
@@ -130,7 +127,6 @@ export default function MonitorReportsPage() {
     }
   ];
 
-  
   const topTypeColumns = [
     {
       title: '排名',

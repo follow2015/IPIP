@@ -18,6 +18,7 @@ _SYSTEM_ROLES = {"admin", "operator", "viewer", "user"}
 
 
 def _invalidate_role_permission_cache(role_name: str):
+    """角色权限变更时，清除该角色的所有权限缓存，使权限撤销实时生效"""
     try:
         from app.utils.cache import cache_manager
         from app.utils.auth import PermissionManager
@@ -32,6 +33,7 @@ def _invalidate_role_permission_cache(role_name: str):
 
 
 class RbacService:
+    """RBAC 权限管理服务"""
 
     def __init__(self, role_repository: RoleRepository, permission_repository: PermissionRepository):
         self.role_repository = role_repository
@@ -42,6 +44,7 @@ class RbacService:
         self, page: int = 1, per_page: int = 20,
         search: str = "", status: Optional[int] = None,
     ) -> Dict[str, Any]:
+        """获取角色列表（分页）。"""
         pagination = self.role_repository.search_roles(
             search=search, status=status, page=page, per_page=per_page,
         )
@@ -59,9 +62,15 @@ class RbacService:
         }
 
     def get_role(self, role_id: int) -> Optional[Role]:
+        """获取角色详情（含权限和用户）。"""
         return self.role_repository.find_by_id_with_relations(role_id)
 
     def create_role(self, data: Dict[str, Any]) -> Role:
+        """创建角色。
+
+        Raises:
+            ValidationError: 名称缺失或重复
+        """
         name = data.get("name", "").strip()
         display_name = data.get("display_name", "").strip()
 
@@ -82,6 +91,11 @@ class RbacService:
         return role
 
     def update_role(self, role_id: int, data: Dict[str, Any]) -> Optional[Role]:
+        """更新角色。
+
+        Raises:
+            ValidationError: 名称重复
+        """
         role = self.role_repository.find_by_id(role_id)
         if not role:
             return None
@@ -102,6 +116,11 @@ class RbacService:
         return role
 
     def delete_role(self, role_id: int) -> bool:
+        """删除角色（系统默认角色和有用户的角色不可删除）。
+
+        Raises:
+            ValidationError: 系统角色或有用户的角色
+        """
         role = self.role_repository.find_by_id(role_id)
         if not role:
             return False
@@ -118,6 +137,11 @@ class RbacService:
         return True
 
     def batch_delete_roles(self, ids: List[int]) -> Dict[str, Any]:
+        """批量删除角色。
+
+        系统默认角色和有用户的角色会被跳过并记录在 failed 中。
+        使用 savepoint 保护单个删除，避免部分失败导致整个 session 脏。
+        """
         deleted = 0
         failed = []
 
@@ -148,6 +172,7 @@ class RbacService:
 
 
     def get_role_permissions(self, role_id: int) -> List[Dict[str, Any]]:
+        """获取角色的权限列表。"""
         role = self.role_repository.find_by_id(role_id)
         if not role:
             return []
@@ -156,6 +181,11 @@ class RbacService:
     def update_role_permissions(
         self, role_id: int, permission_codes: List[str]
     ) -> Dict[str, Any]:
+        """更新角色权限（全量替换）。
+
+        Raises:
+            ValidationError: 权限编码不存在
+        """
         role = self.role_repository.find_by_id(role_id)
         if not role:
             return None
@@ -186,6 +216,7 @@ class RbacService:
         self, page: int = 1, per_page: int = 50,
         search: str = "", category: str = "",
     ) -> Dict[str, Any]:
+        """获取权限列表（分页）。"""
         pagination = self.permission_repository.search_permissions(
             search=search, category=category, page=page, per_page=per_page,
         )
@@ -197,10 +228,12 @@ class RbacService:
         }
 
     def list_permission_categories(self) -> List[str]:
+        """获取权限分类列表。"""
         return self.permission_repository.find_distinct_categories()
 
 
     def get_user_roles(self, user_id: int) -> List[Dict[str, Any]]:
+        """获取用户的角色列表。"""
         user = self.role_repository.session.query(User).get(user_id)
         if not user:
             return []
@@ -209,6 +242,11 @@ class RbacService:
     def update_user_roles(
         self, user_id: int, role_ids: List[int]
     ) -> Dict[str, Any]:
+        """更新用户角色（全量替换）。
+
+        Raises:
+            ValidationError: 角色 ID 不存在
+        """
         user = self.role_repository.session.query(User).get(user_id)
         if not user:
             return None

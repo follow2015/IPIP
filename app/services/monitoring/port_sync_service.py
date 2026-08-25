@@ -34,6 +34,11 @@ logger = logging.getLogger(__name__)
 
 
 class PortSyncService:
+    """端口同步服务（采集 → 四元组匹配 → 替换）。
+
+    对非网管网络设备，用 SNMP 或 Zabbix 采集端口，按四元组匹配后直接替换
+    network_ports 表中的端口数据。collector 由调用方按凭据类型注入。
+    """
 
     def __init__(
         self,
@@ -52,10 +57,24 @@ class PortSyncService:
         collector=None,
         device=None,
     ) -> dict:
+        """同步单台设备的端口（采集 → 四元组匹配 → 替换）。
+
+        Args:
+            device_id: 设备 ID
+            credential: 采集凭据（SNMP 或 Zabbix）
+            ip: 设备管理 IP
+            timeout: 采集超时（秒）
+            collector: 可选 collector 实例（缺省用 self.collector）
+            device: 设备 ORM 对象（Zabbix collector 需要，SNMP 可选）
+
+        Returns:
+            dict: {"success": bool, "device_id": int, "port_count": int,
+                   "matched": int, "added": int, "removed": int, "error": str | None}
+        """
         active_collector = collector or self.collector
         try:
             port_rows = active_collector.collect(credential, ip, timeout=timeout, device=device)
-        except Exception:
+        except Exception:  # noqa: BLE001 - 采集失败静默降级
             logger.warning(
                 "端口采集失败 device_id=%s ip=%s", device_id, ip, exc_info=True,
             )
@@ -79,6 +98,20 @@ class PortSyncService:
         }
 
     def _replace_by_tuple_key(self, device_id: int, port_rows: list[dict]) -> dict:
+        """按 (port_type, slot, card, port_number) 四元组匹配并替换端口。
+
+        语义：
+        - 采集结果中的端口，四元组匹配已有行 → 更新（link_status / speed 等）
+        - 采集结果中的端口，无匹配 → 新增（data_source=auto）
+        - 已有端口不在采集结果中 → 删除（不保留手动端口）
+
+        Args:
+            device_id: 设备 ID
+            port_rows: SNMP 采集的端口数据列表
+
+        Returns:
+            dict: {"matched": int, "added": int, "removed": int}
+        """
         session = self.port_repo.session
         now = datetime.now()
 
@@ -144,6 +177,11 @@ class PortSyncService:
         return {"matched": matched, "added": added, "removed": removed}
 
     def _update_port_fields(self, port: NetworkPort, row: dict, now: datetime) -> None:
+        """更新已匹配端口的采集字段。
+
+        替换语义：采集字段全部覆盖，data_source → auto。
+        自动获取状态下以采集为准，不保留手动 disabled 状态。
+        """
         link_status = row.get("link_status")
         new_usage_status = NetworkPort.derive_usage_status(
             link_status, row.get("port_name"),
@@ -169,6 +207,12 @@ class PortSyncService:
         port.last_collected_at = now
 
     def _cleanup_port_relations(self, ports: list[NetworkPort]) -> None:
+        """清理待删除端口的 LAG / VLAN 成员关系。
+
+        与 PortManagementService.delete_port 语义对齐：
+        - 清除 lag_group_id 并同步 LAG member_count
+        - 删除 VLANPortMember 关联
+        """
         if not ports:
             return
         session = self.port_repo.session

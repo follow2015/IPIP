@@ -27,6 +27,7 @@ from app.utils.transactional import transactional
 
 
 class UserLoginSchema(Schema):
+    """用户登录请求Schema"""
     class Meta:
         unknown = EXCLUDE
     username = fields.Str(required=True)
@@ -34,6 +35,7 @@ class UserLoginSchema(Schema):
 
 
 class UserRegisterSchema(Schema):
+    """用户注册请求Schema"""
     class Meta:
         unknown = EXCLUDE
     username = fields.Str(required=True, validate=validate.Length(min=1, max=100))
@@ -43,12 +45,14 @@ class UserRegisterSchema(Schema):
 
 
 class RefreshTokenSchema(Schema):
+    """刷新令牌请求Schema"""
     class Meta:
         unknown = EXCLUDE
     refresh_token = fields.Str(required=True)
 
 
 class UserUpdateRequestSchema(Schema):
+    """更新用户信息请求Schema"""
     class Meta:
         unknown = EXCLUDE
     username = fields.Str(validate=validate.Length(max=100), allow_none=True)
@@ -61,6 +65,7 @@ class UserUpdateRequestSchema(Schema):
 
 
 class ChangePasswordSchema(Schema):
+    """修改密码请求Schema"""
     class Meta:
         unknown = EXCLUDE
     username = fields.Str(required=True)
@@ -71,6 +76,7 @@ class ChangePasswordSchema(Schema):
 
 
 class ResetPasswordSchema(Schema):
+    """重置密码请求Schema"""
     class Meta:
         unknown = EXCLUDE
     password = fields.Str(required=True, validate=validate.Length(min=6))
@@ -84,10 +90,16 @@ security_service = SecurityService()
 
 
 def _get_client_ip() -> str:
+    """从请求头中提取真实客户端 IP。
+
+    优先读取反向代理写入的 X-Forwarded-For，取第一个非空段；
+    否则回退到 request.remote_addr。
+    """
     forwarded_for = request.headers.get("X-Forwarded-For", "")
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
     return request.remote_addr or ""
+
 
 
 @user_bp.route("/login", methods=["POST"])
@@ -96,6 +108,15 @@ def _get_client_ip() -> str:
 @api_exception_handler
 @transactional
 def login():
+    """用户登录
+
+    Request Body:
+        username: 用户名
+        password: 密码
+
+    Returns:
+        JSON响应，包含访问令牌、刷新令牌和用户信息
+    """
     client_ip = _get_client_ip()
 
     data = request.get_json()
@@ -157,6 +178,17 @@ def login():
 @transactional
 @api_exception_handler
 def register():
+    """用户注册
+
+    Request Body:
+        username: 用户名
+        password: 密码
+        email:    邮箱
+        role:     角色（可选，默认 user）
+
+    Returns:
+        JSON响应，包含新创建的用户信息
+    """
     data = request.get_json()
     if not data:
         return APIResponse.error("请求数据不能为空", status_code=400)
@@ -192,7 +224,7 @@ def register():
     })
 
     return APIResponse.success(
-        data=user.to_dict(exclude=["password"]),
+        data=user.to_dict(exclude=["password"]),   # 字段名为 password，非 password_hash
         message="注册成功",
         status_code=201,
     )
@@ -203,6 +235,11 @@ def register():
 @rate_limit_api
 @api_exception_handler
 def refresh_token():
+    """刷新访问令牌
+
+    Request Body:
+        refresh_token: 刷新令牌
+    """
     data = request.get_json()
     if not data or "refresh_token" not in data:
         return APIResponse.error("缺少refresh_token参数", status_code=400)
@@ -224,9 +261,11 @@ def refresh_token():
 @login_required
 @api_exception_handler
 def logout():
+    """用户登出 — 撤销当前访问令牌"""
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     auth_manager.revoke_token(token)
     return APIResponse.success(message="登出成功")
+
 
 
 @user_bp.route("/verify", methods=["GET"])
@@ -234,6 +273,7 @@ def logout():
 @login_required
 @api_exception_handler
 def verify_token():
+    """验证访问令牌，返回当前用户基本信息"""
     user_id = g.current_user["user_id"]
     user = user_service.get_by_id(user_id)
 
@@ -257,6 +297,7 @@ def verify_token():
 @login_required
 @api_exception_handler
 def get_current_user():
+    """获取当前用户完整信息"""
     user_id = g.current_user["user_id"]
     user = user_service.get_by_id(user_id)
 
@@ -275,6 +316,14 @@ def get_current_user():
 @transactional
 @api_exception_handler
 def update_my_profile():
+    """更新当前用户个人信息（仅允许修改自己的 username/name/email/contact_phone）
+
+    Request Body:
+        username:      用户名（可选）
+        name:          真实姓名（可选）
+        email:         邮箱（可选）
+        contact_phone: 联系电话（可选）
+    """
     user_id = g.current_user["user_id"]
     data = request.get_json()
     if not data:
@@ -299,6 +348,12 @@ def update_my_profile():
 @login_required
 @api_exception_handler
 def get_my_login_logs():
+    """获取当前用户的登录日志
+
+    Query Parameters:
+        page:      页码（默认1）
+        per_page: 每页数量（默认20，最大100）
+    """
     user_id   = g.current_user["user_id"]
     page      = request.args.get("page", 1, type=int)
     per_page  = min(request.args.get("per_page", 20, type=int), 100)
@@ -320,6 +375,15 @@ def get_my_login_logs():
 @permission_required("user:view")
 @api_exception_handler
 def get_user_login_logs(user_id):
+    """管理员获取指定用户的登录日志
+
+    Path Parameters:
+        user_id: 用户ID
+
+    Query Parameters:
+        page:      页码（默认1）
+        per_page: 每页数量（默认20，最大100）
+    """
     page      = request.args.get("page", 1, type=int)
     per_page  = min(request.args.get("per_page", 20, type=int), 100)
 
@@ -340,6 +404,15 @@ def get_user_login_logs(user_id):
 @permission_required("user:view")
 @api_exception_handler
 def get_all_login_logs():
+    """管理员获取全局登录日志（支持按用户、时间段筛选）
+
+    Query Parameters:
+        user_id:     按用户ID过滤（可选）
+        start_time:  起始时间 ISO 格式（可选）
+        end_time:    结束时间 ISO 格式（可选）
+        page:        页码（默认1）
+        per_page:   每页数量（默认20，最大100）
+    """
     user_id    = request.args.get("user_id", None, type=int)
     start_time = request.args.get("start_time", None, type=str)
     end_time   = request.args.get("end_time", None, type=str)
@@ -360,6 +433,7 @@ def get_all_login_logs():
     )
 
 
+
 @user_bp.route("/", methods=["GET"])
 @doc(summary="获取用户列表", tags=["用户"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}, {"name": "all", "in": "query", "schema": {"type": "string", "default": "false"}}, {"name": "active_only", "in": "query", "schema": {"type": "string", "default": "false"}}], responses={200: "UserResponse", 401: "ApiError"})
 @login_required
@@ -367,6 +441,15 @@ def get_all_login_logs():
 @rate_limit_api
 @api_exception_handler
 def list_users():
+    """获取用户列表（支持分页、搜索过滤）
+
+    Query Parameters:
+        page:       页码（默认1）
+        per_page:   每页数量（默认20）
+        search:     搜索关键词，模糊匹配用户名/邮箱/姓名（可选）
+        all:        是否获取所有用户，不分页（默认false）
+        active_only: 配合 all=true 使用，只返回激活用户
+    """
     get_all = request.args.get("all", "false").lower() == "true"
     search = request.args.get("search", type=str)
 
@@ -409,6 +492,17 @@ def list_users():
 @transactional
 @api_exception_handler
 def update_user(user_id):
+    """更新用户信息
+
+    Request Body:
+        username:      用户名（可选）
+        name:          真实姓名（可选）
+        email:         邮箱（可选）
+        department:    部门（可选）
+        contact_phone: 联系电话（可选）
+        status:        状态 0=正常 1=停用（可选）
+        password:      新密码（可选，为空则不修改）
+    """
     user = user_service.get_by_id(user_id)
     if not user:
         return APIResponse.error("用户不存在", status_code=404)
@@ -439,6 +533,11 @@ def update_user(user_id):
 @transactional
 @api_exception_handler
 def batch_delete_users():
+    """批量删除用户
+
+    Request Body:
+        ids: 用户ID列表
+    """
     data = request.get_json()
     if not data or "ids" not in data:
         return APIResponse.error("请提供要删除的用户ID列表", status_code=400)
@@ -480,6 +579,16 @@ def batch_delete_users():
 @permission_required("user:view")
 @api_exception_handler
 def get_user_permissions(user_id):
+    """获取用户的权限列表
+
+    返回用户通过角色继承的所有权限。
+
+    Args:
+        user_id: 用户ID
+
+    Returns:
+        JSON响应，包含用户权限列表
+    """
     user = user_service.get_by_id(user_id)
     if not user:
         return APIResponse.error("用户不存在", error_code="USER_NOT_FOUND", status_code=404)
@@ -499,12 +608,19 @@ def get_user_permissions(user_id):
     )
 
 
+
 @user_bp.route("/change-password", methods=["POST"])
 @doc(summary="修改当前用户密码", tags=["用户"], request_body={"content": {"application/json": {"schema": {"type": "object", "required": ["old_password", "new_password"], "properties": {"old_password": {"type": "string"}, "new_password": {"type": "string", "minLength": 6}}}}}}, responses={200: "ApiResponse", 400: "ApiError", 401: "ApiError"})
 @login_required
 @transactional
 @api_exception_handler
 def change_password():
+    """修改当前用户密码（仅允许修改自己的密码，需验证原密码）
+
+    Request Body:
+        old_password: 原密码
+        new_password: 新密码
+    """
     user_id = g.current_user["user_id"]
     data = request.get_json()
     if not data:
@@ -531,6 +647,20 @@ def change_password():
 @permission_required("user:update")
 @transactional
 def reset_user_password(user_id):
+    """
+    重置用户密码
+
+    管理员重置指定用户的密码。不传密码时自动随机生成。
+
+    Args:
+        user_id: 用户ID
+
+    Request Body:
+        password: 新密码（可选，不传则随机生成）
+
+    Returns:
+        JSON响应，包含重置结果和新密码
+    """
     import secrets
     import string
 

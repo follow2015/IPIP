@@ -13,6 +13,7 @@ from app.models.device_metric_latest import DeviceMetricLatest
 
 
 class DeviceMetricLatestRepository:
+    """设备指标当前值仓库"""
 
     def __init__(self, session=None):
         self.session = session or db.session
@@ -26,6 +27,15 @@ class DeviceMetricLatestRepository:
         )
 
     def upsert_many(self, device_id: int, collected: dict, collected_at: datetime = None) -> int:
+        """批量 upsert 采集结果。
+
+        Args:
+            device_id: 设备 ID
+            collected: {metric_key: {index: {"value":..., "severity":..., "breached":...}}}
+            collected_at: 采集时间（缺省 now）
+        Returns:
+            upsert 行数
+        """
         if not collected:
             return 0
         collected_at = collected_at or datetime.now(timezone.utc)

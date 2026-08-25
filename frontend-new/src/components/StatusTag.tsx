@@ -5,7 +5,6 @@ interface StatusTagProps {
   statusMap: Record<string, { label: string; color: string }>;
 }
 
-
 export function StatusTag({ status, statusMap }: StatusTagProps) {
   const key = status == null ? '' : String(status);
   const cfg = statusMap[key];

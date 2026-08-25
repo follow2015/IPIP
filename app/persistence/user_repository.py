@@ -23,12 +23,18 @@ logger = get_logger(__name__)
 
 
 class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
+    """用户Repository实现
+
+    提供用户相关的数据访问方法，包括用户查询、创建、更新等操作。
+    User 模型使用多对多角色关系（roles），所有角色过滤均通过 JOIN 实现。
+    """
 
     def __init__(self, session=None):
         super().__init__(User, session)
 
 
     def find_by_username(self, username: str) -> Optional[User]:
+        """根据用户名查找用户"""
         try:
             return self.session.query(User).filter(User.username == username).first()
         except SQLAlchemyError as e:
@@ -36,6 +42,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找用户失败", original_error=e)
 
     def find_by_email(self, email: str) -> Optional[User]:
+        """根据邮箱查找用户"""
         try:
             return self.session.query(User).filter(User.email == email).first()
         except SQLAlchemyError as e:
@@ -43,6 +50,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找用户失败", original_error=e)
 
     def find_by_openid(self, openid: str) -> Optional[User]:
+        """根据微信OpenID查找用户"""
         try:
             return self.session.query(User).filter(User.openid == openid).first()
         except SQLAlchemyError as e:
@@ -51,6 +59,15 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def find_by_role(self, role_name: str, active_only: bool = True) -> List[User]:
+        """根据角色名称查找用户
+
+        Args:
+            role_name:   角色名称（Role.name）
+            active_only: 是否只返回激活用户（status=0）
+
+        Returns:
+            List[User]
+        """
         try:
             query = (
                 self.session.query(User)
@@ -66,9 +83,11 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找用户失败", original_error=e)
 
     def find_admins(self) -> List[User]:
+        """查找所有激活的管理员用户"""
         return self.find_by_role("admin", active_only=True)
 
     def count_admins(self) -> int:
+        """统计激活的管理员用户数量"""
         try:
             return (
                 self.session.query(func.count(User.id))
@@ -83,6 +102,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def check_username_exists(self, username: str, exclude_id: int = None) -> bool:
+        """检查用户名是否已存在"""
         try:
             query = self.session.query(User).filter(User.username == username)
             if exclude_id:
@@ -93,6 +113,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("检查用户名存在性失败", original_error=e)
 
     def check_email_exists(self, email: str, exclude_id: int = None) -> bool:
+        """检查邮箱是否已存在"""
         if not email:
             return False
         try:
@@ -114,6 +135,18 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         page: int = 1,
         page_size: int = 20,
     ) -> Dict[str, Any]:
+        """搜索用户（支持关键词、角色、状态过滤）
+
+        Args:
+            keyword:   匹配用户名、邮箱、真实姓名
+            role:      角色名称过滤（Role.name），通过 JOIN 实现
+            status:    状态过滤（0=激活, 1=停用）
+            page:      页码
+            page_size: 每页数量
+
+        Returns:
+            Dict 包含 data / page / page_size / total_count / total_pages 等
+        """
         try:
             query = self.session.query(User).options(selectinload(User.roles))
 
@@ -169,6 +202,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         page_size: int = 20,
         filters: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
+        """分页查找用户"""
         try:
             query = self.session.query(User).options(selectinload(User.roles))
 
@@ -195,6 +229,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("分页查找用户失败", original_error=e)
 
     def get_all_users(self, active_only: bool = False) -> List[User]:
+        """获取所有用户"""
         try:
             query = self.session.query(User).options(selectinload(User.roles))
             if active_only:
@@ -205,6 +240,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("获取所有用户失败", original_error=e)
 
     def find_active_users(self, limit: int = None) -> List[User]:
+        """查找激活用户"""
         try:
             query = self.session.query(User).filter(User.status == UserStatus.ACTIVE)
             if limit:
@@ -215,6 +251,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找用户失败", original_error=e)
 
     def find_recent_users(self, days: int = 7, limit: int = 10) -> List[User]:
+        """查找最近注册的用户"""
         try:
             since_date = datetime.now() - timedelta(days=days)
             return (
@@ -231,6 +268,10 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
     @monitor_query_performance
     def get_user_statistics(self) -> Dict[str, Any]:
+        """获取用户统计信息
+
+        角色统计通过 UserRole + Role JOIN 实现，不依赖不存在的 User.role 列。
+        """
         try:
             from sqlalchemy import case
 
@@ -261,24 +302,35 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def activate_user(self, user_id: int) -> Optional[User]:
+        """激活用户"""
         user = self.find_by_id(user_id)
         if not user:
             raise RecordNotFoundError("users", {"id": user_id})
         return self.update(user_id, {"status": 0})
 
     def deactivate_user(self, user_id: int) -> Optional[User]:
+        """停用用户"""
         user = self.find_by_id(user_id)
         if not user:
             raise RecordNotFoundError("users", {"id": user_id})
         return self.update(user_id, {"status": 1})
 
     def update_password(self, user_id: int, hashed_password: str) -> Optional[User]:
+        """更新用户密码"""
         user = self.find_by_id(user_id)
         if not user:
             raise RecordNotFoundError("users", {"id": user_id})
         return self.update(user_id, {"password": hashed_password}, allowed=["password"])
 
     def delete(self, user_id: int) -> bool:
+        """硬删除用户
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            bool: 成功返回True
+        """
         try:
             user = self.session.query(User).filter(User.id == user_id).first()
             if not user:
@@ -291,6 +343,14 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("删除用户失败", original_error=e)
 
     def count_other_admins(self, exclude_user_id: int) -> int:
+        """统计除指定用户外的管理员数量
+
+        Args:
+            exclude_user_id: 要排除的用户ID
+
+        Returns:
+            int: 其他管理员数量
+        """
         try:
             return (
                 self.session.query(func.count(User.id))

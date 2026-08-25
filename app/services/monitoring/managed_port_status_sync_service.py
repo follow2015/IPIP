@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class ManagedPortStatusSyncService:
+    """网管设备端口状态同步服务。
+
+    仅更新端口状态，不增删端口，不匹配产生告警。
+    """
 
     def __init__(self, status_service: PortStatusUpdateService | None = None):
         self._status_service = status_service or PortStatusUpdateService()
@@ -34,6 +38,24 @@ class ManagedPortStatusSyncService:
         port_rows: list[dict],
         now: datetime | None = None,
     ) -> dict:
+        """同步网管设备端口状态。
+
+        Args:
+            device_id: 设备 ID
+            port_rows: 采集器返回的端口行列表，每行含 port_name + link_status
+            now: 时间戳
+
+        Returns:
+            dict: {
+                "success": bool,
+                "device_id": int,
+                "collected_count": int,
+                "updated": int,
+                "unchanged": int,
+                "not_found": list[str],
+                "error": str | None,
+            }
+        """
         if now is None:
             now = datetime.now()
 

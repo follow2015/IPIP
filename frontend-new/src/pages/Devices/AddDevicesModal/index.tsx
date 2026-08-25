@@ -20,13 +20,17 @@ import CloneTab from './CloneTab';
 export interface AddDevicesModalProps {
   open: boolean;
   onClose: (refresh?: boolean) => void;
-  
   templateDeviceId?: number;
-  
   defaultTab?: 'batch' | 'clone';
 }
 
-
+/**
+ * AddDevicesModal
+ *
+ * 统一的批量设备添加入口，整合手动批量、克隆复制两种方式。
+ * CSV 导入已移至独立的导入导出模块。
+ * 各 Tab 内部完全自治，通过 onClose(refresh?) 通知父组件刷新列表。
+ */
 const AddDevicesModal: React.FC<AddDevicesModalProps> = ({
   open,
   onClose,
@@ -35,14 +39,12 @@ const AddDevicesModal: React.FC<AddDevicesModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
-  
   useEffect(() => {
     if (open && templateDeviceId && templateDeviceId > 0) {
       setActiveTab('clone');
     }
   }, [open, templateDeviceId]);
 
-  
   useEffect(() => {
     if (!open) setActiveTab(defaultTab);
   }, [open, defaultTab]);

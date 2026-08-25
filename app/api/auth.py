@@ -22,6 +22,7 @@ from marshmallow import Schema, fields, validate, EXCLUDE
 
 
 class LoginSchema(Schema):
+    """用户登录请求Schema"""
     class Meta:
         unknown = EXCLUDE
     username = fields.Str(required=True, validate=validate.Length(min=1, max=100))
@@ -30,6 +31,7 @@ class LoginSchema(Schema):
 
 
 class QRCodeConfirmSchema(Schema):
+    """确认二维码登录请求Schema"""
     class Meta:
         unknown = EXCLUDE
     scene_id = fields.Str(required=True)
@@ -37,6 +39,7 @@ class QRCodeConfirmSchema(Schema):
 
 
 class QRCodeCompleteSchema(Schema):
+    """完成二维码登录请求Schema"""
     class Meta:
         unknown = EXCLUDE
     scene_id = fields.Str(required=True)
@@ -49,11 +52,13 @@ qrcode_service = QRCodeService()
 
 
 def verify_token(token: str) -> Optional[Dict]:
+    """验证JWT令牌（兼容函数）"""
     from app.utils.auth import auth_manager
     return auth_manager.verify_token(token)
 
 
 def _extract_bearer_token():
+    """从请求头提取 Bearer Token，失败返回 None"""
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
         return None
@@ -61,11 +66,13 @@ def _extract_bearer_token():
 
 
 def require_permission(*permissions):
+    """要求特定权限的装饰器（兼容函数）"""
     from app.utils.auth import auth_manager
     return auth_manager.require_permission(*permissions)
 
 
 class AuthError(Exception):
+    """认证错误异常"""
     def __init__(self, message, status_code=401):
         self.message = message
         self.status_code = status_code
@@ -73,9 +80,11 @@ class AuthError(Exception):
 
 
 class SecurityValidator:
+    """安全验证器"""
 
     @staticmethod
     def validate_domain(domain):
+        """验证域名格式和安全性"""
         if not domain:
             return False
 
@@ -99,6 +108,7 @@ class SecurityValidator:
 
     @staticmethod
     def validate_url(url):
+        """验证URL格式和安全性"""
         try:
             parsed = urlparse(url)
 
@@ -114,6 +124,7 @@ class SecurityValidator:
 
     @staticmethod
     def get_allowed_domains():
+        """获取允许的域名列表"""
         allowed_domains = set(['127.0.0.1', 'localhost'])
 
         try:
@@ -134,6 +145,7 @@ class SecurityValidator:
 
     @staticmethod
     def validate_request_origin(request):
+        """验证请求来源"""
         referer = request.headers.get('Referer')
         if not referer:
             raise AuthError("拒绝访问：缺少Referer头", 403)
@@ -157,21 +169,25 @@ class SecurityValidator:
 
     @staticmethod
     def validate_username(username):
+        """验证用户名格式（委托给 SecurityService 统一实现）"""
         from app.services.security_service import SecurityService
         return SecurityService.validate_username(username)
 
     @staticmethod
     def validate_password(password):
+        """验证密码强度（委托给 SecurityService 统一实现，避免策略漂移）"""
         from app.services.security_service import SecurityService
         return SecurityService.validate_password(password)
 
     @staticmethod
     def hash_password(password):
+        """对密码进行哈希处理"""
         from app.utils.security.password import password_manager
         return password_manager.hash_password(password)
 
     @staticmethod
     def verify_password(password, hashed_password):
+        """验证密码"""
         from app.utils.security.password import password_manager
         return password_manager.verify_password(password, hashed_password)
 
@@ -182,6 +198,20 @@ class SecurityValidator:
 @api_exception_handler
 @transactional
 def login():
+    """用户名密码登录
+
+    用户通过用户名和密码进行登录认证。
+
+    Request Body:
+        {
+            "username": "用户名",
+            "password": "密码",
+            "remember": false
+        }
+
+    Returns:
+        JSON响应，包含访问令牌和用户信息
+    """
     from app.utils.auth import auth_manager
     from app.services.user_service import UserService
 
@@ -222,7 +252,7 @@ def login():
         if not auth_result:
             if r:
                 r.incr(f"login_attempts:{username}")
-                r.expire(f"login_attempts:{username}", 300)
+                r.expire(f"login_attempts:{username}", 300)  # 5分钟窗口
             return APIResponse.error(message="用户名或密码错误", status_code=401)
 
         if r:
@@ -273,6 +303,16 @@ def login():
 @rate_limit_api
 @api_exception_handler
 def logout():
+    """用户登出
+
+    注销当前用户的登录状态。
+
+    Headers:
+        Authorization: Bearer <token>
+
+    Returns:
+        JSON响应
+    """
     from app.utils.auth import auth_manager
 
     try:
@@ -298,6 +338,16 @@ def logout():
 @rate_limit_api
 @api_exception_handler
 def get_profile():
+    """获取用户资料
+
+    获取当前登录用户的详细信息。
+
+    Headers:
+        Authorization: Bearer <token>
+
+    Returns:
+        JSON响应，包含用户信息
+    """
     from app.utils.auth import auth_manager
     from app.services.user_service import UserService
 
@@ -364,6 +414,13 @@ def get_profile():
 @rate_limit_api
 @api_exception_handler
 def generate_qr():
+    """生成登录二维码
+
+    生成一个用于微信扫码登录的二维码，包含唯一的场景ID。
+
+    Returns:
+        JSON响应，包含二维码图片URL和场景ID
+    """
     result = qrcode_service.generate_qr_code()
     return APIResponse.success(data=result, message="二维码生成成功")
 
@@ -373,6 +430,16 @@ def generate_qr():
 @rate_limit_api
 @api_exception_handler
 def check_qr_login():
+    """检查二维码登录状态
+
+    轮询检查二维码的登录状态。
+
+    Query Parameters:
+        scene_id: 二维码场景ID
+
+    Returns:
+        JSON响应，包含登录状态
+    """
     scene_id = request.args.get("scene_id")
 
     if not scene_id:
@@ -393,6 +460,20 @@ def check_qr_login():
 @rate_limit_api
 @api_exception_handler
 def confirm_qr_login():
+    """确认二维码登录（微信端调用）
+
+    微信端扫码后调用此接口确认登录。
+    使用微信授权码（code）换取 openid，后端校验，防止客户端伪造 openid。
+
+    Request Body:
+        {
+            "scene_id": "场景ID",
+            "code": "微信授权码（wx.login 获取）"
+        }
+
+    Returns:
+        JSON响应
+    """
     data = request.get_json()
 
     if not data or "scene_id" not in data or "code" not in data:
@@ -422,6 +503,18 @@ def confirm_qr_login():
 @api_exception_handler
 @transactional
 def complete_qr_login():
+    """完成二维码登录（生成token）
+
+    微信端确认登录后调用此接口生成token。
+
+    Request Body:
+        {
+            "scene_id": "场景ID"
+        }
+
+    Returns:
+        JSON响应
+    """
     from app.utils.auth import auth_manager
     from app.services.user_service import UserService
 
@@ -467,3 +560,4 @@ def complete_qr_login():
         },
         message="登录成功"
     )
+

@@ -47,7 +47,6 @@ import { DEVICE_TYPE_OPTIONS, SOURCE_OPTIONS, DEVICE_TYPE_LABEL, SOURCE_LABEL } 
 
 const { Text } = Typography;
 
-
 interface GroupFormValues extends Omit<MetricTemplateGroupUpsert, 'vendor'> {
   vendor?: string;
 }
@@ -67,12 +66,10 @@ export default function MetricTemplateGroupsSection() {
   const addTemplates = useAddTemplatesToGroup();
   const removeTemplate = useRemoveTemplateFromGroup();
 
-  
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<MetricTemplateGroupItem | null>(null);
   const [groupForm] = Form.useForm<GroupFormValues>();
 
-  
   const [manageGroupId, setManageGroupId] = useState<number | null>(null);
   const { data: groupDetail } = useMetricTemplateGroupDetail(
     manageGroupId ?? 0,
@@ -82,7 +79,6 @@ export default function MetricTemplateGroupsSection() {
 
   const allGroups = groups ?? [];
 
-  
   const openCreateGroup = () => {
     setEditingGroup(null);
     groupForm.resetFields();
@@ -95,7 +91,6 @@ export default function MetricTemplateGroupsSection() {
     setGroupModalOpen(true);
   };
 
-  
   const openEditGroup = (g: MetricTemplateGroupItem) => {
     setEditingGroup(g);
     groupForm.setFieldsValue({
@@ -110,7 +105,6 @@ export default function MetricTemplateGroupsSection() {
     setGroupModalOpen(true);
   };
 
-  
   const handleGroupSubmit = async () => {
     const values = await groupForm.validateFields();
     const payload = {
@@ -137,7 +131,6 @@ export default function MetricTemplateGroupsSection() {
     }
   };
 
-  
   const handleDeleteGroup = async (id: number) => {
     try {
       await deleteGroup.mutateAsync(id);
@@ -147,13 +140,11 @@ export default function MetricTemplateGroupsSection() {
     }
   };
 
-  
   const openManage = (id: number) => {
     setManageGroupId(id);
     setSelectedTemplateIds([]);
   };
 
-  
   const handleAddTemplates = async () => {
     if (!manageGroupId || selectedTemplateIds.length === 0) return;
     const inGroupIds = new Set((groupDetail?.templates ?? []).map((t) => t.id));
@@ -171,7 +162,6 @@ export default function MetricTemplateGroupsSection() {
     }
   };
 
-  
   const handleRemoveTemplate = async (templateId: number) => {
     if (!manageGroupId) return;
     try {
@@ -182,7 +172,6 @@ export default function MetricTemplateGroupsSection() {
     }
   };
 
-  
   const candidateTemplates = useMemo(() => {
     if (!groupDetail || !templates) return [];
     const inGroupIds = new Set((groupDetail.templates ?? []).map((t) => t.id));
@@ -191,7 +180,6 @@ export default function MetricTemplateGroupsSection() {
       if (inGroupIds.has(t.id)) return false;
       if (t.device_type !== groupDetail.device_type) return false;
       if (t.source !== groupDetail.source) return false;
-      
       if (groupVendor && t.vendor !== groupVendor) return false;
       return true;
     });
@@ -280,7 +268,7 @@ export default function MetricTemplateGroupsSection() {
         locale={{ emptyText: <Empty description="暂无指标模板组，点击右上角「新增模板组」创建" /> }}
       />
 
-      {}
+      {/* 组新增/编辑弹窗 */}
       <Modal
         title={editingGroup ? '编辑指标模板组' : '新增指标模板组'}
         open={groupModalOpen}
@@ -333,7 +321,7 @@ export default function MetricTemplateGroupsSection() {
         </Form>
       </Modal>
 
-      {}
+      {/* 组内模板管理弹窗 */}
       <Modal
         title={`管理模板组「${groupDetail?.name ?? ''}」`}
         open={manageGroupId != null}

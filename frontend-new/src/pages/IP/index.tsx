@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, Space, Tag, Tooltip, Modal } from 'antd';
@@ -47,7 +46,6 @@ import { IPBatchEditModal } from './IPBatchEditModal';
 import { IPStatsModal } from './IPStatsModal';
 import { IPTableToolbar } from './IPTableToolbar';
 
-
 function IP() {
   const table = useTable();
   const [urlParams] = useSearchParams();
@@ -60,13 +58,11 @@ function IP() {
   const [selectedIP, setSelectedIP] = useState<IPAddress | null>(null);
   const [detailAddress, setDetailAddress] = useState('');
 
-  
   useEffect(() => {
     const search = urlParams.get('search');
     const roomId = urlParams.get('room_id');
     if (search) table.setSearch(search);
     if (roomId) table.updateFilter('room_id', roomId);
-    
   }, []);
 
   const updateIPCustomer = useUpdateIPCustomer();
@@ -85,16 +81,13 @@ function IP() {
   const { data: customerOptions } = useAllocatableCustomerOptions();
   const { data: roomOptions } = useRoomOptions();
 
-  
   const { data: ipStats } = useIPStatistics(
     table.filters.room_id ? Number(table.filters.room_id) : undefined,
     table.search || undefined
   );
 
-  
   const { data: ipDetail, isLoading: loadingDetail } = useIPDetail(detailAddress);
 
-  
   const { data, isLoading, refetch } = useIPList({
     page: table.page,
     per_page: table.perPage,
@@ -103,13 +96,11 @@ function IP() {
     room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined
   });
 
-  
   const batch = useBatchSelection<IPAddress>({
     dataSource: data?.items ?? [],
     getRowKey: (r) => r.ip_address
   });
 
-  
   useGlobalEventListener(
     useCallback(
       (event: GlobalEvent) => {
@@ -126,7 +117,6 @@ function IP() {
     )
   );
 
-  
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -137,19 +127,16 @@ function IP() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [refetch]);
 
-  
   const handleEdit = (record: IPAddress) => {
     setSelectedIP(record);
     setEditModalOpen(true);
   };
 
-  
   const handleDetail = (record: IPAddress) => {
     setDetailAddress(record.ip_address);
     setDetailModalOpen(true);
   };
 
-  
   const handleBan = (record: IPAddress) => {
     confirm({
       title: '确认封禁',
@@ -169,7 +156,6 @@ function IP() {
     });
   };
 
-  
   const handleUnban = (record: IPAddress) => {
     confirm({
       title: '确认解封',
@@ -189,7 +175,6 @@ function IP() {
     });
   };
 
-  
   const handleBatchBanSubmit = async (ips: string[]) => {
     if (!ips.length) {
       msg.warning('请输入IP地址');
@@ -205,7 +190,6 @@ function IP() {
     }
   };
 
-  
   const handleBatchBanSelected = () => {
     if (!batch.count) {
       msg.warning('请先选择IP');
@@ -230,7 +214,6 @@ function IP() {
     });
   };
 
-  
   const handleBatchUnbanSelected = () => {
     if (!batch.count) {
       msg.warning('请先选择IP');
@@ -255,7 +238,6 @@ function IP() {
     });
   };
 
-  
   const openBatchEdit = (mode: 'customer' | 'notes') => {
     if (!batch.count) {
       msg.warning('请先选择IP');
@@ -265,7 +247,6 @@ function IP() {
     setBatchEditOpen(true);
   };
 
-  
   const handleBatchEditSubmit = async (values: { customer_id?: number | null; notes?: string }) => {
     const ip_list = batch.selectedKeys.map(String);
     const room_id = table.filters.room_id ? Number(table.filters.room_id) : undefined;
@@ -289,7 +270,6 @@ function IP() {
     }
   };
 
-  
   const handlePing = async (record: IPAddress) => {
     try {
       const result = await pingIP.mutateAsync(record.ip_address);
@@ -304,7 +284,6 @@ function IP() {
     }
   };
 
-  
   const handleScan = async (record: IPAddress) => {
     try {
       const result = await scanIP.mutateAsync(record.ip_address);
@@ -319,13 +298,11 @@ function IP() {
     }
   };
 
-  
   const handleCopy = (record: IPAddress) => {
     const text = `IP: ${record.ip_address}\nMAC: ${record.mac_address ?? 'N/A'}\n交换机: ${record.switch_name ?? '-'}\n端口: ${record.port ?? '-'}\n机房: ${record.room_name ?? '-'}\n客户: ${record.customer_name ?? '-'}\n状态: ${IP_STATUS_MAP[record.status as IPStatusCode]?.label ?? record.status}`;
     copyInfo(text);
   };
 
-  
   const handleExport = () => {
     const items = data?.items ?? [];
     if (!items.length) {
@@ -346,7 +323,6 @@ function IP() {
     exportCSV(headers, rows, { filename: 'ip_addresses' });
   };
 
-  
   const handleEditSubmit = async (values: { customer_id?: number; notes?: string }) => {
     if (!selectedIP) return;
     try {
@@ -367,7 +343,6 @@ function IP() {
     }
   };
 
-  
   const handleScanNetwork = () => {
     if (!table.filters.room_id) {
       msg.warning('请先选择机房');
@@ -398,7 +373,6 @@ function IP() {
     });
   };
 
-  
   const columns = [
     { title: 'IP地址', dataIndex: 'ip_address', key: 'ip_address' },
     {

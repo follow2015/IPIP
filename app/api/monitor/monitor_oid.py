@@ -31,12 +31,14 @@ logger = get_logger(__name__)
 
 
 def _validate_body(schema, body):
+    """统一入口校验：JSON 对象 + schema.load。"""
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")
     try:
         return schema.load(body)
     except MarshmallowValidationError as e:
         raise ValidationError(f"请求参数校验失败: {e.messages}")
+
 
 
 @monitor_bp.route("/oid-category-rules", methods=["GET"])
@@ -84,6 +86,7 @@ def delete_oid_category_rule(rule_id: int):
     return APIResponse.success(data=data)
 
 
+
 @monitor_bp.route("/device-type-recommends", methods=["GET"])
 @doc(summary="列出全部设备类型推荐配置", tags=["监控"], responses={200: "DeviceTypeRecommendListResponse"})
 @login_required
@@ -104,6 +107,7 @@ def update_device_type_recommend(device_type: str):
     from app.services.monitoring.oid_category_service import update_recommend
     result = update_recommend(device_type, data["categories"])
     return APIResponse.success(data=result)
+
 
 
 @monitor_bp.route("/mib-scan", methods=["POST"])
@@ -170,6 +174,7 @@ def mib_scan_persist_rule():
         vendor_id=data.get("vendor_id"),
     )
     return APIResponse.success(data=result)
+
 
 
 @monitor_bp.route("/vendor-brands", methods=["GET"])

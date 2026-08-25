@@ -2,7 +2,6 @@ import React from 'react';
 import { Button, type ButtonProps } from 'antd';
 import { useConfirmAction, type ConfirmActionOptions } from '@/hooks/useConfirmAction';
 
-
 export interface ConfirmButtonProps
   extends
     Omit<ButtonProps, 'onClick' | 'danger' | 'content' | 'title' | 'icon'>,

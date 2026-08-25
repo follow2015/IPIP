@@ -5,7 +5,6 @@
 import { useState, useCallback } from 'react';
 import type { PaginationParams } from '@/types/api';
 
-
 interface UsePaginationReturn {
   page: number;
   perPage: number;
@@ -18,9 +17,7 @@ interface UsePaginationReturn {
   paginationParams: PaginationParams;
 }
 
-
 const DEFAULT_PER_PAGE = 20;
-
 
 export function usePagination(
   initialPerPage: number = DEFAULT_PER_PAGE,
@@ -31,13 +28,11 @@ export function usePagination(
 
   const totalPages = Math.max(1, Math.ceil(total / perPage));
 
-  
   const setPerPage = useCallback((size: number) => {
     setPerPageState(size);
     setPage(1);
   }, []);
 
-  
   const reset = useCallback(() => {
     setPage(1);
     setPerPageState(initialPerPage);

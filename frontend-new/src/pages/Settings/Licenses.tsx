@@ -8,20 +8,13 @@ import { GithubOutlined, ExportOutlined } from '@ant-design/icons';
 
 const { Title, Paragraph, Text, Link } = Typography;
 
-
 interface LicenseInfo {
-  
   name: string;
-  
   version: string;
-  
   license: string;
-  
   usage: string;
-  
   homepage: string;
 }
-
 
 const backendDeps: LicenseInfo[] = [
   {
@@ -208,7 +201,6 @@ const backendDeps: LicenseInfo[] = [
   }
 ];
 
-
 const frontendDeps: LicenseInfo[] = [
   {
     name: 'react',
@@ -296,7 +288,6 @@ const frontendDeps: LicenseInfo[] = [
   }
 ];
 
-
 const licenseColor: Record<string, string> = {
   MIT: 'green',
   'BSD-3-Clause': 'blue',
@@ -305,10 +296,21 @@ const licenseColor: Record<string, string> = {
   'Apache-2.0 / BSD-3-Clause': 'purple'
 };
 
-
 const renderCols = (data: LicenseInfo[]) => [
-  { title: '组件', dataIndex: 'name', key: 'name', width: 200, render: (v: string) => <Text strong>{v}</Text> },
-  { title: '版本', dataIndex: 'version', key: 'version', width: 110, render: (v: string) => <Text code>{v}</Text> },
+  {
+    title: '组件',
+    dataIndex: 'name',
+    key: 'name',
+    width: 200,
+    render: (v: string) => <Text strong>{v}</Text>
+  },
+  {
+    title: '版本',
+    dataIndex: 'version',
+    key: 'version',
+    width: 110,
+    render: (v: string) => <Text code>{v}</Text>
+  },
   {
     title: '许可证',
     dataIndex: 'license',
@@ -324,7 +326,14 @@ const renderCols = (data: LicenseInfo[]) => [
     width: 90,
     render: (v: string) => (
       <Tooltip title={v}>
-        <Button type="link" size="small" icon={<ExportOutlined />} href={v} target="_blank" rel="noopener noreferrer">
+        <Button
+          type="link"
+          size="small"
+          icon={<ExportOutlined />}
+          href={v}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           查看
         </Button>
       </Tooltip>
@@ -353,7 +362,14 @@ export default function LicensesPage() {
           size="small"
           style={{ borderColor: '#1677ff' }}
           extra={
-            <Button type="link" size="small" icon={<ExportOutlined />} href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener noreferrer">
+            <Button
+              type="link"
+              size="small"
+              icon={<ExportOutlined />}
+              href="https://www.apache.org/licenses/LICENSE-2.0"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               完整文本
             </Button>
           }
@@ -390,7 +406,8 @@ export default function LicensesPage() {
         </Card>
 
         <Paragraph type="secondary" style={{ fontSize: 12 }}>
-          开发期构建工具（Vite、TypeScript、ESLint、Vitest 等）未在此列出；如需完整 SBOM，请参考各依赖清单文件。
+          开发期构建工具（Vite、TypeScript、ESLint、Vitest 等）未在此列出；如需完整
+          SBOM，请参考各依赖清单文件。
         </Paragraph>
       </Space>
     </div>

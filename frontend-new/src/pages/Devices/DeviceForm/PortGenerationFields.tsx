@@ -9,7 +9,6 @@ import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
 
 interface PortGenerationFieldsProps {
-  
   portPreview: string[];
 }
 

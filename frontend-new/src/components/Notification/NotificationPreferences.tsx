@@ -112,7 +112,7 @@ const NotificationPreferences: React.FC = () => {
             quietHoursRange: [dayjs(quietHours.start, 'HH:mm'), dayjs(quietHours.end, 'HH:mm')]
           }}
         >
-          {}
+          {/* ── 渠道开关 ─────────────────────────────────────── */}
           <Title level={5} style={{ marginBottom: 16 }}>
             投递渠道
           </Title>
@@ -132,7 +132,7 @@ const NotificationPreferences: React.FC = () => {
 
           <Divider />
 
-          {}
+          {/* ── 订阅类型 ─────────────────────────────────────── */}
           <Title level={5} style={{ marginBottom: 16 }}>
             <FilterOutlined style={{ marginRight: 8 }} />
             订阅类型
@@ -153,7 +153,7 @@ const NotificationPreferences: React.FC = () => {
 
           <Divider />
 
-          {}
+          {/* ── 免打扰时段 ─────────────────────────────────────── */}
           <Title level={5} style={{ marginBottom: 16 }}>
             <MoonOutlined style={{ marginRight: 8 }} />
             免打扰时段

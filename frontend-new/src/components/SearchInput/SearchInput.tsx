@@ -12,17 +12,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Input } from 'antd';
 
 export interface SearchInputProps {
-  
   value?: string;
-  
   onSearch: (value: string) => void;
-  
   placeholder?: string;
-  
   debounce?: number;
-  
   style?: React.CSSProperties;
-  
   size?: 'small' | 'middle' | 'large';
 }
 
@@ -38,14 +32,12 @@ function SearchInput({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isUserEditingRef = useRef(false);
 
-  
   useEffect(() => {
     if (value !== undefined && !isUserEditingRef.current) {
       setLocalValue(value);
     }
   }, [value]);
 
-  
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);

@@ -38,7 +38,6 @@ export default function ConnectionFormModal({
   localPortOptions,
   nicPortOptions
 }: ConnectionFormModalProps) {
-  
   const selectedRoomId = Form.useWatch('room_id', form);
   const selectedCabinetId = Form.useWatch('cabinet_id', form);
   const selectedSwitchId = Form.useWatch('switch_device_id', form);
@@ -59,7 +58,7 @@ export default function ConnectionFormModal({
           </Col>
         </Row>
 
-        {}
+        {/* ── network_to_network: 本机端口选择 ── */}
         {isNetworkDevice && (
           <Row gutter={16}>
             <Col span={12}>
@@ -80,7 +79,7 @@ export default function ConnectionFormModal({
           </Row>
         )}
 
-        {}
+        {/* ── 机房 + 机柜筛选 ── */}
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item name="room_id" label="对端设备所在机房">
@@ -111,7 +110,7 @@ export default function ConnectionFormModal({
           </Col>
         </Row>
 
-        {}
+        {/* ── 对端设备选择 + 对端端口选择 ── */}
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
@@ -146,7 +145,7 @@ export default function ConnectionFormModal({
           </Col>
         </Row>
 
-        {}
+        {/* ── device_to_network: 本机网卡端口选择 ── */}
         {!isNetworkDevice && (
           <Row gutter={16}>
             <Col span={12}>

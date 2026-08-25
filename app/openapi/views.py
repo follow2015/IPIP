@@ -16,12 +16,17 @@ openapi_bp = Blueprint("openapi", __name__)
 
 
 def _docs_disabled() -> bool:
+    """生产环境通过 ENABLE_SWAGGER_DOCS=false 完全关闭文档端点。"""
     return os.environ.get("ENABLE_SWAGGER_DOCS", "true").lower() in ("false", "0", "no")
 
 
 @openapi_bp.route("/openapi.json", methods=["GET"])
 @login_required
 def get_openapi_spec():
+    """返回 OpenAPI 3.0 规范 JSON
+
+    动态生成规范，包含所有已注册的 Schema 和路径信息。
+    """
     if _docs_disabled():
         return jsonify({"error": "not found"}), 404
     from app.openapi.spec import get_spec
@@ -36,6 +41,7 @@ def get_openapi_spec():
 @openapi_bp.route("/docs", methods=["GET"])
 @login_required
 def swagger_ui():
+    """Swagger UI 页面（内联 HTML，无需外部依赖）"""
     if _docs_disabled():
         return jsonify({"error": "not found"}), 404
     html = """<!DOCTYPE html>

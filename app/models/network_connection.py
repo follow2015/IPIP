@@ -15,6 +15,11 @@ from extensions import db
 
 
 class NetworkConnection(BaseModel):
+    """网络设备间连接模型
+
+    表示两个网络设备端口之间的互联关系（network_to_network）。
+    对称设计：local/peer 无主从之分，仅表示两端。
+    """
 
     __tablename__ = "network_connections"
     __table_args__ = (
@@ -85,6 +90,20 @@ class NetworkConnection(BaseModel):
 
     def to_dict(self, include_relations: bool = False,
                 perspective_device_id: Optional[int] = None) -> Dict[str, Any]:
+        """序列化为字典，包含两端端口和设备的详细信息
+
+        连接状态推导规则：
+        - 两端都是逻辑端口 → active
+        - 任一物理端口 link_status 非 up → inactive
+        - 所有物理端口 link_status 都 up → active
+
+        Args:
+            include_relations: 是否包含关联对象
+            perspective_device_id: 查询视角的设备ID，用于确定"本机/对端"方向。
+                N2N 连接是对称的，local/peer 仅表示存储方向。
+                当 perspective_device_id == peer_device_id 时，翻转 local/peer，
+                使"本机"始终对应当前查询视角的设备。
+        """
         from app.models.network_port import NetworkPort
 
         flip = (perspective_device_id is not None

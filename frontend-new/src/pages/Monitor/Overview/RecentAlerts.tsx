@@ -21,13 +21,11 @@ import { ALERT_TYPE_LABEL, ALERT_TYPE_COLOR } from '@/constants/monitor';
 
 const { Text } = Typography;
 
-
 const SEVERITY_COLOR: Record<string, string> = {
   info: 'blue',
   warning: 'orange',
   critical: 'red'
 };
-
 
 const SEVERITY_BAR: Record<string, string> = {
   critical: '#ff4d4f',

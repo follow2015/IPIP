@@ -5,7 +5,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { get } from './api-client';
 
-
 interface NicTemplate {
   id: number;
   name: string;
@@ -13,7 +12,6 @@ interface NicTemplate {
   speed: string;
   description: string | null;
 }
-
 
 export function useNicTemplates() {
   return useQuery({

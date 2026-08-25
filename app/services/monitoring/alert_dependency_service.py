@@ -23,7 +23,7 @@ from typing import List, Optional, Tuple
 logger = get_logger(__name__)
 
 _CACHE_KEY = "monitor:dep_rules:active"
-_CACHE_TTL = 60
+_CACHE_TTL = 60  # 秒
 
 
 def _get_redis():
@@ -31,7 +31,10 @@ def _get_redis():
     return _get_redis()
 
 
+
+
 def _load_active_rules() -> List[dict]:
+    """从 DB 加载启用的手动依赖规则"""
     from app.models.monitor_alert_dependency_rule import MonitorAlertDependencyRule
     from extensions import db
     all_rules = (
@@ -51,6 +54,7 @@ def _load_active_rules() -> List[dict]:
 
 
 def _get_active_rules() -> List[dict]:
+    """获取启用的手动规则（Redis 缓存 → DB 回源）"""
     r = _get_redis()
     if r is not None:
         try:
@@ -70,6 +74,7 @@ def _get_active_rules() -> List[dict]:
 
 
 def invalidate_cache():
+    """失效依赖规则缓存（规则变更时调用）"""
     r = _get_redis()
     if r is not None:
         try:
@@ -78,7 +83,10 @@ def invalidate_cache():
             logger.warning("dep_service 缓存失效失败 key=%s", _CACHE_KEY, exc_info=True)
 
 
+
+
 def _upstream_has_active_alert(upstream_device_id: int, alert_type: str) -> bool:
+    """查询上游设备是否有指定类型的 active 告警（closed_at IS NULL）"""
     from app.models.monitor_alert_outbox import MonitorAlertOutbox
     from extensions import db
     q = (
@@ -93,10 +101,23 @@ def _upstream_has_active_alert(upstream_device_id: int, alert_type: str) -> bool
     return q.first() is not None
 
 
+
+
 def is_suppressed_by_dependency(
     device_id: int,
     alert_type: str,
 ) -> Tuple[bool, str]:
+    """判定告警是否被依赖关系抑制。
+
+    Args:
+        device_id: 下游设备 ID（待判定告警的设备）
+        alert_type: 告警类型
+
+    Returns:
+        (suppressed, reason):
+        - suppressed=True：被抑制（不入箱），reason 描述抑制来源
+        - suppressed=False：放行，reason 为空字符串
+    """
     try:
         rules = _get_active_rules()
         for rule in rules:
@@ -121,7 +142,10 @@ def is_suppressed_by_dependency(
         return False, ""
 
 
+
+
 def list_rules() -> list:
+    """列出全部依赖规则（序列化为 dict 列表）"""
     from app.persistence.monitor_alert_dependency_rule_repository import (
         MonitorAlertDependencyRuleRepository,
     )
@@ -130,6 +154,7 @@ def list_rules() -> list:
 
 
 def create_rule(data: dict) -> dict:
+    """创建依赖规则"""
     from app.models.monitor_alert_dependency_rule import MonitorAlertDependencyRule
     from app.persistence.monitor_alert_dependency_rule_repository import (
         MonitorAlertDependencyRuleRepository,
@@ -162,6 +187,7 @@ def create_rule(data: dict) -> dict:
 
 
 def update_rule(rule_id: int, data: dict) -> dict:
+    """更新依赖规则"""
     from app.persistence.monitor_alert_dependency_rule_repository import (
         MonitorAlertDependencyRuleRepository,
     )
@@ -185,6 +211,7 @@ def update_rule(rule_id: int, data: dict) -> dict:
 
 
 def delete_rule(rule_id: int) -> dict:
+    """删除依赖规则"""
     from app.persistence.monitor_alert_dependency_rule_repository import (
         MonitorAlertDependencyRuleRepository,
     )

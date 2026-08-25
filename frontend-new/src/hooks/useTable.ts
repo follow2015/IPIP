@@ -26,11 +26,8 @@ interface SortParams {
   sort_order?: 'asc' | 'desc';
 }
 
-
 export interface UseTableOptions {
-  
   initialPerPage?: number;
-  
   filterResets?: Record<string, string[]>;
 }
 
@@ -49,14 +46,12 @@ export interface UseTableReturn {
   setSearch: (search: string) => void;
   setSort: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
   setFilters: (filters: Record<string, string | string[]>) => void;
-  
   updateFilter: (key: string, value: string | number | boolean | undefined) => void;
   reset: () => void;
   tableParams: PaginationParams & SortParams & { search?: string; filters?: Record<string, string | string[]> };
 }
 
 export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableReturn {
-  
   const options: UseTableOptions = typeof optionsOrPerPage === 'number'
     ? { initialPerPage: optionsOrPerPage }
     : (optionsOrPerPage ?? {});
@@ -64,7 +59,6 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
   const filterResets = options.filterResets ?? {};
   const pagination = usePagination(initialPerPage);
 
-  
   const { setPage, setPerPage, setTotal, reset: resetPagination } = pagination;
 
   const [search,    setSearchRaw]  = useState('');
@@ -72,16 +66,14 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
   const [sortOrder, setSortOrder]  = useState<'asc' | 'desc'>('asc');
   const [filters,   setFiltersRaw] = useState<Record<string, string | string[]>>({});
 
-  
   const setSearch = useCallback(
     (value: string) => {
       setSearchRaw(value);
       setPage(1);
     },
-    [setPage], 
+    [setPage], // ✅ setPage 是 useState setter，引用永远稳定
   );
 
-  
   const setSort = useCallback(
     (field: string, order: 'asc' | 'desc') => {
       setSortBy(field);
@@ -91,7 +83,6 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
     [setPage],
   );
 
-  
   const setFilters = useCallback(
     (newFilters: Record<string, string | string[]>) => {
       setFiltersRaw(newFilters);
@@ -100,7 +91,6 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
     [setPage],
   );
 
-  
   const updateFilter = useCallback(
     (key: string, value: string | number | boolean | undefined) => {
       const resets = filterResets[key] ?? [];
@@ -110,7 +100,6 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
       } else {
         newFilters[key] = String(value);
       }
-      
       for (const resetKey of resets) {
         delete newFilters[resetKey];
       }
@@ -120,16 +109,14 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
     [filters, filterResets, setPage],
   );
 
-  
   const reset = useCallback(() => {
-    resetPagination(); 
+    resetPagination(); // ✅ useCallback 包裹后引用稳定
     setSearchRaw('');
     setSortBy('');
     setSortOrder('asc');
     setFiltersRaw({});
   }, [resetPagination]);
 
-  
   const tableParams = useMemo(
     () => ({
       page:       pagination.page,
@@ -139,7 +126,6 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
       sort_order: sortBy    ? sortOrder : undefined,
       filters:    Object.keys(filters).length > 0 ? filters : undefined,
     }),
-    
     [pagination.page, pagination.perPage, search, sortBy, sortOrder, filters],
   );
 

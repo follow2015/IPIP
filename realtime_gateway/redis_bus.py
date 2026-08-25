@@ -38,23 +38,27 @@ _redis: aioredis.Redis | None = None
 
 
 def _next_seq(device_id: int) -> int:
+    """获取设备下一个序列号（单调递增，单进程保证全局唯一）"""
     seq = _device_seqs.get(device_id, 0) + 1
     _device_seqs[device_id] = seq
     return seq
 
 
 def _ring_store(device_id: int, event_dict: dict) -> None:
+    """将事件存入设备环形缓冲区"""
     if device_id not in _device_rings:
         _device_rings[device_id] = collections.deque(maxlen=config.RING_BUFFER_SIZE)
     _device_rings[device_id].append(event_dict)
 
 
 def get_events_since(device_id: int, since_seq: int) -> list[dict]:
+    """从环形缓冲区取出 seq > since_seq 的事件（供断线重放）"""
     ring = _device_rings.get(device_id, collections.deque())
     return [e for e in ring if e.get("seq", 0) > since_seq]
 
 
 def subscribe(device_id: int) -> asyncio.Queue:
+    """注册一个设备级订阅者，返回其专属 asyncio.Queue"""
     q: asyncio.Queue = asyncio.Queue(maxsize=config.CLIENT_QUEUE_SIZE)
     _subscribers.setdefault(device_id, []).append(q)
     count = len(_subscribers[device_id])
@@ -63,6 +67,7 @@ def subscribe(device_id: int) -> asyncio.Queue:
 
 
 def unsubscribe(device_id: int, q: asyncio.Queue) -> None:
+    """注销设备级订阅者"""
     subs = _subscribers.get(device_id, [])
     try:
         subs.remove(q)
@@ -74,6 +79,12 @@ def unsubscribe(device_id: int, q: asyncio.Queue) -> None:
 
 
 def subscribe_global(user_id: int | None = None) -> asyncio.Queue:
+    """注册一个全局事件订阅者。
+
+    Args:
+        user_id: 订阅该连接的用户 id；None 表示不绑定特定用户
+                 （只能收到 target_user_ids 缺失/为 None 的全局广播）。
+    """
     q: asyncio.Queue = asyncio.Queue(maxsize=config.CLIENT_QUEUE_SIZE)
     _global_subscribers.append((q, user_id))
     count = len(_global_subscribers)
@@ -82,6 +93,7 @@ def subscribe_global(user_id: int | None = None) -> asyncio.Queue:
 
 
 def unsubscribe_global(q: asyncio.Queue) -> None:
+    """注销全局事件订阅者（按队列对象身份移除）"""
     for i, (item_q, _) in enumerate(_global_subscribers):
         if item_q is q:
             _global_subscribers.pop(i)
@@ -89,22 +101,26 @@ def unsubscribe_global(q: asyncio.Queue) -> None:
     logger.debug("SSE 全局客户端取消订阅，剩余订阅数=%d", len(_global_subscribers))
 
 
+
 async def get_redis() -> aioredis.Redis:
+    """获取 Redis 异步客户端（懒加载单例）"""
     global _redis
     if _redis is not None:
         return _redis
     _redis = aioredis.Redis.from_url(
         config.REDIS_URL,
         decode_responses=True,
-        socket_timeout=None,
-        socket_connect_timeout=5,
+        socket_timeout=None,          # PubSub 长连接不能有读取超时
+        socket_connect_timeout=5,     # 连接超时 5s
     )
     await _redis.ping()
     logger.info("网关 Redis 已连接: %s", config.REDIS_URL)
     return _redis
 
 
+
 def _handle_device_event(device_id: int, raw_data: str) -> None:
+    """处理交换机级事件：分配 seq → 存环形缓冲区 → fan-out"""
     try:
         event_dict = json.loads(raw_data)
     except json.JSONDecodeError:
@@ -130,6 +146,11 @@ def _handle_device_event(device_id: int, raw_data: str) -> None:
 
 
 def _handle_global_event(raw_data: str) -> None:
+    """处理全局事件：按 target_user_ids 过滤后 fan-out。
+
+    target_user_ids 为 None 或字段缺失时，视为全局广播，分发给所有订阅者。
+    否则只分发给绑定了目标用户 id 的订阅连接。
+    """
     try:
         event = json.loads(raw_data)
     except json.JSONDecodeError:
@@ -145,7 +166,14 @@ def _handle_global_event(raw_data: str) -> None:
                 logger.warning("SSE 全局客户端队列已满，丢弃事件")
 
 
+
 async def start_subscriber() -> None:
+    """启动 Redis 订阅主循环（在 asyncio 事件循环中运行）。
+
+    使用 psubscribe("sw:*") 模式订阅所有交换机事件，
+    同时 subscribe 全局 channel。
+    断线自动重连（5s 间隔）。
+    """
     while True:
         try:
             r = await get_redis()

@@ -3,21 +3,14 @@ import type { ReactNode } from 'react';
 import { confirm } from '@/utils/confirm';
 import { useMessage } from '@/hooks/useMessage';
 
-
 export interface ConfirmActionOptions {
   title: ReactNode;
   content: ReactNode;
-  
   okType?: 'primary' | 'danger' | 'default';
-  
   icon?: ReactNode;
-  
   successMessage?: ReactNode;
-  
   errorMessage?: ReactNode;
-  
   onConfirm: () => Promise<unknown> | void;
-  
   afterConfirm?: () => void;
 }
 

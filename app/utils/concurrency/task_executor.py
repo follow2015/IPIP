@@ -22,10 +22,11 @@ from typing import Any, Callable, Dict, Optional
 
 logger = get_logger(__name__)
 
-DEFAULT_TASK_TIMEOUT = 0
+DEFAULT_TASK_TIMEOUT = 0  # 任务结果获取默认超时时间（秒，0=不等待）
 
 
 class TaskInfo:
+    """任务元信息"""
 
     def __init__(self, task_id: str, task_type: str, created_at: float):
         self.task_id = task_id
@@ -34,6 +35,7 @@ class TaskInfo:
         self.future: Optional[Future] = None
 
     def to_dict(self) -> dict:
+        """序列化为字典"""
         status = "running"
         if self.future:
             if self.future.done():
@@ -51,6 +53,10 @@ class TaskInfo:
 
 
 class TaskExecutor:
+    """全局任务执行器
+
+    使用 ThreadPoolExecutor 管理后台任务，限制最大并发数。
+    """
 
     def __init__(self, max_workers: int = 4):
         self._executor = ThreadPoolExecutor(
@@ -67,6 +73,16 @@ class TaskExecutor:
         *args: Any,
         **kwargs: Any,
     ) -> str:
+        """提交后台任务
+
+        Args:
+            task_type: 任务类型（如 scan_room / collect_info / scan_network）
+            fn: 要执行的函数
+            *args, **kwargs: 传递给 fn 的参数
+
+        Returns:
+            str: 任务 ID，可返回给前端用于查询/取消
+        """
         task_id = f"{task_type}_{uuid.uuid4().hex[:8]}"
         info = TaskInfo(
             task_id=task_id,
@@ -92,7 +108,7 @@ class TaskExecutor:
                         "ts": int(time.time() * 1000),
                     }, ensure_ascii=False))
                 except Exception:
-                    pass
+                    pass  # SSE 推送失败不影响异常传播
                 raise
 
         future = self._executor.submit(_wrapped)
@@ -114,6 +130,14 @@ class TaskExecutor:
         return task_id
 
     def cancel(self, task_id: str) -> bool:
+        """取消任务
+
+        Args:
+            task_id: 任务 ID
+
+        Returns:
+            bool: 是否成功取消（未开始的任务才能取消）
+        """
         with self._lock:
             info = self._tasks.get(task_id)
         if not info or not info.future:
@@ -121,10 +145,12 @@ class TaskExecutor:
         return info.future.cancel()
 
     def get_task(self, task_id: str) -> Optional[TaskInfo]:
+        """获取任务信息"""
         with self._lock:
             return self._tasks.get(task_id)
 
     def list_tasks(self, task_type: Optional[str] = None) -> list[dict]:
+        """列出所有任务（可选按类型过滤）"""
         with self._lock:
             tasks = list(self._tasks.values())
         if task_type:
@@ -132,6 +158,7 @@ class TaskExecutor:
         return [t.to_dict() for t in tasks]
 
     def shutdown(self, wait: bool = True):
+        """关闭执行器"""
         self._executor.shutdown(wait=wait)
 
 

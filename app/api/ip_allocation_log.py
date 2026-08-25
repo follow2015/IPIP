@@ -21,12 +21,22 @@ ip_alloc_log_bp = Blueprint("ip_allocation_log", __name__)
 _ip_alloc_log_service = IPAllocationLogService(IPAllocationLogRepository())
 
 
+
+
 @ip_alloc_log_bp.route("/<ip_address>/allocations", methods=["GET"])
 @doc(summary="获取IP分配历史", tags=["IP"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 @permission_required("ip:view")
 @rate_limit_api
 def get_ip_allocations(ip_address):
+    """获取IP分配历史
+
+    Path Parameters:
+        ip_address (str): IP地址
+
+    Query Parameters:
+        room_id (int): 机房ID（可选，用于过滤）
+    """
     room_id = request.args.get('room_id', type=int)
     records = _ip_alloc_log_service.get_by_ip_room(ip_address, room_id)
     return APIResponse.success(data=[r.to_dict() for r in records])

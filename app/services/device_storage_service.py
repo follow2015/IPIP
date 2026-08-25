@@ -16,12 +16,26 @@ logger = get_logger(__name__)
 
 
 class DeviceStorageService:
+    """设备存储服务类
+
+    职责：硬盘的增删改查及序列号唯一性校验。
+    数据访问：全部通过 DeviceStorageRepository。
+    """
 
     def __init__(self, storage_repository: DeviceStorageRepository):
         self.storage_repo = storage_repository
 
 
     def get_device_storage(self, device_id: int, grouped: bool = True) -> List[Dict]:
+        """获取设备硬盘列表
+
+        Args:
+            device_id: 设备 ID
+            grouped: True 返回按型号分组聚合结果；False 返回每条物理记录
+
+        Raises:
+            ValidationError: 设备不存在时抛出
+        """
         self._assert_device_exists(device_id)
 
         if grouped:
@@ -43,6 +57,23 @@ class DeviceStorageService:
         storage_list: List[Dict] = None,
         template_id: int = None,
     ) -> bool:
+        """为设备添加硬盘，支持批量添加
+
+        Args:
+            device_id: 设备 ID
+            storage_type: 存储类型（当 storage_list 为空时必传）
+            capacity: 容量（当 storage_list 为空时必传）
+            count: 单类硬盘数量（创建 count 条记录，每条 count=1）
+            interface_type / manufacturer / model / serial_number: 可选硬件参数
+            storage_list: 批量添加列表，列表中每项可覆盖默认参数
+            template_id: 配件模板ID，从模板自动填充缺失字段
+
+        Returns:
+            bool: 添加成功返回 True
+
+        Raises:
+            ValidationError: 设备不存在或序列号重复
+        """
         self._assert_device_exists(device_id)
 
         if template_id:
@@ -111,6 +142,11 @@ class DeviceStorageService:
         model: str = None,
         serial_number: str = None,
     ) -> bool:
+        """更新单条硬盘信息
+
+        Raises:
+            ValidationError: 硬盘不存在或序列号重复
+        """
         obj = self.storage_repo.find_by_id(storage_id)
         if not obj:
             raise ValidationError(f"硬盘不存在 (ID: {storage_id})")
@@ -142,6 +178,16 @@ class DeviceStorageService:
     def update_device_storage_config(
         self, device_id: int, storage_config: List[Dict]
     ) -> bool:
+        """整机覆盖写入硬盘配置（先删后增，事务内操作）
+
+        使用 flush() 替代 begin_nested() savepoint，
+        由 API 层 @transactional 统一管理事务提交/回滚。
+
+        校验逻辑：所有序列号必须在其他设备上不存在（单次批量查询）。
+
+        Raises:
+            ValidationError: 设备不存在或序列号被其他设备占用
+        """
         self._assert_device_exists(device_id)
 
         if storage_config:
@@ -166,6 +212,11 @@ class DeviceStorageService:
 
 
     def delete_device_storage(self, storage_id: int) -> bool:
+        """删除单条硬盘记录
+
+        Raises:
+            ValidationError: 硬盘不存在
+        """
         obj = self.storage_repo.find_by_id(storage_id)
         if not obj:
             raise ValidationError(f"硬盘不存在 (ID: {storage_id})")
@@ -175,11 +226,24 @@ class DeviceStorageService:
         return result
 
     def delete_device_storage_by_device_id(self, device_id: int) -> int:
+        """删除设备全部硬盘记录
+
+        Returns:
+            int: 删除数量
+        """
         count = self.storage_repo.delete_by_device(device_id)
         logger.info(f"删除设备 {device_id} 的全部硬盘，共 {count} 条")
         return count
 
     def batch_delete_storage(self, storage_ids: List[int]) -> Dict:
+        """批量删除硬盘记录（替代前端 for(id) { DELETE /storage/<id> } 串行循环）
+
+        不存在的 ID 标记为 not_found，其余删除。
+
+        返回 { 'deleted': [id...], 'not_found': [id...] }
+
+        注：仅 flush，由 API 层 @transactional 统一提交/回滚。
+        """
         if not storage_ids:
             return {"deleted": [], "not_found": []}
 
@@ -199,6 +263,11 @@ class DeviceStorageService:
     def validate_serial_number(
         self, serial_number: str, exclude_id: int = None
     ) -> Dict:
+        """校验序列号唯一性（供前端实时校验接口使用）
+
+        Returns:
+            Dict: {"is_valid": bool, "is_duplicate": bool, "message": str}
+        """
         if not serial_number:
             return {"is_valid": True, "is_duplicate": False, "message": "序列号为空，校验通过"}
 
@@ -211,6 +280,7 @@ class DeviceStorageService:
 
 
     def _assert_device_exists(self, device_id: int) -> None:
+        """断言设备存在（非报废），不存在则抛 ValidationError"""
         if not self.storage_repo.device_exists(device_id):
             raise ValidationError(f"设备不存在 (ID: {device_id})")
 

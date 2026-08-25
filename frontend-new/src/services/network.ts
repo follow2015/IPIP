@@ -18,18 +18,16 @@ import { queryKeys } from './query-keys';
 import type { IPNetwork, NetworkDetailResponse, NetworkInfo } from '@/types/models';
 import type { PaginatedData, PaginationParams } from '@/types/api';
 
-
 interface NetworkQueryParams extends PaginationParams {
   room_id?: number;
   switch_id?: number;
   customer_id?: number;
   search?: string;
-  route_type?: string; 
-  notes?: string; 
+  route_type?: string; // 路由类型过滤（RouteNotes 枚举值）
+  notes?: string; // 兼容旧参数名
   switch_name?: string;
   customer_name?: string;
 }
-
 
 interface NetworkDetailParams {
   page?: number;
@@ -38,27 +36,22 @@ interface NetworkDetailParams {
   [key: string]: unknown;
 }
 
-
 interface DeleteNetworkRequest {
   network_id: number;
 }
-
 
 interface UpdateNetworkCustomerRequest {
   network_id: number;
   customer_id: number | null;
   room_id?: number;
-  
   force?: boolean;
 }
-
 
 interface RouteQueryParams {
   switch_id?: number;
   room_id?: number;
   notes?: number;
 }
-
 
 interface RouteItem {
   id: number;
@@ -71,7 +64,6 @@ interface RouteItem {
   updated_at: string;
 }
 
-
 interface NetworkUsageResult {
   cidr: string;
   total_ips: number;
@@ -79,7 +71,6 @@ interface NetworkUsageResult {
   usage_rate: number;
   available_ips: number;
 }
-
 
 interface ScanStatusResult {
   phase: string;
@@ -89,7 +80,6 @@ interface ScanStatusResult {
   failed?: number;
   elapsed_seconds?: number;
   eta_seconds?: number;
-  
   reason?: string;
 }
 
@@ -103,7 +93,6 @@ export function useNetworkList(params?: NetworkQueryParams) {
     }
   });
 }
-
 
 export function useNetworkDetail(network: string, params?: NetworkDetailParams) {
   return useQuery({
@@ -119,7 +108,6 @@ export function useNetworkDetail(network: string, params?: NetworkDetailParams) 
   });
 }
 
-
 export function useNetworkSuspenseDetail(network: string, params?: NetworkDetailParams) {
   return useSuspenseQuery({
     queryKey: queryKeys.networks.detail(network, params),
@@ -133,7 +121,6 @@ export function useNetworkSuspenseDetail(network: string, params?: NetworkDetail
   });
 }
 
-
 export function useDeleteNetwork() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -144,7 +131,6 @@ export function useDeleteNetwork() {
     }
   });
 }
-
 
 export function useUpdateNetworkCustomer() {
   const queryClient = useQueryClient();
@@ -164,7 +150,6 @@ export function useUpdateNetworkCustomer() {
     }
   });
 }
-
 
 export function useScanNetwork() {
   const queryClient = useQueryClient();
@@ -227,7 +212,6 @@ export function useTriggerFullScan() {
   });
 }
 
-
 export function useFullScanStatus(roomId: number, enabled: boolean = false) {
   return useQuery({
     queryKey: [...queryKeys.networks.all, 'scan-status', roomId],
@@ -239,9 +223,7 @@ export function useFullScanStatus(roomId: number, enabled: boolean = false) {
     refetchInterval: (query) => {
       const d = query.state.data;
       if (!d) return 3000;
-      
       if (d.phase === '完成' || d.phase === 'failed' || d.phase === 'unknown') return false;
-      
       if (d.elapsed_seconds && d.elapsed_seconds > 600) return false;
       return 3000;
     },

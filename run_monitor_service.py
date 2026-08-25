@@ -23,11 +23,11 @@ REPO_ROOT = Path(__file__).resolve().parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from app.services.monitoring.standalone_service import (
+from app.services.monitoring.standalone_service import (  # noqa: E402
     StandaloneMonitorService,
     create_headless_monitor_app,
 )
-from app.utils.logging import get_logger
+from app.utils.logging import get_logger  # noqa: E402
 
 logger = get_logger(__name__)
 

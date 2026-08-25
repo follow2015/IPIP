@@ -32,6 +32,10 @@ logger = logging.getLogger(__name__)
 
 
 class PortStatusUpdateService:
+    """公用端口状态更新服务。
+
+    提供原子级端口状态更新操作，供 SSH / 非网管同步 / 网管状态更新复用。
+    """
 
     def __init__(self, session=None):
         from extensions import db
@@ -45,6 +49,18 @@ class PortStatusUpdateService:
         emit_alert: bool = False,
         device_id: int | None = None,
     ) -> bool:
+        """更新单个端口的 link_status + 联动 usage_status。
+
+        Args:
+            port: NetworkPort ORM 对象
+            link_status: 新的链路状态（up/down/admin_down/...）
+            now: 时间戳，缺省 datetime.now()
+            emit_alert: 是否在状态变化时产生 port_status_changed 告警
+            device_id: 设备 ID（emit_alert=True 时必填）
+
+        Returns:
+            bool: 状态是否发生变化（True=变化，False=未变）
+        """
         if now is None:
             now = datetime.now()
 
@@ -73,6 +89,17 @@ class PortStatusUpdateService:
         now: datetime | None = None,
         emit_alert: bool = False,
     ) -> dict:
+        """批量更新端口状态（按 port_name 匹配）。
+
+        Args:
+            device_id: 设备 ID
+            port_status_map: {port_name: link_status}
+            now: 时间戳
+            emit_alert: 是否产生状态变化告警
+
+        Returns:
+            dict: {"updated": int, "unchanged": int, "not_found": list[str]}
+        """
         if now is None:
             now = datetime.now()
 
@@ -110,6 +137,11 @@ class PortStatusUpdateService:
         old_status: str | None,
         new_status: str | None,
     ) -> None:
+        """端口状态变化告警（port_status_changed）。
+
+        复用 MetricAlertService._enqueue 入箱，与现有告警体系一致。
+        同时更新 device_metric_alert_state，使前端告警明细能查到。
+        """
         try:
             from app.services.monitoring.metric_alert_service import MetricAlertService
             from app.models.device_metric_alert_state import DeviceMetricAlertState
@@ -143,7 +175,7 @@ class PortStatusUpdateService:
             state.severity = severity
             state.last_value = value
             self._session.flush()
-        except Exception:
+        except Exception:  # noqa: BLE001 - 告警失败不阻断状态更新
             logger.warning(
                 "端口状态变化告警入箱失败 device_id=%s port=%s",
                 device_id, port_name, exc_info=True,
@@ -154,6 +186,11 @@ class PortStatusUpdateService:
         device_id: int,
         port_names: list[str],
     ) -> None:
+        """端口名不匹配告警（port_name_mismatch）。
+
+        网管设备监控轮询采集到端口，但 DB 中无匹配 port_name 时调用。
+        每个不匹配端口产生一条告警，提示用户端口命名不一致。
+        """
         if not port_names:
             return
         try:
@@ -166,7 +203,7 @@ class PortStatusUpdateService:
                     f"采集到端口 {port_name} 但 DB 中无匹配记录",
                     breached=True,
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001 - 告警失败不阻断
             logger.warning(
                 "端口名不匹配告警入箱失败 device_id=%s ports=%s",
                 device_id, port_names, exc_info=True,

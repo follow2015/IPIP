@@ -14,7 +14,6 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-
 export class ErrorBoundary extends React.Component<
   ErrorBoundaryProps,
   ErrorBoundaryState
@@ -28,7 +27,6 @@ export class ErrorBoundary extends React.Component<
     return { hasError: true, error };
   }
 
-  
   reset = () => {
     this.setState({ hasError: false, error: null });
   };

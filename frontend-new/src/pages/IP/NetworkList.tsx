@@ -1,12 +1,10 @@
 import { confirm } from '@/utils/confirm';
-
 import { Table, Button, Space, Select } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { useNetworkList, useDeleteNetwork, useUpdateNetworkCustomer } from '@/services/network';
 import { useAllocatableCustomerOptions } from '@/services/customer';
 import type { IPNetwork } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
-
 
 function NetworkList() {
   const deleteNetwork = useDeleteNetwork();
@@ -16,7 +14,6 @@ function NetworkList() {
 
   const { data, isLoading, refetch } = useNetworkList({ per_page: 100 });
 
-  
   const handleDelete = (record: IPNetwork) => {
     if (!record.room_id || !record.switch_id || !record.notes || !record.nexthop) {
       message.warning('缺少必要参数（room_id/switch_id/notes/nexthop），无法删除');
@@ -36,7 +33,6 @@ function NetworkList() {
     });
   };
 
-  
   const handleUpdateCustomer = (record: IPNetwork, customerId: number | null) => {
     updateCustomer
       .mutateAsync({

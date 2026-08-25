@@ -16,12 +16,20 @@ from app.models.monitor_metric_template import MonitorMetricTemplate
 
 
 class MonitorMetricTemplateRepository:
+    """指标模板仓库"""
 
     def __init__(self, session=None):
         self.session = session or db.session
 
 
     def find_enabled_by_device_type(self, device_type: str, vendor: str | None = None) -> List[MonitorMetricTemplate]:
+        """返回某设备类型下启用的全部模板（按 id 稳定排序）。
+
+        vendor 过滤规则（品牌专属 OID 匹配）：
+        - vendor=None：返回全部启用模板（向后兼容，不按品牌过滤）
+        - vendor 非空：返回通用模板（vendor IS NULL）+ 匹配品牌的专属模板，
+          排除其他品牌的专属模板（避免对华为设备发 H3C/Cisco 的 OID）
+        """
         q = (
             self.session.query(MonitorMetricTemplate)
             .filter(
@@ -43,11 +51,13 @@ class MonitorMetricTemplateRepository:
         return self.session.get(MonitorMetricTemplate, template_id)
 
     def add(self, tpl: MonitorMetricTemplate) -> MonitorMetricTemplate:
+        """新增模板并 flush。"""
         self.session.add(tpl)
         self.session.flush()
         return tpl
 
     def find_by_metric_key(self, metric_key: str, device_type: str = None) -> Optional[MonitorMetricTemplate]:
+        """按 metric_key（可选 device_type）查询模板；不存在返回 None。"""
         q = self.session.query(MonitorMetricTemplate).filter(
             MonitorMetricTemplate.metric_key == metric_key
         )
@@ -56,6 +66,7 @@ class MonitorMetricTemplateRepository:
         return q.first()
 
     def flush(self) -> None:
+        """flush 到数据库（事务提交由 @transactional 负责）。"""
         self.session.flush()
 
     def list_all(self) -> List[MonitorMetricTemplate]:
@@ -88,6 +99,7 @@ class MonitorMetricTemplateRepository:
         runbook_url: Optional[str] = None,
         runbook_title: Optional[str] = None,
     ) -> MonitorMetricTemplate:
+        """按 (device_type, metric_key, vendor) 幂等创建或更新模板。"""
         tpl = (
             self.session.query(MonitorMetricTemplate)
             .filter(
@@ -133,6 +145,7 @@ class MonitorMetricTemplateRepository:
         return True
 
     def batch_delete(self, template_ids: list[int]) -> int:
+        """批量删除模板，返回实际删除条数。"""
         if not template_ids:
             return 0
         deleted = (
@@ -144,6 +157,7 @@ class MonitorMetricTemplateRepository:
         return deleted
 
     def batch_set_enabled(self, template_ids: list[int], enabled: bool) -> int:
+        """批量启停模板，返回实际更新条数。"""
         if not template_ids:
             return 0
         updated = (
@@ -157,6 +171,15 @@ class MonitorMetricTemplateRepository:
 
     @staticmethod
     def default_seed_specs() -> List[dict]:
+        """内置默认指标模板规格（对应高价值监控指标）。
+
+        metric_key 与 monitor_oid_category_rules.category 对齐：
+        - network：if_status（IF-MIB::ifOperStatus 端口 up/down）
+        - server：temperature（ENTITY-SENSOR-MIB 温度）、raid_failure / disk_failure（IPMI SEL）
+        - 全局：监控中断（心跳超时，非 OID，由 worker 侧判定）
+
+        category 字段桥接 OID 分类规则；display_name 提供中文展示名。
+        """
         return [
             {
                 "device_type": "network",
@@ -698,6 +721,7 @@ class MonitorMetricTemplateRepository:
         ]
 
     def seed_defaults(self) -> int:
+        """写入内置默认模板（幂等），返回新增数量。"""
         created = 0
         for spec in self.default_seed_specs():
             exists = (

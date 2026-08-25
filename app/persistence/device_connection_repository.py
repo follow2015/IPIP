@@ -20,6 +20,7 @@ logger = get_logger(__name__)
 
 
 class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
+    """设备连接Repository"""
 
     def __init__(self, session=None):
         super().__init__(DeviceConnection, session)
@@ -27,6 +28,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
     @staticmethod
     def _default_options():
+        """默认 joinedload 选项"""
         return [
             joinedload(DeviceConnection.device),
             joinedload(DeviceConnection.switch_device),
@@ -36,6 +38,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def find_by_id(self, connection_id: int) -> Optional[Dict[str, Any]]:
+        """根据连接 ID 查找"""
         try:
             conn = (
                 self.session.query(DeviceConnection)
@@ -48,6 +51,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找设备连接失败", original_error=e)
 
     def find_by_device(self, device_id: int) -> List[Dict[str, Any]]:
+        """根据设备 ID 查找连接列表"""
         try:
             conns = (
                 self.session.query(DeviceConnection)
@@ -60,6 +64,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找设备连接失败", original_error=e)
 
     def find_by_switch_device(self, switch_device_id: int) -> List[Dict[str, Any]]:
+        """根据交换机设备 ID 查找连接列表"""
         try:
             conns = (
                 self.session.query(DeviceConnection)
@@ -74,6 +79,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def find_by_switch_and_port(
         self, switch_device_id: int, switch_port_id: int
     ) -> Optional[Dict[str, Any]]:
+        """根据交换机+端口精确查找连接"""
         try:
             conn = (
                 self.session.query(DeviceConnection)
@@ -93,6 +99,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         switch_device_id: int,
         switch_port_id: int = None,
     ) -> bool:
+        """检查连接是否存在"""
         try:
             q = self.session.query(DeviceConnection).filter(
                 DeviceConnection.device_id == device_id,
@@ -110,6 +117,11 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         switch_device_id: int,
         switch_port_id: int = None,
     ) -> bool:
+        """检查连接是否存在（使用 SELECT FOR UPDATE 行级锁，防止并发竞态）
+
+        在 create_connection 的事务内调用，确保两个并发请求不会同时通过
+        存在性检查后创建重复连接。
+        """
         try:
             q = self.session.query(DeviceConnection).filter(
                 DeviceConnection.device_id == device_id,
@@ -122,6 +134,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("检查连接存在性失败(locked)", original_error=e)
 
     def count_by_device(self, device_id: int) -> int:
+        """统计设备的连接数量"""
         try:
             return (
                 self.session.query(DeviceConnection)
@@ -132,6 +145,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("统计连接数量失败", original_error=e)
 
     def count_by_switch(self, switch_device_id: int) -> int:
+        """统计交换机的连接数量"""
         try:
             return (
                 self.session.query(DeviceConnection)
@@ -143,6 +157,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def create_connection(self, data: Dict[str, Any]) -> int:
+        """创建设备连接，返回新连接 ID（flush，由 Service 统一 commit）"""
         try:
             conn = DeviceConnection(
                 device_id=data.get("device_id"),
@@ -163,6 +178,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("创建设备连接失败", original_error=e)
 
     def update_connection(self, connection_id: int, data: Dict[str, Any]) -> bool:
+        """更新设备连接，返回是否成功（flush，由 Service 统一 commit）"""
         try:
             conn = (
                 self.session.query(DeviceConnection)
@@ -192,6 +208,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("更新设备连接失败", original_error=e)
 
     def delete_connection(self, connection_id: int) -> bool:
+        """删除单条连接（flush，由 Service 统一 commit）"""
         try:
             conn = (
                 self.session.query(DeviceConnection)
@@ -207,6 +224,10 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("删除设备连接失败", original_error=e)
 
     def delete_device_connections(self, device_id: int) -> int:
+        """删除设备的全部连接，返回删除数量（flush，由 Service 统一 commit）
+
+        警告：此方法不自动释放端口，调用方（Service 层）须先释放端口再调用此方法。
+        """
         try:
             count = (
                 self.session.query(DeviceConnection)
@@ -219,6 +240,10 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("删除设备连接失败", original_error=e)
 
     def delete_switch_connections(self, switch_device_id: int) -> int:
+        """删除交换机的全部连接，返回删除数量（flush，由 Service 统一 commit）
+
+        警告：此方法不自动释放端口，调用方须先释放端口。
+        """
         try:
             count = (
                 self.session.query(DeviceConnection)

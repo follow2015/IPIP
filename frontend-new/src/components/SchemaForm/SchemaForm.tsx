@@ -38,16 +38,11 @@ export interface FormFieldSchema {
   defaultValue?: unknown;
   component?:    React.ComponentType;
   span?:         number;
-  
   disabled?:     boolean;
   mode?:         'multiple' | undefined;
-  
   min?: number;
-  
   max?: number;
-  
   step?: number;
-  
   rows?: number;
 }
 
@@ -59,16 +54,13 @@ export interface SchemaFormProps {
   schema:          FormSchema;
   initialValues?:  Record<string, unknown>;
   onSubmit:        (values: Record<string, unknown>) => Promise<void>;
-  
   onSuccess?:      () => void;
   onCancel?:       () => void;
   loading?:        boolean;
   layout?:         'horizontal' | 'vertical' | 'inline';
-  
   formRef?:        React.Ref<FormInstance>;
   submitText?:     string;
   cancelText?:     string;
-  
   modalProps?:     {
     open: boolean;
     title: string;
@@ -76,7 +68,6 @@ export interface SchemaFormProps {
     destroyOnHidden?: boolean;
   };
 }
-
 
 function renderControl(schema: FormFieldSchema): React.ReactNode {
   const common = { placeholder: schema.placeholder, disabled: schema.disabled };
@@ -134,16 +125,13 @@ function SchemaForm({
 }: SchemaFormProps) {
   const [form] = Form.useForm();
 
-  
   React.useImperativeHandle(formRef, () => form, [form]);
 
-  
   const handleFinish = async (values: Record<string, unknown>) => {
     await onSubmit(values);
     onSuccess?.();
   };
 
-  
   const formContent = (
     <Form
       form={form}
@@ -168,7 +156,7 @@ function SchemaForm({
         </Form.Item>
       ))}
 
-      {}
+      {/* Modal 模式下不渲染提交按钮（由 Modal.onOk 触发） */}
       {!modalProps && (
         <Form.Item>
           <Space>
@@ -184,7 +172,6 @@ function SchemaForm({
     </Form>
   );
 
-  
   if (modalProps) {
     return (
       <Modal

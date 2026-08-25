@@ -21,6 +21,17 @@ logger = logging.getLogger(__name__)
 
 
 async def device_event_stream(device_id: int, since_seq: int = 0) -> asyncio.AsyncGenerator[str, None]:
+    """SSE 事件流生成器（交换机级别，含断线重放）
+
+    连接建立时先推送 since_seq 之后的历史事件，再进入实时监听。
+
+    Args:
+        device_id:  交换机 device_id（devices.id）
+        since_seq:  客户端最后收到的序列号（0 表示首次连接）
+
+    Yields:
+        str: SSE 格式的文本帧
+    """
     missed = redis_bus.get_events_since(device_id, since_seq)
     for event_dict in missed:
         import json
@@ -48,6 +59,16 @@ async def device_event_stream(device_id: int, since_seq: int = 0) -> asyncio.Asy
 
 
 async def global_event_stream(user_id: int | None = None) -> asyncio.AsyncGenerator[str, None]:
+    """SSE 全局事件流生成器。
+
+    不绑定特定交换机，用于接收机房扫描完成等全局事件。
+
+    Args:
+        user_id: 当前连接用户 id；传入后网关按 target_user_ids 过滤 fan-out。
+
+    Yields:
+        str: SSE 格式的文本帧
+    """
     q = redis_bus.subscribe_global(user_id=user_id)
 
     try:

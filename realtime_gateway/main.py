@@ -34,7 +34,13 @@ from . import sse
 logger = logging.getLogger(__name__)
 
 
+
 def _setup_logging() -> None:
+    """配置网关日志：控制台 + RotatingFileHandler
+
+    在模块导入后、应用启动前调用。
+    uvicorn 自身的日志不受影响（由 uvicorn --log-level 控制）。
+    """
     root = logging.getLogger("realtime_gateway")
     root.setLevel(getattr(logging, config.LOG_LEVEL, logging.INFO))
 
@@ -65,7 +71,9 @@ def _setup_logging() -> None:
 _setup_logging()
 
 
+
 class SSEAuthMiddleware:
+    """SSE 端点鉴权：从请求中提取并校验 JWT token"""
 
     def __init__(self, app):
         self.app = app
@@ -102,19 +110,23 @@ class SSEAuthMiddleware:
         await self.app(scope, receive, send)
 
 
+
 class _ConnectionCounter:
+    """全局 SSE 连接计数，超限拒绝新连接。"""
 
     def __init__(self, limit: int):
         self._limit = limit
         self._current = 0
 
     def acquire(self) -> bool:
+        """尝试占用一个连接槽。返回 True 表示允许，False 表示超限。"""
         if self._current >= self._limit:
             return False
         self._current += 1
         return True
 
     def release(self) -> None:
+        """释放一个连接槽。"""
         if self._current > 0:
             self._current -= 1
 
@@ -131,6 +143,10 @@ _connection_counter = _ConnectionCounter(config.MAX_CONNECTIONS)
 
 
 async def _wrap_stream_with_counter(stream_gen, counter=None):
+    """包裹 SSE 生成器，连接结束时释放计数槽。
+
+    counter 默认使用模块级 _connection_counter；测试可传入自定义实例。
+    """
     if counter is None:
         counter = _connection_counter
     try:
@@ -141,6 +157,7 @@ async def _wrap_stream_with_counter(stream_gen, counter=None):
 
 
 async def switch_events(request: Request) -> StreamingResponse:
+    """SSE 交换机级事件流"""
     if not _connection_counter.acquire():
         logger.warning(
             "SSE 连接超限拒绝 device 路由 current=%d limit=%d",
@@ -171,6 +188,7 @@ async def switch_events(request: Request) -> StreamingResponse:
 
 
 async def global_events(request: Request) -> StreamingResponse:
+    """SSE 全局事件流"""
     if not _connection_counter.acquire():
         logger.warning(
             "SSE 连接超限拒绝 global 路由 current=%d limit=%d",
@@ -199,11 +217,18 @@ async def global_events(request: Request) -> StreamingResponse:
 
 
 async def healthz(request: Request) -> JSONResponse:
+    """健康检查"""
     return JSONResponse({"status": "ok"})
+
 
 
 @asynccontextmanager
 async def lifespan(app):
+    """应用启动：初始化 Redis 连接并启动订阅
+
+    Redis 不可用时网关仍可启动（降级模式），
+    SSE 端点会返回空流，不会报错。等 Redis 恢复后订阅会自动重连。
+    """
     logger.info("ASGI 推送网关启动中...")
     subscriber_task = None
     try:
@@ -227,6 +252,7 @@ async def lifespan(app):
         except asyncio.CancelledError:
             pass
     logger.info("ASGI 推送网关已关闭")
+
 
 
 routes = [

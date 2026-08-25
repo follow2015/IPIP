@@ -10,7 +10,6 @@ import type { IPAllocationLog } from '@/types/models';
 import { IP_STATUS_MAP, IPStatusCode } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
 
-
 const ACTION_LABEL_MAP: Record<string, { label: string; color: string }> = {
   allocate: { label: '分配', color: 'green' },
   release: { label: '释放', color: 'orange' },
@@ -18,12 +17,9 @@ const ACTION_LABEL_MAP: Record<string, { label: string; color: string }> = {
 };
 
 interface AllocationHistoryProps {
-  
   ipAddress: string;
-  
   roomId?: number;
 }
-
 
 function renderStatusValue(v: number | null) {
   if (v === null) return '-';
@@ -31,12 +27,10 @@ function renderStatusValue(v: number | null) {
   return info ? <Tag color={info.color}>{info.label}</Tag> : <Tag>{v}</Tag>;
 }
 
-
 function AllocationHistory({ ipAddress, roomId }: AllocationHistoryProps) {
   const { data, isLoading } = useIPAllocationLogs(ipAddress, roomId);
   const logs = data ?? [];
 
-  
   const columns = [
     {
       title: '时间',
@@ -78,7 +72,6 @@ function AllocationHistory({ ipAddress, roomId }: AllocationHistoryProps) {
     },
   ];
 
-  
   const timelineItems = logs.map((log) => {
     const actionInfo = ACTION_LABEL_MAP[log.action];
     return {
@@ -99,7 +92,7 @@ function AllocationHistory({ ipAddress, roomId }: AllocationHistoryProps) {
 
   return (
     <div>
-      {}
+      {/* 表格视图 */}
       <Table<IPAllocationLog>
         columns={columns}
         dataSource={logs}
@@ -109,7 +102,7 @@ function AllocationHistory({ ipAddress, roomId }: AllocationHistoryProps) {
         size="small"
       />
 
-      {}
+      {/* Timeline 视图（可选，数据量少时更直观） */}
       {logs.length > 0 && logs.length <= 10 && (
         <div style={{ marginTop: 16 }}>
           <Timeline items={timelineItems} />

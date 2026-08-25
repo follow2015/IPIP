@@ -27,7 +27,6 @@ import dayjs from 'dayjs';
 import { ensureUtc } from '@/utils/format';
 import { useMonitorAlerts, useAlertStatistics } from '@/services/monitor';
 
-
 const T = {
   bg: '#f5f7fa',
   cardBg: '#ffffff',
@@ -102,7 +101,6 @@ export default function MonitorNocScreenPage() {
   const warningCount = sortedAlerts.filter((a) => a.severity === 'warning').length;
   const infoCount = sortedAlerts.filter((a) => a.severity === 'info').length;
 
-  
   const severityPieData = useMemo(
     () =>
       (stats?.by_severity ?? []).map((x) => ({
@@ -133,7 +131,6 @@ export default function MonitorNocScreenPage() {
     }
   };
 
-  
   const buildPieConfig = (
     data: { name: string; value: number }[],
     colorMap: Record<string, string>
@@ -144,7 +141,6 @@ export default function MonitorNocScreenPage() {
     color: data.length === 0 ? [T.border] : data.map((d) => colorMap[d.name] ?? T.accent),
     radius: 0.85,
     innerRadius: 0.6,
-    
     label: {
       text: (datum: { name?: string; value?: number }) => {
         const total = data.reduce((s, d) => s + d.value, 0) || 1;
@@ -154,7 +150,6 @@ export default function MonitorNocScreenPage() {
       position: 'outside' as const,
       style: { fontSize: 11, fill: T.textSecondary }
     },
-    
     legend: {
       position: 'bottom' as const,
       layout: 'horizontal' as const,
@@ -191,7 +186,6 @@ export default function MonitorNocScreenPage() {
     animation: { appear: { duration: 400 } }
   };
 
-  
   const cardBase: React.CSSProperties = {
     background: T.cardBg,
     borderRadius: 8,
@@ -209,7 +203,7 @@ export default function MonitorNocScreenPage() {
         fontFamily: FONT_TXT
       }}
     >
-      {}
+      {/* ===== 顶部状态栏 ===== */}
       <div
         style={{
           ...cardBase,
@@ -284,7 +278,7 @@ export default function MonitorNocScreenPage() {
         </Space>
       </div>
 
-      {}
+      {/* ===== 4 KPI 卡片 ===== */}
       <div
         style={{
           display: 'grid',
@@ -332,9 +326,9 @@ export default function MonitorNocScreenPage() {
         ))}
       </div>
 
-      {}
+      {/* ===== 中部：告警墙 + 双饼图 ===== */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
-        {}
+        {/* 告警墙 */}
         <div
           style={{
             ...cardBase,
@@ -383,7 +377,7 @@ export default function MonitorNocScreenPage() {
                     if (p?.title) alertTitle = p.title;
                   }
                 } catch {
-                  
+                  /* ignore */
                 }
                 return (
                   <div
@@ -439,7 +433,7 @@ export default function MonitorNocScreenPage() {
           )}
         </div>
 
-        {}
+        {/* 双饼图 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ ...cardBase, padding: 12 }}>
             <div style={{ fontSize: 12, color: T.textTertiary, marginBottom: 8 }}>按级别分布</div>
@@ -452,7 +446,7 @@ export default function MonitorNocScreenPage() {
         </div>
       </div>
 
-      {}
+      {/* ===== 底部：告警密度时序 ===== */}
       <div style={{ ...cardBase, padding: 16 }}>
         <div
           style={{

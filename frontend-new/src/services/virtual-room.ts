@@ -13,30 +13,23 @@ import type { PaginationParams, PaginatedData } from '@/types/api';
 const fetchVirtualRooms = (params?: PaginationParams) =>
   get<PaginatedData<VirtualRoom>>('/virtual-rooms', params as Record<string, unknown>);
 
-
 const fetchVirtualRoom = (id: number) =>
   get<VirtualRoom>(`/virtual-rooms/${id}`);
-
 
 const createVirtualRoom = (data: { name: string; description?: string; device_ids: number[] }) =>
   post<VirtualRoom>('/virtual-rooms', data);
 
-
 const updateVirtualRoom = (id: number, data: { name?: string; description?: string }) =>
   put<VirtualRoom>(`/virtual-rooms/${id}`, data);
-
 
 const deleteVirtualRoom = (id: number) =>
   del(`/virtual-rooms/${id}`);
 
-
 const updateVirtualRoomMembers = (id: number, device_ids: number[]) =>
   put<VirtualRoom>(`/virtual-rooms/${id}/members`, { device_ids });
 
-
 const scanVirtualRoom = (id: number) =>
   post<{ message: string }>(`/virtual-rooms/${id}/scan`);
-
 
 const fetchVirtualRoomScanProgress = (id: number) =>
   get<{ progress: ScanProgress | null }>(`/virtual-rooms/${id}/scan/progress`);
@@ -60,7 +53,6 @@ export function useVirtualRooms(params?: PaginationParams) {
   });
 }
 
-
 export function useVirtualRoom(id: number, enabled = true) {
   return useQuery({
     queryKey: virtualRoomKeys.detail(id),
@@ -72,7 +64,6 @@ export function useVirtualRoom(id: number, enabled = true) {
   });
 }
 
-
 export function useCreateVirtualRoom() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -82,7 +73,6 @@ export function useCreateVirtualRoom() {
     },
   });
 }
-
 
 export function useUpdateVirtualRoom() {
   const queryClient = useQueryClient();
@@ -96,7 +86,6 @@ export function useUpdateVirtualRoom() {
   });
 }
 
-
 export function useDeleteVirtualRoom() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -106,7 +95,6 @@ export function useDeleteVirtualRoom() {
     },
   });
 }
-
 
 export function useUpdateVirtualRoomMembers() {
   const queryClient = useQueryClient();
@@ -119,13 +107,11 @@ export function useUpdateVirtualRoomMembers() {
   });
 }
 
-
 export function useScanVirtualRoom() {
   return useMutation({
     mutationFn: scanVirtualRoom,
   });
 }
-
 
 export function useVirtualRoomScanProgress(id: number, enabled = true) {
   return useQuery({
@@ -138,7 +124,7 @@ export function useVirtualRoomScanProgress(id: number, enabled = true) {
     refetchInterval: (query) => {
       const progress = query.state.data?.progress;
       if (!progress || progress.phase === '完成' || progress.phase === 'failed') return false;
-      return 2000; 
+      return 2000; // 2s 轮询
     },
   });
 }

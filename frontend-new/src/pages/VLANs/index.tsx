@@ -23,11 +23,9 @@ import { useCrudPage } from '@/hooks/useCrudPage';
 import { formatDateTime } from '@/utils/format';
 import VLANForm from './VLANForm';
 
-
 interface VLANWithHasSsh extends VLAN {
   has_ssh?: boolean;
 }
-
 
 function VLANs() {
   const navigate = useNavigate();
@@ -39,8 +37,6 @@ function VLANs() {
     useDelete: useDeleteVLAN,
     nameKey: 'name',
     nameLabel: 'VLAN',
-    
-    
     buildListParams: (tp) =>
       ({
         ...tp,
@@ -49,20 +45,17 @@ function VLANs() {
   });
   const { table, data, isLoading, refetch, handleAdd, handleDelete, closeForm, formOpen } = crud;
 
-  
   useEffect(() => {
     if (!table.filters.room_id && roomOptions && roomOptions.length > 0) {
       table.updateFilter('room_id', roomOptions[0].value as number);
     }
   }, [roomOptions, table.filters.room_id]);
 
-  
   const switchNameMap = useMemo(
     () => new Map((switchList?.items ?? []).map((sw: any) => [sw.id, sw.name || sw.ip])),
     [switchList]
   );
 
-  
   const goToVlanTab = useCallback(
     (deviceId: number) => {
       navigate(`/devices/${deviceId}#vlans`);
@@ -70,7 +63,6 @@ function VLANs() {
     [navigate]
   );
 
-  
   const columns = useMemo(
     () => [
       { title: 'VLAN ID', dataIndex: 'vlan_id', key: 'vlan_id', width: 90 },

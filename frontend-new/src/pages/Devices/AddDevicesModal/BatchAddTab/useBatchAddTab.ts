@@ -31,7 +31,6 @@ import { type DeviceBatchRow, genBatchName, extractMaxIndex } from '../shared';
 import { checkUConflict, checkNodePositionConflict } from './conflictCheck';
 import { buildCreateDevices, buildSwitchPorts } from './buildCreateRequests';
 
-
 export type EditableRowsApi<T> = {
   rows: T[];
   addRow: (row: Omit<T, 'key'>) => void;
@@ -45,7 +44,6 @@ export type EditableRowsApi<T> = {
 
 export interface UseBatchAddTabResult {
   form: ReturnType<typeof Form.useForm>[0];
-  
   deviceType?: string;
   deviceSubtype?: string;
   selectedRoomId?: number;
@@ -63,11 +61,8 @@ export interface UseBatchAddTabResult {
   availableUCount: number;
   availableUPositions?: unknown;
   portPreview: string[];
-  
   genNodeName: (nodeRow?: number, nodeCol?: number) => string;
-  
   freeNodeSlots?: number;
-  
   rows: DeviceBatchRow[];
   addRow: EditableRowsApi<DeviceBatchRow>['addRow'];
   addRows: EditableRowsApi<DeviceBatchRow>['addRows'];
@@ -76,7 +71,6 @@ export interface UseBatchAddTabResult {
   copyRow: EditableRowsApi<DeviceBatchRow>['copyRow'];
   resetRows: EditableRowsApi<DeviceBatchRow>['resetRows'];
   transformRows: EditableRowsApi<DeviceBatchRow>['transformRows'];
-  
   selectedChassisId?: number;
   setSelectedChassisId: (id?: number) => void;
   addRowCount: number;
@@ -85,7 +79,6 @@ export interface UseBatchAddTabResult {
   setUGap: (n: number) => void;
   batchHeightU: number;
   setBatchHeightU: (n: number) => void;
-  
   handleAddRow: () => void;
   handleAutoAssignU: () => void;
   handleRegenerateNames: () => void;
@@ -93,7 +86,6 @@ export interface UseBatchAddTabResult {
   handleChassisChange: (id?: number) => void;
   handleSubmit: () => Promise<void>;
   handleRetry: (failedItems: BatchCreateItemResult[]) => void;
-  
   batchCreate: ReturnType<typeof useBatchDeviceCreate>;
 }
 
@@ -103,41 +95,30 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
   const batchCreate = useBatchDeviceCreate();
   const queryClient = useQueryClient();
 
-  
   const { data: nicComponentTemplates } = useComponentTemplates('nic');
 
-  
   const deviceType = Form.useWatch('device_type', form) as string | undefined;
   const deviceSubtype = Form.useWatch('device_subtype', form) as string | undefined;
   const selectedRoomId = Form.useWatch('room_id', form) as number | undefined;
   const selectedCabinetId = Form.useWatch('cabinet_id', form) as number | undefined;
 
-  
   const isChassisMode = deviceSubtype === DeviceSubtype.CHASSIS;
-  
   const isNodeMode = deviceSubtype === DeviceSubtype.NODE;
 
-  
   const { rows, addRow, addRows, deleteRow, copyRow, updateRow, resetRows, transformRows } =
     useEditableRows<DeviceBatchRow>();
 
-  
   const { data: availableUPositions } = useCabinetAvailableUPositions(selectedCabinetId ?? 0);
   const { assign: assignU, available: availableUCount } = useUPositionAssigner(availableUPositions);
 
-  
   const { data: roomOptions } = useRoomOptions();
-  
   const { data: cabinetOptions } = useCabinetOptions(selectedRoomId, false, [1, 2]);
 
   const [selectedChassisId, setSelectedChassisId] = useState<number | undefined>();
 
-  
   const isServerType = deviceType === DeviceType.SERVER;
   const isNetworkType = deviceType === DeviceType.NETWORK;
-  
   const hasSsh = Form.useWatch('has_ssh', form) as boolean | undefined;
-  
   const isUnmanagedNetwork = isNetworkType && !hasSsh;
 
   const portTemplate = Form.useWatch('port_template', form);
@@ -147,7 +128,6 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
   const portEnd = Form.useWatch('port_end', form);
   const portCustomPrefix = Form.useWatch('port_custom_prefix', form);
 
-  
   const portPreview = useMemo(() => {
     const ports = buildSwitchPorts({
       template: portTemplate,
@@ -160,13 +140,11 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     return ports ? ports.map((p) => p.port_name).slice(0, 200) : [];
   }, [portTemplate, portSlot, portCard, portStart, portEnd, portCustomPrefix]);
 
-  
   const { data: chassisData } = useDeviceList({
     is_chassis: isNodeMode ? 1 : undefined,
     room_id: isNodeMode ? selectedRoomId : undefined,
     per_page: 200
   });
-  
   const { data: batchChassisNodesData } = useDeviceList({
     device_subtype: isNodeMode ? 'node' : undefined,
     room_id: isNodeMode ? selectedRoomId : undefined,
@@ -191,13 +169,11 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       });
   }, [chassisData, batchChassisNodesData]);
 
-  
   const selectedChassis = useMemo(
     () => chassisData?.items?.find((d: Device) => d.id === selectedChassisId),
     [chassisData, selectedChassisId]
   );
 
-  
   const freeNodeSlots = useMemo(() => {
     if (!isNodeMode || !selectedChassisId || !selectedChassis) return undefined;
     const max = selectedChassis.total_nodes ?? 0;
@@ -207,7 +183,6 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     return max - occupied;
   }, [isNodeMode, selectedChassisId, selectedChassis, batchChassisNodesData]);
 
-  
   const genNodeName = useCallback(
     (nodeRow?: number, nodeCol?: number): string => {
       if (!selectedChassis || !nodeRow || !nodeCol) return '';
@@ -223,7 +198,6 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     [selectedChassis]
   );
 
-  
   const subtypeOptions = useMemo(() => {
     if (!deviceType) return [];
     return (DEVICE_SUBTYPE_MAP[deviceType as DeviceType] ?? []).map((st) => ({
@@ -232,7 +206,6 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     }));
   }, [deviceType]);
 
-  
   const prevActiveRef = useRef(false);
   useEffect(() => {
     if (active && !prevActiveRef.current) {
@@ -266,10 +239,8 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       batchCreate.reset();
     }
     prevActiveRef.current = active;
-    
   }, [active]);
 
-  
   const prevDeviceTypeRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (
@@ -281,24 +252,19 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       transformRows((row, i) => ({ ...row, device_name: genBatchName(deviceType, i + 1) }));
     }
     prevDeviceTypeRef.current = deviceType;
-    
   }, [deviceType]);
 
-  
   const prevRoomRef = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (prevRoomRef.current !== undefined && prevRoomRef.current !== selectedRoomId) {
       form.setFieldValue('cabinet_id', undefined);
     }
     prevRoomRef.current = selectedRoomId;
-    
   }, [selectedRoomId]);
 
-  
+
   const [addRowCount, setAddRowCount] = useState(1);
-  
   const [batchHeightU, setBatchHeightU] = useState<number>(1);
-  
   const [uGap, setUGap] = useState<number>(0);
 
   const handleAddRow = () => {
@@ -315,10 +281,8 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       u_position: isNodeMode ? null : null,
       height_u: isNodeMode ? 0 : 1,
       status: DeviceStatusCode.AVAILABLE,
-      
       node_rows: isChassisMode ? (form.getFieldValue('node_rows') ?? 2) : undefined,
       node_cols: isChassisMode ? (form.getFieldValue('node_cols') ?? 2) : undefined,
-      
       parent_device_id: isNodeMode ? selectedChassisId : undefined
     }));
     addRows(newRows);
@@ -339,7 +303,6 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     transformRows((row, i) => ({ ...row, device_name: genBatchName(dt, startIdx + i) }));
   };
 
-  
   const handleBatchSetHeightU = () => {
     if (batchHeightU < 1 || batchHeightU > 42) {
       message.warning('U高须在 1-42 之间');
@@ -348,7 +311,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     transformRows((row) => ({ ...row, height_u: batchHeightU }));
   };
 
-  
+
   const handleSubmit = async () => {
     try {
       await form.validateFields();
@@ -356,13 +319,11 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       return;
     }
 
-    
     if (isNodeMode && !selectedChassisId) {
       message.error('请选择所属机箱');
       return;
     }
 
-    
     if (isNodeMode && selectedChassisId && selectedChassis) {
       const maxNodes = selectedChassis.total_nodes ?? 0;
       const occupiedCount = (batchChassisNodesData?.items ?? []).filter(
@@ -377,7 +338,6 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       }
     }
 
-    
     if (isNodeMode) {
       const conflict = checkNodePositionConflict(rows);
       if (conflict) {
@@ -386,7 +346,6 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       }
     }
 
-    
     if (!isNodeMode) {
       const conflict = checkUConflict(rows);
       if (conflict) {
@@ -395,12 +354,10 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       }
     }
 
-    
     const values = form.getFieldsValue();
     if (!isNodeMode) {
       const noUPositionRows = rows.filter((r) => r.u_position == null);
       if (noUPositionRows.length > 0 && values.cabinet_id) {
-        
         const confirmed = await new Promise<boolean>((resolve) => {
           confirm({
             title: '部分设备未分配U位',
@@ -432,16 +389,13 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
         const nodeHint = isChassisMode ? '（已为每台机箱自动生成子节点）' : '';
         message.success(`批量创建成功：${result.success_count} 台${nodeHint}`);
       }
-      
       queryClient.invalidateQueries({ queryKey: ['cabinets'] });
 
-      
       const createdIds: number[] =
         result?.results
           ?.filter((r: BatchCreateItemResult) => r.success && r.device_id)
           .map((r: BatchCreateItemResult) => r.device_id!) ?? [];
 
-      
       if (isNetworkType && !values.has_ssh && createdIds.length > 0) {
         const ports = buildSwitchPorts({
           template: values.port_template,
@@ -454,7 +408,6 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
         if (ports && ports.length > 0) {
           try {
             let portFailCount = 0;
-            
             const BATCH_SIZE = 5;
             for (let i = 0; i < createdIds.length; i += BATCH_SIZE) {
               const batch = createdIds.slice(i, i + BATCH_SIZE);
@@ -475,12 +428,11 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
               message.success(`已为 ${createdIds.length} 台设备各生成 ${ports.length} 个端口`);
             }
           } catch {
-            
+            /* 端口创建失败不阻断 */
           }
         }
       }
 
-      
     } catch (err) {
       message.error(err instanceof Error ? err.message : '提交失败');
     }
@@ -493,7 +445,6 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     message.info('已保留失败项，请修正后重新提交');
   };
 
-  
   const handleChassisChange = useCallback(
     (id?: number) => {
       setSelectedChassisId(id);
@@ -505,7 +456,6 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       const pattern = chassis.node_naming_pattern || '{NAME}-Node{POS}';
       let outOfRangeCount = 0;
       transformRows((row) => {
-        
         const rowOutOfRange = row.node_row != null && row.node_row > nodeRows;
         const colOutOfRange = row.node_col != null && row.node_col > nodeCols;
         if (rowOutOfRange || colOutOfRange) outOfRangeCount += 1;

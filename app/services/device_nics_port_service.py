@@ -23,6 +23,7 @@ logger = get_logger(__name__)
 
 
 class DeviceNicsPortService:
+    """设备网卡端口服务"""
 
     def __init__(self, repository: DeviceNicsPortRepository, device_repo=None):
         self.repo = repository
@@ -34,6 +35,10 @@ class DeviceNicsPortService:
         device_id: int,
         nics_config: List[Dict],
     ) -> Tuple[bool, str, List[DeviceNicsPort]]:
+        """创建或更新设备的网卡配置（全量覆盖）
+
+        使用 begin_nested() savepoint 保证原子性，与 batch_create_ports 保持一致。
+        """
         is_valid, error_msg = NicValidator.validate_nic_config(nics_config)
         if not is_valid:
             return (False, error_msg, [])
@@ -69,6 +74,11 @@ class DeviceNicsPortService:
         device_id: int,
         ports_data: List[Dict],
     ) -> Tuple[bool, str, List[DeviceNicsPort]]:
+        """增量批量创建端口（不删除现有端口）
+
+        修复：使用 begin_nested() savepoint，与 DeviceService 等保持一致，
+        由外层事务统一决定提交或回滚，不在 Service 层直接 commit()。
+        """
         device = self.repo.session.get(Device, device_id)
         if not device:
             return (False, f"设备不存在: {device_id}", [])
@@ -128,6 +138,18 @@ class DeviceNicsPortService:
         device_ids: List[int],
         ports_template: List[Dict],
     ) -> Dict:
+        """为多个设备批量创建相同的 NIC 端口配置（单次请求）
+
+        替代前端 for(nodeId) { POST /nics } 串行循环，在单个 savepoint 内完成。
+        典型用途：机箱批量创建时为所有子节点同步创建相同网卡端口。
+
+        Args:
+            device_ids:     目标设备 ID 列表（通常为同一机箱的所有子节点）
+            ports_template: 端口配置模板列表（nic_number/port_number/port_type/port_speed）
+
+        Returns:
+            {'created': int, 'skipped': int, 'failed_devices': list}
+        """
         if not device_ids or not ports_template:
             return {"created": 0, "skipped": 0, "failed_devices": []}
 
@@ -222,6 +244,17 @@ class DeviceNicsPortService:
             return (False, f"删除端口失败: {e}")
 
     def batch_delete_ports(self, device_id: int, port_ids: List[int]) -> Dict:
+        """批量删除端口（替代前端 for(id) { DELETE /nics/<id> } 串行循环）
+
+        业务规则与单条删除一致：
+        - 不属于该设备的端口：标记为 skipped（reason=不属于该设备）
+        - 占用中（port_status=='occupied'）的端口：标记为 skipped（reason=端口占用中）
+        - 其余删除
+
+        返回 { 'deleted': [id...], 'skipped': [{'id': int, 'reason': str}] }
+
+        注：仅 flush，由 API 层 @transactional 统一提交/回滚。
+        """
         if not port_ids:
             return {"deleted": [], "skipped": []}
 
@@ -240,7 +273,7 @@ class DeviceNicsPortService:
                 self.repo.session.delete(p)
                 deleted.append(p.id)
             self.repo.session.flush()
-        except Exception as e:
+        except Exception as e:  # pragma: no cover - 防御性兜底
             logger.error("批量删除端口失败: device_id=%d, error=%s", device_id, e)
             return {"deleted": deleted, "skipped": skipped, "error": str(e)}
 
@@ -269,6 +302,10 @@ class DeviceNicsPortService:
         return summary
 
     def get_child_device_ids(self, parent_device_id: int) -> list[int]:
+        """查询机箱的所有子节点 device_id 列表。
+
+        parent_device_id 是 DeviceServerExt 表的列，不是 Device 的列。
+        """
         if self._device_repo is None:
             from app.persistence.device_repository import DeviceRepository
             self._device_repo = DeviceRepository()

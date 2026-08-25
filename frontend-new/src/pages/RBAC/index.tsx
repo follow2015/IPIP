@@ -1,5 +1,4 @@
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-
 import { useState, useMemo } from 'react';
 import { Table, Button, Space, Card, Tabs, Tag, Switch } from 'antd';
 import {
@@ -25,7 +24,6 @@ import {
 import type { Role, Permission, RoleDetail } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
 
-
 function RBAC() {
   const [activeTab, setActiveTab] = useState('roles');
   const [formOpen, setFormOpen] = useState(false);
@@ -47,19 +45,16 @@ function RBAC() {
     (permsData as unknown as Permission[]) ??
     [];
 
-  
   const handleAdd = () => {
     setEditRecord(null);
     setFormOpen(true);
   };
 
-  
   const handleEdit = (r: Role) => {
     setEditRecord(r);
     setFormOpen(true);
   };
 
-  
   const confirmAction = useConfirmAction();
   const handleDelete = (r: Role) => {
     confirmAction({
@@ -73,13 +68,11 @@ function RBAC() {
     });
   };
 
-  
   const handlePermAssign = (r: Role) => {
     setPermAssignRole(r);
     setPermAssignOpen(true);
   };
 
-  
   const handleFormSubmit = async (values: Record<string, unknown>) => {
     try {
       if (editRecord) {
@@ -99,7 +92,6 @@ function RBAC() {
     }
   };
 
-  
   const roleColumns = [
     { title: '角色名', dataIndex: 'name', key: 'name' },
     { title: '显示名', dataIndex: 'display_name', key: 'display_name' },
@@ -152,7 +144,6 @@ function RBAC() {
     }
   ];
 
-  
   const permCategories = useMemo(() => {
     const map = new Map<string, Permission[]>();
     permissions.forEach((p) => {
@@ -164,7 +155,6 @@ function RBAC() {
     return Array.from(map.entries());
   }, [permissions]);
 
-  
   const permColumns = [
     { title: '权限编码', dataIndex: 'code', key: 'code', render: (v: string) => <Tag>{v}</Tag> },
     { title: '权限名称', dataIndex: 'name', key: 'name' },

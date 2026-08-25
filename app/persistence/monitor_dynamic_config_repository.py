@@ -10,6 +10,7 @@ from app.persistence.base import SQLAlchemyRepository
 
 
 class MonitorDynamicConfigRepository(SQLAlchemyRepository):
+    """monitor_dynamic_config 表的读写。"""
 
     def __init__(self, session=None):
         super().__init__(MonitorDynamicConfig, session)
@@ -22,6 +23,7 @@ class MonitorDynamicConfigRepository(SQLAlchemyRepository):
         description: str = "",
         updated_by: str = "",
     ) -> MonitorDynamicConfig:
+        """按 config_key 更新或插入一行（双写场景下的 DB 侧落库）。"""
         row = (
             self.session.query(MonitorDynamicConfig)
             .filter_by(config_key=key)
@@ -38,6 +40,7 @@ class MonitorDynamicConfigRepository(SQLAlchemyRepository):
         return row
 
     def get_value(self, key: str) -> Optional[str]:
+        """返回原始字符串值；不存在返回 None。"""
         row = (
             self.session.query(MonitorDynamicConfig)
             .filter_by(config_key=key)

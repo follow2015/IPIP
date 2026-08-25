@@ -12,10 +12,14 @@ from extensions import db
 
 
 class IPAllocationLog(db.Model):
+    """IP分配历史日志
+
+    只追加日志表，不继承 BaseModel（无 updated_at 字段）。
+    """
     __tablename__ = "ip_allocation_logs"
     __table_args__ = (
         Index("idx_alloc_ip", "ip_address", "room_id"),
-        Index("idx_alloc_ip_time", "ip_address", "room_id", "created_at"),
+        Index("idx_alloc_ip_time", "ip_address", "room_id", "created_at"),  # 按IP+机房查分配历史+时间排序
         Index("idx_alloc_operator", "operator_id"),
         Index("idx_alloc_created", "created_at"),
         {"comment": "IP分配历史日志"},
@@ -32,6 +36,7 @@ class IPAllocationLog(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.now(), comment="创建时间")
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化"""
         return {
             'id': self.id,
             'ip_address': self.ip_address,

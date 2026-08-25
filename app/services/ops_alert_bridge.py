@@ -38,9 +38,14 @@ NOTIFIABLE_RESOURCES = {
 
 
 def bridge_cache_alert(alert) -> None:
+    """CacheMonitor.add_alert_callback() 的回调函数
+
+    Args:
+        alert: CacheAlert 实例（来自 app.utils.cache.monitoring）
+    """
     try:
         notification_service.notify(
-            type=f"cache_{alert.alert_type}",
+            type=f"cache_{alert.alert_type}",  # cache_performance / cache_error / cache_capacity
             severity=SEVERITY_MAP.get(alert.severity, SeverityLevel.WARNING),
             title=f"缓存告警: {alert.message}",
             content=alert.message,
@@ -56,6 +61,17 @@ def bridge_cache_alert(alert) -> None:
 
 
 def bridge_rate_limit_alert(alert_data: dict) -> None:
+    """RateLimitMonitor 告警桥接
+
+    由 notification_delivery_worker._poll_rate_limit_alerts() 调用。
+
+    Args:
+        alert_data: 限流告警数据
+            - key: 限制键
+            - endpoint: 端点
+            - blocked_count: 被阻止次数
+            - severity: 严重程度
+    """
     try:
         notification_service.notify(
             type=NotificationTypeCode.RATE_LIMIT_EXCEEDED,
@@ -73,12 +89,29 @@ def bridge_rate_limit_alert(alert_data: dict) -> None:
 
 
 def register_ops_alert_callbacks() -> None:
+    """注册所有运维告警回调（在 create_app 中调用）"""
     from app.utils.cache.monitoring import cache_monitor
     cache_monitor.add_alert_callback(bridge_cache_alert)
     logger.info("运维告警回调已注册")
 
 
 def bridge_audit_event(audit_log, severity: str = SeverityLevel.INFO) -> None:
+    """审计事件 → 通知桥接
+
+    根据审计事件的严重程度和操作类型，决定是否发送通知以及通过哪些渠道。
+
+    分级规则:
+    - critical: inbox + email + 企微（穿透免打扰）
+    - warning: inbox + email
+    - info: inbox only（遵守免打扰）
+    - delete 操作自动升级为 warning
+    - rbac/webhook_config/mail_setting 的任何操作自动升级为 warning（安全敏感）
+    - info 级别的 create/update 不通知（避免通知风暴）
+
+    Args:
+        audit_log: AuditLog 实例
+        severity: 严重程度 info/warning/critical（SeverityLevel 值）
+    """
     try:
         if audit_log.resource not in NOTIFIABLE_RESOURCES:
             return

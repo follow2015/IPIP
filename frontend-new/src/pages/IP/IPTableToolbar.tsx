@@ -9,13 +9,11 @@ interface IPTableToolbarProps {
   table: UseTableReturn;
   roomOptions: SelectOption[];
   scanNetworkPending: boolean;
-  
   onOpenBatchBan: () => void;
   onOpenStats: () => void;
   onExport: () => void;
   onScanNetwork: () => void;
 }
-
 
 export function IPTableToolbar(props: IPTableToolbarProps) {
   const {

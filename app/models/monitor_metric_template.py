@@ -22,6 +22,7 @@ from extensions import db
 
 
 class MonitorMetricTemplate(BaseModel):
+    """监控指标模板（配置驱动 SNMP/IPMI 指标采集）"""
 
     __tablename__ = "monitor_metric_templates"
     __table_args__ = (

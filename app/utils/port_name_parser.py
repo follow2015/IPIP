@@ -17,7 +17,7 @@ _PORT_TYPE_MAP = {
     "50ge": "50GE",
     "100ge": "100GE", "hundredgige": "100GE",
     "twohundredgige": "200GE",
-    "eth": "GE",
+    "eth": "GE",  # Eth 简写默认归为 GE
 }
 
 _PORT_PATTERN = re.compile(
@@ -48,6 +48,21 @@ _SIMPLE_PATTERN = re.compile(
 
 
 def parse_port_name(port_name: str) -> dict:
+    """解析端口名为结构化字段
+
+    Args:
+        port_name: 端口名称，如 "GE1/0/1"、"XGigabitEthernet0/0/1"、"Vlanif100"
+
+    Returns:
+        dict: {
+            "port_name": 原始端口名,
+            "slot": 槽位号（默认-1）,
+            "card": 卡号（默认-1）,
+            "port_number": 端口号（默认-1）,
+            "port_type": 接口类型字符串，如 "GE"/"10GE"/"VLAN"/"ETH-TRUNK"（默认 None）,
+            "parsed": 是否成功解析为 slot/card/port 格式
+        }
+    """
     if not port_name:
         return {"port_name": port_name, "slot": -1, "card": -1, "port_number": -1, "port_type": None, "parsed": False}
 
@@ -81,6 +96,14 @@ def parse_port_name(port_name: str) -> dict:
 
 
 def normalize_port_name(port_name: str) -> Optional[str]:
+    """规范化端口名：去除空格，统一大小写
+
+    Args:
+        port_name: 原始端口名
+
+    Returns:
+        规范化后的端口名，输入为空时返回 None
+    """
     if not port_name:
         return None
     return re.sub(r"\s+", "", port_name)

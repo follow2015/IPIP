@@ -19,12 +19,29 @@ config = get_config()
 
 
 class JSONFormatter(logging.Formatter):
+    """JSON格式化器
+    
+    将日志记录格式化为JSON格式，支持结构化日志。
+    """
     
     def __init__(self, include_extra: bool = True):
+        """初始化JSON格式化器
+        
+        Args:
+            include_extra: 是否包含额外字段
+        """
         super().__init__()
         self.include_extra = include_extra
     
     def format(self, record: logging.LogRecord) -> str:
+        """格式化日志记录为JSON
+        
+        Args:
+            record: 日志记录
+            
+        Returns:
+            str: JSON格式的日志字符串
+        """
         log_data = {
             "timestamp": datetime.fromtimestamp(record.created).isoformat(),
             "level": record.levelname,
@@ -61,8 +78,17 @@ class JSONFormatter(logging.Formatter):
 
 
 class StandardFormatter(logging.Formatter):
+    """标准格式化器
+    
+    提供统一的标准日志格式。
+    """
     
     def __init__(self, include_extra: bool = True):
+        """初始化标准格式化器
+        
+        Args:
+            include_extra: 是否包含额外字段
+        """
         super().__init__(
             fmt="%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S"
@@ -70,6 +96,14 @@ class StandardFormatter(logging.Formatter):
         self.include_extra = include_extra
     
     def format(self, record: logging.LogRecord) -> str:
+        """格式化日志记录
+        
+        Args:
+            record: 日志记录
+            
+        Returns:
+            str: 格式化后的日志字符串
+        """
         formatted = super().format(record)
         
         if self.include_extra and hasattr(record, 'extra') and record.extra:
@@ -80,6 +114,10 @@ class StandardFormatter(logging.Formatter):
 
 
 class LoggingConfig:
+    """日志配置类
+    
+    提供统一的日志配置管理。
+    """
     
     LEVEL_MAPPING = {
         'DEBUG': logging.DEBUG,
@@ -94,6 +132,14 @@ class LoggingConfig:
     
     @classmethod
     def get_level(cls, level_name: str) -> int:
+        """获取日志级别
+        
+        Args:
+            level_name: 级别名称
+            
+        Returns:
+            int: 日志级别
+        """
         return cls.LEVEL_MAPPING.get(level_name.upper(), logging.INFO)
     
     @classmethod
@@ -102,10 +148,23 @@ class LoggingConfig:
         filename: str,
         level: Union[str, int] = logging.INFO,
         formatter: Optional[logging.Formatter] = None,
-        max_bytes: int = 10 * 1024 * 1024,
+        max_bytes: int = 10 * 1024 * 1024,  # 10MB
         backup_count: int = 10,
         encoding: str = 'utf-8'
     ) -> RotatingFileHandler:
+        """创建文件处理器
+        
+        Args:
+            filename: 文件名
+            level: 日志级别
+            formatter: 格式化器
+            max_bytes: 最大文件大小
+            backup_count: 备份文件数量
+            encoding: 文件编码
+            
+        Returns:
+            RotatingFileHandler: 文件处理器
+        """
         log_dir = os.path.dirname(filename)
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
@@ -134,6 +193,16 @@ class LoggingConfig:
         formatter: Optional[logging.Formatter] = None,
         stream=None
     ) -> logging.StreamHandler:
+        """创建控制台处理器
+        
+        Args:
+            level: 日志级别
+            formatter: 格式化器
+            stream: 输出流
+            
+        Returns:
+            logging.StreamHandler: 控制台处理器
+        """
         handler = logging.StreamHandler(stream or sys.stdout)
         
         if isinstance(level, str):
@@ -157,6 +226,20 @@ class LoggingConfig:
         formatter: Optional[logging.Formatter] = None,
         encoding: str = 'utf-8'
     ) -> TimedRotatingFileHandler:
+        """创建按时间轮转的文件处理器
+        
+        Args:
+            filename: 文件名
+            when: 轮转时机 ('S', 'M', 'H', 'D', 'midnight')
+            interval: 轮转间隔
+            backup_count: 备份文件数量
+            level: 日志级别
+            formatter: 格式化器
+            encoding: 文件编码
+            
+        Returns:
+            TimedRotatingFileHandler: 时间轮转处理器
+        """
         log_dir = os.path.dirname(filename)
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
@@ -181,6 +264,11 @@ class LoggingConfig:
     
     @classmethod
     def get_default_config(cls) -> Dict[str, Any]:
+        """获取默认日志配置
+        
+        Returns:
+            Dict[str, Any]: 默认配置
+        """
         return {
             'version': 1,
             'disable_existing_loggers': False,

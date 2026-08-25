@@ -22,7 +22,6 @@ interface CabinetFormProps {
   onClose: () => void;
 }
 
-
 function parseCabinetNumbers(input: string): string[] {
   if (!input.trim()) return [];
   const parts = input.split(/[,，\s]+/).filter(Boolean);
@@ -45,7 +44,6 @@ function parseCabinetNumbers(input: string): string[] {
   return result;
 }
 
-
 function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
   const [form] = Form.useForm();
   const message = useMessage();
@@ -56,9 +54,7 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
   const { data: customerOptions } = useAllocatableCustomerOptions();
   const isEdit = !!editRecord;
 
-  
   const [batchMode, setBatchMode] = useState(false);
-  
   const [previewNumbers, setPreviewNumbers] = useState<string[]>([]);
 
   useEffect(() => {
@@ -76,26 +72,21 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
     }
   }, [open, editRecord, form]);
 
-  
   const handleCabinetNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!batchMode) return;
     const numbers = parseCabinetNumbers(e.target.value);
     setPreviewNumbers(numbers);
   };
 
-  
   const handleBatchModeChange = (checked: boolean) => {
     setBatchMode(checked);
     setPreviewNumbers([]);
     form.setFieldValue('cabinet_number', '');
   };
 
-  
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      
-      
       const nullableFields = ['customer_id', 'row', 'col', 'total_power', 'location'] as const;
       for (const field of nullableFields) {
         if (values[field] === undefined) {
@@ -142,7 +133,6 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
     }
   };
 
-  
   const confirmLoading = isEdit
     ? updateCabinet.isPending
     : batchMode
@@ -160,7 +150,7 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
       width={batchMode ? 560 : 480}
     >
       <Form form={form} layout="vertical" autoComplete="off">
-        {}
+        {/* 批量模式开关（仅新增时显示） */}
         {!isEdit && (
           <Form.Item>
             <Space>
@@ -177,7 +167,7 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
           </Form.Item>
         )}
 
-        {}
+        {/* 机柜编号输入 */}
         <Form.Item
           name="cabinet_number"
           label={batchMode ? '机柜编号表达式' : '机柜名称'}
@@ -191,7 +181,7 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
           />
         </Form.Item>
 
-        {}
+        {/* 批量模式预览 */}
         {batchMode && previewNumbers.length > 0 && (
           <Form.Item>
             <Alert
@@ -232,7 +222,7 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
           <InputNumber min={1} max={50} style={{ width: '100%' }} placeholder="U位容量" />
         </Form.Item>
 
-        {}
+        {/* 批量模式下隐藏位置相关字段，因为所有机柜共享同一值无意义，可在创建后逐个编辑 */}
         {!batchMode && (
           <>
             <Form.Item name="location" label="机柜位置">

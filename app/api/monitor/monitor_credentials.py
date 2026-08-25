@@ -24,6 +24,7 @@ from app.utils.transactional import transactional
 @permission_required("monitor:config")
 @transactional
 def post_credentials():
+    """创建共享凭据，并可选地关联到多台设备。"""
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")
@@ -55,6 +56,7 @@ def post_credentials():
 @login_required
 @permission_required("monitor:view")
 def list_credentials():
+    """返回共享凭据列表（id/name/protocol/enabled/linked_count），永不回显密文。"""
     from app.services.monitoring.credential_service import list_credentials as _list
     rows = _list()
     return APIResponse.success(data=rows)
@@ -65,6 +67,7 @@ def list_credentials():
 @login_required
 @permission_required("monitor:view")
 def list_linked_devices(credential_id: int):
+    """返回某共享凭据关联的设备列表。"""
     if not credential_service.credential_exists(credential_id):
         raise BusinessLogicError("共享凭据不存在", status_code=404)
     devices = credential_service.linked_devices_detail(credential_id)
@@ -77,6 +80,7 @@ def list_linked_devices(credential_id: int):
 @permission_required("monitor:config")
 @transactional
 def patch_credential(credential_id: int):
+    """更新共享凭据的启用状态或名称（不触及密文）。"""
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")
@@ -103,6 +107,7 @@ def patch_credential(credential_id: int):
 @permission_required("monitor:config")
 @transactional
 def delete_credential(credential_id: int):
+    """删除共享凭据（须先取消所有设备关联）。"""
     if not credential_service.credential_exists(credential_id):
         raise BusinessLogicError("共享凭据不存在", status_code=404)
 
@@ -127,6 +132,10 @@ def delete_credential(credential_id: int):
 @permission_required("monitor:config")
 @transactional
 def batch_delete_credentials():
+    """批量删除共享凭据（须先取消所有设备关联）。
+
+    替代前端串行 for...of + await + 静默 catch，返回失败明细供前端展示。
+    """
     data = request.get_json(silent=True) or {}
     ids = data.get("ids") or []
     if not isinstance(ids, list):
@@ -166,6 +175,7 @@ def batch_delete_credentials():
 @permission_required("monitor:config")
 @transactional
 def link_existing_credentials(credential_id: int):
+    """把一批设备关联到已存在的共享凭据。"""
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")
@@ -194,6 +204,7 @@ def link_existing_credentials(credential_id: int):
 @permission_required("monitor:config")
 @transactional
 def put_shared_credential_payload(credential_id: int):
+    """按共享凭据维度部分更新密文：解密→合并→加密，影响该凭据全部关联设备。"""
     body = request.get_json(silent=True) or {}
     errors = _credential_payload_schema.validate(body)
     if errors:
@@ -230,6 +241,7 @@ def put_shared_credential_payload(credential_id: int):
 @permission_required("monitor:config")
 @transactional
 def put_device_credential_payload(device_id: int, credential_id: int):
+    """按设备维度部分更新密文：只迁移 device_id 这一台设备。"""
     body = request.get_json(silent=True) or {}
     errors = _credential_payload_schema.validate(body)
     if errors:
@@ -264,6 +276,7 @@ def put_device_credential_payload(device_id: int, credential_id: int):
 @permission_required("monitor:config")
 @transactional
 def delete_credentials(device_id: int, protocol: str):
+    """删除某设备的指定协议凭据（不存在则为 no-op）。"""
     if protocol not in _ALLOWED_PROTOCOLS:
         raise ValidationError(f"protocol 必须为 {'/'.join(sorted(_ALLOWED_PROTOCOLS))}")
 

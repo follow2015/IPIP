@@ -9,7 +9,6 @@ import type { components } from '@/types/api-generated';
 export interface DeviceMonitorStatusData {
   monitored: boolean;
   configured_protocols: string[];
-  
   credentials?: { protocol: string; credential_id: number; name: string | null }[];
   status: {
     id: number;
@@ -26,14 +25,10 @@ export interface DeviceMonitorStatusData {
     latency_ms: number | null;
     extra: Record<string, unknown> | null;
     last_error: string | null;
-    
     monitor_enabled?: boolean;
   } | null;
-  
   active_metric_alerts?: number;
-  
   max_alert_severity?: number;
-  
   monitor_interrupted?: boolean;
 }
 
@@ -45,10 +40,9 @@ export function useDeviceMonitorStatus(deviceId: number) {
       return res.data;
     },
     enabled: deviceId > 0,
-    refetchInterval: 30_000 
+    refetchInterval: 30_000 // 30s，对齐后台最短 60s 轮询；用户离开页面 TanStack Query 默认停止刷新
   });
 }
-
 
 export type MonitorRecentAlert = Required<components['schemas']['MonitorOverviewRecentAlert']>;
 export type MonitorOverviewData = Required<
@@ -56,7 +50,6 @@ export type MonitorOverviewData = Required<
 > & {
   recent_alerts: MonitorRecentAlert[];
 };
-
 
 export function useMonitorOverview() {
   return useQuery({
@@ -69,7 +62,6 @@ export function useMonitorOverview() {
   });
 }
 
-
 export type MonitorStatusItem = Required<components['schemas']['MonitorStatusListItem']>;
 
 export interface MonitorStatusListData {
@@ -81,7 +73,6 @@ export interface MonitorStatusListData {
 
 export type MonitorStatusFilter =
   'unreachable' | 'flapping' | 'blindspot' | 'metric_alerting' | 'interrupted' | undefined;
-
 
 export function useMonitorStatuses(params: {
   status_filter?: MonitorStatusFilter;
@@ -103,7 +94,6 @@ export function useMonitorStatuses(params: {
   });
 }
 
-
 export interface MonitorConfigItem {
   value: number | string | boolean;
   editable: boolean;
@@ -111,9 +101,7 @@ export interface MonitorConfigItem {
   description: string;
 }
 
-
 export type MonitorConfigData = Record<string, MonitorConfigItem>;
-
 
 export function useMonitorConfig() {
   return useQuery({
@@ -125,7 +113,6 @@ export function useMonitorConfig() {
     staleTime: Infinity
   });
 }
-
 
 export function useUpdateMonitorConfig() {
   const qc = useQueryClient();
@@ -142,9 +129,7 @@ export function useUpdateMonitorConfig() {
   });
 }
 
-
 export type ProbeResultData = Required<components['schemas']['MonitorProbeResultResponse']>;
-
 
 export function useCheckDeviceNow() {
   const qc = useQueryClient();
@@ -161,7 +146,6 @@ export function useCheckDeviceNow() {
   });
 }
 
-
 export interface BatchProbeResultData {
   device_id: number;
   reachable: boolean | null;
@@ -174,7 +158,6 @@ export interface CheckBatchResponse {
   results: BatchProbeResultData[];
   skipped: number[];
 }
-
 
 export function useCheckBatchDevices() {
   const qc = useQueryClient();
@@ -190,7 +173,6 @@ export function useCheckBatchDevices() {
   });
 }
 
-
 export type MonitorCredentialListItem = components['schemas']['MonitorCredentialListItem'];
 
 export interface LinkedDevice {
@@ -199,7 +181,6 @@ export interface LinkedDevice {
   device_type: string;
   management_ip: string | null;
 }
-
 
 export function useMonitorCredentials() {
   return useQuery({
@@ -211,7 +192,6 @@ export function useMonitorCredentials() {
   });
 }
 
-
 export function useLinkedDevices(credentialId: number | null) {
   return useQuery({
     queryKey: queryKeys.monitor.linkedDevices(credentialId ?? 0),
@@ -222,7 +202,6 @@ export function useLinkedDevices(credentialId: number | null) {
     enabled: credentialId != null && credentialId > 0
   });
 }
-
 
 export function usePatchCredential() {
   const qc = useQueryClient();
@@ -236,12 +215,10 @@ export function usePatchCredential() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.monitor.credentials() });
-      
       qc.invalidateQueries({ queryKey: queryKeys.monitor.metricDashboardAll });
     }
   });
 }
-
 
 export function useDeleteCredential() {
   const qc = useQueryClient();
@@ -257,7 +234,6 @@ export function useDeleteCredential() {
   });
 }
 
-
 export function useBatchDeleteCredentials() {
   const qc = useQueryClient();
   return useMutation({
@@ -271,7 +247,6 @@ export function useBatchDeleteCredentials() {
     }
   });
 }
-
 
 export function useCreateAndLinkCredential() {
   const qc = useQueryClient();
@@ -287,12 +262,10 @@ export function useCreateAndLinkCredential() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.monitor.credentials() });
-      
       qc.invalidateQueries({ queryKey: queryKeys.monitor.metricDashboardAll });
     }
   });
 }
-
 
 export function useLinkExistingCredential() {
   const qc = useQueryClient();
@@ -313,7 +286,6 @@ export function useLinkExistingCredential() {
   });
 }
 
-
 export function useUnlinkCredential() {
   const qc = useQueryClient();
   return useMutation({
@@ -328,7 +300,6 @@ export function useUnlinkCredential() {
     }
   });
 }
-
 
 export function useUpdateSharedCredentialPayload() {
   const qc = useQueryClient();
@@ -354,7 +325,6 @@ export function useUpdateSharedCredentialPayload() {
   });
 }
 
-
 export function useUpdateCredentialPayload(deviceId: number, credentialId: number) {
   const qc = useQueryClient();
   return useMutation({
@@ -376,12 +346,9 @@ export function useUpdateCredentialPayload(deviceId: number, credentialId: numbe
   });
 }
 
-
 export type MonitorAlertItem = Required<components['schemas']['MonitorAlertListItem']>;
 
-
 export type MonitorAlertDetail = Required<components['schemas']['MonitorAlertDetail']>;
-
 
 export type DeviceMetricLatestItem = Required<components['schemas']['DeviceMetricLatestItem']>;
 
@@ -399,15 +366,12 @@ export interface MonitorAlertQuery {
   device_id?: number | null;
   start_date?: string;
   end_date?: string;
-  
   metric_key?: string;
-  
   index_key?: string;
   scope?: 'all' | 'mine';
   page?: number;
   per_page?: number;
 }
-
 
 export function useMonitorAlerts(params: MonitorAlertQuery) {
   return useQuery({
@@ -431,7 +395,6 @@ export function useMonitorAlerts(params: MonitorAlertQuery) {
   });
 }
 
-
 export function useAlertDetail(alertId: number | null) {
   return useQuery({
     queryKey: queryKeys.monitor.alertDetail(alertId ?? -1),
@@ -442,7 +405,6 @@ export function useAlertDetail(alertId: number | null) {
     enabled: alertId != null
   });
 }
-
 
 export function useRetryAlert() {
   const qc = useQueryClient();
@@ -458,7 +420,6 @@ export function useRetryAlert() {
     }
   });
 }
-
 
 export function useAckAlert() {
   const qc = useQueryClient();
@@ -478,7 +439,6 @@ export function useAckAlert() {
   });
 }
 
-
 export function useBatchAckAlert() {
   const qc = useQueryClient();
   return useMutation({
@@ -495,7 +455,6 @@ export function useBatchAckAlert() {
   });
 }
 
-
 export function useBatchRetryAlert() {
   const qc = useQueryClient();
   return useMutation({
@@ -510,7 +469,6 @@ export function useBatchRetryAlert() {
     }
   });
 }
-
 
 export interface MonitorAlertAggregationItem {
   alert_type: string;
@@ -554,7 +512,6 @@ export function useAlertAggregations(params: MonitorAlertAggregationQuery) {
   });
 }
 
-
 export type MonitorAlertStatistics = components['schemas']['MonitorAlertStatisticsResponse'];
 
 export interface MonitorAlertStatisticsQuery {
@@ -585,7 +542,6 @@ export function useAlertStatistics(params: MonitorAlertStatisticsQuery) {
   });
 }
 
-
 export function useCloseAlert() {
   const qc = useQueryClient();
   return useMutation({
@@ -604,7 +560,6 @@ export function useCloseAlert() {
   });
 }
 
-
 export function useBatchCloseAlert() {
   const qc = useQueryClient();
   return useMutation({
@@ -621,7 +576,6 @@ export function useBatchCloseAlert() {
   });
 }
 
-
 function _downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -632,7 +586,6 @@ function _downloadBlob(blob: Blob, filename: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-
 
 export function useExportAlerts() {
   return useMutation({
@@ -653,7 +606,6 @@ export function useExportAlerts() {
   });
 }
 
-
 export function useExportHistory() {
   return useMutation({
     mutationFn: async (input: { deviceId: number; start_date?: string; end_date?: string }) => {
@@ -669,7 +621,6 @@ export function useExportHistory() {
     }
   });
 }
-
 
 export function useToggleDeviceMonitor() {
   const qc = useQueryClient();
@@ -689,12 +640,10 @@ export function useToggleDeviceMonitor() {
   });
 }
 
-
 export interface BatchMonitorEnabledResult {
   updated: number;
   skipped: number;
 }
-
 
 export function useBatchToggleDeviceMonitor() {
   const qc = useQueryClient();
@@ -713,7 +662,6 @@ export function useBatchToggleDeviceMonitor() {
   });
 }
 
-
 export interface ProbeHistoryItem {
   id: number;
   device_id: number;
@@ -729,7 +677,6 @@ export interface ProbeHistoryItem {
   created_at: string;
 }
 
-
 export interface ProbeHistoryData {
   items: ProbeHistoryItem[];
   total: number;
@@ -737,7 +684,6 @@ export interface ProbeHistoryData {
   to: string | null;
   protocol: string | null;
 }
-
 
 export type ProbeTrends = Required<components['schemas']['MonitorProbeTrendsResponse']>;
 
@@ -747,7 +693,6 @@ export interface ProbeHistoryQuery {
   protocol?: string;
   limit?: number;
 }
-
 
 export function useProbeHistory(deviceId: number, params?: ProbeHistoryQuery) {
   return useQuery({
@@ -767,7 +712,6 @@ export function useProbeHistory(deviceId: number, params?: ProbeHistoryQuery) {
   });
 }
 
-
 export function useProbeTrends(deviceId: number, params?: ProbeHistoryQuery) {
   return useQuery({
     queryKey: queryKeys.monitor.trends(deviceId, params),
@@ -783,7 +727,6 @@ export function useProbeTrends(deviceId: number, params?: ProbeHistoryQuery) {
   });
 }
 
-
 export interface DeviceMetricHistoryItem {
   id: number;
   device_id: number;
@@ -795,7 +738,6 @@ export interface DeviceMetricHistoryItem {
   collected_at: string;
 }
 
-
 export interface DeviceMetricHistoryData {
   items: DeviceMetricHistoryItem[];
   total: number;
@@ -804,14 +746,12 @@ export interface DeviceMetricHistoryData {
   index_key: string | null;
 }
 
-
 export interface DeviceMetricHistoryQuery {
   from?: string;
   to?: string;
   index_key?: string;
   limit?: number;
 }
-
 
 export function useDeviceMetricKeys(deviceId: number) {
   return useQuery({
@@ -823,7 +763,6 @@ export function useDeviceMetricKeys(deviceId: number) {
     enabled: deviceId > 0
   });
 }
-
 
 export function useDeviceMetricLatest(deviceId: number) {
   return useQuery({
@@ -837,7 +776,6 @@ export function useDeviceMetricLatest(deviceId: number) {
     enabled: deviceId > 0
   });
 }
-
 
 export function useDeviceMetricHistory(
   deviceId: number,
@@ -861,9 +799,7 @@ export function useDeviceMetricHistory(
   });
 }
 
-
 export type DeviceTrafficPorts = components['schemas']['DeviceTrafficPortsResponse'];
-
 
 export function useDeviceTrafficPorts(deviceId: number) {
   return useQuery({
@@ -876,7 +812,6 @@ export function useDeviceTrafficPorts(deviceId: number) {
     staleTime: 60 * 1000
   });
 }
-
 
 export function useDeviceTraffic(
   deviceId: number,
@@ -897,7 +832,6 @@ export function useDeviceTraffic(
   });
 }
 
-
 const metricTemplateHooks = createCrudHooks<
   MetricTemplateItem,
   MetricTemplateUpsert,
@@ -907,9 +841,7 @@ const metricTemplateHooks = createCrudHooks<
   queryKey: queryKeys.monitor.metricTemplatesCrud
 });
 
-
 export const useMetricTemplates = metricTemplateHooks.useList;
-
 
 export function useUpsertMetricTemplate() {
   const qc = useQueryClient();
@@ -922,15 +854,11 @@ export function useUpsertMetricTemplate() {
   });
 }
 
-
 export type DeviceTraffic = components['schemas']['DeviceTrafficResponse'];
-
 
 export type MetricTemplateList = components['schemas']['MetricTemplateListResponse'];
 
-
 export type MetricTemplateItem = components['schemas']['MetricTemplateItem'];
-
 
 export interface MetricTemplateUpsert {
   device_type: string;
@@ -938,12 +866,10 @@ export interface MetricTemplateUpsert {
   category?: string | null;
   display_name?: string | null;
   source?: string;
-  
   vendor?: string | null;
   mib?: string | null;
   oid_symbol?: string | null;
   oid?: string | null;
-  
   zabbix_item_key?: string | null;
   index_kind?: string | null;
   metric_type?: string;
@@ -953,12 +879,9 @@ export interface MetricTemplateUpsert {
   severity_default?: string | null;
   enabled?: boolean;
   description?: string | null;
-  
   runbook_url?: string | null;
-  
   runbook_title?: string | null;
 }
-
 
 export interface MetricTemplateGroupItem {
   id: number;
@@ -972,11 +895,9 @@ export interface MetricTemplateGroupItem {
   template_count?: number;
 }
 
-
 export interface MetricTemplateGroupDetail extends MetricTemplateGroupItem {
   templates: MetricTemplateItem[];
 }
-
 
 export interface MetricTemplateGroupUpsert {
   name: string;
@@ -988,7 +909,6 @@ export interface MetricTemplateGroupUpsert {
   description?: string | null;
 }
 
-
 export function useMetricTemplateGroups() {
   return useQuery({
     queryKey: queryKeys.monitor.metricTemplateGroups,
@@ -998,7 +918,6 @@ export function useMetricTemplateGroups() {
     }
   });
 }
-
 
 export function useMetricTemplateGroupDetail(groupId: number, enabled = true) {
   return useQuery({
@@ -1013,7 +932,6 @@ export function useMetricTemplateGroupDetail(groupId: number, enabled = true) {
   });
 }
 
-
 export function useCreateMetricTemplateGroup() {
   const qc = useQueryClient();
   return useMutation({
@@ -1024,7 +942,6 @@ export function useCreateMetricTemplateGroup() {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.monitor.metricTemplateGroups })
   });
 }
-
 
 export function useUpdateMetricTemplateGroup() {
   const qc = useQueryClient();
@@ -1044,7 +961,6 @@ export function useUpdateMetricTemplateGroup() {
   });
 }
 
-
 export function useDeleteMetricTemplateGroup() {
   const qc = useQueryClient();
   return useMutation({
@@ -1054,12 +970,10 @@ export function useDeleteMetricTemplateGroup() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.monitor.metricTemplateGroups });
-      
       qc.invalidateQueries({ queryKey: queryKeys.monitor.metricDashboardAll });
     }
   });
 }
-
 
 export function useAddTemplatesToGroup() {
   const qc = useQueryClient();
@@ -1074,12 +988,10 @@ export function useAddTemplatesToGroup() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.monitor.metricTemplateGroups });
       qc.invalidateQueries({ queryKey: queryKeys.monitor.metricTemplatesCrud });
-      
       qc.invalidateQueries({ queryKey: queryKeys.monitor.metricDashboardAll });
     }
   });
 }
-
 
 export function useRemoveTemplateFromGroup() {
   const qc = useQueryClient();
@@ -1098,7 +1010,6 @@ export function useRemoveTemplateFromGroup() {
   });
 }
 
-
 export function useBatchUpdateMetricTemplateGroup() {
   const qc = useQueryClient();
   return useMutation({
@@ -1107,7 +1018,6 @@ export function useBatchUpdateMetricTemplateGroup() {
       metricTemplateGroupId
     }: {
       deviceIds: number[];
-      
       metricTemplateGroupId: number | null;
     }) => {
       const res = await post<{ updated: number; skipped: number }>(
@@ -1122,7 +1032,6 @@ export function useBatchUpdateMetricTemplateGroup() {
   });
 }
 
-
 export function useBatchUpdatePortSyncEnabled() {
   const qc = useQueryClient();
   return useMutation({
@@ -1131,7 +1040,6 @@ export function useBatchUpdatePortSyncEnabled() {
       portSyncEnabled
     }: {
       deviceIds: number[];
-      
       portSyncEnabled: boolean | null;
     }) => {
       const res = await post<{
@@ -1147,19 +1055,15 @@ export function useBatchUpdatePortSyncEnabled() {
       return res.data;
     },
     onSuccess: () => {
-      
       qc.invalidateQueries({ queryKey: ['devices'] });
     }
   });
 }
 
-
 export type DeviceMetricAlertItem = Required<components['schemas']['DeviceMetricAlertStateItem']>;
-
 export interface DeviceMetricAlertListData {
   items: DeviceMetricAlertItem[];
 }
-
 
 export function useDeviceMetricAlerts(deviceId: number) {
   return useQuery({
@@ -1175,7 +1079,6 @@ export function useDeviceMetricAlerts(deviceId: number) {
   });
 }
 
-
 export interface DeviceMetricDashboardItem {
   metric_key: string;
   metric_name: string;
@@ -1185,7 +1088,6 @@ export interface DeviceMetricDashboardItem {
   breached: boolean;
   collected_at: string | null;
 }
-
 
 export interface DeviceMetricDashboardData {
   device_id: number;
@@ -1200,7 +1102,6 @@ export interface DeviceMetricDashboardData {
   } | null;
   grouped: boolean;
   metric_status: DeviceMetricDashboardItem[];
-  
   overall_status:
     | 'no_credential'
     | 'not_probed'
@@ -1209,13 +1110,11 @@ export interface DeviceMetricDashboardData {
     | 'no_data'
     | 'breached'
     | 'normal';
-  
   status_reason: string | null;
   reachable: boolean | null;
   last_error: string | null;
   last_checked_at: string | null;
 }
-
 
 export function useDeviceMetricDashboard(deviceId: number) {
   return useQuery({
@@ -1231,9 +1130,7 @@ export function useDeviceMetricDashboard(deviceId: number) {
   });
 }
 
-
 export const useDeleteMetricTemplate = metricTemplateHooks.useDelete;
-
 
 export function useBatchDeleteMetricTemplates() {
   const qc = useQueryClient();
@@ -1247,7 +1144,6 @@ export function useBatchDeleteMetricTemplates() {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.monitor.metricTemplatesCrud })
   });
 }
-
 
 export function useBatchToggleMetricTemplateEnabled() {
   const qc = useQueryClient();
@@ -1263,7 +1159,6 @@ export function useBatchToggleMetricTemplateEnabled() {
   });
 }
 
-
 export type MonitorSilenceRule = Required<components['schemas']['MonitorSilenceRuleItem']>;
 
 export interface MonitorSilenceRuleInput {
@@ -1276,7 +1171,6 @@ export interface MonitorSilenceRuleInput {
   enabled?: boolean;
 }
 
-
 const silenceRuleHooks = createCrudHooks<
   MonitorSilenceRule,
   MonitorSilenceRuleInput,
@@ -1286,15 +1180,10 @@ const silenceRuleHooks = createCrudHooks<
   queryKey: queryKeys.monitor.silenceRulesCrud
 });
 
-
 export const useSilenceRules = silenceRuleHooks.useList;
-
 export const useCreateSilenceRule = silenceRuleHooks.useCreate;
-
 export const useUpdateSilenceRule = silenceRuleHooks.useUpdate;
-
 export const useDeleteSilenceRule = silenceRuleHooks.useDelete;
-
 
 export type MonitorAlertDependencyRule = Required<
   components['schemas']['MonitorAlertDependencyRuleItem']
@@ -1318,15 +1207,10 @@ const alertDependencyRuleHooks = createCrudHooks<
   queryKey: queryKeys.monitor.alertDependencyRulesCrud
 });
 
-
 export const useAlertDependencyRules = alertDependencyRuleHooks.useList;
-
 export const useCreateAlertDependencyRule = alertDependencyRuleHooks.useCreate;
-
 export const useUpdateAlertDependencyRule = alertDependencyRuleHooks.useUpdate;
-
 export const useDeleteAlertDependencyRule = alertDependencyRuleHooks.useDelete;
-
 
 export type MonitorSlaTarget = Required<components['schemas']['MonitorSlaTargetItem']>;
 export type MonitorSlaAchievement = components['schemas']['MonitorSlaAchievement'];
@@ -1349,15 +1233,10 @@ const slaTargetHooks = createCrudHooks<
   queryKey: queryKeys.monitor.slaTargetsCrud
 });
 
-
 export const useSlaTargets = slaTargetHooks.useList;
-
 export const useCreateSlaTarget = slaTargetHooks.useCreate;
-
 export const useUpdateSlaTarget = slaTargetHooks.useUpdate;
-
 export const useDeleteSlaTarget = slaTargetHooks.useDelete;
-
 
 export function useSlaAchievements(start?: string, end?: string) {
   const params = new URLSearchParams();
@@ -1375,7 +1254,6 @@ export function useSlaAchievements(start?: string, end?: string) {
   });
 }
 
-
 export type DeviceMetricOverride = Required<components['schemas']['DeviceMetricOverrideItem']>;
 
 export interface DeviceMetricOverrideInput {
@@ -1386,12 +1264,10 @@ export interface DeviceMetricOverrideInput {
   note?: string;
 }
 
-
 export interface ThresholdOverrideQueryParams extends PaginationParams {
   device_id?: number;
   metric_key?: string;
 }
-
 
 const thresholdOverrideHooks = createCrudHooks<
   DeviceMetricOverride,
@@ -1403,9 +1279,7 @@ const thresholdOverrideHooks = createCrudHooks<
   queryKey: queryKeys.monitor.thresholdOverridesCrud
 });
 
-
 export const useThresholdOverrides = thresholdOverrideHooks.useList;
-
 
 export function useUpsertThresholdOverride() {
   const qc = useQueryClient();
@@ -1418,9 +1292,7 @@ export function useUpsertThresholdOverride() {
   });
 }
 
-
 export const useDeleteThresholdOverride = thresholdOverrideHooks.useDelete;
-
 
 export type MonitorEscalationPolicy = Required<
   components['schemas']['MonitorEscalationPolicyItem']
@@ -1445,10 +1317,8 @@ export interface MonitorEscalationPolicyInput {
   escalate_webhook_url?: string | null;
   repeat_minutes?: number;
   enabled?: boolean;
-  
   steps?: MonitorEscalationStepInput[] | null;
 }
-
 
 const escalationPolicyHooks = createCrudHooks<
   MonitorEscalationPolicy,
@@ -1459,19 +1329,13 @@ const escalationPolicyHooks = createCrudHooks<
   queryKey: queryKeys.monitor.escalationPoliciesCrud
 });
 
-
 export const useEscalationPolicies = escalationPolicyHooks.useList;
-
 export const useCreateEscalationPolicy = escalationPolicyHooks.useCreate;
-
 export const useUpdateEscalationPolicy = escalationPolicyHooks.useUpdate;
-
 export const useDeleteEscalationPolicy = escalationPolicyHooks.useDelete;
-
 
 export interface MibScanResult {
   device_ip: string;
-  
   vendor_id?: string | null;
   oid_count: number;
   type_summary: Record<string, number>;
@@ -1485,7 +1349,6 @@ export interface MibScanOid {
   value: string;
   category?: string | null;
   category_label?: string | null;
-  
   category_source?: 'rule' | 'heuristic' | null;
 }
 
@@ -1503,12 +1366,9 @@ export interface MibImportItem {
   description?: string;
 }
 
-
 export function useMibScan() {
   return useMutation({
     mutationFn: async (params: { device_id: number; timeout?: number }) => {
-      
-      
       const res = await apiClient.post<ApiResponse<MibScanResult>>(
         '/monitor/mib-scan',
         params as unknown as Record<string, unknown>,
@@ -1518,7 +1378,6 @@ export function useMibScan() {
     }
   });
 }
-
 
 export function useImportOids() {
   const qc = useQueryClient();
@@ -1537,9 +1396,7 @@ export function useImportOids() {
 
 export type OidCategoryRule = Required<components['schemas']['OidCategoryRuleItem']>;
 
-
 export type DeviceTypeRecommend = Required<components['schemas']['DeviceTypeRecommendItem']>;
-
 
 const oidCategoryRuleHooks = createCrudHooks<
   OidCategoryRule,
@@ -1550,15 +1407,10 @@ const oidCategoryRuleHooks = createCrudHooks<
   queryKey: queryKeys.monitor.oidCategoryRulesCrud
 });
 
-
 export const useOidCategoryRules = oidCategoryRuleHooks.useList;
-
 export const useCreateOidCategoryRule = oidCategoryRuleHooks.useCreate;
-
 export const useUpdateOidCategoryRule = oidCategoryRuleHooks.useUpdate;
-
 export const useDeleteOidCategoryRule = oidCategoryRuleHooks.useDelete;
-
 
 export function useDeviceTypeRecommends() {
   return useQuery({
@@ -1571,7 +1423,6 @@ export function useDeviceTypeRecommends() {
     }
   });
 }
-
 
 export function useUpdateDeviceTypeRecommend() {
   const qc = useQueryClient();
@@ -1593,7 +1444,6 @@ export function useUpdateDeviceTypeRecommend() {
   });
 }
 
-
 export function useRecommendConfig(deviceType: string) {
   return useQuery({
     queryKey: queryKeys.monitor.recommendConfig(deviceType),
@@ -1606,7 +1456,6 @@ export function useRecommendConfig(deviceType: string) {
   });
 }
 
-
 export function usePersistHeuristicRule() {
   const qc = useQueryClient();
   return useMutation({
@@ -1618,14 +1467,11 @@ export function usePersistHeuristicRule() {
   });
 }
 
-
 export type VendorBrand = Required<components['schemas']['VendorBrandItem']>;
-
 
 export interface VendorBrandQueryParams extends PaginationParams {
   device_type?: string;
 }
-
 
 const vendorBrandHooks = createCrudHooks<
   VendorBrand,
@@ -1637,9 +1483,7 @@ const vendorBrandHooks = createCrudHooks<
   queryKey: queryKeys.monitor.vendorBrandsCrud
 });
 
-
 export const useVendorBrands = vendorBrandHooks.useList;
-
 
 export function useCreateVendorBrand() {
   const qc = useQueryClient();
@@ -1651,7 +1495,6 @@ export function useCreateVendorBrand() {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.monitor.vendorBrandsCrud })
   });
 }
-
 
 export function useUpdateVendorBrand() {
   const qc = useQueryClient();
@@ -1666,7 +1509,6 @@ export function useUpdateVendorBrand() {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.monitor.vendorBrandsCrud })
   });
 }
-
 
 export function useDeleteVendorBrand() {
   const qc = useQueryClient();

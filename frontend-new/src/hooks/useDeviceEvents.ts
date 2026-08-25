@@ -16,7 +16,14 @@ import { queryKeys } from '@/services/query-keys';
 
 type ResourceType = 'ports' | 'vlans' | 'lags' | 'connections';
 
-
+/**
+ * 订阅设备事件并自动失效相关缓存
+ *
+ * @param deviceId  设备 ID
+ * @param resource  资源类型（ports/vlans/lags/connections）
+ * @param onEvent   可选的事件回调
+ * @param enabled   是否启用订阅，默认 true；设为 false 时不建立 SSE 连接
+ */
 export function useDeviceEvents(
   deviceId: number,
   resource: ResourceType,
@@ -36,11 +43,9 @@ export function useDeviceEvents(
         case 'ports':
           queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(deviceId) });
           queryClient.invalidateQueries({ queryKey: queryKeys.devices.networkPorts(deviceId) });
-          
           if (event.op_type === 'info_refresh' || event.op_type === 'scan_complete') {
             queryClient.invalidateQueries({ queryKey: queryKeys.switches.detail(deviceId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.devices.detail(deviceId) });
-            
             queryClient.invalidateQueries({ queryKey: queryKeys.switches.all });
             queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
           }
@@ -72,13 +77,9 @@ export function useDeviceEvents(
           break;
         case 'connections':
           queryClient.invalidateQueries({ queryKey: queryKeys.devices.connections(deviceId) });
-          
-          
           queryClient.invalidateQueries({
             queryKey: [...queryKeys.devices.detail(deviceId), 'port-links']
           });
-          
-          
           queryClient.invalidateQueries({
             queryKey: [...queryKeys.devices.connections(deviceId), 'switch']
           });
@@ -98,7 +99,12 @@ export function useDeviceEvents(
   }, [deviceId, resource, queryClient, enabled]);
 }
 
-
+/**
+ * 订阅端口操作结果事件（op_type === 'port_action_result'）
+ *
+ * @param deviceId  设备 ID
+ * @param onResult  操作结果回调
+ */
 export function usePortActionResult(
   deviceId: number,
   onResult: (event: DeviceChangeEvent) => void

@@ -14,7 +14,6 @@ import type { LoginRequest } from '@/types/api';
 
 const { Title } = Typography;
 
-
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -22,7 +21,6 @@ function Login() {
   const message = useMessage();
   const [loading, setLoading] = React.useState(false);
 
-  
   React.useEffect(() => {
     if (isAuthenticated) {
       const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
@@ -30,7 +28,6 @@ function Login() {
     }
   }, [isAuthenticated, navigate, location.state]);
 
-  
   const handleLogin = async (values: LoginRequest) => {
     setLoading(true);
     try {

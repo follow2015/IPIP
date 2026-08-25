@@ -433,7 +433,6 @@ function Dashboard() {
     unused: 0
   };
 
-  
   const deviceChartData = useMemo(() => {
     const dist = stats?.devices?.status_distribution ?? {};
     return Object.entries(DEVICE_STATUS_MAP).map(([code, { label, color }]) => ({
@@ -443,7 +442,6 @@ function Dashboard() {
     }));
   }, [stats?.devices?.status_distribution]);
 
-  
   const cabinetChartData = useMemo(() => {
     const c = stats?.cabinets;
     return [
@@ -475,7 +473,6 @@ function Dashboard() {
     ];
   }, [stats?.cabinets]);
 
-  
   const ipChartData = useMemo(() => {
     return [
       { type: '公网-活跃', value: publicGroup.active, color: '#1890ff' },
@@ -489,7 +486,6 @@ function Dashboard() {
     ].filter((d) => d.value > 0);
   }, [publicGroup, privateGroup]);
 
-  
   const metricCards = [
     {
       title: '机房总数',
@@ -552,7 +548,7 @@ function Dashboard() {
 
   return (
     <div style={{ padding: 0 }}>
-      {}
+      {/* 第一行：核心指标卡片 */}
       <Row gutter={[12, 12]}>
         {metricCards.map((card) => (
           <Col xs={12} sm={8} md={6} lg={3} key={card.title}>
@@ -568,7 +564,7 @@ function Dashboard() {
         ))}
       </Row>
 
-      {}
+      {/* 第二行：三列环形图 — 设备/机柜/IP 状态分布 */}
       <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
         <Col xs={24} lg={8}>
           <Card size="small" title="设备状态分布" style={{ height: '100%' }}>
@@ -587,7 +583,7 @@ function Dashboard() {
         </Col>
       </Row>
 
-      {}
+      {/* 第三行：资源利用率 + 系统状态 + 活动流 */}
       <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
         <Col xs={24} lg={8}>
           <UtilizationGauges />

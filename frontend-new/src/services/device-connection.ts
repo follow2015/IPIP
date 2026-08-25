@@ -10,14 +10,12 @@ import { queryKeys } from './query-keys';
 import { useInvalidatingMutation } from '@/hooks/useInvalidatingMutation';
 import type { DeviceConnection } from '@/types/models';
 
-
 export interface PortLink {
   id: number;
   local_port_id: number;
   local_device_id: number;
   peer_device_id: number;
   link_type: 'network_to_network';
-  
   connection_type: string | null;
   vlan_id: number | null;
   status: string;
@@ -25,25 +23,21 @@ export interface PortLink {
   bandwidth: string | null;
   description: string | null;
   lag_group_id: number | null;
-  
   port_name: string;
   port_type: string | null;
   speed: string | null;
   usage_status: string;
   device_id: number;
   device_name?: string;
-  
   peer_port_name?: string;
   peer_port_id?: number;
   peer_port_type?: string | null;
   peer_port_speed?: string | null;
   peer_device_id_ref?: number;
   peer_device_name?: string;
-  
   created_at: string | null;
   updated_at: string | null;
 }
-
 
 export interface ConnectionRequest {
   device_id: number;
@@ -58,7 +52,6 @@ export interface ConnectionRequest {
   notes?: string;
 }
 
-
 export function useDeviceConnections(deviceId: number) {
   return useQuery({
     queryKey: queryKeys.devices.connections(deviceId),
@@ -69,7 +62,6 @@ export function useDeviceConnections(deviceId: number) {
     enabled: deviceId > 0
   });
 }
-
 
 export function useSwitchConnections(switchDeviceId: number) {
   return useQuery({
@@ -84,7 +76,6 @@ export function useSwitchConnections(switchDeviceId: number) {
   });
 }
 
-
 export function usePortLinks(deviceId: number) {
   return useQuery({
     queryKey: [...queryKeys.devices.detail(deviceId), 'port-links'],
@@ -96,12 +87,10 @@ export function usePortLinks(deviceId: number) {
   });
 }
 
-
 export function useCreateConnection(deviceId: number) {
   return useInvalidatingMutation(
     (data: Omit<ConnectionRequest, 'device_id'>) =>
       post<DeviceConnection>('/device-connections', { ...data, device_id: deviceId }),
-    
     (_data, variables) => {
       const keys: Array<readonly unknown[]> = [
         queryKeys.devices.connections(deviceId),
@@ -120,7 +109,6 @@ export function useCreateConnection(deviceId: number) {
   );
 }
 
-
 export function useUpdateConnection() {
   return useInvalidatingMutation(
     ({ connId, data }: { connId: number; data: Partial<ConnectionRequest> }) =>
@@ -129,14 +117,12 @@ export function useUpdateConnection() {
   );
 }
 
-
 export function useDeleteConnection(deviceId: number) {
   return useInvalidatingMutation(
     (params: { connId: number; switchDeviceId?: number }) =>
       del<void>(`/device-connections/${params.connId}`),
     (_data, variables) => {
       const keys: Array<readonly unknown[]> = [queryKeys.devices.connections(deviceId)];
-      
       if (variables.switchDeviceId) {
         keys.push(queryKeys.devices.connections(variables.switchDeviceId));
       }
@@ -145,12 +131,10 @@ export function useDeleteConnection(deviceId: number) {
   );
 }
 
-
 export function useDisconnectPortLink(deviceId: number) {
   return useInvalidatingMutation(
     (connectionId: number) =>
       del<{ peer_device_id: number }>(`/devices/${deviceId}/port-links/${connectionId}`),
-    
     (res) => {
       const keys: Array<readonly unknown[]> = [
         [...queryKeys.devices.detail(deviceId), 'port-links'],
@@ -168,7 +152,6 @@ export function useDisconnectPortLink(deviceId: number) {
   );
 }
 
-
 export interface PortLinkUpdateRequest {
   connection_type?: string;
   vlan_id?: number | null;
@@ -178,7 +161,6 @@ export interface PortLinkUpdateRequest {
   description?: string | null;
   lag_group_id?: number | null;
 }
-
 
 export function useUpdatePortLink(deviceId: number) {
   return useInvalidatingMutation(

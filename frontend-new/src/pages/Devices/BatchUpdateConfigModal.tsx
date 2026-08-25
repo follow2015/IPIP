@@ -45,11 +45,9 @@ const { Text } = Typography;
 
 interface BatchUpdateConfigModalProps {
   open: boolean;
-  
   devices: Device[];
   onClose: (refresh?: boolean) => void;
 }
-
 
 const HW_FIELDS = [
   'cpu_template_id',
@@ -80,7 +78,6 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
   const deviceSubtype = firstDevice?.device_subtype as DeviceSubtype | null | undefined;
   const isServerHw = deviceType === DeviceType.SERVER && deviceSubtype !== DeviceSubtype.CHASSIS;
   const isNetwork = deviceType === DeviceType.NETWORK;
-  
   const isManagedNetwork = isNetwork && !!firstDevice?.switch_credential?.has_ssh;
   const vendorOptions = (vendorBrands?.items ?? [])
     .filter((v) => v.enabled && (!deviceType || v.device_type === deviceType))
@@ -95,7 +92,6 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
 
   const { data: nicComponentTemplates = [] } = useComponentTemplates('nic', customerId);
 
-  
   const { data: switchPage } = useSwitchList({ page: 1, page_size: 500 });
   const switchOptions = useMemo(
     () =>
@@ -153,14 +149,12 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
       main
     };
 
-    
     if (isServerHw) {
       const hw: Record<string, unknown> = {};
       for (const f of HW_FIELDS) {
         const v = values[f];
         if (v !== undefined && v !== null && v !== '') hw[f] = v;
       }
-      
       const storageItems = values.storage_items as
         | {
             count?: number;
@@ -178,7 +172,6 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
       }
       if (Object.keys(hw).length > 0) payload.hardware = hw;
 
-      
       const nicVal = values.nic_ports as { template_id?: number }[] | undefined;
       if (nicVal && nicVal.length > 0) {
         const expanded = expandNicPorts(nicVal, nicComponentTemplates);
@@ -187,7 +180,6 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
       }
     }
 
-    
     if (isUnmanagedNetwork) {
       const sc = values.switch_config as Record<string, unknown> | undefined;
       if (sc && Object.keys(sc).length > 0) payload.switch_config = sc;
@@ -257,7 +249,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
       destroyOnHidden
     >
       <Form form={form} layout="vertical" preserve={false}>
-        {}
+        {/* 通用字段 */}
         <Divider plain>通用信息</Divider>
         <Row gutter={16}>
           <Col span={8}>
@@ -309,7 +301,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
           </Col>
         </Row>
 
-        {}
+        {/* 服务器硬件配置 + 网卡 */}
         {isServerHw && (
           <>
             <Divider plain>硬件配置（服务器）</Divider>
@@ -329,7 +321,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
           </>
         )}
 
-        {}
+        {/* 网管型网络设备：仅通用字段 */}
         {isManagedNetwork && (
           <Alert
             type="warning"
@@ -338,7 +330,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
           />
         )}
 
-        {}
+        {/* 非网管型网络设备拓扑 + 端口生成 */}
         {isUnmanagedNetwork && (
           <>
             <Divider plain>网络拓扑</Divider>
@@ -406,7 +398,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
               </Col>
             </Row>
 
-            {}
+            {/* 端口生成（支持多组） */}
             <Card
               title="端口生成"
               size="small"
@@ -549,7 +541,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
           </>
         )}
 
-        {}
+        {/* 机箱子类型：仅支持通用字段 */}
         {!isServerHw && !isNetwork && (
           <Alert
             type="warning"

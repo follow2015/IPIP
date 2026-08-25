@@ -11,7 +11,6 @@ import axios, { AxiosError, InternalAxiosRequestConfig, type AxiosResponse } fro
 import type { ApiResponse, BackendPaginatedData } from '@/types/api';
 import { adaptPaginatedResponse } from '@/types/api';
 
-
 interface ApiErrorData {
   message?: string;
   error_code?: string;
@@ -21,7 +20,7 @@ interface ApiErrorData {
 
 const apiClient = axios.create({
   baseURL: '/api',
-  timeout: 30_000, 
+  timeout: 30_000, // CR-19: 全局默认 30 秒，扫描等长操作单独设更长超时
   withCredentials: false
 });
 
@@ -39,9 +38,7 @@ apiClient.interceptors.request.use(
 
 
 let isRefreshing = false;
-
 let pendingRequests: Array<(err?: Error) => void> = [];
-
 
 async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = sessionStorage.getItem('refresh_token');
@@ -57,7 +54,6 @@ async function refreshAccessToken(): Promise<string | null> {
     const { token, refresh_token } = res.data.data;
     sessionStorage.setItem('token', token);
     sessionStorage.setItem('refresh_token', refresh_token);
-    
     try {
       const { useAuthStore } = await import('@/stores/auth');
       const state = useAuthStore.getState();
@@ -65,7 +61,7 @@ async function refreshAccessToken(): Promise<string | null> {
         useAuthStore.setState({ token });
       }
     } catch {
-      
+      /* store 不可用时降级，sessionStorage 已更新 */
     }
     return token;
   } catch {
@@ -95,7 +91,6 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (error.response?.status === 401 && !originalRequest._retry) {
-      
       const url = originalRequest?.url ?? '';
       const isAuthEndpoint =
         url.startsWith('/auth/login') ||
@@ -114,7 +109,6 @@ apiClient.interceptors.response.use(
               isRefreshing = false;
 
               if (newToken) {
-                
                 pendingRequests.forEach((cb) => cb());
                 pendingRequests = [];
 
@@ -122,7 +116,6 @@ apiClient.interceptors.response.use(
                 originalRequest.headers.Authorization = `Bearer ${newToken}`;
                 return apiClient(originalRequest);
               } else {
-                
                 const refreshErr = new Error('Token 刷新失败，请重新登录');
                 pendingRequests.forEach((cb) => cb(refreshErr));
                 pendingRequests = [];
@@ -130,7 +123,6 @@ apiClient.interceptors.response.use(
               }
             } catch {
               isRefreshing = false;
-              
               const refreshErr = new Error('Token 刷新异常，请重新登录');
               pendingRequests.forEach((cb) => cb(refreshErr));
               pendingRequests = [];
@@ -138,7 +130,6 @@ apiClient.interceptors.response.use(
             }
           }
 
-          
           return new Promise((resolve, reject) => {
             pendingRequests.push((err?: Error) => {
               if (err) {
@@ -155,12 +146,10 @@ apiClient.interceptors.response.use(
           });
         }
 
-        
         handleUnauthorized();
       }
     }
 
-    
     const errorData = error.response?.data as ApiErrorData | undefined;
     const backendMsg = errorData?.message;
     if (backendMsg && typeof backendMsg === 'string') {
@@ -176,27 +165,27 @@ apiClient.interceptors.response.use(
 
 let isHandling401 = false;
 
-
+/**
+ * 处理 401 未授权响应
+ * - 防并发：2秒内只处理一次
+ * - 防误清：动态 import 期间用户可能已重新登录，需比对 token 是否仍为触发 401 时的旧值
+ * - 使用 clearAuth() 而非 logout()：token 已被后端拒绝，无需再发 /auth/logout 撤销
+ */
 function handleUnauthorized(): void {
   if (isHandling401) return;
   isHandling401 = true;
 
-  
   const staleToken = sessionStorage.getItem('token');
 
   import('@/stores/auth').then(({ useAuthStore }) => {
     const currentToken = sessionStorage.getItem('token');
-    
     if (currentToken !== staleToken) return;
     useAuthStore.getState().clearAuth();
-    
     import('@/router')
       .then(({ router }) => {
         router.navigate('/login');
       })
       .catch(() => {
-        
-        
         window.location.href = '/login';
       });
   });
@@ -215,7 +204,14 @@ export async function get<T>(
   return res.data;
 }
 
-
+/**
+ * POST：D 默认 object，传入具名接口时无需强制转换
+ *
+ * @example
+ * post<Device, CreateDeviceRequest>('/devices', payload)
+ * // 或让 TypeScript 自动推断 D：
+ * post<Device>('/devices', payload)
+ */
 export async function post<T, D extends object = object>(
   url: string,
   data?: D
@@ -224,7 +220,6 @@ export async function post<T, D extends object = object>(
   return res.data;
 }
 
-
 export async function put<T, D extends object = object>(
   url: string,
   data?: D
@@ -232,7 +227,6 @@ export async function put<T, D extends object = object>(
   const res = await apiClient.put<ApiResponse<T>>(url, data as unknown as Record<string, unknown>);
   return res.data;
 }
-
 
 export async function patch<T, D extends object = object>(
   url: string,
@@ -244,7 +238,6 @@ export async function patch<T, D extends object = object>(
   );
   return res.data;
 }
-
 
 export async function del<T, D extends object = object>(
   url: string,

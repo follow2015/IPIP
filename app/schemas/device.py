@@ -10,6 +10,12 @@ from app.core.enums import SwitchDeviceTypeCode, SSHProtocolCode
 
 
 class NullableDate(fields.Date):
+    """Date 字段，将空字符串视为 None。
+
+    前端表单中日期字段为空时提交 ""（空字符串），
+    Marshmallow 的 fields.Date 不接受空字符串，会报 "Not a valid date"。
+    此字段在反序列化前将空字符串转为 None，使 allow_none=True 生效。
+    """
 
     def _deserialize(self, value, attr, data, **kwargs):
         if isinstance(value, str) and not value.strip():
@@ -18,18 +24,19 @@ class NullableDate(fields.Date):
 
 
 class DeviceCreateSchema(Schema):
+    """创建设备请求验证Schema"""
 
     class Meta:
-        unknown = EXCLUDE
+        unknown = EXCLUDE  # 忽略未知字段
 
     device_name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    cabinet_id = fields.Int(validate=validate.Range(min=1), allow_none=True)
+    cabinet_id = fields.Int(validate=validate.Range(min=1), allow_none=True)  # 节点设备可不指定机柜
     device_type = fields.Str(validate=validate.Length(max=50))
     brand = fields.Str(validate=validate.Length(max=50))
     device_model = fields.Str(validate=validate.Length(max=50))
     serial_number = fields.Str(validate=validate.Length(max=100))
-    u_position = fields.Int(validate=validate.Range(min=0), allow_none=True)
-    height_u = fields.Int(validate=validate.Range(min=0, max=50), allow_none=True)
+    u_position = fields.Int(validate=validate.Range(min=0), allow_none=True)  # 允许0（节点设备不占用U位）
+    height_u = fields.Int(validate=validate.Range(min=0, max=50), allow_none=True)  # 允许0（节点设备）
     power = fields.Float(validate=validate.Range(min=0), allow_none=True)
     ip_address = fields.Str(allow_none=True)
     management_ip = fields.Str(allow_none=True)
@@ -46,7 +53,7 @@ class DeviceCreateSchema(Schema):
     storage_summary = fields.Str(validate=validate.Length(max=200), allow_none=True)
     hostname = fields.Str(validate=validate.Length(max=100), allow_none=True)
     os_version = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    responsible_person = fields.Int(validate=validate.Range(min=1), allow_none=True)
+    responsible_person = fields.Int(validate=validate.Range(min=1), allow_none=True)  # 责任人ID（外键关联users.id）
     parent_device_id = fields.Int(allow_none=True)
     is_chassis = fields.Bool(allow_none=True)
     node_position = fields.Int(allow_none=True)

@@ -22,7 +22,6 @@ export function PortEditModal({ deviceId, port, onClose }: PortEditModalProps) {
   const updatePort = useUpdateNetworkPort(deviceId);
   const { data: customerOptions } = useAllocatableCustomerOptions();
 
-  
   useEffect(() => {
     if (!port) return;
     const macValue = port.mac ?? '';
@@ -43,7 +42,6 @@ export function PortEditModal({ deviceId, port, onClose }: PortEditModalProps) {
     if (!port) return;
     try {
       const values = await editForm.validateFields();
-      
 
       const { port_name, port_type, ...updateData } = values;
       await updatePort.mutateAsync({ portId: port.id, data: updateData });

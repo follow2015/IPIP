@@ -22,9 +22,17 @@ logger = get_logger(__name__)
 
 
 class LagConfigService:
+    """链路聚合子服务"""
 
     def __init__(self, dispatcher, switch_repo: SwitchRepository, sync_coordinator,
                  clear_service=None):
+        """
+        Args:
+            dispatcher: CommandDispatcher 实例，用于命令下发
+            switch_repo: SwitchRepository 实例
+            sync_coordinator: SyncCoordinator 实例，用于事务与同步
+            clear_service: PortClearService 实例，用于端口清除
+        """
         self.dispatcher = dispatcher
         self.switch_repo = switch_repo
         self.sync = sync_coordinator
@@ -33,18 +41,22 @@ class LagConfigService:
 
     @staticmethod
     def _is_trunk_interface(port: str) -> bool:
+        """判断端口名称是否为链路聚合接口（Eth-Trunk10 / Bridge-Aggregation10 / Port-channel10）"""
         return is_trunk_interface(port)
 
     @staticmethod
     def _extract_trunk_id(port: str):
+        """从 Eth-Trunk 端口名中提取数字 ID（如 Eth-Trunk10 → 10）"""
         return extract_trunk_id(port)
 
     @staticmethod
     def _get_trunk_name(device_type: str, channel_id: int) -> str:
+        """根据设备类型生成链路聚合接口名称"""
         return get_trunk_name(device_type, channel_id)
 
 
     def create_port_channel(self, switch, channel_id: int, member_ports: list) -> dict:
+        """创建链路聚合，并在 switch_port_status 中 upsert 对应接口记录"""
         adapter = get_adapter(switch.device_type)
         commands = [adapter.get_create_trunk_command(channel_id)]
         result = self.dispatcher._send_config(switch, commands, err_label="创建Eth-Trunk")
@@ -69,6 +81,16 @@ class LagConfigService:
         return {"success": True, "message": f"Eth-Trunk {channel_id} 已创建"}
 
     def delete_eth_trunk(self, switch, trunk_id: int) -> dict:
+        """删除 Eth-Trunk，并清理 switch_port_status 中对应接口记录
+
+        华为设备要求先移除所有成员接口才能删除 Eth-Trunk，
+        否则报错 "The parameter of trunk command is invalid,
+        because the trunk has member interfaces"。
+
+        移除成员后：
+        1. 批量清除成员端口配置（恢复默认），合并为一次 SSH 交互连接
+        2. 逐端口同步配置缓存和 lag_group_id
+        """
         if not (1 <= trunk_id <= 512):
             return {"success": False, "error": f"Trunk ID {trunk_id} 超出合法范围 1-512"}
 
@@ -130,6 +152,12 @@ class LagConfigService:
         return result
 
     def add_port_to_channel(self, switch, channel_id: int, port: str) -> dict:
+        """添加端口到链路聚合（Eth-Trunk 不存在时自动创建）
+
+        加入前先执行 clear configuration interface <port> 清空端口配置，
+        避免残留配置（如 VLAN、IP）导致加入失败。
+        SSH 成功后统一通过 _sync_port_from_device 从设备同步三表。
+        """
         trunk_result = self._ensure_trunk_exists(switch, channel_id)
         if not trunk_result.get("success"):
             return {
@@ -160,6 +188,11 @@ class LagConfigService:
         return result
 
     def remove_port_from_channel(self, switch, port: str) -> dict:
+        """从链路聚合组移除端口
+
+        直接调用 dispatcher + sync，不经过 Facade._execute_and_sync，
+        避免嵌套 device_op_lock.acquire 导致死锁。
+        """
         a = get_adapter(switch.device_type)
         port_row = self.switch_repo.find_port_by_device_and_name(switch.device_id, port)
         lag_id = port_row.lag_group_id if port_row and port_row.lag_group_id else None
@@ -182,6 +215,11 @@ class LagConfigService:
         return result
 
     def _ensure_trunk_exists(self, switch, channel_id: int) -> dict:
+        """确保 Eth-Trunk 存在，不存在则自动创建
+
+        判断 Trunk 是否存在：在 display 输出中正则匹配具体 Trunk ID。
+        SSH 检查异常时保守认为不存在。
+        """
         adapter = get_adapter(switch.device_type)
         check_cmd = adapter.get_check_trunk_command(channel_id)
 
@@ -206,6 +244,10 @@ class LagConfigService:
 
     def _update_lag_member_relation(self, device_id: int, port_name: str,
                                      channel_id: int, device_type: str = None) -> None:
+        """端口加入 Eth-Trunk 后，更新 lag_group_id 和 member_count
+
+        委托 SwitchRepository.update_lag_member_relation() 执行。
+        """
         if not (1 <= channel_id <= 512):
             logger.warning("_update_lag_member_relation: Trunk ID %d 超出合法范围 1-512，跳过", channel_id)
             return
@@ -213,4 +255,8 @@ class LagConfigService:
         self.switch_repo.update_lag_member_relation(device_id, port_name, channel_id, device_type=device_type)
 
     def _clear_lag_member_relation(self, device_id: int, port_name: str) -> None:
+        """端口离开 Eth-Trunk 后，清除 lag_group_id 并同步 member_count
+
+        委托 SwitchRepository.clear_lag_member_relation() 执行。
+        """
         self.switch_repo.clear_lag_member_relation(device_id, port_name)

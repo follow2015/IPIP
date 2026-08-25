@@ -16,7 +16,6 @@ const RANGE_MAP: Record<string, number> = {
   '24小时': 24 * 3600
 };
 
-
 function pickUnit(max: number): { label: string; divisor: number } {
   const a = Math.abs(max);
   if (a >= 1e12) return { label: 'Tbps', divisor: 1e12 };
@@ -25,7 +24,6 @@ function pickUnit(max: number): { label: string; divisor: number } {
   if (a >= 1e3) return { label: 'Kbps', divisor: 1e3 };
   return { label: 'bps', divisor: 1 };
 }
-
 
 function fmt(n: number): string {
   if (!isFinite(n)) return '-';
@@ -37,15 +35,12 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
   const [selectedPort, setSelectedPort] = useState<string | undefined>(undefined);
   const [shouldFetch, setShouldFetch] = useState(false);
 
-  
   const { data: portsData, isLoading: portsLoading } = useDeviceTrafficPorts(deviceId);
   const ports = portsData?.ports ?? [];
 
-  
   const now = useMemo(() => Math.floor(Date.now() / 1000), [rangeKey, shouldFetch]);
   const windowSec = RANGE_MAP[rangeKey];
 
-  
   const { data, isLoading, isFetching } = useDeviceTraffic(
     deviceId,
     selectedPort,
@@ -54,7 +49,6 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
     shouldFetch
   );
 
-  
   const { series, unit } = useMemo(() => {
     if (!data || !data.time?.length) return { series: [], unit: { label: 'bps', divisor: 1 } };
     const rx = data.rx_bps ?? [];
@@ -89,7 +83,6 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
     setShouldFetch(true);
   };
 
-  
   if (portsLoading) {
     return (
       <Card title="端口流量">
@@ -98,7 +91,6 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
     );
   }
 
-  
   if (portsData && !portsData.configured) {
     const errorMsg =
       portsData.error === 'credential_error'
@@ -128,7 +120,7 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
       }
     >
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
-        {}
+        {/* 端口选择 + 获取按钮 */}
         <Space wrap>
           <Select
             style={{ width: 320 }}
@@ -148,7 +140,7 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
           </Button>
         </Space>
 
-        {}
+        {/* 图表 */}
         {isLoading || isFetching ? (
           <div style={{ textAlign: 'center', padding: 48 }}>加载中...</div>
         ) : !shouldFetch || !series.length ? (

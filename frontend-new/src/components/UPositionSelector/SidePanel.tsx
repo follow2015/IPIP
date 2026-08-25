@@ -16,7 +16,6 @@ interface SidePanelProps {
   dropMsg: DropMsg;
 }
 
-
 const SidePanel: React.FC<SidePanelProps> = ({
   selectedDevice,
   totalU,
@@ -31,7 +30,7 @@ const SidePanel: React.FC<SidePanelProps> = ({
 
   return (
     <>
-      {}
+      {/* 图例 */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {(
           Object.entries(TYPE_CONFIG) as [RackDeviceType, (typeof TYPE_CONFIG)[RackDeviceType]][]
@@ -60,10 +59,10 @@ const SidePanel: React.FC<SidePanelProps> = ({
         ))}
       </div>
 
-      {}
+      {/* 设备详情面板 */}
       <DetailPanel device={selectedDevice} totalU={totalU} />
 
-      {}
+      {/* 利用率概况 */}
       <div
         style={{
           background: token.colorBgContainer,
@@ -118,7 +117,7 @@ const SidePanel: React.FC<SidePanelProps> = ({
         ))}
       </div>
 
-      {}
+      {/* 拖放反馈 */}
       {dropMsg.text && (
         <div
           style={{

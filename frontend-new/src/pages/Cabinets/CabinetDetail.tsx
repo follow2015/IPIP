@@ -27,12 +27,10 @@ import { CABINET_STATUS_MAP } from '@/types/enums';
 import { DeviceStatusCode } from '@/types/status-codes.generated';
 import type { Cabinet, Device } from '@/types/models';
 
-
 function renderStatus(v: number) {
   const s = CABINET_STATUS_MAP[v as keyof typeof CABINET_STATUS_MAP];
   return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{v}</Tag>;
 }
-
 
 function CabinetDetail() {
   const { id } = useParams<{ id: string }>();
@@ -53,12 +51,10 @@ function CabinetDetail() {
   return <CabinetDetailContent cabinetId={cabinetId} />;
 }
 
-
 function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  
   useEffect(() => {
     if (cabinetId > 0) {
       queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.withDevices(cabinetId) });
@@ -72,13 +68,11 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
   const { data: vendorBrands } = useVendorBrands();
   const message = useMessage();
 
-  
   const vendorLabelMap = new Map<string, string>();
   for (const v of vendorBrands?.items ?? []) {
     if (!vendorLabelMap.has(v.enterprise_no)) vendorLabelMap.set(v.enterprise_no, v.label);
   }
 
-  
   const handlePositionChange = useCallback(
     (deviceId: number, newUPos: number) => {
       updateDevice.mutate(
@@ -86,7 +80,6 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
         {
           onSuccess: () => {
             message.success('U位更新成功');
-            
             queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.detail(cabinetId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.withDevices(cabinetId) });
           },
@@ -101,7 +94,6 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
     return <div>机柜不存在</div>;
   }
 
-  
   function mapDeviceType(d: Device): RackDeviceType {
     if (d.is_chassis) return 'multinode';
     const sub = d.device_subtype;
@@ -113,17 +105,15 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
     return 'server';
   }
 
-  
   function mapNodeStatus(status: number): NodeStatus {
-    if (status === DeviceStatusCode.ONLINE) return 'active'; 
-    if (status === DeviceStatusCode.OFFLINE) return 'inactive'; 
-    if (status === DeviceStatusCode.MAINTENANCE) return 'fault'; 
+    if (status === DeviceStatusCode.ONLINE) return 'active'; // 在线
+    if (status === DeviceStatusCode.OFFLINE) return 'inactive'; // 离线
+    if (status === DeviceStatusCode.MAINTENANCE) return 'fault'; // 故障/维护
     return 'inactive';
   }
 
   const allDevices = ((cabinetWithDevices as { devices?: Device[] })?.devices ?? []) as Device[];
 
-  
   const topDevices = allDevices.filter((d) => !d.parent_device_id);
 
   const occupiedPositions: OccupiedPosition[] = topDevices.map((d) => {
@@ -223,8 +213,6 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
           readOnly={false}
           onPositionChange={handlePositionChange}
           onNodeReorder={(chassisId, newOrderedNodeIds) => {
-            
-            
             console.log('机箱子节点重排:', chassisId, newOrderedNodeIds);
           }}
           onSelect={() => {}}

@@ -26,11 +26,14 @@ _device_config_service = DeviceConfigService(DeviceConfigBackupRepository(), Dev
 
 
 class ConfigChangeRequestSchema(Schema):
+    """提交配置变更请求Schema"""
     class Meta:
         unknown = EXCLUDE
     change_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
     content = fields.Str(allow_none=True)
     description = fields.Str(validate=validate.Length(max=500), allow_none=True)
+
+
 
 
 @device_config_bp.route("/<int:device_id>/config", methods=["GET"])
@@ -39,6 +42,11 @@ class ConfigChangeRequestSchema(Schema):
 @permission_required("device:view")
 @rate_limit_api
 def get_device_config(device_id):
+    """获取设备最新配置快照
+
+    Path Parameters:
+        device_id (int): 设备ID
+    """
     config = _device_config_service.get_latest_backup(device_id)
     if not config:
         return APIResponse.success(data={})
@@ -51,6 +59,11 @@ def get_device_config(device_id):
 @permission_required("device:view")
 @rate_limit_api
 def get_config_history(device_id):
+    """获取配置变更历史
+
+    Path Parameters:
+        device_id (int): 设备ID
+    """
     history = _device_config_service.get_backup_history(device_id)
     return APIResponse.success(data=[h.to_dict() for h in history])
 
@@ -63,6 +76,11 @@ def get_config_history(device_id):
 @redis_lock(prefix="config_backup", key_param="device_id", ttl=300)
 @transactional
 def backup_device_config(device_id):
+    """触发配置备份
+
+    Path Parameters:
+        device_id (int): 设备ID
+    """
     result = _device_config_service.create_backup(device_id)
     return APIResponse.success(data=result.to_dict(), message="配置备份成功", status_code=201)
 
@@ -75,6 +93,13 @@ def backup_device_config(device_id):
 @redis_lock(prefix="config_change", key_param="device_id", ttl=300)
 @transactional
 def submit_config_change(device_id):
+    """提交配置变更请求
+
+    Path Parameters:
+        device_id (int): 设备ID
+
+    Request Body: 配置变更参数
+    """
     data = request.get_json()
     if data is None:
         raise ValidationError("请求体不能为空")

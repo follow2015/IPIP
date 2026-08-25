@@ -41,6 +41,7 @@ CUSTOMER_REQUIRED_COLUMNS = ["name"]
 @login_required
 @permission_required("customer:view")
 def download_import_template():
+    """下载客户导入模板（含表头+示例行）"""
     from flask import send_file
 
     buffer = import_export_service.build_template(
@@ -64,6 +65,7 @@ def download_import_template():
 @rate_limit_api
 @transactional
 def batch_import_customers():
+    """批量导入客户"""
     if "file" not in request.files:
         return APIResponse.error(message="请上传文件", status_code=400)
 
@@ -117,6 +119,7 @@ def batch_import_customers():
 @permission_required("customer:view")
 @rate_limit_api
 def export_customers():
+    """导出客户数据"""
     from flask import send_file
     from datetime import datetime
 

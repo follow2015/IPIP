@@ -13,16 +13,13 @@ import type { PaginationParams, PaginatedData } from '@/types/api';
 import type { CustomerCreate, CustomerUpdate } from '@/types/api-bridge';
 import type { SelectOption } from './crud-factory';
 
-
 interface CustomerQueryParams extends PaginationParams {
   search?: string;
   customer_name?: string;
   customer_status?: number;
 }
 
-
 export type CreateCustomerRequest = CustomerCreate;
-
 
 export type UpdateCustomerRequest = CustomerUpdate & { id: number };
 
@@ -45,10 +42,18 @@ export const useUpdateCustomer = customerHooks.useUpdate;
 export const useDeleteCustomer = customerHooks.useDelete;
 export const useCustomerOptions = customerHooks.useOptions;
 
-
 const CUSTOMER_STATUS_TERMINATED = 3;
 
-
+/**
+ * 可分配客户下拉选项（过滤掉 TERMINATED 客户）
+ *
+ * 与 useCustomerOptions 的区别：后者返回全部客户，用于列表查询筛选等
+ * 需要展示历史归属的场景；本 hook 仅返回可分配客户，用于资源分配弹窗
+ * （端口/IP/网段/机柜/设备/组件模板归属客户）。
+ *
+ * 后端 assert_allocatable 守卫会拒绝 TERMINATED 客户分配，本 hook 在前端
+ * 预先过滤，避免用户选到会被后端 409 拒绝的客户。
+ */
 export function useAllocatableCustomerOptions() {
   return useQuery({
     queryKey: [...queryKeys.customers.all, 'options', 'allocatable'],
@@ -74,7 +79,6 @@ export function useCustomerCabinets(id: number) {
   });
 }
 
-
 export function useCustomerDevices(id: number) {
   return useQuery({
     queryKey: queryKeys.customers.devices(id),
@@ -85,7 +89,6 @@ export function useCustomerDevices(id: number) {
     enabled: id > 0
   });
 }
-
 
 export function useCustomerAssets(id: number) {
   return useQuery({
@@ -98,7 +101,6 @@ export function useCustomerAssets(id: number) {
   });
 }
 
-
 export function useCustomerStatistics(id: number) {
   return useQuery({
     queryKey: queryKeys.customers.statistics(id),
@@ -109,7 +111,6 @@ export function useCustomerStatistics(id: number) {
     enabled: id > 0
   });
 }
-
 
 export async function exportCustomerAssets(id: number, customerName: string) {
   const res = await apiClient.get(`/customers/${id}/assets-export`, {
@@ -133,7 +134,6 @@ export interface TerminationPreview {
   will_terminate: boolean;
 }
 
-
 export interface TerminationArchiveMeta {
   id: number;
   created_at: string | null;
@@ -144,7 +144,6 @@ export interface TerminationArchiveMeta {
   has_pdf: boolean;
   summary: Record<string, unknown>;
 }
-
 
 export function useTerminationPreview(id: number) {
   return useQuery({
@@ -157,7 +156,6 @@ export function useTerminationPreview(id: number) {
   });
 }
 
-
 export function useTerminationArchives(id: number) {
   return useQuery({
     queryKey: [...queryKeys.customers.all, 'termination-archives', id],
@@ -168,7 +166,6 @@ export function useTerminationArchives(id: number) {
     enabled: id > 0
   });
 }
-
 
 export async function downloadTerminationArchive(id: number, customerName: string) {
   const res = await apiClient.get(`/customers/${id}/termination-archive`, {
@@ -185,11 +182,9 @@ export async function downloadTerminationArchive(id: number, customerName: strin
   URL.revokeObjectURL(url);
 }
 
-
 export interface TerminateCustomerRequest {
   reason?: string;
 }
-
 
 export function useTerminateCustomer() {
   const queryClient = useQueryClient();
@@ -202,7 +197,6 @@ export function useTerminateCustomer() {
       return res.data;
     },
     onSuccess: () => {
-      
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });

@@ -38,11 +38,11 @@ from app.utils.port_name_parser import parse_port_name
 
 logger = logging.getLogger(__name__)
 
-_IF_NAME_OID = "1.3.6.1.2.1.31.1.1.1.1"
-_IF_DESCR_OID = "1.3.6.1.2.1.2.2.1.2"
-_IF_OPER_STATUS_OID = "1.3.6.1.2.1.2.2.1.8"
-_IF_ADMIN_STATUS_OID = "1.3.6.1.2.1.2.2.1.7"
-_IF_SPEED_OID = "1.3.6.1.2.1.2.2.1.5"
+_IF_NAME_OID = "1.3.6.1.2.1.31.1.1.1.1"        # ifName
+_IF_DESCR_OID = "1.3.6.1.2.1.2.2.1.2"          # ifDescr
+_IF_OPER_STATUS_OID = "1.3.6.1.2.1.2.2.1.8"    # ifOperStatus
+_IF_ADMIN_STATUS_OID = "1.3.6.1.2.1.2.2.1.7"   # ifAdminStatus
+_IF_SPEED_OID = "1.3.6.1.2.1.2.2.1.5"          # ifSpeed
 
 _OPER_STATUS_MAP = {
     "1": "up",
@@ -60,6 +60,16 @@ _ADMIN_STATUS_MAP = {
 }
 
 def _speed_bps_to_label(speed_bps: str) -> str:
+    """将 ifSpeed（bps 字符串）映射为速率标签。
+
+    IF-MIB ifSpeed 单位是 bps，常见值：
+    - 1000000000 → 1G
+    - 10000000000 → 10G
+    - 25000000000 → 25G
+    - 40000000000 → 40G
+    - 100000000000 → 100G
+    - 0 → 端口未协商速率（返回空串）
+    """
     try:
         bps = int(speed_bps)
     except (ValueError, TypeError):
@@ -89,6 +99,15 @@ def _speed_bps_to_label(speed_bps: str) -> str:
 
 
 def _resolve_link_status(oper_status: str, admin_status: str) -> str:
+    """合并 ifOperStatus + ifAdminStatus 为 link_status 字符串。
+
+    语义对齐 SSH 适配器输出的 link_status：
+    - admin down → "admin_down"（管理关闭，与 NetworkPort.derive_usage_status 的
+      admin_down / administratively down / *down 判定对齐）
+    - admin up + oper up → "up"
+    - admin up + oper down → "down"
+    - 其余 → oper_status 原值
+    """
     admin = _ADMIN_STATUS_MAP.get(admin_status, admin_status)
     oper = _OPER_STATUS_MAP.get(oper_status, oper_status)
     if admin == "down":
@@ -101,8 +120,25 @@ def _resolve_link_status(oper_status: str, admin_status: str) -> str:
 
 
 class SnmpPortCollector:
+    """SNMP 端口采集器（IF-MIB → port_rows）。
+
+    对非网管网络设备（has_ssh=false）但有 SNMP 凭据的设备，用 IF-MIB 采集端口
+    列表 + 状态，输出 ``port_rows`` 供 ``incremental_update`` 消费。
+    """
 
     def collect(self, credential: dict, ip: str, timeout: int | None = None, device=None) -> list[dict]:
+        """采集设备端口列表，返回 port_rows（与 SSH 适配器输出对齐）。
+
+        Args:
+            credential: SNMP 凭据（community/version 等）
+            ip: 设备管理 IP
+            timeout: 采集超时（秒），缺省走 monitor_timeout_seconds()
+            device: 设备 ORM 对象（SNMP 不需要，仅为统一 collector 接口）
+
+        Returns:
+            list[dict]: port_rows，每个 dict 含 port_name / port_type / slot /
+            card / port_number / link_status / speed 等字段。采集失败返回空列表。
+        """
         snmp_timeout = timeout if timeout is not None else monitor_timeout_seconds()
 
         templates = [

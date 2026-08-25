@@ -17,6 +17,15 @@ logger = get_logger(__name__)
 
 
 def _resolve_room_ids(scope: str, db_session) -> list[int]:
+    """从 scope 解析涉及的 room_id 列表
+
+    Args:
+        scope: 扫描范围标识，"r:{room_id}" 或 "vr:{virtual_room_id}"
+        db_session: 数据库 session
+
+    Returns:
+        list[int]: room_id 列表
+    """
     if scope.startswith("r:"):
         return [int(scope[2:])]
     elif scope.startswith("vr:"):
@@ -27,9 +36,21 @@ def _resolve_room_ids(scope: str, db_session) -> list[int]:
 
 
 class NoAuthL3Degrader:
+    """三层无权限交换机降级处理
+
+    职责：对无权限 L3 交换机网段下的所有 IP 统一指向上游降级端口。
+    """
 
     def degrade(self, no_auth_sw_ip: str, scope: str,
                 db_session, scan_redis):
+        """执行 L3 降级
+
+        Args:
+            no_auth_sw_ip: 无权限交换机的管理 IP
+            scope: 扫描范围标识
+            db_session: 数据库 session
+            scan_redis: ScanRedis 实例
+        """
         fallback = scan_redis.fallback_get(scope, no_auth_sw_ip)
         if not fallback:
             logger.error(f"[L3Degrader] {no_auth_sw_ip} 无降级映射，跳过")
@@ -63,6 +84,18 @@ class NoAuthL3Degrader:
 
     @staticmethod
     def _get_managed_networks(sw_ip, room_ids: list[int], db_session) -> list[str]:
+        """从 ip_networks 取该无权限交换机的直连网段
+
+        flags 已迁移至 switch_routes 表，通过 JOIN 查询直连路由对应的网段。
+
+        Args:
+            sw_ip: 交换机管理IP
+            room_ids: 机房ID列表
+            db_session: 数据库 session
+
+        Returns:
+            list[str]: 直连网段 CIDR 列表
+        """
         if not room_ids:
             return []
 
@@ -101,6 +134,18 @@ class NoAuthL3Degrader:
     @staticmethod
     def _get_ips_in_network(network: str, room_ids: list[int],
                              db_session) -> list[tuple]:
+        """从 ip_addresses 取该网段下所有 IP，LEFT JOIN ip_switch_info 取已知 MAC
+
+        使用 ip_int 索引列做范围查询，避免 INET_ATON 实时计算。
+
+        Args:
+            network: 网段 CIDR
+            room_ids: 机房ID列表
+            db_session: 数据库 session
+
+        Returns:
+            list[tuple]: (ip_address, mac_address, room_id) 列表
+        """
         if not room_ids:
             return []
 
@@ -129,9 +174,23 @@ class NoAuthL3Degrader:
 
 
 class NoAuthL2Degrader:
+    """二层无权限交换机降级处理
+
+    端口级降级，MAC 保留真实值。
+    通过上游端口的 MAC 集合反查 IP，仅更新属于该 L2 交换机网段的 IP。
+    """
 
     def degrade(self, no_auth_l2_sw_ip: str, scope: str,
                 all_ctxs, db_session, scan_redis):
+        """执行 L2 降级
+
+        Args:
+            no_auth_l2_sw_ip: 无权限 L2 交换机的管理 IP
+            scope: 扫描范围标识
+            all_ctxs: list[SwitchContext] 所有采集上下文
+            db_session: 数据库 session
+            scan_redis: ScanRedis 实例
+        """
         fallback = scan_redis.fallback_get(scope, no_auth_l2_sw_ip)
         if not fallback:
             logger.error(f"[L2Degrader] {no_auth_l2_sw_ip} 无降级映射，跳过")
@@ -190,6 +249,18 @@ class NoAuthL2Degrader:
 
     @staticmethod
     def _get_managed_networks(sw_ip, room_ids: list[int], db_session) -> list[str]:
+        """从 ip_networks 取该无权限 L2 交换机的归属网段
+
+        L2 交换机通常没有自己的路由条目，若无记录则用管理 IP 推算 /24 网段。
+
+        Args:
+            sw_ip: 交换机管理IP
+            room_ids: 机房ID列表
+            db_session: 数据库 session
+
+        Returns:
+            list[str]: 网段 CIDR 列表
+        """
         if not room_ids:
             return []
 
@@ -221,6 +292,15 @@ class NoAuthL2Degrader:
 
 
 def _ip_in_network(ip_str: str, net) -> bool:
+    """判断 IP 是否在网段内
+
+    Args:
+        ip_str: IP 地址字符串
+        net: ipaddress 网络对象
+
+    Returns:
+        bool: 是否在网段内
+    """
     try:
         return ipaddress.ip_address(ip_str) in net
     except ValueError:
@@ -228,6 +308,15 @@ def _ip_in_network(ip_str: str, net) -> bool:
 
 
 def _ip_in_networks(ip_str: str, networks: list[str]) -> bool:
+    """判断 IP 是否在任一网段内
+
+    Args:
+        ip_str: IP 地址字符串
+        networks: 网段 CIDR 列表
+
+    Returns:
+        bool: 是否在任一网段内
+    """
     try:
         ip_obj = ipaddress.ip_address(ip_str)
         return any(

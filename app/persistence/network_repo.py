@@ -16,11 +16,24 @@ logger = get_logger(__name__)
 
 
 class NetworkRepository(BaseRepository):
+    """IPNetwork 数据访问层（网段CRUD）"""
 
     def __init__(self, session=None):
         super().__init__(IPNetwork, session or db.session)
 
     def find_networks_by_filters(self, filters: Dict[str, Any]) -> Dict[str, Any]:
+        """根据过滤条件获取网络列表（支持分页，含关联信息）
+
+        Args:
+            filters: 过滤条件字典，包括:
+                - room_id: 机房ID
+                - switch_id: 交换机ID
+                - customer_id: 客户ID
+                - search: 网络地址搜索（同时搜索网段/交换机名/客户名）
+                - notes: 备注标记
+                - page: 页码（默认为1）
+                - page_size: 每页数量（默认为20）
+        """
         query = self.session.query(IPNetwork).outerjoin(
             IPNetwork.switch
         ).outerjoin(
@@ -137,6 +150,7 @@ class NetworkRepository(BaseRepository):
         }
 
     def create_network(self, data: Dict[str, Any]) -> int:
+        """创建网络"""
         if data.get("port") is None:
             data["port"] = ""
         network = IPNetwork(**data)
@@ -145,6 +159,7 @@ class NetworkRepository(BaseRepository):
         return network.id
 
     def update_network(self, network_id: int, data: Dict[str, Any]) -> bool:
+        """更新网络"""
         allowed = {"network", "notes", "customer_id", "room_id", "switch_id", "port", "gateway"}
         if "port" in data and data["port"] is None:
             data["port"] = ""
@@ -158,6 +173,7 @@ class NetworkRepository(BaseRepository):
         return True
 
     def delete_network(self, network_id: int) -> bool:
+        """删除网络"""
         network = self.find_by_id(network_id)
         if not network:
             return False

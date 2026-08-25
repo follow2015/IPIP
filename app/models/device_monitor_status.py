@@ -11,6 +11,7 @@ from extensions import db
 
 
 class DeviceMonitorStatus(BaseModel):
+    """设备健康监控最新状态快照（每设备一行，非时序表）"""
 
     __tablename__ = "device_monitor_status"
     __table_args__ = (

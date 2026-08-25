@@ -16,7 +16,6 @@ export interface StepEditProps {
   cloneAvailablePositions: number[];
 }
 
-
 const StepEdit: React.FC<StepEditProps> = ({
   diffRows,
   diffColumns,

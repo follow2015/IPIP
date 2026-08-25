@@ -21,13 +21,11 @@ export enum DeviceType {
   OTHER = 'other'
 }
 
-
 export const DEVICE_TYPE_MAP: Record<DeviceType, { label: string; color: string }> = {
   [DeviceType.SERVER]: { label: '服务器', color: 'blue' },
   [DeviceType.NETWORK]: { label: '网络设备', color: 'green' },
   [DeviceType.OTHER]: { label: '其他设备', color: 'default' }
 };
-
 
 export enum DeviceSubtype {
   STANDALONE = 'standalone',
@@ -43,7 +41,6 @@ export enum DeviceSubtype {
   OTHER = 'other'
 }
 
-
 export const DEVICE_SUBTYPE_MAP: Record<DeviceType, DeviceSubtype[]> = {
   [DeviceType.SERVER]: [
     DeviceSubtype.STANDALONE,
@@ -55,7 +52,6 @@ export const DEVICE_SUBTYPE_MAP: Record<DeviceType, DeviceSubtype[]> = {
   [DeviceType.NETWORK]: [DeviceSubtype.SWITCH, DeviceSubtype.ROUTER, DeviceSubtype.FIREWALL],
   [DeviceType.OTHER]: [DeviceSubtype.PDU, DeviceSubtype.UPS, DeviceSubtype.OTHER]
 };
-
 
 export const DEVICE_SUBTYPE_LABELS: Record<DeviceSubtype, string> = {
   [DeviceSubtype.STANDALONE]: '独立服务器',
@@ -70,7 +66,6 @@ export const DEVICE_SUBTYPE_LABELS: Record<DeviceSubtype, string> = {
   [DeviceSubtype.UPS]: '不间断电源',
   [DeviceSubtype.OTHER]: '其他'
 };
-
 
 export const DEVICE_SUBTYPE_COLORS: Record<DeviceSubtype, string> = {
   [DeviceSubtype.STANDALONE]: 'blue',
@@ -92,13 +87,11 @@ export enum LinkType {
   NETWORK_TO_NETWORK = 'network_to_network'
 }
 
-
 export enum ImportExportType {
   DEVICE = 'device',
   CUSTOMER = 'customer',
   CABINET = 'cabinet'
 }
-
 
 export enum SSHAction {
   ENABLE = 'enable',
@@ -110,7 +103,6 @@ export enum SSHAction {
   DELETE_CONFIG = 'delete_config'
 }
 
-
 export const SWITCH_DEVICE_TYPE_OPTIONS = [
   { label: '华为', value: 'huawei' },
   { label: '思科', value: 'cisco' },
@@ -118,6 +110,14 @@ export const SWITCH_DEVICE_TYPE_OPTIONS = [
 ];
 
 
+/**
+ * 端口占用状态映射（网卡端口 / 交换机端口的 usage_status 字符串）
+ * - free: 空闲（可用）→ 绿
+ * - occupied: 占用（已用）→ 蓝
+ * - disabled: 禁用 → 默认灰
+ * - error: 异常 → 红
+ * 注意：与 status-codes.generated.ts 中的后端 PortStatus（int 0/1/2）是不同域，勿混淆。
+ */
 export const PORT_USAGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
   free: { label: '空闲', color: 'green' },
   occupied: { label: '占用', color: 'blue' },
@@ -125,7 +125,9 @@ export const PORT_USAGE_STATUS_MAP: Record<string, { label: string; color: strin
   error: { label: '异常', color: 'red' }
 };
 
-
+/**
+ * 端口占用状态 → 色块背景色（十六进制，供图形化色块使用；与 PORT_USAGE_STATUS_MAP 语义一致）
+ */
 export const PORT_STATUS_BG_COLOR: Record<string, string> = {
   free: '#52c41a',
   occupied: '#1677ff',
@@ -133,13 +135,23 @@ export const PORT_STATUS_BG_COLOR: Record<string, string> = {
   error: '#ff4d4f'
 };
 
-
+/**
+ * 连接活跃状态映射（由后端 device_connection.status 字符串 active/inactive 推导）
+ * - active: 活跃 → 绿
+ * - inactive: 不活跃 → 默认灰
+ */
 export const CONNECTION_STATUS_MAP: Record<string, { label: string; color: string }> = {
   active: { label: '活跃', color: 'green' },
   inactive: { label: '不活跃', color: 'default' }
 };
 
-
+/**
+ * 端口链路状态映射（up / down / admin_down / disabled，纯展示）
+ * - up: 在线 → 绿（success）
+ * - down: 离线 → 红（error）
+ * - admin_down: 管理关闭 → 默认灰
+ * - disabled: 已禁用 → 默认灰
+ */
 export const LINK_STATUS_MAP: Record<string, { label: string; color: string }> = {
   up: { label: '在线', color: 'success' },
   down: { label: '离线', color: 'error' },
@@ -147,7 +159,12 @@ export const LINK_STATUS_MAP: Record<string, { label: string; color: string }> =
   disabled: { label: '已禁用', color: 'default' }
 };
 
-
+/**
+ * 拓扑节点状态映射（online / offline / warning，纯展示）
+ * - online: 在线 → 绿（success）
+ * - offline: 离线 → 默认灰
+ * - warning: 告警 → 橙（warning）
+ */
 export const NODE_STATUS_MAP: Record<string, { label: string; color: string }> = {
   online: { label: '在线', color: 'success' },
   offline: { label: '离线', color: 'default' },
@@ -162,7 +179,6 @@ export const LOGIN_TYPE_MAP: Record<string, { label: string; color: string }> = 
   mobile: { label: '移动端', color: 'purple' },
   token: { label: 'Token', color: 'cyan' }
 };
-
 
 export const AUTH_METHOD_OPTIONS = [
   { label: '密码', value: 'password' },
@@ -183,14 +199,12 @@ export const MONITOR_PROTOCOL_OPTIONS = [
   { value: 'ping', label: 'Ping' }
 ];
 
-
 export const MONITOR_PROTOCOL_COLOR_MAP: Record<string, string> = {
   snmp: 'blue',
   ipmi: 'geekblue',
   zabbix: 'orange',
   ping: 'green'
 };
-
 
 export const MONITOR_PROTOCOL_PALETTE: Record<string, string> = {
   snmp: '#1677ff',
@@ -212,13 +226,11 @@ export const SEVERITY_OPTIONS = [
   { label: '信息', value: 'info' }
 ];
 
-
 export const SEVERITY_COLOR_MAP: Record<string, string> = {
   critical: 'red',
   warning: 'gold',
   info: 'blue'
 };
-
 
 export const SEVERITY_LABELS: Record<string, string> = {
   critical: '严重',
@@ -235,7 +247,6 @@ export const CHANNEL_LABELS: Record<string, string> = {
   custom: '自定义'
 };
 
-
 export const CHANNEL_COLORS: Record<string, string> = {
   inbox: 'blue',
   email: 'cyan',
@@ -243,7 +254,6 @@ export const CHANNEL_COLORS: Record<string, string> = {
   feishu: 'blue',
   custom: 'default'
 };
-
 
 export const BROADCAST_CHANNEL_OPTIONS = [
   { label: '企业微信', value: 'wechat_work' },

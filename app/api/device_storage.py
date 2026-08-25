@@ -21,6 +21,7 @@ device_storage_bp = Blueprint(
 
 
 class StorageAddSchema(Schema):
+    """为设备添加硬盘请求Schema"""
     class Meta:
         unknown = EXCLUDE
     storage_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
@@ -34,12 +35,14 @@ class StorageAddSchema(Schema):
 
 
 class StorageOverwriteSchema(Schema):
+    """整机覆盖写入存储配置请求Schema"""
     class Meta:
         unknown = EXCLUDE
     storage_config = fields.List(fields.Dict(), allow_none=True)
 
 
 class StorageUpdateSchema(Schema):
+    """更新单条硬盘信息请求Schema"""
     class Meta:
         unknown = EXCLUDE
     storage_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
@@ -51,6 +54,7 @@ class StorageUpdateSchema(Schema):
 
 
 class StorageSerialCheckSchema(Schema):
+    """校验硬盘序列号唯一性请求Schema"""
     class Meta:
         unknown = EXCLUDE
     serial_number = fields.Str(required=True, validate=validate.Length(min=1, max=100))
@@ -58,9 +62,11 @@ class StorageSerialCheckSchema(Schema):
 
 
 class StorageBatchDeleteSchema(Schema):
+    """批量删除硬盘请求Schema"""
     class Meta:
         unknown = EXCLUDE
     storage_ids = fields.List(fields.Int(), required=True)
+
 
 
 @device_storage_bp.route("/advanced/devices/<int:device_id>/storage/grouped", methods=["GET"])
@@ -70,6 +76,7 @@ class StorageBatchDeleteSchema(Schema):
 @rate_limit_api
 @api_exception_handler
 def get_device_storage_grouped(device_id):
+    """获取设备硬盘分组统计（用于详情页面）"""
     try:
         data = device_storage_service.get_device_storage(device_id, grouped=True)
     except ValidationError as e:
@@ -84,12 +91,18 @@ def get_device_storage_grouped(device_id):
 @rate_limit_api
 @api_exception_handler
 def get_device_storage(device_id):
+    """获取设备硬盘列表（逐条记录）
+
+    Query Parameters:
+        grouped: 传 "true" 则返回分组聚合结果（默认 false）
+    """
     grouped = request.args.get("grouped", "false").lower() == "true"
     try:
         data = device_storage_service.get_device_storage(device_id, grouped=grouped)
     except ValidationError as e:
         return APIResponse.error(str(e), error_code="DEVICE_NOT_FOUND", status_code=404)
     return APIResponse.success(data=data, message="获取存储列表成功")
+
 
 
 @device_storage_bp.route("/devices/<int:device_id>/storage", methods=["POST"])
@@ -100,6 +113,18 @@ def get_device_storage(device_id):
 @api_exception_handler
 @transactional
 def add_device_storage(device_id):
+    """为设备添加硬盘（支持 storage_list 批量写入）
+
+    Request Body:
+        storage_type:   存储类型（必需，无 storage_list 时）
+        capacity:       容量（必需，无 storage_list 时）
+        count:          数量，默认 1
+        interface_type: 接口类型（可选）
+        manufacturer:   制造商（可选）
+        model:          型号（可选）
+        serial_number:  序列号（可选，全局唯一）
+        storage_list:   批量写入列表（与上述字段二选一）
+    """
     data = request.get_json()
     if not data:
         return APIResponse.error("请求数据不能为空", status_code=400)
@@ -130,6 +155,7 @@ def add_device_storage(device_id):
     return APIResponse.success(message="硬盘添加成功", status_code=201)
 
 
+
 @device_storage_bp.route("/devices/<int:device_id>/storage/config", methods=["PUT"])
 @doc(summary="整机覆盖写入存储配置", tags=["设备"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/StorageOverwrite"}}}}, parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 400: "ApiError"})
 @login_required
@@ -138,6 +164,11 @@ def add_device_storage(device_id):
 @api_exception_handler
 @transactional
 def update_device_storage_config(device_id):
+    """整机覆盖写入存储配置（先清空后批量创建）
+
+    Request Body:
+        storage_config: 硬盘配置列表（空列表则清空所有硬盘）
+    """
     data = request.get_json()
     if data is None:
         return APIResponse.error("请求数据不能为空", status_code=400)
@@ -152,6 +183,7 @@ def update_device_storage_config(device_id):
     return APIResponse.success(message="存储配置更新成功")
 
 
+
 @device_storage_bp.route("/storage/<int:storage_id>", methods=["PUT"])
 @doc(summary="更新单条硬盘信息", tags=["设备"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/StorageUpdate"}}}}, parameters=[{"name": "storage_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "DeviceStorageResponse", 400: "ApiError"})
 @login_required
@@ -160,6 +192,7 @@ def update_device_storage_config(device_id):
 @api_exception_handler
 @transactional
 def update_storage(storage_id):
+    """更新单条硬盘信息（仅更新传入字段）"""
     data = request.get_json()
     if not data:
         return APIResponse.error("请求数据不能为空", status_code=400)
@@ -188,6 +221,7 @@ def update_storage(storage_id):
 @api_exception_handler
 @transactional
 def delete_storage(storage_id):
+    """删除单条硬盘记录"""
     try:
         device_storage_service.delete_device_storage(storage_id)
     except ValidationError as e:
@@ -204,6 +238,7 @@ def delete_storage(storage_id):
 @api_exception_handler
 @transactional
 def delete_device_storage_all(device_id):
+    """删除设备的全部硬盘记录"""
     count = device_storage_service.delete_device_storage_by_device_id(device_id)
 
     return APIResponse.success(
@@ -220,6 +255,11 @@ def delete_device_storage_all(device_id):
 @api_exception_handler
 @transactional
 def batch_delete_storage(device_id):
+    """批量删除硬盘记录（替代前端串行循环删除）
+
+    URL: DELETE /api/devices/<device_id>/storage/batch
+    Body: { "storage_ids": [int] }
+    """
     data = request.get_json(silent=True) or {}
     storage_ids = data.get("storage_ids") or []
     if not storage_ids:
@@ -232,6 +272,7 @@ def batch_delete_storage(device_id):
     )
 
 
+
 @device_storage_bp.route("/advanced/storage/validate-serial", methods=["POST"])
 @doc(summary="校验硬盘序列号唯一性", tags=["设备"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/StorageSerialCheck"}}}}, responses={200: "ApiResponse", 400: "ApiError"})
 @login_required
@@ -239,6 +280,12 @@ def batch_delete_storage(device_id):
 @rate_limit_api
 @api_exception_handler
 def validate_serial_number():
+    """校验序列号唯一性
+
+    Request Body:
+        serial_number: 待校验序列号
+        exclude_id:    编辑时排除自身记录 ID（可选）
+    """
     data = request.get_json(silent=True) or {}
     serial_number = data.get("serial_number")
     exclude_id    = data.get("exclude_id")

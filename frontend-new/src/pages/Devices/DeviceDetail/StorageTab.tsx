@@ -39,12 +39,10 @@ interface StorageTabProps {
   deviceId: number;
 }
 
-
 function formatGb(gb: number): string {
   if (gb >= 1024) return `${(gb / 1024).toFixed(1)}TB`;
   return `${Math.round(gb)}GB`;
 }
-
 
 function StorageTab({ deviceId }: StorageTabProps) {
   const { data: storageList, isLoading } = useDeviceStorageDetail(deviceId);
@@ -53,32 +51,25 @@ function StorageTab({ deviceId }: StorageTabProps) {
   const deleteStorage = useDeleteStorage(deviceId);
   const message = useMessage();
 
-  
   const [formOpen, setFormOpen] = useState(false);
   const [editingStorage, setEditingStorage] = useState<DeviceStorageDetail | null>(null);
   const [form] = Form.useForm();
 
-  
   const [templateOpen, setTemplateOpen] = useState(false);
   const [templateForm] = Form.useForm();
 
-  
   const details: DeviceStorageDetail[] = useMemo(() => storageList ?? [], [storageList]);
 
-  
   const batch = useBatchSelection<DeviceStorageDetail>({ dataSource: details });
 
-  
   const batchDeleteStorage = useBatchDeleteStorage(deviceId);
 
-  
   const handleEdit = (record: DeviceStorageDetail) => {
     setEditingStorage(record);
     form.setFieldsValue(record);
     setFormOpen(true);
   };
 
-  
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -92,7 +83,6 @@ function StorageTab({ deviceId }: StorageTabProps) {
     }
   };
 
-  
   const handleBatchDelete = async () => {
     if (batch.count === 0) return;
     try {
@@ -107,7 +97,6 @@ function StorageTab({ deviceId }: StorageTabProps) {
     }
   };
 
-  
   const handleTemplateSubmit = async () => {
     try {
       await templateForm.validateFields();
@@ -133,7 +122,6 @@ function StorageTab({ deviceId }: StorageTabProps) {
     }
   };
 
-  
   const storageSummary = useMemo(() => {
     if (details.length === 0) return null;
     let totalGb = 0;
@@ -149,7 +137,6 @@ function StorageTab({ deviceId }: StorageTabProps) {
     return { totalGb, byType };
   }, [details]);
 
-  
   const columns = [
     {
       title: '类型',
@@ -243,7 +230,7 @@ function StorageTab({ deviceId }: StorageTabProps) {
 
   return (
     <div>
-      {}
+      {/* 存储容量汇总 */}
       {storageSummary && storageSummary.totalGb > 0 && (
         <div
           style={{
@@ -305,7 +292,7 @@ function StorageTab({ deviceId }: StorageTabProps) {
         rowSelection={batch.rowSelection}
       />
 
-      {}
+      {/* ─── 编辑 Modal ─── */}
       <Modal
         title="编辑存储"
         open={formOpen}
@@ -375,7 +362,7 @@ function StorageTab({ deviceId }: StorageTabProps) {
         </Form>
       </Modal>
 
-      {}
+      {/* ─── 模板配置 Modal（复用 HardwareConfigFields 存储部分） ─── */}
       <Modal
         title="存储模板配置"
         open={templateOpen}

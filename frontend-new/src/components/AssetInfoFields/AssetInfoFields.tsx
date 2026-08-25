@@ -39,7 +39,6 @@ import { ThunderboltOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 
-
 export function generateAssetNumber(prefix = 'ZC'): string {
   const now = new Date();
   const d = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
@@ -54,15 +53,10 @@ export type AssetNumberMode = 'manual' | 'manual-with-switch' | 'auto-only' | 'n
 
 export interface AssetInfoFieldsProps {
   form: FormInstance;
-  
   prefix?: string;
-  
   assetNumberMode?: AssetNumberMode;
-  
   autoGenerate?: boolean;
-  
   onAutoGenerateChange?: (value: boolean) => void;
-  
   defaultOnlineDateNow?: boolean;
 }
 
@@ -76,7 +70,12 @@ const toNumber = (v: unknown): number | null => {
   return Number.isNaN(n) ? null : n;
 };
 
-
+/**
+ * 生命周期联动：下线日期 ↔ 预计使用年限。
+ * anchor 取「上线日期」，未设置时回退为今天。
+ * - 仅一项有值：推断另一项（年限四舍五入取整，并据此修正日期保持一致）。
+ * - 两项都有：取更久的一方；年限取整后同步修改下线日期。
+ */
 function syncLifecycle(
   form: FormInstance,
   prefix: string | undefined,
@@ -107,7 +106,6 @@ function syncLifecycle(
     return;
   }
 
-  
   const years = toNumber(val);
   if (years == null) return;
   const offlineRaw = form.getFieldValue(buildName(prefix, 'offline_date'));
@@ -126,7 +124,13 @@ function syncLifecycle(
   }
 }
 
-
+/**
+ * 上线日期变化（含清空）后，以下线日期/预计使用年限为基准，按新的锚点重新推算另一项。
+ * 锚点取「上线日期」，未设置时回退为「当天编辑/提交时间」(dayjs())。
+ * - 两项都有：取更久的一方，年限取整后同步修改下线日期。
+ * - 仅一项有值：推断另一项（年限四舍五入取整并据此修正日期）。
+ * - 两项都无：不处理。
+ */
 function resyncLifecycle(form: FormInstance, prefix: string | undefined) {
   const anchorRaw = form.getFieldValue(buildName(prefix, 'online_date'));
   const anchor = anchorRaw ? dayjs(anchorRaw) : dayjs();
@@ -153,7 +157,6 @@ function resyncLifecycle(form: FormInstance, prefix: string | undefined) {
   }
 }
 
-
 function OnlineDateControl({
   value,
   onChange,
@@ -177,7 +180,6 @@ function OnlineDateControl({
     />
   );
 }
-
 
 function WarrantyEndControl({
   value,
@@ -228,7 +230,6 @@ function WarrantyEndControl({
   );
 }
 
-
 function LifecycleOfflineControl({
   value,
   onChange,
@@ -252,7 +253,6 @@ function LifecycleOfflineControl({
     />
   );
 }
-
 
 function LifecycleYearsControl({
   value,
@@ -299,7 +299,6 @@ function AssetNumberSection({
   if (mode === 'none') return null;
   const name = (key: string) => buildName(prefix, key);
 
-  
   if (mode === 'auto-only') {
     return (
       <Row gutter={16} align="middle">
@@ -327,7 +326,6 @@ function AssetNumberSection({
     );
   }
 
-  
   if (mode === 'manual-with-switch') {
     return (
       <Row gutter={16} align="middle">
@@ -364,7 +362,6 @@ function AssetNumberSection({
     );
   }
 
-  
   return (
     <Row gutter={16}>
       <Col span={16}>
@@ -399,7 +396,7 @@ export default function AssetInfoFields({
 
   return (
     <>
-      {}
+      {/* 资产编号 */}
       <Divider plain>资产编号</Divider>
       <AssetNumberSection
         form={form}
@@ -409,7 +406,7 @@ export default function AssetInfoFields({
         onAutoGenerateChange={onAutoGenerateChange}
       />
 
-      {}
+      {/* 采购信息 */}
       <Divider plain>采购信息</Divider>
       <Row gutter={16}>
         <Col span={12}>
@@ -448,7 +445,7 @@ export default function AssetInfoFields({
         </Col>
       </Row>
 
-      {}
+      {/* 保修信息 */}
       <Divider plain>保修信息</Divider>
       <Row gutter={16}>
         <Col span={8}>
@@ -472,7 +469,7 @@ export default function AssetInfoFields({
         </Col>
       </Row>
 
-      {}
+      {/* 生命周期 */}
       <Divider plain>生命周期</Divider>
       <Row gutter={16}>
         <Col span={8}>

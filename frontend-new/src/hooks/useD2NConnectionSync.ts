@@ -15,7 +15,6 @@ function isPortDataChanged(event: DeviceChangeEvent): boolean {
   return PORT_DATA_OP_TYPES.has(event.op_type) || (event.affected_ports?.length ?? 0) > 0;
 }
 
-
 export function useD2NConnectionSync(deviceId: number, switchIds: number[]): void {
   const queryClient = useQueryClient();
 
@@ -28,8 +27,6 @@ export function useD2NConnectionSync(deviceId: number, switchIds: number[]): voi
     for (const sid of switchIds) {
       const bus = getDeviceBus(sid);
       releases.push(() => releaseDeviceBus(sid));
-      
-      
       const handler = (event: DeviceChangeEvent) => {
         if (isPortDataChanged(event)) {
           queryClient.invalidateQueries({ queryKey: queryKeys.devices.connections(deviceId) });

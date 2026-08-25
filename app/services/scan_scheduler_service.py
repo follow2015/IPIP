@@ -38,12 +38,21 @@ end
 
 
 class ScanSchedulerService:
+    """自动扫描调度 + 陈旧度清理服务
+
+    两个独立循环：
+    1. 扫描调度：按 SCAN_AUTO_INTERVAL 触发各扫描单元（物理机房/虚拟机房各扫各的）
+    2. 陈旧度清理：按 SCAN_AUTO_CLEANUP_INTERVAL 降级超期未观测的 IP
+
+    多进程/多实例下各自 Redis leader 选举（心跳续约 + token 校验主动释放）。
+    续约失败时通过 lock_lost Event 联动中止主流程（v5 修复 P0 B）。
+    """
 
     SCAN_LEADER_KEY = "scan_scheduler:scan_leader"
     CLEANUP_LEADER_KEY = "scan_scheduler:cleanup_leader"
     LOCK_TTL = 90
     RENEW_INTERVAL = 30
-    RENEW_JOIN_TIMEOUT = 5
+    RENEW_JOIN_TIMEOUT = 5  # 续约线程 join 超时
 
     def __init__(self, app):
         self.app = app
@@ -52,6 +61,7 @@ class ScanSchedulerService:
         self._threads: list[threading.Thread] = []
 
     def _get_redis(self):
+        """获取 Redis 客户端（复用 monitor_worker 的 _redis_client）"""
         from app.services.monitoring.monitor_worker import _redis_client
         return _redis_client(self.app)
 
@@ -150,6 +160,16 @@ class ScanSchedulerService:
             self._release_lock(self.CLEANUP_LEADER_KEY, token)
 
     def _acquire_lock(self, key: str):
+        """获取 leader 锁，启动续约线程。
+
+        Returns:
+            (got, token, lock_lost, renew_stop, renew_thread)
+            - got: 是否获取成功
+            - token: 锁 token（v5 §12 修复：局部变量传参，不用实例属性）
+            - lock_lost: 续约失败时会被 set() 的 Event（v5 P0 B 修复，主流程检查它来中止）
+            - renew_stop: 用于主动停止续约线程的 Event（v5 P1 C 修复）
+            - renew_thread: 续约线程引用（v5 P1 C 修复，用于 join）
+        """
         redis_client = self._get_redis()
         token = f"{self._instance_id}:{time.time()}"
         got = redis_client.set(key, token, nx=True, ex=self.LOCK_TTL)
@@ -168,6 +188,7 @@ class ScanSchedulerService:
         return True, token, lock_lost, renew_stop, renew_thread
 
     def _renew_loop(self, key: str, token: str, lock_lost: threading.Event, stop_event: threading.Event):
+        """续约循环。续约失败时 set(lock_lost) 通知主流程中止（v5 P0 B 修复）。"""
         redis_client = self._get_redis()
         renew_script = redis_client.register_script(_RENEW_LOCK_SCRIPT)
         while not stop_event.wait(self.RENEW_INTERVAL):
@@ -177,7 +198,7 @@ class ScanSchedulerService:
                 renewed = renew_script(keys=[key], args=[token, self.LOCK_TTL])
                 if not renewed:
                     logger.warning("锁 %s 续约失败（可能被其他实例抢占），通知主流程中止", key)
-                    lock_lost.set()
+                    lock_lost.set()  # v5 修复 P0 B：真正 set，让 _do_scan 的检查生效
                     return
             except Exception:
                 logger.exception("锁 %s 续约异常", key)
@@ -185,6 +206,7 @@ class ScanSchedulerService:
                 return
 
     def _stop_renew(self, renew_stop: threading.Event | None, renew_thread: threading.Thread | None):
+        """v5 修复 P1 C：主动停止续约线程并 join，避免悬挂线程和误报日志"""
         if renew_stop is None or renew_thread is None:
             return
         renew_stop.set()
@@ -192,6 +214,7 @@ class ScanSchedulerService:
             renew_thread.join(timeout=self.RENEW_JOIN_TIMEOUT)
 
     def _release_lock(self, key: str, token: str):
+        """释放锁（token 校验，只删自己的锁）"""
         if not token:
             return
         try:
@@ -232,6 +255,7 @@ class ScanSchedulerService:
 
 
 def start_scan_scheduler(app):
+    """启动自动扫描调度服务（供 create_app 调用）"""
     service = ScanSchedulerService(app)
     service.start()
     app.scan_scheduler = service

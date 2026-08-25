@@ -11,6 +11,12 @@ from marshmallow import Schema, fields, validate, EXCLUDE, pre_load
 
 
 class NullableDate(fields.Date):
+    """Date 字段，将空字符串视为 None。
+
+    前端表单中日期字段为空时提交 ""（空字符串），
+    Marshmallow 的 fields.Date 不接受空字符串，会报 "Not a valid date"。
+    此字段在反序列化前将空字符串转为 None，使 allow_none=True 生效。
+    """
 
     def _deserialize(self, value, attr, data, **kwargs):
         if isinstance(value, str) and not value.strip():
@@ -44,18 +50,19 @@ cabinet_service = CabinetService(CabinetRepository())
 
 
 class DeviceCreateSchema(Schema):
+    """创建设备请求验证Schema"""
 
     class Meta:
-        unknown = EXCLUDE
+        unknown = EXCLUDE  # 忽略未知字段
 
     device_name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    cabinet_id = fields.Int(validate=validate.Range(min=1), allow_none=True)
+    cabinet_id = fields.Int(validate=validate.Range(min=1), allow_none=True)  # 节点设备可不指定机柜
     device_type = fields.Str(validate=validate.Length(max=50))
     brand = fields.Str(validate=validate.Length(max=50))
     device_model = fields.Str(validate=validate.Length(max=50))
     serial_number = fields.Str(validate=validate.Length(max=100))
-    u_position = fields.Int(validate=validate.Range(min=0), allow_none=True)
-    height_u = fields.Int(validate=validate.Range(min=0, max=50), allow_none=True)
+    u_position = fields.Int(validate=validate.Range(min=0), allow_none=True)  # 允许0（节点设备不占用U位）
+    height_u = fields.Int(validate=validate.Range(min=0, max=50), allow_none=True)  # 允许0（节点设备）
     power = fields.Float(validate=validate.Range(min=0), allow_none=True)
     ip_address = fields.Str(allow_none=True)
     management_ip = fields.Str(allow_none=True)
@@ -72,7 +79,7 @@ class DeviceCreateSchema(Schema):
     storage_summary = fields.Str(validate=validate.Length(max=200), allow_none=True)
     hostname = fields.Str(validate=validate.Length(max=100), allow_none=True)
     os_version = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    responsible_person = fields.Int(validate=validate.Range(min=1), allow_none=True)
+    responsible_person = fields.Int(validate=validate.Range(min=1), allow_none=True)  # 责任人ID（外键关联users.id）
     parent_device_id = fields.Int(allow_none=True)
     is_chassis = fields.Bool(allow_none=True)
     node_position = fields.Int(allow_none=True)
@@ -113,19 +120,20 @@ class DeviceCreateSchema(Schema):
 
 
 class DeviceUpdateSchema(Schema):
+    """更新设备请求验证Schema"""
 
     class Meta:
-        unknown = EXCLUDE
+        unknown = EXCLUDE  # 忽略未知字段
 
-    id = fields.Int(dump_only=True)
+    id = fields.Int(dump_only=True)  # 只读，不参与验证
     device_name = fields.Str(validate=validate.Length(min=1, max=100), allow_none=True)
     cabinet_id = fields.Int(validate=validate.Range(min=1), allow_none=True)
     device_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
     brand = fields.Str(validate=validate.Length(max=50), allow_none=True)
     device_model = fields.Str(validate=validate.Length(max=50), allow_none=True)
     serial_number = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    u_position = fields.Int(validate=validate.Range(min=0), allow_none=True)
-    height_u = fields.Int(validate=validate.Range(min=0, max=50), allow_none=True)
+    u_position = fields.Int(validate=validate.Range(min=0), allow_none=True)  # 允许0（节点设备不占用U位）
+    height_u = fields.Int(validate=validate.Range(min=0, max=50), allow_none=True)  # 允许0（节点设备）
     power = fields.Float(validate=validate.Range(min=0), allow_none=True)
     ip_address = fields.Str(allow_none=True)
     management_ip = fields.Str(allow_none=True)
@@ -142,7 +150,7 @@ class DeviceUpdateSchema(Schema):
     storage_summary = fields.Str(validate=validate.Length(max=200), allow_none=True)
     hostname = fields.Str(validate=validate.Length(max=100), allow_none=True)
     os_version = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    responsible_person = fields.Int(validate=validate.Range(min=1), allow_none=True)
+    responsible_person = fields.Int(validate=validate.Range(min=1), allow_none=True)  # 责任人ID（外键关联users.id）
     parent_device_id = fields.Int(allow_none=True)
     is_chassis = fields.Bool(allow_none=True)
     node_position = fields.Int(allow_none=True)
@@ -185,6 +193,7 @@ class DeviceUpdateSchema(Schema):
 
 
 class BatchUpdateAssetSchema(Schema):
+    """批量更新设备资产信息请求Schema"""
 
     class Meta:
         unknown = EXCLUDE
@@ -206,6 +215,7 @@ class BatchUpdateAssetSchema(Schema):
 
 
 class BatchResetAssetSchema(Schema):
+    """批量重置设备资产信息请求Schema"""
 
     class Meta:
         unknown = EXCLUDE
@@ -214,6 +224,7 @@ class BatchResetAssetSchema(Schema):
 
 
 class BatchDeleteSchema(Schema):
+    """批量删除请求Schema"""
 
     class Meta:
         unknown = EXCLUDE
@@ -222,6 +233,7 @@ class BatchDeleteSchema(Schema):
 
 
 class BatchUpdateDeviceStatusSchema(Schema):
+    """批量更新设备状态请求Schema"""
 
     class Meta:
         unknown = EXCLUDE
@@ -231,6 +243,7 @@ class BatchUpdateDeviceStatusSchema(Schema):
 
 
 class BatchUpdateHardwareSchema(Schema):
+    """批量更新设备硬件配置请求Schema"""
 
     class Meta:
         unknown = EXCLUDE
@@ -254,6 +267,7 @@ class BatchUpdateHardwareSchema(Schema):
 
 
 class DeviceStatusUpdateSchema(Schema):
+    """更新设备状态请求Schema"""
 
     class Meta:
         unknown = EXCLUDE
@@ -262,6 +276,7 @@ class DeviceStatusUpdateSchema(Schema):
 
 
 class DeviceLocationUpdateSchema(Schema):
+    """更新设备位置请求Schema"""
 
     class Meta:
         unknown = EXCLUDE
@@ -272,6 +287,7 @@ class DeviceLocationUpdateSchema(Schema):
 
 
 class SerialNumberGenerateSchema(Schema):
+    """生成序列号请求Schema"""
 
     class Meta:
         unknown = EXCLUDE
@@ -282,6 +298,7 @@ class SerialNumberGenerateSchema(Schema):
 
 
 class SerialNumberCheckSchema(Schema):
+    """检查序列号唯一性请求Schema"""
 
     class Meta:
         unknown = EXCLUDE
@@ -291,6 +308,7 @@ class SerialNumberCheckSchema(Schema):
 
 
 class NodePositionCheckSchema(Schema):
+    """检查节点位置重复请求Schema"""
 
     class Meta:
         unknown = EXCLUDE
@@ -301,6 +319,7 @@ class NodePositionCheckSchema(Schema):
 
 
 class SwitchPortUpdateSchema(Schema):
+    """更新交换机端口请求Schema"""
     class Meta:
         unknown = EXCLUDE
     port_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
@@ -312,6 +331,7 @@ class SwitchPortUpdateSchema(Schema):
 
 
 class BatchCreateSwitchPortsSchema(Schema):
+    """批量创建交换机端口请求Schema"""
     class Meta:
         unknown = EXCLUDE
     device_id = fields.Int(required=True)
@@ -319,12 +339,14 @@ class BatchCreateSwitchPortsSchema(Schema):
 
 
 class BatchCreateDevicesSchema(Schema):
+    """批量创建设备请求Schema"""
     class Meta:
         unknown = EXCLUDE
     devices = fields.List(fields.Dict(), required=True)
 
 
 class DeviceVLANCreateSchema(Schema):
+    """在设备上创建VLAN请求Schema"""
     class Meta:
         unknown = EXCLUDE
     vlan_id = fields.Int(required=True)
@@ -336,12 +358,14 @@ class DeviceVLANCreateSchema(Schema):
 
 
 class VLANMemberUpdateSchema(Schema):
+    """更新VLAN成员端口请求Schema"""
     class Meta:
         unknown = EXCLUDE
     port_ids = fields.List(fields.Int(), required=True)
 
 
 class VLANFieldUpdateSchema(Schema):
+    """更新VLAN字段请求Schema"""
     class Meta:
         unknown = EXCLUDE
     purpose = fields.Str(validate=validate.Length(max=200), allow_none=True)
@@ -349,6 +373,7 @@ class VLANFieldUpdateSchema(Schema):
 
 
 class LAGCreateSchema(Schema):
+    """创建链路聚合组请求Schema"""
     class Meta:
         unknown = EXCLUDE
     lag_name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
@@ -356,12 +381,14 @@ class LAGCreateSchema(Schema):
 
 
 class LAGMemberUpdateSchema(Schema):
+    """更新LAG成员端口请求Schema"""
     class Meta:
         unknown = EXCLUDE
     port_ids = fields.List(fields.Int(), required=True)
 
 
 class LAGFieldUpdateSchema(Schema):
+    """更新链路聚合组字段请求Schema"""
     class Meta:
         unknown = EXCLUDE
     purpose = fields.Str(validate=validate.Length(max=200), allow_none=True)
@@ -373,6 +400,22 @@ class LAGFieldUpdateSchema(Schema):
 @permission_required("device:view")
 @rate_limit_api
 def list_devices():
+    """获取设备列表（支持分页、搜索过滤）
+
+    Query Parameters:
+        page: 页码（默认1）
+        per_page: 每页数量（默认20）
+        search: 搜索关键词，模糊匹配设备名/序列号/资产标签/管理IP等（可选）
+        cabinet_id: 按机柜ID过滤（可选）
+        room_id: 按机房ID过滤（可选，通过机柜关联）
+        customer_id: 按客户ID过滤（可选）
+        device_type: 按设备主类型过滤（可选）
+        device_subtype: 按设备子类型过滤（可选）
+        status: 按状态过滤（可选）
+        parent_device_id: 按父设备ID过滤（可选）
+        is_chassis: 按是否为机箱过滤（可选，1=机箱，0=非机箱）
+        has_ssh: 按是否有SSH管理权限过滤（可选，true/false，仅网络设备有效）
+    """
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 100)
     search = request.args.get("search", type=str)
@@ -425,7 +468,7 @@ def list_devices():
                 did = d.get("id")
                 if did is not None and did in monitor_summary_map:
                     d["monitor_summary"] = monitor_summary_map[did]
-        except Exception:
+        except Exception:  # noqa: BLE001 - 监控摘要注入失败不阻断列表
             logger.warning("设备列表监控摘要注入失败", exc_info=True)
 
         return APIResponse.paginated(
@@ -446,6 +489,14 @@ def list_devices():
 @permission_required("device:view")
 @rate_limit_api
 def get_device(device_id):
+    """获取单个设备详情
+
+    Args:
+        device_id: 设备ID
+
+    Returns:
+        JSON响应，包含设备详细信息
+    """
     try:
         device = device_service.get_by_id(device_id)
     except Exception as e:
@@ -480,6 +531,27 @@ def get_device(device_id):
 @rate_limit_api
 @transactional
 def create_device():
+    """创建新设备
+
+    Request Body:
+        name: 设备名称（必需）
+        cabinet_id: 机柜ID（必需）
+        device_type: 设备类型（可选）
+        brand: 品牌（可选）
+        model: 型号（可选）
+        serial_number: 序列号（可选）
+        u_position: U位位置（可选）
+        u_height: U位高度（可选）
+        power_consumption: 功耗（可选）
+        ip_address: IP地址（可选）
+        mac_address: MAC地址（可选）
+        customer_id: 客户ID（可选）
+        status: 状态（可选）
+        description: 描述（可选）
+
+    Returns:
+        JSON响应，包含新创建的设备信息
+    """
     data = validation_manager.validate_schema(request.json, DeviceCreateSchema())
 
     if not data.get("parent_device_id") and not data.get("cabinet_id"):
@@ -527,6 +599,30 @@ def create_device():
 @rate_limit_api
 @transactional
 def update_device(device_id):
+    """更新设备信息
+
+    Args:
+        device_id: 设备ID
+
+    Request Body:
+        name: 设备名称（可选）
+        cabinet_id: 机柜ID（可选）
+        device_type: 设备类型（可选）
+        brand: 品牌（可选）
+        model: 型号（可选）
+        serial_number: 序列号（可选）
+        u_position: U位位置（可选）
+        u_height: U位高度（可选）
+        power_consumption: 功耗（可选）
+        ip_address: IP地址（可选）
+        mac_address: MAC地址（可选）
+        customer_id: 客户ID（可选）
+        status: 状态（可选）
+        description: 描述（可选）
+
+    Returns:
+        JSON响应，包含更新后的设备信息
+    """
     data = validation_manager.validate_schema(request.json, DeviceUpdateSchema())
 
     device = device_service.get_by_id(device_id)
@@ -588,6 +684,14 @@ def update_device(device_id):
 @rate_limit_api
 @transactional
 def delete_device(device_id):
+    """删除设备
+
+    Args:
+        device_id: 设备ID
+
+    Returns:
+        JSON响应
+    """
     device = device_service.get_by_id(device_id)
     if not device:
         return APIResponse.error(message="设备不存在", error_code="DEVICE_NOT_FOUND", status_code=404)
@@ -607,6 +711,14 @@ def delete_device(device_id):
 @permission_required("device:view")
 @rate_limit_api
 def get_device_connections(device_id):
+    """获取设备连接列表
+
+    Args:
+        device_id: 设备ID
+
+    Returns:
+        JSON响应，包含设备连接列表
+    """
     from app.services.device_connection_service import device_connection_service
 
     device = device_service.get_by_id(device_id)
@@ -627,6 +739,18 @@ def get_device_connections(device_id):
 @permission_required("device:view")
 @rate_limit_api
 def get_device_ports(device_id):
+    """获取设备端口列表
+
+    根据设备类型分流查询：
+      - 网络设备 (network) → 查询 network_ports 表
+      - 其他设备           → 查询 device_nics_port 表
+
+    Args:
+        device_id: 设备ID
+
+    Returns:
+        JSON响应，包含设备端口列表
+    """
     device = device_service.get_by_id(device_id)
     if not device:
         return APIResponse.error(message="设备不存在", error_code="DEVICE_NOT_FOUND", status_code=404)
@@ -651,6 +775,14 @@ def get_device_ports(device_id):
 @permission_required("device:view")
 @rate_limit_api
 def get_device_nodes(device_id):
+    """获取设备的节点列表（机箱模式）
+
+    Args:
+        device_id: 设备ID
+
+    Returns:
+        JSON响应，包含节点列表
+    """
     device = device_service.get_by_id(device_id)
     if not device:
         return APIResponse.error(message="设备不存在", error_code="DEVICE_NOT_FOUND", status_code=404)
@@ -672,6 +804,15 @@ def get_device_nodes(device_id):
 @permission_required("device:view")
 @rate_limit_api
 def find_switch_port_by_name():
+    """根据交换机ID和端口名称查找端口
+    
+    Query Parameters:
+        device_id: 设备ID(必需)
+        port_name: 端口名称(必需)
+    
+    Returns:
+        JSON响应,包含端口信息
+    """
     from app.services.network_port_service import NetworkPortService
     _port_svc = NetworkPortService(NetworkPortRepository())
 
@@ -704,6 +845,14 @@ def find_switch_port_by_name():
 @rate_limit_api
 @transactional
 def update_switch_port(port_id):
+    """更新交换机端口信息
+
+    Args:
+        port_id: 端口ID
+
+    Request Body:
+        可更新字段: port_type, port_name, speed, status, description, vlan 等
+    """
     from app.services.network_port_service import NetworkPortService
     _port_svc = NetworkPortService(NetworkPortRepository())
 
@@ -734,6 +883,23 @@ def update_switch_port(port_id):
 @rate_limit_api
 @transactional
 def batch_create_switch_ports():
+    """批量创建交换机端口
+    
+    Request Body:
+        device_id: 设备ID（必需）
+        ports: 端口列表（必需）
+            - port_name: 端口名称
+            - port_type: 端口类型（electrical/optical/management等）
+            - slot: 槽位号
+            - card: 卡号
+            - port_number: 端口号
+            - speed: 速率
+            - status: 状态（free/used/disabled）
+            - description: 描述
+    
+    Returns:
+        JSON响应，包含创建结果
+    """
     from app.services.network_port_service import NetworkPortService
     _port_svc = NetworkPortService(NetworkPortRepository())
 
@@ -773,6 +939,14 @@ def batch_create_switch_ports():
 @rate_limit_api
 @transactional
 def delete_device_switch_ports(device_id):
+    """删除设备的所有端口
+    
+    Args:
+        device_id: 设备ID
+    
+    Returns:
+        JSON响应
+    """
     from app.services.network_port_service import NetworkPortService
     _port_svc = NetworkPortService(NetworkPortRepository())
 
@@ -795,6 +969,14 @@ def delete_device_switch_ports(device_id):
 @rate_limit_api
 @transactional
 def batch_delete_devices():
+    """批量删除设备
+    
+    Request Body:
+        ids: 设备ID列表
+    
+    Returns:
+        JSON响应，包含删除结果
+    """
     
     data = request.get_json()
     if not data or "ids" not in data:
@@ -834,12 +1016,23 @@ def batch_delete_devices():
     )
 
 
+
 @device_bp.route("/deleted", methods=["GET"])
 @doc(summary="查询已删除设备（回收站）", tags=["设备"], responses={200: "ApiResponse"})
 @login_required
 @permission_required("device:view")
 @rate_limit_api
 def get_deleted_devices():
+    """查询已软删除的设备列表
+
+    Query Params:
+        page, per_page: 分页
+        start_date, end_date: 删除时间段 (YYYY-MM-DD)
+        room_id: 机房ID
+        cabinet_id: 机柜ID
+        device_type: 设备类型
+        ip_search: IP地址搜索（参数名：search）
+    """
     from datetime import datetime
 
     page = request.args.get("page", 1, type=int)
@@ -882,6 +1075,12 @@ def get_deleted_devices():
 @rate_limit_api
 @transactional
 def restore_device(device_id):
+    """恢复已软删除的设备
+
+    Request Body (可选):
+        cabinet_id: 指定机柜ID（U位冲突时）
+        u_position: 指定U位（U位冲突时）
+    """
     data = request.get_json() or {}
     cabinet_id = data.get("cabinet_id")
     u_position = data.get("u_position")
@@ -912,6 +1111,13 @@ def restore_device(device_id):
 @rate_limit_api
 @transactional
 def batch_restore_devices():
+    """批量恢复已软删除的设备
+
+    Request Body:
+        device_ids: 设备ID列表
+        cabinet_id: 指定机柜ID（可选）
+        u_position: 指定U位（可选）
+    """
     data = request.get_json()
     if not data or "device_ids" not in data:
         return APIResponse.error(message="请提供要恢复的设备ID列表", status_code=400)
@@ -939,6 +1145,7 @@ def batch_restore_devices():
 @rate_limit_api
 @transactional
 def permanent_delete_device(device_id):
+    """永久删除设备（物理删除，不可恢复）"""
     from app.exceptions.validation import ValidationError
     try:
         device_service.permanent_delete_device(device_id)
@@ -958,6 +1165,11 @@ def permanent_delete_device(device_id):
 @rate_limit_api
 @transactional
 def batch_permanent_delete_devices():
+    """批量永久删除设备（物理删除，不可恢复）
+
+    Request Body:
+        device_ids: 设备ID列表
+    """
     data = request.get_json()
     if not data or "device_ids" not in data:
         return APIResponse.error(message="请提供要永久删除的设备ID列表", status_code=400)
@@ -973,12 +1185,22 @@ def batch_permanent_delete_devices():
     )
 
 
+
+
 @device_bp.route("/batch-create", methods=["POST"])
 @doc(summary="批量创建设备", tags=["设备"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/BatchCreateDevices"}}}}, responses={200: "DeviceResponse", 400: "ApiError"})
 @login_required
 @permission_required("device:create")
 @transactional
 def batch_create_devices():
+    """批量创建设备，逐条创建，支持部分成功
+
+    Request Body:
+        devices: 设备数据列表（每项符合 DeviceCreateSchema）
+
+    Returns:
+        JSON响应，包含批量创建结果（total、success_count、failed_count、results）
+    """
     data = request.get_json()
     devices_data = data.get("devices", [])
 
@@ -989,7 +1211,7 @@ def batch_create_devices():
         return APIResponse.error(message="单次批量创建上限为50台", status_code=400)
 
     from app.utils.cabinet_utils import CabinetUCalculator
-    cabinet_groups: dict[int, list[tuple[int, dict]]] = {}
+    cabinet_groups: dict[int, list[tuple[int, dict]]] = {}  # cabinet_id → [(index, device_data)]
     for index, device_data in enumerate(devices_data):
         cabinet_id = device_data.get("cabinet_id")
         if cabinet_id and device_data.get("u_position") is None:
@@ -1131,6 +1353,7 @@ CLONE_EXCLUDE_FIELDS = {
 @login_required
 @permission_required("device:view")
 def clone_device(device_id):
+    """获取设备模板数据用于克隆，排除唯一性字段"""
     device = device_service.get_device_by_id(device_id)
     if not device:
         return APIResponse.error(message="设备不存在", status_code=404)
@@ -1147,6 +1370,16 @@ def clone_device(device_id):
 @permission_required("device:view")
 @rate_limit_api
 def get_switch_ports():
+    """获取交换机端口列表
+    
+    Query Parameters:
+        device_id: 交换机设备ID（可选）
+        page: 页码（默认1）
+        per_page: 每页数量（默认20）
+    
+    Returns:
+        JSON响应，包含端口列表
+    """
     from app.services.network_port_service import NetworkPortService
 
     device_id = request.args.get("device_id", type=int)
@@ -1176,12 +1409,18 @@ def get_switch_ports():
         return APIResponse.error(message="操作失败", status_code=500)
 
 
+
 @device_bp.route("/statistics", methods=["GET"])
 @doc(summary="获取设备统计信息", tags=["设备"], responses={200: "ApiResponse", 500: "ApiError"})
 @login_required
 @permission_required("device:view")
 @rate_limit_api
 def get_device_statistics():
+    """获取设备统计信息
+    
+    Returns:
+        JSON响应，包含设备统计数据（按类型、状态、机房等维度统计）
+    """
     try:
         stats = device_service.get_device_statistics()
         return APIResponse.success(data=stats, message="获取设备统计信息成功")
@@ -1196,6 +1435,15 @@ def get_device_statistics():
 @permission_required("device:view")
 @rate_limit_api
 def get_device_count():
+    """获取设备总数
+    
+    Query Parameters:
+        cabinet_id: 按机柜ID过滤（可选）
+        room_id: 按机房ID过滤（可选）
+    
+    Returns:
+        JSON响应，包含设备总数
+    """
     try:
         cabinet_id = request.args.get("cabinet_id", type=int)
         room_id = request.args.get("room_id", type=int)
@@ -1220,6 +1468,17 @@ def get_device_count():
 @rate_limit_api
 @transactional
 def change_device_status(device_id):
+    """更改设备状态
+    
+    Args:
+        device_id: 设备ID
+    
+    Request Body:
+        status: 新状态值（0-已报废, 1-可用, 2-在线, 3-离线, 4-维护中, 5-预留）
+    
+    Returns:
+        JSON响应，包含更新结果
+    """
     try:
         data = request.get_json()
         if not data:
@@ -1250,6 +1509,17 @@ def change_device_status(device_id):
 @rate_limit_api
 @transactional
 def update_device_location(device_id):
+    """更新设备所在机柜
+    
+    Args:
+        device_id: 设备ID
+    
+    Request Body:
+        cabinet_id: 新机柜ID
+    
+    Returns:
+        JSON响应，包含更新结果
+    """
     try:
         data = request.get_json()
         if not data:
@@ -1276,6 +1546,15 @@ def update_device_location(device_id):
 @rate_limit_api
 @transactional
 def batch_update_device_status():
+    """批量更新设备状态
+    
+    Request Body:
+        device_ids: 设备ID列表
+        status: 新状态值
+    
+    Returns:
+        JSON响应，包含更新结果
+    """
     try:
         data = request.get_json()
         if not data:
@@ -1306,6 +1585,15 @@ def batch_update_device_status():
 @rate_limit_api
 @transactional
 def batch_update_device_hardware():
+    """批量更新设备硬件配置
+
+    Request Body:
+        ids: 设备ID列表
+        其余字段: 硬件配置字段（cpu, memory, os_version 等）
+
+    Returns:
+        JSON响应，包含 {updated, skipped}
+    """
     try:
         data = request.get_json()
         if not data:
@@ -1331,6 +1619,16 @@ def batch_update_device_hardware():
 @rate_limit_api
 @transactional
 def batch_update_device_asset():
+    """批量更新设备资产信息
+
+    Request Body:
+        ids: 设备ID列表
+        auto_generate_asset_number: 是否为每个设备自动生成资产编号（默认false）
+        其余字段: 资产信息字段（supplier, purchase_date 等，资产编号仅支持自动生成）
+
+    Returns:
+        JSON响应，包含 {updated, skipped}
+    """
     try:
         data = request.get_json()
         if not data:
@@ -1362,6 +1660,14 @@ def batch_update_device_asset():
 @rate_limit_api
 @transactional
 def batch_update_device_metric_template_group():
+    """批量设置/清除设备的显式指标模板组关联。
+
+    Request Body:
+        device_ids: 设备ID列表
+        metric_template_group_id: 目标模板组ID（传 null 表示清除，回到自动匹配）
+
+    供「批量修改监控」弹窗使用：选中多台设备统一绑定（或清除）某个指标模板组。
+    """
     try:
         data = request.get_json(silent=True) or {}
         device_ids = data.get("device_ids") or []
@@ -1385,6 +1691,15 @@ def batch_update_device_metric_template_group():
 @rate_limit_api
 @transactional
 def batch_update_device_port_sync_enabled():
+    """批量设置/清除设备的端口同步开关。
+
+    Request Body:
+        device_ids: 设备ID列表
+        port_sync_enabled: true=强制开, false=强制关, null=跟随全局
+
+    供「批量修改监控」弹窗使用：选中多台网络设备统一开启/关闭/跟随全局端口同步。
+    仅对网络设备（device_type='network'）生效，非网络设备跳过。
+    """
     try:
         data = request.get_json(silent=True) or {}
         device_ids = data.get("device_ids") or []
@@ -1421,6 +1736,19 @@ def batch_update_device_port_sync_enabled():
 @rate_limit_api
 @transactional
 def batch_update_device_config():
+    """批量修改设备配置（通用字段 + 硬件配置 / 网络拓扑 + 端口生成）
+
+    请求体（其余字段除 ids 外均为可选，按需传）：
+        ids: 设备ID列表（须为同一子类型）
+        main: {brand, device_model, power, responsible_person, customer_id}
+        hardware: DeviceHardware 字段（cpu/memory/gpu/storage_summary/ipmi_username/ipmi_password 等，不含 ipmi_address）
+        nic_ports: 已展开的网卡端口列表
+        switch_config: {switch_role, layer, uplink_device_id, core_device_id, uplink_port_ids, port_num}
+        switch_ports: 已展开的交换机端口列表（由端口生成规则展开）
+
+    Returns:
+        JSON响应，包含 {updated, skipped, nic_created, port_created}
+    """
     try:
         data = request.get_json()
         if not data:
@@ -1451,6 +1779,14 @@ def batch_update_device_config():
 @rate_limit_api
 @transactional
 def batch_reset_device_asset():
+    """批量重置（清空）设备资产信息
+
+    Request Body:
+        ids: 设备ID列表
+
+    Returns:
+        JSON响应，包含 {updated, skipped}
+    """
     try:
         data = request.get_json()
         if not data:
@@ -1474,6 +1810,16 @@ def batch_reset_device_asset():
 @permission_required("device:create")
 @rate_limit_api
 def generate_serial_number():
+    """生成唯一序列号
+    
+    Request Body:
+        prefix: 序列号前缀（可选）
+        format_type: 格式类型（可选，默认'numeric'）
+        length: 序列号长度（可选，默认8）
+    
+    Returns:
+        JSON响应，包含生成的序列号
+    """
     try:
         data = request.get_json(silent=True) or {}
         prefix = data.get("prefix", "DEV")
@@ -1493,6 +1839,15 @@ def generate_serial_number():
 @permission_required("device:view")
 @rate_limit_api
 def check_serial_number_unique():
+    """检查序列号是否唯一
+    
+    Request Body:
+        serial_number: 待检查的序列号
+        exclude_id: 排除的设备ID（可选，用于编辑时排除自身）
+    
+    Returns:
+        JSON响应，包含是否唯一的结果
+    """
     try:
         data = request.get_json()
         if not data:
@@ -1517,6 +1872,14 @@ def check_serial_number_unique():
 @permission_required("device:view")
 @rate_limit_api
 def get_device_by_name(device_name):
+    """根据设备名称获取设备
+    
+    Args:
+        device_name: 设备名称
+    
+    Returns:
+        JSON响应，包含设备信息
+    """
     try:
         device = device_service.get_by_device_name(device_name)
         if not device:
@@ -1533,6 +1896,14 @@ def get_device_by_name(device_name):
 @permission_required("device:view")
 @rate_limit_api
 def get_device_by_serial(serial_number):
+    """根据序列号获取设备
+    
+    Args:
+        serial_number: 序列号
+    
+    Returns:
+        JSON响应，包含设备信息
+    """
     try:
         device = device_service.get_by_serial_number(serial_number)
         if not device:
@@ -1548,6 +1919,18 @@ def get_device_by_serial(serial_number):
 @login_required
 @permission_required("device:view")
 def check_node_position():
+    """检查节点位置是否重复
+
+    用于设备创建/编辑时验证节点位置的唯一性。
+
+    Request Body:
+        chassis_id: 机箱ID
+        node_position: 节点位置
+        exclude_device_id: 排除的设备ID（编辑时使用）
+
+    Returns:
+        JSON响应，包含检查结果
+    """
     try:
         data = request.get_json()
         chassis_id = data.get("chassis_id")
@@ -1578,6 +1961,14 @@ def check_node_position():
 @rate_limit_api
 @transactional
 def swap_node_positions(chassis_id):
+    """拖拽更换机箱节点位置
+
+    请求体：
+        source_position: 拖拽源节点所在位置（该位置必须已有节点）
+        target_position: 目标位置（可空可占用；占用则交换，空则移动）
+
+    返回：{ swapped, source, target, exchanged }
+    """
     from app.exceptions.validation import ValidationError
 
     data = request.get_json(silent=True) or {}
@@ -1593,16 +1984,25 @@ def swap_node_positions(chassis_id):
         result = device_service.swap_node_positions(chassis_id, source, target)
     except ValidationError as e:
         return APIResponse.error(message=str(e), error_code="VALIDATION_ERROR", status_code=400)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error("交换节点位置失败: %s", e)
         return APIResponse.error(message="交换节点位置失败", error_code="DEVICE_UPDATE_ERROR", status_code=500)
     return APIResponse.success(data=result, message="节点位置已更新")
+
 
 
 @device_bp.route("/<int:device_id>/vlans", methods=["GET"])
 @doc(summary="获取设备VLAN列表", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
 def list_device_vlans(device_id):
+    """获取设备VLAN列表（所有交换机可用，has_ssh无关）
+
+    Args:
+        device_id: 设备ID
+
+    Returns:
+        JSON响应，包含VLAN列表
+    """
     from app.services.vlan_service import VLANService
     vlan_svc = VLANService(VLANRepository())
     vlans = vlan_svc.get_by_device(device_id)
@@ -1615,11 +2015,16 @@ def list_device_vlans(device_id):
 @permission_required("switch:create")
 @transactional
 def create_device_vlan(device_id):
+    """在指定设备上创建VLAN（设备维度端点，device_id通过URL路径传递）
+
+    Request Body: vlan_id, name, purpose等（不含device_id）
+    """
     from marshmallow import Schema, fields, validate
     from app.services.vlan_service import VLANService
     from app.exceptions.validation import ValidationError
 
     class DeviceVLANCreateSchema(Schema):
+        """设备维度VLAN创建参数（device_id从URL获取）"""
         vlan_id = fields.Int(required=True, validate=validate.Range(min=1, max=4094))
         name = fields.Str(required=True, validate=validate.Length(min=1, max=64))
         purpose = fields.Str(load_default=None, validate=validate.Length(max=200))
@@ -1642,6 +2047,15 @@ def create_device_vlan(device_id):
 @doc(summary="获取VLAN成员端口列表", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "vlan_db_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
 def get_vlan_members(device_id, vlan_db_id):
+    """获取VLAN成员端口列表
+
+    Args:
+        device_id: 设备ID
+        vlan_db_id: VLAN数据库ID
+
+    Returns:
+        JSON响应，包含成员端口列表
+    """
     from app.services.vlan_service import VLANService
     vlan_svc = VLANService(VLANRepository())
     members = vlan_svc.get_members(vlan_db_id)
@@ -1654,6 +2068,18 @@ def get_vlan_members(device_id, vlan_db_id):
 @permission_required("switch:config")
 @transactional
 def update_vlan_members(device_id, vlan_db_id):
+    """手动更新VLAN成员端口（全量替换，所有交换机可用）
+
+    Args:
+        device_id: 设备ID
+        vlan_db_id: VLAN数据库ID
+
+    Request Body:
+        port_ids: 端口ID列表
+
+    Returns:
+        JSON响应
+    """
     from app.services.vlan_service import VLANService
     data = request.get_json()
     port_ids = data.get("port_ids", [])
@@ -1668,6 +2094,19 @@ def update_vlan_members(device_id, vlan_db_id):
 @permission_required("switch:config")
 @transactional
 def update_device_vlan(device_id, vlan_db_id):
+    """更新 VLAN 字段（如 purpose、name），仅修改数据库记录，不操作交换机
+
+    Args:
+        device_id: 设备ID
+        vlan_db_id: VLAN数据库ID
+
+    Request Body:
+        purpose: 用途说明
+        name: VLAN名称
+
+    Returns:
+        JSON响应，包含更新后的VLAN记录
+    """
     from app.services.vlan_service import VLANService
     data = request.get_json()
     vlan_svc = VLANService(VLANRepository())
@@ -1679,6 +2118,16 @@ def update_device_vlan(device_id, vlan_db_id):
 @doc(summary="获取设备端口互联关系", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
 def get_device_port_links(device_id):
+    """查询设备的端口互联关系（network_to_network）
+
+    从 network_connections 表查询，返回包含 connection_type 等业务字段的完整数据。
+
+    Args:
+        device_id: 设备ID
+
+    Returns:
+        JSON响应，包含端口互联关系列表
+    """
     from app.services.device_connection_service import device_connection_service
     links = device_connection_service.get_network_connections(device_id)
     return APIResponse.success(data=links, message="获取端口互联关系成功")
@@ -1690,6 +2139,17 @@ def get_device_port_links(device_id):
 @permission_required("device:delete")
 @transactional
 def disconnect_port_link(device_id, connection_id):
+    """断开端口的互联关系（network_to_network）
+
+    从 network_connections 表删除记录，同时释放两端端口的占用状态。
+
+    Args:
+        device_id: 设备ID
+        connection_id: network_connections 表的主键 ID
+
+    Returns:
+        JSON响应
+    """
     from app.services.device_connection_service import device_connection_service
     from app.persistence.network_connection_repository import NetworkConnectionRepository
     nc_repo = NetworkConnectionRepository()
@@ -1710,6 +2170,18 @@ def disconnect_port_link(device_id, connection_id):
 @permission_required("device:update")
 @transactional
 def update_port_link(device_id, connection_id):
+    """更新端口互联关系的业务字段（network_to_network）
+
+    可更新字段：connection_type, vlan_id, status, notes, bandwidth, description, lag_group_id
+    不支持更换端口（需删除后重建）。
+
+    Args:
+        device_id: 设备ID
+        connection_id: network_connections 表的主键 ID
+
+    Returns:
+        JSON响应
+    """
     from app.persistence.network_connection_repository import NetworkConnectionRepository
     nc_repo = NetworkConnectionRepository()
     conn = nc_repo.find_by_id(connection_id)
@@ -1734,6 +2206,14 @@ def update_port_link(device_id, connection_id):
 @doc(summary="获取设备LAG列表", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
 def list_device_port_channels(device_id):
+    """获取设备LAG列表（所有交换机可用）
+
+    Args:
+        device_id: 设备ID
+
+    Returns:
+        JSON响应，包含LAG列表
+    """
     from app.services.link_aggregation_service import LinkAggregationService
     lag_svc = LinkAggregationService(LinkAggregationRepository())
     lags = lag_svc.get_by_device(device_id)
@@ -1746,6 +2226,13 @@ def list_device_port_channels(device_id):
 @permission_required("switch:create")
 @transactional
 def create_device_port_channel(device_id):
+    """在指定设备上创建链路聚合组（设备维度端点）
+
+    Args:
+        device_id: 设备ID
+
+    Request Body: lag_name, lag_type等（不含device_id）
+    """
     from app.services.link_aggregation_service import LinkAggregationService
     from app.exceptions.validation import ValidationError
     data = request.get_json()
@@ -1764,6 +2251,12 @@ def create_device_port_channel(device_id):
 @permission_required("switch:delete")
 @transactional
 def delete_device_port_channel(device_id, lag_id):
+    """删除链路聚合组（设备维度端点）
+
+    Args:
+        device_id: 设备ID
+        lag_id: 链路聚合组ID
+    """
     from app.services.link_aggregation_service import LinkAggregationService
     lag_svc = LinkAggregationService(LinkAggregationRepository())
     if lag_svc.delete(lag_id):
@@ -1775,6 +2268,15 @@ def delete_device_port_channel(device_id, lag_id):
 @doc(summary="获取LAG成员端口列表", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "lag_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
 def get_lag_members(device_id, lag_id):
+    """获取LAG成员端口列表
+
+    Args:
+        device_id: 设备ID
+        lag_id: LAG组ID
+
+    Returns:
+        JSON响应，包含成员端口列表
+    """
     from app.services.link_aggregation_service import LinkAggregationService
     lag_svc = LinkAggregationService(LinkAggregationRepository())
     members = lag_svc.get_members(lag_id)
@@ -1787,6 +2289,18 @@ def get_lag_members(device_id, lag_id):
 @permission_required("switch:config")
 @transactional
 def update_lag_members(device_id, lag_id):
+    """手动更新LAG成员端口（全量替换，所有交换机可用）
+
+    Args:
+        device_id: 设备ID
+        lag_id: LAG组ID
+
+    Request Body:
+        port_ids: 端口ID列表
+
+    Returns:
+        JSON响应
+    """
     from app.services.link_aggregation_service import LinkAggregationService
     data = request.get_json()
     port_ids = data.get("port_ids", [])
@@ -1801,6 +2315,18 @@ def update_lag_members(device_id, lag_id):
 @permission_required("switch:config")
 @transactional
 def update_port_channel(device_id, lag_id):
+    """更新链路聚合组字段（如 purpose）
+
+    Args:
+        device_id: 设备ID
+        lag_id: LAG组ID
+
+    Request Body:
+        purpose: 用途说明
+
+    Returns:
+        JSON响应，包含更新后的LAG记录
+    """
     from app.services.link_aggregation_service import LinkAggregationService
     data = request.get_json()
     lag_svc = LinkAggregationService(LinkAggregationRepository())

@@ -13,12 +13,9 @@ import { CABINET_STATUS_MAP } from '@/types/enums';
 import type { Cabinet } from '@/types/models';
 
 interface RoomLayoutProps {
-  
   cabinets: Cabinet[];
-  
   readOnly?: boolean;
 }
-
 
 interface CabinetCell {
   cabinet: Cabinet;
@@ -26,21 +23,18 @@ interface CabinetCell {
   col: number;
 }
 
-
 function extractRowPrefix(cabinetNumber: string): string {
   const match = cabinetNumber.match(/^[A-Za-z]+/);
   return match ? match[0].toUpperCase() : '';
 }
 
-
 const STATUS_BG_COLORS: Record<number, string> = {
-  0: '#ff4d4f', 
-  1: '#52c41a', 
-  2: '#1677ff', 
-  3: '#fa8c16', 
-  4: '#722ed1', 
+  0: '#ff4d4f', // 禁用 - red
+  1: '#52c41a', // 可用 - green
+  2: '#1677ff', // 使用中 - blue
+  3: '#fa8c16', // 维护中 - orange
+  4: '#722ed1', // 已预留 - purple
 };
-
 
 const STATUS_BORDER_COLORS: Record<number, string> = {
   0: '#cf1322',
@@ -54,7 +48,6 @@ function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
   const navigate = useNavigate();
   const { token } = theme.useToken();
 
-  
   const { maxRow, maxCol, grid, rowLabels } = useMemo(() => {
     const positioned = cabinets.filter(
       (c) => c.row != null && c.col != null && c.row > 0 && c.col > 0,
@@ -81,7 +74,6 @@ function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
       grid.push(row);
     }
 
-    
     const rowLabels: string[] = [];
     for (let r = 1; r <= maxRow; r++) {
       const prefixCounts = new Map<string, number>();
@@ -94,7 +86,6 @@ function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
           }
         }
       }
-      
       let bestPrefix = '';
       let bestCount = 0;
       prefixCounts.forEach((count, prefix) => {
@@ -109,7 +100,6 @@ function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
     return { maxRow, maxCol, grid, rowLabels };
   }, [cabinets]);
 
-  
   const handleClick = useCallback(
     (cabinetId: number) => {
       if (readOnly) return;
@@ -118,7 +108,6 @@ function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
     [navigate, readOnly],
   );
 
-  
   const renderCell = (cell: CabinetCell | null, rowIdx: number, colIdx: number) => {
     if (!cell) {
       return (

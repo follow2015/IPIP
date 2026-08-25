@@ -17,7 +17,6 @@ interface LAGFormProps {
   onSuccess: () => void;
 }
 
-
 function useLAGFormSchema() {
   const { data: switchList } = useSwitchList();
 
@@ -64,7 +63,6 @@ function useLAGFormSchema() {
 
   return schema;
 }
-
 
 function LAGForm({ open, onCancel, onSuccess }: LAGFormProps) {
   const schema = useLAGFormSchema();

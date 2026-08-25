@@ -8,7 +8,6 @@ export interface IpConfigValues {
   ip_type: 'primary' | 'secondary';
 }
 
-
 const SUBNET_MASK_OPTIONS = [
   { value: '255.255.255.252', label: '255.255.255.252 (/30)' },
   { value: '255.255.255.248', label: '255.255.255.248 (/29)' },
@@ -31,7 +30,6 @@ interface IpConfigModalProps {
   hasPrimary: boolean;
   onSubmit: (values: IpConfigValues) => void;
 }
-
 
 export function IpConfigModal({
   open,
@@ -63,7 +61,6 @@ export function IpConfigModal({
         ip_type: values.ip_type as 'primary' | 'secondary'
       });
     } catch {
-      
     }
   };
 

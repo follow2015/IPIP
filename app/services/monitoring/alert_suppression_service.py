@@ -28,6 +28,7 @@ logger = get_logger(__name__)
 
 
 class SuppressionDecision(TypedDict):
+    """抑制判定结果"""
     suppressed: bool
     """是否为聚合告警（抑制窗口内累计后放行的一条）"""
     aggregated: bool
@@ -38,11 +39,13 @@ class SuppressionDecision(TypedDict):
 
 
 def _get_redis():
+    """复用 switch_events 的 Redis 客户端（懒加载单例）"""
     from app.services.switch_events import _get_redis as _get
     return _get()
 
 
 def _load_config():
+    """从 Flask config 读取抑制参数（支持 current_app 与 get_config 双路径）"""
     try:
         from flask import current_app
         cfg = current_app.config
@@ -65,6 +68,16 @@ def _load_config():
 
 
 def should_emit(dedup_key: str, now: Optional[float] = None) -> SuppressionDecision:
+    """判定一条告警是否应放行。
+
+    Args:
+        dedup_key: 告警去重键（同 key 在窗口内限频）
+        now: 当前时间戳（测试注入），默认 time.time()
+
+    Returns:
+        SuppressionDecision: suppressed=False 表示放行；True 表示抑制。
+        aggregated=True 表示这是抑制窗口累计后放行的聚合告警。
+    """
     enabled, window, max_count, throttle = _load_config()
     if not enabled:
         return SuppressionDecision(
@@ -109,7 +122,7 @@ def should_emit(dedup_key: str, now: Optional[float] = None) -> SuppressionDecis
         window_start = ts
 
     if count >= max_count and (ts - last_alert_at) >= throttle:
-        suppressed_count = count - max_count
+        suppressed_count = count - max_count  # 累计被抑制数
         new_state = json.dumps({
             "count": 1, "window_start": ts, "last_alert_at": ts,
         })

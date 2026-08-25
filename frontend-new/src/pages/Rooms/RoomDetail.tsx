@@ -18,12 +18,10 @@ import { ROOM_STATUS_MAP } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
 import type { Cabinet } from '@/types/models';
 
-
 function renderStatus(v: number) {
   const s = ROOM_STATUS_MAP[v as keyof typeof ROOM_STATUS_MAP];
   return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{v}</Tag>;
 }
-
 
 function RoomDetail() {
   const { id } = useParams<{ id: string }>();
@@ -43,7 +41,6 @@ function RoomDetail() {
 
   return <RoomDetailContent roomId={roomId} />;
 }
-
 
 function RoomDetailContent({ roomId }: { roomId: number }) {
   const navigate = useNavigate();

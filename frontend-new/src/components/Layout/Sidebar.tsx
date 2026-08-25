@@ -16,11 +16,9 @@ import { usePermission } from '@/hooks/usePermission';
 import { useUIStore } from '@/stores/ui';
 import { MENU_CONFIGS, FLATTENED_MENUS, findMenuByPath } from '@/constants/menu';
 
-
 interface SidebarProps {
   collapsed: boolean;
 }
-
 
 const KEY_TO_PATH = new Map(FLATTENED_MENUS.map((m) => [m.key, m.path]));
 
@@ -28,20 +26,17 @@ function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { hasPermission } = usePermission();
-  const { token } = theme.useToken(); 
+  const { token } = theme.useToken(); // 已 useCallback 包裹，引用稳定
   const addTab = useUIStore((s) => s.addTab);
 
-  
   const filteredMenus = useMemo(
     () => MENU_CONFIGS.filter((item) => !item.permission || hasPermission(item.permission)),
     [hasPermission]
   );
 
-  
   const menuItems = useMemo(
     () =>
       filteredMenus.map((item) => {
-        
         if (item.children && item.children.length > 0) {
           const childItems = item.children
             .filter((c) => !c.permission || hasPermission(c.permission))
@@ -69,7 +64,6 @@ function Sidebar({ collapsed }: SidebarProps) {
     [filteredMenus, collapsed, hasPermission]
   );
 
-  
   const selectedKey = useMemo(() => {
     const matched = findMenuByPath(location.pathname);
     return matched?.key ?? 'dashboard';
@@ -78,7 +72,6 @@ function Sidebar({ collapsed }: SidebarProps) {
   const handleMenuClick = ({ key }: { key: string }) => {
     const path = KEY_TO_PATH.get(key);
     if (path) {
-      
       const config = FLATTENED_MENUS.find((m) => m.key === key);
       if (config) {
         addTab({
@@ -94,7 +87,7 @@ function Sidebar({ collapsed }: SidebarProps) {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {}
+      {/* Logo */}
       <div
         style={{
           height: 64,
@@ -110,7 +103,7 @@ function Sidebar({ collapsed }: SidebarProps) {
         </h2>
       </div>
 
-      {}
+      {/* 导航菜单 */}
       <Menu
         mode="inline"
         selectedKeys={[selectedKey]}

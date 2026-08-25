@@ -37,12 +37,27 @@ _METRIC_TO_ALERT_TYPE = {
 
 
 class MetricAlertService:
+    """指标告警服务（按指标维度去重与恢复）"""
 
     def __init__(self, session=None):
         from extensions import db
         self._session = session or db.session
 
     def process(self, device_id: int, collector_result: dict) -> dict:
+        """处理一轮采集结果，入箱状态变化的告警/恢复，返回入箱明细。
+
+        ``collector_result`` 结构::
+
+            {metric_key: {index: {"severity", "breached", "value"}}}
+
+        返回::
+
+            {"alerted": int, "recovered": int, "skipped": int}
+
+        性能（P1-1 修复）：一次性批量预取该设备全部 alert state 到内存 dict，
+        替代原先对每个 (device_id, metric_key, index) 单独一次 DB 查询（N+1），
+        将 N×M 次查询降为 1 次。
+        """
         states = (
             self._session.query(DeviceMetricAlertState)
             .filter(DeviceMetricAlertState.device_id == device_id)
@@ -78,6 +93,17 @@ class MetricAlertService:
 
     def _apply_one(self, device_id, metric_key, index, alert_type, info, breached,
                    state_map: dict) -> str:
+        """处理单个指标实例，返回 "alert" / "recover" / "skip"。
+
+        ``state_map`` 由 ``process`` 批量预取，键为 ``(metric_key, index)``。
+
+        P0 修复：原实现用裸 ``session.add`` + ``flush`` 写新告警态行，当上一轮事务
+        残留 / 跨事务并发导致 ``(device_id, metric_key, index_key)`` 已存在时，INSERT
+        违反 ``uq_dmas_device_metric_index`` 唯一约束，flush 抛 IntegrityError 使会话
+        进入 rollback-pending 态，后续所有操作级联抛 PendingRollbackError。改用
+        MySQL ``INSERT ... ON DUPLICATE KEY UPDATE`` 原子 upsert，从根本上消除重复
+        键冲突。
+        """
         state = state_map.get((metric_key, index))
 
         if breached and (state is None or not state.breached):
@@ -111,6 +137,16 @@ class MetricAlertService:
 
     def _upsert_alert_state(self, device_id, metric_key, index, alert_type,
                             breached, severity, last_value) -> DeviceMetricAlertState:
+        """原子 upsert 一行告警态，返回持久化后的 ORM 对象。
+
+        用 ``INSERT ... ON DUPLICATE KEY UPDATE`` 替代裸 ``session.add``，避免
+        ``(device_id, metric_key, index_key)`` 重复时 IntegrityError 污染会话。
+        upsert 后从 DB 重新查回该行，确保拿到自增 id 与最新字段值。
+
+        dialect 兼容：MySQL 走原生 ``ON DUPLICATE KEY UPDATE``（生产）；
+        SQLite/其他 dialect（单测）走 ``query + add/update`` fallback——单测用
+        SQLite 无法编译 MySQL 专属 DML。
+        """
         dialect_name = self._session.get_bind().dialect.name
         if dialect_name == "mysql":
             stmt = mysql_insert(DeviceMetricAlertState).values(
@@ -163,6 +199,11 @@ class MetricAlertService:
         return state
 
     def _enqueue(self, device_id, alert_type, severity, metric_key, index, value, breached):
+        """写一条待发告警/恢复行到 outbox（与告警态更新同一事务）。
+
+        P1-2：接入统一治理门面（AlertIngress），使指标告警与连通性告警获得一致的
+        静默（G4.1）/风暴抑制（G13）/SSE 权限发布（G1），不再裸入箱。
+        """
         from app.models.monitor_alert_outbox import MonitorAlertOutbox
         from app.services.monitoring.alert_ingress import build_dedup_key
 

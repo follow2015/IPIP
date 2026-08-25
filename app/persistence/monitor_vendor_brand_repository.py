@@ -11,6 +11,7 @@ from app.models.monitor_vendor_brand import MonitorVendorBrand
 
 
 class MonitorVendorBrandRepository:
+    """厂商品牌仓库"""
 
     def __init__(self, session=None):
         self.session = session or db.session
@@ -20,6 +21,7 @@ class MonitorVendorBrandRepository:
         device_type: Optional[str] = None,
         only_enabled: bool = True,
     ) -> List[MonitorVendorBrand]:
+        """列出厂商品牌（按 sort_order 排序）。"""
         q = self.session.query(MonitorVendorBrand)
         if device_type:
             q = q.filter_by(device_type=device_type)
@@ -31,6 +33,7 @@ class MonitorVendorBrandRepository:
         ).all()
 
     def list_enabled(self) -> List[MonitorVendorBrand]:
+        """列出启用的厂商品牌（按 sort_order 排序，用于 label map）。"""
         return (
             self.session.query(MonitorVendorBrand)
             .filter_by(enabled=True)
@@ -42,9 +45,15 @@ class MonitorVendorBrandRepository:
         )
 
     def find_by_id(self, brand_id: int) -> Optional[MonitorVendorBrand]:
+        """按 ID 查询；不存在返回 None。"""
         return self.session.get(MonitorVendorBrand, brand_id)
 
     def find_by_brand_name(self, brand_name: str) -> Optional[MonitorVendorBrand]:
+        """按 brand_name 查启用品牌；不存在返回 None。
+
+        供 batch_import_templates 防御性归一化使用：前端传 brand_name 时转成 enterprise_no。
+        仅查启用品牌，避免导入到已下线厂商。
+        """
         return (
             self.session.query(MonitorVendorBrand)
             .filter_by(brand_name=brand_name, enabled=True)
@@ -52,6 +61,7 @@ class MonitorVendorBrandRepository:
         )
 
     def find_by_id_or_404(self, brand_id: int) -> MonitorVendorBrand:
+        """按 ID 查询；不存在抛 404。"""
         row = self.session.get(MonitorVendorBrand, brand_id)
         if row is None:
             from app.exceptions.business import BusinessLogicError
@@ -59,13 +69,16 @@ class MonitorVendorBrandRepository:
         return row
 
     def add(self, row: MonitorVendorBrand) -> MonitorVendorBrand:
+        """新增并 flush。"""
         self.session.add(row)
         self.session.flush()
         return row
 
     def delete(self, row: MonitorVendorBrand) -> None:
+        """删除并 flush。"""
         self.session.delete(row)
         self.session.flush()
 
     def commit(self) -> None:
+        """提交事务。"""
         self.session.commit()

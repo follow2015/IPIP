@@ -51,7 +51,6 @@ const DEVICE_TYPE_OPTIONS = [
   { label: 'other（其他）', value: 'other' }
 ];
 
-
 function useAllCategories(): string[] {
   const { data } = useOidCategoryRules();
   const set = new Set<string>();
@@ -60,7 +59,6 @@ function useAllCategories(): string[] {
   }
   return Array.from(set).sort();
 }
-
 
 function CategoryRulesTab() {
   const { data, isLoading } = useOidCategoryRules();
@@ -75,14 +73,12 @@ function CategoryRulesTab() {
   const watchDeviceType = Form.useWatch('device_type', form) ?? '';
   const table = useTable({ initialPerPage: 50 });
 
-  
   const watchVendorId = Form.useWatch('vendor_id', form) as string | undefined;
   const vendorOptions: { key: string | number; label: string; value: string }[] = (
     vendorBrands?.items ?? []
   )
     .filter((v) => v.enabled && (!watchDeviceType || v.device_type === watchDeviceType))
     .map((v) => ({ key: v.id, label: v.label, value: v.enterprise_no }));
-  
   if (watchVendorId && !vendorOptions.some((o) => o.value === watchVendorId)) {
     vendorOptions.push({
       key: `__fallback__${watchVendorId}`,
@@ -91,7 +87,6 @@ function CategoryRulesTab() {
     });
   }
 
-  
   const vendorLabelMap = new Map<string, string>();
   for (const v of vendorBrands?.items ?? []) {
     if (!vendorLabelMap.has(v.enterprise_no)) {
@@ -309,7 +304,6 @@ function CategoryRulesTab() {
     </Card>
   );
 }
-
 
 function RecommendConfigTab() {
   const { data, isLoading } = useDeviceTypeRecommends();

@@ -7,6 +7,7 @@ from app.models.monitor_sla_target import MonitorSlaTarget
 
 
 class MonitorSlaTargetRepository:
+    """SLA 目标仓库"""
 
     def __init__(self, session=None):
         self.session = session or db.session

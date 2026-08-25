@@ -33,6 +33,10 @@ _STATUS_ITEM_KEY_PREFIXES = ("net.if.status", "agent.ifstatus", "zabbix.if.statu
 
 
 def _status_value_to_link_status(value) -> str:
+    """Zabbix 端口状态值 → link_status 字符串。
+
+    Zabbix net.if.status: 1=up, 0=down
+    """
     try:
         v = int(value)
     except (ValueError, TypeError):
@@ -45,16 +49,33 @@ def _status_value_to_link_status(value) -> str:
 
 
 class ZabbixPortCollector:
+    """Zabbix 端口采集器（API → port_rows）。
+
+    对非网管网络设备（has_ssh=false）但有 Zabbix 凭据的设备，用 Zabbix API 采集
+    端口列表 + 状态，输出 ``port_rows`` 供 ``PortSyncService`` 消费。
+    """
 
     def __init__(self, graph_service: ZabbixGraphService | None = None):
         self._graph_service = graph_service or ZabbixGraphService()
 
     def collect(self, credential: dict, ip: str, timeout: int | None = None, device=None) -> list[dict]:
+        """采集设备端口列表，返回 port_rows（与 SnmpPortCollector 输出对齐）。
+
+        Args:
+            credential: Zabbix 凭据（api_url / api_token / verify_ssl / match_by）
+            ip: 设备管理 IP（Zabbix 不直接使用，仅为统一 collector 接口）
+            timeout: 采集超时（秒），Zabbix API 自带 timeout，此参数仅用于兼容接口
+            device: 设备 ORM 对象（需有 id / management_ip / hostname）
+
+        Returns:
+            list[dict]: port_rows，每个 dict 含 port_name / port_type / slot /
+            card / port_number / link_status / speed 等字段。采集失败返回空列表。
+        """
         if device is None:
             return []
         try:
             port_items = self._graph_service.list_ports(credential, device, use_cache=True)
-        except Exception:
+        except Exception:  # noqa: BLE001 - 采集失败静默降级
             logger.warning(
                 "Zabbix 端口列表采集失败 device_id=%s",
                 getattr(device, "id", None), exc_info=True,
@@ -91,7 +112,7 @@ class ZabbixPortCollector:
                 "card": parsed["card"],
                 "port_number": parsed["port_number"],
                 "link_status": link_status,
-                "speed": "",
+                "speed": "",  # Zabbix 流量 item 不直接提供速率，留空
                 "description": None,
                 "vlan": None,
                 "mac": None,
@@ -101,6 +122,10 @@ class ZabbixPortCollector:
         return port_rows
 
     def _collect_port_status(self, credential: dict, device) -> dict[str, str]:
+        """查 Zabbix 端口状态 item，返回 {port_name: link_status}。
+
+        尝试多个状态 item key 前缀，首个有结果的即用。
+        """
         api_url = credential.get("api_url")
         if not api_url:
             return {}
@@ -160,6 +185,12 @@ class ZabbixPortCollector:
 
     @staticmethod
     def _extract_port_from_status_item(label: str) -> str:
+        """从状态 item key_/name 提取端口名。
+
+        支持格式：
+        - ``net.if.status[GigabitEthernet1/0/1]`` → ``GigabitEthernet1/0/1``
+        - ``net.if.status[bps,GigabitEthernet1/0/1]`` → ``GigabitEthernet1/0/1``
+        """
         label = label or ""
         if "[" in label and label.endswith("]"):
             inner = label[label.index("[") + 1: -1]

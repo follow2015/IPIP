@@ -18,12 +18,14 @@ logger = get_logger(__name__)
 
 
 class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
+    """设备存储Repository"""
 
     def __init__(self, session=None):
         super().__init__(DeviceStorage, session)
 
 
     def device_exists(self, device_id: int) -> bool:
+        """检查有效设备是否存在（非报废状态）"""
         try:
             from app.models.device import Device
             from app.core.enums import DeviceStatus
@@ -42,6 +44,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("检查设备存在性失败", original_error=e)
 
     def find_by_device(self, device_id: int) -> List[DeviceStorage]:
+        """获取设备全部硬盘记录（不分组）"""
         try:
             return (
                 self.session.query(DeviceStorage)
@@ -53,6 +56,11 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找设备存储失败", original_error=e)
 
     def find_grouped_by_device(self, device_id: int) -> List[Dict[str, Any]]:
+        """按型号分组统计设备硬盘，返回聚合结果
+
+        聚合维度：storage_type / capacity / interface_type / manufacturer / model
+        聚合字段：total_count（数量合计）/ serial_numbers（序列号列表）
+        """
         try:
             rows = (
                 self.session.query(
@@ -99,6 +107,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找分组存储失败", original_error=e)
 
     def find_by_id(self, storage_id: int) -> Optional[DeviceStorage]:
+        """根据 ID 查找硬盘记录"""
         try:
             return (
                 self.session.query(DeviceStorage)
@@ -114,6 +123,13 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         exclude_id: int = None,
         exclude_device_id: int = None,
     ) -> bool:
+        """检查序列号是否已存在
+
+        Args:
+            serial_number: 待检查序列号
+            exclude_id: 排除的硬盘 ID（用于单条更新校验）
+            exclude_device_id: 排除的设备 ID（用于整机覆盖写入前校验）
+        """
         if not serial_number:
             return False
         try:
@@ -133,6 +149,15 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         serial_numbers: List[str],
         exclude_device_id: int = None,
     ) -> List[str]:
+        """批量检查序列号中哪些已存在（单次查询，O(1) DB 往返）
+
+        Args:
+            serial_numbers: 待检查序列号列表
+            exclude_device_id: 排除当前设备自身的序列号
+
+        Returns:
+            List[str]: 已存在的序列号列表（为空则全部合法）
+        """
         if not serial_numbers:
             return []
         try:
@@ -147,6 +172,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def create(self, data: Dict[str, Any]) -> DeviceStorage:
+        """创建单条硬盘记录（flush-only，由 Service 层统一 commit/rollback）"""
         try:
             obj = DeviceStorage(
                 device_id=data["device_id"],
@@ -168,6 +194,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("创建存储记录失败", original_error=e)
 
     def bulk_create(self, device_id: int, items: List[Dict[str, Any]]) -> int:
+        """批量创建硬盘记录，返回创建数量（flush-only，由 Service 层统一 commit/rollback）"""
         try:
             objs = [
                 DeviceStorage(
@@ -192,6 +219,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("批量创建存储记录失败", original_error=e)
 
     def update(self, storage_id: int, data: Dict[str, Any]) -> bool:
+        """更新硬盘记录（flush-only，由 Service 层统一 commit/rollback）"""
         try:
             obj = self.find_by_id(storage_id)
             if not obj:
@@ -212,6 +240,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("更新存储记录失败", original_error=e)
 
     def delete(self, storage_id: int) -> bool:
+        """删除单条硬盘记录（flush-only，由 Service 层统一 commit/rollback）"""
         try:
             obj = self.find_by_id(storage_id)
             if not obj:
@@ -223,6 +252,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("删除存储记录失败", original_error=e)
 
     def delete_by_device(self, device_id: int) -> int:
+        """删除设备全部硬盘记录，返回删除数量（flush-only，由 Service 层统一 commit/rollback）"""
         try:
             count = (
                 self.session.query(DeviceStorage)

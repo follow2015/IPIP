@@ -1,5 +1,4 @@
 
-
 export enum IPStatusCode {
   ACTIVE = 0,
   INACTIVE = 1,
@@ -260,7 +259,6 @@ export const PROBE_ERROR_MAP: Record<ProbeErrorCode, { label: string; color: str
   [ProbeErrorCode.ZABBIX_EMPTY_HOST_LIST]: { label: 'Zabbix主机列表为空', color: 'orange' },
   [ProbeErrorCode.HOST_NOT_IN_ZABBIX]: { label: '主机不在Zabbix中', color: 'orange' }
 };
-
 
 export const NOTIFICATION_TYPE_GROUP_OPTIONS = [
   {

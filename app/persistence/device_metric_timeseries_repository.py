@@ -14,11 +14,21 @@ from app.models.device_metric_timeseries import DeviceMetricTimeseries
 
 
 class DeviceMetricTimeseriesRepository:
+    """设备指标值历史时序仓库"""
 
     def __init__(self, session=None):
         self.session = session or db.session
 
     def add_many(self, device_id: int, collected: dict, collected_at: datetime = None) -> int:
+        """批量插入采集结果到时序表。
+
+        Args:
+            device_id: 设备 ID
+            collected: {metric_key: {index: {"value":..., "severity":..., "breached":...}}}
+            collected_at: 采集时间（缺省 now）
+        Returns:
+            插入行数
+        """
         if not collected:
             return 0
         collected_at = collected_at or datetime.now(timezone.utc)
@@ -49,6 +59,16 @@ class DeviceMetricTimeseriesRepository:
         to: Optional[datetime] = None,
         limit: int = 2000,
     ) -> List[DeviceMetricTimeseries]:
+        """查询设备某指标的历史时序。
+
+        Args:
+            device_id: 设备 ID
+            metric_key: 指标 key
+            index_key: 指标实例索引（可选，None=所有 index）
+            from_: 起始时间（可选）
+            to: 结束时间（可选）
+            limit: 最多返回行数（默认 2000，上限 5000）
+        """
         limit = max(1, min(limit, 5000))
         conditions = [
             DeviceMetricTimeseries.device_id == device_id,
@@ -69,6 +89,7 @@ class DeviceMetricTimeseriesRepository:
         )
 
     def list_metric_keys(self, device_id: int) -> List[str]:
+        """查询设备有历史时序数据的所有 metric_key（供前端指标选择器）。"""
         rows = (
             self.session.query(DeviceMetricTimeseries.metric_key)
             .filter_by(device_id=device_id)

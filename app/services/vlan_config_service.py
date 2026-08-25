@@ -18,9 +18,17 @@ from app.utils.port_name_utils import get_vlanif_name
 logger = get_logger(__name__)
 
 class VlanConfigService:
+    """VLAN 配置子服务"""
 
     def __init__(self, dispatcher, switch_repo: SwitchRepository, sync_coordinator,
                  clear_service=None):
+        """
+        Args:
+            dispatcher: CommandDispatcher 实例，用于命令下发
+            switch_repo: SwitchRepository 实例
+            sync_coordinator: SyncCoordinator 实例，用于事务与同步
+            clear_service: PortClearService 实例，用于端口清除
+        """
         self.dispatcher = dispatcher
         self.switch_repo = switch_repo
         self.sync = sync_coordinator
@@ -28,6 +36,14 @@ class VlanConfigService:
 
 
     def create_vlan(self, switch, vlan_id: int) -> dict:
+        """创建 VLAN（幂等：已存在时跳过创建，但确保 switch_port_status 有对应记录）
+
+        优先查 vlans 表判断存在性（数据库是权威数据源），
+        仅在库中不存在时才SSH到设备执行创建。
+
+        库网一致性校验：若库中存在但设备上不存在（人工删除等场景），
+        则补发 SSH 创建命令，避免静默失败。
+        """
         if not (1 <= vlan_id <= 4094):
             return {"success": False, "error": f"VLAN ID {vlan_id} 超出合法范围 1-4094"}
 
@@ -80,6 +96,20 @@ class VlanConfigService:
         return result
 
     def delete_vlan(self, switch, vlan_id: int) -> dict:
+        """删除 VLAN，并清理数据库中所有相关记录
+
+        删除前先尝试删除对应的 L3 接口（Vlanif），否则华为设备会报错：
+        "Error: The VLAN has a L3 interface. Please delete it first."
+
+        时序保证：SSH 成功后才执行 DB 写入，避免 SSH 失败时 DB 与设备不一致。
+        1. 只读查询受影响端口列表
+        2. SSH 删除 VLAN + 清除端口配置
+        3. 事务内执行 DB 写入（reset_ports_vlan + 清理关联记录）
+
+        数据库清理：switch_port_status（VLANIF + VLAN记录）、switch_port_status.raw_info（配置缓存）、
+        switch_port_ips（FK CASCADE 自动删除）、device_connections（vlan_id引用）、
+        network_connections（vlan_id引用）。
+        """
         if not (1 <= vlan_id <= 4094):
             return {"success": False, "error": f"VLAN ID {vlan_id} 超出合法范围 1-4094"}
 
@@ -147,6 +177,20 @@ class VlanConfigService:
 
     def set_port_vlan(self, switch, port: str, vlan_id: int,
                       mode: str = "access", allowed_vlans: str = None) -> dict:
+        """设置端口 VLAN（VLAN 不存在时自动创建）
+
+        加入前先执行 clear configuration interface <port> 清空端口配置，
+        避免残留配置（如 IP、Trunk）导致加入失败。
+        SSH 成功后统一通过 _sync_port_from_device 从设备同步三表。
+
+        Args:
+            switch:       交换机对象
+            port:         端口名称
+            vlan_id:      默认 VLAN ID（PVID）
+            mode:         "access" 或 "trunk"
+            allowed_vlans: Trunk 允许的 VLAN 列表字符串（如 "1-10,20,30-40"），
+                           为 None 时默认只允许 vlan_id
+        """
         vlan_result = self.create_vlan(switch, vlan_id)
         if not vlan_result.get("success"):
             return {
@@ -160,7 +204,7 @@ class VlanConfigService:
             for start, end in vlan_ranges:
                 for vid in range(start, end + 1):
                     if vid == vlan_id:
-                        continue
+                        continue  # PVID 已创建，跳过
                     self.create_vlan(switch, vid)
 
         clear_result = self.clear_service._clear_port_config_on_device(switch, port, auto_save=False)
@@ -180,6 +224,11 @@ class VlanConfigService:
 
     def _ensure_vlan_record(self, device_id: int, vlan_id: int,
                             room_id: int = None) -> None:
+        """确保 vlans 表中存在指定 VLAN 记录（upsert）
+
+        委托 SwitchRepository.upsert_vlan_record() 统一入口，
+        避免分散逻辑导致字段填充不一致。
+        """
         if not (1 <= vlan_id <= 4094):
             logger.warning("_ensure_vlan_record: VLAN ID %d 超出合法范围 1-4094，跳过", vlan_id)
             return
@@ -189,6 +238,10 @@ class VlanConfigService:
     def _update_vlan_member_relation(self, device_id: int, port_name: str,
                                       vlan_id: int, mode: str,
                                       room_id: int = None) -> None:
+        """端口设置 VLAN 后，更新 vlan_port_members 关联表
+
+        委托 SwitchRepository.update_vlan_member_relation() 执行。
+        """
         if not (1 <= vlan_id <= 4094):
             logger.warning("_update_vlan_member_relation: VLAN ID %d 超出合法范围 1-4094，跳过", vlan_id)
             return
@@ -198,12 +251,32 @@ class VlanConfigService:
         )
 
     def _sync_vlan_members(self, device_id: int, port: str, members: list) -> None:
+        """将VLAN成员端口列表写入vlans表
+
+        委托 SwitchRepository.sync_vlan_members() 执行。
+        """
         self.switch_repo.sync_vlan_members(device_id, port, members)
 
     def _build_port_vlan_cmds(
         self, switch, port: str, vlan_id: int, mode: str,
         allowed_vlans: str = None,
     ) -> tuple[list, str]:
+        """构造 VLAN 配置命令序列，同时返回可选的 portswitch 模式切换命令。
+
+        - 当前端口无 VLAN（三层模式）→ 需要追加 portswitch 命令切换为二层
+        - 已有 VLAN（已是二层模式）→ 直接设置 VLAN
+
+        Args:
+            switch: 交换机对象
+            port: 端口名称
+            vlan_id: 目标 VLAN ID（PVID）
+            mode: "access" 或 "trunk"
+            allowed_vlans: Trunk 允许的 VLAN 列表字符串（如 "1-10,20,30-40"），
+                           为 None 时默认只允许 vlan_id
+
+        Returns:
+            (commands, mode_cmd): 完整命令列表，以及 portswitch 命令（可能为空字符串）
+        """
         a = get_adapter(switch.device_type)
         current_vlan = self.switch_repo.get_port_vlan(switch.device_id, port)
         mode_cmd = a.get_portswitch_command() if current_vlan is None else ""

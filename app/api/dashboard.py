@@ -29,6 +29,11 @@ dashboard_bp = Blueprint("dashboard", __name__)
 @doc(summary="获取仪表盘统计数据", tags=["仪表盘"], responses={200: "DashboardStatsResponse", 401: "ApiError"})
 @login_required
 def get_stats():
+    """获取仪表盘统计数据
+
+    Returns:
+        JSON响应，包含各项统计数据，含设备/机柜按状态码的完整分布
+    """
     room_repo = create_repository(RoomRepository)
     cabinet_repo = create_repository(CabinetRepository)
     device_repo = create_repository(DeviceRepository)
@@ -131,6 +136,14 @@ def get_stats():
 @doc(summary="获取最近活动记录", tags=["仪表盘"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def get_activities():
+    """获取最近活动记录（基于 UserLog 登录日志）
+
+    Query Params:
+        limit: 返回条数，默认 20，最大 50
+
+    Returns:
+        JSON响应，包含活动记录列表
+    """
     from flask import request
 
     try:
@@ -181,6 +194,7 @@ def get_activities():
 @doc(summary="获取系统状态", tags=["仪表盘"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def get_system_status():
+    """获取系统状态"""
     try:
         try:
             import psutil
@@ -261,6 +275,11 @@ def get_system_status():
 @doc(summary="获取系统警告列表", tags=["仪表盘"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def get_alerts():
+    """获取系统警告列表
+
+    Returns:
+        JSON响应，包含警告列表
+    """
     data = {
         "alerts": [],
         "total": 0
@@ -274,6 +293,7 @@ def get_alerts():
 @doc(summary="获取仪表盘统计数据（兼容旧接口）", tags=["仪表盘"], responses={200: "DashboardStatsResponse", 401: "ApiError"})
 @login_required
 def get_dashboard_stats():
+    """获取仪表盘统计数据（兼容旧接口）"""
     return get_stats()
 
 
@@ -282,6 +302,10 @@ def get_dashboard_stats():
 @login_required
 @permission_required("system:stats")
 def get_statistics():
+    """获取系统统计信息
+
+    统计IP状态、机房和交换机的相关信息。
+    """
     try:
         from app.services.network_service import NetworkService
         from app.persistence.network_repo import NetworkRepository

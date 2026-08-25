@@ -31,7 +31,6 @@ import { SEVERITY_COLOR_MAP, SEVERITY_LABELS } from '@/types/enums';
 
 const { Text, Paragraph } = Typography;
 
-
 function NotificationItemRow({
   item,
   onRead
@@ -40,7 +39,6 @@ function NotificationItemRow({
   onRead: (id: number) => void;
 }) {
   const { token } = theme.useToken();
-  
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -91,7 +89,6 @@ function NotificationItemRow({
   );
 }
 
-
 function formatTime(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
@@ -107,38 +104,28 @@ function formatTime(iso: string | null): string {
   return d.toLocaleDateString('zh-CN');
 }
 
-
 function NotificationBell() {
   const { token } = theme.useToken();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
-  
   const [open, setOpen] = useState(false);
 
-  
   const { data: unreadCount = 0 } = useUnreadCount(isAuthenticated);
 
-  
   const { data: listResult, isLoading } = useNotificationList({ per_page: 20 }, open);
 
-  
   const markReadMutation = useMarkRead();
 
-  
   const deleteReadMutation = useDeleteReadNotifications();
 
-  
   const sortedItems = useMemo(() => {
     const items = listResult?.items ?? [];
     return [...items].sort((a, b) => {
-      
       if (a.is_read !== b.is_read) return a.is_read ? 1 : -1;
-      
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [listResult?.items]);
 
-  
   const hasReadItems = sortedItems.some((item) => item.is_read);
 
   const handleRead = useCallback(
@@ -149,14 +136,13 @@ function NotificationBell() {
   );
 
   const handleMarkAllRead = useCallback(() => {
-    markReadMutation.mutate(null); 
+    markReadMutation.mutate(null); // null = 全部标记已读
   }, [markReadMutation]);
 
   const handleClearRead = useCallback(() => {
     deleteReadMutation.mutate();
   }, [deleteReadMutation]);
 
-  
   useGlobalEventListener((event) => {
     if (event.event_type !== 'monitor_alert') return;
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -168,14 +154,12 @@ function NotificationBell() {
     try {
       new Notification(title, { body, tag: String(payload.dedup_key ?? '') });
     } catch {
-      
     }
   });
 
-  
   const content = (
     <div style={{ width: 380, maxHeight: 480, overflow: 'auto' }}>
-      {}
+      {/* 顶部操作栏 */}
       <div
         style={{
           display: 'flex',
@@ -222,7 +206,7 @@ function NotificationBell() {
         </Space>
       </div>
 
-      {}
+      {/* 通知列表 */}
       {isLoading ? (
         <div style={{ padding: 40, textAlign: 'center' }}>
           <Text type="secondary">加载中...</Text>

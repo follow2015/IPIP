@@ -31,7 +31,6 @@ export default function StatusPie({
   const { token } = useToken();
 
   const chartData = useMemo(() => {
-    
     const base = [
       { name: '可达', value: reachable ?? 0, color: token.colorSuccess },
       { name: '不可达', value: unreachable ?? 0, color: token.colorError },

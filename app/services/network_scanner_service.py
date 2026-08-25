@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+# -*- coding: utf-8 -*-
 """全量扫描编排服务
 
 ScanOrchestrator 替换原 NetworkScannerService，
@@ -34,22 +34,30 @@ from app.utils.transactional import transaction_checkpoint
 logger = get_logger(__name__)
 
 
+
+
 @dataclass
 class ScanProgress:
-    scope: str = ""
-    room_id: int = 0
+    """扫描进度追踪
+
+    记录机房扫描的实时进度，支持存入 Redis 供前端轮询。
+    """
+    scope: str = ""          # 扫描范围标识，"r:{room_id}" 或 "vr:{virtual_room_id}"
+    room_id: int = 0         # 保留用于向后兼容
     total_switches: int = 0
     completed: int = 0
     failed: int = 0
     current_phase: str = ""
-    reason: str = ""
+    reason: str = ""         # 失败原因（如 missing_n2n_connections）
     start_time: float = 0
     switch_timings: Dict[int, float] = field(default_factory=dict)
 
     def start(self) -> None:
+        """开始计时"""
         self.start_time = time.time()
 
     def to_dict(self) -> dict:
+        """序列化为字典"""
         elapsed = time.time() - self.start_time if self.start_time else 0
         remaining = self.total_switches - self.completed - self.failed
         eta = (elapsed / max(self.completed, 1) * remaining) if remaining > 0 and self.completed > 0 else 0
@@ -66,6 +74,11 @@ class ScanProgress:
         }
 
     def save_to_redis(self) -> None:
+        """将进度存入缓存，供前端实时轮询
+
+        CR-14: 统一使用 ScanRedis.progress_set() 作为唯一写入入口，
+        避免与 ScanRedis.progress_set() 数据格式不一致。
+        """
         try:
             from app.services.scan_redis import ScanRedis
             from app.utils.cache import cache_manager
@@ -81,6 +94,16 @@ class ScanProgress:
 
 
 def get_scan_progress(scope: str) -> Optional[dict]:
+    """从缓存获取扫描进度
+
+    使用 Redis hash 读取，与 ScanRedis.progress_get 保持一致。
+
+    Args:
+        scope: 扫描范围标识
+
+    Returns:
+        Optional[dict]: 进度信息，不存在返回 None
+    """
     try:
         from app.utils.cache import cache_manager
         key = f"ipm:scan_progress:{scope}"
@@ -110,7 +133,14 @@ def get_scan_progress(scope: str) -> Optional[dict]:
     return None
 
 
+
+
 def _resolve_uplink_port_name(uplink_port_ids, uplink_device_id=None) -> str | None:
+    """从本机上行端口 ID 解析对端（上联交换机）端口名
+
+    uplink_port_ids 存储本机上行端口 ID，需通过 NetworkConnection 反查对端端口。
+    如果无连接记录，则回退到返回本机端口名。
+    """
     if not uplink_port_ids or not isinstance(uplink_port_ids, list):
         return None
     from app.models.network_connection import NetworkConnection
@@ -135,24 +165,47 @@ def _resolve_uplink_port_name(uplink_port_ids, uplink_device_id=None) -> str | N
     return port.port_name if port else None
 
 
+
 @dataclass
 class SwitchMeta:
-    id: int
-    cred_id: int
+    """交换机元数据（采集前加载）
+
+    从 switch_credentials + devices 组合而来，
+    供 ScanOrchestrator 加载和采集使用。
+    """
+    id: int                    # device_id (devices.id)
+    cred_id: int               # switch_credentials.id
     ip: str
     device_type: str
     has_ssh: bool
     layer: int
     is_core: bool
     uplink_sw_id: int | None
-    uplink_port: str | None
+    uplink_port: str | None  # 上联交换机上的端口名（通过 N2N 连接从本机上行端口反查）
     room_id: int
-    scope: str = ""
+    scope: str = ""          # 扫描范围标识
+
+
 
 
 class ScanOrchestrator:
+    """全量扫描的顶层编排器
+
+    严格按 Phase 顺序执行：
+    Phase 1: 路由表同步 → ip_network + 拓扑图网关IP
+    Phase 2: MAC 倒排索引 → Redis mac_index + port_mac
+    Phase 3: ARP 同步 → ip_manager + ip_info
+    Phase 4: Nexthop 关联推断 → UPDATE ip_network
+    Phase 5: 无权限降级 → UPDATE ip_info
+    """
 
     def __init__(self, ssh_manager=None, redis_client=None):
+        """初始化扫描编排器
+
+        Args:
+            ssh_manager: SSH 管理器实例
+            redis_client: Redis 客户端实例
+        """
         self.ssh_mgr = ssh_manager or SSHManager()
         self.sw_repo = SwitchRepository()
         self.sw_ext_repo = SwitchExtRepository()
@@ -169,6 +222,11 @@ class ScanOrchestrator:
 
     @staticmethod
     def _get_redis_client():
+        """获取 Redis 客户端
+
+        Returns:
+            Redis 客户端实例或 None
+        """
         try:
             from app.utils.cache import cache_manager
             if cache_manager.primary_storage and cache_manager.primary_storage.redis_client:
@@ -178,6 +236,15 @@ class ScanOrchestrator:
         return None
 
     def full_scan(self, room_id: int = None, virtual_room_id: int = None) -> dict:
+        """执行全量扫描
+
+        Args:
+            room_id: 机房ID（单机房扫描，向后兼容）
+            virtual_room_id: 虚拟机房ID（跨机房扫描）
+
+        Returns:
+            dict: 扫描结果摘要
+        """
         if virtual_room_id:
             scope = f"vr:{virtual_room_id}"
             all_sw = self._load_switch_metas_by_virtual_room(virtual_room_id)
@@ -193,6 +260,7 @@ class ScanOrchestrator:
         sr = self.scan_redis
 
         def _emit_progress():
+            """保存进度到 Redis 并通过 SSE 推送给前端"""
             progress_dict = progress.to_dict()
             if sr:
                 sr.progress_set(scope, progress_dict)
@@ -239,7 +307,8 @@ class ScanOrchestrator:
         heartbeat_stop = threading.Event()
 
         def _heartbeat():
-            while not heartbeat_stop.wait(1800):
+            """定期续期扫描锁 TTL"""
+            while not heartbeat_stop.wait(1800):  # 每 1800s 续期一次
                 if sr:
                     for lk in acquired_locks:
                         sr.r.expire(lk, SCAN_LOCK_TTL)
@@ -280,15 +349,22 @@ class ScanOrchestrator:
             app_ref = current_app._get_current_object()
 
             def collect_port_one(device_id: int):
+                """每台交换机在子线程中独立采集并提交。
+
+                每个工作线程创建独立的 SwitchInfoService 实例（各自持有独立的
+                db.session，scoped_session 下为线程局部），避免跨线程共享同一
+                Session 带来的数据竞争；线程结束时显式 remove 释放连接回池，
+                防止长生命周期线程连接泄漏。
+                """
                 with app_ref.app_context():
                     from app.services.switch_info_service import SwitchInfoService
                     from extensions import db
-                    svc = SwitchInfoService()
+                    svc = SwitchInfoService()  # 独立 session
                     try:
                         with transaction_checkpoint(svc.sw_repo.session, f"phase0:port:{device_id}"):
                             return svc.collect_port_info(device_id)
                     finally:
-                        db.session.remove()
+                        db.session.remove()  # 归还连接到池
 
             with ThreadPoolExecutor(max_workers=min(10, len(authorized))) as pool:
                 futures = {pool.submit(collect_port_one, sw.id): sw
@@ -304,6 +380,7 @@ class ScanOrchestrator:
             _emit_progress()
 
             def collect_info_one(device_id: int):
+                """每台交换机在子线程中独立采集并提交（独立 session，见 collect_port_one）。"""
                 with app_ref.app_context():
                     from app.services.switch_info_service import SwitchInfoService
                     from extensions import db
@@ -540,6 +617,14 @@ class ScanOrchestrator:
     def release_scan_locks(scope: str, acquired_locks: list[str],
                            heartbeat_stop: threading.Event = None,
                            sr: 'ScanRedis' = None):
+        """释放扫描锁 + 停止心跳（供正常完成和异常退出共用）
+
+        Args:
+            scope: 扫描范围标识
+            acquired_locks: 已获取的锁 key 列表
+            heartbeat_stop: 心跳停止事件
+            sr: ScanRedis 实例
+        """
         if heartbeat_stop:
             heartbeat_stop.set()
         if sr:
@@ -550,6 +635,16 @@ class ScanOrchestrator:
                     logger.debug("释放扫描锁失败: lock_key=%s", lk, exc_info=True)
 
     def _load_switch_metas(self, room_id: int) -> list[SwitchMeta]:
+        """加载机房内所有交换机元数据
+
+        从 switch_credentials + devices 组合加载。
+
+        Args:
+            room_id: 机房ID
+
+        Returns:
+            list[SwitchMeta]: 交换机元数据列表
+        """
         scope = f"r:{room_id}"
         switches = self.sw_repo.get_by_room(room_id)
         metas = []
@@ -575,6 +670,16 @@ class ScanOrchestrator:
         return metas
 
     def _load_switch_metas_by_virtual_room(self, virtual_room_id: int) -> list[SwitchMeta]:
+        """加载虚拟机房内所有交换机元数据
+
+        从 virtual_room_members + switch_credentials + devices 组合加载。
+
+        Args:
+            virtual_room_id: 虚拟机房ID
+
+        Returns:
+            list[SwitchMeta]: 交换机元数据列表
+        """
         scope = f"vr:{virtual_room_id}"
         from app.services.virtual_room_service import VirtualRoomService
         from app.persistence.virtual_room_repository import VirtualRoomRepository
@@ -606,12 +711,23 @@ class ScanOrchestrator:
 
     def _collect_all(self, authorized: list[SwitchMeta]
                      ) -> tuple[list[SwitchContext], list[str]]:
+        """并发采集所有有权限的交换机
+
+        复用主线程的 Flask app context，避免每线程创建新 app 耗尽连接池。
+
+        Args:
+            authorized: 有 SSH 权限的交换机元数据列表
+
+        Returns:
+            tuple: (成功采集的上下文列表, 失败的IP列表)
+        """
         from flask import current_app
 
         valid, failed = [], []
         app_ref = current_app._get_current_object()
 
         def collect_one(sw: SwitchMeta) -> SwitchContext:
+            """复用主线程 app context 执行采集"""
             with app_ref.app_context():
                 return self._collect_single(sw)
 
@@ -627,6 +743,19 @@ class ScanOrchestrator:
         return valid, failed
 
     def _collect_single(self, sw: SwitchMeta) -> SwitchContext:
+        """采集单台交换机（含重试）
+
+        采集路由表（仅L3）、ARP表、MAC表，组装为 SwitchContext。
+
+        Args:
+            sw: 交换机元数据
+
+        Returns:
+            SwitchContext: 采集结果上下文
+
+        Raises:
+            RuntimeError: 重试耗尽后仍失败
+        """
         MAX_RETRY = 2
         for attempt in range(MAX_RETRY + 1):
             try:
@@ -706,6 +835,15 @@ class ScanOrchestrator:
 
     @staticmethod
     def _summary(scope: str, progress: ScanProgress) -> dict:
+        """返回扫描结果摘要
+
+        Args:
+            scope: 扫描范围标识
+            progress: 扫描进度对象
+
+        Returns:
+            dict: 扫描结果摘要
+        """
         return {
             "scope": scope,
             "room_id": progress.room_id,
@@ -717,9 +855,30 @@ class ScanOrchestrator:
 
 
     def scan_room(self, room_id: int) -> dict:
+        """兼容旧接口：扫描机房
+
+        Args:
+            room_id: 机房ID
+
+        Returns:
+            dict: 扫描结果
+        """
         return self.full_scan(room_id)
 
     def scan_switch(self, device_id: int) -> dict:
+        """兼容旧接口：扫描单台交换机
+
+        执行完整的数据同步流程：采集 → 端口更新 → 路由同步 → MAC索引 → ARP同步。
+
+        Args:
+            device_id: 交换机 device_id（devices.id，统一交换机标识）
+
+        Returns:
+            dict: 扫描结果
+
+        Raises:
+            ValueError: 交换机不存在
+        """
         sw = self.sw_repo.find_by_device_id(device_id)
         if not sw:
             raise ValueError(f"交换机 {device_id} 不存在")
@@ -762,7 +921,7 @@ class ScanOrchestrator:
             logger.error("[scan_switch] 交换机 %s 设备信息采集失败: %s", sw.ip, e)
 
         try:
-            scope = f"r:{room_id}"
+            scope = f"r:{room_id}"  # 与下方 topology_graph / route_sync 使用的 scope 保持一致
             port_ip_rows = self.sw_repo.get_port_ips_by_device_id(sw.device_id)
             for row in port_ip_rows:
                 sr.port_ip_set(scope, row[0], row[1], row[2], row[3] or 24)
@@ -816,24 +975,70 @@ class ScanOrchestrator:
         return {"device_id": device_id, "ip": sw.ip, "context": ctx}
 
 
+
+
 class NetworkScannerService:
+    """兼容旧代码的扫描服务入口
+
+    委托给 ScanOrchestrator 实现，保持旧代码的调用方式不变。
+    """
 
     def __init__(self, ssh_manager=None):
+        """初始化扫描服务
+
+        Args:
+            ssh_manager: SSH管理器实例
+        """
         self._orchestrator = ScanOrchestrator(ssh_manager=ssh_manager)
         self.ssh_mgr = self._orchestrator.ssh_mgr
         self.sw_repo = self._orchestrator.sw_repo
 
     def scan_switch(self, device_id: int) -> dict:
+        """扫描单台交换机
+
+        Args:
+            device_id: 交换机 device_id（devices.id，统一交换机标识）
+
+        Returns:
+            dict: 扫描结果
+        """
         return self._orchestrator.scan_switch(device_id)
 
     def scan_room(self, room_id: int) -> dict:
+        """扫描机房
+
+        Args:
+            room_id: 机房ID
+
+        Returns:
+            dict: 扫描结果
+        """
         return self._orchestrator.scan_room(room_id)
 
     def get_scan_status(self) -> dict:
+        """获取扫描任务状态
+
+        Returns:
+            dict: 扫描状态信息
+        """
         return {"is_scanning": False}
 
 
 def _validate_topology_coverage(all_sw: list, topology_graph) -> list[str]:
+    """检查拓扑图的连通性覆盖率，返回警告信息列表（不阻断扫描，仅记录）
+
+    检查每台交换机是否至少有一条边连接到图中的其他节点（核心除外，
+    核心交换机本身允许没有"上联"，因为它就是顶层）。
+    孤立节点意味着该交换机与其他交换机之间缺少 NetworkConnection 记录，
+    其下终端IP的图遍历定位会退化为 mac_index_fallback 或 unresolved。
+
+    Args:
+        all_sw: 本次扫描涉及的交换机元数据列表
+        topology_graph: TopologyGraph 实例
+
+    Returns:
+        list[str]: 警告信息列表
+    """
     warnings = []
     core_ids = {n.sw_id for n in topology_graph.nodes.values() if n.is_core}
     for sw in all_sw:

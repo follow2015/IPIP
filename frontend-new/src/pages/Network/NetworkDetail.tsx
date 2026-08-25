@@ -12,7 +12,6 @@ import type { NetworkInfoListItem } from '@/types/models';
 import { ROUTE_NOTES_MAP } from '@/types/enums';
 import DataTable from '@/components/DataTable';
 
-
 function NetworkDetail() {
   const { ipNetwork } = useParams<{ ipNetwork: string }>();
   const navigate = useNavigate();
@@ -27,12 +26,10 @@ function NetworkDetail() {
     { page_size: 999, room_id: roomId, switch_id: switchId },
   );
 
-  
   const { data: usageData } = useNetworkUsage(
     networkName,
   );
 
-  
   const handleViewIPs = () => {
     const params = new URLSearchParams();
     params.set('search', networkName);
@@ -43,7 +40,6 @@ function NetworkDetail() {
     return <div>网段不存在</div>;
   }
 
-  
   const routeColumns = [
     { title: '端口', dataIndex: 'port', key: 'port', render: (v: string | null) => v || '-' },
     { title: '下一跳', dataIndex: 'nexthop', key: 'nexthop', render: (v: string | null) => v || '-' },
@@ -62,7 +58,7 @@ function NetworkDetail() {
         返回列表
       </Button>
 
-      {}
+      {/* 基本信息 Card */}
       <Card title={`网段详情 - ${networkName}`} extra={
         <Button type="primary" icon={<SearchOutlined />} onClick={handleViewIPs}>
           查看网段IP
@@ -80,7 +76,7 @@ function NetworkDetail() {
         )}
       </Card>
 
-      {}
+      {/* 使用率 Card */}
       {usageData && (
         <Card title="使用率" style={{ marginTop: 16 }}>
           <Row gutter={24} align="middle">
@@ -109,7 +105,7 @@ function NetworkDetail() {
         </Card>
       )}
 
-      {}
+      {/* 路由信息 Card */}
       {detailData.network_info_list && detailData.network_info_list.length > 0 && (
         <Card title="路由信息" style={{ marginTop: 16 }}>
           <DataTable

@@ -15,6 +15,7 @@ from extensions import db
 
 
 class MonitorEscalationPolicy(BaseModel):
+    """监控告警升级策略"""
 
     __tablename__ = "monitor_escalation_policy"
     __table_args__ = (

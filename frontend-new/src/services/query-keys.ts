@@ -13,7 +13,6 @@
  */
 
 export const queryKeys = {
-  
   rooms: {
     all: ['rooms'] as const,
     list: (p?: unknown) => ['rooms', 'list', p] as const,
@@ -24,7 +23,6 @@ export const queryKeys = {
     options: ['rooms', 'options'] as const
   },
 
-  
   cabinets: {
     all: ['cabinets'] as const,
     list: (p?: unknown) => ['cabinets', 'list', p] as const,
@@ -37,7 +35,6 @@ export const queryKeys = {
     options: (roomId?: number) => ['cabinets', 'options', roomId ?? null] as const
   },
 
-  
   devices: {
     all: ['devices'] as const,
     list: (p?: unknown) => ['devices', 'list', p] as const,
@@ -52,7 +49,6 @@ export const queryKeys = {
     portSyncEnabled: (id: number) => ['devices', id, 'port-sync-enabled'] as const
   },
 
-  
   customers: {
     all: ['customers'] as const,
     list: (p?: unknown) => ['customers', 'list', p] as const,
@@ -64,7 +60,6 @@ export const queryKeys = {
     options: ['customers', 'options'] as const
   },
 
-  
   switches: {
     all: ['switches'] as const,
     list: (p?: unknown) => ['switches', 'list', p] as const,
@@ -73,7 +68,6 @@ export const queryKeys = {
     portDetail: (id: number, port: string) => ['switches', id, 'ports', port] as const
   },
 
-  
   ip: {
     all: ['ip_addresses'] as const,
     list: (p?: unknown) => ['ip_addresses', 'list', p] as const,
@@ -87,7 +81,6 @@ export const queryKeys = {
     detail: (network: string, p?: unknown) => ['network_detail', network, p] as const
   },
 
-  
   rbac: {
     all: ['rbac'] as const,
     roles: (p?: unknown) => ['rbac', 'roles', p] as const,
@@ -99,7 +92,6 @@ export const queryKeys = {
     options: ['rbac', 'options'] as const
   },
 
-  
   users: {
     all: ['users'] as const,
     list: (p?: unknown) => ['users', 'list', p] as const,
@@ -108,12 +100,10 @@ export const queryKeys = {
     permissions: (id: number) => ['users', id, 'permissions'] as const
   },
 
-  
   dashboard: {
     stats: ['dashboard', 'stats'] as const
   },
 
-  
   linkAggregation: {
     all: ['linkAggregation'] as const,
     byDevice: (deviceId: number) => ['linkAggregation', 'device', deviceId] as const,
@@ -122,7 +112,6 @@ export const queryKeys = {
     detail: (lagId: number) => ['linkAggregation', 'detail', lagId] as const
   },
 
-  
   vlans: {
     all: ['vlans'] as const,
     list: (p?: unknown) => ['vlans', 'list', p] as const,
@@ -131,20 +120,17 @@ export const queryKeys = {
     byDevice: (deviceId: number) => ['vlans', 'byDevice', deviceId] as const
   },
 
-  
   auditLogs: {
     all: ['auditLogs'] as const,
     list: (p?: unknown) => ['auditLogs', 'list', p] as const
   },
 
-  
   deviceConfig: {
     all: ['deviceConfig'] as const,
     detail: (deviceId: number) => ['deviceConfig', 'detail', deviceId] as const,
     history: (deviceId: number) => ['deviceConfig', 'history', deviceId] as const
   },
 
-  
   topology: {
     all: ['topology'] as const,
     network: (p?: unknown) => ['topology', 'network', p] as const,
@@ -152,7 +138,6 @@ export const queryKeys = {
     autoDetect: ['topology', 'auto-detect'] as const
   },
 
-  
   notifications: {
     all: ['notifications'] as const,
     unreadCount: ['notifications', 'unread-count'] as const,
@@ -160,35 +145,28 @@ export const queryKeys = {
     preferences: ['notifications', 'preferences'] as const
   },
 
-  
   webhookConfigs: {
     all: ['webhookConfigs'] as const,
     list: ['webhookConfigs', 'list'] as const
   },
 
-  
   mailSettings: {
     all: ['mailSettings'] as const,
     config: ['mailSettings', 'config'] as const
   },
 
-  
   monitor: {
     status: (deviceId: number) => ['monitor', 'status', deviceId] as const,
     credentials: () => ['monitor', 'credentials'] as const,
     overview: ['monitor', 'overview'] as const,
     statuses: (params?: unknown) => ['monitor', 'statuses', params] as const,
-    
     statusesAll: ['monitor', 'statuses'] as const,
     config: ['monitor', 'config'] as const,
     alerts: (params?: unknown) => ['monitor', 'alerts', params] as const,
-    
     alertsAll: ['monitor', 'alerts'] as const,
-    
     alertDetail: (alertId: number) => ['monitor', 'alerts', alertId] as const,
     alertAggregations: (params: Record<string, unknown> | object) =>
       ['monitor', 'alerts', 'aggregations', params] as const,
-    
     alertStatistics: (params: Record<string, unknown> | object) =>
       ['monitor', 'alerts', 'statistics', params] as const,
     linkedDevices: (credentialId: number) =>
@@ -198,17 +176,14 @@ export const queryKeys = {
     trends: (deviceId: number, params?: unknown) =>
       ['monitor', 'trends', deviceId, params] as const,
     metricKeys: (deviceId: number) => ['monitor', 'metric-keys', deviceId] as const,
-    
     metricLatest: (deviceId: number) => ['monitor', 'metric-latest', deviceId] as const,
     metricHistory: (deviceId: number, metricKey: string, params?: unknown) =>
       ['monitor', 'metric-history', deviceId, metricKey, params] as const,
     traffic: (deviceId: number, port: string, from: number, till: number) =>
       ['monitor', 'traffic', deviceId, port, from, till] as const,
     metricAlerts: (deviceId: number) => ['monitor', 'metric-alerts', deviceId] as const,
-    
     metricAlertsAll: ['monitor', 'metric-alerts'] as const,
     metricDashboard: (deviceId: number) => ['monitor', 'metric-dashboard', deviceId] as const,
-    
     metricDashboardAll: ['monitor', 'metric-dashboard'] as const,
     metricTemplates: () => ['monitor', 'metric-templates'] as const,
     metricTemplateGroups: ['monitor', 'metric-template-groups'] as const,
@@ -219,7 +194,6 @@ export const queryKeys = {
     thresholdOverrides: (params?: unknown) => ['monitor', 'threshold-overrides', params] as const,
     thresholdOverridesAll: ['monitor', 'threshold-overrides'] as const,
     mibScan: () => ['monitor', 'mib-scan'] as const,
-    
     silenceRulesCrud: ['monitor', 'silence-rules', 'crud'] as const,
     alertDependencyRulesCrud: ['monitor', 'alert-dependency-rules', 'crud'] as const,
     slaTargetsCrud: ['monitor', 'sla-targets', 'crud'] as const,
@@ -229,7 +203,6 @@ export const queryKeys = {
     vendorBrandsCrud: ['monitor', 'vendor-brands', 'crud'] as const,
     metricTemplatesCrud: ['monitor', 'metric-templates', 'crud'] as const,
     thresholdOverridesCrud: ['monitor', 'threshold-overrides', 'crud'] as const,
-    
     deviceTypeRecommends: ['monitor', 'device-type-recommends'] as const,
     recommendConfig: (deviceType: string) => ['monitor', 'recommend-config', deviceType] as const
   }

@@ -18,18 +18,26 @@ _VALID_CHANNELS = BROADCAST_CHANNELS
 
 
 class WebhookConfigService:
+    """Webhook 配置服务"""
 
     def __init__(self, webhook_config_repository: WebhookConfigRepository):
         self.webhook_config_repository = webhook_config_repository
 
     def list_configs(self) -> List[Dict[str, Any]]:
+        """列出所有 Webhook 配置。"""
         configs = self.webhook_config_repository.find_all_ordered()
         return [c.to_dict() for c in configs]
 
     def get_config(self, config_id: int) -> Optional[WebhookConfig]:
+        """获取单个 Webhook 配置。"""
         return self.webhook_config_repository.find_by_id(config_id)
 
     def create_config(self, data: Dict[str, Any], created_by: int) -> WebhookConfig:
+        """创建 Webhook 配置。
+
+        Raises:
+            ValidationError: 必填项缺失、渠道无效、名称重复、URL 不合法
+        """
         name = data.get("name")
         channel = data.get("channel")
         url = data.get("url")
@@ -65,6 +73,11 @@ class WebhookConfigService:
     def update_config(
         self, config_id: int, data: Dict[str, Any]
     ) -> Optional[WebhookConfig]:
+        """更新 Webhook 配置。
+
+        Raises:
+            ValidationError: URL 不合法
+        """
         config = self.webhook_config_repository.find_by_id(config_id)
         if not config:
             return None
@@ -85,6 +98,7 @@ class WebhookConfigService:
         return config
 
     def delete_config(self, config_id: int) -> bool:
+        """删除 Webhook 配置。"""
         config = self.webhook_config_repository.find_by_id(config_id)
         if not config:
             return False

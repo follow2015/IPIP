@@ -12,6 +12,7 @@ from extensions import db
 
 
 class MonitorSlaTarget(BaseModel):
+    """SLA/SLO 监控目标"""
 
     __tablename__ = "monitor_sla_target"
     __table_args__ = (

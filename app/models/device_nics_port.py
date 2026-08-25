@@ -14,10 +14,17 @@ from extensions import db
 
 
 class DeviceNicsPort(BaseModel):
+    """设备网卡端口模型
+    
+    统一管理所有设备的端口信息:
+    - 服务器设备的网卡端口
+    - 交换机设备的端口
+    - 其他网络设备的端口
+    """
     
     __tablename__ = "device_nics_port"
     __table_args__ = (
-        Index("uk_device_nic_port", "device_id", "nic_number", "port_number", unique=True),
+        Index("uk_device_nic_port", "device_id", "nic_number", "port_number", unique=True),  # 前缀覆盖 idx_device_id
         Index("idx_port_type_speed", "port_type", "port_speed"),
         {"comment": "设备网卡端口表"},
     )
@@ -64,15 +71,37 @@ class DeviceNicsPort(BaseModel):
     
     @property
     def display_name(self) -> str:
+        """获取端口的显示名称
+
+        优先使用 nic_name（如模板生成的 X710-DA2:端口1），
+        否则回退到默认格式 网卡{N}:端口{M}。
+
+        Returns:
+            格式化的端口显示名称
+        """
         if self.nic_name:
             return self.nic_name
         return f"网卡{self.nic_number}:端口{self.port_number}"
     
     @property
     def full_info(self) -> str:
+        """获取端口的完整信息描述
+        
+        Returns:
+            完整的端口信息,如"网卡1:端口1 (电口/1G)"
+        """
         return f"{self.display_name} ({self.port_type}/{self.port_speed})"
     
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> Dict[str, Any]:
+        """转换为字典
+        
+        Args:
+            exclude: 排除的字段列表
+            include_relations: 是否包含关联对象
+            
+        Returns:
+            字典格式的端口信息
+        """
         data = super().to_dict(exclude=exclude)
         
         data["display_name"] = self.display_name
@@ -86,18 +115,39 @@ class DeviceNicsPort(BaseModel):
         return data
     
     def is_available(self) -> bool:
+        """检查端口是否可用
+        
+        Returns:
+            True表示端口空闲可用,False表示端口已占用或禁用
+        """
         return self.port_status == 'free'
     
     def occupy(self) -> None:
+        """占用端口
+        
+        将端口状态设置为已占用
+        """
         self.port_status = 'occupied'
     
     def release(self) -> None:
+        """释放端口
+        
+        将端口状态设置为空闲
+        """
         self.port_status = 'free'
     
     def disable(self) -> None:
+        """禁用端口
+        
+        将端口状态设置为禁用
+        """
         self.port_status = 'disabled'
     
     def set_error(self) -> None:
+        """设置端口错误状态
+        
+        将端口状态设置为错误
+        """
         self.port_status = 'error'
     
     def __repr__(self) -> str:

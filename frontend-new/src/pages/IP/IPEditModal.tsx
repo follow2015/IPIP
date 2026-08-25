@@ -9,10 +9,8 @@ interface IPEditModalProps {
   ip: IPAddress | null;
   customerOptions: SelectOption[];
   submitting: boolean;
-  
   onSubmit: (values: { customer_id?: number; notes?: string }) => void;
 }
-
 
 export function IPEditModal({
   open,
@@ -26,14 +24,12 @@ export function IPEditModal({
 
   useEffect(() => {
     if (open && ip) {
-      
       form.setFieldsValue({ customer_id: ip.customer_id ?? undefined, notes: ip.notes });
     }
   }, [open, ip, form]);
 
   const handleOk = async () => {
     const values = await form.validateFields();
-    
     onSubmit({ customer_id: values.customer_id ?? null, notes: values.notes });
   };
 

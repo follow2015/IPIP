@@ -14,6 +14,14 @@ from extensions import db
 
 
 def _cidr_to_ints(cidr: str):
+    """将 CIDR 字符串解析为 (network_int, prefix) 整数元组
+
+    Args:
+        cidr: CIDR 格式网段，如 '192.168.1.0/24'
+
+    Returns:
+        tuple: (network_int, prefix) 或 (None, None)
+    """
     try:
         ip_part, prefix_part = cidr.rsplit("/", 1)
         network_int = struct.unpack("!I", socket.inet_aton(ip_part))[0]
@@ -24,12 +32,17 @@ def _cidr_to_ints(cidr: str):
 
 
 class IPNetwork(BaseModel):
+    """IP网段规划
+
+    仅管理网段信息（CIDR、网关、归属）。
+    路由条目（nexthop/route_type）已迁移至 switch_routes 表。
+    """
     __tablename__ = "ip_networks"
     __table_args__ = (
         Index("idx_net_switch", "switch_id"),
         Index("idx_net_room", "room_id"),
         Index("idx_net_customer", "customer_id"),
-        Index("idx_net_network_int", "network_int"),
+        Index("idx_net_network_int", "network_int"),  # network_int 范围查询索引
         Index("uk_net_switch_port_room", "network", "switch_id", "port", "room_id", unique=True),
         {"comment": "IP网段规划(仅网段信息)"},
     )
@@ -45,6 +58,7 @@ class IPNetwork(BaseModel):
     prefix = db.Column(db.SmallInteger, nullable=True, comment="子网掩码位数(如24)")
 
     def __init__(self, **kwargs):
+        """自动填充 network_int 和 prefix"""
         if "network" in kwargs:
             if "network_int" not in kwargs or "prefix" not in kwargs:
                 ni, pf = _cidr_to_ints(kwargs["network"])
@@ -59,16 +73,18 @@ class IPNetwork(BaseModel):
     customer = relationship("Customer", foreign_keys=[customer_id], lazy="joined")
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化"""
         result = super().to_dict(exclude=exclude)
         result['ip_network'] = self.network
         return result
 
 
 class SwitchRoute(BaseModel):
+    """交换机路由条目"""
     __tablename__ = "switch_routes"
     __table_args__ = (
-        Index("uk_route_switch_dest_nexthop_type", "switch_id", "destination", "nexthop", "route_type", unique=True),
-        Index("idx_route_dest_int", "destination_int", "destination_prefix"),
+        Index("uk_route_switch_dest_nexthop_type", "switch_id", "destination", "nexthop", "route_type", unique=True),  # 前缀覆盖 idx_route_switch
+        Index("idx_route_dest_int", "destination_int", "destination_prefix"),  # 整数化范围查询索引
         {"comment": "交换机路由条目"},
     )
 
@@ -86,6 +102,7 @@ class SwitchRoute(BaseModel):
     nexthop_int = db.Column(db.Integer, nullable=True, comment="下一跳IP整数(INET_ATON)")
 
     def __init__(self, **kwargs):
+        """自动填充 destination_int/destination_prefix/nexthop_int"""
         if "destination" in kwargs:
             ni, pf = _cidr_to_ints(kwargs["destination"])
             if "destination_int" not in kwargs and ni is not None:
@@ -100,4 +117,5 @@ class SwitchRoute(BaseModel):
         super().__init__(**kwargs)
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化，包含整数化列"""
         return super().to_dict(exclude=exclude)

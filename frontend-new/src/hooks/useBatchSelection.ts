@@ -28,32 +28,20 @@ import type { Key } from 'react';
 import type { TableProps } from 'antd';
 
 export interface UseBatchSelectionOptions<T> {
-  
   getRowKey?: (record: T) => Key;
-  
   preserveSelectedRowKeys?: boolean;
-  
   dataSource?: T[];
 }
 
 export interface UseBatchSelectionReturn<T> {
-  
   selectedKeys: Key[];
-  
   setSelectedKeys: (keys: Key[]) => void;
-  
   selectedRows: T[];
-  
   hasSelection: boolean;
-  
   count: number;
-  
   rowSelection: TableProps<T>['rowSelection'];
-  
   clear: () => void;
-  
   allCurrentPageSelected: boolean;
-  
   toggleSelectAllOnPage: (rows: T[]) => void;
 }
 
@@ -69,7 +57,6 @@ export function useBatchSelection<T extends object>(
 
   const [selectedKeys, setSelectedKeysState] = useState<Key[]>([]);
 
-  
   const setSelectedKeys = useCallback((keys: Key[]) => {
     setSelectedKeysState(keys.map(String));
   }, []);

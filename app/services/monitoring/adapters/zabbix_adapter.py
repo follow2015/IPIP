@@ -31,21 +31,27 @@ from app.core.enums import ProbeErrorCode
 logger = logging.getLogger(__name__)
 
 _zabbix_cache: dict[str, tuple[float, dict[str, dict]]] = {}
-_cache_lock = threading.Lock()
-_rebuilding: set[str] = set()
+_cache_lock = threading.Lock()  # ThreadPoolExecutor 并发 probe 共享缓存
+_rebuilding: set[str] = set()  # 正在重建索引的 cache_key 集合，防并发重复重建
 
 
 def _cache_key(api_url: str, credential: dict) -> str:
+    """缓存复合 key：api_url + token 短哈希，区分同一 api_url 下不同凭据。"""
     token = credential.get("api_token", "")
     token_fp = hashlib.sha256(token.encode()).hexdigest()[:16]
     return f"{api_url}::{token_fp}"
 
 
 class _ZabbixEmptyHostError(Exception):
-    pass
+    """host.get 返回空主机列表（token 无权限 / server 无主机）。
+
+    属配置错误而非设备宕机，由 probe() 转为 zabbix_empty_host_list，
+    不进可达性状态机批量告警（见 v4-final §17 L3/E2）。
+    """
 
 
 class ZabbixAdapter(MonitorAdapter):
+    """Zabbix 协议适配器（集中式拉取 + 批量缓存）。"""
 
     protocol = MonitorProtocolCode.ZABBIX
 
@@ -54,6 +60,11 @@ class ZabbixAdapter(MonitorAdapter):
         self._session = requests.Session()
 
     def probe(self, device, credential) -> ProbeResult:
+        """探测单设备：从批量缓存查 Zabbix 主机可用性 + 活跃问题。
+
+        credential (共享 Zabbix API 凭据) 形状:
+            {api_url, api_token, verify_ssl, match_by}
+        """
         host_ref = self._resolve_host_ref(device, credential)
         if not host_ref:
             return ProbeResult(reachable=False, error=ProbeErrorCode.NO_HOST_REF.value)
@@ -93,7 +104,7 @@ class ZabbixAdapter(MonitorAdapter):
                 holder["from_cache"] = from_cache
             except _ZabbixEmptyHostError:
                 holder["empty"] = True
-            except Exception as e:
+            except Exception as e:  # 缓存重建异常 → 单设备失败不影响整轮
                 err_holder["e"] = e
 
         start = time.monotonic()
@@ -117,12 +128,23 @@ class ZabbixAdapter(MonitorAdapter):
         return self._to_probe_result(host_data, elapsed_ms, from_cache=from_cache)
 
     def _resolve_host_ref(self, device, credential: dict) -> str | None:
+        """按 credential.match_by 决定用 hostname 还是 management_ip 匹配 Zabbix 主机。"""
         match_by = credential.get("match_by", "host")
         if match_by == "ip":
             return getattr(device, "management_ip", None)
         return getattr(device, "hostname", None) or getattr(device, "management_ip", None)
 
     def _get_host_data(self, ckey: str, api_url: str, credential: dict, host_ref: str) -> "tuple[dict | None, bool]":
+        """返回 (host_data, from_cache)。
+
+        from_cache=True 表示数据来自本地缓存（未触发 Zabbix API I/O），此时
+        probe() 会把 latency_ms 置 0（缓存命中无网络延迟），并标记 from_cache=True，
+        避免趋势图把缓存字典查找时间误判为设备网络延迟。未命中（重建索引）则
+        from_cache=False。
+
+        并发保护：当线程 A 正在重建时，线程 B 发现 _rebuilding 中有该 ckey，
+        直接返回旧缓存数据（降级），避免多线程同时触发 _rebuild_index 浪费 API 调用。
+        """
         ttl = self._cache_ttl()
         with _cache_lock:
             entry = _zabbix_cache.get(ckey)
@@ -134,7 +156,7 @@ class ZabbixAdapter(MonitorAdapter):
             _rebuilding.add(ckey)
             stale = entry[1] if entry else {}
         try:
-            fresh = self._rebuild_index(api_url, credential)
+            fresh = self._rebuild_index(api_url, credential)  # 耗时 I/O 在锁外
             with _cache_lock:
                 _zabbix_cache[ckey] = (time.monotonic(), fresh)
             return fresh.get(host_ref, stale.get(host_ref)), False
@@ -143,11 +165,19 @@ class ZabbixAdapter(MonitorAdapter):
                 _rebuilding.discard(ckey)
 
     def _rebuild_index(self, api_url: str, credential: dict) -> dict[str, dict]:
+        """一次 host.get + 一次 problem.get 重建 {host_ref: host_data} 索引。
+
+        L1 修正：索引建多路 key（host / name / interface ip），使 match_by="ip"
+        也能命中——IP 不再只存 value，也作为 key，修复原先 match_by="ip" 永远 miss 的 bug。
+        E2 修正：host.get 返回空列表（token 无权限/server 无主机）时抛 _ZabbixEmptyHostError，
+        由 probe() 转为 zabbix_empty_host_list 配置错误，不进可达性状态机批量告警。
+        E3 修正：problem.get 失败时降级为空 problems，不让非关键 API 失败拖垮可达性判定。
+        """
         hosts = self._zabbix_call(api_url, credential, "host.get", {
             "output": ["hostid", "host", "name", "status"],
             "selectInterfaces": ["ip", "available", "type"],
         }) or []
-        if not hosts:
+        if not hosts:  # E2: 空主机列表 = 配置/权限错误，非设备宕机
             raise _ZabbixEmptyHostError(api_url)
 
         try:
@@ -184,8 +214,8 @@ class ZabbixAdapter(MonitorAdapter):
             iface = (h.get("interfaces") or [{}])[0]
             data = {
                 "hostid": h.get("hostid"),
-                "host_status": int(h.get("status", 1) or 1),
-                "available": int(iface.get("available", 0) or 0),
+                "host_status": int(h.get("status", 1) or 1),  # 0=monitored 1=not monitored
+                "available": int(iface.get("available", 0) or 0),  # or 0 防 "" → int("") 崩
                 "ip": iface.get("ip"),
                 "active_problems": prob_by_host.get(h.get("hostid"), []),
             }
@@ -200,6 +230,7 @@ class ZabbixAdapter(MonitorAdapter):
         return next(ZabbixAdapter._rpc_id)
 
     def _zabbix_call(self, api_url: str, credential: dict, method: str, params: dict) -> Any:
+        """Zabbix JSON-RPC 2.0 单次调用（API Token Bearer 鉴权）。"""
         headers = {"Content-Type": "application/json-rpc"}
         token = credential.get("api_token")
         if token:
@@ -222,6 +253,12 @@ class ZabbixAdapter(MonitorAdapter):
         return data.get("result")
 
     def _to_probe_result(self, host_data: dict, elapsed_ms: int, from_cache: bool = False) -> ProbeResult:
+        """Zabbix 主机数据 → 统一 ProbeResult（见 v4-final §7 映射表）。
+
+        from_cache=True（命中本地缓存、未触发 Zabbix API I/O）时，latency_ms 置 0
+        并在 extra 标注 from_cache=True——缓存命中无真实网络延迟，避免趋势图误判为
+        设备网络延迟（P11 修复）。
+        """
         available = host_data.get("available", 0)
         monitored = host_data.get("host_status", 1) == 0
         reachable = monitored and (available == 1)
@@ -246,6 +283,7 @@ class ZabbixAdapter(MonitorAdapter):
         return ProbeResult(reachable=reachable, latency_ms=effective_latency, extra=extra, error=error)
 
     def _cache_ttl(self) -> int:
+        """从 current_app.config 取缓存 TTL，无上下文回退 30s。"""
         try:
             from flask import current_app
             return int(current_app.config.get("MONITOR_ZABBIX_CACHE_TTL", 30))
@@ -254,6 +292,7 @@ class ZabbixAdapter(MonitorAdapter):
 
 
     def _resolve_hostid_for_metrics(self, api_url: str, credential: dict, device) -> str | None:
+        """按设备 IP/hostname 匹配 Zabbix host，返回 hostid（供 item.get 查询）。"""
         host_ref = self._resolve_host_ref(device, credential)
         if not host_ref:
             return None
@@ -274,6 +313,19 @@ class ZabbixAdapter(MonitorAdapter):
         return host.get("hostid") if host else None
 
     def collect_metrics(self, device, credential, templates: list) -> dict:
+        """按指标模板采集 Zabbix 指标（连通性之外的业务指标采集）。
+
+        供 worker 指标采集循环调用（与 SNMP collect_metrics 对齐）。templates 为
+        ``[{metric_key, zabbix_item_key, metric_type, ...}]``，仅处理含 zabbix_item_key 的模板。
+
+        流程：
+        1. 解析 hostid（host.get 按 IP/hostname 匹配）
+        2. 对每个模板，item.get 按 hostids + search key_ 找 itemid（可能多个实例）
+        3. history.get 拉每个 item 最新值（limit=1, sortfield=clock, sortorder=DESC）
+        4. 返回 ``{metric_key: {item_name: value}}``，item_name 作为 index
+
+        采集失败/无模板返回空 dict，不抛出（与 SNMP 一致，静默降级）。
+        """
         api_url = credential.get("api_url")
         if not api_url or not templates:
             return {}

@@ -29,7 +29,6 @@ export default function EditCredentialModal({
   const updateShared = useUpdateSharedCredentialPayload();
   const msg = useMessage();
 
-  
   const editInitialValues = (() => {
     const meta = editCred?.payload_meta || {};
     const initial: Record<string, unknown> = {
@@ -49,7 +48,6 @@ export default function EditCredentialModal({
     return initial;
   })();
 
-  
   const handleSubmitEdit = async () => {
     if (!editCred?.id) return;
     let values: Record<string, unknown>;

@@ -21,19 +21,31 @@ from extensions import db
 
 
 def ip_to_int(ip_address: str) -> int:
+    """将 IPv4 地址转换为整数（等价于 MySQL INET_ATON）
+
+    Args:
+        ip_address: IPv4 地址字符串
+
+    Returns:
+        int: 整数表示，无效 IP 返回 None
+    """
     try:
         return struct.unpack("!I", socket.inet_aton(ip_address))[0]
     except (OSError, struct.error):
         return None
 
 class IPManager(BaseModel):
+    """IP地址管理主表 — ip_manager
+
+    记录每个 IP 的状态、客户归属等信息。
+    """
     __tablename__ = "ip_addresses"
     __table_args__ = (
         UniqueConstraint("ip_address", "room_id", name="uq_ip_room"),
         Index("ix_ip_manager_status", "status"),
         Index("ix_ip_manager_room", "room_id"),
-        Index("ix_ip_int", "ip_int"),
-        Index("ix_ip_last_active", "last_active_at"),
+        Index("ix_ip_int", "ip_int"),  # ip_int 范围查询索引
+        Index("ix_ip_last_active", "last_active_at"),  # 陈旧度清理索引
         {"extend_existing": True},
     )
 
@@ -56,6 +68,7 @@ class IPManager(BaseModel):
     )
 
     def __init__(self, **kwargs):
+        """自动填充 ip_int"""
         if "ip_address" in kwargs and "ip_int" not in kwargs:
             kwargs["ip_int"] = ip_to_int(kwargs["ip_address"])
         super().__init__(**kwargs)
@@ -69,9 +82,11 @@ class IPManager(BaseModel):
     )
 
     def is_banned(self) -> bool:
+        """判断当前 IP 是否处于封禁状态（含封禁中）"""
         return self.status in (IPStatus.BANNED, IPStatus.PENDING_BAN)
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化，增加 status 文本描述"""
         result = super().to_dict(exclude=exclude, include_relations=include_relations)
         result["status_text"] = {
             0: "活跃", 1: "非活跃", 2: "封禁", 3: "未使用",
@@ -80,6 +95,10 @@ class IPManager(BaseModel):
         return result
 
 class IPBanRecord(BaseModel):
+    """IP封禁记录表 — ip_ban_records
+
+    记录封禁元数据，支持黑洞路由(route)和静态ARP(arp)两种封禁方式。
+    """
     __tablename__ = "ip_ban_records"
     __table_args__ = (
         Index("idx_ban_ip_room_active", "ip_address", "room_id", "is_active"),
@@ -109,6 +128,8 @@ class IPBanRecord(BaseModel):
     )
 
     def __init__(self, **kwargs):
+        """自动填充 ip_int"""
         if "ip_address" in kwargs and "ip_int" not in kwargs:
             kwargs["ip_int"] = ip_to_int(kwargs["ip_address"])
         super().__init__(**kwargs)
+

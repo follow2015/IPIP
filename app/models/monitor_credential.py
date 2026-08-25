@@ -33,6 +33,7 @@ NON_SECRET_KEYS = {
 
 
 class MonitorCredential(BaseModel):
+    """设备监控共享凭据（AES-256-GCM 加密）"""
 
     __tablename__ = "monitor_credentials"
     __table_args__ = (
@@ -70,6 +71,11 @@ class MonitorCredential(BaseModel):
     )
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化，永远排除 encrypted_payload（安全，比照 SwitchCredentials.password）
+
+        额外附加 `payload_meta`：仅含非敏感字段，供编辑弹窗预填。
+        community 是否回显由 MONITOR_CREDENTIAL_ECHO_COMMUNITY（默认 False）控制。
+        """
         _exclude = {"encrypted_payload"}
         if exclude:
             _exclude.update(exclude)
@@ -78,6 +84,7 @@ class MonitorCredential(BaseModel):
         return result
 
     def _payload_meta(self) -> dict:
+        """返回非敏感字段（编辑弹窗预填用）。解密失败/无 app 上下文时返回空 dict。"""
         try:
             payload = json.loads(decrypt(self.encrypted_payload))
         except Exception:
@@ -92,6 +99,7 @@ class MonitorCredential(BaseModel):
 
 
 class DeviceMonitorCredential(BaseModel):
+    """凭据 ↔ 设备关联（多对多，支持同一凭据共享给多台设备）"""
 
     __tablename__ = "device_monitor_credentials"
     __table_args__ = (

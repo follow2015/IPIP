@@ -1,5 +1,4 @@
 
-
 export type RackDeviceType = 'server' | 'switch' | 'storage' | 'multinode' | 'pdu' | 'kvm';
 export type NodeStatus = 'active' | 'inactive' | 'fault';
 
@@ -36,7 +35,6 @@ export interface UPositionSelectorProps {
   occupiedPositions: OccupiedPosition[];
   readOnly?: boolean;
   onPositionChange?: (deviceId: number, newUPos: number) => void;
-  
   onNodeReorder?: (chassisId: number, newOrderedNodeIds: string[]) => void;
   onSelect?: (device: OccupiedPosition | null) => void;
 }

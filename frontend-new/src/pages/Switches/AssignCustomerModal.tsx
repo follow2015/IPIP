@@ -17,7 +17,6 @@ interface AssignCustomerModalProps {
   onSubmit: (values: AssignCustomerValues) => void;
 }
 
-
 export function AssignCustomerModal({
   open,
   onClose,
@@ -44,7 +43,6 @@ export function AssignCustomerModal({
         description: (values.description ?? '') as string
       });
     } catch {
-      
     }
   };
 

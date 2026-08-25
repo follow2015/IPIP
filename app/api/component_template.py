@@ -26,6 +26,14 @@ component_template_bp = Blueprint(
 @rate_limit_api
 @api_exception_handler
 def list_templates():
+    """列出配件模板，支持按类别、启用状态和客户筛选。
+
+    Query Parameters:
+        category: 按类别筛选 (cpu/memory/disk/nic/gpu)
+        is_active: 是否只返回启用的 (可选，不传则返回全部)
+        customer_id: 按客户ID筛选 (可选)
+        include_global: 传 customer_id 时是否包含全局通用模板 (默认 true)
+    """
     category = request.args.get("category")
     customer_id = request.args.get("customer_id", type=int)
     is_active_str = request.args.get("is_active")
@@ -51,6 +59,7 @@ def list_templates():
 @rate_limit_api
 @api_exception_handler
 def get_template(template_id):
+    """获取单个配件模板"""
     t = component_template_service.get_template(template_id)
     if not t:
         return APIResponse.error(message="模板不存在", status_code=404)
@@ -65,6 +74,17 @@ def get_template(template_id):
 @api_exception_handler
 @transactional
 def create_template():
+    """创建配件模板
+
+    Request Body:
+        category: 配件类别 (cpu/memory/disk/nic/gpu)
+        brand: 品牌
+        model: 型号
+        spec: 规格详情 (JSON)
+        is_active: 是否启用 (默认 true)
+        sort_order: 排序权重
+        remark: 备注
+    """
     data = request.get_json()
     if not data:
         return APIResponse.error("请求数据不能为空", status_code=400)
@@ -85,6 +105,7 @@ def create_template():
 @api_exception_handler
 @transactional
 def update_template(template_id):
+    """更新配件模板"""
     data = request.get_json()
     if not data:
         return APIResponse.error("请求数据不能为空", status_code=400)
@@ -107,6 +128,7 @@ def update_template(template_id):
 @api_exception_handler
 @transactional
 def delete_template(template_id):
+    """删除配件模板"""
     result = component_template_service.delete_template(template_id)
     if not result:
         return APIResponse.error(message="模板不存在", status_code=404)

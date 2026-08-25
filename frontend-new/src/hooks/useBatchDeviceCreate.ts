@@ -33,10 +33,9 @@ export function useBatchDeviceCreate() {
   const [result, setResult] = useState<BatchCreateResult | null>(null);
   const [resultOpen, setResultOpen] = useState(false);
 
-  
   const submit = useCallback(
     async (devices: CreateDeviceRequest[]): Promise<BatchCreateResult | null> => {
-      const res = await mutation.mutateAsync(devices); 
+      const res = await mutation.mutateAsync(devices); // throws on network error
       const data = res.data ?? null;
       setResult(data);
       if (data) setResultOpen(true);
@@ -45,17 +44,14 @@ export function useBatchDeviceCreate() {
     [mutation],
   );
 
-  
   const closeResult = useCallback(() => setResultOpen(false), []);
 
-  
   const getFailedIndices = useCallback(
     (failedItems: BatchCreateItemResult[]): Set<number> =>
       new Set(failedItems.map(item => item.index)),
     [],
   );
 
-  
   const reset = useCallback(() => {
     setResult(null);
     setResultOpen(false);

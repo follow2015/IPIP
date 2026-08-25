@@ -17,6 +17,7 @@ from extensions import db
 
 
 class DeviceMetricLatest(BaseModel):
+    """设备指标当前值（按 device_id + metric_key + index_key 维度）"""
 
     __tablename__ = "device_metric_latest"
     __table_args__ = (

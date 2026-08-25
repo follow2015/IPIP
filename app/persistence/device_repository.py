@@ -41,6 +41,11 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         super().__init__(Device, session)
 
     def find_ids_by_responsible_person(self, user_id: int) -> List[int]:
+        """查询指定用户负责的设备 ID 列表（供告警历史「我负责的」过滤）。
+
+        由 ``monitor_routes.list_alerts`` 的 scope=mine 分支调用，
+        避免在 API 路由层直接操作 db.session（项目约束：数据库必须走 Repository 层）。
+        """
         rows = (
             self.session.query(Device.id)
             .filter(Device.responsible_person == user_id)
@@ -49,6 +54,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         return [r.id for r in rows]
 
     def find_ids_by_room_ids(self, room_ids: List[int]) -> List[int]:
+        """查询位于指定机房列表内的设备 ID（供 data_scope_service room 模式使用）。"""
         if not room_ids:
             return []
         from app.models.cabinet import Cabinet
@@ -61,6 +67,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         return [r.id for r in rows]
 
     def find_responsible_person_by_id(self, device_id: int) -> Optional[int]:
+        """查询设备责任人 ID（供 data_scope_service 反查使用）。"""
         row = (
             self.session.query(Device.responsible_person)
             .filter(Device.id == device_id)
@@ -81,6 +88,10 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找设备失败", original_error=e)
 
     def find_by_ids(self, device_ids: list) -> dict:
+        """批量按 ID 查找设备，返回 {device_id: Device}。
+
+        P1 修复：消除 batch_set_monitor_enabled 的 N+1 查询。
+        """
         if not device_ids:
             return {}
         try:
@@ -95,6 +106,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("批量查找设备失败", original_error=e)
 
     def find_by_id_or_404(self, device_id: int) -> Device:
+        """按 ID 查找设备，不存在则抛出 404（供 Task 8 手动探测路径使用）"""
         device = self.find_by_id(device_id)
         if device is None:
             from flask import abort
@@ -102,6 +114,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         return device
 
     def find_by_id_including_deleted(self, device_id: int) -> Optional[Device]:
+        """查询设备（含已软删除），用于回收站恢复场景"""
         try:
             return (
                 self.session.query(Device)
@@ -116,6 +129,11 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找设备失败（含已删除）", original_error=e)
 
     def find_ids_by_type(self, device_ids: List[int], device_types: set) -> List[int]:
+        """批量按 id + 设备类型过滤，仅返回 id 列表（供监控 worker 减少 N 次单查）。
+
+        返回 id 升序；device_ids 或 device_types 为空时返回 []。
+        仅 SELECT id，不带 joinedload，避免为过滤而加载完整设备行。
+        """
         if not device_ids or not device_types:
             return []
         try:
@@ -145,6 +163,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找设备失败", original_error=e)
 
     def find_nodes_by_chassis(self, chassis_id: int) -> List[Device]:
+        """获取机箱的所有子节点（按 node_position 排序）"""
         try:
             from app.models.device_server_ext import DeviceServerExt
             return (
@@ -160,6 +179,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找机箱子节点失败", original_error=e)
 
     def find_chassis_by_id(self, device_id: int) -> Optional[Device]:
+        """查找机箱设备（排除已报废和已删除）"""
         try:
             return (
                 self._base_query()
@@ -175,6 +195,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def find_node_by_position(
         self, chassis_id: int, position: int, exclude_id: int = None
     ) -> Optional[Device]:
+        """按位置查找节点（用于冲突检测）"""
         try:
             from app.models.device_server_ext import DeviceServerExt
             q = (
@@ -232,6 +253,11 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找设备失败", original_error=e)
 
     def clear_customer(self, customer_id: int) -> int:
+        """批量解绑客户名下所有设备（customer_id 置 NULL）。
+
+        Returns:
+            int: 受影响行数
+        """
         from extensions import db
         result = db.session.query(Device).filter(
             Device.customer_id == customer_id,
@@ -306,6 +332,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         include_scrapped=False,
         has_ssh=None,
     ):
+        """统一设备过滤条件，供 get_all_devices 和 count 查询共用"""
         from app.models.cabinet import Cabinet
 
         if not include_scrapped:
@@ -359,8 +386,8 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         device_subtype: str = None,
         page: int = 1,
         page_size: int = 20,
-        include_scrapped: bool = False,
-        has_ssh: bool = None,
+        include_scrapped: bool = False,   # BUG-3 修复：显式参数控制是否包含报废设备
+        has_ssh: bool = None,             # has_ssh 筛选（仅网络设备有效）
     ) -> Dict[str, Any]:
         try:
             base_query = self._base_query().options(
@@ -483,6 +510,11 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         height_u: int,
         exclude_id: int = None,
     ) -> List[Device]:
+        """检查 U 位冲突（SQL 范围重叠，不在 Python 做集合运算）
+
+        两区间 [a, a+ha) 与 [b, b+hb) 重叠的充要条件：
+            a < b+hb  AND  b < a+ha
+        """
         try:
             from app.models.device_server_ext import DeviceServerExt
             q = (
@@ -507,6 +539,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
     @monitor_query_performance
     def get_room_device_statistics(self, room_id: int) -> Dict[str, int]:
+        """机房设备统计（适配 device_type: server/network/other 新方案）"""
         try:
             from app.models.cabinet import Cabinet
 
@@ -591,6 +624,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def sync_chassis_nodes(self, chassis_id: int, changed_params: Dict[str, Any]) -> bool:
+        """同步机箱参数到全部子节点（BUG-13：仅对遵循命名规则的节点重命名）"""
         try:
             nodes = self.find_child_devices(chassis_id)
             if not nodes:
@@ -664,6 +698,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("统计设备数量失败", original_error=e)
 
     def count_by_status(self, status) -> int:
+        """按设备状态统计数量。"""
         try:
             return (
                 self._base_query()
@@ -676,6 +711,11 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("统计设备数量失败", original_error=e)
 
     def count_switches(self) -> int:
+        """统计交换机数量。
+
+        数据契约：交换机的 device_type='network'，device_subtype='switch'。
+        兼容历史数据中 device_type 直接写 'switch' 的情况。
+        """
         try:
             return (
                 self._base_query()
@@ -714,6 +754,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("更新设备失败", original_error=e)
 
     def delete(self, device_id: int) -> bool:
+        """软删除设备（遵循 __soft_delete__ = True），由调用方负责 commit"""
         return super().delete(device_id)
 
     def batch_update_status(self, device_ids: List[int], new_status: int) -> int:
@@ -742,6 +783,15 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("更新设备位置失败", original_error=e)
 
     def check_management_ip_exists(self, ip_address: str, exclude_id: int = 0) -> bool:
+        """检查管理IP是否已被其他设备占用
+
+        Args:
+            ip_address: 管理IP地址
+            exclude_id: 排除的设备ID
+
+        Returns:
+            bool: 存在返回True
+        """
         if not ip_address:
             return False
         try:
@@ -753,6 +803,16 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("校验管理IP失败", original_error=e)
 
     def check_device_name_duplicate(self, device_name: str, cabinet_id: int = None, exclude_id: int = 0) -> Optional[Device]:
+        """检查同机柜内是否存在同名设备
+
+        Args:
+            device_name: 设备名称
+            cabinet_id: 机柜ID（可选，若提供则仅检查同机柜）
+            exclude_id: 排除的设备ID（更新时排除自身）
+
+        Returns:
+            冲突的 Device 对象，无冲突返回 None
+        """
         if not device_name:
             return None
         try:
@@ -866,6 +926,12 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         device_type: str = None,
         ip_search: str = None,
     ) -> Dict[str, Any]:
+        """查询已软删除的设备列表（回收站）
+
+        支持：分页、删除时间段、机房/机柜/设备类型筛选、IP地址搜索
+        IP搜索同时匹配 devices.management_ip、device_hardware.ipmi_address、
+        device_hardware.ip_address（JSON列 LIKE cast）
+        """
         try:
             from app.models.device_hardware import DeviceHardware
             from app.models.cabinet import Cabinet
@@ -940,6 +1006,10 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查询已删除设备失败", original_error=e)
 
     def get_child_device_ids(self, parent_device_id: int) -> list[int]:
+        """查询机箱的所有子节点 device_id 列表。
+
+        parent_device_id 是 DeviceServerExt 表的列，不是 Device 的列。
+        """
         from app.models.device_server_ext import DeviceServerExt
         rows = self.session.query(DeviceServerExt.device_id).filter_by(
             parent_device_id=parent_device_id

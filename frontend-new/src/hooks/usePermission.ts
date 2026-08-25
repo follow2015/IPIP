@@ -11,21 +11,14 @@
 import { useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth';
 
-
 export interface UsePermissionReturn {
-  
   hasPermission: (permission: string) => boolean;
-  
   hasAnyPermission: (permissions: string[]) => boolean;
-  
   hasAllPermissions: (permissions: string[]) => boolean;
-  
   hasRole: (role: string) => boolean;
 }
 
-
 export function usePermission(): UsePermissionReturn {
-  
   const permissions = useAuthStore((s) => s.permissions);
   const userRoles   = useAuthStore((s) => s.user?.roles);
 

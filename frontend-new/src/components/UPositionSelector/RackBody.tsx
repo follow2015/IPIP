@@ -29,7 +29,6 @@ interface RackBodyProps {
   onNodeReorder?: (chassisId: number, newOrderedNodeIds: string[]) => void;
 }
 
-
 const RackBody: React.FC<RackBodyProps> = ({
   bodyRef,
   devices,
@@ -67,7 +66,7 @@ const RackBody: React.FC<RackBodyProps> = ({
         overflow: 'hidden'
       }}
     >
-      {}
+      {/* 机柜头 */}
       <div
         style={{
           background: token.colorFillQuaternary,
@@ -84,7 +83,7 @@ const RackBody: React.FC<RackBodyProps> = ({
         </span>
       </div>
 
-      {}
+      {/* 机柜体 */}
       <div style={{ padding: 6 }}>
         <div
           ref={bodyRef}
@@ -94,7 +93,7 @@ const RackBody: React.FC<RackBodyProps> = ({
           onDragEnd={onDragEnd}
           style={{ position: 'relative', height: totalH, userSelect: 'none' }}
         >
-          {}
+          {/* 空槽行 + U 编号 */}
           {Array.from({ length: totalU }, (_, i) => i + 1).map((u) => {
             const isHl = highlightUs.includes(u);
             const isOccupied = occupiedSet.has(u);
@@ -112,7 +111,7 @@ const RackBody: React.FC<RackBodyProps> = ({
                   gap: 4
                 }}
               >
-                {}
+                {/* U 编号（根据方向显示对应标号） */}
                 <span
                   style={{
                     width: layout.uNumW,
@@ -125,7 +124,7 @@ const RackBody: React.FC<RackBodyProps> = ({
                 >
                   {displayLabel(u, totalU)}
                 </span>
-                {}
+                {/* 空槽位 */}
                 {!isOccupied && (
                   <div
                     style={{
@@ -144,7 +143,7 @@ const RackBody: React.FC<RackBodyProps> = ({
             );
           })}
 
-          {}
+          {/* 设备块 */}
           {devices.map((device) => (
             <DeviceBlock
               key={device.deviceId}
@@ -163,7 +162,7 @@ const RackBody: React.FC<RackBodyProps> = ({
         </div>
       </div>
 
-      {}
+      {/* 机柜底栏统计 */}
       <div
         style={{
           padding: '6px 10px',

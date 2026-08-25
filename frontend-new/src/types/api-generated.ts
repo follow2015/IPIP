@@ -11,7 +11,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -21,7 +20,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -47,7 +45,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -57,7 +54,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -83,7 +79,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -93,7 +88,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -102,7 +96,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -128,7 +121,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -138,7 +130,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -147,7 +138,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -175,7 +165,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -189,7 +178,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -198,7 +186,6 @@ export interface paths {
                         "application/json": components["schemas"]["LoginDataResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -224,7 +211,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -234,7 +220,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -243,7 +228,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -267,7 +251,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -277,7 +260,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -286,7 +268,6 @@ export interface paths {
                         "application/json": components["schemas"]["UserResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -314,7 +295,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -324,7 +304,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -348,7 +327,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query: {
@@ -360,7 +338,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -388,7 +365,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -402,7 +378,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -411,7 +386,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -437,7 +411,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -451,7 +424,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -460,7 +432,6 @@ export interface paths {
                         "application/json": components["schemas"]["LoginDataResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -486,7 +457,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -496,7 +466,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -505,7 +474,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -531,7 +499,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -541,7 +508,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -550,7 +516,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -574,7 +539,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -584,7 +548,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -610,7 +573,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -620,7 +582,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -648,7 +609,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -662,7 +622,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -671,7 +630,6 @@ export interface paths {
                         "application/json": components["schemas"]["LoginDataResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -697,7 +655,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -711,7 +668,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -720,7 +676,6 @@ export interface paths {
                         "application/json": components["schemas"]["UserResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -729,7 +684,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -755,7 +709,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -769,7 +722,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -778,7 +730,6 @@ export interface paths {
                         "application/json": components["schemas"]["LoginDataResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -804,7 +755,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -814,7 +764,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -823,7 +772,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -847,7 +795,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -857,7 +804,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -866,7 +812,6 @@ export interface paths {
                         "application/json": components["schemas"]["VerifyDataResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -892,7 +837,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -902,7 +846,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -911,7 +854,6 @@ export interface paths {
                         "application/json": components["schemas"]["UserResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -938,7 +880,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -957,7 +898,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -966,7 +906,6 @@ export interface paths {
                         "application/json": components["schemas"]["UserResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -975,7 +914,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1000,7 +938,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -1013,7 +950,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1022,7 +958,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1048,7 +983,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -1063,7 +997,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1072,7 +1005,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1098,7 +1030,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -1114,7 +1045,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1123,7 +1053,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1149,7 +1078,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -1165,7 +1093,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1174,7 +1101,6 @@ export interface paths {
                         "application/json": components["schemas"]["UserResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1201,7 +1127,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -1217,7 +1142,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1226,7 +1150,6 @@ export interface paths {
                         "application/json": components["schemas"]["UserResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -1235,7 +1158,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1244,7 +1166,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -1271,7 +1192,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -1285,7 +1205,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1294,7 +1213,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -1303,7 +1221,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1327,7 +1244,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -1339,7 +1255,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1348,7 +1263,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1357,7 +1271,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -1385,7 +1298,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -1402,7 +1314,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1411,7 +1322,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -1420,7 +1330,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1446,7 +1355,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -1462,7 +1370,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1471,7 +1378,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -1480,7 +1386,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1504,7 +1409,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -1514,7 +1418,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1523,7 +1426,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1551,7 +1453,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -1561,7 +1462,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1570,7 +1470,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -1594,7 +1493,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -1604,7 +1502,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1630,7 +1527,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -1640,7 +1536,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1649,7 +1544,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -1677,7 +1571,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -1687,7 +1580,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1696,7 +1588,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1722,7 +1613,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -1732,7 +1622,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1741,7 +1630,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -1765,7 +1653,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -1775,7 +1662,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1784,7 +1670,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -1812,7 +1697,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -1822,7 +1706,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1831,7 +1714,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -1857,7 +1739,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -1867,7 +1748,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1876,7 +1756,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1900,7 +1779,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -1914,7 +1792,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1923,7 +1800,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoomResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -1935,7 +1811,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -1949,7 +1824,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -1958,7 +1832,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoomResponse"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -1967,7 +1840,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -1991,7 +1863,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -2003,7 +1874,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2012,7 +1882,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoomResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2023,7 +1892,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -2039,7 +1907,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2048,7 +1915,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoomResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2057,7 +1923,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2066,7 +1931,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -2075,7 +1939,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -2087,7 +1950,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -2099,7 +1961,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2108,7 +1969,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2117,7 +1977,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -2126,7 +1985,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -2151,7 +2009,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -2165,7 +2022,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2174,7 +2030,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2198,7 +2053,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -2210,7 +2064,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2219,7 +2072,6 @@ export interface paths {
                         "application/json": components["schemas"]["CabinetResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2245,7 +2097,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -2257,7 +2108,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2266,7 +2116,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2292,7 +2141,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -2304,7 +2152,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2313,7 +2160,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2339,7 +2185,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -2351,7 +2196,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2360,7 +2204,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2386,7 +2229,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -2396,7 +2238,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2405,7 +2246,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoomResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -2431,7 +2271,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -2454,7 +2293,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2463,7 +2301,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -2475,7 +2312,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -2489,7 +2325,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -2498,7 +2333,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2507,7 +2341,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -2531,7 +2364,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -2543,7 +2375,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2552,7 +2383,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2563,7 +2393,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -2579,7 +2408,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2588,7 +2416,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2597,7 +2424,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2606,7 +2432,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -2618,7 +2443,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -2630,7 +2454,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2639,7 +2462,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2662,7 +2484,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -2674,7 +2495,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2683,7 +2503,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceConnectionResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2695,7 +2514,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -2705,7 +2523,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2714,7 +2531,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2738,7 +2554,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -2750,7 +2565,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2759,7 +2573,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2771,7 +2584,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -2781,7 +2593,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2790,7 +2601,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -2814,7 +2624,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -2826,7 +2635,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2835,7 +2643,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2844,7 +2651,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2870,7 +2676,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query: {
@@ -2883,7 +2688,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2892,7 +2696,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2901,7 +2704,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2928,7 +2730,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -2944,7 +2745,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2953,7 +2753,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2962,7 +2761,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -2989,7 +2787,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3003,7 +2800,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3012,7 +2808,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3021,7 +2816,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -3048,7 +2842,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -3060,7 +2853,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3069,7 +2861,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -3094,7 +2885,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3108,7 +2898,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3117,7 +2906,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3141,7 +2929,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -3151,7 +2938,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3179,7 +2965,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3189,7 +2974,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3215,7 +2999,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3242,7 +3025,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -3252,7 +3034,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3277,7 +3058,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3303,7 +3083,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3317,7 +3096,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3326,7 +3104,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3352,7 +3129,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3364,7 +3140,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3373,7 +3148,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -3397,7 +3171,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -3411,7 +3184,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3420,7 +3192,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3446,7 +3217,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -3456,7 +3226,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3465,7 +3234,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3491,7 +3259,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -3504,7 +3271,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3513,7 +3279,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3540,7 +3305,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -3556,7 +3320,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3565,7 +3328,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3574,7 +3336,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3600,7 +3361,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -3616,7 +3376,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3625,7 +3384,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3634,7 +3392,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3661,7 +3418,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3675,7 +3431,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3684,7 +3439,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3693,7 +3447,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3719,7 +3472,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3733,7 +3485,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3742,7 +3493,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3751,7 +3501,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3777,7 +3526,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3791,7 +3539,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3800,7 +3547,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3809,7 +3555,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3835,7 +3580,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3845,7 +3589,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3854,7 +3597,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3863,7 +3605,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3889,7 +3630,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3899,7 +3639,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3908,7 +3647,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3917,7 +3655,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3943,7 +3680,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -3953,7 +3689,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3962,7 +3697,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3971,7 +3705,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -3997,7 +3730,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -4011,7 +3743,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4020,7 +3751,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -4029,7 +3759,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -4055,7 +3784,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -4069,7 +3797,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4078,7 +3805,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -4104,7 +3830,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -4118,7 +3843,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4127,7 +3851,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -4136,7 +3859,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -4160,7 +3882,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -4172,7 +3893,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4181,7 +3901,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4190,7 +3909,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -4216,7 +3934,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -4228,7 +3945,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4237,7 +3953,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4246,7 +3961,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -4274,7 +3988,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -4288,7 +4001,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4297,7 +4009,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -4306,7 +4017,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -4332,7 +4042,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -4342,7 +4051,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4351,7 +4059,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -4360,7 +4067,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4384,7 +4090,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -4396,7 +4101,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4405,7 +4109,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4417,7 +4120,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -4433,7 +4135,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -4442,7 +4143,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -4466,7 +4166,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -4479,7 +4178,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4488,7 +4186,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4499,7 +4196,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -4516,7 +4212,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4525,7 +4220,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4550,7 +4244,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -4560,7 +4253,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4569,7 +4261,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4580,7 +4271,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -4597,7 +4287,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4606,7 +4295,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4618,7 +4306,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -4628,7 +4315,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4637,7 +4323,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -4660,7 +4345,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -4672,7 +4356,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4681,7 +4364,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4708,7 +4390,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -4721,7 +4402,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4730,7 +4410,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -4739,7 +4418,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4751,7 +4429,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -4764,7 +4441,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4773,7 +4449,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -4782,7 +4457,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4805,7 +4479,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -4817,7 +4490,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4826,7 +4498,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4838,7 +4509,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -4854,7 +4524,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -4863,7 +4532,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -4887,7 +4555,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -4897,7 +4564,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4906,7 +4572,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4917,7 +4582,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -4934,7 +4598,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4943,7 +4606,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4955,7 +4617,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -4968,7 +4629,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4977,7 +4637,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5000,7 +4659,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -5013,7 +4671,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5022,7 +4679,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5033,7 +4689,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -5050,7 +4705,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5059,7 +4713,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5084,11 +4737,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
-                    
                     type?: string;
                 };
                 header?: never;
@@ -5097,7 +4748,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5125,7 +4775,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -5136,13 +4785,11 @@ export interface paths {
             requestBody?: {
                 content: {
                     "multipart/form-data": {
-                        
                         file: string;
                     };
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5151,7 +4798,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -5160,7 +4806,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -5184,7 +4829,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -5197,7 +4841,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5206,7 +4849,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5215,7 +4857,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -5241,7 +4882,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -5257,7 +4897,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5266,7 +4905,6 @@ export interface paths {
                         "application/json": components["schemas"]["CabinetResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -5278,7 +4916,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -5292,7 +4929,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -5301,7 +4937,6 @@ export interface paths {
                         "application/json": components["schemas"]["CabinetResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -5310,7 +4945,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -5319,7 +4953,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -5343,7 +4976,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -5355,7 +4987,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5364,7 +4995,6 @@ export interface paths {
                         "application/json": components["schemas"]["CabinetResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5375,7 +5005,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -5391,7 +5020,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5400,7 +5028,6 @@ export interface paths {
                         "application/json": components["schemas"]["CabinetResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5409,7 +5036,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -5421,7 +5047,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -5433,7 +5058,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5442,7 +5066,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5451,7 +5074,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -5474,7 +5096,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -5486,7 +5107,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5495,7 +5115,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5521,7 +5140,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -5533,7 +5151,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5542,7 +5159,6 @@ export interface paths {
                         "application/json": components["schemas"]["CabinetUtilizationResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5568,7 +5184,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -5583,7 +5198,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5609,7 +5223,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -5621,7 +5234,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5630,7 +5242,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5656,7 +5267,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -5668,7 +5278,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5677,7 +5286,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5705,7 +5313,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -5721,7 +5328,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5730,7 +5336,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -5739,7 +5344,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5765,7 +5369,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -5781,7 +5384,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5790,7 +5392,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -5799,7 +5400,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5823,7 +5423,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -5840,7 +5439,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5849,7 +5447,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5875,7 +5472,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -5887,7 +5483,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5896,7 +5491,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5905,7 +5499,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -5933,7 +5526,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -5949,7 +5541,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5958,7 +5549,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -5967,7 +5557,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5976,7 +5565,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6002,7 +5590,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -6018,7 +5605,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6027,7 +5613,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6036,7 +5621,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6062,7 +5646,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -6078,7 +5661,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6087,7 +5669,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -6096,7 +5677,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6121,7 +5701,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -6137,7 +5716,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6146,7 +5724,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6171,7 +5748,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -6183,7 +5759,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6192,7 +5767,6 @@ export interface paths {
                         "application/json": components["schemas"]["CabinetResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6218,7 +5792,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -6230,7 +5803,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6239,7 +5811,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6267,7 +5838,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -6281,7 +5851,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6290,7 +5859,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -6314,7 +5882,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -6324,7 +5891,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6333,7 +5899,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6359,7 +5924,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -6371,7 +5935,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6380,7 +5943,6 @@ export interface paths {
                         "application/json": components["schemas"]["CabinetResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6389,7 +5951,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6415,7 +5976,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -6427,7 +5987,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6436,7 +5995,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6464,7 +6022,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -6476,7 +6033,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6485,7 +6041,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6509,7 +6064,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -6521,7 +6075,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6530,7 +6083,6 @@ export interface paths {
                         "application/json": components["schemas"]["CabinetResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6539,7 +6091,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6565,7 +6116,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -6575,7 +6125,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6603,7 +6152,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -6614,13 +6162,11 @@ export interface paths {
             requestBody?: {
                 content: {
                     "multipart/form-data": {
-                        
                         file: string;
                     };
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6629,7 +6175,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -6638,7 +6183,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6662,7 +6206,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -6674,7 +6217,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6683,7 +6225,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6692,7 +6233,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6718,7 +6258,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -6733,7 +6272,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6742,7 +6280,6 @@ export interface paths {
                         "application/json": components["schemas"]["CustomerResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -6754,7 +6291,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -6768,7 +6304,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -6777,7 +6312,6 @@ export interface paths {
                         "application/json": components["schemas"]["CustomerResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -6786,7 +6320,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -6810,7 +6343,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -6822,7 +6354,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6831,7 +6362,6 @@ export interface paths {
                         "application/json": components["schemas"]["CustomerResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6842,7 +6372,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -6858,7 +6387,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6867,7 +6395,6 @@ export interface paths {
                         "application/json": components["schemas"]["CustomerResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -6876,7 +6403,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6885,7 +6411,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -6897,7 +6422,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -6909,7 +6433,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6918,7 +6441,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6927,7 +6449,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -6950,7 +6471,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -6962,7 +6482,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6971,7 +6490,6 @@ export interface paths {
                         "application/json": components["schemas"]["CabinetResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6997,7 +6515,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7009,7 +6526,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7018,7 +6534,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7044,7 +6559,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7056,7 +6570,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7065,7 +6578,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7091,7 +6603,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7103,7 +6614,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7112,7 +6622,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -7138,7 +6647,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7150,7 +6658,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7159,7 +6666,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7168,7 +6674,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -7196,7 +6701,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -7210,7 +6714,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7219,7 +6722,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -7245,7 +6747,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -7255,7 +6756,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7264,7 +6764,6 @@ export interface paths {
                         "application/json": components["schemas"]["CustomerResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7273,7 +6772,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -7297,7 +6795,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7307,7 +6804,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7316,7 +6812,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7342,7 +6837,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7354,7 +6848,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7363,7 +6856,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7372,7 +6864,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -7398,7 +6889,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7408,7 +6898,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7417,7 +6906,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7445,7 +6933,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -7455,7 +6942,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7464,7 +6950,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7488,7 +6973,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7498,7 +6982,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7526,7 +7009,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -7537,13 +7019,11 @@ export interface paths {
             requestBody?: {
                 content: {
                     "multipart/form-data": {
-                        
                         file: string;
                     };
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7552,7 +7032,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -7561,7 +7040,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -7585,7 +7063,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7595,7 +7072,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7604,7 +7080,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7613,7 +7088,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -7639,7 +7113,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -7652,7 +7125,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7661,7 +7133,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceConnectionResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -7673,7 +7144,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -7687,7 +7157,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -7696,7 +7165,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceConnectionResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -7720,7 +7188,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7732,7 +7199,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7741,7 +7207,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceConnectionResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7752,7 +7217,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -7768,7 +7232,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7777,7 +7240,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceConnectionResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -7789,7 +7251,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -7801,7 +7262,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7810,7 +7270,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7836,7 +7295,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -7848,7 +7306,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7857,7 +7314,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7880,7 +7336,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -7892,7 +7347,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7901,7 +7355,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceStorageResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7927,7 +7380,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -7941,7 +7393,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -7950,7 +7401,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceStorageResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7962,7 +7412,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -7978,7 +7427,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -7987,7 +7435,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceStorageResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -7998,7 +7445,6 @@ export interface paths {
                 };
             };
         };
-        
         delete: {
             parameters: {
                 query?: never;
@@ -8010,7 +7456,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8019,7 +7464,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -8043,7 +7487,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -8059,7 +7502,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8068,7 +7510,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8094,7 +7535,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -8110,7 +7550,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8119,7 +7558,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceStorageResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8131,7 +7569,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -8143,7 +7580,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8152,7 +7588,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -8178,7 +7613,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -8190,7 +7624,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8199,7 +7632,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8224,7 +7656,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -8238,7 +7669,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8247,7 +7677,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8271,7 +7700,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -8283,7 +7711,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8292,7 +7719,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -8303,7 +7729,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -8319,7 +7744,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8328,7 +7752,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8340,7 +7763,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -8352,7 +7774,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8361,7 +7782,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8386,7 +7806,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -8402,7 +7821,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8411,7 +7829,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8435,7 +7852,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
@@ -8450,7 +7866,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8459,7 +7874,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -8485,7 +7899,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -8498,7 +7911,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8507,7 +7919,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -8518,7 +7929,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -8535,7 +7945,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8544,7 +7953,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8553,7 +7961,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -8565,7 +7972,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -8578,7 +7984,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8587,7 +7992,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8596,7 +8000,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -8622,7 +8025,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -8634,7 +8036,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8643,7 +8044,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8668,7 +8068,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -8684,7 +8083,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8693,7 +8091,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8717,7 +8114,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -8729,7 +8125,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8738,7 +8133,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceNicPortResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -8764,7 +8158,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -8774,7 +8167,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8802,7 +8194,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -8812,7 +8203,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8821,7 +8211,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8830,7 +8219,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -8839,7 +8227,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -8865,7 +8252,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -8875,7 +8261,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8884,7 +8269,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8893,7 +8277,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -8902,7 +8285,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -8928,7 +8310,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -8938,7 +8319,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8947,7 +8327,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -8973,7 +8352,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -8983,7 +8361,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -8992,7 +8369,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9016,7 +8392,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9026,7 +8401,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9035,7 +8409,6 @@ export interface paths {
                         "application/json": components["schemas"]["IPAddressResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9044,7 +8417,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -9072,7 +8444,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -9082,7 +8453,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9091,7 +8461,6 @@ export interface paths {
                         "application/json": components["schemas"]["IPAddressResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9115,7 +8484,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9125,7 +8493,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9134,7 +8501,6 @@ export interface paths {
                         "application/json": components["schemas"]["IPAddressResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -9161,7 +8527,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -9171,7 +8536,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9180,7 +8544,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -9205,7 +8568,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9215,7 +8577,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9224,7 +8585,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -9235,7 +8595,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -9245,7 +8604,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9254,7 +8612,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -9281,7 +8638,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -9291,7 +8647,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9300,7 +8655,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9326,7 +8680,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -9336,7 +8689,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9345,7 +8697,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9369,7 +8720,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9379,7 +8729,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9388,7 +8737,6 @@ export interface paths {
                         "application/json": components["schemas"]["IPAddressDetailResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -9416,7 +8764,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -9426,7 +8773,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9435,7 +8781,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9461,7 +8806,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -9471,7 +8815,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9480,7 +8823,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9506,7 +8848,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -9516,7 +8857,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9525,7 +8865,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9549,7 +8888,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9559,7 +8897,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9568,7 +8905,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -9594,7 +8930,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9604,7 +8939,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9613,7 +8947,6 @@ export interface paths {
                         "application/json": components["schemas"]["IPNetworkResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -9639,7 +8972,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9649,7 +8981,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9658,7 +8989,6 @@ export interface paths {
                         "application/json": components["schemas"]["IPNetworkResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9667,7 +8997,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -9693,7 +9022,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9703,7 +9031,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9712,7 +9039,6 @@ export interface paths {
                         "application/json": components["schemas"]["IPNetworkResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9721,7 +9047,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -9747,7 +9072,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9757,7 +9081,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9766,7 +9089,6 @@ export interface paths {
                         "application/json": components["schemas"]["IPNetworkResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -9795,7 +9117,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -9805,7 +9126,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9814,7 +9134,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9823,7 +9142,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -9847,7 +9165,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -9857,7 +9174,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9866,7 +9182,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9875,7 +9190,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -9900,7 +9214,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9910,7 +9223,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9919,7 +9231,6 @@ export interface paths {
                         "application/json": components["schemas"]["IPNetworkResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -9945,7 +9256,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -9955,7 +9265,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9964,7 +9273,6 @@ export interface paths {
                         "application/json": components["schemas"]["IPNetworkResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -9973,7 +9281,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -10001,7 +9308,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -10011,7 +9317,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10020,7 +9325,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -10044,7 +9348,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10054,7 +9357,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10063,7 +9365,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -10089,7 +9390,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10099,7 +9399,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10108,7 +9407,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -10136,7 +9434,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -10146,7 +9443,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10155,7 +9451,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -10179,7 +9474,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10189,7 +9483,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10198,7 +9491,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -10224,7 +9516,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10234,7 +9525,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10243,7 +9533,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10254,7 +9543,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -10264,7 +9552,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10273,7 +9560,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10282,7 +9568,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -10291,7 +9576,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -10303,7 +9587,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -10313,7 +9596,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10322,7 +9604,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10331,7 +9612,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -10340,7 +9620,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -10365,7 +9644,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -10375,7 +9653,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10384,7 +9661,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchResponse"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -10393,7 +9669,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -10417,7 +9692,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10427,7 +9701,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10436,7 +9709,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchPortResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10462,7 +9734,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10472,7 +9743,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10481,7 +9751,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10509,7 +9778,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -10519,7 +9787,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10528,7 +9795,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10554,7 +9820,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -10564,7 +9829,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10573,7 +9837,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10599,7 +9862,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -10609,7 +9871,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10618,7 +9879,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -10642,7 +9902,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10652,7 +9911,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10661,7 +9919,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -10689,7 +9946,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -10699,7 +9955,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10708,7 +9963,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10732,7 +9986,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10742,7 +9995,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10751,7 +10003,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchPortResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10762,7 +10013,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -10772,7 +10022,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10781,7 +10030,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10806,7 +10054,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10816,7 +10063,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10825,7 +10071,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchPortResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -10851,7 +10096,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10861,7 +10105,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10870,7 +10113,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchPortResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -10898,7 +10140,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -10908,7 +10149,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10917,7 +10157,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -10944,7 +10183,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -10954,7 +10192,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10963,7 +10200,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -10986,7 +10222,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -10996,7 +10231,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11005,7 +10239,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchPortResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -11033,7 +10266,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -11043,7 +10275,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11052,7 +10283,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -11061,7 +10291,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11087,7 +10316,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -11097,7 +10325,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11106,7 +10333,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -11115,7 +10341,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11141,7 +10366,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -11151,7 +10375,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11160,7 +10383,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11186,7 +10408,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -11196,7 +10417,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11205,7 +10425,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11231,7 +10450,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -11241,7 +10459,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11250,7 +10467,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11276,7 +10492,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -11286,7 +10501,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11295,7 +10509,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11322,7 +10535,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -11332,7 +10544,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11341,7 +10552,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11366,7 +10576,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -11376,7 +10585,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11385,7 +10593,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11412,7 +10619,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -11422,7 +10628,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11431,7 +10636,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11454,7 +10658,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -11464,7 +10667,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11473,7 +10675,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchPortIPResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -11485,7 +10686,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -11495,7 +10695,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11504,7 +10703,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11515,7 +10713,6 @@ export interface paths {
                 };
             };
         };
-        
         delete: {
             parameters: {
                 query?: never;
@@ -11525,7 +10722,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11534,7 +10730,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11560,7 +10755,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -11570,7 +10764,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11579,7 +10772,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11602,7 +10794,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -11612,7 +10803,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11621,7 +10811,6 @@ export interface paths {
                         "application/json": components["schemas"]["LinkAggregationGroupResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -11633,7 +10822,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -11643,7 +10831,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11652,7 +10839,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -11661,7 +10847,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11688,7 +10873,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -11698,7 +10882,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11707,7 +10890,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11730,7 +10912,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -11740,7 +10921,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11749,7 +10929,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -11775,7 +10954,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -11785,7 +10963,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 410: {
                     headers: {
                         [name: string]: unknown;
@@ -11811,7 +10988,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -11821,7 +10997,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 410: {
                     headers: {
                         [name: string]: unknown;
@@ -11847,7 +11022,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -11857,7 +11031,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11866,7 +11039,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11877,7 +11049,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -11887,7 +11058,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11896,7 +11066,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11907,7 +11076,6 @@ export interface paths {
                 };
             };
         };
-        
         post: {
             parameters: {
                 query?: never;
@@ -11917,7 +11085,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11926,7 +11093,6 @@ export interface paths {
                         "application/json": components["schemas"]["SwitchResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -11951,7 +11117,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -11961,7 +11126,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -11970,7 +11134,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -11979,7 +11142,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -12004,7 +11166,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12014,7 +11175,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12023,7 +11183,6 @@ export interface paths {
                         "application/json": components["schemas"]["AuditLogResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -12049,7 +11208,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12059,7 +11217,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12068,7 +11225,6 @@ export interface paths {
                         "application/json": components["schemas"]["VLANResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -12080,7 +11236,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -12090,7 +11245,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -12099,7 +11253,6 @@ export interface paths {
                         "application/json": components["schemas"]["VLANResponse"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -12123,7 +11276,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12133,7 +11285,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12142,7 +11293,6 @@ export interface paths {
                         "application/json": components["schemas"]["VLANResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -12153,7 +11303,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -12163,7 +11312,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12172,7 +11320,6 @@ export interface paths {
                         "application/json": components["schemas"]["VLANResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -12184,7 +11331,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -12194,7 +11340,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12203,7 +11348,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -12226,7 +11370,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12236,7 +11379,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12245,7 +11387,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -12271,7 +11412,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12281,7 +11421,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12290,7 +11429,6 @@ export interface paths {
                         "application/json": components["schemas"]["LinkAggregationGroupResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -12316,7 +11454,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12328,7 +11465,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12337,7 +11473,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceConfigBackupResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -12363,7 +11498,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12375,7 +11509,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12384,7 +11517,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceConfigBackupResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -12412,7 +11544,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -12424,7 +11555,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -12433,7 +11563,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceConfigBackupResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -12459,7 +11588,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -12475,7 +11603,6 @@ export interface paths {
                 };
             };
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -12484,7 +11611,6 @@ export interface paths {
                         "application/json": components["schemas"]["DeviceConfigChangeResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -12508,7 +11634,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12518,7 +11643,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12527,7 +11651,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -12538,7 +11661,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -12548,7 +11670,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12557,7 +11678,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -12569,7 +11689,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -12579,7 +11698,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12588,7 +11706,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -12612,7 +11729,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -12622,7 +11738,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12631,7 +11746,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -12643,7 +11757,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -12653,7 +11766,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12662,7 +11774,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -12685,7 +11796,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12695,7 +11805,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12706,7 +11815,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -12716,7 +11824,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12741,7 +11848,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12751,7 +11857,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12777,7 +11882,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12787,7 +11891,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12814,7 +11917,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -12824,7 +11926,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12849,7 +11950,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12859,7 +11959,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12885,7 +11984,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -12895,7 +11993,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12923,7 +12020,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -12933,7 +12029,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12959,7 +12054,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -12969,7 +12063,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -12993,7 +12086,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13003,7 +12095,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13015,7 +12106,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -13025,7 +12115,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13049,7 +12138,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13059,7 +12147,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13088,7 +12175,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -13098,7 +12184,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13111,7 +12196,6 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        
         patch: {
             parameters: {
                 query?: never;
@@ -13121,7 +12205,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13143,7 +12226,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -13169,7 +12251,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -13179,7 +12260,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13204,7 +12284,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -13214,7 +12293,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13240,7 +12318,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -13250,7 +12327,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13278,7 +12354,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -13288,7 +12363,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13311,7 +12385,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13321,7 +12394,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13347,7 +12419,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13357,7 +12428,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13383,7 +12453,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13393,7 +12462,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13419,7 +12487,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13429,7 +12496,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13455,7 +12521,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13465,7 +12530,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13491,7 +12555,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13501,7 +12564,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13529,7 +12591,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -13539,7 +12600,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13565,7 +12625,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -13575,7 +12634,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13601,7 +12659,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -13611,7 +12668,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13637,7 +12693,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -13647,7 +12702,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13673,7 +12727,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -13683,7 +12736,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13709,7 +12761,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -13719,7 +12770,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13749,7 +12799,6 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        
         patch: {
             parameters: {
                 query?: never;
@@ -13759,7 +12808,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13785,7 +12833,6 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        
         patch: {
             parameters: {
                 query?: never;
@@ -13795,7 +12842,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13815,7 +12861,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13825,7 +12870,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13836,7 +12880,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -13846,7 +12889,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13871,7 +12913,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13881,7 +12922,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13907,7 +12947,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -13917,7 +12956,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13928,7 +12966,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -13938,7 +12975,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13965,7 +13001,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -13975,7 +13010,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14002,7 +13036,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -14012,7 +13045,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14038,7 +13070,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -14048,7 +13079,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14077,7 +13107,6 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        
         patch: {
             parameters: {
                 query?: never;
@@ -14087,7 +13116,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14107,7 +13135,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14117,7 +13144,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14143,7 +13169,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14153,7 +13178,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14179,7 +13203,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14189,7 +13212,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14201,7 +13223,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -14211,7 +13232,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14235,7 +13255,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14245,7 +13264,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14256,7 +13274,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -14266,7 +13283,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14278,7 +13294,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -14288,7 +13303,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14313,7 +13327,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -14323,7 +13336,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14350,7 +13362,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -14360,7 +13371,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14383,7 +13393,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14393,7 +13402,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14419,7 +13427,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14429,7 +13436,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14455,7 +13461,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14465,7 +13470,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14491,7 +13495,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14501,7 +13504,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14513,7 +13515,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -14523,7 +13524,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14550,7 +13550,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -14560,7 +13559,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14573,7 +13571,6 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        
         patch: {
             parameters: {
                 query?: never;
@@ -14583,7 +13580,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14603,7 +13599,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14613,7 +13608,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14625,7 +13619,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -14635,7 +13628,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14662,7 +13654,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -14672,7 +13663,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14695,7 +13685,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14705,7 +13694,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14717,7 +13705,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -14727,7 +13714,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14754,7 +13740,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -14764,7 +13749,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14777,7 +13761,6 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        
         patch: {
             parameters: {
                 query?: never;
@@ -14787,7 +13770,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14807,7 +13789,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14817,7 +13798,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14829,7 +13809,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -14839,7 +13818,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14866,7 +13844,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -14876,7 +13853,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14889,7 +13865,6 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        
         patch: {
             parameters: {
                 query?: never;
@@ -14899,7 +13874,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14919,7 +13893,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -14929,7 +13902,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14941,7 +13913,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -14951,7 +13922,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -14978,7 +13948,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -14988,7 +13957,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15001,7 +13969,6 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        
         patch: {
             parameters: {
                 query?: never;
@@ -15011,7 +13978,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15031,7 +13997,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15041,7 +14006,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15067,7 +14031,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15077,7 +14040,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15103,7 +14065,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15113,7 +14074,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15125,7 +14085,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -15135,7 +14094,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15162,7 +14120,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -15172,7 +14129,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15185,7 +14141,6 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        
         patch: {
             parameters: {
                 query?: never;
@@ -15195,7 +14150,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15215,7 +14169,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15225,7 +14178,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15252,7 +14204,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -15262,7 +14213,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15289,7 +14239,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -15299,7 +14248,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15325,7 +14273,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -15335,7 +14282,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15359,7 +14305,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15369,7 +14314,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15397,7 +14341,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -15407,7 +14350,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15431,7 +14373,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15441,7 +14382,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15453,7 +14393,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -15463,7 +14402,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15490,7 +14428,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -15500,7 +14437,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15513,7 +14449,6 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        
         patch: {
             parameters: {
                 query?: never;
@@ -15523,7 +14458,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15543,17 +14477,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
-                    
                     room_id?: number;
-                    
                     virtual_room_id?: number;
-                    
                     layer?: number;
-                    
                     include_offline?: boolean;
                 };
                 header?: never;
@@ -15562,7 +14491,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15586,17 +14514,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: {
-                    
                     room_id?: number;
-                    
                     virtual_room_id?: number;
-                    
                     cabinet_id?: number;
-                    
                     switch_device_id?: number;
                 };
                 header?: never;
@@ -15605,7 +14528,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15631,7 +14553,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -15641,7 +14562,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15663,7 +14583,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15673,7 +14592,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15682,7 +14600,6 @@ export interface paths {
                         "application/json": components["schemas"]["DashboardStatsResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -15708,7 +14625,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15718,7 +14634,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15727,7 +14642,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -15753,7 +14667,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15763,7 +14676,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15772,7 +14684,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -15798,7 +14709,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15808,7 +14718,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15817,7 +14726,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -15843,7 +14751,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15853,7 +14760,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15862,7 +14768,6 @@ export interface paths {
                         "application/json": components["schemas"]["DashboardStatsResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -15888,7 +14793,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15898,7 +14802,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15907,7 +14810,6 @@ export interface paths {
                         "application/json": components["schemas"]["DashboardStatsResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -15933,7 +14835,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -15943,7 +14844,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15952,7 +14852,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -15980,7 +14879,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -15990,7 +14888,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -15999,7 +14896,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -16023,7 +14919,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -16033,7 +14928,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16042,7 +14936,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -16054,7 +14947,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -16064,7 +14956,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -16073,7 +14964,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -16097,7 +14987,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -16107,7 +14996,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16116,7 +15004,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -16127,7 +15014,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -16137,7 +15023,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16146,7 +15031,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -16158,7 +15042,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -16168,7 +15051,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16177,7 +15059,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -16200,7 +15081,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -16210,7 +15090,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16222,7 +15101,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -16232,7 +15110,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -16241,7 +15118,6 @@ export interface paths {
                         "application/json": components["schemas"]["VirtualRoomResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -16265,7 +15141,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -16275,7 +15150,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16284,7 +15158,6 @@ export interface paths {
                         "application/json": components["schemas"]["VirtualRoomResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -16295,7 +15168,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -16305,7 +15177,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16314,7 +15185,6 @@ export interface paths {
                         "application/json": components["schemas"]["VirtualRoomResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -16326,7 +15196,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -16336,7 +15205,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16345,7 +15213,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -16369,7 +15236,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -16379,7 +15245,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16388,7 +15253,6 @@ export interface paths {
                         "application/json": components["schemas"]["VirtualRoomResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -16415,7 +15279,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -16425,7 +15288,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16434,7 +15296,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -16458,7 +15319,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -16468,7 +15328,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16494,7 +15353,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -16504,7 +15362,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16530,7 +15387,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -16540,7 +15396,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16568,7 +15423,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -16578,7 +15432,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16604,7 +15457,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -16614,7 +15466,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16641,7 +15492,6 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -16651,7 +15501,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16674,7 +15523,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -16684,7 +15532,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16695,7 +15542,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -16705,7 +15551,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16730,7 +15575,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -16740,7 +15584,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16752,7 +15595,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -16762,7 +15604,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16787,7 +15628,6 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        
         put: {
             parameters: {
                 query?: never;
@@ -16797,7 +15637,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16809,7 +15648,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -16819,7 +15657,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16844,7 +15681,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -16854,7 +15690,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16878,7 +15713,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -16888,7 +15722,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16899,7 +15732,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -16909,7 +15741,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16921,7 +15752,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -16931,7 +15761,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16956,7 +15785,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -16966,7 +15794,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16990,7 +15817,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -17000,7 +15826,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17009,7 +15834,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoleResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -17021,7 +15845,6 @@ export interface paths {
             };
         };
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -17031,7 +15854,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -17040,7 +15862,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoleResponse"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -17064,7 +15885,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -17074,7 +15894,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17083,7 +15902,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoleResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17094,7 +15912,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -17104,7 +15921,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17113,7 +15929,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoleResponse"];
                     };
                 };
-                
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -17125,7 +15940,6 @@ export interface paths {
             };
         };
         post?: never;
-        
         delete: {
             parameters: {
                 query?: never;
@@ -17135,7 +15949,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17144,7 +15957,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -17169,7 +15981,6 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        
         post: {
             parameters: {
                 query?: never;
@@ -17179,7 +15990,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17188,7 +15998,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -17212,7 +16021,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -17222,7 +16030,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17231,7 +16038,6 @@ export interface paths {
                         "application/json": components["schemas"]["PermissionResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17242,7 +16048,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -17252,7 +16057,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17261,7 +16065,6 @@ export interface paths {
                         "application/json": components["schemas"]["PermissionResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -17272,7 +16075,6 @@ export interface paths {
                 };
             };
         };
-        
         post: {
             parameters: {
                 query?: never;
@@ -17282,7 +16084,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17291,7 +16092,6 @@ export interface paths {
                         "application/json": components["schemas"]["PermissionResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -17315,7 +16115,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -17325,7 +16124,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17334,7 +16132,6 @@ export interface paths {
                         "application/json": components["schemas"]["PermissionResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -17360,7 +16157,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -17370,7 +16166,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17379,7 +16174,6 @@ export interface paths {
                         "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
-                
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -17405,7 +16199,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        
         get: {
             parameters: {
                 query?: never;
@@ -17415,7 +16208,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17424,7 +16216,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoleResponse"];
                     };
                 };
-                
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -17435,7 +16226,6 @@ export interface paths {
                 };
             };
         };
-        
         put: {
             parameters: {
                 query?: never;
@@ -17445,7 +16235,6 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -17454,7 +16243,6 @@ export interface paths {
                         "application/json": components["schemas"]["RoleResponse"];
                     };
                 };
-                
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -17477,17 +16265,12 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         PaginationMeta: {
-            
             page: number;
-            
             per_page: number;
-            
             total: number;
-            
             total_pages: number;
         };
         ApiError: {
-            
             success: boolean;
             message: string;
             error_code?: string;
@@ -17529,24 +16312,18 @@ export interface components {
             node_cols?: number | null;
             device_subtype?: string | null;
             node_naming_pattern?: string | null;
-            
             auto_create_nodes: boolean;
             asset_number?: string | null;
             supplier?: string | null;
             supplier_contact?: string | null;
             contract_number?: string | null;
-            
             purchase_date?: string | null;
             purchase_price?: number | null;
             invoice_number?: string | null;
-            
             warranty_start?: string | null;
-            
             warranty_end?: string | null;
             warranty_type?: string | null;
-            
             online_date?: string | null;
-            
             offline_date?: string | null;
             lifecycle_years?: number | null;
             ipmi_address?: string | null;
@@ -17558,24 +16335,17 @@ export interface components {
             node_hardware?: {
                 [key: string]: unknown;
             } | null;
-            
             storage_items: {
                 [key: string]: unknown;
             }[];
-            
             nic_ports: {
                 [key: string]: unknown;
             }[];
-            
             cpu_template_id: number | null;
-            
             memory_template_id: number | null;
-            
             memory_dimm_count: number | null;
             gpu?: string | null;
-            
             gpu_count: number | null;
-            
             gpu_template_id: number | null;
         };
         DeviceUpdate: {
@@ -17619,18 +16389,13 @@ export interface components {
             supplier?: string | null;
             supplier_contact?: string | null;
             contract_number?: string | null;
-            
             purchase_date?: string | null;
             purchase_price?: number | null;
             invoice_number?: string | null;
-            
             warranty_start?: string | null;
-            
             warranty_end?: string | null;
             warranty_type?: string | null;
-            
             online_date?: string | null;
-            
             offline_date?: string | null;
             lifecycle_years?: number | null;
             ipmi_address?: string | null;
@@ -17639,53 +16404,38 @@ export interface components {
             switch_config?: {
                 [key: string]: unknown;
             } | null;
-            
             cpu_template_id: number | null;
-            
             memory_template_id: number | null;
-            
             memory_dimm_count: number | null;
             gpu?: string | null;
-            
             gpu_count: number | null;
-            
             gpu_template_id: number | null;
-            
             auto_create_nodes: boolean;
             node_hardware?: {
                 [key: string]: unknown;
             } | null;
-            
             storage_items: {
                 [key: string]: unknown;
             }[];
-            
             nic_ports: {
                 [key: string]: unknown;
             }[];
-            
             overwrite_nodes: boolean;
             metric_template_group_id?: number | null;
         };
         BatchUpdateAsset: {
             ids: number[];
-            
             auto_generate_asset_number: boolean;
             supplier?: string | null;
             supplier_contact?: string | null;
             contract_number?: string | null;
-            
             purchase_date?: string | null;
             purchase_price?: number | null;
             invoice_number?: string | null;
-            
             warranty_start?: string | null;
-            
             warranty_end?: string | null;
             warranty_type?: string | null;
-            
             online_date?: string | null;
-            
             offline_date?: string | null;
             lifecycle_years?: number | null;
         };
@@ -17726,11 +16476,8 @@ export interface components {
             height_u?: number | null;
         };
         SerialNumberGenerate: {
-            
             prefix: string;
-            
             format_type: string;
-            
             length: number;
         };
         SerialNumberCheck: {
@@ -17790,25 +16537,20 @@ export interface components {
             cabinet_number: string;
             room_id: number;
             location?: string | null;
-            
             row: number | null;
-            
             col: number | null;
             total_u?: number;
             total_power?: number | null;
             customer_id?: number | null;
             status?: number;
             notes?: string | null;
-            
             batch: boolean;
         };
         CabinetUpdate: {
             cabinet_number?: string;
             room_id?: number;
             location?: string | null;
-            
             row: number | null;
-            
             col: number | null;
             total_u?: number;
             total_power?: number | null;
@@ -17850,11 +16592,9 @@ export interface components {
         };
         CustomerCreate: {
             customer_name: string;
-            
             customer_status: number;
             contact_person?: string | null;
             contact_phone?: string | null;
-            
             email?: string | null;
             address?: string | null;
             notes?: string | null;
@@ -17864,18 +16604,14 @@ export interface components {
             customer_status?: number;
             contact_person?: string | null;
             contact_phone?: string | null;
-            
             email?: string | null;
             address?: string | null;
             notes?: string | null;
         };
         RoomCreate: {
             name: string;
-            
             location: string;
-            
             contact: string;
-            
             contact_phone: string;
         };
         RoomUpdate: {
@@ -17957,7 +16693,6 @@ export interface components {
         Login: {
             username: string;
             password: string;
-            
             remember: boolean;
         };
         QRCodeConfirm: {
@@ -17968,30 +16703,20 @@ export interface components {
             scene_id: string;
         };
         AuditLogQuery: {
-            
             user_id: number | null;
-            
             action: string | null;
-            
             resource: string | null;
-            
             resource_id: number | null;
-            
             page: number;
-            
             per_page: number;
         };
         VLANCreate: {
             vlan_id: number;
             name: string;
-            
             purpose: string | null;
-            
             subnet_id: number | null;
-            
             room_id: number | null;
             device_id: number;
-            
             status: number;
         };
         VLANUpdate: {
@@ -18003,9 +16728,7 @@ export interface components {
         };
         VirtualRoomCreate: {
             name: string;
-            
             description: string;
-            
             device_ids: number[];
         };
         VirtualRoomUpdate: {
@@ -18048,7 +16771,6 @@ export interface components {
             password: string;
         };
         MonitorCredentialUpsert: {
-            
             protocol: "snmp" | "ipmi" | "zabbix" | "ping";
             payload: {
                 [key: string]: unknown;
@@ -18485,7 +17207,6 @@ export interface components {
             switch_id?: number | null;
             port?: string | null;
             customer_id?: number | null;
-            
             nexthop?: string | null;
             route_type?: number | null;
             notes?: string | null;
@@ -18944,12 +17665,10 @@ export interface components {
             display_name?: string | null;
             device_type?: string;
             source?: string;
-            
             vendor?: string | null;
             mib?: string | null;
             oid_symbol?: string | null;
             oid?: string | null;
-            
             zabbix_item_key?: string | null;
             index_kind?: string | null;
             metric_type?: string;
@@ -18961,9 +17680,7 @@ export interface components {
             severity_default?: string | null;
             enabled?: boolean;
             description?: string | null;
-            
             runbook_url?: string | null;
-            
             runbook_title?: string | null;
         };
         MetricTemplateListResponse: {
@@ -18998,7 +17715,6 @@ export interface components {
         DeviceTrafficPortsResponse: {
             ports?: components["schemas"]["DeviceTrafficPortItem"][];
             configured?: boolean;
-            
             error?: string | null;
         };
         OidCategoryRuleItem: {
@@ -19272,22 +17988,17 @@ export interface components {
             grouped?: boolean;
             metric_status?: components["schemas"]["DeviceMetricDashboardItem"][];
             overall_status?: string;
-            
             status_reason?: string | null;
             reachable?: boolean | null;
             last_error?: string | null;
             last_checked_at?: string | null;
         };
         DevicePortSyncEnabledResponse: {
-            
             port_sync_enabled?: boolean | null;
-            
             global_enabled?: boolean;
-            
             effective_enabled?: boolean;
         };
         DevicePortSyncEnabledUpdateResponse: {
-            
             port_sync_enabled?: boolean | null;
         };
         DeviceBatchPortSyncEnabledResponse: {

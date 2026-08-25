@@ -50,14 +50,11 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
     }
   }, [open, editRecord, form]);
 
-  
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      
       const protocol = values.protocol ?? 'ssh';
       const port = values.port ?? (protocol === 'telnet' ? 23 : 22);
-      
       const payload = {
         ...values,
         port,
@@ -65,7 +62,6 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
         layer: values.layer ?? 2,
         authentication_method: values.authentication_method ?? 'password'
       };
-      
       if (!values.password) {
         delete payload.password;
       } else {
@@ -91,7 +87,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
     >
       <Form form={form} layout="vertical">
         <Row gutter={24}>
-          {}
+          {/* 第一行：交换机名称 + 管理IP */}
           <Col span={12}>
             <Form.Item
               name="name"
@@ -114,7 +110,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
             </Form.Item>
           </Col>
 
-          {}
+          {/* 第二行：端口号 + 协议 */}
           <Col span={12}>
             <Form.Item name="port" label="端口号" extra="留空则按协议自动填充：SSH→22，Telnet→23">
               <InputNumber
@@ -135,7 +131,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
             </Form.Item>
           </Col>
 
-          {}
+          {/* 第三行：用户名 + 密码 */}
           <Col span={12}>
             <Form.Item
               name="username"
@@ -151,7 +147,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
             </Form.Item>
           </Col>
 
-          {}
+          {/* 第四行：设备类型 + 型号 */}
           <Col span={12}>
             <Form.Item
               name="device_type"
@@ -167,7 +163,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
             </Form.Item>
           </Col>
 
-          {}
+          {/* 第五行：交换机类型 + 网络层级 */}
           <Col span={12}>
             <Form.Item
               name="switch_role"
@@ -194,7 +190,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
             </Form.Item>
           </Col>
 
-          {}
+          {/* 第六行：认证方法 + has_ssh 管理权限开关 */}
           <Col span={12}>
             <Form.Item
               name="authentication_method"

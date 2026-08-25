@@ -35,12 +35,13 @@ from app.services.ip_status_service import detect_ip_status
 
 logger = get_logger(__name__)
 
-BAN_MODE_ROUTE = "route"
-BAN_MODE_ARP = "arp"
+BAN_MODE_ROUTE = "route"       # 黑洞路由方式（三层）
+BAN_MODE_ARP = "arp"           # 静态ARP方式（二层）
 
 
 @dataclass
 class BanResult:
+    """封禁/解封操作结果"""
     ip_address: str
     success: bool
     switch_id: int
@@ -50,6 +51,22 @@ class BanResult:
 
 
 class IPBanService:
+    """IP 封禁/解封服务
+
+    自动判断二层/三层网络，选择最优封禁方式。
+    所有数据库操作统一使用 self.session，不再混用 db.session。
+
+    三阶段事务模型:
+    阶段1 (commit DB): 写 PENDING 状态 + ban_record + Redis pending → commit
+    阶段2 (无事务):     执行 SSH
+    阶段3 (commit DB): SSH成功 → 终态 commit；SSH失败 → 原态 + 清理 commit
+
+    崩溃安全:
+    - 死在阶段1 commit 前：事务未提交，IP 状态不变
+    - 死在阶段1 commit 后、阶段2 前：IP 是 PENDING_BAN，check_ban_consistency 可发现
+    - 死在阶段2 SSH 成功后、阶段3 前：IP 是 PENDING_BAN，交换机已生效，check_ban_consistency 可修复
+    - 死在阶段3：同上
+    """
 
     def __init__(self, ssh_manager: SSHManager, session=None):
         self.ssh_mgr = ssh_manager
@@ -68,6 +85,17 @@ class IPBanService:
         operator_id: Optional[int] = None,
         ban_mode: Optional[str] = None,
     ) -> BanResult:
+        """封禁指定 IP
+
+        Args:
+            ip_address: IP地址
+            room_id: 机房ID（为空时自动查找该IP所在机房）
+            operator_id: 操作人用户ID
+            ban_mode: 封禁方式(None=自动, "route"=黑洞路由, "arp"=静态ARP)
+
+        Returns:
+            BanResult: 封禁结果
+        """
         if room_id is not None:
             ip_record = self.ip_mgr_repo.get_by_ip_room(ip_address, room_id)
         else:
@@ -97,6 +125,7 @@ class IPBanService:
     def _ban_via_route(
         self, ip_address: str, room_id: int, operator_id: Optional[int],
     ) -> BanResult:
+        """三层封禁：黑洞路由方式（三阶段）"""
         switch = self._pick_core_switch(ip_address, room_id)
         adapter = get_adapter(switch.device_type)
         device_model = switch.device.device_model if switch.device else ""
@@ -150,6 +179,7 @@ class IPBanService:
     def _ban_via_arp(
         self, ip_address: str, room_id: int, operator_id: Optional[int],
     ) -> BanResult:
+        """二层封禁：静态ARP方式（三阶段）"""
         switch, mac_address, vlan_id = self._find_gateway_info(ip_address, room_id)
         adapter = get_adapter(switch.device_type)
         device_model = switch.device.device_model if switch.device else ""
@@ -208,6 +238,16 @@ class IPBanService:
         room_id: Optional[int] = None,
         operator_id: Optional[int] = None,
     ) -> BanResult:
+        """解封指定 IP
+
+        Args:
+            ip_address: IP地址
+            room_id: 机房ID（为空时自动查找该IP所在机房）
+            operator_id: 操作人用户ID
+
+        Returns:
+            BanResult: 解封结果
+        """
         if room_id is not None:
             ip_record = self.ip_mgr_repo.get_by_ip_room(ip_address, room_id)
         else:
@@ -236,6 +276,7 @@ class IPBanService:
     def _unban_via_route(
         self, ip_address: str, room_id: int, operator_id: Optional[int],
     ) -> BanResult:
+        """三层解封：撤销黑洞路由（三阶段）"""
         switch = self._find_ban_switch(ip_address, room_id)
         adapter = get_adapter(switch.device_type)
         device_model = switch.device.device_model if switch.device else ""
@@ -278,6 +319,7 @@ class IPBanService:
     def _unban_via_arp(
         self, ip_address: str, room_id: int, operator_id: Optional[int],
     ) -> BanResult:
+        """二层解封：撤销静态ARP（三阶段）"""
         switch, mac_address, vlan_id = self._find_arp_ban_info(ip_address, room_id)
         adapter = get_adapter(switch.device_type)
         device_model = switch.device.device_model if switch.device else ""
@@ -322,6 +364,7 @@ class IPBanService:
         switch, ban_mode: str, operator_id: Optional[int],
         already_unbanned: bool = False,
     ) -> BanResult:
+        """解封收尾：标记记录、更新状态、提交、探测真实状态（阶段3）"""
         active_ban = self.ip_ban_repo.find_active_ban(ip_address, room_id)
         if active_ban:
             active_ban.is_active = False
@@ -365,6 +408,23 @@ class IPBanService:
 
 
     def _determine_ban_mode(self, ip_address: str, room_id: int) -> str:
+        """自动判断封禁方式
+
+        基于 switch_routes 表判断：
+        - IP 属于直连子网路由（route_type=SUBNET, 出接口为 VLAN 接口）→ 静态ARP
+          二层网络中，交换机有该子网的 VLAN 接口，IP 可直接通过二层到达，
+          用 ARP static 绑定无效 MAC 即可阻断通信
+        - IP 属于非直连路由（需经路由到达）→ 黑洞路由
+          三层网络中，IP 需要路由转发，用黑洞路由将流量丢弃到 NULL0
+        - 无法判断 → 降级到黑洞路由
+
+        Args:
+            ip_address: IP地址
+            room_id: 机房ID
+
+        Returns:
+            str: BAN_MODE_ARP 或 BAN_MODE_ROUTE
+        """
         route = self._find_ip_route(ip_address, room_id)
         if route is None:
             logger.debug("IP %s 无路由记录，降级到黑洞路由封禁", ip_address)
@@ -388,6 +448,15 @@ class IPBanService:
     def _find_ip_route(
         self, ip_address: str, room_id: int,
     ) -> Optional[SwitchRoute]:
+        """通过 switch_routes 表找到 IP 所属路由（最长前缀匹配）
+
+        Args:
+            ip_address: IP地址
+            room_id: 机房ID
+
+        Returns:
+            Optional[SwitchRoute]: 路由记录，优先返回 SUBNET 类型
+        """
         try:
             ipaddress.ip_address(ip_address)
         except ValueError:
@@ -418,6 +487,15 @@ class IPBanService:
     def _detect_ban_mode_from_record(
         self, ip_address: str, room_id: int,
     ) -> str:
+        """从 ip_ban_records 判断封禁方式
+
+        Args:
+            ip_address: IP地址
+            room_id: 机房ID
+
+        Returns:
+            str: BAN_MODE_ARP 或 BAN_MODE_ROUTE
+        """
         record = self.ip_ban_repo.find_active_ban(ip_address, room_id)
         if record:
             return record.ban_mode
@@ -428,6 +506,18 @@ class IPBanService:
     def _find_gateway_info(
         self, ip_address: str, room_id: int,
     ) -> tuple:
+        """查找IP的网关交换机、MAC地址和VLAN ID
+
+        Args:
+            ip_address: IP地址
+            room_id: 机房ID
+
+        Returns:
+            tuple: (switch, mac_address, vlan_id)
+
+        Raises:
+            NoCoreSwitch: 找不到网关交换机
+        """
         from app.models.switch_credentials import IPSwitchInfo
 
         isi = self.ip_sw_repo.get_by_ip_room(ip_address, room_id)
@@ -449,6 +539,15 @@ class IPBanService:
     def _find_arp_ban_info(
         self, ip_address: str, room_id: int,
     ) -> tuple:
+        """从 ip_ban_records 获取ARP解封所需信息
+
+        Args:
+            ip_address: IP地址
+            room_id: 机房ID
+
+        Returns:
+            tuple: (switch, mac_address, vlan_id)
+        """
         record = self.ip_ban_repo.find_active_ban(ip_address, room_id)
 
         if record:
@@ -474,10 +573,37 @@ class IPBanService:
 
     @staticmethod
     def _extract_vlan_from_interface(interface: str) -> int:
+        """从VLAN接口名提取VLAN ID
+
+        只匹配 Vlanif/Vlan-interface/SVI 等VLAN接口格式，
+        对物理接口（如 GE1/0/10）返回0。
+
+        Args:
+            interface: 接口名（如 Vlanif100, Vlan-interface200）
+
+        Returns:
+            int: VLAN ID，非VLAN接口返回0
+        """
         m = re.search(r'(?i)(?:vlanif|vlan-interface|svi)(\d+)', interface)
         return int(m.group(1)) if m else 0
 
     def _pick_core_switch(self, ip_address: str, room_id: int):
+        """选取核心交换机（最长前缀匹配）
+
+        优先选已有该 IP 网段的核心交换机（最长前缀匹配）；
+        当前机房找不到时，跨机房查找（三层网关可能不在 IP 所在机房）；
+        均无则取机房内第一台核心交换机。
+
+        Args:
+            ip_address: IP地址
+            room_id: 机房ID
+
+        Returns:
+            SwitchCredentials: 选中的核心交换机
+
+        Raises:
+            NoCoreSwitch: 机房无可用核心交换机
+        """
         try:
             ip_obj = ipaddress.ip_address(ip_address)
         except ValueError:
@@ -512,6 +638,15 @@ class IPBanService:
         )
 
     def _find_best_switch_by_prefix(self, ip_int_val: int, room_id: Optional[int] = None) -> Optional[int]:
+        """在 ip_networks 表中按最长前缀匹配查找网关交换机
+
+        Args:
+            ip_int_val: IP 地址的整数值
+            room_id: 机房ID，None 表示跨机房查找
+
+        Returns:
+            Optional[int]: 最佳匹配的 switch_id，无匹配返回 None
+        """
         if room_id is not None:
             all_networks = self.ip_net_repo.find_by_room_id(room_id)
         else:
@@ -530,10 +665,27 @@ class IPBanService:
         return best_switch_id
 
     def _find_banned_ip_record(self, ip_address: str):
+        """查找处于封禁状态的 IP 记录（不限定机房）
+
+        Args:
+            ip_address: IP地址
+
+        Returns:
+            Optional[IPManager]: 封禁状态的 IP 记录
+        """
         from app.models.ip_model import IPManager
         return self.ip_mgr_repo.find_one({"ip_address": ip_address, "status": IPStatus.BANNED})
 
     def _find_ban_switch(self, ip_address: str, room_id: int):
+        """从 ip_ban_records 反查交换机
+
+        Args:
+            ip_address: IP地址
+            room_id: 机房ID
+
+        Returns:
+            SwitchCredentials: 交换机对象
+        """
         record = self.ip_ban_repo.find_active_ban(ip_address, room_id)
         if record:
             sw = self.sw_repo.find_by_device_id(record.switch_id)
@@ -547,6 +699,17 @@ class IPBanService:
         mac_address: str = None, vlan_id: int = None,
         operator_id: Optional[int] = None,
     ) -> None:
+        """插入封禁记录，若该 IP+机房 已有活跃记录则跳过。
+
+        Args:
+            ip_address: IP地址
+            switch_id: 交换机ID
+            room_id: 机房ID
+            ban_mode: 封禁方式（route/arp）
+            mac_address: MAC地址（ARP封禁时使用）
+            vlan_id: VLAN ID（ARP封禁时使用）
+            operator_id: 操作人用户ID
+        """
         exists = self.ip_ban_repo.exists_active_ban(ip_address, room_id)
         if exists:
             return
@@ -570,9 +733,16 @@ class IPBanService:
         ))
 
     def _deactivate_ban_record(self, ip_address: str, room_id: int) -> None:
+        """将活跃封禁记录标记为非活跃（SSH 失败时清理阶段1插入的记录）。
+
+        Args:
+            ip_address: IP地址
+            room_id: 机房ID
+        """
         record = self.ip_ban_repo.find_active_ban(ip_address, room_id)
         if record:
             record.is_active = False
+
 
 
 def ban_ip_list(
@@ -582,6 +752,24 @@ def ban_ip_list(
     operator_id: Optional[int] = None,
     ban_mode: Optional[str] = None,
 ) -> dict:
+    """批量封禁 IP 列表（三阶段）
+
+    按交换机分组，合并命令一次性下发，减少 SSH 交互次数。
+    三阶段事务模型：
+    阶段1：逐条写 PENDING_BAN + ban_record + Redis pending → commit
+    阶段2：按组下发 SSH 命令
+    阶段3：逐条写 BANNED 终态 → commit（SSH 失败的回滚原态）
+
+    Args:
+        service: IPBanService 实例
+        ip_list: IP地址列表
+        room_id: 机房ID（为空时逐IP自动查找所在机房）
+        operator_id: 操作人用户ID
+        ban_mode: 封禁方式(None=自动, "route"=黑洞路由, "arp"=静态ARP)
+
+    Returns:
+        dict: {"success": [...], "failed": [...], "skipped": [...]}
+    """
     result = {"success": [], "failed": [], "skipped": []}
 
     groups = defaultdict(list)
@@ -707,6 +895,23 @@ def unban_ip_list(
     room_id: Optional[int] = None,
     operator_id: Optional[int] = None,
 ) -> dict:
+    """批量解封 IP 列表（三阶段）
+
+    按交换机分组，合并命令一次性下发，减少 SSH 交互次数。
+    三阶段事务模型：
+    阶段1：逐条写 PENDING_UNBAN + Redis pending → commit
+    阶段2：按组下发 SSH 命令
+    阶段3：逐条写 INACTIVE 终态 → commit（SSH 失败的回滚 BANNED）
+
+    Args:
+        service: IPBanService 实例
+        ip_list: IP地址列表
+        room_id: 机房ID（为空时自动查找）
+        operator_id: 操作人用户ID
+
+    Returns:
+        dict: {"success": [...], "failed": [...], "skipped": [...]}
+    """
     result = {"success": [], "failed": [], "skipped": []}
 
     groups = defaultdict(list)
@@ -841,10 +1046,12 @@ def unban_ip_list(
     return result
 
 
-BAN_PENDING_TTL = 300
+
+BAN_PENDING_TTL = 300  # 5分钟
 
 
 def _mark_ban_pending(ip_address: str, room_id: int, switch_id: int, ban_mode: str) -> None:
+    """在 Redis 中标记封禁操作 pending 状态"""
     try:
         from app.utils.cache import cache_manager
         import json
@@ -857,6 +1064,7 @@ def _mark_ban_pending(ip_address: str, room_id: int, switch_id: int, ban_mode: s
 
 
 def _clear_ban_pending(ip_address: str, room_id: int) -> None:
+    """清除 Redis 中的 pending 标记"""
     try:
         from app.utils.cache import cache_manager
         key = f"ipm:ban_pending:{room_id}:{ip_address}"
@@ -866,6 +1074,23 @@ def _clear_ban_pending(ip_address: str, room_id: int) -> None:
 
 
 def _verify_ban_output(output: str, ip: str, action: str) -> None:
+    """验证交换机返回输出
+
+    检测交换机输出中的错误行（以 Error: 或 Error 开头的行），
+    避免误判包含 "error" 等关键词的正常输出。
+
+    解封时，若错误为"路由不存在"/"ARP条目不存在"等配置缺失类错误，
+    视为该IP已通过其他方式解封，抛出 BanConfigNotFoundError 而非 BanCommandFailed。
+
+    Args:
+        output: 交换机命令输出
+        ip: IP地址
+        action: 操作类型（ban/unban）
+
+    Raises:
+        BanCommandFailed: 输出包含错误行
+        BanConfigNotFoundError: 解封时配置不存在（路由/ARP已消失）
+    """
     if not output:
         return
     error_patterns = re.compile(
@@ -888,6 +1113,22 @@ def _verify_ban_output(output: str, ip: str, action: str) -> None:
 
 
 def check_ban_consistency(room_id: int = None) -> dict:
+    """检查封禁一致性：发现 ip_ban_records 与 ip_manager 状态不一致的记录
+
+    不一致场景：
+    - ip_ban_records 有活跃记录但 ip_manager.status != BANNED（SSH 成功但数据库更新遗漏）
+    - ip_manager.status == BANNED 但 ip_ban_records 无活跃记录（记录丢失）
+
+    PENDING 超时场景（三阶段事务模型新增）：
+    - ip_manager.status == PENDING_BAN 且 Redis pending 已过期（进程崩溃，阶段1已提交但未完成阶段3）
+    - ip_manager.status == PENDING_UNBAN 且 Redis pending 已过期（同上）
+
+    Args:
+        room_id: 机房ID，为空则检查所有机房
+
+    Returns:
+        dict: {"inconsistent": [...], "pending_timeout": [...], "pending_stuck": [...]}
+    """
     import json
     from app.utils.cache import cache_manager
     from app.models.ip_model import IPManager

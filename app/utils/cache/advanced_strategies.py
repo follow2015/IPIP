@@ -21,13 +21,15 @@ logger = get_logger(__name__)
 
 
 class CacheLevel(Enum):
-    L1 = "L1"
-    L2 = "L2"
-    L3 = "L3"
+    """缓存级别枚举"""
+    L1 = "L1"  # 内存缓存（最快）
+    L2 = "L2"  # Redis缓存（持久化）
+    L3 = "L3"  # 数据库缓存（最慢但最可靠）
 
 
 @dataclass
 class CacheMetrics:
+    """缓存指标数据类"""
     hits: int = 0
     misses: int = 0
     sets: int = 0
@@ -40,12 +42,24 @@ class CacheMetrics:
 
 
 class MultiLevelCacheStrategy(CacheStrategy):
+    """多级缓存策略
+    
+    实现L1(内存) -> L2(Redis) -> L3(数据库)的多级缓存架构。
+    """
     
     def __init__(self, 
                  l1_max_size: int = 1000,
                  l2_max_size: int = 10000,
                  promotion_threshold: int = 3,
                  demotion_threshold: int = 100):
+        """初始化多级缓存策略
+        
+        Args:
+            l1_max_size: L1缓存最大条目数
+            l2_max_size: L2缓存最大条目数  
+            promotion_threshold: 提升到上级缓存的访问次数阈值
+            demotion_threshold: 降级到下级缓存的时间阈值（秒）
+        """
         self.l1_max_size = l1_max_size
         self.l2_max_size = l2_max_size
         self.promotion_threshold = promotion_threshold
@@ -53,7 +67,7 @@ class MultiLevelCacheStrategy(CacheStrategy):
         
         self.access_count = ThreadSafeDict()
         self.access_time = ThreadSafeDict()
-        self.cache_level = ThreadSafeDict()
+        self.cache_level = ThreadSafeDict()  # 记录每个键所在的缓存级别
         
         self.metrics = {
             CacheLevel.L1: CacheMetrics(),
@@ -65,27 +79,30 @@ class MultiLevelCacheStrategy(CacheStrategy):
         logger.info("多级缓存策略初始化完成")
     
     def should_cache(self, key: str, value: Any) -> bool:
+        """判断是否应该缓存"""
         if value is None:
             return False
         
         data_size = self._estimate_size(value)
-        if data_size > 1024 * 1024:
+        if data_size > 1024 * 1024:  # 1MB限制
             logger.warning(f"数据过大，不缓存: {key}, 大小: {data_size}字节")
             return False
         
         return True
     
     def get_ttl(self, key: str, value: Any) -> Optional[int]:
+        """获取缓存过期时间"""
         access_count = self.access_count.get(key, 0)
         
         if access_count > 10:
-            return 3600
+            return 3600  # 高频访问数据：1小时
         elif access_count > 5:
-            return 1800
+            return 1800  # 中频访问数据：30分钟
         else:
-            return 900
+            return 900   # 低频访问数据：15分钟
     
     def determine_cache_level(self, key: str, value: Any) -> CacheLevel:
+        """确定数据应该存储在哪个缓存级别"""
         access_count = self.access_count.get(key, 0)
         current_level = self.cache_level.get(key, CacheLevel.L2)
         
@@ -105,6 +122,7 @@ class MultiLevelCacheStrategy(CacheStrategy):
         return current_level
     
     def on_hit(self, key: str, value: Any) -> None:
+        """缓存命中时的回调"""
         current_time = time.time()
         
         self.access_count.set(key, self.access_count.get(key, 0) + 1)
@@ -118,12 +136,14 @@ class MultiLevelCacheStrategy(CacheStrategy):
         logger.debug(f"多级缓存命中: {key}, 级别: {level.value}")
     
     def on_miss(self, key: str) -> None:
+        """缓存未命中时的回调"""
         with self.metrics_lock:
             self.metrics[CacheLevel.L2].misses += 1
         
         logger.debug(f"多级缓存未命中: {key}")
     
     def on_set(self, key: str, value: Any, ttl: int = None) -> None:
+        """设置缓存时的回调"""
         current_time = time.time()
         
         level = self.determine_cache_level(key, value)
@@ -138,6 +158,7 @@ class MultiLevelCacheStrategy(CacheStrategy):
         logger.debug(f"多级缓存设置: {key}, 级别: {level.value}")
     
     def on_delete(self, key: str) -> None:
+        """删除缓存时的回调"""
         level = self.cache_level.get(key, CacheLevel.L2)
         
         self.access_count.delete(key)
@@ -150,6 +171,7 @@ class MultiLevelCacheStrategy(CacheStrategy):
         logger.debug(f"多级缓存删除: {key}, 级别: {level.value}")
     
     def _estimate_size(self, value: Any) -> int:
+        """估算数据大小"""
         try:
             if isinstance(value, str):
                 return len(value.encode('utf-8'))
@@ -158,20 +180,27 @@ class MultiLevelCacheStrategy(CacheStrategy):
             else:
                 return len(str(value).encode('utf-8'))
         except Exception:
-            return 1024
+            return 1024  # 默认1KB
     
     def get_metrics(self) -> Dict[str, CacheMetrics]:
+        """获取缓存指标"""
         with self.metrics_lock:
             return {level.value: metrics for level, metrics in self.metrics.items()}
     
     def reset_metrics(self) -> None:
+        """重置缓存指标"""
         with self.metrics_lock:
             for level in self.metrics:
                 self.metrics[level] = CacheMetrics()
 
 class SmartInvalidationStrategy(CacheStrategy):
+    """智能缓存失效策略
+    
+    基于数据依赖关系和业务逻辑的智能缓存失效。
+    """
     
     def __init__(self):
+        """初始化智能失效策略"""
         self.dependency_graph = ThreadSafeDict()
         self.reverse_dependency = ThreadSafeDict()
         self.tag_to_keys = ThreadSafeDict()
@@ -182,6 +211,12 @@ class SmartInvalidationStrategy(CacheStrategy):
         logger.info("智能缓存失效策略初始化完成")
     
     def add_dependency(self, key: str, depends_on: List[str]) -> None:
+        """添加缓存依赖关系
+        
+        Args:
+            key: 缓存键
+            depends_on: 依赖的其他缓存键列表
+        """
         with self.lock.write_lock():
             self.reverse_dependency.set(key, depends_on)
             
@@ -194,6 +229,12 @@ class SmartInvalidationStrategy(CacheStrategy):
         logger.debug(f"添加缓存依赖: {key} -> {depends_on}")
     
     def add_tag(self, key: str, tags: List[str]) -> None:
+        """为缓存键添加标签
+        
+        Args:
+            key: 缓存键
+            tags: 标签列表
+        """
         with self.lock.write_lock():
             self.key_to_tags.set(key, tags)
             
@@ -206,6 +247,14 @@ class SmartInvalidationStrategy(CacheStrategy):
         logger.debug(f"添加缓存标签: {key} -> {tags}")
     
     def get_invalidation_keys(self, key: str) -> Set[str]:
+        """获取需要失效的相关缓存键
+        
+        Args:
+            key: 发生变化的缓存键
+            
+        Returns:
+            Set[str]: 需要失效的缓存键集合
+        """
         invalidation_keys = set()
         
         with self.lock.read_lock():
@@ -223,6 +272,7 @@ class SmartInvalidationStrategy(CacheStrategy):
         return invalidation_keys
     
     def _get_recursive_dependencies(self, key: str, visited: Set[str]) -> Set[str]:
+        """递归获取依赖关系"""
         if key in visited:
             return set()
         
@@ -238,24 +288,30 @@ class SmartInvalidationStrategy(CacheStrategy):
         return result
     
     def should_cache(self, key: str, value: Any) -> bool:
+        """判断是否应该缓存"""
         return value is not None
     
     def get_ttl(self, key: str, value: Any) -> Optional[int]:
+        """获取缓存过期时间"""
         if self.reverse_dependency.has(key) or self.key_to_tags.has(key):
-            return 1800
+            return 1800  # 30分钟
         else:
-            return 3600
+            return 3600  # 1小时
     
     def on_hit(self, key: str, value: Any) -> None:
+        """缓存命中时的回调"""
         logger.debug(f"智能失效缓存命中: {key}")
     
     def on_miss(self, key: str) -> None:
+        """缓存未命中时的回调"""
         logger.debug(f"智能失效缓存未命中: {key}")
     
     def on_set(self, key: str, value: Any, ttl: int = None) -> None:
+        """设置缓存时的回调"""
         logger.debug(f"智能失效设置缓存: {key}")
     
     def on_delete(self, key: str) -> None:
+        """删除缓存时的回调"""
         invalidation_keys = self.get_invalidation_keys(key)
         
         if invalidation_keys:
@@ -288,11 +344,16 @@ class SmartInvalidationStrategy(CacheStrategy):
 
 
 class CacheWarmupStrategy(CacheStrategy):
+    """缓存预热策略
+    
+    在系统启动或低峰期预热关键缓存数据。
+    """
     
     def __init__(self):
-        self.warmup_tasks = ThreadSafeDict()
-        self.warmup_schedule = ThreadSafeDict()
-        self.warmup_stats = ThreadSafeDict()
+        """初始化缓存预热策略"""
+        self.warmup_tasks = ThreadSafeDict()  # 预热任务
+        self.warmup_schedule = ThreadSafeDict()  # 预热调度
+        self.warmup_stats = ThreadSafeDict()  # 预热统计
         
         self.lock = ReadWriteLock()
         
@@ -303,6 +364,14 @@ class CacheWarmupStrategy(CacheStrategy):
                            data_loader: Callable[[], Any],
                            priority: int = 1,
                            schedule: str = "startup") -> None:
+        """注册预热任务
+        
+        Args:
+            key_pattern: 缓存键模式
+            data_loader: 数据加载函数
+            priority: 优先级（数字越大优先级越高）
+            schedule: 调度时机（startup, hourly, daily）
+        """
         task_id = hashlib.md5(key_pattern.encode()).hexdigest()[:8]
         
         task = {
@@ -329,6 +398,14 @@ class CacheWarmupStrategy(CacheStrategy):
     
     @monitor_performance(log_slow_calls=True, slow_threshold=5.0)
     def execute_warmup(self, schedule: str = "startup") -> Dict[str, Any]:
+        """执行预热任务
+        
+        Args:
+            schedule: 调度时机
+            
+        Returns:
+            Dict: 执行结果统计
+        """
         results = {
             'total_tasks': 0,
             'successful_tasks': 0,
@@ -383,24 +460,31 @@ class CacheWarmupStrategy(CacheStrategy):
         return results
     
     def should_cache(self, key: str, value: Any) -> bool:
+        """判断是否应该缓存"""
         return value is not None
     
     def get_ttl(self, key: str, value: Any) -> Optional[int]:
-        return 7200
+        """获取缓存过期时间"""
+        return 7200  # 2小时
     
     def on_hit(self, key: str, value: Any) -> None:
+        """缓存命中时的回调"""
         logger.debug(f"预热缓存命中: {key}")
     
     def on_miss(self, key: str) -> None:
+        """缓存未命中时的回调"""
         logger.debug(f"预热缓存未命中: {key}")
     
     def on_set(self, key: str, value: Any, ttl: int = None) -> None:
+        """设置缓存时的回调"""
         logger.debug(f"预热设置缓存: {key}")
     
     def on_delete(self, key: str) -> None:
+        """删除缓存时的回调"""
         logger.debug(f"预热删除缓存: {key}")
     
     def get_warmup_stats(self) -> Dict[str, Any]:
+        """获取预热统计信息"""
         with self.lock.read_lock():
             stats = {}
             
@@ -422,8 +506,13 @@ class CacheWarmupStrategy(CacheStrategy):
 
 
 class HybridCacheStrategy(CacheStrategy):
+    """混合缓存策略
+    
+    结合多种策略的优点，根据数据特征选择最适合的策略。
+    """
     
     def __init__(self):
+        """初始化混合缓存策略"""
         self.multi_level = MultiLevelCacheStrategy()
         self.smart_invalidation = SmartInvalidationStrategy()
         self.warmup = CacheWarmupStrategy()
@@ -441,6 +530,7 @@ class HybridCacheStrategy(CacheStrategy):
         logger.info("混合缓存策略初始化完成")
     
     def _get_strategy_for_key(self, key: str) -> CacheStrategy:
+        """根据键选择合适的策略"""
         key_parts = key.split(':')
         if key_parts:
             data_type = key_parts[0]
@@ -448,43 +538,54 @@ class HybridCacheStrategy(CacheStrategy):
         return self.multi_level
     
     def should_cache(self, key: str, value: Any) -> bool:
+        """判断是否应该缓存"""
         strategy = self._get_strategy_for_key(key)
         return strategy.should_cache(key, value)
     
     def get_ttl(self, key: str, value: Any) -> Optional[int]:
+        """获取缓存过期时间"""
         strategy = self._get_strategy_for_key(key)
         return strategy.get_ttl(key, value)
     
     def on_hit(self, key: str, value: Any) -> None:
+        """缓存命中时的回调"""
         strategy = self._get_strategy_for_key(key)
         strategy.on_hit(key, value)
     
     def on_miss(self, key: str) -> None:
+        """缓存未命中时的回调"""
         strategy = self._get_strategy_for_key(key)
         strategy.on_miss(key)
     
     def on_set(self, key: str, value: Any, ttl: int = None) -> None:
+        """设置缓存时的回调"""
         strategy = self._get_strategy_for_key(key)
         strategy.on_set(key, value, ttl)
     
     def on_delete(self, key: str) -> None:
+        """删除缓存时的回调"""
         strategy = self._get_strategy_for_key(key)
         strategy.on_delete(key)
     
     def add_dependency(self, key: str, depends_on: List[str]) -> None:
+        """添加缓存依赖关系"""
         self.smart_invalidation.add_dependency(key, depends_on)
     
     def add_tag(self, key: str, tags: List[str]) -> None:
+        """为缓存键添加标签"""
         self.smart_invalidation.add_tag(key, tags)
     
     def register_warmup_task(self, key_pattern: str, data_loader: Callable[[], Any],
                            priority: int = 1, schedule: str = "startup") -> None:
+        """注册预热任务"""
         self.warmup.register_warmup_task(key_pattern, data_loader, priority, schedule)
     
     def execute_warmup(self, schedule: str = "startup") -> Dict[str, Any]:
+        """执行预热任务"""
         return self.warmup.execute_warmup(schedule)
     
     def get_comprehensive_stats(self) -> Dict[str, Any]:
+        """获取综合统计信息"""
         return {
             'multi_level_metrics': self.multi_level.get_metrics(),
             'warmup_stats': self.warmup.get_warmup_stats(),

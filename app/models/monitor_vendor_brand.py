@@ -15,6 +15,7 @@ from .base import BaseModel
 
 
 class MonitorVendorBrand(BaseModel):
+    """厂商品牌（enterprise 号 → 品牌名称）"""
 
     __tablename__ = "monitor_vendor_brands"
     __table_args__ = (

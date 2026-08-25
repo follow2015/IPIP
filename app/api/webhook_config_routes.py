@@ -25,6 +25,7 @@ router = Blueprint("webhook_configs", __name__, url_prefix="/api/webhook-configs
 
 
 def _require_admin():
+    """检查当前用户是否为管理员"""
     from app.services.user_service import UserService
     from app.persistence.user_repository import UserRepository
     from app.persistence.user_log_repository import UserLogRepository
@@ -39,6 +40,7 @@ def _require_admin():
 @doc(summary="列出 Webhook 配置", tags=["Webhook配置"], responses={200: "ApiResponse"})
 @login_required
 def list_webhook_configs():
+    """列出所有 Webhook 配置（管理员）。"""
     if not _require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
@@ -51,6 +53,7 @@ def list_webhook_configs():
 @login_required
 @transactional
 def create_webhook_config():
+    """创建 Webhook 配置（管理员）。"""
     if not _require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
@@ -74,6 +77,7 @@ def create_webhook_config():
 @login_required
 @transactional
 def update_webhook_config(config_id):
+    """更新 Webhook 配置（管理员）。"""
     if not _require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
@@ -93,6 +97,7 @@ def update_webhook_config(config_id):
 @login_required
 @transactional
 def delete_webhook_config(config_id):
+    """删除 Webhook 配置（管理员）。"""
     if not _require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
@@ -106,6 +111,10 @@ def delete_webhook_config(config_id):
 @doc(summary="测试 Webhook 连通性", tags=["Webhook配置"], responses={200: "ApiResponse"})
 @login_required
 def test_webhook_config(config_id):
+    """测试 Webhook 连通性（管理员）。
+
+    发送一条测试消息到 Webhook URL，验证配置是否正确。
+    """
     if not _require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 

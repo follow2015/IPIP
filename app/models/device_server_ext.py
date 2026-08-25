@@ -16,6 +16,11 @@ from extensions import db
 
 
 class DeviceServerExt(db.Model):
+    """服务器扩展表（1:1 扩展 devices）
+
+    仅服务器(device_type='server')和机箱(device_type='chassis')使用。
+    device_id 为主键兼外键，与 devices 表 1:1 关联。
+    """
 
     __tablename__ = "device_server_ext"
     __table_args__ = (
@@ -68,6 +73,7 @@ class DeviceServerExt(db.Model):
     )
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化"""
         return {
             "device_id": self.device_id,
             "parent_device_id": self.parent_device_id,

@@ -40,7 +40,7 @@ from app.utils.transactional import transactional
 logger = get_logger(__name__)
 
 _ROLE_ACTIVE_USER_CACHE: dict = {}
-_ROLE_ACTIVE_USER_TTL = 300
+_ROLE_ACTIVE_USER_TTL = 300  # 5 分钟
 _ROLE_ACTIVE_USER_CACHE_LOCK = threading.Lock()
 
 CONFIG_ERROR_CODES = frozenset({
@@ -53,15 +53,20 @@ CONFIG_ERROR_CODES = frozenset({
 
 @dataclass(frozen=True)
 class AlertTarget:
-    target_type: str
-    target_id: object
-    channels: tuple
-    allow_broadcast: bool
-    has_recipient: bool
+    """告警目标解析结果（替代 5-tuple，消除魔数索引访问）。"""
+    target_type: str        # "user" 或 "role"
+    target_id: object      # User 对象或角色名 str
+    channels: tuple        # 通知渠道，如 ("inbox", "wechat_work", "feishu")
+    allow_broadcast: bool  # 是否允许外部广播渠道
+    has_recipient: bool    # 是否存在有效接收人（False = 告警盲区）
 
 
 @dataclass(frozen=True)
 class _MonitorTransition:
+    """可达性状态机的纯计算结果（无副作用，便于单测聚焦状态机本身）。
+
+    由 ``_compute_monitor_transition`` 产出，``apply_result`` 据此落库 + 告警。
+    """
 
     reachable: bool
     failures: int
@@ -71,7 +76,7 @@ class _MonitorTransition:
     re_alert_due: bool
     down_alerted: bool
     episode: int
-    alert_action: str
+    alert_action: str  # "unreachable" / "recovered" / ""（无告警）
 
 
 def _compute_monitor_transition(
@@ -86,6 +91,16 @@ def _compute_monitor_transition(
     old_episode: int,
     last_alerted_at: Optional[str],
 ) -> _MonitorTransition:
+    """根据旧快照 + 本轮探测，计算可达性状态机的下一步（S1：状态机显式化）。
+
+    基于持久化的 flag（不做 DB 列迁移）推导：
+    - failures：可达归零，不可达则 +1；
+    - became_down：不可达且达阈值且此前未告警 → 新不可达周期（episode+1）；
+    - recovered：恢复可达且此前处于已告警周期 → 关闭周期；
+    - re_alert_due：已告警的不可达周期内持续失败、距上次告警超阈值 → 周期重告警
+      （同 episode，含盲区场景避免永久沉默）；last_alerted_at 缺失/非法也判为到期。
+    返回 alert_action 供 apply_result 分支投递，避免重复判定。
+    """
     failures = 0 if reachable else old_failures + 1
     ever_reachable = old_ever or reachable
 
@@ -139,6 +154,7 @@ def _compute_monitor_transition(
 
 
 class MonitorService:
+    """设备健康监控服务（状态机 + 告警投递）"""
 
     def __init__(
         self,
@@ -184,6 +200,12 @@ class MonitorService:
 
 
     def _cfg(self, name: str, default, session=None):
+        """运行时配置读取：优先动态配置（Redis/DB），miss 则回退 current_app.config。
+
+        动态配置经 MonitorDynamicConfig 在线修改并热重载，无需重启即可生效。
+        `session`：可选注入 Session（每任务独立 Session 场景），透传给动态配置 DB
+        回退读，避免与调用方独立事务争用 StaticPool 单连接。
+        """
         from app.services.monitoring.dynamic_config import MonitorDynamicConfig
 
         val = MonitorDynamicConfig.get(name, session=session)
@@ -192,6 +214,7 @@ class MonitorService:
         return current_app.config.get(name, default)
 
     def _now(self) -> datetime:
+        """统一时间戳，apply_result 内只算一次，复用到三个时间字段。"""
         return datetime.now(timezone.utc)
 
     _CFG_KEYS = (
@@ -208,6 +231,10 @@ class MonitorService:
     }
 
     def _batch_cfg(self, session=None) -> tuple:
+        """批量预读 4 个监控配置项（单次 HGETALL 替代 4 次 HGET）。
+
+        返回 (threshold, re_alert, fallback_role, blindspot_role)。
+        """
         from app.services.monitoring.dynamic_config import MonitorDynamicConfig
         batch = MonitorDynamicConfig.get_batch(list(self._CFG_KEYS), session=session)
         vals = []
@@ -220,10 +247,22 @@ class MonitorService:
 
 
     def _candidate_protocols(self, device) -> list:
+        """按设备类型给出候选协议顺序（由协议注册表驱动，OCP）。
+
+        注册表 `device_type_to_protocols` 维护 device_type → 协议顺序映射，
+        新增协议只需在注册表加一条 `ProtocolSpec`，此处无需改动。
+        """
         device_type = getattr(device, "device_type", None)
         return device_type_to_protocols(device_type)
 
     def get_monitored_device_ids(self, protocols: list) -> list:
+        """返回启用且协议匹配的去重 device_id 列表（供 worker 轮询）。
+
+        - 协议全为需凭据协议（snmp/ipmi/zabbix）：经关联表查持有对应协议凭据的设备；
+        - 含无凭据协议（ping）：查所有开启设备级监控开关的设备（不依赖凭据关联表）。
+        monitor_enabled_only=True：只纳入「设备级开关开启」或「尚未首探（无状态行
+        视为默认启用）」的设备，跳过被用户暂停监控的设备。
+        """
         if protocols and all(not protocol_requires_credential(p) for p in protocols):
             return self._credential_repo.find_enabled_device_ids_all(
                 monitor_enabled_only=True
@@ -233,6 +272,14 @@ class MonitorService:
         )
 
     def _select_adapter(self, device):
+        """按 device_type 分流，并依据凭据可用情况选定真正可用的适配器。
+
+        返回 (adapter, cred)；若所有候选协议均不可用，返回 None
+        （check_device 应直接 return，不落库、不告警）。
+
+        - 需凭据协议（snmp/ipmi/zabbix）：须设备持有该协议凭据才可用；
+        - 无凭据协议（ping）：始终可用（复用 ip_status_service），cred=None。
+        """
         for protocol in self._candidate_protocols(device):
             adapter = self._adapters.get(protocol)
             if adapter is None:
@@ -246,6 +293,11 @@ class MonitorService:
 
 
     def check_device(self, device) -> None:
+        """探测单个设备并落库 + 告警。
+
+        探测在事务外执行（避免网络 I/O 占用 DB 连接），
+        仅落库 + 告警阶段在 @transactional 内完成。
+        """
         selected = self.probe_device(device)
         if selected is None:
             return
@@ -260,6 +312,36 @@ class MonitorService:
         )
 
     def check_device_in_session(self, device, session) -> None:
+        """每任务独立 Session 变体（供独立 async 微服务使用）。
+
+        **本方法负责调用方传入 session 的最终 commit**（见方法末尾 `session.commit()`，
+        P18）：落库 + 入箱均在本方法内以未提交状态写入，统一在末尾提交，保证状态快照与
+        待发告警原子提交。调用方只需提供 session 并负责其关闭，无需自行 commit。
+
+        与 `check_device` 的区别：
+        - 探测（网络 I/O）同样在事务/session 之外执行，绝不持有 DB 连接跨网络 I/O；
+        - 读旧快照 / 写新状态 / 告警全部走**调用方传入的独立 Session**，
+          本方法内部不提交，仅执行落库写操作，由调用方显式 `session.commit()`，
+          从而解耦 Flask scoped session，避免跨线程 / 跨协程污染，并修掉 Zabbix
+          会放大的「在 @transactional 内占用 DB 连接」问题。
+        - 告警路径（`notification_service.notify`）仍走其自身独立 session，自行提交。
+
+        一致性窗口（已由 outbox 模式消除）：
+        apply_result 内部顺序为 upsert(未提交) → 入箱(未提交) → 返回 →
+        session.commit()（状态快照 + 待发告警原子提交）。告警投递由独立进程内
+        MonitorOutboxSender 轮询完成，不再在事务内同步直发，故不再存在「告警已发
+        但状态回滚」或「状态已提交但告警丢失」的窗口。发件器提供至少一次投递，
+        notify 的 idempotency_key 幂等去重保证不会重复通知。
+
+        调用契约（由 `StandaloneMonitorService.check_one` 保证）：
+        1. 必须在 **Flask 应用上下文内** 调用——`apply_result` 经 `_cfg()` 读取
+           `current_app.config`（如 `MONITOR_CONSECUTIVE_FAILURES_THRESHOLD`），
+           离开 app context 会抛 `RuntimeError`；
+        2. `session` 须为调用方创建的独立 Session（非 Flask scoped session），调用方
+           负责其 `commit()` 与最终关闭；
+        3. 适配 asyncio 的 `run_in_executor` 线程执行模型——网络 I/O 阶段不持有任何
+           DB 连接，仅落库 / 告警阶段短暂使用传入 session。
+        """
         selected = self.probe_device(device)
         if selected is None:
             return
@@ -279,6 +361,13 @@ class MonitorService:
     def _persist(self, device, result, protocol, threshold=None,
                  re_alert_interval_minutes=None, fallback_role=None,
                  blindspot_role=None) -> None:
+        """落库 + 入箱（在 @transactional 内执行）。
+
+        后台 worker 线程不在 API 请求上下文内，没有 API 层 @transactional 收口，
+        必须在 Service 层自行管理事务提交。告警投递由进程内发件轮询器异步完成。
+        threshold/re_alert/fallback/blindspot 由事务外预读后传入，避免事务内
+        触发动态配置 Redis I/O。
+        """
         self.apply_result(
             device, result, protocol,
             threshold=threshold, re_alert_interval_minutes=re_alert_interval_minutes,
@@ -286,6 +375,21 @@ class MonitorService:
         )
 
     def probe_device(self, device) -> Optional[tuple[ProbeResult, str]]:
+        """仅探测、不落库、不告警。
+
+        供 Task 8 的手动 POST /check 在【事务外】调用：
+        - 复用 `_select_adapter(device)` 分流选适配器 + 取凭据；
+        - 若设备无可用凭据（`_select_adapter` 返回 None）则直接返回 None；
+        - 否则 `result = adapter.probe(device, cred)`，返回 `(result, protocol.value)`。
+
+        与 `check_device` 的区别：本方法不做 apply_result（落库 + 告警），
+        把落库动作交给调用方在 @transactional 内完成。
+
+        H2 防泄漏：对非 IP 的连接目标先做带超时 DNS 预解析；若解析
+        超时/失败，返回 ``skipped=True`` 的 ProbeResult，交由上层跳过本轮探测，
+        避免 hostname 场景 DNS 挂死进入协议适配器线程后 daemon 线程被遗弃造成泄漏。
+        IPMI 协议优先使用 ipmi_address（真正的 BMC 地址），其余协议使用 management_ip。
+        """
         selected = self._select_adapter(device)
         if selected is None:
             return None
@@ -306,6 +410,11 @@ class MonitorService:
         return result, adapter.protocol.value
 
     def probe_and_persist(self, device) -> Optional[tuple[ProbeResult, str]]:
+        """手动探测 + 落库 + 告警的统一入口（I2：route handler 不再调 _cfg 私有方法）。
+
+        在事务外调用：先 probe_device（网络 I/O），再读取运行时配置并 apply_result。
+        返回 (result, protocol) 或 None（设备未配置凭据）。
+        """
         probed = self.probe_device(device)
         if probed is None:
             return None
@@ -324,6 +433,11 @@ class MonitorService:
         return result, protocol
 
     def check_probe_cooldown(self, device_id: int) -> bool:
+        """per-device 探测冷却限流（Redis SET NX EX）。
+
+        I1：route handler 不再直接访问 Redis / 调 service 私有方法。
+        返回 True 表示可探测，False 表示冷却中。Redis 不可用时 fail-open。
+        """
         try:
             from flask import current_app
             from app.services.monitoring.dynamic_config import MonitorDynamicConfig
@@ -338,6 +452,11 @@ class MonitorService:
             return True
 
     def check_batch(self, device_ids: list[int]) -> dict:
+        """批量手动探测（C3：route handler 不再管理 session 生命周期 / ThreadPoolExecutor）。
+
+        返回 {"results": list[dict], "skipped": list[int]}。
+        每台设备独立 Session（避免并发污染 scoped_session），线程池复用实例级 _batch_executor。
+        """
         from concurrent.futures import ThreadPoolExecutor
         from flask import current_app
         from sqlalchemy.orm import sessionmaker
@@ -353,7 +472,7 @@ class MonitorService:
             if not device:
                 skipped.append(did)
                 continue
-            _ = device.hardware
+            _ = device.hardware  # 触发 lazy load（请求线程内，安全）
             _ = getattr(device.hardware, "ipmi_address", None) if device.hardware else None
             targets.append(device)
 
@@ -409,6 +528,14 @@ class MonitorService:
         return {"results": results, "skipped": skipped}
 
     def collect_device_metrics(self, device) -> dict:
+        """对设备做业务指标采集（连通性之外的指标，供 worker 探测后调用）。
+
+        复用 ``_select_adapter`` 选适配器 + 凭据，经 ``MetricCollector`` 按启用
+        指标模板采集并做阈值评估。返回 ``{metric_key: {index: {...}}}``；
+        适配器无 ``collect_metrics`` 能力（如 Zabbix/Ping）或无可采集指标时返回空。
+
+        不抛异常：采集失败以空结果静默降级，避免影响主探测流程。
+        """
         selected = self._select_adapter(device)
         if selected is None:
             return {}
@@ -420,7 +547,7 @@ class MonitorService:
 
             collector = MetricCollector(self._template_repo, _tpl_cache=self._tpl_cache)
             return collector.collect(device, adapter, cred)
-        except Exception:
+        except Exception:  # noqa: BLE001 - 采集失败静默降级，不中断主探测
             logger.warning(
                 "设备 %s 指标采集失败（已降级跳过）",
                 getattr(device, "id", None),
@@ -429,7 +556,12 @@ class MonitorService:
             return {}
 
     def get_device_status(self, device_id: int) -> dict:
-        self._device_repo.find_by_id_or_404(device_id)
+        """查询设备监控状态（供 API 层调用，避免路由层直接访问 Repository）。
+
+        Returns:
+            dict: {"monitored": bool, "configured_protocols": [str], "status": dict|None}
+        """
+        self._device_repo.find_by_id_or_404(device_id)  # 设备缺失即 404
         creds = self._credential_repo.find_enabled_protocols(device_id)
         status = self.status_repo.find_by_device(device_id)
 
@@ -449,6 +581,11 @@ class MonitorService:
         }
 
     def get_device_status_with_alerts(self, device_id: int) -> dict:
+        """查询设备监控状态 + 指标告警聚合（I13：route handler 不再做业务聚合）。
+
+        返回 get_device_status 的字段 + active_metric_alerts / max_alert_severity /
+        monitor_interrupted。
+        """
         from app.persistence.device_metric_alert_state_repository import (
             DeviceMetricAlertStateRepository,
         )
@@ -461,6 +598,29 @@ class MonitorService:
         return data
 
     def get_devices_monitor_summary(self, device_ids: list) -> dict:
+        """批量查询设备监控摘要（供设备列表 API 注入，避免 N+1）。
+
+        分两类信号：
+        - ping_reachable：ping 轮询的管理 IP 连通性（从 extra.ping_reachable 读，
+          None=未 ping 过）。ping 无需凭据，对所有启用设备兜底探测。
+        - monitor_*：snmp/zabbix/ipmi 凭据协议的探测结果 + 指标告警。
+          仅当设备持有这些凭据且状态行 protocol 为其中之一时才有值。
+
+        Args:
+            device_ids: 设备 ID 列表
+
+        Returns:
+            {device_id: {
+                ping_reachable: bool | null,
+                has_monitor_credential: bool,
+                monitor_reachable: bool | null,
+                monitor_protocol: str | null,
+                active_metric_alerts: int,
+                max_alert_severity: int,
+                monitor_interrupted: bool,
+            }}
+            完全无监控数据（无状态行 + 无凭据 + 无告警）的设备不在返回字典中。
+        """
         if not device_ids:
             return {}
         from app.persistence.device_metric_alert_state_repository import (
@@ -515,6 +675,34 @@ class MonitorService:
         return result
 
     def get_device_metric_dashboard(self, device_id: int) -> dict:
+        """设备监控数据聚合（GET /monitor/devices/<id>/metric-dashboard）。
+
+        供前端「监控数据」卡片的下半部分展示设备监控指标状态。
+
+        指标内容来源（优先级，KISS）：
+        1. 设备显式关联的模板组（``device.metric_template_group_id``）中的模板指标；
+        2. 未显式关联时，按 ``device_type + brand + 已配置协议`` 自动匹配启用模板组；
+        3. 未命中模板组或组内无模板 → ``grouped=False``，前端沿用默认 METRIC_GROUPS。
+
+        状态判定（前端据此渲染灰色卡片 + 状态标签）：
+        - ``has_credential=False``：无凭据，前端整体提示「需要关联凭据」；
+        - ``status is None``：已配置凭据但尚未首探 → ``not_probed``；
+        - ``not reachable``：不可达 → ``unreachable``；
+        - ``not reachable and last_error in CONFIG_ERROR_CODES``：凭据/配置错误 →
+          ``credential_error``（区分于设备真实宕机）；
+        - 命中模板组但 ``metric_status`` 为空 → ``no_data``；
+        - 存在超阈值指标 → ``breached``；
+        - 其余 → ``normal``。
+
+        重要：当 overall_status 为 ``unreachable`` / ``credential_error`` / ``no_data``
+        / ``not_probed`` / ``no_credential`` 时，``metric_status`` 返回空 list，
+        前端在指标区域直接展示对应状态，不渲染历史 latest 值（避免误导）。
+
+        Returns:
+            dict: 包含 has_credential / has_zabbix / template_group / grouped /
+                  metric_status / overall_status / status_reason / reachable /
+                  last_error / last_checked_at。
+        """
         device = self._device_repo.find_by_id_or_404(device_id)
         creds = self._credential_repo.find_enabled_protocols(device_id)
         has_credential = bool(creds)
@@ -563,7 +751,7 @@ class MonitorService:
                 DeviceMetricLatestRepository,
             )
             latest_rows = DeviceMetricLatestRepository().find_by_device(device_id)
-            latest_map: dict = {}
+            latest_map: dict = {}  # metric_key -> 首个实例
             for row in latest_rows:
                 if row.metric_key not in latest_map:
                     latest_map[row.metric_key] = row
@@ -583,7 +771,7 @@ class MonitorService:
                                 "source": t.source,
                             })
                             seen_keys.add(t.metric_key)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     logger.warning(
                         "dashboard 合并通用 if_* 模板失败 device_id=%s", device_id, exc_info=True
                     )
@@ -614,7 +802,7 @@ class MonitorService:
                         tpl_map[t.metric_key] = {
                             "display_name": t.display_name,
                         }
-                except Exception:
+                except Exception:  # noqa: BLE001 - 模板查询失败降级为空映射
                     logger.warning(
                         "metric_status 模板映射查询失败 device_id=%s", device_id, exc_info=True
                     )
@@ -652,6 +840,11 @@ class MonitorService:
         }
 
     def _find_matched_template_group(self, device_type: str, source: str, brand: str | None) -> dict | None:
+        """按 device_type + brand + source 匹配启用模板组（自动匹配路径）。
+
+        Returns:
+            dict: 组信息（id/name）或 None。
+        """
         from app.persistence.monitor_metric_template_group_repository import (
             MonitorMetricTemplateGroupRepository,
         )
@@ -664,6 +857,14 @@ class MonitorService:
         return {"id": group.id, "name": group.name}
 
     def _dashboard_overall_status(self, has_credential: bool, status, grouped: bool) -> tuple[str, str]:
+        """聚合判定「监控数据」卡片整体状态。
+
+        Returns:
+            tuple: (overall_status, status_reason)
+            overall_status: no_credential / not_probed / unreachable / credential_error
+                            / no_data / breached / normal
+            status_reason: 供前端展示的中文说明
+        """
         if not has_credential:
             return "no_credential", "设备未关联任何监控凭据"
         if status is None:
@@ -677,7 +878,18 @@ class MonitorService:
         return "normal", "指标采集正常"
 
     def set_device_monitor_enabled(self, device_id: int, enabled: bool) -> dict:
-        device = self._device_repo.find_by_id_or_404(device_id)
+        """设备级监控启停（PATCH /monitor/devices/<id>/monitor-enabled）。
+
+        - 设备不存在 → find_by_id_or_404 抛 404（由 @transactional 路由回滚后上浮）；
+        - 已有状态行 → 原地更新 monitor_enabled；
+        - 无状态行（尚未首探）→ 预置一行，仅记录用户偏好，其余非 NULL 必填项
+          （protocol/reachable/last_checked_at）取合理默认值。首次真实探测的 upsert
+          不触碰 monitor_enabled，故偏好被保留。
+
+        返回 {"device_id": int, "monitor_enabled": bool}。
+        事务边界由调用方（路由 @transactional）收口。
+        """
+        device = self._device_repo.find_by_id_or_404(device_id)  # 设备缺失即 404
         existing = self.status_repo.find_by_device(device_id)
         if existing is not None:
             existing.monitor_enabled = enabled
@@ -695,6 +907,12 @@ class MonitorService:
         return {"device_id": device_id, "monitor_enabled": enabled}
 
     def batch_set_monitor_enabled(self, device_ids: list[int], enabled: bool) -> dict:
+        """批量设备级监控启停（PATCH /monitor/batch-monitor-enabled）。
+
+        对每台设备调用 set_device_monitor_enabled 逻辑，跳过不存在的设备。
+        返回 {"updated": int, "skipped": int}。
+        事务边界由调用方（路由 @transactional）收口。
+        """
         updated = 0
         skipped = 0
         device_map = self._device_repo.find_by_ids(list(device_ids))
@@ -723,6 +941,14 @@ class MonitorService:
 
     def _apply_config_error(self, device, result: ProbeResult, protocol: str,
                             repo, old, now) -> None:
+        """L3：配置错误轻量落库——只更新 last_checked_at + last_error，冻结状态机。
+
+        - 保留 consecutive_failures / down_alerted / ever_reachable / down_episode /
+          各时间戳不变，避免「配置错误」污染设备不可达判定；
+        - reachable 字段：有旧快照则保留旧值；新设备因 NOT NULL 约束回落到
+          result.reachable（配置错误恒为 False），但不触发任何告警；
+        - 不调用 _enqueue_alert（配置错误不是设备宕机，不该产生 critical 告警）。
+        """
         repo.upsert(
             device_id=device.id,
             protocol=protocol,
@@ -743,6 +969,17 @@ class MonitorService:
                      status_repo=None, threshold=None,
                      re_alert_interval_minutes=None, fallback_role=None,
                      blindspot_role=None) -> None:
+        """读旧快照 → 算状态机 → upsert → 入箱。落库 + 入箱的唯一入口。
+
+        告警不再同步直发：待发告警写入 monitor_alert_outbox（与状态 upsert 同一
+        事务），由 MonitorOutboxSender 轮询投递，消除一致性窗口。
+
+        Task 8 的手动探测路径会直接调用本方法，故签名必须稳定：
+        (device, result, protocol)。`status_repo` 为可选注入（每任务独立 Session
+        场景），缺省回落到 `self.status_repo`（@transactional 全局 scoped session）。
+        threshold/re_alert/fallback/blindspot 由事务外预读后传入，避免事务内
+        触发动态配置 Redis I/O；未传时向后兼容 fallback 到 _cfg()。
+        """
         if getattr(result, "skipped", False):
             logger.warning(
                 "探测被跳过（%s），不更新状态、不告警 device_id=%s",
@@ -860,6 +1097,18 @@ class MonitorService:
 
     def _resolve_alert_target(self, device, status_repo=None,
                               fallback_role=None, blindspot_role=None) -> AlertTarget:
+        """解析告警目标。
+
+        - 责任人有值 → AlertTarget(target_type="user", ...)
+        - 为空 → 先尝试兜底角色 MONITOR_FALLBACK_ROLE（默认 admin）；
+          若该角色无活跃用户，再回退到盲区应急组 MONITOR_BLINDSPOT_ROLE；
+          两者皆无活跃用户 → 真正的「告警盲区」，has_recipient=False，
+          由 _alert / apply_result 记录 critical 日志 + 状态标记，避免关键告警静默丢失。
+        - allow_broadcast：责任人缺失时为 False，不走企微/飞书等外部广播渠道。
+        - `status_repo`：可选注入（每任务独立 Session 场景），用于查角色活跃用户。
+        - fallback_role/blindspot_role 由事务外预读后传入，避免事务内触发
+          动态配置 Redis I/O；未传时向后兼容 fallback 到 _cfg()。
+        """
         responsible = getattr(device, "responsible_person", None)
         if responsible:
             return AlertTarget("user", responsible, ("inbox", "wechat_work", "feishu"), True, True)
@@ -886,6 +1135,10 @@ class MonitorService:
         return AlertTarget("role", blindspot_role, ("inbox",), False, False)
 
     def _role_has_active_user(self, role_name: str, status_repo=None) -> bool:
+        """兜底角色是否存在活跃（status==0）用户。
+
+        P1 修复：加进程级 TTL 缓存（5 分钟），避免同批次 N 台设备宕机产生 N 次重复查询。
+        """
         cached = _ROLE_ACTIVE_USER_CACHE.get(role_name)
         if cached is not None and cached[1] > time.monotonic():
             return cached[0]
@@ -913,6 +1166,13 @@ class MonitorService:
     def _build_alert_payload(self, device, alert_type: str, severity: str, result: ProbeResult,
                               episode: int, protocol: str, re_alert_seq: int = 0,
                               resolved=None, now=None) -> dict:
+        """构造告警的 notify 参数字典（不发送，供入箱/测试复用）。
+
+        source_module 按设备隔离冷却，idempotency_key 含 episode + re_alert_seq，
+        使不同不可达周期（episode）及同一周期内的周期重告警（re_alert_seq>=1）
+        互不幂等去重。target_type/target_id/channels/allow_broadcast 由 resolved
+        （_resolve_alert_target 结果）决定；resolved 未传时内部解析一次。
+        """
         if resolved is None:
             resolved = self._resolve_alert_target(device)
         target_type = resolved.target_type
@@ -939,7 +1199,7 @@ class MonitorService:
             else:
                 title = f"设备恢复：{getattr(device, 'device_name', device.id)}"
                 content = "设备已恢复可达。"
-        else:
+        else:  # device_unreachable（默认）
             metadata["reachable"] = False
             if source == "zabbix":
                 title = f"设备异常（Zabbix）：{getattr(device, 'device_name', device.id)}"
@@ -978,6 +1238,13 @@ class MonitorService:
     def _enqueue_alert(self, device, alert_type: str, severity: str, result: ProbeResult,
                        episode: int, protocol: str, re_alert_seq: int = 0,
                        resolved=None, session=None, now=None) -> None:
+        """入箱一条待发告警（与状态 upsert 同一事务提交）。
+
+        不再在 apply_result 内同步调用 notify，避免「状态未提交即已发送通知」的
+        一致性窗口；投递由进程内 MonitorOutboxSender 轮询完成。
+        dedup_key 直接复用 notify 的 idempotency_key：发件器重放时 notify 幂等去重
+        保证「至少一次投递」且不会重复通知。
+        """
         payload = self._build_alert_payload(
             device, alert_type, severity, result, episode, protocol,
             re_alert_seq=re_alert_seq, resolved=resolved, now=now,
@@ -1053,7 +1320,12 @@ class MonitorService:
             logger.warning("SSE 推送失败（不影响告警入箱）", exc_info=True)
 
 
+
 def get_overview(failure_threshold: int = 2) -> dict:
+    """监控总览统计（多 repo 聚合）。
+
+    P1-1：读路径下沉 service，路由层不再直访 repository。
+    """
     from app.persistence.device_monitor_status_repository import DeviceMonitorStatusRepository
     from app.persistence.device_metric_alert_state_repository import DeviceMetricAlertStateRepository
     status_repo = DeviceMonitorStatusRepository()
@@ -1074,6 +1346,12 @@ def get_overview(failure_threshold: int = 2) -> dict:
 
 def list_statuses(status_filter: str = None, page: int = 1, per_page: int = 20,
                   keyword: str = None) -> dict:
+    """批量查询设备监控状态（含指标告警聚合）。
+
+    返回 {"total": int, "items": list[dict]}。
+    P1-1：读路径下沉 service，路由层不再直访 repository。
+    keyword：模糊匹配 device_name / management_ip / ipmi_address（透传至 repo）。
+    """
     from app.persistence.device_monitor_status_repository import DeviceMonitorStatusRepository
     from app.persistence.device_metric_alert_state_repository import DeviceMetricAlertStateRepository
     status_repo = DeviceMonitorStatusRepository()
@@ -1099,6 +1377,14 @@ def list_statuses(status_filter: str = None, page: int = 1, per_page: int = 20,
 
 
 def list_alerts(params: dict) -> dict:
+    """分页查询告警投递历史。
+
+    返回 {"total": int, "items": list[dict], "page": int, "per_page": int}。
+    P1-1：读路径下沉 service，路由层不再直访 repository。
+
+    scope=mine：仅返回当前用户负责的设备的告警（device.responsible_person == user_id）。
+    user_id 由调用方（路由层）注入，避免 service 依赖 request 上下文。
+    """
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     alert_repo = MonitorAlertOutboxRepository()
     page = params.get("page") or 1
@@ -1133,6 +1419,10 @@ def list_alerts(params: dict) -> dict:
 
 
 def get_alert_detail(alert_id: int) -> dict:
+    """P1-6: 查询单条告警详情（含 device 展示字段 + acknowledged_* + payload 解析）。
+
+    返回完整字段 dict；行不存在抛 BusinessLogicError(404)。
+    """
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     from app.exceptions.business import BusinessLogicError
     alert_repo = MonitorAlertOutboxRepository()
@@ -1143,6 +1433,11 @@ def get_alert_detail(alert_id: int) -> dict:
 
 
 def retry_alert(alert_id: int) -> dict:
+    """乐观锁重试失败告警：仅当 status=='failed' 时重置为 pending。
+
+    返回 {"retried": bool, "alert_id": int, "status": str, "message"?: str}。
+    I3：route handler 不再直访 alert_repo / ORM session。
+    """
     from app.models.monitor_alert_outbox import MonitorAlertOutbox
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     from app.exceptions.business import BusinessLogicError
@@ -1162,6 +1457,14 @@ def retry_alert(alert_id: int) -> dict:
 
 
 def ack_alert(alert_id: int, user: str, note: Optional[str] = None) -> dict:
+    """G9: 人工确认/认领告警。
+
+    幂等：已确认告警再次确认将刷新 acknowledged_at 与 ack_note。
+    不变更 status（保持 sent），仅填充 acknowledged_by/at/note 三字段。
+    升级扫描通过 acknowledged_at IS NULL 判断未确认，ack 后天然排除该行，无需失效缓存。
+
+    返回 {"id": int, "acknowledged_by": str, "acknowledged_at": str|None, "ack_note": str|None}。
+    """
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     from app.exceptions.business import BusinessLogicError
     alert_repo = MonitorAlertOutboxRepository()
@@ -1177,18 +1480,21 @@ def ack_alert(alert_id: int, user: str, note: Optional[str] = None) -> dict:
 
 
 def batch_ack_alert(ids: list, user: str, note: Optional[str] = None) -> dict:
+    """G9 批量确认/认领告警。返回 {"acknowledged": N, "not_found": M}。"""
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     alert_repo = MonitorAlertOutboxRepository()
     return alert_repo.batch_acknowledge(ids, user=user, note=note)
 
 
 def batch_retry_alert(ids: list) -> dict:
+    """批量乐观锁重试失败告警。返回 {"retried": N, "skipped": M}。"""
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     alert_repo = MonitorAlertOutboxRepository()
     return alert_repo.batch_reset_to_pending(ids)
 
 
 def close_alert(alert_id: int, user: str, reason: Optional[str] = None) -> dict:
+    """P2-16: 手动关闭告警。"""
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     from app.exceptions.business import BusinessLogicError
     alert_repo = MonitorAlertOutboxRepository()
@@ -1204,6 +1510,7 @@ def close_alert(alert_id: int, user: str, reason: Optional[str] = None) -> dict:
 
 
 def batch_close_alert(ids: list, user: str, reason: Optional[str] = None) -> dict:
+    """P2-16: 批量手动关闭告警。"""
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     alert_repo = MonitorAlertOutboxRepository()
     return alert_repo.batch_close(ids, user=user, reason=reason)
@@ -1215,6 +1522,12 @@ def get_probe_trends(
     to_: Optional[datetime] = None,
     protocol: Optional[str] = None,
 ) -> dict:
+    """聚合统计（供趋势卡片）：可达率 / 延迟统计 / 不可达周期数。
+
+    90 天 retention floor 决策下沉到 service 层：
+    - from_ 在 90 天内 → 走 events 明细表
+    - from_ 超过 90 天 → 走 hourly 聚合表
+    """
     if to_ is None:
         to_ = datetime.now(timezone.utc).replace(tzinfo=None)
     if from_ is None:
@@ -1241,6 +1554,7 @@ def aggregate_alerts(
     only_active: bool = True,
     max_groups: int = 50,
 ) -> list:
+    """P2-10: 告警聚合/事件关联。返回聚类组列表。"""
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     repo = MonitorAlertOutboxRepository()
     return repo.aggregate_alerts(
@@ -1261,6 +1575,15 @@ def get_alert_statistics(
     bucket: str = "hour",
     top_n: int = 10,
 ) -> dict:
+    """P2-15: 告警多维度统计报表。
+
+    参数:
+    - start_date / end_date: 时间范围（ISO 字符串或 datetime）
+    - device_id: 仅统计指定设备
+    - severity: 仅统计指定级别
+    - bucket: density 桶粒度，'hour' 或 'day'
+    - top_n: Top N 设备/类型取多少条
+    """
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     from datetime import datetime
 

@@ -16,7 +16,6 @@ import type { Switch } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
 import { useState } from 'react';
 
-
 const EDITABLE_FIELDS = [
   'port',
   'protocol',
@@ -29,7 +28,6 @@ const EDITABLE_FIELDS = [
 ] as const;
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
-
 
 const FIELD_LABELS: Record<EditableField, string> = {
   port: '端口号',
@@ -52,9 +50,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
   const [form] = Form.useForm();
   const message = useMessage();
   const batchUpdate = useBatchUpdateSwitch();
-  
   const [checkedFields, setCheckedFields] = useState<Set<EditableField>>(new Set());
-  
   const [partialResult, setPartialResult] = useState<BatchUpdateSwitchResult | null>(null);
 
   const handleCheckChange = (field: EditableField, checked: boolean) => {
@@ -79,14 +75,12 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
       const values = await form.validateFields();
       const deviceIds = selectedSwitches.map((s) => s.device_id);
 
-      
       const updates: Record<string, unknown> = {};
       for (const field of checkedFields) {
         if (field === 'port') {
           const protocol = values.protocol ?? 'ssh';
           updates.port = values.port ?? (protocol === 'telnet' ? 23 : 22);
         } else if (field === 'password') {
-          
           if (values.password) {
             updates.password = values.password;
           } else {
@@ -150,7 +144,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
 
       <Form form={form} layout="vertical">
         <Row gutter={24}>
-          {}
+          {/* 端口号 */}
           <Col span={12}>
             <Form.Item
               label={
@@ -175,7 +169,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
             </Form.Item>
           </Col>
 
-          {}
+          {/* 协议 */}
           <Col span={12}>
             <Form.Item
               label={
@@ -204,7 +198,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
             </Form.Item>
           </Col>
 
-          {}
+          {/* 用户名 */}
           <Col span={12}>
             <Form.Item
               label={
@@ -229,7 +223,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
             </Form.Item>
           </Col>
 
-          {}
+          {/* 密码 */}
           <Col span={12}>
             <Form.Item
               label={
@@ -251,7 +245,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
             </Form.Item>
           </Col>
 
-          {}
+          {/* 设备类型 */}
           <Col span={12}>
             <Form.Item
               label={
@@ -282,7 +276,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
             </Form.Item>
           </Col>
 
-          {}
+          {/* 交换机类型 */}
           <Col span={12}>
             <Form.Item
               label={
@@ -316,7 +310,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
             </Form.Item>
           </Col>
 
-          {}
+          {/* 网络层级 */}
           <Col span={12}>
             <Form.Item
               label={
@@ -345,7 +339,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
             </Form.Item>
           </Col>
 
-          {}
+          {/* 认证方法 */}
           <Col span={12}>
             <Form.Item
               label={

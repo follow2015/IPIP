@@ -39,7 +39,6 @@ import { formatDateTime } from '@/utils/format';
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
 
-
 const ALERT_TYPE_OPTIONS = [
   { label: 'device_unreachable', value: 'device_unreachable' },
   { label: 'device_recovered', value: 'device_recovered' },
@@ -97,7 +96,6 @@ export default function SilenceRulesPage() {
         message.error('请选择静默时间窗口');
         return;
       }
-      
       let deviceIds: number[] | null = null;
       if (typeof values.device_ids === 'string' && (values.device_ids as string).trim()) {
         deviceIds = (values.device_ids as string)

@@ -21,6 +21,7 @@ RETENTION_DAYS = 90
 
 
 def cleanup_notifications():
+    """执行一次通知清理：删除 90 天前的已读已确认回执 + 孤立通知主体。"""
     from app.persistence.notification_repository import NotificationRepository, NotificationReceiptRepository
 
     try:
@@ -44,6 +45,7 @@ def cleanup_notifications():
 
 
 def _cleanup_loop():
+    """定时清理循环（后台守护线程）。"""
     while True:
         try:
             time.sleep(CLEANUP_INTERVAL)
@@ -53,6 +55,14 @@ def _cleanup_loop():
 
 
 def start_cleanup_scheduler(app):
+    """启动通知清理后台线程。
+
+    应在 create_app() 中调用，传入 Flask app 实例
+    （用于确保 application context 可用）。
+
+    Args:
+        app: Flask 应用实例
+    """
     def _run_with_app_context():
         with app.app_context():
             _cleanup_loop()

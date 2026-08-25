@@ -19,8 +19,14 @@ from typing import Optional, Tuple
 
 
 class MetricThresholdService:
+    """指标阈值评估服务（纯逻辑，无 IO）"""
 
     def evaluate(self, metric_type: str, value, threshold: Optional[dict]) -> Tuple[str, bool]:
+        """评估单个指标值，返回 (severity, breached)。
+
+        severity ∈ {"crit", "warn", "ok"}；breached 表示是否触发告警。
+        value 为 None 或（非 event 型）阈值缺失时视为不告警。
+        """
         if value is None:
             return "ok", False
 
@@ -62,6 +68,13 @@ class MetricThresholdService:
 
     @staticmethod
     def _severity_for_state(threshold: dict) -> str:
+        """state 型偏离时的告警层级。
+
+        P2-3 修复：支持三种显式方式，优先级从高到低：
+        1. ``threshold["severity"]``：显式层级（"crit"/"warn"）
+        2. ``threshold["crit"]``：布尔标记（True → crit，兼容旧配置）
+        3. 缺省 → "warn"
+        """
         sev = threshold.get("severity")
         if isinstance(sev, str) and sev in ("crit", "warn"):
             return sev

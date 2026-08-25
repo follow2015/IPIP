@@ -15,6 +15,7 @@ logger = get_logger(__name__)
 
 
 class ComponentTemplateService:
+    """配件模板服务"""
 
     def __init__(self, template_repository: ComponentTemplateRepository):
         self.template_repository = template_repository
@@ -26,6 +27,7 @@ class ComponentTemplateService:
         customer_id: Optional[int] = None,
         include_global: bool = True,
     ) -> List[Dict[str, Any]]:
+        """列出配件模板，支持按类别、启用状态和客户筛选。"""
         templates = self.template_repository.find_by_category(
             category=category,
             is_active=is_active,
@@ -35,9 +37,15 @@ class ComponentTemplateService:
         return [t.to_dict() for t in templates]
 
     def get_template(self, template_id: int) -> Optional[ComponentTemplate]:
+        """获取单个配件模板。"""
         return self.template_repository.find_by_id(template_id)
 
     def create_template(self, data: Dict[str, Any]) -> ComponentTemplate:
+        """创建配件模板。
+
+        Raises:
+            ValidationError: 类别/型号缺失，或三元组重复
+        """
         category = data.get("category")
         model = data.get("model")
         if not category:
@@ -71,6 +79,11 @@ class ComponentTemplateService:
     def update_template(
         self, template_id: int, data: Dict[str, Any]
     ) -> ComponentTemplate:
+        """更新配件模板。
+
+        Raises:
+            ValidationError: 三元组冲突
+        """
         template = self.template_repository.find_by_id(template_id)
         if not template:
             return None
@@ -101,6 +114,7 @@ class ComponentTemplateService:
         return template
 
     def delete_template(self, template_id: int) -> bool:
+        """删除配件模板。"""
         template = self.template_repository.find_by_id(template_id)
         if not template:
             return False

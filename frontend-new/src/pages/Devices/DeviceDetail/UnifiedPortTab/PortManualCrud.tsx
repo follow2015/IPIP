@@ -38,9 +38,7 @@ interface PortManualCrudProps {
   rowSelection: TableProps<SwitchPort>['rowSelection'];
   highlightPort: string | null;
   onClearSelection: () => void;
-  
   renderBatchActions?: RenderBatchActionsFn;
-  
   hasSnmpCredential?: boolean;
 }
 
@@ -68,14 +66,12 @@ export function PortManualCrud({
   const deletePort = useDeleteNetworkPort(deviceId);
   const updateUsageStatus = useUpdatePortUsageStatus(deviceId);
 
-  
   const portSyncQuery = useDevicePortSyncEnabled(deviceId);
   const setPortSync = useSetDevicePortSyncEnabled(deviceId);
   const effectiveEnabled = portSyncQuery.data?.effective_enabled ?? false;
   const globalEnabled = portSyncQuery.data?.global_enabled ?? false;
   const deviceOverride = portSyncQuery.data?.port_sync_enabled ?? null;
 
-  
   const handleTogglePortSync = useCallback(
     (checked: boolean) => {
       setPortSync.mutate(checked, {
@@ -90,7 +86,6 @@ export function PortManualCrud({
     [setPortSync, message]
   );
 
-  
   const handleResetToGlobal = useCallback(() => {
     setPortSync.mutate(null, {
       onSuccess: () => {
@@ -102,13 +97,11 @@ export function PortManualCrud({
     });
   }, [setPortSync, message]);
 
-  
   const handleEdit = useCallback((port: SwitchPort) => {
     setEditingPort(port);
     setEditModalOpen(true);
   }, []);
 
-  
   const handleDelete = useCallback(
     (port: SwitchPort) => {
       confirm({
@@ -124,7 +117,6 @@ export function PortManualCrud({
     [deletePort, message]
   );
 
-  
   const handleToggleUsageStatus = useCallback(
     (port: SwitchPort) => {
       const newStatus = port.usage_status === 'disabled' ? 'free' : 'disabled';
@@ -141,7 +133,6 @@ export function PortManualCrud({
     [updateUsageStatus, message]
   );
 
-  
   const handleBatchLocalUpdate = useCallback(
     async (portNames: string[], updates: Record<string, unknown>) => {
       const portsToUpdate = sortedPorts.filter((p) => portNames.includes(p.port_name));
@@ -170,7 +161,7 @@ export function PortManualCrud({
 
   return (
     <>
-      {}
+      {/* 批量操作工具栏 — 由注入渲染器提供，避免 Devices→Switches 耦合 */}
       {renderBatchActions?.({
         selectedPorts: selectedRowKeys as string[],
         onClearSelection,
@@ -179,7 +170,7 @@ export function PortManualCrud({
         onBatchLocalUpdate: handleBatchLocalUpdate
       })}
 
-      {}
+      {/* 工具栏 */}
       <div
         style={{
           display: 'flex',
@@ -240,7 +231,7 @@ export function PortManualCrud({
         />
       </div>
 
-      {}
+      {/* 端口自动获取提示：未配置 SNMP/Zabbix 凭据时引导用户先添加凭据 */}
       {!hasSnmpCredential && (
         <Alert
           type="info"
@@ -251,7 +242,7 @@ export function PortManualCrud({
         />
       )}
 
-      {}
+      {/* 端口列表 */}
       <PortTable
         columns={columns}
         dataSource={filteredPorts}
@@ -260,14 +251,14 @@ export function PortManualCrud({
         highlightPort={highlightPort}
       />
 
-      {}
+      {/* 新增端口弹窗 */}
       <PortBatchAddModal
         deviceId={deviceId}
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
       />
 
-      {}
+      {/* 编辑端口弹窗 */}
       <PortEditModal
         deviceId={deviceId}
         port={editModalOpen ? editingPort : null}

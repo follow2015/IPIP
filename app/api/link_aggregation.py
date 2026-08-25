@@ -30,12 +30,23 @@ lag_global_bp = Blueprint("link_aggregation_global", __name__)
 _lag_service = LinkAggregationService(LinkAggregationRepository())
 
 
+
+
 @lag_global_bp.route("/", methods=["GET"])
 @doc(summary="获取所有链路聚合组", tags=["链路聚合"], responses={200: "LinkAggregationGroupResponse", 401: "ApiError"})
 @login_required
 @permission_required("switch:view")
 @rate_limit_api
 def list_all_port_channels():
+    """获取所有链路聚合组（全局视图，分页）
+
+    Query Parameters:
+        page (int): 页码，默认 1
+        per_page (int): 每页数量，默认 20
+        search (str, optional): 模糊搜索（匹配聚合组名称）
+        room_id (int, optional): 按机房筛选
+        device_id (int, optional): 按交换机筛选
+    """
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
     search = request.args.get("search", type=str)
@@ -48,11 +59,18 @@ def list_all_port_channels():
     return APIResponse.paginated(result["items"], page, per_page, result["total"])
 
 
+
+
 @lag_bp.route("/<int:device_id>/port-channels", methods=["GET"])
 @doc(summary="获取设备的链路聚合组", tags=["链路聚合"], responses={200: "LinkAggregationGroupResponse", 401: "ApiError"})
 @login_required
 @permission_required("switch:view")
 @rate_limit_api
 def get_port_channels(device_id):
+    """获取设备的链路聚合组
+
+    Path Parameters:
+        device_id (int): 设备ID
+    """
     groups = _lag_service.get_by_device(device_id)
     return APIResponse.success(data=[g.to_dict() for g in groups])

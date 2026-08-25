@@ -12,13 +12,9 @@ import NicConfigFields from '@/components/NicConfigFields';
 
 interface ChassisConfigFieldsProps {
   form: FormInstance;
-  
   customerId: number | undefined;
-  
   generateNodes: boolean;
-  
   onGenerateNodesChange: (checked: boolean) => void;
-  
   isEdit: boolean;
 }
 
@@ -111,9 +107,9 @@ export default function ChassisConfigFields({
           )}
         </Col>
       </Row>
-      {}
+      {/* 勾选生成子节点后，显示硬件配置用于批量设置 */}
       {generateNodes && <HardwareConfigFields form={form} customerId={customerId} showIpmi />}
-      {}
+      {/* 勾选生成子节点后，显示网卡配置区域 */}
       {generateNodes && <NicConfigFields form={form} customerId={customerId} />}
     </>
   );

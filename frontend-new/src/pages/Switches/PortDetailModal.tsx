@@ -20,7 +20,6 @@ interface PortDetailModalProps {
   onDeleteIP: (ipAddress: string, subnetMask: string, isSecondary: boolean) => void;
 }
 
-
 export function PortDetailModal({
   open,
   onClose,

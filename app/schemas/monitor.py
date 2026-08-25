@@ -13,6 +13,11 @@ from app.services.monitoring.snmp_versions import SNMP_REQUIRED_BY_VERSION
 
 
 def _validate_zabbix_api_url(value):
+    """Zabbix API 地址校验：必须为非空字符串且以 http(s):// 开头。
+
+    不强制完整域名（validate.URL 会拒绝内网单标签主机名 / IP，误伤合法凭据），
+    仅守住宿主方案，避免把缺 scheme 的畸形地址入库。
+    """
     if not isinstance(value, str) or not value:
         raise ValidationError("api_url 不能为空")
     if not (value.startswith("http://") or value.startswith("https://")):
@@ -20,7 +25,10 @@ def _validate_zabbix_api_url(value):
     return True
 
 
+
+
 class MonitorCredentialUpsertSchema(Schema):
+    """PUT /credentials 与 POST /credentials 请求体验证（共享凭据 + 批量关联）"""
 
     class Meta:
         unknown = EXCLUDE
@@ -38,10 +46,11 @@ class MonitorCredentialUpsertSchema(Schema):
 
     @validates_schema
     def validate_payload_by_protocol(self, data, **kwargs):
+        """按协议校验 payload 必要字段，畸形凭据在入口即拦截。"""
         protocol = data.get("protocol")
         payload = data.get("payload")
         if protocol is None or payload is None:
-            return
+            return  # 必填校验由字段级 required 处理
 
         errors: dict = {}
         if protocol == MonitorProtocolCode.SNMP.value:
@@ -81,6 +90,12 @@ class MonitorCredentialUpsertSchema(Schema):
 
 
 class MonitorCredentialPayloadUpdateSchema(Schema):
+    """PUT /credentials/<id>/payload 与 /devices/<id>/credentials/<id>/payload 请求体。
+
+    仅含用户实际修改的字段：有值→覆盖，null→清空，未传→保持不变。
+    payload 不能为空 dict（否则无意义）。协议级字段合法性不在入口强校验——
+    部分更新允许「先清掉某字段再补」，且密文留空保持不变场景下 payload 可能只含一个字段。
+    """
 
     class Meta:
         unknown = EXCLUDE
@@ -100,6 +115,15 @@ class MonitorCredentialPayloadUpdateSchema(Schema):
 
 
 class ZabbixCredentialSchema(Schema):
+    """Zabbix 共享凭据 payload 校验（P5）。
+
+    Zabbix 适配器以 JSON-RPC Bearer 调用 Zabbix API，凭据形状为
+    {api_url, api_token, verify_ssl?, match_by?}。入口即校验必填字段，
+    避免把缺 api_url / api_token 的畸形凭据加密入库、到探测时才失败。
+
+    注：当前适配器仅支持 API Token（Bearer）鉴权；若未来引入 auth_mode
+    分支（如 username/password），在此按 auth_mode 细分必填即可。
+    """
 
     class Meta:
         unknown = EXCLUDE
@@ -119,6 +143,7 @@ class ZabbixCredentialSchema(Schema):
 
 
 class MonitorCheckBatchSchema(Schema):
+    """POST /check-batch 请求体（批量手动探测）。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -131,6 +156,11 @@ class MonitorCheckBatchSchema(Schema):
 
 
 class MonitorAlertListQuerySchema(Schema):
+    """GET /monitor/alerts 查询参数验证（分页 + 过滤 + 时间范围）。
+
+    查询参数均为可选；marshmallow 的 load() 负责把字符串 coerce 为
+    int / datetime，便于仓储层直接消费。
+    """
 
     class Meta:
         unknown = EXCLUDE
@@ -179,6 +209,7 @@ class MonitorAlertListQuerySchema(Schema):
 
 
 class MonitorDeviceMonitorEnabledSchema(Schema):
+    """PATCH /monitor/devices/<id>/monitor-enabled 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -187,6 +218,10 @@ class MonitorDeviceMonitorEnabledSchema(Schema):
 
 
 class MonitorBatchMonitorEnabledSchema(Schema):
+    """PATCH /monitor/batch-monitor-enabled 请求体（批量监控启停）。
+
+    device_ids 须含 1-200 个设备 id（与批量修改配置对齐，上限 200）。
+    """
 
     class Meta:
         unknown = EXCLUDE
@@ -200,6 +235,7 @@ class MonitorBatchMonitorEnabledSchema(Schema):
 
 
 class MonitorConfigUpdateSchema(Schema):
+    """PUT /monitor/config 请求体：在线修改运行配置（白名单内 editable 项）。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -238,7 +274,10 @@ class MonitorConfigUpdateSchema(Schema):
             raise ValidationError(errors)
 
 
+
+
 class MonitorSilenceRuleCreateSchema(Schema):
+    """POST /silence-rules 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -253,6 +292,7 @@ class MonitorSilenceRuleCreateSchema(Schema):
 
 
 class MonitorSilenceRuleUpdateSchema(Schema):
+    """PATCH /silence-rules/<id> 请求体（部分更新）。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -267,6 +307,7 @@ class MonitorSilenceRuleUpdateSchema(Schema):
 
 
 class MonitorAlertDependencyRuleCreateSchema(Schema):
+    """POST /alert-dependency-rules 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -280,6 +321,7 @@ class MonitorAlertDependencyRuleCreateSchema(Schema):
 
 
 class MonitorAlertDependencyRuleUpdateSchema(Schema):
+    """PATCH /alert-dependency-rules/<id> 请求体（部分更新）。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -293,6 +335,7 @@ class MonitorAlertDependencyRuleUpdateSchema(Schema):
 
 
 class MonitorSlaTargetCreateSchema(Schema):
+    """POST /sla-targets 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -306,6 +349,7 @@ class MonitorSlaTargetCreateSchema(Schema):
 
 
 class MonitorSlaTargetUpdateSchema(Schema):
+    """PATCH /sla-targets/<id> 请求体（部分更新）。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -319,6 +363,7 @@ class MonitorSlaTargetUpdateSchema(Schema):
 
 
 class DeviceMetricOverrideUpsertSchema(Schema):
+    """POST /threshold-overrides 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -331,6 +376,7 @@ class DeviceMetricOverrideUpsertSchema(Schema):
 
 
 class MonitorEscalationStepInputSchema(Schema):
+    """P2-11: 升级链单步请求体（嵌套在 Policy Create/Update 的 steps 数组中）。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -344,6 +390,7 @@ class MonitorEscalationStepInputSchema(Schema):
 
 
 class MonitorEscalationPolicyCreateSchema(Schema):
+    """POST /escalation-policies 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -361,6 +408,7 @@ class MonitorEscalationPolicyCreateSchema(Schema):
 
 
 class MonitorEscalationPolicyUpdateSchema(Schema):
+    """PATCH /escalation-policies/<id> 请求体（部分更新）。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -378,6 +426,7 @@ class MonitorEscalationPolicyUpdateSchema(Schema):
 
 
 class OidCategoryRuleCreateSchema(Schema):
+    """POST /oid-category-rules 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -392,6 +441,7 @@ class OidCategoryRuleCreateSchema(Schema):
 
 
 class OidCategoryRuleUpdateSchema(Schema):
+    """PATCH /oid-category-rules/<id> 请求体（部分更新）。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -406,6 +456,7 @@ class OidCategoryRuleUpdateSchema(Schema):
 
 
 class DeviceTypeRecommendUpdateSchema(Schema):
+    """PUT /device-type-recommends/<device_type> 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -414,6 +465,7 @@ class DeviceTypeRecommendUpdateSchema(Schema):
 
 
 class MibScanImportSchema(Schema):
+    """POST /mib-scan/import 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -422,6 +474,7 @@ class MibScanImportSchema(Schema):
 
 
 class MibScanPersistRuleSchema(Schema):
+    """POST /mib-scan/persist-rule 请求体（把启发式命中的类别沉淀为规则，P1）。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -432,6 +485,7 @@ class MibScanPersistRuleSchema(Schema):
 
 
 class MibScanRequestSchema(Schema):
+    """POST /mib-scan 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -441,6 +495,7 @@ class MibScanRequestSchema(Schema):
 
 
 class VendorBrandCreateSchema(Schema):
+    """POST /vendor-brands 请求体。"""
 
     class Meta:
         unknown = EXCLUDE
@@ -454,6 +509,7 @@ class VendorBrandCreateSchema(Schema):
 
 
 class VendorBrandUpdateSchema(Schema):
+    """PATCH /vendor-brands/<id> 请求体（部分更新）。"""
 
     class Meta:
         unknown = EXCLUDE

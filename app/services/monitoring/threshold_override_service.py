@@ -13,7 +13,7 @@ from typing import Optional
 
 logger = get_logger(__name__)
 
-_CACHE_TTL = 300
+_CACHE_TTL = 300  # 5 分钟
 
 
 def _get_redis():
@@ -34,6 +34,16 @@ def get_effective_threshold(
     metric_key: str,
     device_type: Optional[str] = None,
 ) -> Optional[dict]:
+    """获取生效阈值（设备级覆盖优先，回退全局模板）。
+
+    Args:
+        device_id: 设备 ID
+        metric_key: 指标标识
+        device_type: 设备类型（用于查全局模板，可选）
+
+    Returns:
+        阈值 dict 或 None
+    """
     r = _get_redis()
     ck = _cache_key(device_id, metric_key)
     if r is not None:
@@ -73,6 +83,7 @@ def get_effective_threshold(
 
 
 def invalidate_cache(device_id: int, metric_key: Optional[str] = None):
+    """失效缓存（覆盖变更时调用）"""
     r = _get_redis()
     if r is None:
         return
@@ -88,6 +99,10 @@ def invalidate_cache(device_id: int, metric_key: Optional[str] = None):
 
 
 def list_threshold_overrides(device_id: int = None, metric_key: str = None) -> list:
+    """列出阈值覆盖（按 device_id/metric_key 过滤，序列化为 dict 列表）。
+
+    P1-1：读路径下沉 service，路由层不再直访 repository。
+    """
     from app.persistence.device_metric_override_repository import DeviceMetricOverrideRepository
     repo = DeviceMetricOverrideRepository()
     rows = repo.list_by_filters(device_id=device_id, metric_key=metric_key)
@@ -95,6 +110,7 @@ def list_threshold_overrides(device_id: int = None, metric_key: str = None) -> l
 
 
 def upsert(data: dict) -> dict:
+    """upsert 阈值覆盖（I5：route handler 不再做完整 upsert）。"""
     from app.models.device_metric_override import DeviceMetricOverride
     from app.persistence.device_metric_override_repository import DeviceMetricOverrideRepository
     from app.exceptions.validation import ValidationError
@@ -130,6 +146,7 @@ def upsert(data: dict) -> dict:
 
 
 def delete(override_id: int) -> dict:
+    """删除阈值覆盖。"""
     from app.persistence.device_metric_override_repository import DeviceMetricOverrideRepository
     from app.exceptions.business import BusinessLogicError
     repo = DeviceMetricOverrideRepository()

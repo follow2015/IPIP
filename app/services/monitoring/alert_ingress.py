@@ -23,10 +23,11 @@ from typing import Optional, Tuple
 logger = get_logger(__name__)
 
 
-_MAINT_CACHE_TTL = 60
+_MAINT_CACHE_TTL = 60  # 秒；维护态变更时主动失效
 
 
 def _get_redis():
+    """惰性获取 Redis 客户端（失败返回 None，走降级直查 DB）。"""
     try:
         from app.services.monitoring.monitor_worker import _redis_client
         from flask import current_app
@@ -40,6 +41,7 @@ def _maint_cache_key(device_id: int) -> str:
 
 
 def invalidate_maintenance_cache(device_id: int) -> None:
+    """设备状态变更时主动失效维护态缓存（供 device_service 调用）。"""
     r = _get_redis()
     if r is not None:
         try:
@@ -49,6 +51,7 @@ def invalidate_maintenance_cache(device_id: int) -> None:
 
 
 def _is_maintenance_cached(device_id: int) -> Optional[bool]:
+    """查缓存返回维护态；未命中返回 None（需回源 DB）。"""
     r = _get_redis()
     if r is None:
         return None
@@ -63,6 +66,7 @@ def _is_maintenance_cached(device_id: int) -> Optional[bool]:
 
 
 def _set_maintenance_cache(device_id: int, is_maint: bool) -> None:
+    """回填维护态缓存。"""
     r = _get_redis()
     if r is None:
         return
@@ -78,6 +82,21 @@ def governance_should_emit(
     idempotency_key: str,
     now: Optional[float] = None,
 ) -> Tuple[bool, bool, int]:
+    """统一告警治理判定：静默检查（G4.1）+ 风暴抑制（G13）。
+
+    Args:
+        device_id: 设备 ID
+        alert_type: 告警类型（字符串）
+        idempotency_key: 告警幂等/去重键（供风暴抑制窗口计数）
+        now: 当前时间戳（测试注入）
+
+    Returns:
+        (should_emit, aggregated, suppressed_count):
+        - should_emit=False：命中静默或被抑制，调用方应**不**入箱；
+        - should_emit=True：放行；
+        - aggregated=True：这是抑制窗口累计后放行的一条聚合告警（应标注 suppressed_count）；
+        - suppressed_count：聚合时累计被抑制的告警数。
+    """
     try:
         from app.core.enums import DeviceStatus
 
@@ -150,6 +169,11 @@ def publish_monitor_alert_event(
     payload: dict,
     target_user_ids=None,
 ) -> None:
+    """G1: 入箱后 best-effort publish 到 Redis global channel，驱动 SSE 实时推送。
+
+    target_user_ids 由 data_scope_service 按设备可见用户反查（多用户隔离）；
+    为 None 视为全局广播。publish 失败不影响 outbox 落库与后续投递。
+    """
     try:
         from app.services.monitoring.data_scope_service import (
             get_users_with_device_access,
@@ -178,6 +202,8 @@ def publish_monitor_alert_event(
         )
 
 
+
+
 def build_dedup_key(
     alert_type: str,
     device_id: int,
@@ -185,6 +211,17 @@ def build_dedup_key(
     index: Optional[str] = None,
     action: Optional[str] = None,
 ) -> str:
+    """统一构造告警去重/幂等键。
+
+    规范格式：``{alert_type}:{device_id}:{metric_key}:{index}:{action}``
+
+    - 指标告警：metric_key/index/action=raise|recover 全填
+    - 连通性告警：metric_key 留空，action=raise|recover，index 可放 episode 等扩展
+    - 各段为 None 时归一化为空字符串，保证段数恒为 5，便于解析与 LIKE 过滤
+
+    所有告警入箱路径（MetricAlertService / MonitorService）必须经此函数生成 dedup_key，
+    禁止各处自行 f-string 拼接，避免格式漂移导致去重失效或过滤错位。
+    """
     return ":".join([
         str(alert_type) if alert_type is not None else "",
         str(device_id) if device_id is not None else "",
@@ -195,6 +232,11 @@ def build_dedup_key(
 
 
 def parse_dedup_key(dedup_key: str) -> dict:
+    """解析 dedup_key 为结构化字段（供过滤/统计使用）。
+
+    返回 dict 含 alert_type/device_id/metric_key/index/action，
+    缺段补 None，device_id 转 int（失败保留原字符串）。
+    """
     parts = (dedup_key or "").split(":")
     parts = (parts + [""] * 5)[:5]
     device_id_raw = parts[1] if parts[1] else None
@@ -203,7 +245,7 @@ def parse_dedup_key(dedup_key: str) -> dict:
         try:
             device_id = int(device_id_raw)
         except ValueError:
-            device_id = None
+            device_id = None  # type: ignore
     return {
         "alert_type": parts[0] or None,
         "device_id": device_id,

@@ -27,9 +27,7 @@ interface UseDeviceSubmitParams {
   form: ReturnType<typeof Form.useForm>[0];
   isEdit: boolean;
   editRecord: Device | null;
-  
   generateNodes: boolean;
-  
   nicComponentTemplates: any[];
   createDevice: { mutateAsync: (values: any) => Promise<{ data?: { id?: number } } | any> };
   updateDevice: { mutateAsync: (values: any) => Promise<any> };
@@ -41,7 +39,16 @@ interface UseDeviceSubmitParams {
   onClose: () => void;
 }
 
-
+/**
+ * 设备表单中由 DatePicker 持有的日期字段。
+ *
+ * 编辑回填时 DeviceForm 已将其从字符串转为 dayjs 对象供 DatePicker 渲染；
+ * 提交时必须转回 'YYYY-MM-DD' 字符串，否则 dayjs 经 axios(JSON.stringify) 序列化后
+ * 变成 ISO 时间串（如 2024-01-01T00:00:00.000Z），后端 Marshmallow 的
+ * `NullableDate`(fields.Date) 仅接受 'YYYY-MM-DD'，会报 "Not a valid date."。
+ *
+ * 此列表须与 DeviceForm.tsx 的 DEVICE_DATE_FIELDS 保持一致（编辑回填方向）。
+ */
 const SUBMIT_DATE_FIELDS = [
   'purchase_date',
   'warranty_start',
@@ -50,14 +57,12 @@ const SUBMIT_DATE_FIELDS = [
   'offline_date'
 ];
 
-
 function serializeDateField(value: unknown): unknown {
   if (dayjs.isDayjs(value)) {
     return (value as Dayjs).format('YYYY-MM-DD');
   }
   return value;
 }
-
 
 function buildNodeHardware(values: Record<string, any>) {
   return {
@@ -90,34 +95,25 @@ export function useDeviceSubmit({
   const handleSubmit = async () => {
     try {
       const values = (await form.validateFields()) as Record<string, any>;
-      
-      
       for (const f of SUBMIT_DATE_FIELDS) {
         if (values[f] !== undefined) {
           values[f] = serializeDateField(values[f]);
         }
       }
-      
       delete values.device_gap;
-      
       const portGroupsVal = values.port_groups;
       delete values.port_groups;
       delete values.nic_templates;
-      
 
       if (values.device_subtype === 'chassis') {
         values.is_chassis = true;
       }
 
-      
       const nicPortsFormVal = values.nic_ports as { template_id?: number }[] | undefined;
-      
-      
       const isChassisWithNodes = generateNodes && values.is_chassis;
       if (!isChassisWithNodes) {
         delete values.nic_ports;
       } else {
-        
         const expandedNicPorts = expandNicPorts(nicPortsFormVal, nicComponentTemplates);
         if (expandedNicPorts.length > 0) {
           values.nic_ports = expandedNicPorts;
@@ -126,7 +122,6 @@ export function useDeviceSubmit({
         }
       }
 
-      
       const storageItems = values.storage_items as
         (StorageItem & { template_id?: number })[] | undefined;
       if (storageItems && storageItems.length > 0) {
@@ -137,19 +132,14 @@ export function useDeviceSubmit({
       }
 
       if (isEdit) {
-        
-        
         if (generateNodes && values.is_chassis) {
           values.auto_create_nodes = true;
           values.overwrite_nodes = true;
           values.node_hardware = buildNodeHardware(values);
-          
         }
 
-        
         await updateDevice.mutateAsync({ id: editRecord!.id, ...values });
 
-        
         if (
           !values.is_chassis &&
           values.device_type === DeviceType.SERVER &&
@@ -159,7 +149,6 @@ export function useDeviceSubmit({
           try {
             const expandedNicPorts = expandNicPorts(nicPortsFormVal, nicComponentTemplates);
             if (expandedNicPorts.length > 0) {
-              
               const nicGroups: Record<number, typeof expandedNicPorts> = {};
               for (const p of expandedNicPorts) {
                 const num = p.nic_number;
@@ -180,25 +169,20 @@ export function useDeviceSubmit({
               await put(`/devices/${editRecord!.id}/nics`, { nics });
             }
           } catch {
-            
+            /* 网卡更新失败不阻断设备更新 */
           }
         }
 
-        
         let n2nWarning = '';
         if (values.device_type === DeviceType.NETWORK && values.switch_config) {
           const sc = values.switch_config;
           const uplinkDevId = sc.uplink_device_id;
-          const peerPortIds: number[] = sc.peer_port_ids ?? []; 
-          
-          
+          const peerPortIds: number[] = sc.peer_port_ids ?? []; // 对端互联端口
           let uplinkPortIds: number[] = sc.uplink_port_ids ?? [];
 
           if (uplinkDevId && peerPortIds.length > 0) {
-            
             if (isEdit) {
               try {
-                
                 const { data: freshLinks } = await get<any[]>(
                   `/devices/${editRecord!.id}/port-links`
                 );
@@ -210,18 +194,15 @@ export function useDeviceSubmit({
                   try {
                     await del(`/devices/${editRecord!.id}/port-links/${conn.id}`);
                   } catch (err: any) {
-                    
                     if (err?.response?.status !== 404) {
                       console.warn('删除旧上行连接失败:', conn.id, err);
                     }
                   }
                 }
               } catch {
-                
               }
             }
 
-            
             if (uplinkPortIds.length === 0 && isEdit) {
               try {
                 const { data: freshLinks } = await get<any[]>(
@@ -235,11 +216,9 @@ export function useDeviceSubmit({
                   link.local_device_id === editRecord!.id ? link.local_port_id : link.peer_port_id
                 );
               } catch {
-                
               }
             }
 
-            
             const pairCount = Math.min(uplinkPortIds.length, peerPortIds.length);
             if (pairCount === 0) {
               n2nWarning =
@@ -251,8 +230,8 @@ export function useDeviceSubmit({
                   await post('/device-connections', {
                     device_id: editRecord!.id,
                     switch_device_id: uplinkDevId,
-                    switch_port_id: uplinkPortIds[i], 
-                    peer_port_id: peerPortIds[i], 
+                    switch_port_id: uplinkPortIds[i], // 本机上行端口（N2N: local_port_id）
+                    peer_port_id: peerPortIds[i], // 对端互联端口（N2N: peer_port_id）
                     link_type: 'network_to_network',
                     connection_type: 'fiber',
                     notes: '上行'
@@ -268,7 +247,6 @@ export function useDeviceSubmit({
               }
             }
           } else if (uplinkDevId && peerPortIds.length === 0) {
-            
             n2nWarning = '已选择上行设备但未选择对端互联端口，上行连接未创建';
           }
         }
@@ -278,23 +256,18 @@ export function useDeviceSubmit({
           message.warning(n2nWarning, 5);
         }
       } else {
-        
         if (values.device_type === DeviceType.NETWORK && values.switch_config) {
-          
         }
 
-        
         if (generateNodes && values.is_chassis) {
           values.auto_create_nodes = true;
           values.node_hardware = buildNodeHardware(values);
-          
         }
 
         const result = await createDevice.mutateAsync(values);
         message.success('创建成功');
         const deviceId = result?.data?.id;
 
-        
         if (
           deviceId &&
           values.device_type === DeviceType.NETWORK &&
@@ -332,11 +305,10 @@ export function useDeviceSubmit({
               message.success(`已生成 ${allPorts.length} 个端口`);
             }
           } catch {
-            
+            /* 端口创建失败不阻断 */
           }
         }
 
-        
         if (
           deviceId &&
           values.device_type === DeviceType.SERVER &&
@@ -351,7 +323,7 @@ export function useDeviceSubmit({
               message.success(`已创建 ${nicPorts.length} 个网卡端口`);
             }
           } catch {
-            
+            /* 网卡创建失败不阻断 */
           }
         }
       }

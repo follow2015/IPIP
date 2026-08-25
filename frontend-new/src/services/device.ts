@@ -27,11 +27,16 @@ export interface DeviceQueryParams extends PaginationParams {
   parent_device_id?: number;
   customer_id?: number;
   is_chassis?: number;
-  
   has_ssh?: boolean;
 }
 
-
+/**
+ * 创建设备请求
+ * 基于 OpenAPI DeviceCreate Schema，补充前端专有嵌套字段
+ * - Omit 掉 OpenAPI 中类型不精确的 nic_ports/storage_items/switch_config/node_hardware
+ * - 将 required-but-defaulted 字段（auto_create_nodes, cpu_template_id 等）转为 optional
+ * - 前端专有嵌套结构（switch_config/node_hardware/storage_items/nic_ports）在此重新定义
+ */
 export interface CreateDeviceRequest extends Omit<
   OpenApiDeviceCreate,
   | 'switch_config'
@@ -45,19 +50,12 @@ export interface CreateDeviceRequest extends Omit<
   | 'gpu_count'
   | 'gpu_template_id'
 > {
-  
   auto_create_nodes?: boolean;
-  
   cpu_template_id?: number | null;
-  
   memory_template_id?: number | null;
-  
   memory_dimm_count?: number | null;
-  
   gpu_count?: number | null;
-  
   gpu_template_id?: number | null;
-  
   switch_config?: {
     ip?: string;
     port?: number;
@@ -69,13 +67,11 @@ export interface CreateDeviceRequest extends Omit<
     layer?: number;
     authentication_method?: string;
     has_ssh?: boolean;
-    
     uplink_device_id?: number | null;
     core_device_id?: number | null;
     port_num?: number | null;
     uplink_port_ids?: number[] | null;
   };
-  
   node_hardware?: {
     cpu?: string;
     cpu_way?: number;
@@ -90,7 +86,6 @@ export interface CreateDeviceRequest extends Omit<
     gpu_template_id?: number | null;
     storage_summary?: string;
   };
-  
   storage_items?: {
     template_id?: number;
     storage_type?: string;
@@ -99,7 +94,6 @@ export interface CreateDeviceRequest extends Omit<
     count?: number;
     slot_number?: number;
   }[];
-  
   nic_ports?: {
     template_id?: number;
     nic_number?: number;
@@ -115,7 +109,6 @@ export interface CreateDeviceRequest extends Omit<
 
 export interface UpdateDeviceRequest extends Partial<CreateDeviceRequest> {
   id: number;
-  
   metric_template_group_id?: number | null;
 }
 
@@ -134,7 +127,12 @@ export const useDeviceList = deviceHooks.useList;
 export const useDeviceDetail = deviceHooks.useDetail;
 export const useDeviceSuspenseDetail = deviceHooks.useSuspenseDetail;
 
-
+/**
+ * 设备删除 mutation（覆盖工厂默认行为）
+ *
+ * 关键修复：设备删除后同时 invalidate 机柜缓存，
+ * 确保机柜详情页的 U 位布局图即时刷新。
+ */
 export function useDeleteDevice() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -142,8 +140,6 @@ export function useDeleteDevice() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
-      
-      
       queryClient.invalidateQueries({ queryKey: queryKeys.monitor.statusesAll });
       queryClient.invalidateQueries({ queryKey: queryKeys.monitor.alertsAll });
       queryClient.invalidateQueries({ queryKey: queryKeys.monitor.metricAlertsAll });
@@ -152,7 +148,12 @@ export function useDeleteDevice() {
   });
 }
 
-
+/**
+ * 设备创建 mutation（覆盖工厂默认行为）
+ *
+ * 关键修复：设备创建后同时 invalidate 机柜缓存，
+ * 确保机柜详情页的 U 位布局图即时刷新。
+ */
 export function useCreateDevice() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -164,7 +165,12 @@ export function useCreateDevice() {
   });
 }
 
-
+/**
+ * 设备更新 mutation（覆盖工厂默认行为）
+ *
+ * 关键修复：设备更新后同时 invalidate 机柜缓存，
+ * 确保机柜详情页的 U 位布局图即时刷新。
+ */
 export function useUpdateDevice() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -174,10 +180,7 @@ export function useUpdateDevice() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      
       queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
-      
-      
       queryClient.invalidateQueries({ queryKey: queryKeys.monitor.metricDashboardAll });
     }
   });
@@ -194,7 +197,6 @@ export function useDeviceStatistics() {
   });
 }
 
-
 export function useUpdateDeviceStatus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -206,7 +208,6 @@ export function useUpdateDeviceStatus() {
     }
   });
 }
-
 
 export function useUpdateDeviceLocation() {
   const queryClient = useQueryClient();
@@ -225,7 +226,6 @@ export function useUpdateDeviceLocation() {
   });
 }
 
-
 export function useBatchDeleteDevices() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -241,7 +241,6 @@ export function useBatchDeleteDevices() {
   });
 }
 
-
 export function useBatchUpdateDeviceStatus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -254,7 +253,6 @@ export function useBatchUpdateDeviceStatus() {
   });
 }
 
-
 export function useBatchCreateDevices() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -266,13 +264,11 @@ export function useBatchCreateDevices() {
   });
 }
 
-
 export function useCloneDevice() {
   return useMutation({
     mutationFn: (deviceId: number) => post<CloneDeviceData>(`/devices/clone/${deviceId}`)
   });
 }
-
 
 export interface BatchUpdateHardwareRequest {
   ids: number[];
@@ -293,7 +289,6 @@ export interface BatchUpdateHardwareRequest {
   storage_summary?: string | null;
 }
 
-
 export interface BatchUpdateAssetRequest {
   ids: number[];
   auto_generate_asset_number: boolean;
@@ -311,7 +306,9 @@ export interface BatchUpdateAssetRequest {
   lifecycle_years?: number | null;
 }
 
-
+/**
+ * 批量更新设备资产信息
+ */
 export function useBatchUpdateDeviceAsset() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -329,7 +326,6 @@ export function useBatchUpdateDeviceAsset() {
   });
 }
 
-
 export interface BatchUpdateConfigRequest {
   ids: number[];
   main?: {
@@ -340,7 +336,6 @@ export interface BatchUpdateConfigRequest {
     customer_id?: number | null;
   };
   hardware?: Record<string, unknown>;
-  
   storage_items?: {
     template_id?: number;
     storage_type?: string;
@@ -374,7 +369,10 @@ export function useBatchUpdateDeviceConfig() {
   });
 }
 
-
+/**
+ * 拖拽更换机箱节点位置
+ * source_position 必须有节点；target_position 可空可占用（占用则交换，空则移动）
+ */
 export interface SwapNodePositionsRequest {
   source_position: number;
   target_position: number;
@@ -394,7 +392,9 @@ export function useSwapNodePositions(chassisId: number) {
   });
 }
 
-
+/**
+ * 批量重置（清空）设备资产信息
+ */
 export function useBatchResetDeviceAsset() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -409,7 +409,12 @@ export function useBatchResetDeviceAsset() {
   });
 }
 
-
+/**
+ * 批量更新设备硬件配置
+ *
+ * 替代 NodeTab 中串行 N 次 PATCH 的反模式。
+ * 单次 POST 请求，后端在同一事务中批量写入，全部成功或全部回滚。
+ */
 export function useBatchUpdateDeviceHardware() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -419,7 +424,6 @@ export function useBatchUpdateDeviceHardware() {
         ...hardware
       }),
     onSuccess: (_, variables) => {
-      
       variables.ids.forEach((id) => {
         queryClient.invalidateQueries({ queryKey: queryKeys.devices.detail(id) });
       });
@@ -428,7 +432,16 @@ export function useBatchUpdateDeviceHardware() {
   });
 }
 
-
+/**
+ * 生成序列号
+ *
+ * 改为 useQuery（GET 语义，不应是 mutation）。
+ * 通过 mutation 调用，后端为 POST 端点。
+ *
+ * 用法：
+ *   const generateSN = useGenerateSerialNumber();
+ *   // 点击按钮时：generateSN.mutateAsync({ prefix: 'SN' })
+ */
 export function useGenerateSerialNumber() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -450,7 +463,6 @@ export interface DeletedDeviceQueryParams extends PaginationParams {
   search?: string;
 }
 
-
 export function useDeletedDeviceList(params: DeletedDeviceQueryParams) {
   return useQuery({
     queryKey: [...queryKeys.devices.all, 'deleted', params],
@@ -460,7 +472,6 @@ export function useDeletedDeviceList(params: DeletedDeviceQueryParams) {
     }
   });
 }
-
 
 export function useRestoreDevice() {
   const queryClient = useQueryClient();
@@ -480,7 +491,6 @@ export function useRestoreDevice() {
     }
   });
 }
-
 
 export function useBatchRestoreDevices() {
   const queryClient = useQueryClient();
@@ -506,7 +516,6 @@ export function useBatchRestoreDevices() {
   });
 }
 
-
 export function usePermanentDeleteDevice() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -516,7 +525,6 @@ export function usePermanentDeleteDevice() {
     }
   });
 }
-
 
 export function useBatchPermanentDeleteDevices() {
   const queryClient = useQueryClient();
@@ -536,7 +544,10 @@ export interface DeviceSearchResult {
   management_ip: string | null;
 }
 
-
+/**
+ * 命令式搜索设备（非 hook，供 onSearch 回调直接调用）。
+ * 对齐 GET /devices?search=...&per_page=50，返回精简字段。
+ */
 export async function searchDevicesForLink(keyword: string): Promise<DeviceSearchResult[]> {
   const res = await get<{ items: DeviceSearchResult[]; total: number }>('/devices', {
     search: keyword,

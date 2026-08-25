@@ -19,9 +19,21 @@ logger = get_logger(__name__)
 
 
 class APIResponse:
+    """统一的API响应格式化器
+    
+    标准响应结构：
+    {
+        "success": true/false,
+        "message": "操作成功",
+        "data": { ... },          // 成功时可选
+        "error_code": "10001",    // 失败时可选
+        "timestamp": "2026-04-10T10:00:00Z"
+    }
+    """
     
     @staticmethod
     def success(data: Any = None, message: str = "操作成功", status_code: int = 200) -> Tuple[Dict, int]:
+        """成功响应"""
         from datetime import datetime, timezone
         
         response = {
@@ -37,6 +49,14 @@ class APIResponse:
     
     @staticmethod
     def error(message: str, error_code: str = None, status_code: int = 400, details: Dict = None) -> Tuple[Dict, int]:
+        """错误响应
+        
+        Args:
+            message: 错误消息
+            error_code: 错误代码（如 "10001"）
+            status_code: HTTP状态码
+            details: 错误详情（可选）
+        """
         from datetime import datetime, timezone
         
         response = {
@@ -55,6 +75,34 @@ class APIResponse:
     
     @staticmethod
     def paginated(data: list, page: int, per_page: int, total: int, message: str = "获取数据成功") -> Tuple[Dict, int]:
+        """分页响应
+        
+        统一分页响应格式，将数据和分页信息嵌套在 data 字段中：
+        {
+            "success": true,
+            "message": "获取数据成功",
+            "data": {
+                "data": [...数据列表...],
+                "pagination": {
+                    "page": 1,
+                    "per_page": 20,
+                    "total": 100,
+                    "total_pages": 5
+                }
+            },
+            "timestamp": "2026-04-10T10:00:00Z"
+        }
+        
+        Args:
+            data: 数据列表
+            page: 当前页码
+            per_page: 每页数量
+            total: 总记录数
+            message: 响应消息
+            
+        Returns:
+            tuple: (响应字典, HTTP状态码)
+        """
         from datetime import datetime, timezone
         
         total_pages = (total + per_page - 1) // per_page if total > 0 else 0
@@ -78,9 +126,11 @@ class APIResponse:
 
 
 class RequestValidator:
+    """统一的请求验证器"""
     
     @staticmethod
     def validate_json(schema: Schema, data: Dict = None) -> Dict:
+        """验证JSON数据"""
         if data is None:
             data = request.get_json()
             
@@ -94,6 +144,7 @@ class RequestValidator:
     
     @staticmethod
     def validate_required_fields(data: Dict, required_fields: list) -> None:
+        """验证必填字段"""
         missing_fields = []
         for field in required_fields:
             if field not in data or data[field] is None or data[field] == '':
@@ -104,6 +155,7 @@ class RequestValidator:
     
     @staticmethod
     def validate_pagination_params() -> Tuple[int, int]:
+        """验证分页参数"""
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
         
@@ -119,6 +171,7 @@ class RequestValidator:
 
 
 def api_exception_handler(f):
+    """API异常处理装饰器"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:
@@ -150,6 +203,7 @@ def api_exception_handler(f):
 
 
 def validate_request_json(schema: Schema):
+    """请求JSON验证装饰器"""
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
@@ -164,6 +218,7 @@ def validate_request_json(schema: Schema):
 
 
 class HTTPStatusCode:
+    """HTTP状态码常量"""
     OK = 200
     CREATED = 201
     BAD_REQUEST = 400
@@ -175,6 +230,7 @@ class HTTPStatusCode:
 
 
 class ErrorCode:
+    """统一错误码体系"""
     VALIDATION_ERROR = "10001"
     AUTHENTICATION_ERROR = "10002"
     AUTHORIZATION_ERROR = "10003"

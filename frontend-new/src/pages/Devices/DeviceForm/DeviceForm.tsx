@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Form, Input, Row, Col, Modal } from 'antd';
 import dayjs from 'dayjs';
@@ -52,7 +51,6 @@ import { useDeviceSubmit } from './useDeviceSubmit';
 import AssetInfoFields from '@/components/AssetInfoFields';
 import { getCategoryConfig } from '../shared/categoryConfig';
 
-
 const DEVICE_DATE_FIELDS: (keyof Device)[] = [
   'purchase_date',
   'warranty_start',
@@ -66,12 +64,9 @@ interface DeviceFormProps {
   open: boolean;
   editRecord: Device | null;
   onClose: () => void;
-  
   defaultDeviceType?: string;
-  
   editDeviceId?: number;
 }
-
 
 function DeviceForm({
   open,
@@ -89,10 +84,8 @@ function DeviceForm({
   const { data: customerOptions } = useAllocatableCustomerOptions();
   const { data: userOptions } = useUserOptions();
 
-  
   const customerId = Form.useWatch('customer_id', form);
 
-  
   const { data: cpuTemplates = [] } = useComponentTemplates('cpu', customerId);
   const { data: memoryTemplates = [] } = useComponentTemplates('memory', customerId);
   const { data: diskTemplates = [] } = useComponentTemplates('disk', customerId);
@@ -103,45 +96,32 @@ function DeviceForm({
 
   const isEdit = !!editRecordProp || !!editDeviceId;
 
-  
   const { data: fetchedDevice } = useDeviceDetail(editDeviceId ?? 0);
-  
   const editRecord = editRecordProp ?? (editDeviceId ? (fetchedDevice ?? null) : null);
 
-  
   const prevDeviceType = useRef<string | undefined>(undefined);
 
-  
   const prevRoomId = useRef<number | undefined>(undefined);
 
-  
   const prevChassisId = useRef<number | undefined>(undefined);
 
-  
   const deviceType = Form.useWatch('device_type', form);
   const deviceSubtype = Form.useWatch('device_subtype', form);
   const selectedRoomId = Form.useWatch('room_id', form);
   const selectedCabinetId = Form.useWatch('cabinet_id', form);
   const selectedChassisId = Form.useWatch('parent_device_id', form);
-  
   const watchedNodePosition = Form.useWatch('node_position', form);
-  
   const watchedUPosition = Form.useWatch('u_position', form);
   const watchedHeightU = Form.useWatch('height_u', form);
 
-  
   const [generateNodes, setGenerateNodes] = useState(false);
 
-  
   const { data: cabinetOptions } = useCabinetOptions(selectedRoomId, false, [1, 2]);
 
-  
   const { data: availableUPositions } = useCabinetAvailableUPositions(selectedCabinetId ?? 0);
 
-  
   const { data: cabinetLayout } = useCabinetLayout(selectedCabinetId ?? 0);
 
-  
   const { data: chassisData } = useDeviceList({
     device_type: DeviceType.SERVER,
     device_subtype: DeviceSubtype.CHASSIS,
@@ -149,7 +129,6 @@ function DeviceForm({
     per_page: 999
   });
 
-  
   const { data: allChassisNodesData } = useDeviceList({
     device_type: DeviceType.SERVER,
     device_subtype: DeviceSubtype.NODE,
@@ -157,13 +136,11 @@ function DeviceForm({
     per_page: 999
   });
 
-  
   const { data: chassisNodesData } = useDeviceList({
     parent_device_id: selectedChassisId ?? undefined,
     per_page: 999
   });
 
-  
   const [storageValidation, setStorageValidation] = useState<{
     valid: boolean;
     preview: string;
@@ -171,7 +148,6 @@ function DeviceForm({
     errors: string[];
   }>({ valid: true, preview: '', items: [], errors: [] });
 
-  
   const subtypeOptions = deviceType
     ? (DEVICE_SUBTYPE_MAP[deviceType as DeviceType] ?? []).map((st) => ({
         label: DEVICE_SUBTYPE_LABELS[st],
@@ -179,7 +155,6 @@ function DeviceForm({
       }))
     : [];
 
-  
   const serverCfg = getCategoryConfig(deviceType as DeviceType);
   const serverRegions =
     deviceType === DeviceType.SERVER
@@ -194,25 +169,18 @@ function DeviceForm({
   const showChassisConfig = serverRegions?.chassis ?? false;
   const showNodeAssoc = serverRegions?.nodeAssoc ?? false;
 
-  
   const showLocation = !showNodeAssoc;
 
-  
   const isNetwork = deviceType === DeviceType.NETWORK;
 
-  
   const hasSsh = Form.useWatch(['switch_config', 'has_ssh'], form);
 
-  
   const isUnmanagedNetwork = isNetwork && !hasSsh;
 
-  
   const showSwitchConfig = isNetwork && hasSsh;
 
-  
   const portGroups = Form.useWatch('port_groups', form);
 
-  
   const portPreview = useMemo(() => {
     if (!portGroups || portGroups.length === 0) return [];
     const allPorts: string[] = [];
@@ -231,10 +199,8 @@ function DeviceForm({
     return allPorts.slice(0, 500);
   }, [portGroups]);
 
-  
   const showNicConfig = showHardware || (showChassisConfig && generateNodes);
 
-  
   const chassisOptions = useMemo(() => {
     const chassisList = chassisData?.items ?? [];
     const allNodes = allChassisNodesData?.items ?? [];
@@ -256,7 +222,6 @@ function DeviceForm({
       });
   }, [chassisData, allChassisNodesData, editRecord]);
 
-  
   const availablePositions = useMemo(() => {
     if (!selectedChassisId) return [];
     const chassis = chassisData?.items?.find((c) => c.id === selectedChassisId);
@@ -279,7 +244,6 @@ function DeviceForm({
     return positions;
   }, [selectedChassisId, chassisData, chassisNodesData, editRecord]);
 
-  
   const uPositionStatus = useMemo(() => {
     const uPos = form.getFieldValue('u_position');
     const heightU = form.getFieldValue('height_u') ?? 1;
@@ -309,7 +273,6 @@ function DeviceForm({
     editRecord
   ]);
 
-  
   const handleAutoAssignUPosition = useCallback(() => {
     if (!availableUPositions || availableUPositions.length === 0) {
       message.warning('当前机柜无可用U位');
@@ -320,7 +283,6 @@ function DeviceForm({
 
     const sorted = [...availableUPositions].sort((a, b) => a - b);
 
-    
     let candidatePositions = sorted;
     if (isEdit && editRecord?.u_position) {
       const myPositions: number[] = [];
@@ -353,7 +315,6 @@ function DeviceForm({
     message.warning(`无连续${needed}个U位可用`);
   }, [availableUPositions, form, message, isEdit, editRecord]);
 
-  
   useEffect(() => {
     if (prevDeviceType.current !== undefined && prevDeviceType.current !== deviceType) {
       form.setFieldValue('device_subtype', undefined);
@@ -361,7 +322,6 @@ function DeviceForm({
     prevDeviceType.current = deviceType;
   }, [deviceType, form]);
 
-  
   useEffect(() => {
     if (prevRoomId.current !== undefined && prevRoomId.current !== selectedRoomId) {
       form.setFieldValue('cabinet_id', undefined);
@@ -372,7 +332,6 @@ function DeviceForm({
     prevRoomId.current = selectedRoomId;
   }, [selectedRoomId, form]);
 
-  
   useEffect(() => {
     if (prevChassisId.current !== undefined && prevChassisId.current !== selectedChassisId) {
       form.setFieldValue('node_position', undefined);
@@ -380,12 +339,10 @@ function DeviceForm({
     prevChassisId.current = selectedChassisId;
   }, [selectedChassisId, form]);
 
-  
   useEffect(() => {
     if (!showNodeAssoc || !selectedChassisId || !watchedNodePosition) return;
     const chassis = chassisData?.items?.find((c) => c.id === selectedChassisId);
     if (!chassis) return;
-    
     const pattern = chassis.node_naming_pattern || '{chassis}-Node{pos}';
     const newName = pattern
       .replace('{chassis}', chassis.device_name)
@@ -396,17 +353,14 @@ function DeviceForm({
     form.setFieldValue('notes', `${chassis.device_name} 节点 ${watchedNodePosition}`);
   }, [showNodeAssoc, selectedChassisId, watchedNodePosition, chassisData, form]);
 
-  
   useEffect(() => {
     if (open) {
       setGenerateNodes(false);
       if (editRecord) {
-        
         prevDeviceType.current = undefined;
         prevRoomId.current = undefined;
         prevChassisId.current = undefined;
 
-        
         const editValues = { ...editRecord };
         for (const f of DEVICE_DATE_FIELDS) {
           const v = editValues[f];
@@ -415,7 +369,6 @@ function DeviceForm({
           }
         }
 
-        
         form.setFieldsValue({
           ...editValues,
           room_id: editRecord.room_id,
@@ -424,7 +377,6 @@ function DeviceForm({
             : undefined
         });
 
-        
         if (editRecord.device_type === DeviceType.NETWORK && editRecord.switch_credential) {
           const sc = editRecord.switch_credential;
           form.setFieldsValue({
@@ -437,7 +389,6 @@ function DeviceForm({
               switch_role: sc.switch_role,
               layer: sc.layer ?? undefined,
               authentication_method: sc.authentication_method ?? undefined,
-              
               has_ssh: sc.has_ssh,
               uplink_device_id: sc.uplink_device_id ?? undefined,
               uplink_port_ids: sc.uplink_port_ids ?? undefined,
@@ -447,14 +398,12 @@ function DeviceForm({
           });
         }
 
-        
         setTimeout(() => {
           prevDeviceType.current = editRecord.device_type;
           prevRoomId.current = editRecord.room_id ?? undefined;
           prevChassisId.current = editRecord.parent_device_id ?? undefined;
         }, 0);
 
-        
         if (editRecord.storage_summary) {
           const result = parseStorageConfig(editRecord.storage_summary);
           if (result.items.length > 0) {
@@ -471,7 +420,6 @@ function DeviceForm({
           }
         }
 
-        
         if (editRecord.cpu_template_id) {
           form.setFieldValue('cpu_template_id', editRecord.cpu_template_id);
         }
@@ -482,7 +430,6 @@ function DeviceForm({
           form.setFieldValue('memory_dimm_count', editRecord.memory_dimm_count);
         }
 
-        
         const nicPorts = editRecord.nic_ports;
         if (nicPorts?.length) {
           const nicGroups: Record<number, DeviceNicPort[]> = {};
@@ -498,7 +445,6 @@ function DeviceForm({
           form.setFieldValue('nic_ports', nicPortsFormValue);
         }
 
-        
         const storageItemsData = editRecord.storage_items;
         if (storageItemsData?.length) {
           const storageItemsFormValue = storageItemsData.map((s) => ({
@@ -517,11 +463,9 @@ function DeviceForm({
         form.setFieldValue('status', DeviceStatusCode.ONLINE);
         form.setFieldValue('height_u', 1);
         form.setFieldValue('device_gap', 2);
-        
         if (defaultDeviceType) {
           form.setFieldValue('device_type', defaultDeviceType);
         }
-        
         prevDeviceType.current = undefined;
         prevRoomId.current = undefined;
         prevChassisId.current = undefined;
@@ -529,13 +473,11 @@ function DeviceForm({
     }
   }, [open, editRecord, form]);
 
-  
   const handleGenerateDeviceName = useCallback(() => {
     const name = generateDeviceName(deviceType);
     form.setFieldValue('device_name', name);
   }, [deviceType, form]);
 
-  
   const handleStorageChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const text = e.target.value;
@@ -550,7 +492,6 @@ function DeviceForm({
     [form]
   );
 
-  
   const handleGenerateNodesChange = useCallback((checked: boolean) => {
     setGenerateNodes(checked);
     if (checked) {
@@ -566,35 +507,27 @@ function DeviceForm({
     }
   }, []);
 
-  
   const currentDeviceId = editRecord?.id;
 
-  
   const { data: portLinks } = usePortLinks(currentDeviceId!);
 
-  
   useEffect(() => {
     if (!isEdit || !currentDeviceId || !portLinks?.length) return;
-    
     const uplinkDevId =
       form.getFieldValue(['switch_config', 'uplink_device_id']) ??
       editRecord?.switch_credential?.uplink_device_id;
     if (!uplinkDevId) return;
-    
     const uplinkConns = portLinks.filter(
       (link: any) => link.peer_device_id === uplinkDevId || link.local_device_id === uplinkDevId
     );
     if (uplinkConns.length > 0) {
-      
-      
       const peerPortIds = uplinkConns.map((link: any) =>
         link.peer_device_id === uplinkDevId ? link.peer_port_id : link.local_port_id
       );
       form.setFieldValue(['switch_config', 'peer_port_ids'], peerPortIds);
     }
-  }, [isEdit, currentDeviceId, portLinks]); 
+  }, [isEdit, currentDeviceId, portLinks]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  
   const { handleSubmit } = useDeviceSubmit({
     form,
     isEdit,
@@ -607,13 +540,11 @@ function DeviceForm({
     onClose
   });
 
-  
   const typeOptions = Object.entries(DEVICE_TYPE_MAP).map(([key, val]) => ({
     label: val.label,
     value: key
   }));
 
-  
   const statusOptions = Object.entries(DEVICE_STATUS_MAP).map(([key, val]) => ({
     label: val.label,
     value: Number(key)
@@ -644,25 +575,25 @@ function DeviceForm({
           showNodeAssoc={showNodeAssoc}
           onGenerateName={handleGenerateDeviceName}
         />
-        {}
+        {/* ── 硬件配置区块（独立服务器 + 子节点共用） ── */}
         {showHardware && <HardwareConfigFields form={form} customerId={customerId} showIpmi />}
 
-        {}
+        {/* ── 网卡配置区块（独立服务器/子节点） ── */}
         {showHardware && <NicConfigFields form={form} customerId={customerId} />}
 
-        {}
+        {/* ── 网络信息区块 ── */}
         <NetworkInfoFields isNetwork={isNetwork} />
 
-        {}
+        {/* ── 网络拓扑区块（所有网络设备可见） ── */}
         {isNetwork && <NetworkTopologyFields form={form} isEdit={isEdit} editRecord={editRecord} />}
 
-        {}
+        {/* ── 交换机配置区块（仅网络设备且开启管理权限时显示） ── */}
         {showSwitchConfig && <SwitchConfigFields isEdit={isEdit} />}
 
-        {}
+        {/* ── 端口生成区块（非网管型网络设备，支持多组） ── */}
         {isUnmanagedNetwork && !isEdit && <PortGenerationFields portPreview={portPreview} />}
 
-        {}
+        {/* ── 机箱配置区块 ── */}
         {showChassisConfig && (
           <ChassisConfigFields
             form={form}
@@ -673,7 +604,7 @@ function DeviceForm({
           />
         )}
 
-        {}
+        {/* ── 位置信息区块（非节点设备） ── */}
         {showLocation && (
           <LocationInfoFields
             roomOptions={roomOptions}
@@ -688,10 +619,10 @@ function DeviceForm({
           />
         )}
 
-        {}
+        {/* ── 资产与采购信息区块（共享 AssetInfoFields） ── */}
         <AssetInfoFields form={form} assetNumberMode="manual" defaultOnlineDateNow={!isEdit} />
 
-        {}
+        {/* 备注：设备级字段，不属于资产信息，单独渲染 */}
         <Row gutter={16}>
           <Col span={24}>
             <Form.Item name="notes" label="备注">

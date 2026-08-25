@@ -14,6 +14,7 @@ from extensions import db
 
 
 class MonitorAlertDependencyRule(BaseModel):
+    """监控告警依赖抑制规则（手动配置）"""
 
     __tablename__ = "monitor_alert_dependency_rule"
     __table_args__ = (

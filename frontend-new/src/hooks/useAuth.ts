@@ -6,7 +6,6 @@ import { useAuthStore } from '@/stores/auth';
 import type { LoginRequest } from '@/types/api';
 import type { User } from '@/types/models';
 
-
 interface UseAuthReturn {
   user: User | null;
   token: string | null;
@@ -15,7 +14,6 @@ interface UseAuthReturn {
   login: (credentials: LoginRequest) => Promise<void>;
   logout: () => void;
 }
-
 
 export function useAuth(): UseAuthReturn {
   const { user, token, isAuthenticated, permissions, login, logout } =

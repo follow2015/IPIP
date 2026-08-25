@@ -13,7 +13,6 @@ import type {
   DeviceStorageResponse
 } from '@/types/models';
 
-
 interface StorageRequest {
   storage_type: string;
   capacity?: string;
@@ -29,12 +28,10 @@ interface StorageRequest {
   count?: number;
 }
 
-
 async function fetchDeviceStorage(deviceId: number, grouped = true) {
   const res = await get<DeviceStorageResponse>(`/devices/${deviceId}/storage`, { grouped });
   return unwrapNested(res, 'storage');
 }
-
 
 export function useDeviceStorage(deviceId: number) {
   return useQuery({
@@ -47,7 +44,6 @@ export function useDeviceStorage(deviceId: number) {
   });
 }
 
-
 export function useDeviceStorageDetail(deviceId: number) {
   return useQuery({
     queryKey: queryKeys.devices.storageDetail(deviceId),
@@ -58,7 +54,6 @@ export function useDeviceStorageDetail(deviceId: number) {
     enabled: deviceId > 0
   });
 }
-
 
 export function useCreateStorage(deviceId: number) {
   const queryClient = useQueryClient();
@@ -71,7 +66,6 @@ export function useCreateStorage(deviceId: number) {
   });
 }
 
-
 export function useUpdateStorage(deviceId: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -83,24 +77,20 @@ export function useUpdateStorage(deviceId: number) {
   });
 }
 
-
 export function useDeleteStorage(deviceId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (storageId: number) => del<void>(`/storage/${storageId}`),
     onSuccess: () => {
-      
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.storage(deviceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.storageDetail(deviceId) });
     }
   });
 }
 
-
 interface BatchDeleteStorageRequest {
   storage_ids: number[];
 }
-
 
 export function useBatchDeleteStorage(deviceId: number) {
   const queryClient = useQueryClient();
@@ -114,7 +104,6 @@ export function useBatchDeleteStorage(deviceId: number) {
   });
 }
 
-
 export function useDeleteAllStorage(deviceId: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -124,7 +113,6 @@ export function useDeleteAllStorage(deviceId: number) {
     }
   });
 }
-
 
 export function useValidateSerial() {
   return useMutation({

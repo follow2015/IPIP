@@ -36,22 +36,42 @@ T = TypeVar("T", bound=BaseRepository)
 
 
 def _register(repo_cls: Type[T], ctor: Callable[[Optional[Session]], T]) -> None:
-    BaseRepository._REGISTRY[repo_cls] = ctor
+    """登记一个仓储类的构造器（自动注册与特例 DAO 共用）。"""
+    BaseRepository._REGISTRY[repo_cls] = ctor  # type: ignore[assignment]
 
 
 class RepositoryFactory:
+    """Repository 工厂。
+
+    通过注册表将仓储类型映射到其构造器。``create()`` 接受仓储类与可选 session，
+    返回对应实例。实例不缓存。
+    """
 
     def create(self, repo_cls: Type[T], session: Optional[Session] = None) -> T:
-        ctor = BaseRepository._REGISTRY.get(repo_cls)
+        """创建指定类型的 Repository 实例。
+
+        Args:
+            repo_cls: 仓储类（或其接口类）。
+            session: 数据库会话；缺省使用全局 ``db.session``。
+
+        Returns:
+            T: 仓储实例。
+
+        Raises:
+            KeyError: 未注册的仓储类型。
+        """
+        ctor = BaseRepository._REGISTRY.get(repo_cls)  # type: ignore[var-annotated]
         if ctor is None:
             raise KeyError(f"未注册的 Repository 类型: {repo_cls}")
-        return ctor(session or db.session)
+        return ctor(session or db.session)  # type: ignore[return-value]
+
 
 
 _default_factory: Optional[RepositoryFactory] = None
 
 
 def get_repository_factory() -> RepositoryFactory:
+    """获取 Repository 工厂实例（进程级单例）。"""
     global _default_factory
     if _default_factory is None:
         _default_factory = RepositoryFactory()
@@ -59,10 +79,17 @@ def get_repository_factory() -> RepositoryFactory:
 
 
 def create_repository(repo_cls: Type[T], session: Optional[Session] = None) -> T:
+    """便捷函数：创建指定类型的 Repository 实例。"""
     return get_repository_factory().create(repo_cls, session)
 
 
+
 def _discover_repositories() -> None:
+    """扫描 app.persistence 下所有子模块，触发各 Repository 子类的自动注册。
+
+    具体仓储在定义时通过 ``BaseRepository.__init_subclass__`` 自注册，
+    因此只需 import 对应模块即可完成登记，无需在本文件逐行维护。
+    """
     import app.persistence as _pkg
     for mod in pkgutil.iter_modules(_pkg.__path__):
         name = mod.name
@@ -73,7 +100,7 @@ def _discover_repositories() -> None:
 
 _discover_repositories()
 
-from app.persistence.switch_ext_repository import SwitchExtRepository
-from app.persistence.user_log_repository import UserLogRepository
+from app.persistence.switch_ext_repository import SwitchExtRepository  # noqa: E402
+from app.persistence.user_log_repository import UserLogRepository  # noqa: E402
 _register(SwitchExtRepository, lambda s: SwitchExtRepository())
 _register(UserLogRepository, lambda s: UserLogRepository())

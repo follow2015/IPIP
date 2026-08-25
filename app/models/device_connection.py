@@ -15,12 +15,18 @@ from extensions import db
 
 
 class DeviceConnection(BaseModel):
+    """设备连接模型（D2N）
+
+    表示设备（服务器）与交换机端口的连接关系。
+    通过device_nics_port_id关联到device_nics_port表,统一管理端口信息。
+    N2N连接由 NetworkConnection（network_connections表）负责，本表不再承担。
+    """
 
     __tablename__ = "device_connections"
     __table_args__ = (
         Index("idx_device_nics_port", "device_nics_port_id"),
         Index("idx_dc_vlan_id", "vlan_id"),
-        Index("idx_dc_device_switch", "device_id", "switch_device_id"),
+        Index("idx_dc_device_switch", "device_id", "switch_device_id"),  # D2N连接按设备+交换机联合筛选
         {"comment": "设备连接表(D2N)"},
     )
 
@@ -102,6 +108,13 @@ class DeviceConnection(BaseModel):
     )
 
     def to_dict(self) -> Dict[str, Any]:
+        """转换为字典
+
+        连接状态推导规则（D2N）：
+        - 仅检查交换机端口（switch_port）的 link_status
+        - 逻辑端口不参与推导
+        - 物理端口 link_status 非 up → inactive
+        """
         from app.models.network_port import NetworkPort
 
         derived_status = self.status or "active"
@@ -142,7 +155,7 @@ class DeviceConnection(BaseModel):
             result["source_nic_number"] = self.nics_port.nic_number
             result["source_port_number"] = self.nics_port.port_number
             result["source_port_display"] = self.nics_port.display_name
-            result["device_nics_port_name"] = self.nics_port.display_name
+            result["device_nics_port_name"] = self.nics_port.display_name  # 添加此字段供前端使用
             result["port_type"] = self.nics_port.port_type
             result["port_speed"] = self.nics_port.port_speed
 
