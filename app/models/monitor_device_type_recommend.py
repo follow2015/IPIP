@@ -12,6 +12,7 @@ from .base import BaseModel
 
 
 class MonitorDeviceTypeRecommend(BaseModel):
+    """设备类型推荐配置（device_type → 推荐的 category 列表）"""
 
     __tablename__ = "monitor_device_type_recommends"
     __table_args__ = (

@@ -15,7 +15,6 @@ import { formatDateTime } from '@/utils/format';
 
 const { RangePicker } = DatePicker;
 
-
 function LoginLogs() {
   const [searchParams] = useSearchParams();
   const [userId, setUserId] = useState<number | undefined>();
@@ -29,7 +28,6 @@ function LoginLogs() {
     value: u.id,
   }));
 
-  
   useEffect(() => {
     const uid = searchParams.get('user_id');
     if (uid) {
@@ -37,7 +35,6 @@ function LoginLogs() {
     }
   }, [searchParams]);
 
-  
   const queryParams: LoginLogQueryParams = {
     page,
     per_page: pageSize,
@@ -48,14 +45,12 @@ function LoginLogs() {
 
   const { data, isLoading, refetch } = useAllLoginLogs(queryParams);
 
-  
   const handleReset = () => {
     setUserId(undefined);
     setDateRange(null);
     setPage(1);
   };
 
-  
   const columns = [
     {
       title: '登录时间',
@@ -106,7 +101,7 @@ function LoginLogs() {
 
   return (
     <Card>
-      {}
+      {/* 筛选栏 */}
       <Space style={{ marginBottom: 16 }} wrap>
         <span style={{ color: '#666' }}>用户：</span>
         <Select
@@ -131,7 +126,7 @@ function LoginLogs() {
         </Button>
       </Space>
 
-      {}
+      {/* 日志表格 */}
       <Table<LoginLog>
         columns={columns}
         dataSource={data?.items ?? []}

@@ -20,16 +20,41 @@ from app.utils.port_name_utils import normalize_port
 logger = get_logger(__name__)
 
 
+
+
 class ArpSync:
+    """ARP 同步：全局合并去重 + 拓扑图驱动定位
+
+    使用 TopologyGraph 替代原有7级 if/elif 启发式评分链：
+    ① 管理IP → 直接归属（零遍历）
+    ② 网关IP → 直接归属（零遍历）
+    ③ 终端IP → 图遍历 + Redis 下游追溯
+    ④ 无法定位 → 回退到 ARP 来源交换机 + interface（arp_fallback）
+    """
 
     def __init__(self, ip_repo: IPManagerRepository):
+        """初始化 ArpSync
+
+        Args:
+            ip_repo: IPManagerRepository 实例（必须由调用方注入，绑定正确的 session）
+        """
         self._ip_repo = ip_repo
-        self._valid_switch_ids = None
-        self._device_room_map: dict[int, int] = {}
-        self._topology_graph: TopologyGraph | None = None
+        self._valid_switch_ids = None  # switch_id 有效性缓存
+        self._device_room_map: dict[int, int] = {}  # device_id → room_id 映射
+        self._topology_graph: TopologyGraph | None = None  # 拓扑图（由 sync_all 设置）
 
     def sync_all(self, all_ctxs: list[SwitchContext], db_session, scan_redis,
                  topology_graph: TopologyGraph | None = None) -> None:
+        """全局 ARP 合并去重 + 逐条处理
+
+        每条 ARP 失败时 rollback 恢复事务，确保不影响后续条目。
+
+        Args:
+            all_ctxs: list[SwitchContext] 所有有权限交换机的上下文
+            db_session: 数据库 session
+            scan_redis: ScanRedis 实例
+            topology_graph: TopologyGraph 实例（必须提供，否则所有IP标记为 unresolved）
+        """
         self._valid_switch_ids = self._ip_repo.load_valid_switch_ids()
         self._device_room_map = self._ip_repo.load_device_room_map()
         self._topology_graph = topology_graph
@@ -78,16 +103,27 @@ class ArpSync:
 
     @staticmethod
     def _load_valid_switch_ids(db_session) -> set:
+        """预加载所有有效的 device id 集合（已迁移至 IPManagerRepository.load_valid_switch_ids）"""
         from app.persistence.ip_repositories import IPManagerRepository
         return IPManagerRepository(db_session).load_valid_switch_ids()
 
     @staticmethod
     def _load_device_room_map(db_session) -> dict[int, int]:
+        """预加载 device_id → room_id 映射（已迁移至 IPManagerRepository.load_device_room_map）"""
         from app.persistence.ip_repositories import IPManagerRepository
         return IPManagerRepository(db_session).load_device_room_map()
 
     def _resolve_location(self, ip: str, arp: ParsedArpEntry, ctx: SwitchContext,
                           scan_redis) -> LocationResult:
+        """完整解析一个 IP 的定位信息（不写任何数据库）
+
+        多级定位，所有路径返回统一 LocationResult 结构：
+        ① 管理IP → 直接归属该交换机本身（零遍历）
+        ② 网关IP → 直接归属配置该网关的交换机（零遍历）
+        ③ 终端IP → 图遍历 + Redis 下游追溯
+        ④ MAC索引候选兜底 → 图遍历失败时，从MAC候选中取任意候选（confidence=low）
+        ⑤ ARP来源交换机回退 → 回退到 ARP 来源交换机 + interface（arp_fallback）
+        """
         if not self._topology_graph:
             if arp.interface:
                 fallback_port = normalize_port(arp.interface)
@@ -170,6 +206,10 @@ class ArpSync:
         )
 
     def _get_mac_candidates(self, scope: str, mac: str, scan_redis) -> list[tuple[int, str]]:
+        """从 MAC 索引获取候选列表（不带评分，仅原始采集记录）
+
+        返回所有候选供图遍历算法使用。
+        """
         key = f"mac_index:{scope}:{mac}"
         all_candidates = scan_redis.r.hgetall(key)
         if not all_candidates:
@@ -184,6 +224,17 @@ class ArpSync:
 
     def _process_arp(self, ip: str, arp: ParsedArpEntry, ctx: SwitchContext,
                      db_session, scan_redis) -> None:
+        """处理单条 ARP 记录（统一单次解析 + 末尾原子写入）
+
+        重构版：先完整解析出 (sw_id, port, room_id, confidence)，
+        再在末尾统一写入。消除旧版"先写后纠"的多阶段中间状态。
+
+        三级定位：
+        ① 管理IP → 直接归属（零遍历）
+        ② 网关IP → 直接归属（零遍历）
+        ③ 终端IP → 图遍历 + Redis 下游追溯
+        ④ 无法定位 → room_id 回退到 ARP 来源交换机机房
+        """
         loc = self._resolve_location(ip, arp, ctx, scan_redis)
 
         self._apply_location(ip, arp.mac, loc, db_session)
@@ -195,12 +246,30 @@ class ArpSync:
                             "room_id": loc.room_id})
 
     def _is_valid_switch(self, sw_id: int) -> bool:
+        """校验 switch_id 是否在 devices 表中存在"""
         if self._valid_switch_ids is None:
             return True
         return sw_id in self._valid_switch_ids
 
     @staticmethod
     def _apply_location(ip: str, mac: str, loc: LocationResult, db_session) -> None:
+        """原子化写入：ip_addresses + ip_switch_info + 清理旧记录
+
+        所有路径（管理IP/网关IP/终端IP/unresolved）统一走此方法，
+        消除旧版"先写后纠"的多阶段中间状态。
+
+        写入规则：
+        - 清理跨房间残留（ip_switch_info + ip_addresses）
+        - UPSERT ip_addresses（房间已确定，一次写入）
+        - confidence not in (low, none) 且有 sw_id → UPSERT ip_switch_info
+          - 有 port：终端IP，写入 switch_id + port
+          - 无 port：管理/网关IP，写入 switch_id（覆盖旧记录，port=NULL）
+        - confidence in (low, none) → 删除该IP的所有 ip_switch_info（含同房间旧记录），
+          避免旧的错误定位数据残留
+
+        room_id 使用定位到的交换机所在机房（loc.room_id），
+        确保终端IP归属到实际连接的交换机和机房。
+        """
         final_room_id = loc.room_id
 
         ip_repo = IPManagerRepository(db_session)

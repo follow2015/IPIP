@@ -18,15 +18,17 @@ logger = get_logger(__name__)
 
 
 class DeviceOperationConflict(Exception):
-    pass
+    """设备当前有操作正在执行，无法接受新操作"""
 
 
 class DeviceOpLock:
+    """设备级操作锁（Redis / 内存双模式）"""
 
     _local_locks: dict[int, threading.Lock] = {}
     _meta_lock = threading.Lock()
 
     def _get_local_lock(self, device_id: int) -> threading.Lock:
+        """获取或创建设备级线程锁"""
         with self._meta_lock:
             if device_id not in self._local_locks:
                 self._local_locks[device_id] = threading.Lock()
@@ -34,6 +36,18 @@ class DeviceOpLock:
 
     @contextlib.contextmanager
     def acquire(self, device_id: int, timeout: float = 60.0):
+        """获取设备操作锁
+
+        Args:
+            device_id: 要锁定的设备 ID
+            timeout:   等待超时（秒）
+
+        Raises:
+            DeviceOperationConflict: 超时无法获取锁（设备繁忙）
+
+        Usage:
+            with device_op_lock.acquire(switch.device_id):
+        """
         from app.services.switch_events import _get_redis
         r = _get_redis()
 
@@ -41,8 +55,8 @@ class DeviceOpLock:
             lock_key = f"device_op_lock:{device_id}"
             lock = r.lock(
                 lock_key,
-                timeout=timeout * 2,
-                blocking_timeout=timeout,
+                timeout=timeout * 2,  # 自动释放时间 = 操作超时的2倍
+                blocking_timeout=timeout,  # 等待时间 = 操作超时
             )
             acquired = lock.acquire(blocking=True)
             if not acquired:

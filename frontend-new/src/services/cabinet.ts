@@ -12,14 +12,12 @@ import type { Cabinet, Device, CabinetUtilization, CabinetUsageMap, CabinetStats
 import type { PaginationParams } from '@/types/api';
 import type { CabinetCreate, CabinetUpdate } from '@/types/api-bridge';
 
-
 export interface CabinetQueryParams extends PaginationParams {
   search?: string;
   room_id?: number;
   cabinet_number?: string;
   status?: number;
 }
-
 
 export interface BatchCreateCabinetResponse {
   created: Cabinet[];
@@ -29,9 +27,7 @@ export interface BatchCreateCabinetResponse {
   failed_count: number;
 }
 
-
 type CreateCabinetRequest = CabinetCreate;
-
 
 type UpdateCabinetRequest = CabinetUpdate & { id: number };
 
@@ -47,7 +43,6 @@ export const useCabinetSuspenseDetail = cabinetHooks.useSuspenseDetail;
 export const useCreateCabinet = cabinetHooks.useCreate;
 export const useDeleteCabinet = cabinetHooks.useDelete;
 
-
 export function useUpdateCabinet() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -61,7 +56,6 @@ export function useUpdateCabinet() {
     },
   });
 }
-
 
 export function useBatchCreateCabinet() {
   const queryClient = useQueryClient();
@@ -88,7 +82,6 @@ export function useCabinetWithDevices(id: number) {
   });
 }
 
-
 export function useCabinetDevices(id: number) {
   return useQuery({
     queryKey: queryKeys.cabinets.devices(id),
@@ -99,7 +92,6 @@ export function useCabinetDevices(id: number) {
     enabled: id > 0,
   });
 }
-
 
 export function useCabinetUtilization(id: number) {
   return useQuery({
@@ -112,7 +104,6 @@ export function useCabinetUtilization(id: number) {
   });
 }
 
-
 export function useCabinetUsageMap(id: number) {
   return useQuery({
     queryKey: queryKeys.cabinets.usageMap(id),
@@ -123,7 +114,6 @@ export function useCabinetUsageMap(id: number) {
     enabled: id > 0,
   });
 }
-
 
 export function useCabinetAvailableUPositions(id: number) {
   return useQuery({
@@ -139,7 +129,6 @@ export function useCabinetAvailableUPositions(id: number) {
     enabled: id > 0,
   });
 }
-
 
 export function useCabinetLayout(id: number) {
   return useQuery({
@@ -170,7 +159,6 @@ export function useCabinetLayout(id: number) {
   });
 }
 
-
 export function useCabinetStats(id: number) {
   return useQuery({
     queryKey: queryKeys.cabinets.stats(id),
@@ -182,7 +170,18 @@ export function useCabinetStats(id: number) {
   });
 }
 
-
+/**
+ * 获取机柜下拉选项
+ *
+ * 三种场景：
+ * 1. 设备主界面筛选（forFilter=true）：所有状态机柜，含U位已满
+ * 2. 新增/批量/克隆设备（statuses=[1,2]）：可用U位>=1且状态为可用(1)和使用中(2)
+ * 3. 默认：可用U位>=1且状态为可用(1)
+ *
+ * @param roomId 机房ID（可选，传给available API做机房过滤）
+ * @param forFilter 是否用于筛选场景（默认false）
+ * @param statuses 允许的机柜状态码列表（可选，如[1,2]）
+ */
 export function useCabinetOptions(roomId?: number, forFilter: boolean = false, statuses?: number[]) {
   return useQuery({
     queryKey: queryKeys.cabinets.options(roomId),
@@ -191,15 +190,12 @@ export function useCabinetOptions(roomId?: number, forFilter: boolean = false, s
       if (roomId) params.room_id = roomId;
 
       if (statuses) {
-        
         params.statuses = statuses.join(',');
         params.min_available_u = 1;
       } else if (forFilter) {
-        
         params.all_status = 1;
         params.min_available_u = 0;
       } else {
-        
         params.min_available_u = 1;
       }
 

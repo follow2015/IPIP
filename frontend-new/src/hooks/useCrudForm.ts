@@ -26,35 +26,29 @@ import type { ApiResponse } from '@/types/api';
 
 
 export interface UseCrudFormOptions<T, TCreate, TUpdate> {
-  
   open: boolean;
-  
   editRecord: T | null;
-  
   onClose: () => void;
-  
   useCreate: () => UseMutationResult<ApiResponse<T>, Error, TCreate>;
-  
   useUpdate: () => UseMutationResult<ApiResponse<T>, Error, TUpdate>;
-  
   toFormValues?: (record: T) => Record<string, unknown>;
-  
   toUpdatePayload?: (id: number, values: TCreate) => TUpdate;
 }
 
-
 export interface UseCrudFormReturn<TCreate> {
-  
   form: ReturnType<typeof Form.useForm>[0];
-  
   isEdit: boolean;
-  
   handleSubmit: () => Promise<void>;
-  
   confirmLoading: boolean;
 }
 
 
+/**
+ * CRUD 表单逻辑 Hook
+ *
+ * @param options - 配置项
+ * @returns 表单全套状态和操作
+ */
 export function useCrudForm<T extends { id: number }, TCreate, TUpdate>(
   options: UseCrudFormOptions<T, TCreate, TUpdate>,
 ): UseCrudFormReturn<TCreate> {
@@ -74,7 +68,6 @@ export function useCrudForm<T extends { id: number }, TCreate, TUpdate>(
   const updateMutation = useUpdate();
   const isEdit = !!editRecord;
 
-  
   useEffect(() => {
     if (open) {
       if (editRecord) {
@@ -85,7 +78,6 @@ export function useCrudForm<T extends { id: number }, TCreate, TUpdate>(
     }
   }, [open, editRecord, form, toFormValues]);
 
-  
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();

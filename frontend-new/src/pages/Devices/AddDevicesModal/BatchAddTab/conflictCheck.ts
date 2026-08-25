@@ -7,10 +7,12 @@
 
 import type { DeviceBatchRow } from '../shared';
 
-
+/**
+ * 前端本地 U 位冲突预检查：同一批次内 U 位区间不能重叠（节点模式跳过，由调用方控制）。
+ * @returns 冲突描述字符串；无冲突返回 null
+ */
 export function checkUConflict(rowsToCheck: DeviceBatchRow[]): string | null {
   const withU = rowsToCheck.filter((r) => r.u_position != null);
-  
   const sorted = [...withU].sort((a, b) => (a.u_position ?? 0) - (b.u_position ?? 0));
   for (let i = 0; i < sorted.length - 1; i++) {
     const a = sorted[i];
@@ -23,7 +25,10 @@ export function checkUConflict(rowsToCheck: DeviceBatchRow[]): string | null {
   return null;
 }
 
-
+/**
+ * 节点模式：检查同批次内行号+列号是否重复。
+ * @returns 冲突描述字符串；无冲突返回 null
+ */
 export function checkNodePositionConflict(rowsToCheck: DeviceBatchRow[]): string | null {
   const seen = new Map<string, string>();
   for (const r of rowsToCheck) {

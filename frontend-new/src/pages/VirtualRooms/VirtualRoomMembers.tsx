@@ -17,7 +17,6 @@ interface VirtualRoomMembersProps {
   onClose: () => void;
 }
 
-
 interface SwitchOption {
   key: string;
   title: string;
@@ -26,7 +25,6 @@ interface SwitchOption {
   roomId: number;
 }
 
-
 function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) {
   const [targetKeys, setTargetKeys] = useState<string[]>([]);
   const [switchOptions, setSwitchOptions] = useState<SwitchOption[]>([]);
@@ -34,10 +32,8 @@ function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) 
   const updateMembers = useUpdateVirtualRoomMembers();
   const message = useMessage();
 
-  
   const { data: detail } = useVirtualRoom(record?.id ?? 0, open && !!record);
 
-  
   const loadSwitches = useCallback(async () => {
     setLoading(true);
     try {
@@ -66,21 +62,18 @@ function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) 
     }
   }, []);
 
-  
   useEffect(() => {
     if (open && record) {
       loadSwitches();
     }
   }, [open, record, loadSwitches]);
 
-  
   useEffect(() => {
     if (detail?.members) {
       setTargetKeys(detail.members.map((m: { device_id: number }) => String(m.device_id)));
     }
   }, [detail]);
 
-  
   const handleSubmit = async () => {
     if (!record) return;
     try {
@@ -93,7 +86,6 @@ function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) 
     }
   };
 
-  
   const filterOption = (inputValue: string, option: SwitchOption) =>
     option.title.toLowerCase().includes(inputValue.toLowerCase()) ||
     option.description.toLowerCase().includes(inputValue.toLowerCase()) ||

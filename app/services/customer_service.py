@@ -25,20 +25,56 @@ config = get_config()
 
 
 class CustomerService:
+    """客户服务类
+
+    提供客户的CRUD操作和业务逻辑。
+    重构后的版本使用Repository模式进行数据访问，职责更加单一。
+    """
 
     def __init__(self, customer_repository: CustomerRepository):
+        """初始化客户服务
+        
+        Args:
+            customer_repository: 客户Repository实例
+        """
         self.customer_repository = customer_repository
-        self.cache_ttl = config.CACHE_TTL_ROOM
+        self.cache_ttl = config.CACHE_TTL_ROOM  # 客户数据使用与机房相同的TTL
 
     def get_by_id(self, customer_id: int) -> Optional[Customer]:
+        """根据客户ID获取客户
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            Optional[Customer]: 客户对象
+        """
         return self.customer_repository.find_by_id(customer_id)
 
     def get_by_name(self, customer_name: str) -> Optional[Customer]:
+        """根据客户名称获取客户
+
+        Args:
+            customer_name: 客户名称
+
+        Returns:
+            Optional[Customer]: 客户对象
+        """
         return self.customer_repository.find_by_customer_name(customer_name)
 
     def search_customers(
         self, keyword: str = None, page: int = 1, page_size: int = 20
     ) -> Dict[str, Any]:
+        """搜索客户
+
+        Args:
+            keyword: 搜索关键词（匹配客户名称、联系人、电话、邮箱）
+            page: 页码
+            page_size: 每页数量
+
+        Returns:
+            Dict: 分页数据
+        """
         result = self.customer_repository.search(
             search_fields=["customer_name", "contact_person", "contact_phone", "email"],
             keyword=keyword,
@@ -51,9 +87,29 @@ class CustomerService:
         return result
 
     def name_exists(self, name: str, exclude_id: int = None) -> bool:
+        """检查客户名称是否已存在（唯一入口）。
+
+        Args:
+            name: 客户名称
+            exclude_id: 要排除的客户ID（用于更新时）
+
+        Returns:
+            bool: 存在返回True，否则返回False
+        """
         return self.customer_repository.check_customer_name_exists(name, exclude_id)
 
     def create_customer(self, data: Dict[str, Any]) -> Customer:
+        """创建客户。名称重复时抛出 ValidationError。
+
+        Args:
+            data: 客户数据
+
+        Returns:
+            Customer: 创建的客户对象
+
+        Raises:
+            ValidationError: 创建失败时抛出
+        """
         payload = self._normalize_customer_payload(data, is_update=False)
         name = payload.get("customer_name")
         if not name:
@@ -67,6 +123,7 @@ class CustomerService:
         return customer
 
     def update_customer(self, customer_id: int, data: Dict[str, Any]) -> Optional[Customer]:
+        """更新客户"""
         payload = self._normalize_customer_payload(data, is_update=True)
         if "customer_name" in payload:
             if self.name_exists(payload["customer_name"], exclude_id=customer_id):
@@ -79,6 +136,18 @@ class CustomerService:
 
 
     def assert_allocatable(self, customer_id: int) -> None:
+        """分配前守卫：终止态客户禁止任何资源分配。
+
+        在 ip/device/cabinet/switch 端口等分配 service 写入 customer_id 前调用。
+        后端守卫为唯一可信源，前端预判仅辅助。
+
+        Args:
+            customer_id: 目标客户ID
+
+        Raises:
+            RecordNotFoundError: 客户不存在
+            BusinessLogicError: 客户已终止，禁止分配资源（code="CUSTOMER_TERMINATED"）
+        """
         customer = self.customer_repository.find_by_id(customer_id)
         if customer is None:
             raise RecordNotFoundError(f"客户不存在: {customer_id}")
@@ -91,6 +160,25 @@ class CustomerService:
 
 
     def terminate_customer(self, customer_id: int, operator_id: int, reason: Optional[str] = None) -> Customer:
+        """终止客户并原子释放全部资源。
+
+        事务边界由外层 API handler 的 @transactional 提供。本方法内部
+        使用 begin_nested() + flush()，异常 raise 交由外层统一 rollback。
+
+        并发安全：入口对 customer 行加 SELECT ... FOR UPDATE（with_for_update），
+        保证并发终止只有一个事务能进入释放分支，避免重复 archive。
+
+        Args:
+            customer_id: 客户ID
+            operator_id: 操作人ID（get_current_user_id()）
+            reason: 终止原因（可选，P2-2）
+
+        Returns:
+            Customer: 终止后的客户对象（幂等：已终止则直接返回）
+
+        Raises:
+            RecordNotFoundError: 客户不存在
+        """
         from extensions import db
         from app.utils.transactional import on_commit
         from app.services.audit_service import AuditService
@@ -133,14 +221,14 @@ class CustomerService:
                 "pdf_blob": None,
                 "pdf_size": None,
             })
-            db.session.flush()
+            db.session.flush()  # 确保 archive.id 可用（F3）
 
-            ip_repo.clear_customer(customer_id)
-            ip_network_repo.clear_customer(customer_id)
-            device_repo.clear_customer(customer_id)
-            cabinet_repo.clear_customer(customer_id)
-            switch_port_repo.release_customer_ports(customer_id)
-            template_repo.delete_customer_templates(customer_id)
+            ip_repo.clear_customer(customer_id)              # IP
+            ip_network_repo.clear_customer(customer_id)      # 网段
+            device_repo.clear_customer(customer_id)          # 设备
+            cabinet_repo.clear_customer(customer_id)         # 机柜
+            switch_port_repo.release_customer_ports(customer_id)  # 交换机端口
+            template_repo.delete_customer_templates(customer_id)  # 组件模板（硬删除）
 
             customer.customer_status = CustomerStatus.TERMINATED.value
             self.customer_repository.save(customer)
@@ -159,6 +247,12 @@ class CustomerService:
         return customer
 
     def _generate_and_persist_pdf(self, archive_id: int) -> None:
+        """事务提交后生成 PDF 并回填 archive.pdf_blob（失败仅告警，不阻断主流程）。
+
+        使用独立 session 写入（与 AuditService.log 同模式），因为本方法在
+        on_commit 回调中执行，外层 @transactional 已 commit，业务 session
+        处于事务已结束状态——若用 db.session 只 flush 不 commit，PDF 不会持久化。
+        """
         from sqlalchemy.orm import Session
         from extensions import db as _db
         from app.models.customer_termination_archive import CustomerTerminationArchive
@@ -186,6 +280,19 @@ class CustomerService:
             independent_session.close()
 
     def generate_customer_termination_pdf(self, customer, assets: dict):
+        """生成终止存档 PDF（基于释放前资源快照）。
+
+        内容与 Excel 导出（generate_customer_assets_excel）5 个 Sheet 对齐：
+        资源概览 / 机柜明细 / 设备明细 / 网段与IP / 端口分配。
+        外加终止信息块（客户名/终止时间/操作人/原因）。
+
+        Args:
+            customer: 客户对象（含名称/状态等）
+            assets: get_customer_assets 返回的完整结构化资源
+
+        Returns:
+            BytesIO: 可被 flask.send_file 消费的 PDF 缓冲
+        """
         from io import BytesIO
         from datetime import datetime
         from reportlab.lib.pagesizes import A4, landscape
@@ -219,7 +326,7 @@ class CustomerService:
         try:
             pdfmetrics.registerFont(UnicodeCIDFont(cn_font))
         except Exception:
-            cn_font = "Helvetica"
+            cn_font = "Helvetica"  # 兜底（中文将显示为方块，但不阻断生成）
 
         buf = BytesIO()
         doc = SimpleDocTemplate(buf, pagesize=landscape(A4), title=f"客户终止存档-{customer.customer_name}")
@@ -341,6 +448,18 @@ class CustomerService:
 
 
     def delete_customer(self, customer_id: int, force: bool = False) -> bool:
+        """删除客户
+
+        Args:
+            customer_id: 客户ID
+            force: 是否强制删除（即使有关联机柜或设备）
+
+        Returns:
+            bool: 删除成功返回True
+
+        Raises:
+            ValidationError: 删除失败时抛出
+        """
         customer = self.get_by_id(customer_id)
         if not customer:
             return False
@@ -364,6 +483,7 @@ class CustomerService:
         return result
 
     def _normalize_customer_payload(self, data: Dict[str, Any], is_update: bool) -> Dict[str, Any]:
+        """标准化客户字段，过滤模型不支持的字段。"""
         payload = dict(data or {})
 
         if "name" in payload and "customer_name" not in payload:
@@ -380,6 +500,14 @@ class CustomerService:
         return normalized
 
     def get_cabinets(self, customer_id: int) -> List:
+        """获取客户的所有机柜（使用Repository优化）
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            List: 机柜列表
+        """
         customer = self.customer_repository.find_with_relations(customer_id, ["cabinets"])
         if not customer:
             return []
@@ -387,6 +515,14 @@ class CustomerService:
         return customer.cabinets
 
     def get_devices(self, customer_id: int) -> List:
+        """获取客户的所有设备（使用Repository优化）
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            List: 设备列表
+        """
         customer = self.customer_repository.find_with_relations(customer_id, ["devices"])
         if not customer:
             return []
@@ -395,6 +531,14 @@ class CustomerService:
 
     @cached(key_pattern="customer:resources:{customer_id}")
     def get_customer_resources(self, customer_id: int) -> Dict[str, Any]:
+        """获取客户的资源信息（使用Repository优化）
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            Dict: 资源信息
+        """
         customer = self.customer_repository.find_with_relations(customer_id, ["cabinets", "devices"])
         if not customer:
             return None
@@ -424,6 +568,11 @@ class CustomerService:
 
 
     def get_all_customers_list(self) -> List[Dict[str, Any]]:
+        """获取所有客户列表（通过Repository查询）
+
+        Returns:
+            List[Dict]: 客户列表
+        """
         try:
             customers = self.customer_repository.find_all(order_by="customer_name")
             return [
@@ -441,9 +590,30 @@ class CustomerService:
             raise
 
     def customer_exists_by_id(self, customer_id: int) -> bool:
+        """检查客户ID是否存在
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            bool: 存在返回 True
+        """
         return self.customer_repository.find_by_id(customer_id) is not None
 
     def get_customer_switch_ports(self, customer_id: int) -> Dict[str, Any]:
+        """根据客户ID获取分配给该客户的所有交换机端口IP地址段
+
+        处理场景：
+        1. 网段级分配：ip_network表中的整个网段
+        2. IP级分配：ip_manager表中的单个IP
+        3. 冲突处理：当网段分配给客户A，但部分IP分配给客户B时，自动拆分网段
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            Dict: 按机房分组的资源数据
+        """
         try:
             from sqlalchemy import func as sa_func
 
@@ -522,7 +692,7 @@ class CustomerService:
                             f"检测到网段 {ip_network_str} 有 {len(occupied_ips)} 个IP被其他客户占用"
                         )
                         available_ips = []
-                        host_count = network_obj.num_addresses - 2
+                        host_count = network_obj.num_addresses - 2  # 减去网络地址和广播地址
                         if host_count > 1024 and len(occupied_ips) < host_count // 2:
                             occupied_ints = sorted(int(ip) for ip in occupied_ips)
                             first = int(network_obj.network_address) + 1
@@ -709,6 +879,14 @@ class CustomerService:
             return {}
 
     def _ips_to_cidrs(self, ip_list: List[ipaddress.IPv4Address]) -> List[ipaddress.IPv4Network]:
+        """将IP地址列表转换为最优的CIDR块列表
+
+        Args:
+            ip_list: IP地址对象列表
+
+        Returns:
+            List[ipaddress.IPv4Network]: CIDR网络对象列表
+        """
         if not ip_list:
             return []
 
@@ -721,6 +899,14 @@ class CustomerService:
         return cidrs
 
     def _filter_contained_networks(self, networks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """过滤被包含的小网段
+
+        Args:
+            networks: 网段数据列表
+
+        Returns:
+            List[Dict]: 过滤后的网段列表
+        """
         if not networks:
             return []
 
@@ -770,6 +956,14 @@ class CustomerService:
             return networks
 
     def _format_datetime(self, dt: Any) -> Optional[str]:
+        """格式化日期时间
+
+        Args:
+            dt: 日期时间对象
+
+        Returns:
+            Optional[str]: 格式化后的字符串
+        """
         if dt is None:
             return None
         if isinstance(dt, (datetime,)):
@@ -779,6 +973,7 @@ class CustomerService:
         return str(dt)
 
     def get_paginated(self, page: int = 1, per_page: int = 20, filters: Dict = None):
+        """获取分页数据（兼容API）"""
         filters = dict(filters or {})
         if "status" in filters and "customer_status" not in filters:
             filters["customer_status"] = filters.pop("status")
@@ -790,6 +985,20 @@ class CustomerService:
         )
         return result.get("data", []), result.get("total_count", 0)
     def get_customer_assets(self, customer_id: int) -> Dict[str, Any]:
+        """获取客户资产统计。
+
+        根据客户ID统计客户使用的机房、机柜、设备、网络信息。
+        如果整柜和整个网段均归属同一个客户,则不再单独显示U位和IP使用情况。
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            Dict: 客户资产统计信息
+
+        Raises:
+            RecordNotFoundError: 客户不存在
+        """
         customer = self.customer_repository.find_by_id(customer_id)
         if not customer:
             raise RecordNotFoundError(f"客户不存在: {customer_id}")
@@ -853,6 +1062,17 @@ class CustomerService:
         return assets
 
     def generate_customer_assets_excel(self, customer_id: int):
+        """生成客户资源导出 Excel（5 个 Sheet）。
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            BytesIO: 可被 flask.send_file 直接消费的缓冲
+
+        Raises:
+            RecordNotFoundError: 客户不存在
+        """
         import pandas as pd
         from io import BytesIO
         from app.models.network_port import NetworkPort

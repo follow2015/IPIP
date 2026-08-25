@@ -22,10 +22,18 @@ MAX_TOPOLOGY_NODES = 500
 
 
 class TopologyService:
+    """网络拓扑聚合与自动推断服务"""
 
 
     @staticmethod
     def _switch_query_base():
+        """网络设备基础查询：预加载所有需要的关联，消灭 N+1
+
+        joinedload(Device.cabinet) 仅做预加载（LEFT OUTER JOIN），
+        不影响 WHERE 过滤。调用方按需添加 room_id 过滤。
+        使用 outerjoin(DeviceSwitchExt) 确保没有 switch_ext 记录的网络设备
+        （如路由器、防火墙）也能出现在拓扑中。
+        """
         from app.models.cabinet import Cabinet
         return (
             Device.query
@@ -39,6 +47,7 @@ class TopologyService:
 
     @staticmethod
     def _device_query_base():
+        """设备基础查询：预加载 cabinet + room，消灭 N+1"""
         from app.models.cabinet import Cabinet
         return (
             Device.query
@@ -52,6 +61,7 @@ class TopologyService:
 
     @staticmethod
     def _serialize_node(d: Device) -> Dict[str, Any]:
+        """统一设备节点序列化（已预加载 cabinet + cabinet.room）"""
         from app.core.enums import DeviceStatus
         STATUS_MAP = {
             DeviceStatus.ONLINE: "online",
@@ -85,6 +95,11 @@ class TopologyService:
 
     @staticmethod
     def _get_virtual_room_device_ids(virtual_room_id: int) -> Optional[Set[int]]:
+        """获取虚拟机房的成员设备 ID 集合
+
+        Returns:
+            设备 ID 集合，虚拟机房不存在时返回 None
+        """
         from app.models.virtual_room import VirtualRoom
         vr = VirtualRoom.query.get(virtual_room_id)
         if vr is None:
@@ -98,6 +113,17 @@ class TopologyService:
         layer: Optional[int] = None,
         include_offline: bool = False,
     ) -> Dict[str, Any]:
+        """构建网络层拓扑（交换机 + N2N 互联 + uplink 逻辑链路）
+
+        Args:
+            room_id: 按机房过滤
+            virtual_room_id: 按虚拟机房过滤（与 room_id 互斥，优先级更高）
+            layer: 按网络层级过滤
+            include_offline: 是否包含离线设备
+
+        Returns:
+            {"nodes": [...], "edges": [...], "stats": {...}}
+        """
         query = self._switch_query_base()
         if virtual_room_id is not None:
             vr_device_ids = self._get_virtual_room_device_ids(virtual_room_id)
@@ -192,6 +218,17 @@ class TopologyService:
         cabinet_id: Optional[int] = None,
         switch_device_id: Optional[int] = None,
     ) -> Dict[str, Any]:
+        """构建设备层拓扑（交换机 + 服务器 + N2N + D2N）
+
+        Args:
+            room_id: 按机房过滤
+            virtual_room_id: 按虚拟机房过滤（与 room_id 互斥，优先级更高）
+            cabinet_id: 按机柜过滤
+            switch_device_id: 以某交换机为中心展开（星形视图）
+
+        Returns:
+            {"nodes": [...], "edges": [...], "stats": {...}}
+        """
         if switch_device_id is not None:
             return self._build_star_topology(switch_device_id)
 
@@ -291,6 +328,7 @@ class TopologyService:
         return {"nodes": nodes, "edges": edges, "stats": stats}
 
     def _build_star_topology(self, switch_device_id: int) -> Dict[str, Any]:
+        """以某交换机为中心的星形拓扑（joinedload 预加载，合并二次查询）"""
         from app.models.cabinet import Cabinet
 
         switch = (
@@ -384,6 +422,22 @@ class TopologyService:
         dry_run: bool = True,
         force: bool = False,
     ) -> Dict[str, Any]:
+        """基于 N2N 连接自动推断拓扑字段
+
+        推断规则：
+        1. 核心交换机识别：度中心性排名 top-K% → switch_role=0
+        2. BFS 分层：从核心出发，layer = BFS 深度 + 1
+        3. 上行链路推断：非核心交换机的 N2N 邻居中 layer 最小且 < 自身 → uplink_device_id
+        4. 核心归属推断：沿 uplink 链路向上追溯至 switch_role=0 → core_device_id
+
+        Args:
+            room_id: 机房 ID
+            dry_run: True 仅返回推断结果不写入 DB
+            force: True 时覆盖已手动设定的字段
+
+        Returns:
+            {"changes": [...], "dry_run": bool}
+        """
         from app.models.cabinet import Cabinet
         switches = (
             self._switch_query_base()
@@ -459,7 +513,7 @@ class TopologyService:
 
         for sid in switch_ids:
             if sid not in layer_map:
-                layer_map[sid] = 2
+                layer_map[sid] = 2  # 默认接入层
 
         uplink_map: Dict[int, int] = {}
         core_map: Dict[int, int] = {}

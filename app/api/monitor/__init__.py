@@ -101,6 +101,7 @@ monitor_service = MonitorService(
 
 
 def _audit_credential_change(action: str, detail: dict) -> None:
+    """记录监控凭据变更审计（独立 session，失败不影响主流程）。"""
     try:
         AuditService().log(
             user_id=get_current_user_id(),
@@ -114,6 +115,7 @@ def _audit_credential_change(action: str, detail: dict) -> None:
 
 
 def _audit_monitor_enabled(device_id: int, enabled: bool) -> None:
+    """记录设备级监控启停审计（独立 session，失败不影响主流程）。"""
     try:
         AuditService().log(
             user_id=get_current_user_id(),
@@ -127,6 +129,7 @@ def _audit_monitor_enabled(device_id: int, enabled: bool) -> None:
 
 
 def _audit_config_change(updates: dict, updated: list) -> None:
+    """记录监控运行配置在线修改审计（独立 session，失败不影响主流程）。"""
     try:
         AuditService().log(
             user_id=get_current_user_id(),
@@ -139,9 +142,9 @@ def _audit_config_change(updates: dict, updated: list) -> None:
         logger.warning("监控配置审计写入失败（已忽略）", exc_info=True)
 
 
-from app.api.monitor import monitor_device
-from app.api.monitor import monitor_credentials
-from app.api.monitor import monitor_alerts
-from app.api.monitor import monitor_config
-from app.api.monitor import monitor_rules
-from app.api.monitor import monitor_oid
+from app.api.monitor import monitor_device  # noqa: E402,F401
+from app.api.monitor import monitor_credentials  # noqa: E402,F401
+from app.api.monitor import monitor_alerts  # noqa: E402,F401
+from app.api.monitor import monitor_config  # noqa: E402,F401
+from app.api.monitor import monitor_rules  # noqa: E402,F401
+from app.api.monitor import monitor_oid  # noqa: E402,F401

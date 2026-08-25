@@ -12,12 +12,16 @@ from extensions import db
 
 
 class AuditLog(db.Model):
+    """操作审计日志
+
+    只追加日志表，不继承 BaseModel（无 updated_at 字段）。
+    """
     __tablename__ = "audit_logs"
     __table_args__ = (
         Index("idx_audit_user", "user_id"),
         Index("idx_audit_action", "action"),
         Index("idx_audit_resource", "resource", "resource_id"),
-        Index("idx_audit_resource_time", "resource", "resource_id", "created_at"),
+        Index("idx_audit_resource_time", "resource", "resource_id", "created_at"),  # 按资源+时间范围查询
         Index("idx_audit_created", "created_at"),
         {"comment": "操作审计日志"},
     )
@@ -32,6 +36,7 @@ class AuditLog(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.now(), comment="创建时间")
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化"""
         return {
             'id': self.id,
             'user_id': self.user_id,

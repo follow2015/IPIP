@@ -77,11 +77,10 @@ export function useUnreadCount(enabled = true) {
   return useQuery({
     queryKey: queryKeys.notifications.unreadCount,
     queryFn: fetchUnreadCount,
-    refetchInterval: 60_000, 
+    refetchInterval: 60_000, // SSE 不可用时的兜底轮询（原 15s，SSE 驱动后降至 60s）
     enabled
   });
 }
-
 
 export function useNotificationList(params?: NotificationListParams, enabled = true) {
   return useQuery({
@@ -90,7 +89,6 @@ export function useNotificationList(params?: NotificationListParams, enabled = t
     enabled
   });
 }
-
 
 export function useMarkRead() {
   const queryClient = useQueryClient();
@@ -102,7 +100,6 @@ export function useMarkRead() {
   });
 }
 
-
 export function useAckNotification() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -112,7 +109,6 @@ export function useAckNotification() {
     }
   });
 }
-
 
 export function useDeleteReadNotifications() {
   const queryClient = useQueryClient();
@@ -159,7 +155,6 @@ async function updateNotificationPreferences(
   return res.data;
 }
 
-
 export function useNotificationPreferences(enabled = true) {
   return useQuery({
     queryKey: queryKeys.notifications.preferences,
@@ -167,7 +162,6 @@ export function useNotificationPreferences(enabled = true) {
     enabled
   });
 }
-
 
 export function useUpdateNotificationPreferences() {
   const queryClient = useQueryClient();
@@ -244,7 +238,6 @@ async function testWebhookConfig(id: number): Promise<TestWebhookResult> {
   return res.data ?? { success: false, message: '测试失败' };
 }
 
-
 export function useWebhookConfigs(enabled = true) {
   return useQuery({
     queryKey: queryKeys.webhookConfigs.list,
@@ -252,7 +245,6 @@ export function useWebhookConfigs(enabled = true) {
     enabled
   });
 }
-
 
 export function useCreateWebhookConfig() {
   const queryClient = useQueryClient();
@@ -263,7 +255,6 @@ export function useCreateWebhookConfig() {
     }
   });
 }
-
 
 export function useUpdateWebhookConfig() {
   const queryClient = useQueryClient();
@@ -276,7 +267,6 @@ export function useUpdateWebhookConfig() {
   });
 }
 
-
 export function useDeleteWebhookConfig() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -286,7 +276,6 @@ export function useDeleteWebhookConfig() {
     }
   });
 }
-
 
 export function useTestWebhookConfig() {
   return useMutation({

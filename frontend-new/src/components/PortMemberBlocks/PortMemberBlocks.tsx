@@ -21,7 +21,6 @@ import {
 import { PORT_STATUS_BG_COLOR, PORT_USAGE_STATUS_MAP } from '@/types/enums';
 import type { SwitchPort } from '@/types/models';
 
-
 export function renderPortDetail(port: SwitchPort | undefined, portName: string) {
   const type = classifyPortType(portName);
   if (!port) {
@@ -52,7 +51,6 @@ export function renderPortDetail(port: SwitchPort | undefined, portName: string)
   );
 }
 
-
 export function GroupedMemberPorts({
   memberPorts,
   portMap
@@ -61,7 +59,6 @@ export function GroupedMemberPorts({
   portMap: Map<string, SwitchPort>;
 }) {
   const { token } = theme.useToken();
-  
   const groups = useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const name of memberPorts) {
@@ -69,16 +66,13 @@ export function GroupedMemberPorts({
       if (!map[type]) map[type] = [];
       map[type].push(name);
     }
-    
     for (const key of Object.keys(map)) {
       map[key].sort((a, b) => extractPortIndex(a) - extractPortIndex(b));
     }
-    
     const sorted = PORT_TYPE_ORDER.filter((key) => map[key]?.length).map((key) => ({
       type: key,
       ports: map[key]
     }));
-    
     for (const key of Object.keys(map)) {
       if (!PORT_TYPE_ORDER.includes(key)) {
         sorted.push({ type: key, ports: map[key] });
@@ -93,7 +87,7 @@ export function GroupedMemberPorts({
         const barColor = PORT_TYPE_BAR_COLOR[type] ?? PORT_TYPE_BAR_COLOR['其他'];
         return (
           <div key={type}>
-            {}
+            {/* 分组标题 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
               <Tag
                 color={PORT_TYPE_TAG_COLOR[type] ?? 'default'}
@@ -111,7 +105,7 @@ export function GroupedMemberPorts({
                 {groupPorts.length} 口
               </span>
             </div>
-            {}
+            {/* 色块面板 */}
             <div
               style={{
                 display: 'flex',
@@ -141,9 +135,9 @@ export function GroupedMemberPorts({
                       cursor: 'pointer'
                     }}
                   >
-                    {}
+                    {/* 左侧端口类型色条 */}
                     <div style={{ width: 3, backgroundColor: barColor, flexShrink: 0 }} />
-                    {}
+                    {/* 色块主体：占用状态颜色 */}
                     <div
                       style={{
                         width,
@@ -182,7 +176,6 @@ export function GroupedMemberPorts({
     </div>
   );
 }
-
 
 export function PortLegend() {
   const { token } = theme.useToken();

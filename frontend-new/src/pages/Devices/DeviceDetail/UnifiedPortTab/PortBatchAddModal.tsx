@@ -34,7 +34,6 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
     batchForm.resetFields();
   };
 
-  
   const handleAdd = async () => {
     try {
       const values = await addForm.validateFields();
@@ -46,7 +45,6 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
     }
   };
 
-  
   const handleBatchAdd = async () => {
     try {
       const values = await batchForm.validateFields();
@@ -78,7 +76,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
       width={addMode === 'batch' ? 640 : 520}
       destroyOnHidden
     >
-      {}
+      {/* 模式切换 */}
       <div style={{ marginBottom: 16 }}>
         <Space>
           <Button
@@ -98,7 +96,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
         </Space>
       </div>
 
-      {}
+      {/* 批量模式（多组） */}
       {addMode === 'batch' && (
         <Form form={batchForm} layout="vertical">
           <div
@@ -244,7 +242,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
               </>
             )}
           </Form.List>
-          {}
+          {/* 预览 */}
           {batchPreview.length > 0 && (
             <div
               style={{
@@ -271,7 +269,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
         </Form>
       )}
 
-      {}
+      {/* 单条模式 */}
       {addMode === 'single' && (
         <Form form={addForm} layout="vertical">
           <Form.Item

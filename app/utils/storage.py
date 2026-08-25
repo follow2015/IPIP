@@ -14,8 +14,18 @@ logger = get_logger(__name__)
 
 
 class StorageAdapter:
+    """存储适配器
+    
+    支持 Redis 和内存双模式存储，提供统一的存储接口。
+    当 Redis 连接失败时，自动降级到内存存储。
+    """
 
     def __init__(self, redis_client=None):
+        """初始化存储适配器
+        
+        Args:
+            redis_client: Redis 客户端实例，如果为 None 则使用内存存储
+        """
         self.redis_client = redis_client
         self.memory_store: Dict[str, Dict[str, Any]] = {}
         self.use_redis = redis_client is not None
@@ -31,6 +41,16 @@ class StorageAdapter:
             logger.info("存储适配器: 使用内存存储")
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+        """设置键值对
+        
+        Args:
+            key: 键名
+            value: 值（支持任意可序列化的类型）
+            ttl: 过期时间（秒），None 表示永不过期
+            
+        Returns:
+            bool: 操作是否成功
+        """
         try:
             if self.use_redis:
                 try:
@@ -59,6 +79,14 @@ class StorageAdapter:
             return False
 
     def get(self, key: str) -> Optional[Any]:
+        """获取值
+        
+        Args:
+            key: 键名
+            
+        Returns:
+            Any: 存储的值，如果不存在或已过期则返回 None
+        """
         try:
             if self.use_redis:
                 try:
@@ -86,6 +114,14 @@ class StorageAdapter:
             return None
 
     def delete(self, key: str) -> bool:
+        """删除键
+        
+        Args:
+            key: 键名
+            
+        Returns:
+            bool: 操作是否成功
+        """
         try:
             if self.use_redis:
                 try:
@@ -104,6 +140,14 @@ class StorageAdapter:
             return False
 
     def exists(self, key: str) -> bool:
+        """检查键是否存在
+        
+        Args:
+            key: 键名
+            
+        Returns:
+            bool: 键是否存在且未过期
+        """
         try:
             if self.use_redis:
                 try:
@@ -128,6 +172,14 @@ class StorageAdapter:
             return False
 
     def incr(self, key: str) -> int:
+        """递增计数器
+        
+        Args:
+            key: 键名
+            
+        Returns:
+            int: 递增后的值
+        """
         try:
             if self.use_redis:
                 try:
@@ -155,6 +207,15 @@ class StorageAdapter:
             return 0
 
     def expire(self, key: str, ttl: int) -> bool:
+        """设置过期时间
+        
+        Args:
+            key: 键名
+            ttl: 过期时间（秒）
+            
+        Returns:
+            bool: 操作是否成功
+        """
         try:
             if self.use_redis:
                 try:
@@ -174,6 +235,11 @@ class StorageAdapter:
             return False
 
     def cleanup_expired(self):
+        """清理过期的内存存储项
+        
+        这个方法仅用于内存存储模式，定期清理过期的键值对。
+        Redis 会自动处理过期键。
+        """
         if self.use_redis:
             return
         

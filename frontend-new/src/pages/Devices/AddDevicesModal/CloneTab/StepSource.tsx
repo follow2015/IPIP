@@ -25,7 +25,6 @@ export interface StepSourceProps {
   cabinetOptions: { label: string; value: number }[];
 }
 
-
 const StepSource: React.FC<StepSourceProps> = ({
   templateId,
   setTemplateId,
@@ -46,7 +45,6 @@ const StepSource: React.FC<StepSourceProps> = ({
   cloneAvailablePositions,
   cabinetOptions
 }) => {
-  
   const templatePreviewItems = useMemo(() => {
     if (!templateDetail) return [];
     const d = templateDetail;
@@ -70,7 +68,6 @@ const StepSource: React.FC<StepSourceProps> = ({
         children: <Tag color={getStatusColor(d.status)}>{getStatusLabel(d.status)}</Tag>
       }
     ];
-    
     if (d.is_chassis && d.node_rows && d.node_cols) {
       items.push({
         label: '节点布局',
@@ -137,7 +134,7 @@ const StepSource: React.FC<StepSourceProps> = ({
             <span style={{ color: '#8c8c8c', fontSize: 12 }}>最多 50 台</span>
           </Space>
         </div>
-        {}
+        {/* 节点模式：选择目标机箱；非节点模式：选择目标机柜 */}
         {isNodeTemplate ? (
           <div>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>

@@ -17,15 +17,10 @@ import { CloseCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 
 export interface BatchActionBarProps {
-  
   count: number;
-  
   unit?: string;
-  
   onClear: () => void;
-  
   children?: ReactNode;
-  
   className?: string;
 }
 

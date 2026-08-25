@@ -12,7 +12,6 @@ interface DetailPanelProps {
   totalU: number;
 }
 
-
 const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
   const navigate = useNavigate();
   const { token } = theme.useToken();
@@ -37,7 +36,6 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
   const cfg = TYPE_CONFIG[device.deviceType ?? 'server'];
   const isMulti = device.deviceType === 'multinode';
 
-  
   const uStart = displayLabel(device.uPosition, totalU);
   const uEnd = displayLabel(device.uPosition + device.uSize - 1, totalU);
   const uRange = `U${uEnd}–U${uStart}（${device.uSize}U）`;
@@ -59,7 +57,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
         overflow: 'hidden'
       }}
     >
-      {}
+      {/* 设备头 */}
       <div
         style={{
           padding: '8px 12px',
@@ -89,7 +87,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
         <span style={{ fontSize: 10, color: cfg.subText, flexShrink: 0 }}>{cfg.label}</span>
       </div>
 
-      {}
+      {/* 字段列表 */}
       <div style={{ padding: '4px 0' }}>
         {rows.map(([label, val]) => (
           <div
@@ -112,7 +110,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
         ))}
       </div>
 
-      {}
+      {/* 多节点详情 */}
       {isMulti && device.nodes && device.nodes.length > 0 && (
         <div
           style={{
@@ -146,7 +144,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
         </div>
       )}
 
-      {}
+      {/* 详情按钮 */}
       <div style={{ padding: '6px 12px', borderTop: `0.5px solid ${token.colorBorderSecondary}` }}>
         <Button
           type="link"

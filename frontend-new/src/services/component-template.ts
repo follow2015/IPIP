@@ -7,7 +7,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, put, del } from './api-client';
 import { queryKeys } from './query-keys';
 
-
 export interface ComponentTemplate {
   id: number;
   category: 'cpu' | 'memory' | 'disk' | 'nic' | 'gpu';
@@ -23,7 +22,6 @@ export interface ComponentTemplate {
   updated_at: string;
 }
 
-
 async function fetchTemplates(category?: string, customerId?: number | null, includeGlobal = true) {
   const params: Record<string, string | number> = { is_active: 'true' };
   if (category) params.category = category;
@@ -33,14 +31,12 @@ async function fetchTemplates(category?: string, customerId?: number | null, inc
   return res.data ?? [];
 }
 
-
 export function useComponentTemplates(category?: string, customerId?: number | null, includeGlobal = true) {
   return useQuery({
     queryKey: [...(queryKeys.devices.all ?? ['devices']), 'component-templates', category, customerId, includeGlobal],
     queryFn: () => fetchTemplates(category, customerId, includeGlobal),
   });
 }
-
 
 export function useCreateTemplate() {
   const queryClient = useQueryClient();
@@ -52,7 +48,6 @@ export function useCreateTemplate() {
   });
 }
 
-
 export function useUpdateTemplate() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -63,7 +58,6 @@ export function useUpdateTemplate() {
     },
   });
 }
-
 
 export function useDeleteTemplate() {
   const queryClient = useQueryClient();

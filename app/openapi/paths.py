@@ -35,6 +35,14 @@ TAG_DEFINITIONS = [
 
 
 def register_all_paths(spec: APISpec):
+    """从 Flask app 的 url_map 收集并注册所有带 @doc 注解的路径
+
+    遍历当前 app 的所有路由规则，检查视图函数是否有 _openapi_meta 属性，
+    有则将其转换为 OpenAPI path item 并注册到 spec。
+
+    Args:
+        spec: APISpec 实例
+    """
     for tag in TAG_DEFINITIONS:
         spec.tag(tag)
 
@@ -69,11 +77,31 @@ def register_all_paths(spec: APISpec):
 
 
 def _flask_rule_to_openapi_path(rule: str) -> str:
+    """将 Flask 路由规则转换为 OpenAPI 路径格式
+
+    Flask: /api/devices/<int:id>
+    OpenAPI: /api/devices/{id}
+
+    Args:
+        rule: Flask 路由规则字符串
+
+    Returns:
+        str: OpenAPI 路径格式
+    """
     import re
     return re.sub(r"<(?:\w+:)?(\w+)>", r"{\1}", rule)
 
 
 def _build_operation(meta: dict, rule) -> dict:
+    """从 @doc 元数据构建 OpenAPI operation 对象
+
+    Args:
+        meta: _openapi_meta 字典
+        rule: Flask 路由规则
+
+    Returns:
+        dict: OpenAPI operation 定义
+    """
     operation = {
         "summary": meta.get("summary", ""),
         "tags": meta.get("tags", []),
@@ -97,6 +125,18 @@ def _build_operation(meta: dict, rule) -> dict:
 
 
 def _resolve_responses(responses: dict) -> dict:
+    """解析响应定义，将简写格式展开为完整 OpenAPI 响应对象
+
+    支持的简写格式：
+    - {200: "DeviceResponse"} → 标准 $ref 格式
+    - {200: {"description": "...", "schema": "DeviceResponse"}} → 带 description 的 $ref
+
+    Args:
+        responses: 原始响应定义
+
+    Returns:
+        dict: 标准 OpenAPI 响应定义
+    """
     resolved = {}
     for status_code, value in responses.items():
         if isinstance(value, str):

@@ -1,8 +1,6 @@
 
-
 import { DeviceType, DeviceSubtype } from '@/types/enums';
 import type { Device } from '@/types/models';
-
 
 export type CategoryKey = DeviceType;
 
@@ -32,10 +30,8 @@ export type FormSectionKey =
 export interface TabSpec {
   key: TabKey;
   label: string;
-  
   when?: (d: Pick<Device, 'is_chassis'>) => boolean;
 }
-
 
 export interface ServerSubtypeSections {
   hardware: boolean;
@@ -47,11 +43,8 @@ export interface CategoryConfig {
   key: DeviceType;
   label: string;
   deviceType: DeviceType;
-  
   detailTabs: TabSpec[];
-  
   serverSubtypeSections?: Partial<Record<DeviceSubtype, ServerSubtypeSections>>;
-  
   formSections: FormSectionKey[];
 }
 
@@ -72,7 +65,6 @@ export const CATEGORY_LIST: CategoryConfig[] = [
       T('metrics', '监控数据'),
       T('credentials', '监控凭据', (d) => !d.is_chassis)
     ],
-    
     serverSubtypeSections: {
       [DeviceSubtype.STANDALONE]: { hardware: true, nodeAssoc: false, chassis: false },
       [DeviceSubtype.NODE]: { hardware: true, nodeAssoc: true, chassis: false },
@@ -123,7 +115,7 @@ const BY_DEVICE_TYPE: Record<DeviceType, CategoryConfig> = {
 };
 
 export function getCategoryConfig(deviceType: DeviceType): CategoryConfig {
-  return BY_DEVICE_TYPE[deviceType] ?? CATEGORY_LIST[2]; 
+  return BY_DEVICE_TYPE[deviceType] ?? CATEGORY_LIST[2]; // 兜底 other
 }
 
 export function categoryFromDeviceType(deviceType: DeviceType): CategoryKey {

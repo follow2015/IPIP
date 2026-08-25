@@ -14,11 +14,13 @@ from extensions import db
 
 
 class CustomerTerminationArchiveRepository(SQLAlchemyRepository):
+    """客户终止存档 Repository。"""
 
     def __init__(self, session=None):
         super().__init__(CustomerTerminationArchive, session)
 
     def find_by_customer_id(self, customer_id: int) -> List[CustomerTerminationArchive]:
+        """按客户ID查询历史存档（时间倒序，defer pdf_blob 避免大字段 IO）。"""
         return (
             db.session.query(CustomerTerminationArchive)
             .options(defer(CustomerTerminationArchive.pdf_blob))
@@ -28,6 +30,7 @@ class CustomerTerminationArchiveRepository(SQLAlchemyRepository):
         )
 
     def find_latest_by_customer_id(self, customer_id: int) -> Optional[CustomerTerminationArchive]:
+        """查询客户最近一份存档（含 pdf_blob，用于下载）。"""
         return (
             db.session.query(CustomerTerminationArchive)
             .filter_by(customer_id=customer_id)
@@ -36,6 +39,7 @@ class CustomerTerminationArchiveRepository(SQLAlchemyRepository):
         )
 
     def find_by_id_with_blob(self, archive_id: int) -> Optional[CustomerTerminationArchive]:
+        """按 ID 查询存档（含 pdf_blob，用于下载/rebuild）。"""
         return (
             db.session.query(CustomerTerminationArchive)
             .filter_by(id=archive_id)

@@ -11,6 +11,7 @@ from extensions import db
 
 
 class DeviceMetricOverride(BaseModel):
+    """设备级阈值覆盖"""
 
     __tablename__ = "device_metric_override"
     __table_args__ = (

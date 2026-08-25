@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState } from 'react';
 import {
   Button,
@@ -31,33 +30,22 @@ import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useMessage } from '@/hooks/useMessage';
 
 interface BatchPortActionsProps {
-  
   switchId: number;
-  
   selectedPorts: string[];
-  
   onClearSelection: () => void;
-  
   onRefresh?: () => void;
-  
   hasSsh?: boolean;
-  
   onBatchLocalUpdate?: (portNames: string[], updates: Record<string, unknown>) => Promise<void>;
 }
-
 
 interface BatchActionDef {
   key: string;
   label: string;
   icon: React.ReactNode;
-  
   needParams: boolean;
-  
   sshOnly: boolean;
-  
   disabled?: boolean;
 }
-
 
 const BATCH_ACTIONS: BatchActionDef[] = [
   {
@@ -132,7 +120,6 @@ const BATCH_ACTIONS: BatchActionDef[] = [
   }
 ];
 
-
 export default function BatchPortActions({
   switchId,
   selectedPorts,
@@ -158,12 +145,10 @@ export default function BatchPortActions({
   const [customerForm] = Form.useForm();
   const [speedForm] = Form.useForm();
 
-  
   const availableActions = hasSsh
     ? BATCH_ACTIONS
     : BATCH_ACTIONS.map((a) => ({ ...a, disabled: a.sshOnly }));
 
-  
   const submitBatchAction = (action: string, params?: Record<string, unknown>) => {
     const data: BatchPortActionRequest = {
       action,
@@ -177,7 +162,6 @@ export default function BatchPortActions({
         onSuccess: () => {
           message.info('批量操作已提交，完成后将通过消息通知您');
           onClearSelection();
-          
         },
         onError: (err) => {
           message.error('批量操作提交失败：' + String(err));
@@ -186,7 +170,6 @@ export default function BatchPortActions({
     );
   };
 
-  
   const submitLocalBatchAction = async (updates: Record<string, unknown>) => {
     if (!onBatchLocalUpdate) return;
     setLocalLoading(true);
@@ -201,7 +184,6 @@ export default function BatchPortActions({
     }
   };
 
-  
   const handleSimpleAction = (actionKey: string) => {
     const actionLabel = BATCH_ACTIONS.find((a) => a.key === actionKey)?.label;
     if (hasSsh) {
@@ -211,7 +193,6 @@ export default function BatchPortActions({
         onOk: () => submitBatchAction(actionKey)
       });
     } else {
-      
       const updates: Record<string, unknown> = {};
       if (actionKey === 'enable_port') {
         updates.usage_status = 'free';
@@ -226,7 +207,6 @@ export default function BatchPortActions({
     }
   };
 
-  
   const handleVlanOk = () => {
     vlanForm.validateFields().then((values) => {
       if (hasSsh) {
@@ -236,7 +216,6 @@ export default function BatchPortActions({
           allowed_vlans: values.allowed_vlans || undefined
         });
       } else {
-        
         submitLocalBatchAction({ vlan: String(values.vlan_id) });
       }
       setVlanModalOpen(false);
@@ -244,7 +223,6 @@ export default function BatchPortActions({
     });
   };
 
-  
   const handleDescOk = () => {
     descForm.validateFields().then((values) => {
       if (hasSsh) {
@@ -252,7 +230,6 @@ export default function BatchPortActions({
           description: values.description || ''
         });
       } else {
-        
         submitLocalBatchAction({ description: values.description || '' });
       }
       setDescModalOpen(false);
@@ -260,7 +237,6 @@ export default function BatchPortActions({
     });
   };
 
-  
   const handleTrunkOk = () => {
     trunkForm.validateFields().then((values) => {
       submitBatchAction('add_port_to_trunk', {
@@ -271,7 +247,6 @@ export default function BatchPortActions({
     });
   };
 
-  
   const handleCustomerOk = () => {
     customerForm.validateFields().then((values) => {
       if (hasSsh) {
@@ -286,11 +261,9 @@ export default function BatchPortActions({
     });
   };
 
-  
   const handleSpeedOk = () => {
     speedForm.validateFields().then((values) => {
       const params: Record<string, unknown> = {};
-      
       if (values.inbound != null && values.inbound > 0) {
         params.inbound = values.inbound;
       }
@@ -307,7 +280,6 @@ export default function BatchPortActions({
     });
   };
 
-  
   const handleCancelSpeedOk = () => {
     cancelSpeedForm.validateFields().then((values) => {
       const cancelInbound = values.cancel_inbound ?? false;
@@ -326,7 +298,6 @@ export default function BatchPortActions({
     });
   };
 
-  
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     switch (key) {
       case 'enable_port':
@@ -356,7 +327,6 @@ export default function BatchPortActions({
     }
   };
 
-  
   const menuItems: MenuProps['items'] = availableActions.map((action) => ({
     key: action.key,
     label: action.disabled ? (
@@ -397,7 +367,7 @@ export default function BatchPortActions({
         }
       />
 
-      {}
+      {/* VLAN 配置弹窗 */}
       <Modal
         title="批量配置VLAN"
         open={vlanModalOpen}
@@ -440,7 +410,7 @@ export default function BatchPortActions({
         </Form>
       </Modal>
 
-      {}
+      {/* 描述修改弹窗 */}
       <Modal
         title="批量修改端口描述"
         open={descModalOpen}
@@ -458,7 +428,7 @@ export default function BatchPortActions({
         </Form>
       </Modal>
 
-      {}
+      {/* 链路聚合弹窗（仅 SSH 模式） */}
       {hasSsh && (
         <Modal
           title="批量加入链路聚合"
@@ -482,7 +452,7 @@ export default function BatchPortActions({
         </Modal>
       )}
 
-      {}
+      {/* 客户分配弹窗 */}
       <Modal
         title="批量分配客户"
         open={customerModalOpen}
@@ -508,7 +478,7 @@ export default function BatchPortActions({
         </Form>
       </Modal>
 
-      {}
+      {/* 批量限速弹窗（仅 SSH 模式） */}
       {hasSsh && (
         <Modal
           title="批量限速"
@@ -537,7 +507,7 @@ export default function BatchPortActions({
         </Modal>
       )}
 
-      {}
+      {/* 批量取消限速弹窗（仅 SSH 模式） */}
       {hasSsh && (
         <Modal
           title="批量取消限速"

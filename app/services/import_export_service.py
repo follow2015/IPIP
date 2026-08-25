@@ -36,14 +36,18 @@ from app.exceptions.validation import (
 logger = get_logger(__name__)
 
 
-MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024
+MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 class FileTooLargeError(InvalidFormatError):
-    pass
+    """上传文件超过大小上限。"""
 
 
 class IdempotencyConflictError(Exception):
+    """幂等冲突：文件已导入（"1"）或正在导入（"pending"）。
+
+    路由层统一映射为 409（error_code=IDEMPOTENCY_CONFLICT）。
+    """
 
     def __init__(self, message: str, in_progress: bool = False):
         self.message = message
@@ -53,12 +57,13 @@ class IdempotencyConflictError(Exception):
 
 @dataclass
 class ImportOutcome:
+    """批量导入编排结果。"""
 
     imported_count: int
     failed_count: int
     failed_rows: list
     message: str
-    raw: Optional[dict] = None
+    raw: Optional[dict] = None  # 业务层的完整返回（如设备导入的 imported_ids）
 
 
 def run_batch_import(
@@ -70,6 +75,40 @@ def run_batch_import(
     import_fn: Callable[["pd.DataFrame"], dict],
     redis_client=None,
 ) -> ImportOutcome:
+    """通用批量导入编排（设备/机柜/客户路由共用，脱离具体实体、可单测）。
+
+    负责整条 HTTP 无关的导入管道：
+        文件大小校验 → 内容 hash → 幂等两阶段(pending→确认) →
+        解析(parse_fn) → 导入(import_fn) → 按结果置/清幂等键。
+
+    业务差异通过回调注入，使本函数只承载通用流程：
+        - parse_fn(bytes, filename) -> DataFrame
+        - import_fn(df) -> {"imported_count", "failed_count", "failed_rows", ...}
+
+    幂等语义（与历史行为一致）：幂等键按「文件内容 hash」计算。只要有成功行即
+    确认键(长 TTL=86400)。重导同一文件会被 409 拦截，避免把已成功的行重复导入
+    产生重复数据；部分成功时前端提示用户仅重导失败行（失败行存为独立文件后 hash
+    不同，不触发冲突）。
+
+    Args:
+        file_bytes: 上传文件原始字节
+        filename: 原始文件名
+        user_id: 当前用户ID（参与幂等键）
+        idem_scope: 幂等键业务域，如 "import_devices"
+        parse_fn: (bytes, filename) -> DataFrame
+        import_fn: (df) -> 结果 dict
+        redis_client: 可选 Redis 客户端（None 时跳过幂等）
+
+    Returns:
+        ImportOutcome
+
+    Raises:
+        FileTooLargeError: 文件超限（路由→413）
+        IdempotencyConflictError: 已导入/导入中（路由→409）
+        RequiredFieldError: 缺必需列（import_fn 内抛出，路由→400）
+        AppValidationError: 解析格式错误（ValueError/KeyError 包装，路由→400）
+        Exception: 其他异常（路由→500，已清占位键）
+    """
     validate_file_size(file_bytes)
 
     file_hash = hashlib.md5(file_bytes).hexdigest()
@@ -123,6 +162,7 @@ def run_batch_import(
 
 
 def validate_file_size(file_bytes: bytes, max_bytes: int = MAX_IMPORT_FILE_BYTES) -> None:
+    """校验上传文件字节大小，超限抛出 FileTooLargeError（路由层转 413）。"""
     if len(file_bytes) > max_bytes:
         mb = max_bytes // (1024 * 1024)
         raise FileTooLargeError(
@@ -134,6 +174,7 @@ def validate_file_size(file_bytes: bytes, max_bytes: int = MAX_IMPORT_FILE_BYTES
 
 
 class EmptyExportError(InvalidOperationError):
+    """导出时没有任何数据。"""
 
     def __init__(self, message: str = "没有可导出的数据"):
         super().__init__(operation="export", reason=message, message=message)
@@ -141,6 +182,22 @@ class EmptyExportError(InvalidOperationError):
 
 
 def export_to_excel(rows: list, sheet_name: str) -> BytesIO:
+    """将记录列表统一导出为 Excel 字节流（设备/机柜/客户共用）。
+
+    统一职责：空数据检查 + DataFrame 构造 + ExcelWriter 拼装，使三个实体的
+    导出构造路径一致；数据获取（含是否需要分页）由调用方决定——
+    大数据量的设备走分页循环，机柜/客户量小直接全量取，分页是数据量驱动而非风格差异。
+
+    Args:
+        rows: 已序列化为 dict 的记录列表（如 get_all_*_list 返回 List[Dict]）
+        sheet_name: Excel 工作表名
+
+    Returns:
+        可被 flask.send_file 直接消费的 BytesIO 缓冲
+
+    Raises:
+        EmptyExportError: rows 为空时
+    """
     if not rows:
         raise EmptyExportError()
     df = pd.DataFrame(rows)
@@ -151,11 +208,24 @@ def export_to_excel(rows: list, sheet_name: str) -> BytesIO:
     return output
 
 
+
 def parse_file_to_df(
     file_bytes: bytes,
     filename: str,
     cn_to_en: Optional[dict] = None,
 ) -> pd.DataFrame:
+    """将上传的文件字节流解析为标准化 DataFrame。
+
+    包含：扩展名选择解析方式、NaN 清洗、中文列名→英文列名映射。
+
+    Args:
+        file_bytes: 上传文件的原始字节
+        filename: 原始文件名（用于判断 csv/xlsx）
+        cn_to_en: 中文→英文列名映射字典（可选）
+
+    Returns:
+        清洗并映射后的 DataFrame
+    """
     buf = BytesIO(file_bytes)
     fname = (filename or "").lower()
     if fname.endswith(".csv"):
@@ -171,12 +241,24 @@ def parse_file_to_df(
     return df
 
 
+
 def build_template(
     columns: list[str],
     example_rows: list[dict],
     en_to_cn: dict,
     sheet_name: str,
 ) -> BytesIO:
+    """生成导入模板字节流（含中文表头+示例行）。
+
+    Args:
+        columns: 英文列名列表（定义列顺序）
+        example_rows: 示例行数据（英文 key）
+        en_to_cn: 英文→中文列名映射
+        sheet_name: Excel Sheet 名称
+
+    Returns:
+        可被 flask.send_file 直接消费的 BytesIO 缓冲
+    """
     df = pd.DataFrame(example_rows, columns=columns)
     cn_columns = [en_to_cn.get(col, col) for col in columns]
     df.columns = cn_columns
@@ -186,6 +268,7 @@ def build_template(
     return buffer
 
 
+
 def import_rows(
     df: pd.DataFrame,
     create_func: Callable[[dict], any],
@@ -193,6 +276,25 @@ def import_rows(
     entity_name: str = "记录",
     name_column: str = "name",
 ) -> dict:
+    """逐行导入 DataFrame 数据。
+
+    Args:
+        df: 已解析并映射好的 DataFrame
+        create_func: 单行创建回调，接收 dict 返回创建的对象（或抛异常）
+        required_columns: 必需列名列表
+        entity_name: 实体中文名（用于日志）
+        name_column: 名称列名（用于失败行详情，如 "name"/"device_name"）
+
+    Returns:
+        {
+            "imported_count": int,
+            "failed_count": int,
+            "failed_rows": [{"row": int, "name": str, "error": str}, ...],
+        }
+
+    Raises:
+        RequiredFieldError: 缺少必需列时
+    """
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         raise RequiredFieldError(

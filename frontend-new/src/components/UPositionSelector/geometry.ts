@@ -1,27 +1,21 @@
 
-
 import type { OccupiedPosition } from './types';
-
 
 export function uToTop(u: number, unit: number): number {
   return (u - 1) * unit;
 }
 
-
 export function displayLabel(internalU: number, totalU: number): number {
   return totalU - internalU + 1;
 }
-
 
 export function internalToPhysical(internalU: number, totalU: number): number {
   return totalU - internalU + 1;
 }
 
-
 export function physicalToInternal(physicalU: number, totalU: number): number {
   return totalU - physicalU + 1;
 }
-
 
 export function checkConflict(
   devices: OccupiedPosition[],

@@ -15,6 +15,7 @@ from extensions import db
 
 
 class MonitorEscalationStep(BaseModel):
+    """监控告警升级链步骤（P2-11）"""
 
     __tablename__ = "monitor_escalation_step"
     __table_args__ = (

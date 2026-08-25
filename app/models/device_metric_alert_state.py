@@ -17,6 +17,7 @@ from extensions import db
 
 
 class DeviceMetricAlertState(BaseModel):
+    """设备指标告警状态（按 device_id + metric_key + index 维度）"""
 
     __tablename__ = "device_metric_alert_state"
     __table_args__ = (

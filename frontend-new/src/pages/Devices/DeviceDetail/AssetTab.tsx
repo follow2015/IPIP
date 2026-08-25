@@ -1,6 +1,5 @@
 import { confirm } from '@/utils/confirm';
 
-
 import { useState, useCallback } from 'react';
 import dayjs, { Dayjs } from 'dayjs';
 import { Descriptions, Tag, Button, Space, Form, Modal } from 'antd';
@@ -25,7 +24,6 @@ interface AssetTabProps {
   device: Device;
 }
 
-
 function getWarrantyStatus(device: Device) {
   if (!device.warranty_end)
     return { label: '未设置', color: 'default', icon: <ClockCircleOutlined /> };
@@ -42,12 +40,10 @@ function getWarrantyStatus(device: Device) {
   return { label: '保修中', color: 'green', icon: <CheckCircleOutlined /> };
 }
 
-
 function formatPrice(price: number | null | undefined): string {
   if (price == null) return '-';
   return `¥${Number(price).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-
 
 const ASSET_DATE_KEYS = new Set([
   'purchase_date',
@@ -56,7 +52,6 @@ const ASSET_DATE_KEYS = new Set([
   'online_date',
   'offline_date'
 ]);
-
 
 function serializeAssetDate(value: unknown): unknown {
   if (dayjs.isDayjs(value)) {
@@ -74,7 +69,6 @@ function AssetTab({ device }: AssetTabProps) {
   const [editForm] = Form.useForm();
   const [autoGenerate, setAutoGenerate] = useState(false);
 
-  
   const handleOpenEdit = useCallback(() => {
     editForm.setFieldsValue({
       asset_number: device.asset_number ?? undefined,
@@ -95,20 +89,17 @@ function AssetTab({ device }: AssetTabProps) {
     setEditOpen(true);
   }, [device, editForm]);
 
-  
   const handleEditSubmit = async () => {
     try {
       const values = await editForm.validateFields();
       const payload: UpdateDeviceRequest = { id: device.id };
 
-      
       if (autoGenerate) {
         payload.asset_number = generateAssetNumber();
       } else if (values.asset_number !== undefined) {
         payload.asset_number = values.asset_number || null;
       }
 
-      
       const assetKeys = [
         'supplier',
         'supplier_contact',
@@ -140,7 +131,6 @@ function AssetTab({ device }: AssetTabProps) {
     }
   };
 
-  
   const handleReset = useCallback(() => {
     confirm({
       title: '重置资产信息',
@@ -161,7 +151,7 @@ function AssetTab({ device }: AssetTabProps) {
 
   return (
     <>
-      {}
+      {/* 操作按钮 */}
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
         <Button icon={<EditOutlined />} onClick={handleOpenEdit}>
           编辑
@@ -172,7 +162,7 @@ function AssetTab({ device }: AssetTabProps) {
       </div>
 
       <Descriptions column={2} bordered size="small">
-        {}
+        {/* 资产编号 */}
         <Descriptions.Item label="资产编号">{device.asset_number ?? '-'}</Descriptions.Item>
         <Descriptions.Item label="保修状态">
           <Tag color={warrantyStatus.color} icon={warrantyStatus.icon}>
@@ -180,7 +170,7 @@ function AssetTab({ device }: AssetTabProps) {
           </Tag>
         </Descriptions.Item>
 
-        {}
+        {/* 采购信息 */}
         <Descriptions.Item label="供应商">{device.supplier ?? '-'}</Descriptions.Item>
         <Descriptions.Item label="供应商联系人">{device.supplier_contact ?? '-'}</Descriptions.Item>
         <Descriptions.Item label="合同编号">{device.contract_number ?? '-'}</Descriptions.Item>
@@ -188,7 +178,7 @@ function AssetTab({ device }: AssetTabProps) {
         <Descriptions.Item label="采购价格">{formatPrice(device.purchase_price)}</Descriptions.Item>
         <Descriptions.Item label="发票号码">{device.invoice_number ?? '-'}</Descriptions.Item>
 
-        {}
+        {/* 保修信息 */}
         <Descriptions.Item label="保修类型">{device.warranty_type ?? '-'}</Descriptions.Item>
         <Descriptions.Item label="保修期限">
           {device.warranty_start || device.warranty_end
@@ -196,7 +186,7 @@ function AssetTab({ device }: AssetTabProps) {
             : '-'}
         </Descriptions.Item>
 
-        {}
+        {/* 生命周期 */}
         <Descriptions.Item label="上线日期">{formatDate(device.online_date)}</Descriptions.Item>
         <Descriptions.Item label="下线日期">{formatDate(device.offline_date)}</Descriptions.Item>
         <Descriptions.Item label="预计使用年限">
@@ -205,7 +195,7 @@ function AssetTab({ device }: AssetTabProps) {
         <Descriptions.Item label="创建时间">{formatDateTime(device.created_at)}</Descriptions.Item>
       </Descriptions>
 
-      {}
+      {/* 编辑弹窗 */}
       <Modal
         title="编辑资产信息"
         open={editOpen}

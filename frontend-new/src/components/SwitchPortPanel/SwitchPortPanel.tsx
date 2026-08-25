@@ -28,11 +28,8 @@ import { getStatusLabel } from '@/utils/portStatus';
 import { PORT_USAGE_STATUS_MAP } from '@/types/enums';
 import type { SwitchPort } from '@/types/models';
 
-
 interface SwitchPortPanelProps {
-  
   ports: SwitchPort[];
-  
   onPortClick?: (port: SwitchPort) => void;
 }
 
@@ -46,12 +43,11 @@ function parseSpeedMbps(speed: string): number {
   if (!speed) return 0;
   const s = speed.toUpperCase().replace(/\s/g, '');
 
-  
   const patterns: [RegExp, number][] = [
-    [/^(\d+(?:\.\d+)?)GBPS$/, 1000], 
-    [/^(\d+(?:\.\d+)?)MBPS$/, 1], 
-    [/^(\d+(?:\.\d+)?)G(?:E|B)?$/, 1000], 
-    [/^(\d+(?:\.\d+)?)M(?:E|B)?$/, 1] 
+    [/^(\d+(?:\.\d+)?)GBPS$/, 1000], // 100GBPS
+    [/^(\d+(?:\.\d+)?)MBPS$/, 1], // 1000MBPS
+    [/^(\d+(?:\.\d+)?)G(?:E|B)?$/, 1000], // 10G/10GE/10GB
+    [/^(\d+(?:\.\d+)?)M(?:E|B)?$/, 1] // 100M/100ME/100MB
   ];
 
   for (const [regex, factor] of patterns) {
@@ -59,13 +55,11 @@ function parseSpeedMbps(speed: string): number {
     if (m) return Math.round(parseFloat(m[1]) * factor);
   }
 
-  
   const numMatch = s.match(/^(\d+(?:\.\d+)?)$/);
   if (numMatch) return Math.round(parseFloat(numMatch[1]));
 
   return 0;
 }
-
 
 const PORT_TYPE_MAX_SPEED: Record<string, number> = {
   '100GE': 100000,
@@ -77,13 +71,13 @@ const PORT_TYPE_MAX_SPEED: Record<string, number> = {
   '100M': 100
 };
 
-
 function isUnderspeed(portType: string, speed: string): boolean {
   const maxSpeed = PORT_TYPE_MAX_SPEED[portType];
   if (!maxSpeed) return false;
   const actualSpeed = parseSpeedMbps(speed);
   return actualSpeed > 0 && actualSpeed < maxSpeed;
 }
+
 
 
 function getPortVisual(status: string | null | undefined, underspeed: boolean) {
@@ -106,7 +100,6 @@ function getPortVisual(status: string | null | undefined, underspeed: boolean) {
 
 function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
   const { token } = theme.useToken();
-  
   const groupedPorts = useMemo(() => {
     const groups: Record<string, SwitchPort[]> = {};
     for (const port of ports) {
@@ -114,16 +107,13 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
       if (!groups[key]) groups[key] = [];
       groups[key].push(port);
     }
-    
     for (const key of Object.keys(groups)) {
       groups[key].sort((a, b) => extractPortIndex(a.port_name) - extractPortIndex(b.port_name));
     }
-    
     const sorted = PORT_TYPE_ORDER.filter((key) => groups[key]?.length).map((key) => ({
       type: key,
       ports: groups[key]
     }));
-    
     for (const key of Object.keys(groups)) {
       if (!PORT_TYPE_ORDER.includes(key)) {
         sorted.push({ type: key, ports: groups[key] });
@@ -136,7 +126,7 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
 
   return (
     <div style={{ marginBottom: 16 }}>
-      {}
+      {/* 图例 */}
       <div
         style={{ marginBottom: 8, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}
       >
@@ -160,7 +150,7 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
         </Space>
       </div>
 
-      {}
+      {/* 按端口类型分组展示 */}
       {groupedPorts.map(({ type, ports: groupPorts }) => {
         const upCount = groupPorts.filter((p) => getLinkStatus(p)?.toLowerCase() === 'up').length;
         const downCount = groupPorts.filter(
@@ -173,7 +163,7 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
 
         return (
           <div key={type} style={{ marginBottom: 12 }}>
-            {}
+            {/* 分组标题 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <Tag
                 color={PORT_TYPE_TAG_COLOR[type] ?? 'default'}
@@ -200,7 +190,7 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
               </span>
             </div>
 
-            {}
+            {/* 端口色块面板 */}
             <div
               style={{
                 display: 'flex',

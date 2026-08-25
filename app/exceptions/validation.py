@@ -10,6 +10,10 @@ from .base import BaseAppException
 
 
 class ValidationError(BaseAppException):
+    """数据验证异常
+    
+    当输入数据不符合验证规则时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -18,6 +22,14 @@ class ValidationError(BaseAppException):
         errors: Optional[Dict[str, Any]] = None,
         details: Optional[Dict[str, Any]] = None
     ):
+        """初始化验证异常
+        
+        Args:
+            message: 异常消息
+            field: 验证失败的字段名
+            errors: 详细的验证错误信息
+            details: 额外的异常详情
+        """
         exception_details = details or {}
         if field:
             exception_details["field"] = field
@@ -36,6 +48,10 @@ class ValidationError(BaseAppException):
 
 
 class SchemaValidationError(ValidationError):
+    """Schema验证异常
+    
+    当使用Marshmallow等Schema验证失败时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -43,6 +59,13 @@ class SchemaValidationError(ValidationError):
         schema_errors: Optional[Dict[str, List[str]]] = None,
         details: Optional[Dict[str, Any]] = None
     ):
+        """初始化Schema验证异常
+        
+        Args:
+            message: 异常消息
+            schema_errors: Schema验证错误详情
+            details: 额外的异常详情
+        """
         exception_details = details or {}
         if schema_errors:
             exception_details["schema_errors"] = schema_errors
@@ -55,12 +78,22 @@ class SchemaValidationError(ValidationError):
 
 
 class RequiredFieldError(ValidationError):
+    """必需字段缺失异常
+    
+    当必需的字段缺失时抛出此异常。
+    """
     
     def __init__(
         self,
         missing_fields: List[str],
         message: Optional[str] = None
     ):
+        """初始化必需字段异常
+        
+        Args:
+            missing_fields: 缺失的字段列表
+            message: 自定义异常消息
+        """
         if not message:
             fields_str = "、".join(missing_fields)
             message = f"缺少必需字段：{fields_str}"
@@ -72,6 +105,10 @@ class RequiredFieldError(ValidationError):
 
 
 class InvalidFormatError(ValidationError):
+    """格式错误异常
+    
+    当数据格式不正确时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -80,6 +117,14 @@ class InvalidFormatError(ValidationError):
         actual_value: Any = None,
         message: Optional[str] = None
     ):
+        """初始化格式错误异常
+        
+        Args:
+            field: 字段名
+            expected_format: 期望的格式
+            actual_value: 实际值
+            message: 自定义异常消息
+        """
         if not message:
             message = f"字段 {field} 格式不正确，期望格式：{expected_format}"
             
@@ -97,6 +142,10 @@ class InvalidFormatError(ValidationError):
 
 
 class ValueRangeError(ValidationError):
+    """数值范围错误异常
+    
+    当数值不在允许范围内时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -106,6 +155,15 @@ class ValueRangeError(ValidationError):
         max_value: Optional[Any] = None,
         message: Optional[str] = None
     ):
+        """初始化数值范围错误异常
+        
+        Args:
+            field: 字段名
+            value: 实际值
+            min_value: 最小值
+            max_value: 最大值
+            message: 自定义异常消息
+        """
         if not message:
             if min_value is not None and max_value is not None:
                 message = f"字段 {field} 的值必须在 {min_value} 到 {max_value} 之间"

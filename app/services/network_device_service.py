@@ -10,6 +10,11 @@ logger = get_logger(__name__)
 
 
 class NetworkDeviceService:
+    """网络设备统一管理服务
+
+    封装 Device + SwitchCredentials 的原子创建/更新操作，
+    确保数据同步规则（management_ip等）在服务层统一处理。
+    """
 
     def __init__(self, device_repo: DeviceRepository = None, switch_repo: SwitchRepository = None):
         self.device_repo = device_repo or DeviceRepository()
@@ -22,6 +27,14 @@ class NetworkDeviceService:
     _STRIP_KEYS = ("auto_create_nodes", "node_hardware", "storage_items", "nic_ports")
 
     def _route_switch_config(self, switch_config: dict, device: Device) -> dict:
+        """将 switch_config 中的字段路由至 Device / DeviceSwitchExt
+
+        - _DEVICE_ROUTE_KEYS → setattr(device, ...)
+        - _EXT_ROUTE_KEYS → 收集为 ext_data 返回
+
+        Returns:
+            ext_data: 需要写入 DeviceSwitchExt 的字段字典
+        """
         for key in self._DEVICE_ROUTE_KEYS:
             if key in switch_config:
                 setattr(device, key, switch_config.pop(key))
@@ -30,6 +43,19 @@ class NetworkDeviceService:
         return ext_data
 
     def create_network_device(self, device_data: dict, switch_config: dict) -> tuple:
+        """原子创建 Device + SwitchCredentials
+
+        数据同步规则（创建时）：
+        - switch_config.ip → devices.management_ip
+        - device.cabinet.room_id → switch_credentials.room_id（自动同步）
+
+        Args:
+            device_data: devices表字段（name/model/brand/cabinet_id等）
+            switch_config: switch_credentials表字段（ip/username/password等）
+
+        Returns:
+            (Device, SwitchCredentials) 两个对象
+        """
         if switch_config.get("ip"):
             device_data["management_ip"] = switch_config["ip"]
 
@@ -71,6 +97,20 @@ class NetworkDeviceService:
         return device, switch
 
     def update_network_device(self, device_id: int, device_data: dict, switch_config: dict = None) -> Device:
+        """原子更新 Device（及可选的 SwitchCredentials）
+
+        数据同步规则（更新时）：
+        - switch_config.ip 变更时，同步更新 devices.management_ip
+        - device.cabinet_id 变更时，自动同步 switch_credentials.room_id
+
+        Args:
+            device_id: 设备ID
+            device_data: 需要更新的devices表字段
+            switch_config: 需要更新的switch_credentials表字段（可选）
+
+        Returns:
+            更新后的Device对象
+        """
         device = self.device_repo.find_by_id(device_id)
         if not device:
             raise ValueError(f"设备 {device_id} 不存在")
@@ -124,6 +164,14 @@ class NetworkDeviceService:
         return device
 
     def get_with_switch_info(self, device_id: int) -> dict:
+        """获取设备详情，聚合switch_credentials信息
+
+        Args:
+            device_id: 设备ID
+
+        Returns:
+            包含device和switch_credential的字典
+        """
         device = self.device_repo.find_by_id(device_id)
         switch = self.switch_repo.find_by_device_id(device_id)
         return {

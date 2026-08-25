@@ -38,6 +38,7 @@ device_import_bp = Blueprint("device_import", __name__)
 @login_required
 @permission_required("device:view")
 def download_import_template():
+    """下载设备导入模板（按设备类型拆分，含表头+示例行）"""
     from flask import send_file
 
     template_type = request.args.get("type", "server").lower()
@@ -58,6 +59,14 @@ def download_import_template():
 @rate_limit_api
 @transactional
 def batch_import_devices():
+    """批量导入设备
+
+    Request:
+        file: Excel文件
+
+    Returns:
+        JSON响应，包含导入结果
+    """
     if "file" not in request.files:
         return APIResponse.error(message="请上传文件", status_code=400)
 
@@ -109,6 +118,15 @@ def batch_import_devices():
 @permission_required("device:view")
 @rate_limit_api
 def export_devices():
+    """导出设备数据
+
+    Query Parameters:
+        cabinet_id: 机柜ID（可选）
+        customer_id: 客户ID（可选）
+
+    Returns:
+        Excel文件
+    """
     from flask import send_file
     from datetime import datetime
 

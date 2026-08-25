@@ -16,6 +16,12 @@ from extensions import db
 
 
 class CustomerTerminationArchive(BaseModel):
+    """客户终止存档。
+
+    每次终止生成一条记录：summary_json 在终止事务内写入（释放前快照），
+    pdf_blob 在事务提交后由 on_commit 回调回填（失败则保留 None，可由
+    POST /termination-archive/rebuild 凭 summary_json 重建）。
+    """
 
     __tablename__ = "customer_termination_archive"
     __table_args__ = (
@@ -35,6 +41,10 @@ class CustomerTerminationArchive(BaseModel):
     operator = relationship("User", lazy="joined")
 
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> dict:
+        """转换为字典。
+
+        列表接口默认不返回 pdf_blob（大字段），调用方应配合 defer 使用。
+        """
         data = super().to_dict(exclude=exclude, include_relations=include_relations)
         data.pop("pdf_blob", None)
         return data

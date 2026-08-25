@@ -17,6 +17,13 @@ except ImportError:
 
 
 def _build_redis_url() -> str:
+    """从拆分字段组装 Redis URL，与 Flask config.REDIS_URL 逻辑一致。
+
+    优先级：
+    1. 环境变量 REDIS_URL（直接指定完整 URL）
+    2. 从 REDIS_HOST / REDIS_PORT / REDIS_PASSWORD / REDIS_DB 组装
+    3. 兜底 redis://localhost:6379/0
+    """
     explicit = os.environ.get("REDIS_URL")
     if explicit:
         return explicit
@@ -36,10 +43,10 @@ REDIS_URL: str = _build_redis_url()
 JWT_SECRET_KEY: str = os.environ.get("JWT_SECRET_KEY") or os.environ.get("SECRET_KEY", "")
 JWT_ALGORITHM: str = os.environ.get("JWT_ALGORITHM", "HS256")
 
-KEEPALIVE_INTERVAL: int = int(os.environ.get("SSE_KEEPALIVE_INTERVAL", "25"))
+KEEPALIVE_INTERVAL: int = int(os.environ.get("SSE_KEEPALIVE_INTERVAL", "25"))  # 秒
 CLIENT_QUEUE_SIZE: int = int(os.environ.get("SSE_CLIENT_QUEUE_SIZE", "64"))
-MAX_IDLE_SECONDS: int = int(os.environ.get("SSE_MAX_IDLE_SECONDS", "300"))
-MAX_CONNECTIONS: int = int(os.environ.get("SSE_MAX_CONNECTIONS", "500"))
+MAX_IDLE_SECONDS: int = int(os.environ.get("SSE_MAX_IDLE_SECONDS", "300"))  # 5分钟无数据断开
+MAX_CONNECTIONS: int = int(os.environ.get("SSE_MAX_CONNECTIONS", "500"))  # G2: 全局连接数上限
 
 RING_BUFFER_SIZE: int = int(os.environ.get("SSE_RING_BUFFER_SIZE", "200"))
 
@@ -47,5 +54,5 @@ GLOBAL_CHANNEL: str = "events:global"
 
 LOG_LEVEL: str = os.environ.get("GATEWAY_LOG_LEVEL", "INFO")
 LOG_DIR: str = os.environ.get("GATEWAY_LOG_DIR", "logs")
-LOG_MAX_BYTES: int = 10 * 1024 * 1024
+LOG_MAX_BYTES: int = 10 * 1024 * 1024  # 10MB
 LOG_BACKUP_COUNT: int = 5

@@ -26,13 +26,14 @@ from types import SimpleNamespace
 logger = get_logger(__name__)
 
 MAX_RETRIES = 3
-RETRY_BASE = 0.5
+RETRY_BASE = 0.5  # 秒，指数退避基数
 
 
 _NETMIKO_LOG_REPORTED = False
 
 
 def _netmiko_log_state():
+    """返回 (是否开启, 环境变量值, 配置值)，供开关判定与自报共用"""
     env_val = os.environ.get("NETMIKO_SESSION_LOG")
     cfg_val = getattr(Config, "NETMIKO_SESSION_LOG", False)
     enabled = bool(env_val) or bool(cfg_val)
@@ -40,6 +41,12 @@ def _netmiko_log_state():
 
 
 def report_netmiko_log_switch():
+    """进程内一次性自报 netmiko 会话日志开关状态
+
+    放在 Flask 启动期调用，这样**无需真正连接设备**即可在启动日志里确认开关
+    是否生效（例如：env=None config=False → 关闭）。连接设备时也会再调用一次，
+    但受 _NETMIKO_LOG_REPORTED 保护只打一次。
+    """
     global _NETMIKO_LOG_REPORTED
     if _NETMIKO_LOG_REPORTED:
         return
@@ -61,6 +68,18 @@ def report_netmiko_log_switch():
 
 
 def _enable_netmiko_session_log(switch) -> Optional[str]:
+    """根据环境变量 NETMIKO_SESSION_LOG 或 Config.NETMIKO_SESSION_LOG 决定是否记录 netmiko 完整会话日志
+
+    返回会话日志文件路径；返回 None 表示禁用（默认）。
+
+    开启后 netmiko 会把与设备的完整交互（发送的命令 + 设备回显，含登录密码
+    明文）写入 logs/netmiko_{ip}_{时间戳}.log，并把标准库 ``netmiko`` logger
+    设为 DEBUG。仅用于临时调试 **range 失败 / 逐端口降级** 等疑难问题，
+    调试结束后务必删除 logs/netmiko_*.log 文件，避免敏感凭证泄露。
+
+    Returns:
+        Optional[str]: 会话日志绝对路径，或 None（未开启）
+    """
     enabled, _, _ = _netmiko_log_state()
     report_netmiko_log_switch()
     if not enabled:
@@ -75,6 +94,10 @@ def _enable_netmiko_session_log(switch) -> Optional[str]:
 
 
 class SSHManager:
+    """SSH 连接管理器
+
+    封装 netmiko 的连接管理，提供命令下发、自动重试等功能。
+    """
 
     def send_show_command(
         self,
@@ -82,6 +105,19 @@ class SSHManager:
         command: str,
         timeout: int = 120,
     ) -> str:
+        """下发 show 命令并返回输出
+
+        Args:
+            switch: 交换机对象
+            command: 查询命令
+            timeout: 超时时间（秒）
+
+        Returns:
+            str: 命令输出
+
+        Raises:
+            SSHConnectionError: 连接失败
+        """
         return self._execute_with_retry(
             lambda: self._send_show_sync(switch, command, timeout),
             switch.ip,
@@ -94,6 +130,21 @@ class SSHManager:
         save_cmd: str = "",
         read_timeout: int = 120,
     ) -> str:
+        """下发配置命令序列（自动重试）
+
+        对 CE 型号使用 config set 模式，其他使用 send_config_set。
+
+        Args:
+            switch: 交换机对象
+            commands: 配置命令列表
+            save_cmd: 保存配置命令
+
+        Returns:
+            str: 命令输出
+
+        Raises:
+            SSHConnectionError: 连续 3 次失败
+        """
         return self._execute_with_retry(
             lambda: self._send_config_sync(switch, commands, save_cmd, read_timeout),
             switch.ip,
@@ -105,6 +156,19 @@ class SSHManager:
         steps: list,
         save_cmd: str = "",
     ) -> str:
+        """下发交互式命令序列
+
+        每个步骤为 (command, expect_pattern) 元组。
+        适用于 clear configuration this 等需要交互式确认的命令。
+
+        Args:
+            switch: 交换机对象
+            steps: 命令步骤列表，每项为 (command_str, expect_regex)
+            save_cmd: 保存配置命令
+
+        Returns:
+            str: 命令输出
+        """
         return self._execute_with_retry(
             lambda: self._send_interactive_sync(switch, steps, save_cmd),
             switch.ip,
@@ -112,6 +176,7 @@ class SSHManager:
 
     @staticmethod
     def _normalize_switch_info(switch_info) -> dict:
+        """将交换机凭证 ORM 对象或原始 dict 统一为连接参数字典。"""
         if isinstance(switch_info, dict):
             return switch_info
         return {
@@ -126,6 +191,14 @@ class SSHManager:
 
     @contextmanager
     def get_connection(self, switch_info):
+        """上下文管理器：创建并自动释放 SSH/Telnet 连接
+
+        Args:
+            switch_info: 交换机信息（dict 或 SwitchCredentials ORM 对象）
+
+        Yields:
+            netmiko 连接对象
+        """
         from netmiko import ConnectHandler
 
         info = self._normalize_switch_info(switch_info)
@@ -173,6 +246,14 @@ class SSHManager:
                     pass
 
     def test_connection(self, switch_info: dict) -> dict:
+        """测试 SSH 连接
+
+        Args:
+            switch_info: 交换机信息字典
+
+        Returns:
+            dict: {success: bool, message: str, details: dict}
+        """
         try:
             with self.get_connection(switch_info) as conn:
                 if conn:
@@ -191,21 +272,55 @@ class SSHManager:
             return {"success": False, "message": str(e), "details": {}}
 
     def execute_command(self, connection, command: str) -> str:
+        """执行单条命令。
+
+        执行失败（异常）时抛出 SSHConnectionError，交由调用方决定重试/降级，
+        避免把失败静默转为空串、被上层误判为"设备无输出/资源不存在"（fail-open 掩码）。
+        仅当设备确实返回空输出时返回空串——此时与异常有本质区别。
+        """
         try:
             return connection.send_command(command, delay_factor=2) or ""
         except Exception as e:
             raise SSHConnectionError(f"命令执行失败 [{command}]: {e}") from e
 
     def execute_config_commands(self, connection, commands: list) -> str:
+        """执行配置模式命令序列。
+
+        执行失败（异常）时抛出 SwitchConfigError，避免静默返回空串掩盖配置错误。
+        """
         try:
             return connection.send_config_set(commands) or ""
         except Exception as e:
             raise SwitchConfigError(reason=f"配置命令执行失败 {commands}: {e}") from e
 
     def execute_show_on_conn(self, connection, command: str, timeout: int = 120) -> str:
+        """在已有连接上执行 show 命令
+
+        Args:
+            connection: 已建立的 netmiko 连接
+            command: 查询命令
+            timeout: 超时时间（秒）
+
+        Returns:
+            str: 命令输出
+        """
         return connection.send_command(command, read_timeout=timeout)
 
     def execute_config_on_conn(self, connection, commands: list) -> str:
+        """在已有连接上执行配置命令序列
+
+        执行后检测设备返回中的 Error 信息，发现错误时抛出异常。
+
+        Args:
+            connection: 已建立的 netmiko 连接
+            commands: 配置命令列表
+
+        Returns:
+            str: 命令输出
+
+        Raises:
+            SSHConnectionError: 设备返回配置错误
+        """
         output = connection.send_config_set(commands)
         error_lines = self._detect_config_errors(output)
         if error_lines:
@@ -214,6 +329,15 @@ class SSHManager:
         return output
 
     def execute_interactive_on_conn(self, connection, steps: list) -> str:
+        """在已有连接上执行交互式命令序列
+
+        Args:
+            connection: 已建立的 netmiko 连接
+            steps: 命令步骤列表，每项为 (command_str, expect_regex)
+
+        Returns:
+            str: 命令输出
+        """
         output = ""
         for cmd, expect in steps:
             output += connection.send_command(cmd, expect_string=expect, read_timeout=60)
@@ -221,6 +345,18 @@ class SSHManager:
 
 
     def _execute_with_retry(self, func, switch_ip: str) -> str:
+        """带指数退避重试的执行器
+
+        Args:
+            func: 待执行的同步函数
+            switch_ip: 交换机 IP（用于日志）
+
+        Returns:
+            str: 命令输出
+
+        Raises:
+            SSHConnectionError: 重试耗尽
+        """
         last_exc = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
@@ -242,6 +378,7 @@ class SSHManager:
         ) from last_exc
 
     def _send_show_sync(self, switch, command: str, timeout: int) -> str:
+        """同步执行 show 命令"""
         from netmiko import ConnectHandler
 
         conn_params = self._build_conn_params(switch, timeout)
@@ -250,6 +387,10 @@ class SSHManager:
         return output
 
     def _send_config_sync(self, switch, commands: list, save_cmd: str, read_timeout: int = 120) -> str:
+        """同步执行配置命令
+
+        执行后检测设备返回中的 Error 信息，发现错误时抛出异常。
+        """
         from netmiko import ConnectHandler
 
         conn_params = self._build_conn_params(switch)
@@ -271,6 +412,17 @@ class SSHManager:
 
     @staticmethod
     def _detect_config_errors(output: str) -> list:
+        """检测设备配置输出中的 Error 行
+
+        匹配华为/H3C/Cisco 常见的配置错误模式（以 "Error:" 开头的行）。
+        空输出或无匹配时返回空列表。
+
+        Args:
+            output: 设备命令输出
+
+        Returns:
+            list[str]: 错误信息列表，空列表表示无错误
+        """
         if not output:
             return []
 
@@ -284,6 +436,10 @@ class SSHManager:
     def _send_interactive_sync(
         self, switch, steps: list, save_cmd: str,
     ) -> str:
+        """同步执行交互式命令序列
+
+        每个步骤使用 send_command + expect_string 逐条发送。
+        """
         from netmiko import ConnectHandler
 
         conn_params = self._build_conn_params(switch)
@@ -300,6 +456,15 @@ class SSHManager:
         return output
 
     def _build_conn_params(self, switch, timeout: int = 120) -> dict:
+        """构建 netmiko 连接参数字典
+
+        Args:
+            switch: 交换机对象
+            timeout: 读取超时时间（秒）
+
+        Returns:
+            dict: netmiko ConnectHandler 参数
+        """
         protocol = (switch.protocol or "ssh").lower()
         default_port = 23 if protocol == "telnet" else 22
 
@@ -338,6 +503,14 @@ class SSHManager:
 
     @staticmethod
     def _huawei_ssh_options(version: str) -> dict:
+        """旧版华为固件（< 200519）禁用 rsa-sha2-512/256 算法
+
+        Args:
+            version: 固件版本号字符串
+
+        Returns:
+            dict: 额外的 SSH 参数，或空字典
+        """
         DISABLED = {"pubkeys": ["rsa-sha2-512", "rsa-sha2-256"]}
         try:
             ver_num = int("".join(filter(str.isdigit, version))[:6])

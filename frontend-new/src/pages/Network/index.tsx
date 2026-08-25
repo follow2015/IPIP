@@ -1,6 +1,5 @@
 import { confirm } from '@/utils/confirm';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Button,
@@ -48,7 +47,6 @@ import { useMessage } from '@/hooks/useMessage';
 import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
 import type { GlobalEvent } from '@/hooks/useGlobalEvents';
 
-
 const PHASE_WEIGHT: Record<string, number> = {
   准备中: 0,
   collecting: 0,
@@ -65,7 +63,6 @@ const PHASE_WEIGHT: Record<string, number> = {
   完成: 1.0
 };
 
-
 const PHASE_LABEL: Record<string, string> = {
   准备中: '准备中',
   collecting: '采集数据',
@@ -81,7 +78,6 @@ const PHASE_LABEL: Record<string, string> = {
   phase7_supplement_detect: '补充探测',
   完成: '完成'
 };
-
 
 function parseScanProgress(progress: {
   phase?: string;
@@ -103,7 +99,6 @@ function parseScanProgress(progress: {
   } else {
     const basePct = (PHASE_WEIGHT[basePhase] ?? 0) * 100;
     const total = Math.max(progress.total ?? 0, 1);
-    
     const collectPct = (((progress.completed ?? 0) + (progress.failed ?? 0)) / total) * 35;
     pct = Math.round(Math.max(basePct, collectPct));
   }
@@ -120,14 +115,11 @@ function parseScanProgress(progress: {
 import { exportCSV } from '@/utils/csv';
 import type { IPNetwork } from '@/types/models';
 
-
 const DEFAULT_ROUTE = '0.0.0.0/0';
-
 
 function isDefaultRoute(ipNetwork: string): boolean {
   return ipNetwork === DEFAULT_ROUTE;
 }
-
 
 function Network() {
   const table = useTable();
@@ -135,20 +127,16 @@ function Network() {
   const copyInfo = useCopyInfo();
   const navigate = useNavigate();
 
-  
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignRecord, setAssignRecord] = useState<IPNetwork | null>(null);
   const [routesOpen, setRoutesOpen] = useState(false);
   const [assignForm] = Form.useForm();
 
-  
   const [scanningRoomId, setScanningRoomId] = useState<number | null>(null);
-  
   const triggerFullScan = useTriggerFullScan();
   const queryClient = useQueryClient();
   const { data: scanStatus } = useFullScanStatus(scanningRoomId ?? 0, scanningRoomId !== null);
 
-  
   const { data, isLoading, refetch } = useNetworkList({
     page: table.page,
     per_page: table.perPage,
@@ -159,34 +147,28 @@ function Network() {
     customer_id: table.filters.customer_id ? Number(table.filters.customer_id) : undefined
   });
 
-  
   const { data: routesData, isLoading: routesLoading } = useNetworkRoutes(
     routesOpen
       ? { room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined }
       : undefined
   );
 
-  
   const lastCompletedPhaseRef = useRef<string | null>(null);
 
-  
   useEffect(() => {
     if (!scanStatus) return;
     const phaseStr = scanStatus.phase || '';
-    
     const subMatch = phaseStr.match(/^phase7_supplement_detect:(\d+)\/(\d+)$/);
     const phase7Complete = subMatch && Number(subMatch[1]) >= Number(subMatch[2]);
     const isComplete = phaseStr === '完成' || phase7Complete;
     const isFailed = phaseStr === 'failed';
 
     if (isComplete || isFailed) {
-      
       if (lastCompletedPhaseRef.current === scanStatus.phase) return;
       lastCompletedPhaseRef.current = scanStatus.phase;
 
       setScanningRoomId(null);
       if (isComplete) {
-        
         refetch();
       } else {
         refetch();
@@ -196,7 +178,6 @@ function Network() {
     }
   }, [scanStatus, refetch]);
 
-  
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -207,7 +188,6 @@ function Network() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [refetch]);
 
-  
   const deleteNetwork = useDeleteNetwork();
   const updateNetworkCustomer = useUpdateNetworkCustomer();
   const scanNetwork = useScanNetwork();
@@ -215,7 +195,7 @@ function Network() {
   const { data: customerOptions } = useCustomerOptions();
   const { data: allocatableCustomerOptions } = useAllocatableCustomerOptions();
 
-  
+
   const handleViewDetail = (record: IPNetwork) => {
     const params = new URLSearchParams();
     if (record.room_id) params.set('room_id', String(record.room_id));
@@ -224,7 +204,6 @@ function Network() {
     navigate(`/network/${encodeURIComponent(record.ip_network)}${qs ? `?${qs}` : ''}`);
   };
 
-  
   const confirmAction = useConfirmAction();
   const handleDelete = (record: IPNetwork) => {
     if (
@@ -251,14 +230,12 @@ function Network() {
     });
   };
 
-  
   const handleAssignOpen = (record: IPNetwork) => {
     setAssignRecord(record);
     assignForm.setFieldsValue({ customer_id: record.customer_id ?? undefined });
     setAssignOpen(true);
   };
 
-  
   const handleAssignSubmit = async () => {
     if (!assignRecord) return;
     try {
@@ -280,13 +257,11 @@ function Network() {
     }
   };
 
-  
   const handleCopy = (record: IPNetwork) => {
     const text = `网段: ${record.ip_network}\n交换机: ${record.switch_name ?? '-'}\n端口: ${record.port ?? '-'}\n机房: ${record.room_name ?? '-'}\n客户: ${record.customer_name ?? '-'}\n下一跳: ${record.nexthop ?? '-'}\n类型: ${record.route_type ?? '-'}\n备注: ${record.notes ?? '-'}`;
     copyInfo(text);
   };
 
-  
   const handleExport = useCallback(() => {
     const items = data?.items ?? [];
     if (!items.length) {
@@ -307,7 +282,6 @@ function Network() {
     exportCSV(headers, rows, { filename: 'networks' });
   }, [data]);
 
-  
   const handleScanNetwork = (record: IPNetwork) => {
     if (isDefaultRoute(record.ip_network)) {
       msg.warning('默认路由网段（0.0.0.0/0）不可扫描');
@@ -328,7 +302,6 @@ function Network() {
         try {
           await scanNetwork.mutateAsync({ ipNetwork: record.ip_network, roomId: record.room_id! });
           msg.info(`网段 ${record.ip_network} 扫描已提交，完成后将通过消息通知您`);
-          
           setTimeout(() => refetch(), 30000);
         } catch {
           msg.error('扫描启动失败');
@@ -337,7 +310,6 @@ function Network() {
     });
   };
 
-  
   const handleFullScan = () => {
     if (!table.filters.room_id) {
       msg.warning('请先选择机房，全量扫描需限定机房范围');
@@ -348,7 +320,6 @@ function Network() {
       content: `将对当前机房内所有交换机执行全量扫描（端口采集+路由同步+MAC索引+ARP同步+IP对账+补充探测），可能需要较长时间。扫描在后台执行，完成后自动刷新。`,
       onOk: async () => {
         try {
-          
           queryClient.removeQueries({
             queryKey: [...queryKeys.networks.all, 'scan-status', Number(table.filters.room_id)]
           });
@@ -363,7 +334,6 @@ function Network() {
     });
   };
 
-  
   useGlobalEventListener(
     useCallback(
       (event: GlobalEvent) => {
@@ -407,13 +377,12 @@ function Network() {
           return;
         }
 
-        
       },
       [refetch]
     )
   );
 
-  
+
   const routeColumns = [
     { title: '目标网段', dataIndex: 'destination', key: 'destination' },
     { title: '下一跳', dataIndex: 'nexthop', key: 'nexthop' },
@@ -431,7 +400,6 @@ function Network() {
     { title: '备注', dataIndex: 'notes', key: 'notes', render: (v: string | null) => v || '-' }
   ];
 
-  
   const networkColumns = [
     {
       title: '网段',
@@ -538,7 +506,7 @@ function Network() {
     }
   ];
 
-  
+
   const scanProgressIndicator =
     scanStatus &&
     scanStatus.phase !== 'unknown' &&
@@ -570,7 +538,7 @@ function Network() {
 
   return (
     <>
-      {}
+      {/* 网段列表 */}
       <DataTable<IPNetwork>
         columns={networkColumns}
         dataSource={data?.items ?? []}
@@ -639,7 +607,7 @@ function Network() {
         }
       />
 
-      {}
+      {/* 分配客户弹窗 */}
       <Modal
         title="分配客户"
         open={assignOpen}
@@ -667,7 +635,7 @@ function Network() {
         </Form>
       </Modal>
 
-      {}
+      {/* 路由列表弹窗 */}
       <Modal
         title="路由列表"
         open={routesOpen}

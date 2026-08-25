@@ -41,37 +41,41 @@ import type {
 
 export type User = OApiUser;
 
-
 export type VerifyData = OApiVerifyData;
 
-
+/**
+ * 登录响应数据
+ * 基于 OpenAPI LoginDataResponse，扩展 user 内嵌对象的额外字段
+ * （OpenAPI 中 user 是 LoginUserResponse，字段为 id/username/email/name/roles/is_active/status）
+ */
 export interface LoginData extends Omit<OApiLoginData, 'user'> {
   user: OApiLoginData['user'] & {
-    
     name: string;
-    
     roles: string[];
-    
     is_active: boolean;
-    
     status: number;
   };
 }
 
 
+/**
+ * 机房
+ * 基于 OpenAPI RoomResponse，扩展 include_relations 时的关联字段
+ */
 export interface Room extends OApiRoom {
-  
   cabinets?: Cabinet[];
 }
 
 
+/**
+ * 机柜
+ * 基于 OpenAPI CabinetResponse，扩展 include_relations 时的关联字段
+ */
 export interface Cabinet extends OApiCabinet {
-  
   devices?: Device[];
   used_u_positions?: number[];
   available_u_ranges?: Array<{ start: number; end: number; count: number }>;
 }
-
 
 export interface CabinetUtilization {
   total_u: number;
@@ -79,7 +83,6 @@ export interface CabinetUtilization {
   available_u: number;
   usage_rate: number;
 }
-
 
 export interface CabinetUsageMap {
   [uPosition: number]: {
@@ -89,7 +92,6 @@ export interface CabinetUsageMap {
   };
 }
 
-
 export interface CabinetStats {
   total_devices: number;
   total_power: number;
@@ -98,27 +100,26 @@ export interface CabinetStats {
 }
 
 
+/**
+ * 设备
+ * 基于 OpenAPI DeviceResponse，扩展：
+ * - switch_credential 内嵌字段（OpenAPI 中为 SwitchCredentialEmbedded）
+ * - port_summary 内嵌字段（OpenAPI 中为 PortSummaryEmbedded）
+ * - 子资源数组 nic_ports / storage_items（仅 GET /<id> 端点返回）
+ */
 export type Device = OApiDevice & {
-  
   nic_ports?: DeviceNicPort[];
   storage_items?: DeviceStorageDetail[];
-  
   peer_port_names?: string[] | null;
-  
   monitor_summary?: {
-    
     ping_reachable: boolean | null;
-    
     has_monitor_credential: boolean;
-    
     monitor_reachable: boolean | null;
-    
     monitor_protocol: string | null;
     active_metric_alerts: number;
     max_alert_severity: number;
     monitor_interrupted: boolean;
   };
-  
   deleted_location_snapshot?: {
     cabinet_id?: number;
     cabinet_number?: string;
@@ -136,12 +137,9 @@ export type Device = OApiDevice & {
 
 export type DeviceNicPort = OApiDeviceNicPort;
 
-
 export type DeviceConnection = OApiDeviceConnection;
 
-
 export type DeviceStorageDetail = OApiDeviceStorageDetail;
-
 
 export interface DeviceStorageGrouped {
   storage_type: string;
@@ -153,16 +151,13 @@ export interface DeviceStorageGrouped {
   serial_numbers: string[];
 }
 
-
 export interface DeviceStorageResponse {
   storage: DeviceStorageDetail[] | DeviceStorageGrouped[];
 }
 
-
 export interface DevicePortsResponse {
   ports: DeviceNicPort[];
 }
-
 
 export interface DeviceNodesResponse {
   nodes: Device[];
@@ -171,15 +166,12 @@ export interface DeviceNodesResponse {
 
 export type IPAddress = OApiIPAddress;
 
-
 export type IPAddressDetail = OApiIPAddressDetail;
-
 
 export interface IPScanResult {
   ip_address: string;
   open_ports: number[];
 }
-
 
 export interface PingResult {
   ip_address: string;
@@ -188,23 +180,21 @@ export interface PingResult {
 
 
 export type Switch = OApiSwitch & {
-  
   peer_port_names?: string[] | null;
 };
 
-
+/**
+ * 交换机端口
+ * 基于 OpenAPI SwitchPortResponse，添加 status 别名（= usage_status）
+ * 后端 to_dict() 返回 usage_status，但部分前端代码引用 status
+ */
 export interface SwitchPort extends OApiSwitchPort {
-  
   status?: string;
-  
   mac?: string;
-  
   raw_info?: string;
 }
 
-
 export type SwitchPortIP = OApiSwitchPortIP;
-
 
 export interface SwitchPortDetail {
   port?: string;
@@ -226,7 +216,6 @@ export interface SwitchPortDetail {
   eth_trunk_id?: number;
 }
 
-
 export interface PortConfigResult {
   port_config: string;
   updated_at: string | null;
@@ -235,19 +224,20 @@ export interface PortConfigResult {
   trunk_members?: string[];
 }
 
-
 export interface SwitchWithPortsResponse {
   switch: Switch;
   ports: SwitchPort[];
 }
 
 
+/**
+ * 客户
+ * 基于 OpenAPI CustomerResponse，扩展 include_relations 时的关联字段
+ */
 export interface Customer extends OApiCustomer {
-  
   cabinets?: Cabinet[];
   devices?: Device[];
 }
-
 
 export interface CustomerAssets {
   customer_name: string;
@@ -288,9 +278,7 @@ export interface CustomerAssets {
 
 export type Role = OApiRole;
 
-
 export type Permission = OApiPermission;
-
 
 export interface RoleDetail {
   id: number;
@@ -315,7 +303,10 @@ export interface IPStatusGroup {
   unused: number;
 }
 
-
+/**
+ * 仪表盘统计数据（手写，OpenAPI DashboardStatsResponse 嵌套对象为 {[key:string]:unknown}）
+ * 后端 Marshmallow Schema 未定义嵌套对象结构，需手写保持类型精确
+ */
 export interface DashboardStats {
   rooms: { total: number; active: number };
   cabinets: {
@@ -331,7 +322,6 @@ export interface DashboardStats {
     total: number;
     online: number;
     offline: number;
-    
     status_distribution: Record<string, number>;
   };
   networks: {
@@ -357,7 +347,6 @@ export interface DashboardStats {
   };
 }
 
-
 export interface DashboardActivity {
   id: number;
   title: string;
@@ -367,7 +356,6 @@ export interface DashboardActivity {
   icon: string;
   color: string;
 }
-
 
 export interface SystemStatus {
   overall: 'healthy' | 'warning' | 'critical' | 'unknown';
@@ -397,7 +385,6 @@ export interface ImportResult {
   failed_rows: number[];
 }
 
-
 export interface BatchCreateItemResult {
   index: number;
   device_name: string;
@@ -406,14 +393,12 @@ export interface BatchCreateItemResult {
   error?: string;
 }
 
-
 export interface BatchCreateResult {
   total: number;
   success_count: number;
   failed_count: number;
   results: BatchCreateItemResult[];
 }
-
 
 export interface CloneDeviceData {
   device_type: string;
@@ -437,7 +422,6 @@ export interface CloneDeviceData {
   [key: string]: unknown;
 }
 
-
 export interface SSHOperationRequest {
   action:
     | 'enable'
@@ -450,7 +434,6 @@ export interface SSHOperationRequest {
   params?: Record<string, unknown>;
 }
 
-
 export interface PortScanResult {
   ip: string;
   open_ports: number[];
@@ -459,7 +442,6 @@ export interface PortScanResult {
 
 
 export type IPNetwork = OApiIPNetwork;
-
 
 export interface NetworkInfo {
   network: string;
@@ -483,7 +465,6 @@ export interface NetworkInfo {
   nexthop?: string | null;
 }
 
-
 export interface NetworkInfoListItem {
   switch_id: number | null;
   port: string | null;
@@ -495,7 +476,6 @@ export interface NetworkInfoListItem {
   customer_name: string | null;
 }
 
-
 export interface NetworkDetailResponse {
   ip_addresses: NetworkIPAddress[];
   total: number;
@@ -506,7 +486,6 @@ export interface NetworkDetailResponse {
   page_size: number;
   total_pages: number;
 }
-
 
 export interface NetworkIPAddress {
   ip_address: string;
@@ -520,7 +499,6 @@ export interface NetworkIPAddress {
   updated_at: string | null;
 }
 
-
 export interface NetworkListResponse {
   data: IPNetwork[];
   pagination: {
@@ -530,7 +508,6 @@ export interface NetworkListResponse {
     page_size: number;
   };
 }
-
 
 export interface IPNetworkListResponse {
   networks: IPNetwork[];
@@ -542,7 +519,6 @@ export interface IPNetworkListResponse {
 
 
 export type AuditLog = OApiAuditLog;
-
 
 export interface IPAllocationLog {
   id: number;
@@ -556,27 +532,20 @@ export interface IPAllocationLog {
   created_at: string;
 }
 
-
 export type VLAN = OApiVLAN;
-
 
 export type LinkAggregationGroup = OApiLinkAggregationGroup;
 
-
 export type DeviceConfigBackup = OApiDeviceConfigBackup;
-
 
 export type DeviceConfigChange = OApiDeviceConfigChange;
 
 
 export type TopologyNode = OApiTopologyNode;
 
-
 export type TopologyEdge = OApiTopologyEdge;
 
-
 export type TopologyStats = OApiTopologyStats;
-
 
 export type TopologyAutoDetectChange = OApiTopologyAutoDetectChange;
 
@@ -590,7 +559,6 @@ export interface VirtualRoomMember {
   room_name?: string;
 }
 
-
 export interface VirtualRoom {
   id: number;
   name: string;
@@ -602,7 +570,6 @@ export interface VirtualRoom {
   member_count: number;
   members?: VirtualRoomMember[];
 }
-
 
 export interface ScanProgress {
   scope: string;

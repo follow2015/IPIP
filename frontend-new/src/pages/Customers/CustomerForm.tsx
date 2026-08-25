@@ -20,7 +20,6 @@ interface CustomerFormProps {
   onCancel: () => void;
 }
 
-
 function CustomerForm({ open, editRecord, onCancel }: CustomerFormProps) {
   const { form, isEdit, handleSubmit, confirmLoading } = useCrudForm<
     Customer,

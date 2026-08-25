@@ -22,12 +22,21 @@ logger = get_logger(__name__)
 rbac_bp = Blueprint("rbac", __name__, url_prefix="/api/rbac")
 
 
+
 @rbac_bp.route("/roles/", methods=["GET"])
 @doc(summary="获取角色列表", tags=["RBAC"], responses={200: "RoleResponse", 401: "ApiError"})
 @login_required
 @permission_required("user:view")
 @api_exception_handler
 def get_roles():
+    """获取角色列表
+
+    Query Parameters:
+        page:     页码（默认1）
+        per_page: 每页数量（默认20）
+        search:   搜索关键词
+        status:   状态过滤
+    """
     page     = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
     search   = request.args.get("search", "", type=str)
@@ -51,6 +60,7 @@ def get_roles():
 @permission_required("user:view")
 @api_exception_handler
 def get_role(role_id):
+    """获取角色详情"""
     role = rbac_service.get_role(role_id)
     if not role:
         return APIResponse.error(message="角色不存在", status_code=404)
@@ -67,6 +77,14 @@ def get_role(role_id):
 @api_exception_handler
 @transactional
 def create_role():
+    """创建角色
+
+    Request Body:
+        name:         角色名称（唯一）
+        display_name: 显示名称
+        description:  描述（可选）
+        status:       状态（可选，默认0）
+    """
     data = request.get_json(silent=True) or {}
     try:
         role = rbac_service.create_role(data)
@@ -84,6 +102,14 @@ def create_role():
 @api_exception_handler
 @transactional
 def update_role(role_id):
+    """更新角色
+
+    Request Body:
+        name:         角色名称（可选）
+        display_name: 显示名称（可选）
+        description:  描述（可选）
+        status:       状态（可选）
+    """
     data = request.get_json(silent=True) or {}
     try:
         role = rbac_service.update_role(role_id, data)
@@ -102,6 +128,7 @@ def update_role(role_id):
 @api_exception_handler
 @transactional
 def delete_role(role_id):
+    """删除角色（系统默认角色和有用户的角色不可删除）"""
     try:
         result = rbac_service.delete_role(role_id)
     except ValidationError as e:
@@ -119,6 +146,13 @@ def delete_role(role_id):
 @api_exception_handler
 @transactional
 def batch_delete_roles():
+    """批量删除角色
+
+    Request Body:
+        ids: 角色ID列表
+
+    系统默认角色和有用户的角色会被跳过并记录在 failed 中。
+    """
     data = request.get_json(silent=True) or {}
     ids  = data.get("ids", [])
 
@@ -133,12 +167,14 @@ def batch_delete_roles():
     return APIResponse.success(data=result, message=message)
 
 
+
 @rbac_bp.route("/roles/<int:role_id>/permissions/", methods=["GET"])
 @doc(summary="获取角色权限列表", tags=["RBAC"], responses={200: "PermissionResponse", 404: "ApiError"})
 @login_required
 @permission_required("user:view")
 @api_exception_handler
 def get_role_permissions(role_id):
+    """获取角色的权限列表"""
     perms = rbac_service.get_role_permissions(role_id)
     if perms is None:
         return APIResponse.error(message="角色不存在", status_code=404)
@@ -152,6 +188,11 @@ def get_role_permissions(role_id):
 @api_exception_handler
 @transactional
 def update_role_permissions(role_id):
+    """更新角色权限（全量替换）
+
+    Request Body:
+        permissions: 权限编码列表（permission.code）
+    """
     data = request.get_json(silent=True) or {}
     permission_codes = data.get("permissions", [])
 
@@ -169,12 +210,21 @@ def update_role_permissions(role_id):
     return APIResponse.success(data=result, message="角色权限更新成功")
 
 
+
 @rbac_bp.route("/permissions/", methods=["GET"])
 @doc(summary="获取权限列表", tags=["RBAC"], responses={200: "PermissionResponse", 401: "ApiError"})
 @login_required
 @permission_required("user:view")
 @api_exception_handler
 def get_permissions():
+    """获取权限列表
+
+    Query Parameters:
+        page:     页码（默认1）
+        per_page: 每页数量（默认50）
+        search:   搜索关键词
+        category: 分类过滤
+    """
     page     = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 50, type=int)
     search   = request.args.get("search", "", type=str)
@@ -198,8 +248,10 @@ def get_permissions():
 @permission_required("user:view")
 @api_exception_handler
 def get_permission_categories():
+    """获取权限分类列表"""
     categories = rbac_service.list_permission_categories()
     return APIResponse.success(data=categories, message="获取权限分类成功")
+
 
 
 @rbac_bp.route("/users/<int:user_id>/roles/", methods=["GET"])
@@ -208,6 +260,7 @@ def get_permission_categories():
 @permission_required("user:view")
 @api_exception_handler
 def get_user_roles(user_id):
+    """获取用户的角色列表"""
     roles = rbac_service.get_user_roles(user_id)
     if roles is None:
         return APIResponse.error(message="用户不存在", status_code=404)
@@ -221,6 +274,11 @@ def get_user_roles(user_id):
 @api_exception_handler
 @transactional
 def update_user_roles(user_id):
+    """更新用户角色（全量替换）
+
+    Request Body:
+        role_ids: 角色ID列表
+    """
     data = request.get_json(silent=True) or {}
     role_ids = data.get("role_ids", [])
 
@@ -238,6 +296,16 @@ def update_user_roles(user_id):
     return APIResponse.success(data=result, message="用户角色更新成功")
 
 
+
 def register_rbac_routes(app):
+    """向后兼容入口 — 推荐直接在 app/__init__.py 中 register_blueprint。
+
+    Usage (旧式):
+        register_rbac_routes(app)
+
+    Usage (推荐):
+        from app.api.rbac import rbac_bp
+        app.register_blueprint(rbac_bp)
+    """
     app.register_blueprint(rbac_bp)
     logger.info("RBAC Blueprint 注册完成")

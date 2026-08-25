@@ -18,6 +18,7 @@ from app.utils.port_name_parser import parse_port_name
 logger = get_logger(__name__)
 
 class SwitchInfoService:
+    """交换机信息采集服务"""
 
     def __init__(self, ssh_manager: SSHManager = None):
         self.ssh_mgr = ssh_manager or SSHManager()
@@ -25,6 +26,20 @@ class SwitchInfoService:
         self.port_repo = NetworkPortRepository()
 
     def collect_device_info(self, device_id: int) -> dict:
+        """采集交换机设备信息并更新数据库
+
+        采集步骤：
+        1. 执行 display version，由适配器解析 model / version / uptime
+        2. 若适配器未能解析出序列号，则发送设备特定命令补充采集（支持多槽位框架交换机）
+        3. 执行 display sysname / show hostname，解析主机名
+        4. 将采集结果写回：model/serial/hostname → Device，version/uptime → SwitchCredentials
+
+        Args:
+            device_id: 交换机 device_id（devices.id，统一交换机标识）
+
+        Returns:
+            dict: {success, switch_id, info} 或 {success, switch_id, error}
+        """
         switch = self.sw_repo.find_by_device_id(device_id)
         if not switch:
             raise ValueError(f"交换机 device_id={device_id} 不存在")
@@ -72,6 +87,20 @@ class SwitchInfoService:
     def _collect_serial(
         self, switch, info: ParsedDeviceInfo,
     ) -> ParsedDeviceInfo:
+        """补充采集序列号（当适配器版本解析未能获取 serial 时调用）
+
+        华为设备：display esn（收集所有槽位 ESN）
+        H3C 设备：display device manuinfo
+
+        多槽位框架交换机的序列号以逗号拼接存储。
+
+        Args:
+            switch: 交换机对象
+            info: 已解析的设备信息（serial 为空）
+
+        Returns:
+            ParsedDeviceInfo: 填充了 serial 字段的新实例（其余字段不变）
+        """
         dt = (switch.device_type or "").lower()
         try:
             if SwitchDeviceTypeCode.HUAWEI in dt:
@@ -100,6 +129,19 @@ class SwitchInfoService:
     def _collect_hostname(
         self, switch, adapter, info: ParsedDeviceInfo,
     ) -> ParsedDeviceInfo:
+        """采集交换机主机名
+
+        通过 display sysname（华为/H3C）或 show hostname（Cisco）获取主机名。
+        部分设备可能不支持该命令，此时静默跳过。
+
+        Args:
+            switch: 交换机对象（SwitchCredentials）
+            adapter: 设备适配器实例
+            info: 已解析的设备信息
+
+        Returns:
+            ParsedDeviceInfo: 填充了 hostname 字段的新实例
+        """
         try:
             sysname_output = self.ssh_mgr.send_show_command(
                 switch, adapter.get_sysname_command(),
@@ -120,6 +162,14 @@ class SwitchInfoService:
         return info
 
     def collect_port_info(self, device_id: int) -> dict:
+        """采集交换机端口信息并增量更新
+
+        Args:
+            device_id: 交换机 device_id（devices.id，统一交换机标识）
+
+        Returns:
+            dict: {success, switch_id, port_count} 或 {success, switch_id, error}
+        """
         switch = self.sw_repo.find_by_device_id(device_id)
         if not switch:
             raise ValueError(f"交换机 device_id={device_id} 不存在")
@@ -141,8 +191,8 @@ class SwitchInfoService:
                     "slot":        parsed_name["slot"],
                     "card":        parsed_name["card"],
                     "port_number": parsed_name["port_number"],
-                    "port_type":   parsed_name["port_type"],
-                    "link_status": p.status,
+                    "port_type":   parsed_name["port_type"],   # "GE"/"10GE" 接口类型字符串
+                    "link_status": p.status,                    # "up"/"down" 链路状态
                     "vlan":        p.vlan,
                     "mac":         p.mac,
                     "ip_address":  p.ip_address.split(",")[0].strip() if p.ip_address else None,
@@ -165,6 +215,11 @@ class SwitchInfoService:
             return {"success": False, "switch_id": device_id, "error": str(e)}
 
     def _sync_port_ips(self, switch_id: int, parsed_ports) -> None:
+        """将解析到的端口 IP 同步到 sw_info_ip 表（CIDR 或点分十进制均支持）
+
+        修复：IP 为空的端口也调用 sync_port_ips（传空列表），利用其全量替换语义
+        清理 sw_info_ip 中残留的旧 IP 记录，避免交换机删除端口 IP 后前端仍显示。
+        """
         import ipaddress
         for p in parsed_ports:
             ip_list = []
@@ -178,15 +233,15 @@ class SwitchInfoService:
                             iface = ipaddress.ip_interface(ip_str)
                             ip_addr = str(iface.ip)
                             mask = str(iface.network.netmask)
-                            prefix = iface.network.prefixlen
+                            prefix = iface.network.prefixlen  # CR-PREFIX-UNIFY: 同步计算prefix
                         else:
                             ip_addr = ip_str
                             mask = "255.255.255.0"
-                            prefix = 24
+                            prefix = 24  # CR-PREFIX-UNIFY: 默认/24
                         ip_list.append({
                             "ip_address": ip_addr,
                             "subnet_mask": mask,
-                            "prefix": prefix,
+                            "prefix": prefix,  # CR-PREFIX-UNIFY
                             "is_primary": len(ip_list) == 0,
                         })
                     except (ValueError, TypeError):
@@ -195,6 +250,13 @@ class SwitchInfoService:
 
     def _sync_vlan_trunk_bases(self, device_id: int, parsed_ports,
                                room_id: int = None) -> None:
+        """扫描时将 Vlanif/Eth-Trunk 端口同步写入 vlans/link_aggregation_groups 基础记录
+
+        仅写入 device_id + vlan_id/lag_name 等基础字段，不获取成员列表（避免额外SSH开销）。
+        成员列表在用户点击端口详情时按需 SSH 获取并缓存。
+        若记录已存在则跳过，保留已有的 member_ports 缓存。
+        同时清理设备上已不存在的 Vlanif/Eth-Trunk 对应的残留记录。
+        """
         from app.models.vlan import VLAN
         from app.models.link_aggregation import LinkAggregationGroup
         from sqlalchemy import delete as sa_delete

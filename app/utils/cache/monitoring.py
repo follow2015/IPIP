@@ -19,8 +19,9 @@ logger = get_logger(__name__)
 
 @dataclass
 class CacheEvent:
+    """缓存事件数据类"""
     timestamp: float
-    event_type: str
+    event_type: str  # hit, miss, set, delete, error
     key: str
     cache_level: str = "unknown"
     execution_time: float = 0.0
@@ -30,19 +31,30 @@ class CacheEvent:
 
 @dataclass
 class CacheAlert:
+    """缓存告警数据类"""
     timestamp: float
-    alert_type: str
-    severity: str
+    alert_type: str  # performance, error, capacity
+    severity: str    # low, medium, high, critical
     message: str
     metrics: Dict[str, Any]
     resolved: bool = False
 
 
 class CacheMonitor:
+    """缓存监控器
+    
+    监控缓存性能、错误和容量使用情况。
+    """
     
     def __init__(self, 
                  max_events: int = 10000,
                  alert_thresholds: Dict[str, Any] = None):
+        """初始化缓存监控器
+        
+        Args:
+            max_events: 最大事件数量
+            alert_thresholds: 告警阈值配置
+        """
         self.max_events = max_events
         self.alert_thresholds = alert_thresholds or self._get_default_thresholds()
         
@@ -58,23 +70,25 @@ class CacheMonitor:
         self.alert_callbacks = []
 
         self._alert_cooldown_seconds: float = 60.0
-        self._alert_last_fired: Dict[str, float] = {}
+        self._alert_last_fired: Dict[str, float] = {}  # key → timestamp
 
         self._initialize_metrics()
         
         logger.info("缓存监控器初始化完成")
     
     def _get_default_thresholds(self) -> Dict[str, Any]:
+        """获取默认告警阈值"""
         return {
-            'hit_rate_low': 0.7,
-            'response_time_high': 0.1,
-            'error_rate_high': 0.05,
-            'memory_usage_high': 0.8,
-            'eviction_rate_high': 0.1,
-            'connection_failure_count': 5
+            'hit_rate_low': 0.7,           # 命中率低于70%
+            'response_time_high': 0.1,     # 响应时间超过100ms
+            'error_rate_high': 0.05,       # 错误率超过5%
+            'memory_usage_high': 0.8,      # 内存使用率超过80%
+            'eviction_rate_high': 0.1,     # 淘汰率超过10%
+            'connection_failure_count': 5   # 连接失败次数超过5次
         }
     
     def _initialize_metrics(self) -> None:
+        """初始化监控指标"""
         initial_metrics = {
             'total_requests': 0,
             'total_hits': 0,
@@ -84,7 +98,7 @@ class CacheMonitor:
             'total_errors': 0,
             'total_response_time': 0.0,
             'max_response_time': 0.0,
-            'min_response_time': None,
+            'min_response_time': None,  # None 表示尚未记录；避免 float('inf') 进入 JSON 序列化抛 ValueError
             'cache_size': 0,
             'memory_usage': 0,
             'connection_failures': 0,
@@ -95,6 +109,11 @@ class CacheMonitor:
             self.metrics.set(key, value)
     
     def record_event(self, event: CacheEvent) -> None:
+        """记录缓存事件
+        
+        Args:
+            event: 缓存事件
+        """
         with self.events_lock:
             self.events.append(event)
 
@@ -103,6 +122,7 @@ class CacheMonitor:
         self._check_alerts(event)
     
     def _update_metrics(self, event: CacheEvent) -> None:
+        """更新实时指标"""
         with self.metrics_lock.write_lock():
             if event.event_type == 'hit':
                 self.metrics.set('total_hits', self.metrics.get('total_hits', 0) + 1)
@@ -134,6 +154,7 @@ class CacheMonitor:
             self.metrics.set('last_update', time.time())
     
     def _check_alerts(self, event: CacheEvent) -> None:
+        """检查告警条件（带 per-type 冷却，防止告警风暴）。"""
         now = time.time()
         current_metrics = self.get_current_metrics()
         alerts_to_create = []
@@ -179,11 +200,12 @@ class CacheMonitor:
             cooldown_key = f"{alert.alert_type}:{alert.severity}"
             last_fired = self._alert_last_fired.get(cooldown_key, 0.0)
             if now - last_fired < self._alert_cooldown_seconds:
-                continue
+                continue  # 冷却期内，跳过
             self._alert_last_fired[cooldown_key] = now
             self._create_alert(alert)
     
     def _create_alert(self, alert: CacheAlert) -> None:
+        """创建告警"""
         with self.alerts_lock:
             self.alerts.append(alert)
 
@@ -196,9 +218,15 @@ class CacheMonitor:
         logger.warning("缓存告警: %s - %s", alert.alert_type, alert.message)
     
     def add_alert_callback(self, callback: Callable[[CacheAlert], None]) -> None:
+        """添加告警回调函数
+        
+        Args:
+            callback: 告警回调函数
+        """
         self.alert_callbacks.append(callback)
     
     def get_current_metrics(self) -> Dict[str, Any]:
+        """获取当前指标"""
         with self.metrics_lock.read_lock():
             total_requests = self.metrics.get('total_requests', 0)
             total_hits = self.metrics.get('total_hits', 0)
@@ -232,10 +260,21 @@ class CacheMonitor:
                    start_time: Optional[float] = None,
                    end_time: Optional[float] = None,
                    limit: int = 100) -> List[CacheEvent]:
+        """获取缓存事件
+        
+        Args:
+            event_type: 事件类型过滤
+            start_time: 开始时间
+            end_time: 结束时间
+            limit: 返回数量限制
+            
+        Returns:
+            List[CacheEvent]: 事件列表
+        """
         with self.events_lock:
             filtered_events = []
             
-            for event in reversed(self.events):
+            for event in reversed(self.events):  # 最新的在前
                 if start_time and event.timestamp < start_time:
                     continue
                 if end_time and event.timestamp > end_time:
@@ -256,10 +295,21 @@ class CacheMonitor:
                    severity: Optional[str] = None,
                    resolved: Optional[bool] = None,
                    limit: int = 50) -> List[CacheAlert]:
+        """获取告警信息
+        
+        Args:
+            alert_type: 告警类型过滤
+            severity: 严重程度过滤
+            resolved: 是否已解决过滤
+            limit: 返回数量限制
+            
+        Returns:
+            List[CacheAlert]: 告警列表
+        """
         with self.alerts_lock:
             filtered_alerts = []
             
-            for alert in reversed(self.alerts):
+            for alert in reversed(self.alerts):  # 最新的在前
                 if alert_type and alert.alert_type != alert_type:
                     continue
                 
@@ -277,6 +327,14 @@ class CacheMonitor:
             return filtered_alerts
     
     def resolve_alert(self, alert_index: int) -> bool:
+        """解决告警
+        
+        Args:
+            alert_index: 告警索引
+            
+        Returns:
+            bool: 是否成功解决
+        """
         with self.alerts_lock:
             if 0 <= alert_index < len(self.alerts):
                 self.alerts[alert_index].resolved = True
@@ -287,8 +345,17 @@ class CacheMonitor:
     def generate_report(self, 
                        start_time: Optional[float] = None,
                        end_time: Optional[float] = None) -> Dict[str, Any]:
+        """生成监控报告
+        
+        Args:
+            start_time: 报告开始时间
+            end_time: 报告结束时间
+            
+        Returns:
+            Dict: 监控报告
+        """
         if not start_time:
-            start_time = time.time() - 3600
+            start_time = time.time() - 3600  # 默认最近1小时
         if not end_time:
             end_time = time.time()
         
@@ -345,7 +412,7 @@ class CacheMonitor:
                 'slow_operations': [
                     asdict(event) for event in events 
                     if event.execution_time > self.alert_thresholds['response_time_high']
-                ][:10]
+                ][:10]  # 最慢的10个操作
             },
             'error_analysis': {
                 'error_types': self._analyze_errors(error_events),
@@ -361,6 +428,7 @@ class CacheMonitor:
         return report
     
     def _calculate_percentiles(self, values: List[float]) -> Dict[str, float]:
+        """计算百分位数"""
         if not values:
             return {}
         
@@ -375,6 +443,7 @@ class CacheMonitor:
         }
     
     def _analyze_errors(self, error_events: List[CacheEvent]) -> Dict[str, int]:
+        """分析错误类型"""
         error_types = {}
         
         for event in error_events:
@@ -396,6 +465,7 @@ class CacheMonitor:
         return error_types
     
     def reset_metrics(self) -> None:
+        """重置监控指标"""
         with self.events_lock:
             self.events.clear()
         
@@ -420,9 +490,11 @@ def __getattr__(name: str):
 
 
 def get_cache_monitor() -> "CacheMonitor":
+    """显式获取缓存监控器单例（惰性创建）。"""
     return __getattr__("cache_monitor")
 
 
 def reset_cache_monitor_for_test() -> None:
+    """测试专用：重置单例（不销毁已注册的回调之外的状态）。"""
     global _cache_monitor_instance
     _cache_monitor_instance = None

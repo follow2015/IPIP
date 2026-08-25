@@ -16,6 +16,16 @@ T = TypeVar('T')
 
 
 def synchronized(lock: Optional[threading.Lock] = None):
+    """同步装饰器
+    
+    为方法或函数添加同步锁，确保同一时间只有一个线程可以执行。
+    
+    Args:
+        lock: 可选的锁对象，如果不提供则创建新锁
+        
+    Returns:
+        Callable: 装饰器函数
+    """
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         func_lock = lock or threading.RLock()
         
@@ -34,6 +44,19 @@ def retry_on_conflict(max_retries: int = 3,
                      delay: float = 0.1, 
                      backoff: float = 2.0,
                      exceptions: tuple = (Exception,)):
+    """冲突重试装饰器
+    
+    当发生指定异常时自动重试，支持指数退避。
+    
+    Args:
+        max_retries: 最大重试次数
+        delay: 初始延迟时间
+        backoff: 退避倍数
+        exceptions: 需要重试的异常类型
+        
+    Returns:
+        Callable: 装饰器函数
+    """
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -66,6 +89,16 @@ def retry_on_conflict(max_retries: int = 3,
 
 
 def atomic_operation(isolation_level: str = "READ_COMMITTED"):
+    """原子操作装饰器
+    
+    确保被装饰的函数在数据库事务中执行，支持事务隔离级别设置。
+    
+    Args:
+        isolation_level: 事务隔离级别
+        
+    Returns:
+        Callable: 装饰器函数
+    """
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -102,6 +135,17 @@ def atomic_operation(isolation_level: str = "READ_COMMITTED"):
 
 def rate_limited(calls_per_second: float = 10.0, 
                 burst_size: int = None):
+    """频率限制装饰器
+    
+    限制函数的调用频率，支持令牌桶算法。
+    
+    Args:
+        calls_per_second: 每秒允许的调用次数
+        burst_size: 突发调用大小，默认为calls_per_second的2倍
+        
+    Returns:
+        Callable: 装饰器函数
+    """
     burst_size = burst_size or int(calls_per_second * 2)
     
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
@@ -132,6 +176,17 @@ def rate_limited(calls_per_second: float = 10.0,
 
 
 def timeout(seconds: float):
+    """超时装饰器
+
+    为函数执行设置超时时间。使用线程 + Event 实现，兼容多线程环境
+    （signal.SIGALRM 仅在主线程可用，Flask 工作线程中会抛 ValueError）。
+
+    Args:
+        seconds: 超时时间（秒）
+
+    Returns:
+        Callable: 装饰器函数
+    """
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -162,6 +217,16 @@ def timeout(seconds: float):
 
 
 def thread_local_cache(max_size: int = 128):
+    """线程本地缓存装饰器
+    
+    为每个线程维护独立的函数结果缓存。
+    
+    Args:
+        max_size: 缓存最大大小
+        
+    Returns:
+        Callable: 装饰器函数
+    """
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         local_storage = threading.local()
         
@@ -205,6 +270,17 @@ def thread_local_cache(max_size: int = 128):
 
 def monitor_performance(log_slow_calls: bool = True, 
                        slow_threshold: float = 1.0):
+    """性能监控装饰器
+    
+    监控函数执行时间，记录慢调用。
+    
+    Args:
+        log_slow_calls: 是否记录慢调用
+        slow_threshold: 慢调用阈值（秒）
+        
+    Returns:
+        Callable: 装饰器函数
+    """
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         stats = {
             'call_count': 0,
@@ -268,11 +344,23 @@ def monitor_performance(log_slow_calls: bool = True,
 def circuit_breaker(failure_threshold: int = 5,
                    recovery_timeout: float = 60.0,
                    expected_exception: type = Exception):
+    """断路器装饰器
+    
+    当连续失败次数达到阈值时，暂时停止调用函数，避免级联失败。
+    
+    Args:
+        failure_threshold: 失败阈值
+        recovery_timeout: 恢复超时时间
+        expected_exception: 预期的异常类型
+        
+    Returns:
+        Callable: 装饰器函数
+    """
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         state = {
             'failure_count': 0,
             'last_failure_time': None,
-            'state': 'CLOSED'
+            'state': 'CLOSED'  # CLOSED, OPEN, HALF_OPEN
         }
         lock = threading.RLock()
         

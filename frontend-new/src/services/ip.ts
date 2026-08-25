@@ -21,24 +21,20 @@ interface IPCustomerRequest {
   customer_id: number | null;
 }
 
-
 interface BanRequest {
   ip_address: string;
   room_id?: number;
 }
-
 
 interface BatchBanRequest {
   ip_list: string[];
   room_id?: number;
 }
 
-
 interface BatchUnbanRequest {
   ip_list: string[];
   room_id?: number;
 }
-
 
 interface BatchUpdateIPCustomerRequest {
   ip_list: string[];
@@ -46,13 +42,11 @@ interface BatchUpdateIPCustomerRequest {
   room_id?: number;
 }
 
-
 interface BatchUpdateIPNotesRequest {
   ip_list: string[];
   notes: string;
   room_id?: number;
 }
-
 
 interface BanResult {
   ip_address: string;
@@ -60,14 +54,12 @@ interface BanResult {
   switch_ip: string;
 }
 
-
 interface BanStatusResult {
   ip_address: string;
   is_banned: boolean;
   status: number;
   updated_at: string | null;
 }
-
 
 interface IPStatisticsResult {
   total: number;
@@ -88,7 +80,6 @@ export function useIPList(params?: IPQueryParams) {
   });
 }
 
-
 export function useIPDetail(address: string) {
   return useQuery({
     queryKey: queryKeys.ip.detail(address),
@@ -99,7 +90,6 @@ export function useIPDetail(address: string) {
     enabled: !!address
   });
 }
-
 
 export function useScanIP() {
   return useMutation({
@@ -114,7 +104,6 @@ export function usePingIP() {
   });
 }
 
-
 export function useDetectIPStatus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -128,7 +117,6 @@ export function useDetectIPStatus() {
   });
 }
 
-
 export function useUpdateIPCustomer() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -140,7 +128,6 @@ export function useUpdateIPCustomer() {
   });
 }
 
-
 export function useIPNotes(address: string) {
   return useQuery({
     queryKey: [...queryKeys.ip.detail(address), 'notes'],
@@ -151,7 +138,6 @@ export function useIPNotes(address: string) {
     enabled: !!address
   });
 }
-
 
 export function useUpdateIPNotes() {
   const queryClient = useQueryClient();
@@ -175,7 +161,6 @@ export function useBanIP() {
   });
 }
 
-
 export function useUnbanIP() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -185,7 +170,6 @@ export function useUnbanIP() {
     }
   });
 }
-
 
 export function useBatchBanIP() {
   const queryClient = useQueryClient();
@@ -197,7 +181,6 @@ export function useBatchBanIP() {
   });
 }
 
-
 export function useBatchUnbanIP() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -207,7 +190,6 @@ export function useBatchUnbanIP() {
     }
   });
 }
-
 
 export function useBatchUpdateIPCustomer() {
   const queryClient = useQueryClient();
@@ -220,7 +202,6 @@ export function useBatchUpdateIPCustomer() {
   });
 }
 
-
 export function useBatchUpdateIPNotes() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -231,7 +212,6 @@ export function useBatchUpdateIPNotes() {
     }
   });
 }
-
 
 export function useBanStatus(address: string, roomId: number) {
   return useQuery({

@@ -27,18 +27,21 @@ device_nics_port_bp = Blueprint(
 
 
 class NicPortBatchSchema(Schema):
+    """创建或更新设备网卡配置请求Schema"""
     class Meta:
         unknown = EXCLUDE
     nics = fields.List(fields.Dict(), required=True)
 
 
 class NicPortIncrementalBatchSchema(Schema):
+    """增量批量创建网卡端口请求Schema"""
     class Meta:
         unknown = EXCLUDE
     ports = fields.List(fields.Dict(), required=True)
 
 
 class NicPortUpdateSchema(Schema):
+    """更新单个端口请求Schema"""
     class Meta:
         unknown = EXCLUDE
     port_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
@@ -49,9 +52,11 @@ class NicPortUpdateSchema(Schema):
 
 
 class NicPortBatchDeleteSchema(Schema):
+    """批量删除端口请求Schema"""
     class Meta:
         unknown = EXCLUDE
     port_ids = fields.List(fields.Int(), required=True)
+
 
 
 @device_nics_port_bp.route("/<int:device_id>/nics", methods=["PUT"])
@@ -62,6 +67,29 @@ class NicPortBatchDeleteSchema(Schema):
 @api_exception_handler
 @transactional
 def create_or_update_nics(device_id: int):
+    """创建或更新设备的网卡配置
+
+    URL: PUT /api/devices/<device_id>/nics
+
+    Request Body:
+        {
+            "nics": [
+                {
+                    "nic_number": 1,
+                    "nic_name": "网卡1",
+                    "ports": [
+                        {
+                            "port_number": 1,
+                            "port_type": "RJ45",
+                            "speed": "1G",
+                            "port_name": "eth0",
+                            "description": "网卡1端口1"
+                        }
+                    ]
+                }
+            ]
+        }
+    """
     data = request.get_json()
     if not data:
         return APIResponse.error("请求数据不能为空", status_code=400)
@@ -88,6 +116,24 @@ def create_or_update_nics(device_id: int):
 @api_exception_handler
 @transactional
 def batch_create_nics(device_id: int):
+    """增量批量创建网卡端口（不删除现有端口）
+
+    URL: POST /api/devices/<device_id>/nics/batch-create
+
+    Request Body:
+        {
+            "ports": [
+                {
+                    "nic_number": 1,
+                    "port_number": 1,
+                    "port_type": "RJ45",
+                    "port_speed": "1G",
+                    "port_name": "eth0",
+                    "description": "网卡1端口1"
+                }
+            ]
+        }
+    """
     data = request.get_json()
     if not data:
         return APIResponse.error("请求数据不能为空", status_code=400)
@@ -114,6 +160,10 @@ def batch_create_nics(device_id: int):
 @rate_limit_api
 @api_exception_handler
 def get_device_nics(device_id: int):
+    """获取设备的网卡配置
+
+    URL: GET /api/devices/<device_id>/nics
+    """
     ports   = device_nics_port_service.get_device_ports(device_id)
     summary = device_nics_port_service.get_ports_summary(device_id)
 
@@ -134,6 +184,10 @@ def get_device_nics(device_id: int):
 @api_exception_handler
 @transactional
 def delete_device_nics(device_id: int):
+    """删除设备的所有网卡配置
+
+    URL: DELETE /api/devices/<device_id>/nics
+    """
     success, message = device_nics_port_service.delete_device_ports(device_id)
 
     if success:
@@ -147,6 +201,14 @@ def delete_device_nics(device_id: int):
 @rate_limit_api
 @api_exception_handler
 def get_available_ports(device_id: int):
+    """获取设备的可用端口列表
+
+    URL: GET /api/devices/<device_id>/available-ports
+
+    Query Parameters:
+        - port_type: 端口类型过滤(可选)
+        - port_speed: 端口速率过滤(可选)
+    """
     port_type  = request.args.get('port_type')
     port_speed = request.args.get('port_speed')
 
@@ -158,12 +220,17 @@ def get_available_ports(device_id: int):
     )
 
 
+
 @device_nics_port_bp.route("/<int:device_id>/nics/<int:port_id>", methods=["GET"])
 @doc(summary="获取单个端口详情", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "port_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "DeviceNicPortResponse", 404: "ApiError"})
 @login_required
 @rate_limit_api
 @api_exception_handler
 def get_single_port(device_id: int, port_id: int):
+    """获取单个端口详情
+
+    URL: GET /api/devices/<device_id>/nics/<port_id>
+    """
     port = device_nics_port_service.get_port_by_id(port_id)
 
     if not port or port.device_id != device_id:
@@ -184,6 +251,10 @@ def get_single_port(device_id: int, port_id: int):
 @api_exception_handler
 @transactional
 def update_single_port(device_id: int, port_id: int):
+    """更新单个端口
+
+    URL: PUT /api/devices/<device_id>/nics/<port_id>
+    """
     port = device_nics_port_service.get_port_by_id(port_id)
 
     if not port or port.device_id != device_id:
@@ -224,6 +295,10 @@ def update_single_port(device_id: int, port_id: int):
 @api_exception_handler
 @transactional
 def delete_single_port(device_id: int, port_id: int):
+    """删除单个端口
+
+    URL: DELETE /api/devices/<device_id>/nics/<port_id>
+    """
     port = device_nics_port_service.get_port_by_id(port_id)
 
     if not port or port.device_id != device_id:
@@ -253,6 +328,11 @@ def delete_single_port(device_id: int, port_id: int):
 @api_exception_handler
 @transactional
 def batch_delete_nics(device_id: int):
+    """批量删除端口（替代前端串行循环删除）
+
+    URL: DELETE /api/devices/<device_id>/nics/batch
+    Body: { "port_ids": [int] }
+    """
     data = request.get_json(silent=True) or {}
     port_ids = data.get("port_ids") or []
     if not port_ids:
@@ -268,6 +348,7 @@ def batch_delete_nics(device_id: int):
     return APIResponse.success(data=result, message=message)
 
 
+
 _port_bp = Blueprint(
     "device_nics_port_single",
     __name__,
@@ -281,6 +362,10 @@ _port_bp = Blueprint(
 @rate_limit_api
 @api_exception_handler
 def get_port_by_id(port_id: int):
+    """获取端口详情
+
+    URL: GET /api/nics-ports/<port_id>
+    """
     port = device_nics_port_service.get_port_by_id(port_id)
 
     if not port:
@@ -291,6 +376,7 @@ def get_port_by_id(port_id: int):
         )
 
     return APIResponse.success(data=port.to_dict(), message="获取端口信息成功")
+
 
 
 _template_bp = Blueprint(
@@ -306,6 +392,10 @@ _template_bp = Blueprint(
 @rate_limit_api
 @api_exception_handler
 def get_nic_templates():
+    """获取网卡模板列表
+
+    URL: GET /api/nic-templates
+    """
     templates = [
         {
             "key": "dual_1g_electrical",
@@ -372,6 +462,7 @@ def get_nic_templates():
     )
 
 
+
 @device_nics_port_bp.route("/<int:chassis_id>/children/nics", methods=["POST"])
 @doc(summary="为机箱子节点批量创建网卡端口", tags=["设备"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/NicPortIncrementalBatch"}}}}, parameters=[{"name": "chassis_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 400: "ApiError"})
 @login_required
@@ -379,6 +470,14 @@ def get_nic_templates():
 @api_exception_handler
 @transactional
 def batch_create_children_nics(chassis_id: int):
+    """为机箱的所有子节点批量创建相同的 NIC 端口
+
+    URL: POST /api/devices/{chassis_id}/children/nics
+    Body: { "ports": [{ nic_number, port_number, port_type, port_speed, ... }] }
+
+    替代前端 for(nodeId) { POST /nics } 串行循环，
+    在单个 savepoint 内为所有子节点创建相同端口配置。
+    """
     from app.models.device import Device
 
     data = request.get_json()

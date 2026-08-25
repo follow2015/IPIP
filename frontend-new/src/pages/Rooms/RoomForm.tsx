@@ -16,7 +16,6 @@ interface RoomFormProps {
   onClose: () => void;
 }
 
-
 const ROOM_SCHEMA: FormSchema = {
   fields: [
     { name: 'name', label: '机房名称', type: 'input', required: true, placeholder: '请输入机房名称' },
@@ -26,7 +25,6 @@ const ROOM_SCHEMA: FormSchema = {
   ],
 };
 
-
 function RoomForm({ open, editRecord, onClose }: RoomFormProps) {
   const formRef = useRef<FormInstance>(null);
   const message = useMessage();
@@ -34,7 +32,6 @@ function RoomForm({ open, editRecord, onClose }: RoomFormProps) {
   const updateRoom = useUpdateRoom();
   const isEdit = !!editRecord;
 
-  
   useEffect(() => {
     if (open && formRef.current) {
       if (editRecord) {
@@ -45,7 +42,6 @@ function RoomForm({ open, editRecord, onClose }: RoomFormProps) {
     }
   }, [open, editRecord]);
 
-  
   const handleSubmit = async (values: Record<string, unknown>) => {
     try {
       if (isEdit) {

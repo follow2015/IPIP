@@ -22,7 +22,6 @@ interface DeviceBlockProps {
   onNodeReorder?: (chassisId: number, newOrderedNodeIds: string[]) => void;
 }
 
-
 const DeviceBlock: React.FC<DeviceBlockProps> = ({
   device,
   readOnly,
@@ -40,17 +39,14 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
   const isMulti = device.deviceType === 'multinode';
   const hasNodes = isMulti && device.nodes && device.nodes.length > 0;
 
-  
   const { titleFontSize, infoFontSize, contentWidth, rowH } = layout;
 
-  
   const { showInfoLine, showModelLine, showSnLine, showInlineInfo } = computeBlockInfoVisibility(
     h,
     contentWidth,
     rowH
   );
 
-  
   const [nodeDragSrcIdx, setNodeDragSrcIdx] = useState<number | null>(null);
   const [localNodes, setLocalNodes] = useState<DeviceNode[]>(device.nodes ?? []);
   useEffect(() => {
@@ -113,7 +109,7 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
         boxSizing: 'border-box'
       }}
     >
-      {}
+      {/* 左侧色条 */}
       <div
         style={{
           position: 'absolute',
@@ -137,9 +133,9 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
           overflow: 'hidden'
         }}
       >
-        {}
+        {/* 标题行 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-          {}
+          {/* 机箱折叠按钮 */}
           {hasNodes && !readOnly && (
             <span
               onClick={(e) => {
@@ -175,7 +171,7 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
             {device.deviceName}
           </span>
 
-          {}
+          {/* 1U设备内联IP（宽度足够但不占额外行） */}
           {showInlineInfo && !isMulti && infoParts.length > 0 && (
             <span
               style={{
@@ -192,7 +188,7 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
             </span>
           )}
 
-          {}
+          {/* 多节点汇总 */}
           {isMulti && hasNodes && (
             <span
               style={{
@@ -207,7 +203,7 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
             </span>
           )}
 
-          {}
+          {/* 普通设备：型号 + 功率（自适应：仅空间足够时显示） */}
           {!isMulti && (
             <>
               {showModelLine && device.model && (
@@ -238,7 +234,7 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
           )}
         </div>
 
-        {}
+        {/* IP / IPMI 信息行（自适应：宽度+高度足够时显示） */}
         {showInfoLine && infoParts.length > 0 && (
           <div
             style={{
@@ -255,7 +251,7 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
           </div>
         )}
 
-        {}
+        {/* 序列号行（自适应：宽度+高度足够时显示） */}
         {showSnLine && device.sn && (
           <div
             style={{
@@ -272,7 +268,7 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
           </div>
         )}
 
-        {}
+        {/* 机箱节点区域（未折叠时显示） */}
         {hasNodes && !isCollapsed && (
           <>
             {device.nodeRows && device.nodeCols ? (
@@ -295,7 +291,7 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
           </>
         )}
 
-        {}
+        {/* 折叠态：只显示圆点汇总 */}
         {hasNodes && isCollapsed && (
           <div
             style={{

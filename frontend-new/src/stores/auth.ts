@@ -16,7 +16,6 @@ import type { User } from '@/types/models';
 import { login as apiLogin, logout as apiLogout } from '@/services/auth';
 import type { LoginRequest, LoginResponse } from '@/types/api';
 
-
 interface AuthState {
   user: User | null;
   token: string | null;
@@ -31,20 +30,18 @@ interface AuthState {
   setVerifying: (verifying: boolean) => void;
 }
 
-
 function buildUserFromLogin(loginUser: LoginResponse['user']): User {
   return {
     id:           loginUser.id,
     username:     loginUser.username,
     email:        loginUser.email,
     name:         loginUser.name ?? '',
-    real_name:    loginUser.name ?? '',     
+    real_name:    loginUser.name ?? '',     // login 响应 name === real_name
     department:   null,
     contact_phone:null,
     roles:        loginUser.roles,
     is_active:    loginUser.is_active,
     status:       loginUser.status,
-    
     created_at:   '',
     updated_at:   '',
   };
@@ -68,16 +65,13 @@ export const useAuthStore = create<AuthState>()(
         const user = buildUserFromLogin(loginUser);
         set({ user, token, permissions: permissions ?? [], isAuthenticated: true });
 
-        
         sessionStorage.setItem('token', token);
-        
         if (res.data.refresh_token) {
           sessionStorage.setItem('refresh_token', res.data.refresh_token);
         }
       },
 
       logout: () => {
-        
         const { token } = get();
         if (token) {
           apiLogout().catch(() => {});
@@ -87,7 +81,6 @@ export const useAuthStore = create<AuthState>()(
         sessionStorage.removeItem('refresh_token');
       },
 
-      
       clearAuth: () => {
         set({ user: null, token: null, permissions: [], isAuthenticated: false, isVerifying: false });
         sessionStorage.removeItem('token');
@@ -117,14 +110,12 @@ export const useAuthStore = create<AuthState>()(
         permissions:     state.permissions,
         isAuthenticated: state.isAuthenticated,
       }),
-      
       onRehydrateStorage: () => (state) => {
         if (state && (!state.token || !state.isAuthenticated)) {
           state.user            = null;
           state.token           = null;
           state.permissions     = [];
           state.isAuthenticated = false;
-          
           sessionStorage.removeItem('token');
           sessionStorage.removeItem('refresh_token');
         }

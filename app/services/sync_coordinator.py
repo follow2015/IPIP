@@ -33,8 +33,15 @@ logger = get_logger(__name__)
 
 
 class SyncCoordinator:
+    """同步协调器：封装事务管理与设备同步逻辑"""
 
     def __init__(self, ssh_mgr, switch_repo, device_op_lock):
+        """
+        Args:
+            ssh_mgr: SSHManager 实例
+            switch_repo: SwitchRepository 实例
+            device_op_lock: DeviceOpLock 实例（设备级操作锁）
+        """
         self.ssh_mgr = ssh_mgr
         self.switch_repo = switch_repo
         self.device_op_lock = device_op_lock
@@ -52,6 +59,25 @@ class SyncCoordinator:
         affected_connections: list[int] = None,
         extra:                dict      = None,
     ):
+        """统一事务上下文：yield 后广播结构化 SSE 事件。
+
+        用法：
+            with sync._db_transaction(switch.device_id, OpType.VLAN_CREATE,
+                                      affected_ports=[port]):
+                switch_repo.update_port_status_vlan(switch.device_id, port, vlan_id)
+
+        事务提交由 API 层 @transactional 统一管理，此处仅负责广播事件。
+        异常时事件不广播，异常继续向上传播。
+
+        Args:
+            switch_id:            交换机 device_id（devices.id，用于 SSE 路由和日志）
+            op_type:              操作类型（OpType 常量）
+            affected_ports:       变更的端口名列表
+            affected_vlans:       变更的 VLAN 数据库 ID 列表
+            affected_lags:        变更的 LAG 数据库 ID 列表
+            affected_connections: 变更的连接 ID 列表
+            extra:                额外上下文
+        """
         try:
             yield
             emit_resource_change(
@@ -74,6 +100,27 @@ class SyncCoordinator:
                                affected_vlans:  list[int] = None,
                                affected_lags:   list[int] = None,
                                affected_connections: list[int] = None) -> None:
+        """SSH 配置成功后，从设备实时同步三表，commit 并广播结构化 SSE 事件。
+
+        所有 SSH 配置操作统一调用本方法作为唯一的 DB 更新入口，
+        消除中间 DB 写入（会被本方法全量覆盖）。
+        fetch_port_config 仅做 flush，commit 在此处统一执行。
+        刷新失败时 rollback，主操作结果不受影响（仅记录警告日志）。
+
+        P8: 异常分层处理
+        - SSHConnectionError：可重试的连接异常（warning）
+        - OperationalError：DB 连接失败（error + rollback）
+        - 其他 Exception：编程错误（error + rollback + exc_info）
+
+        Args:
+            switch_id: 交换机 device_id（devices.id）
+            port:      端口名称
+            op_type:   SSE 事件操作类型（OpType 常量）
+            affected_ports:  变更的端口名列表
+            affected_vlans:  变更的 VLAN 数据库 ID 列表
+            affected_lags:   变更的 LAG 数据库 ID 列表
+            affected_connections: 变更的连接 ID 列表
+        """
         try:
             with self._db_transaction(
                 switch_id, op_type,
@@ -101,6 +148,18 @@ class SyncCoordinator:
             logger.error("同步意外异常（编程错误）: %s", e, exc_info=True)
 
     def _read_port_link_status(self, switch_id: int, port: str) -> Optional[str]:
+        """从设备读取单个端口的实际链路状态
+
+        用于启用/禁用单端口后获取真实链路状态（替代硬编码 up/admin_down）。
+        通过 `display/show interface <port>` 精准查询，经 parse_ports 解析出该端口 status。
+
+        Args:
+            switch_id: 交换机 device_id
+            port:      端口名称
+
+        Returns:
+            Optional[str]: 实际链路状态（up/down/admin_down），查询或解析失败时返回 None
+        """
         switch = self.switch_repo.find_by_device_id(switch_id)
         if not switch:
             logger.warning("读取端口链路状态失败：交换机不存在 device_id=%s", switch_id)
@@ -130,6 +189,25 @@ class SyncCoordinator:
         return None
 
     def sync_single_port_on_conn(self, conn, switch, port: str, op_type: str) -> Optional[str]:
+        """在已建立的 SSH 连接上同步单端口：实际链路状态 + 配置缓存（连接复用）
+
+        供单端口 enable/disable 合并路径使用，将「读取实际链路状态 + 配置缓存同步」
+        合并到配置下发的同一连接，避免额外 SSH 握手，减少等待时间。
+
+        流程：
+        1. 读取该端口实际链路状态（display/show interface <port>）→ update_port_status
+        2. 读取配置缓存（display current-configuration interface <port>）→ _apply_port_config_text
+        3. 广播 SSE（_db_transaction）
+
+        Args:
+            conn: 已建立的 SSH 连接（来自 ssh_mgr.get_connection）
+            switch: 交换机对象
+            port:  端口名称
+            op_type: OpType.PORT_ENABLE / OpType.PORT_DISABLE
+
+        Returns:
+            Optional[str]: 实际链路状态；读取/解析失败时返回 None（由调用方兜底）
+        """
         adapter = get_adapter(switch.device_type)
         actual_status: Optional[str] = None
         try:
@@ -167,6 +245,20 @@ class SyncCoordinator:
     def bulk_sync_ports_from_device(
         self, switch_id: int, ports: list, op_type: str, *, timeout: int = 120,
     ) -> dict:
+        """批量同步多个端口缓存：仅建立 1 个 SSH 连接（连接复用），并合并广播 1 个 SSE 事件。
+
+        用于替代批量操作中的逐端口 _sync_port_from_device，将 O(N) 次 SSH 握手降为 O(1)，
+        O(N) 个 SSE 事件降为 1 个。
+
+        - 调用方须已持有设备锁（batch_port_action 已在 device_op_lock 内调用本方法）。
+        - 单端口同步失败不影响其他端口（尽力同步），失败端口进入返回值的 failed 列表。
+        - 仅物理口（GE/10GE/...）真正复用连接；Vlanif/Eth-Trunk 的成员查询(_get_port_members)
+          会额外建连，但批量操作几乎不涉及此类端口，影响可忽略。
+        - 合并后的 SSE 事件 affected_ports 为全部端口（含失败端口），由前端一次性刷新。
+
+        Returns:
+            {"succeeded": [port, ...], "failed": [(port, reason), ...]}
+        """
         switch = self.switch_repo.find_by_device_id(switch_id)
         if not switch:
             logger.warning("批量同步失败：交换机不存在 device_id=%s", switch_id)
@@ -211,6 +303,16 @@ class SyncCoordinator:
     def fetch_port_config(
         self, device_id: int, port: str, force_refresh: bool = False,
     ) -> dict:
+        """获取端口配置（三类处理：普通口 / VLANIF / Eth-Trunk）
+
+        流程：
+        1. 查 switch_port_status.raw_info 缓存（非强制刷新时）
+        2. 未命中或强制刷新 → SSH 获取
+        3. 写入 switch_port_status.raw_info，解析成员列表，同步 switch_port_status / switch_port_ips
+
+        Args:
+            device_id: 交换机 device_id（devices.id，统一交换机标识）
+        """
         if not force_refresh:
             cached_result = self._get_cached_config(device_id, port)
             if cached_result:
@@ -243,6 +345,12 @@ class SyncCoordinator:
     def _apply_port_config_text(
         self, device_id: int, port: str, config_output: str, switch, adapter,
     ) -> dict:
+        """给定端口配置文本，回写 DB 缓存（VLAN/IP/描述/成员）。
+
+        供单端口 fetch_port_config 与批量 bulk_sync_ports_from_device 共用，
+        避免解析回写逻辑重复。返回 port_extra（vlan_ports/trunk_members），
+        供上层合并进返回结构。
+        """
         self.switch_repo.upsert_port_config(device_id, port, config_output)
 
         port_extra = {}
@@ -267,6 +375,15 @@ class SyncCoordinator:
 
 
     def _get_cached_config(self, switch_id: int, port: str) -> Optional[dict]:
+        """从缓存中提取端口配置，若命中返回完整结构，否则返回 None
+
+        Args:
+            switch_id: 交换机 ID
+            port:      端口名称
+
+        Returns:
+            缓存命中时返回 {port_config, updated_at, from_cache, ...}，否则 None
+        """
         cached = self.switch_repo.get_port_config_with_time(switch_id, port)
         if not cached:
             return None
@@ -288,6 +405,13 @@ class SyncCoordinator:
         return result
 
     def _get_port_members(self, switch, port: str, port_type: str) -> list:
+        """获取 VLANIF 或 Eth-Trunk 的成员端口列表
+
+        Args:
+            switch: 交换机对象
+            port: 端口名称（如 Vlanif100 或 Eth-Trunk1）
+            port_type: "vlan" 或 "trunk"
+        """
         import re
 
         try:
@@ -326,11 +450,13 @@ class SyncCoordinator:
             return []
 
     def _sync_trunk_members(self, device_id: int, port: str, members: list) -> None:
+        """将Eth-Trunk成员端口列表写入link_aggregation_groups表"""
         self.switch_repo.sync_trunk_members(device_id, port, members)
 
     def _update_port_info_cache_if_exists(
         self, device_id: int, port: str, extra: dict,
     ) -> None:
+        """仅当端口已存在于 network_ports 表时，更新其 port_info 缓存"""
         from app.persistence.switch_port_repository import NetworkPort
         row = self.switch_repo.session.query(NetworkPort).filter(
             NetworkPort.device_id == device_id,
@@ -348,10 +474,22 @@ class SyncCoordinator:
             self.switch_repo.session.flush()
 
     def _sync_vlan_members(self, device_id: int, port: str, members: list) -> None:
+        """将VLAN成员端口列表写入vlans表"""
         self.switch_repo.sync_vlan_members(device_id, port, members)
 
 
     def batch_sync_members(self, device_id: int) -> dict:
+        """批量同步 VLAN 和链路聚合的成员端口
+
+        使用 display vlan / display eth-trunk（不带 ID）一次性获取所有成员，
+        替代逐个端口 SSH 查询，大幅减少 SSH 连接次数。
+
+        Args:
+            device_id: 交换机 device_id（devices.id）
+
+        Returns:
+            {"vlan_synced": int, "lag_synced": int, "errors": list}
+        """
         results = {"vlan_synced": 0, "lag_synced": 0, "errors": []}
 
         switch = self.switch_repo.find_by_device_id(device_id)
@@ -406,6 +544,37 @@ class SyncCoordinator:
 
     @staticmethod
     def _parse_all_vlan_members(output: str) -> dict[int, list[str]]:
+        """解析 display vlan 输出，提取每个 VLAN 的成员端口列表
+
+        支持三种输出格式：
+
+        1. S 型表格格式（华为 S 系列交换机，VID 从行首开始）：
+            VID  Type    Ports
+            --------------------------------------------------------------------------------
+            1    common  UT:Eth-Trunk1(D)
+            3    common  UT:GE0/0/1(D)      GE0/0/2(D)      GE0/0/3(D)
+                            GE0/0/5(U)      GE0/0/6(U)
+
+        2. 核心交换机表格格式（VID 前有缩进）：
+            VID          Ports
+            --------------------------------------------------------------------------------
+               1         UT:Eth-Trunk10(D)  100GE1/0/3(D)   10GE1/0/48(U)
+                         TG:10GE1/0/47(D)   10GE1/0/48(U)
+               3         UT:Eth-Trunk1(U)   10GE1/0/2(U)
+
+        3. 详细格式（华为 VRP 特有）：
+            VLAN ID: 1
+            VLAN Type: Common
+            ...
+            Tagged   Ports: none
+            Untagged Ports: 10GE1/0/1  10GE1/0/2
+
+        底部统计行格式为 "VID  Status  Property  MAC-LRN  Statistics  Description"，
+        不含端口信息，需排除。
+
+        Returns:
+            {vlan_id: [port_name, ...]}
+        """
         import re
         from app.utils.port_name_utils import normalize_port
 
@@ -479,6 +648,23 @@ class SyncCoordinator:
 
     @staticmethod
     def _parse_all_trunk_members(output: str) -> dict[int, list[str]]:
+        """解析 display eth-trunk 输出，提取每个 Eth-Trunk 的成员端口列表
+
+        输出格式示例：
+            Eth-Trunk1's state information is:
+            ...
+            PortName                      Status      Weight
+            10GE1/0/5                     Up          1
+            10GE1/0/6                     Down        1
+
+            Eth-Trunk2's state information is:
+            ...
+            PortName                      Status      Weight
+            10GE1/0/8                     Down        1
+
+        Returns:
+            {trunk_id: [port_name, ...]}
+        """
         import re
 
         trunk_header = re.compile(
@@ -493,7 +679,7 @@ class SyncCoordinator:
 
         result = {}
         current_trunk_id = None
-        past_header = False
+        past_header = False  # 是否已过 PortName 表头行
 
         for line in output.splitlines():
             m = trunk_header.search(line)
@@ -522,6 +708,7 @@ class SyncCoordinator:
     def _sync_port_vlan_from_config(
         self, switch_id: int, port: str, config_text: str, adapter=None,
     ) -> None:
+        """从端口配置文本提取 VLAN ID，同步回 switch_port_status.vlan"""
         if not adapter:
             switch = self.switch_repo.find_by_device_id(switch_id)
             if not switch:
@@ -538,6 +725,7 @@ class SyncCoordinator:
     def _sync_port_ips_from_config(
         self, switch_id: int, port: str, config_text: str, adapter,
     ) -> None:
+        """从端口配置文本提取 IP，全量同步到 switch_port_ips，并更新 switch_port_status.ip_address"""
         try:
             parsed_ips = adapter.parse_existing_ips(config_text or "")
             ip_list = []
@@ -560,6 +748,7 @@ class SyncCoordinator:
     def _sync_port_description_from_config(
         self, switch_id: int, port: str, config_text: str, adapter=None,
     ) -> None:
+        """从端口配置文本提取描述，同步回 switch_port_status.description"""
         if not adapter:
             switch = self.switch_repo.find_by_device_id(switch_id)
             if not switch:

@@ -14,6 +14,7 @@ from extensions import db
 
 
 class Notification(BaseModel):
+    """通知主体模型"""
 
     __tablename__ = "notifications"
     __table_args__ = (
@@ -60,6 +61,7 @@ class Notification(BaseModel):
 
 
 class NotificationReceipt(BaseModel):
+    """通知投递回执（每用户一条）"""
 
     __tablename__ = "notification_receipts"
     __table_args__ = (

@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 """虚拟机房模型
 
 虚拟机房是用户自由组合交换机形成的逻辑扫描单元，
@@ -13,6 +13,7 @@ from extensions import db
 
 
 class VirtualRoom(BaseModel):
+    """虚拟机房主表"""
     __tablename__ = "virtual_rooms"
     __table_args__ = (
         Index("idx_virtual_room_name", "name"),
@@ -34,6 +35,7 @@ class VirtualRoom(BaseModel):
     )
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化"""
         data = super().to_dict(exclude=exclude)
         data["member_count"] = self.members.count()
         if include_relations:
@@ -43,6 +45,10 @@ class VirtualRoom(BaseModel):
 
 
 class VirtualRoomMember(db.Model):
+    """虚拟机房成员（交换机）关联表
+
+    使用复合主键 (virtual_room_id, device_id)，不继承 BaseModel。
+    """
     __tablename__ = "virtual_room_members"
     __table_args__ = (
         UniqueConstraint("virtual_room_id", "device_id", name="uq_vr_member"),
@@ -70,6 +76,7 @@ class VirtualRoomMember(db.Model):
     device = relationship("Device", lazy="select")
 
     def to_dict(self, exclude=None):
+        """序列化"""
         data = {
             "virtual_room_id": self.virtual_room_id,
             "device_id": self.device_id,

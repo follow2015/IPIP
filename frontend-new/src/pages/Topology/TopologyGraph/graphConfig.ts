@@ -23,7 +23,6 @@ import {
   type TopologyComboDatum
 } from './graphBuilders';
 
-
 interface G6StyleDatum {
   data?: {
     switch_role?: number;
@@ -45,7 +44,10 @@ const TOOLTIP_BOX_STYLE = `
   font-size:12px; line-height:1.8; color:#262626;
 `;
 
-
+/**
+ * 根据节点 / 边 / 机柜 combo 的数据生成 tooltip HTML 字符串。
+ * 判定顺序：device_type → cabinetId → 否则视为边。
+ */
 export function buildTooltipContent(
   data: TopologyNode | TopologyEdge | TopologyComboDatum
 ): string {
@@ -86,7 +88,9 @@ interface BuildGraphOptionsParams {
   layout: LayoutType;
 }
 
-
+/**
+ * 构造 G6 Graph 实例所需的完整配置对象（不含事件监听）。
+ */
 export function buildGraphOptions({
   container,
   width,

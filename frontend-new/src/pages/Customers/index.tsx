@@ -29,20 +29,17 @@ import { useCrudPage } from '@/hooks/useCrudPage';
 import { useMessage } from '@/hooks/useMessage';
 import { formatDateTime } from '@/utils/format';
 
-
 function renderStatus(v: number) {
   const s = CUSTOMER_STATUS_MAP[v as keyof typeof CUSTOMER_STATUS_MAP];
   if (v === undefined || v === null) return '-';
   return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{v}</Tag>;
 }
 
-
 function customerStatusLabel(v: number | null | undefined) {
   if (v === null || v === undefined) return '-';
   const s = CUSTOMER_STATUS_MAP[v as keyof typeof CUSTOMER_STATUS_MAP];
   return s ? s.label : String(v);
 }
-
 
 function buildCustomerInfoText(c: Customer): string {
   return [
@@ -70,17 +67,14 @@ function Customers() {
 
   const { table, data, isLoading, refetch } = crud;
 
-  
   const [terminateTarget, setTerminateTarget] = useState<Customer | null>(null);
   const [terminateReason, setTerminateReason] = useState('');
   const terminateMutation = useTerminateCustomer();
 
-  
   const handleAssets = (r: Customer) => {
     navigate(`/customers/${r.id}`);
   };
 
-  
   const handleCopy = (r: Customer) => {
     const text = buildCustomerInfoText(r);
     if (navigator.clipboard?.writeText) {
@@ -93,7 +87,6 @@ function Customers() {
     }
   };
 
-  
   const columns = [
     {
       title: 'ID',

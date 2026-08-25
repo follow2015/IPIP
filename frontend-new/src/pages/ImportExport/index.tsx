@@ -36,13 +36,11 @@ import { ImportExportType, DeviceType } from '@/types/enums';
 
 const { Text, Title } = Typography;
 
-
 const TYPE_OPTIONS = [
   { label: '设备', value: ImportExportType.DEVICE },
   { label: '客户', value: ImportExportType.CUSTOMER },
   { label: '机柜', value: ImportExportType.CABINET }
 ];
-
 
 const DEVICE_TEMPLATE_OPTIONS: { label: string; value: DeviceType; desc: string }[] = [
   {
@@ -54,13 +52,11 @@ const DEVICE_TEMPLATE_OPTIONS: { label: string; value: DeviceType; desc: string 
   { label: '其他设备', value: DeviceType.OTHER, desc: 'PDU、UPS等，仅基本信息+资产归属' }
 ];
 
-
 const TYPE_LABEL: Record<ImportExportType, string> = {
   [ImportExportType.DEVICE]: '设备',
   [ImportExportType.CUSTOMER]: '客户',
   [ImportExportType.CABINET]: '机柜'
 };
-
 
 interface FailedRowDetail {
   row: number;
@@ -85,7 +81,6 @@ function ImportPanel() {
 
   const isDevice = importType === ImportExportType.DEVICE;
 
-  
   const handleDownloadTemplate = async () => {
     try {
       const res = await downloadTemplate.mutateAsync({
@@ -108,19 +103,16 @@ function ImportPanel() {
     }
   };
 
-  
   const handleFileSelect = (file: File) => {
     setFileList([file]);
     setImportResult(null);
-    return false; 
+    return false; // 阻止自动上传
   };
 
-  
   const handleImport = async () => {
     if (!fileList.length) return;
     try {
       const res = await importData.mutateAsync({ type: importType, file: fileList[0] });
-      
       const result = res?.data?.data;
       if (result) {
         setImportResult(result);
@@ -138,13 +130,11 @@ function ImportPanel() {
     }
   };
 
-  
   const handleReset = () => {
     setFileList([]);
     setImportResult(null);
   };
 
-  
   const failedColumns = [
     { title: '行号', dataIndex: 'row', key: 'row', width: 60 },
     {
@@ -168,7 +158,7 @@ function ImportPanel() {
 
   return (
     <Space orientation="vertical" style={{ width: '100%' }} size="middle">
-      {}
+      {/* 上方：操作区(左) + 说明区(右)，等高 */}
       <Row gutter={24} align="stretch">
         <Col xs={24} lg={14}>
           <Card title="导入操作" styles={{ body: { padding: 24 } }}>
@@ -308,7 +298,7 @@ function ImportPanel() {
         </Col>
       </Row>
 
-      {}
+      {/* 导入结果（下方全宽） */}
       {importResult && (
         <Card title="导入结果" styles={{ body: { padding: 16 } }}>
           <Space orientation="vertical" style={{ width: '100%' }} size="middle">
@@ -363,7 +353,6 @@ function ExportPanel() {
 
   const isDevice = exportType === ImportExportType.DEVICE;
 
-  
   const handleExport = async () => {
     try {
       const params: Record<string, unknown> = {};
@@ -393,7 +382,7 @@ function ExportPanel() {
       <Col xs={24} lg={14}>
         <Card title="导出操作" styles={{ body: { padding: 24 } }}>
           <Space orientation="vertical" style={{ width: '100%' }} size="large">
-            {}
+            {/* 数据类型选择 */}
             <div>
               <Text strong style={{ display: 'block', marginBottom: 8 }}>
                 选择数据类型
@@ -410,7 +399,7 @@ function ExportPanel() {
               />
             </div>
 
-            {}
+            {/* 设备导出过滤条件 */}
             {isDevice && (
               <div>
                 <Text strong style={{ display: 'block', marginBottom: 8 }}>
@@ -445,7 +434,7 @@ function ExportPanel() {
               </div>
             )}
 
-            {}
+            {/* 导出按钮 */}
             <Button
               type="primary"
               icon={<ExportOutlined />}

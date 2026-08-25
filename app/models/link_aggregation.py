@@ -8,6 +8,11 @@ from app.core.enums import LAGStatus
 
 
 class LinkAggregationGroup(BaseModel):
+    """链路聚合组
+
+    V2.0: 增加 member_ports 字段，
+    存储成员端口列表，避免每次点击详情都SSH获取。
+    """
     __tablename__ = "link_aggregation_groups"
     __table_args__ = (
         Index("uk_lag_device_name", "device_id", "lag_name", unique=True),
@@ -31,6 +36,7 @@ class LinkAggregationGroup(BaseModel):
     )
 
     def to_dict(self, exclude=None, include_relations=False):
+        """序列化"""
         result = super().to_dict(exclude=exclude)
         result['purpose'] = self.purpose or ''
         if hasattr(self, 'member_port_list'):

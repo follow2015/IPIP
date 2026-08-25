@@ -13,6 +13,7 @@ from extensions import db
 
 
 class MonitorSilenceRule(BaseModel):
+    """监控告警静默规则"""
 
     __tablename__ = "monitor_silence_rule"
     __table_args__ = (

@@ -20,6 +20,7 @@ router = Blueprint("notifications", __name__, url_prefix="/api/notifications")
 @doc(summary="获取未读通知数", tags=["通知"], responses={200: "ApiResponse"})
 @login_required
 def unread_count():
+    """获取当前用户未读通知数（轮询端点，轻量）。"""
     from flask import g
     count = notification_service.get_unread_count(g.current_user["user_id"])
     return APIResponse.success(data={"unread_count": count})
@@ -29,6 +30,7 @@ def unread_count():
 @doc(summary="获取通知列表", tags=["通知"], responses={200: "ApiResponse"})
 @login_required
 def notification_list():
+    """获取当前用户通知列表（分页）。"""
     from flask import g
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
@@ -48,6 +50,7 @@ def notification_list():
 @login_required
 @transactional
 def mark_read():
+    """标记通知为已读。"""
     from flask import g
     data = request.get_json(silent=True) or {}
     notification_ids = data.get("notification_ids")
@@ -64,6 +67,7 @@ def mark_read():
 @login_required
 @transactional
 def ack_notification(notification_id):
+    """确认通知（ack_required 场景，如设备离线告警）。"""
     from flask import g
     success = notification_service.mark_acked(
         user_id=g.current_user["user_id"],
@@ -79,15 +83,18 @@ def ack_notification(notification_id):
 @login_required
 @transactional
 def delete_read_notifications():
+    """清除当前用户所有已读通知（未读通知保留）。"""
     from flask import g
     count = notification_service.delete_read(g.current_user["user_id"])
     return APIResponse.success(data={"deleted_count": count}, message=f"已清除 {count} 条已读通知")
+
 
 
 @router.route("/preferences", methods=["GET"])
 @doc(summary="获取通知偏好", tags=["通知"], responses={200: "ApiResponse"})
 @login_required
 def get_preferences():
+    """获取当前用户通知偏好设置。"""
     from flask import g
     prefs = notification_service.get_preferences(g.current_user["user_id"])
     return APIResponse.success(data=prefs)
@@ -98,6 +105,13 @@ def get_preferences():
 @login_required
 @transactional
 def update_preferences():
+    """更新当前用户通知偏好（merge 语义，只更新传入的字段）。
+
+    Body:
+        channels: {"inbox": true, "email": true}
+        subscribed_types: ["device_unreachable", "device_recovered", "room_scan_complete"]
+        quiet_hours: {"enabled": true, "start": "22:00", "end": "08:00"}
+    """
     from flask import g
     data = request.get_json(silent=True) or {}
     if not data:

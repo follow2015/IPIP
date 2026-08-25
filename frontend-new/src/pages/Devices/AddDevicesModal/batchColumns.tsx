@@ -15,7 +15,6 @@ export type BatchColumns = NonNullable<TableProps<DeviceBatchRow>['columns']>;
 
 export interface CommonColumnDeps {
   updateRow: EditableRowsApi<DeviceBatchRow>['updateRow'];
-  
   genNodeName: (nodeRow?: number, nodeCol?: number) => string;
   isChassis: boolean;
   isNode: boolean;
@@ -30,7 +29,10 @@ export interface CommonColumnDeps {
 
 const DEFAULT_WIDTHS = { serial: 160, layout: 120, row: 72, col: 72, u: 86 };
 
-
+/**
+ * 返回 [序列号, 机箱行×列?, 节点行号/列号?, 非节点U位?, 状态] 列。
+ * 设备名称列由调用方在工厂结果前自行插入（宽度不同）。
+ */
 export function buildCommonBatchColumns({
   updateRow,
   genNodeName,

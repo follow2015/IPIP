@@ -22,14 +22,28 @@ logger = get_logger(__name__)
 
 
 def _api_response():
+    """延迟导入 APIResponse，避免与 app.api.base 的循环依赖。"""
     from app.api.base import APIResponse
     return APIResponse
 
 
 def register_error_handlers(app: Flask) -> None:
+    """注册统一的错误处理器
+    
+    Args:
+        app: Flask应用实例
+    """
     
     @app.errorhandler(BaseAppException)
     def handle_base_app_exception(error: BaseAppException) -> Tuple[Dict[str, Any], int]:
+        """处理应用基础异常
+        
+        Args:
+            error: 应用基础异常
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         if isinstance(error, (ValidationError, BusinessLogicError)):
             logger.warning(f"业务异常: {error.code} - {error.message}")
         elif isinstance(error, (DataAccessError, SystemError)):
@@ -46,6 +60,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(ValidationError)
     def handle_validation_error(error: ValidationError) -> Tuple[Dict[str, Any], int]:
+        """处理验证错误
+        
+        Args:
+            error: 验证错误
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.warning(f"验证错误: {error.message}")
         
         details = []
@@ -63,6 +85,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(MarshmallowValidationError)
     def handle_marshmallow_error(error: MarshmallowValidationError) -> Tuple[Dict[str, Any], int]:
+        """处理Marshmallow验证错误
+        
+        Args:
+            error: Marshmallow验证错误
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.warning(f"Schema验证错误: {error.messages}")
         
         schema_error = SchemaValidationError(
@@ -79,6 +109,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(SQLAlchemyError)
     def handle_sqlalchemy_error(error: SQLAlchemyError) -> Tuple[Dict[str, Any], int]:
+        """处理SQLAlchemy错误
+        
+        Args:
+            error: SQLAlchemy错误
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.error(f"SQLAlchemy错误: {str(error)}", exc_info=True)
         
         if isinstance(error, IntegrityError):
@@ -104,6 +142,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(HTTPException)
     def handle_http_exception(error: HTTPException) -> Tuple[Dict[str, Any], int]:
+        """处理HTTP异常
+        
+        Args:
+            error: HTTP异常
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.warning(f"HTTP异常: {error.code} - {error.description}")
         
         return _api_response().error(
@@ -114,6 +160,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(400)
     def handle_bad_request(error) -> Tuple[Dict[str, Any], int]:
+        """处理400错误
+        
+        Args:
+            error: 错误对象
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.warning("400 错误请求")
         return _api_response().error(
             message="错误的请求",
@@ -123,6 +177,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(401)
     def handle_unauthorized(error) -> Tuple[Dict[str, Any], int]:
+        """处理401错误
+        
+        Args:
+            error: 错误对象
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.warning("401 未授权")
         return _api_response().error(
             message="未授权，请先登录",
@@ -132,6 +194,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(403)
     def handle_forbidden(error) -> Tuple[Dict[str, Any], int]:
+        """处理403错误
+        
+        Args:
+            error: 错误对象
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.warning("403 禁止访问")
         return _api_response().error(
             message="权限不足",
@@ -141,6 +211,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(404)
     def handle_not_found(error) -> Tuple[Dict[str, Any], int]:
+        """处理404错误
+        
+        Args:
+            error: 错误对象
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.warning("404 资源不存在")
         return _api_response().error(
             message="资源不存在",
@@ -150,6 +228,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(405)
     def handle_method_not_allowed(error) -> Tuple[Dict[str, Any], int]:
+        """处理405错误
+        
+        Args:
+            error: 错误对象
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.warning("405 方法不允许")
         return _api_response().error(
             message="方法不允许",
@@ -159,6 +245,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(429)
     def handle_too_many_requests(error) -> Tuple[Dict[str, Any], int]:
+        """处理429错误
+        
+        Args:
+            error: 错误对象
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.warning("429 请求过多")
         return _api_response().error(
             message="请求过于频繁，请稍后再试",
@@ -168,6 +262,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(500)
     def handle_internal_server_error(error) -> Tuple[Dict[str, Any], int]:
+        """处理500错误
+        
+        Args:
+            error: 错误对象
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.error("500 服务器内部错误", exc_info=True)
         return _api_response().error(
             message="服务器内部错误",
@@ -177,6 +279,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(503)
     def handle_service_unavailable(error) -> Tuple[Dict[str, Any], int]:
+        """处理503错误
+        
+        Args:
+            error: 错误对象
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.error("503 服务不可用", exc_info=True)
         return _api_response().error(
             message="服务暂时不可用",
@@ -186,6 +296,14 @@ def register_error_handlers(app: Flask) -> None:
     
     @app.errorhandler(Exception)
     def handle_unexpected_error(error: Exception) -> Tuple[Dict[str, Any], int]:
+        """处理未预期的错误
+        
+        Args:
+            error: 错误对象
+            
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
         logger.error(f"未预期的错误: {str(error)}", exc_info=True)
         
         system_error = SystemError(
@@ -202,6 +320,14 @@ def register_error_handlers(app: Flask) -> None:
 
 
 def handle_api_exception(error: Exception) -> Tuple[Dict[str, Any], int]:
+    """处理API异常的通用函数
+    
+    Args:
+        error: 异常对象
+        
+    Returns:
+        Tuple: (响应数据, HTTP状态码)
+    """
     if isinstance(error, BaseAppException):
         logger.warning(f"API异常: {error.code} - {error.message}")
         return _api_response().error(

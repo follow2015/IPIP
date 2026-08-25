@@ -27,7 +27,6 @@ import RackBody from './RackBody';
 import SidePanel from './SidePanel';
 import type { UPositionSelectorProps } from './types';
 
-
 export type {
   RackDeviceType,
   NodeStatus,
@@ -75,7 +74,7 @@ const UPositionSelector: React.FC<UPositionSelectorProps> = (props) => {
         onNodeReorder={onNodeReorder}
       />
 
-      {}
+      {/* ── 右侧信息列（大屏） / 底部信息区（小屏） ── */}
       {rack.layout.showSidePanel ? (
         <div
           style={{

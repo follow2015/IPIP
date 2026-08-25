@@ -8,7 +8,6 @@ import { useEffect, useMemo } from 'react';
 import { Modal, Form, Input, Select } from 'antd';
 import type { User } from '@/types/models';
 
-
 const PASSWORD_TIPS = '至少8位，需包含大写字母、小写字母、数字和特殊字符';
 
 interface UserFormProps {
@@ -20,12 +19,10 @@ interface UserFormProps {
   roleOptions?: { label: string; value: string | number }[];
 }
 
-
 function UserForm({ open, editRecord, onCancel, onOk, loading, roleOptions }: UserFormProps) {
   const [form] = Form.useForm();
   const isEdit = !!editRecord;
 
-  
   useEffect(() => {
     if (open && editRecord) {
       form.setFieldsValue({
@@ -42,10 +39,8 @@ function UserForm({ open, editRecord, onCancel, onOk, loading, roleOptions }: Us
     }
   }, [open, editRecord, form]);
 
-  
   const handleSubmit = async () => {
     const values = await form.validateFields();
-    
     const { confirm_password, ...submitValues } = values;
     await onOk(submitValues);
   };

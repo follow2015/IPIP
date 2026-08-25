@@ -34,6 +34,7 @@ METHOD_ACTION_MAP = {
 
 
 def _resolve_resource(path: str) -> str | None:
+    """从请求路径解析资源类型"""
     for prefix, resource in AUDITED_RESOURCES.items():
         if path.startswith(prefix):
             return resource
@@ -41,6 +42,16 @@ def _resolve_resource(path: str) -> str | None:
 
 
 def _extract_resource_id(path: str, resource: str) -> int | None:
+    """从请求路径提取资源ID
+
+    解析策略：找"资源前缀之后的第一段数字"，而非"最后一段"。
+    这样 /api/devices/123/nics 也能正确提取 123（设备ID），
+    而不是尝试把 "nics" 转为 int。
+
+    Args:
+        path: 请求路径
+        resource: 资源类型（用于定位前缀在路径中的位置）
+    """
     resource_prefix = None
     for prefix, res in AUDITED_RESOURCES.items():
         if res == resource:
@@ -65,6 +76,11 @@ def _extract_resource_id(path: str, resource: str) -> int | None:
 
 
 class AuditMiddleware:
+    """审计中间件
+
+    注册 Flask before_request/after_request 钩子，
+    自动记录关键资源的写操作到 audit_logs 表并触发分级通知。
+    """
 
     def __init__(self, app=None):
         self.app = app
@@ -72,11 +88,13 @@ class AuditMiddleware:
             self.init_app(app)
 
     def init_app(self, app):
+        """初始化审计中间件"""
         app.before_request(self._before_request)
         app.after_request(self._after_request)
         logger.info("审计中间件已注册")
 
     def _before_request(self):
+        """请求前：标记是否需要审计"""
         method = request.method
         path = request.path
 
@@ -93,6 +111,7 @@ class AuditMiddleware:
         g._audit_resource_id = _extract_resource_id(path, resource)
 
     def _after_request(self, response):
+        """请求后：写入审计日志并触发分级通知"""
         if not getattr(g, '_audit_needed', False):
             return response
 
@@ -130,6 +149,11 @@ class AuditMiddleware:
 
     @staticmethod
     def _extract_id_from_response(response) -> int | None:
+        """从响应体中提取资源ID
+
+        支持单个对象 {data: {id: 123}} 和批量创建 {data: [{id: 1}, {id: 2}]}。
+        批量创建时返回第一个 ID，完整 ID 列表记录在 detail 中。
+        """
         try:
             data = response.get_json(silent=True)
             if not data or not isinstance(data, dict) or 'data' not in data:

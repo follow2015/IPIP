@@ -22,16 +22,23 @@ from app.interfaces.cache import CacheStorage
 
 logger = get_logger(__name__)
 
-REDIS_POOL_TIMEOUT = 5
+REDIS_POOL_TIMEOUT = 5  # Redis 连接/读写超时时间（秒）
 
 
 def _json_default(o: Any) -> Any:
+    """JSON 序列化兜底：显式处理常见非原生类型，未知类型直接报错。
+
+    替代 ``default=str`` 的静默字符串化——后者会把 datetime/Decimal/UUID 等
+    转成字符串、丢失类型信息（datetime 还会变成不可解析的 "2026-07-27 14:10:43"）。
+    这里将可识别类型转为 JSON 原生表达，无法识别的类型抛 TypeError，
+    由调用方 ``except`` 转译为 ValueError 暴露出来，避免静默数据损坏。
+    """
     if isinstance(o, (datetime, date)):
         return o.isoformat()
     if isinstance(o, timedelta):
         return o.total_seconds()
     if isinstance(o, Decimal):
-        return str(o)
+        return str(o)  # 保留精度，读取方按需解析
     if isinstance(o, UUID):
         return str(o)
     if isinstance(o, (bytes, bytearray)):
@@ -42,13 +49,27 @@ def _json_default(o: Any) -> Any:
 
 
 class RedisCacheStorage(CacheStorage):
+    """Redis缓存存储实现"""
     
     def __init__(self, config=None, key_prefix: str = ""):
+        """初始化Redis缓存存储
+        
+        Args:
+            config: 配置对象
+            key_prefix: 键前缀
+        """
         self.config = config or get_config()
         self.key_prefix = key_prefix
         self.redis_client = self._init_redis()
         
     def _init_redis(self):
+        """初始化Redis客户端
+
+        关键配置说明：
+        - retry_on_timeout: 超时后自动重试，防止 Broken pipe
+        - health_check_interval: 定期检测连接有效性，自动剔除失效连接
+        - socket_keepalive: 启用 TCP keepalive，防止空闲连接被中间设备断开
+        """
         try:
             config_instance = self.config() if isinstance(self.config, type) else self.config
             redis_password = (
@@ -76,6 +97,12 @@ class RedisCacheStorage(CacheStorage):
             return None
     
     def _make_key(self, key: str) -> str:
+        """生成带前缀的缓存键
+
+        前缀与键之间使用 ':' 分隔，防止命名空间泄漏。
+        如果实例未配置前缀，使用环境变量 CACHE_KEY_PREFIX（默认 ipip:）。
+        前缀中的尾随冒号会被归一化，避免产生 'ipip::user:1' 这类双冒号键。
+        """
         prefix = self.key_prefix or os.getenv('CACHE_KEY_PREFIX', 'ipip:')
         if prefix:
             prefix = prefix.rstrip(':')
@@ -84,6 +111,12 @@ class RedisCacheStorage(CacheStorage):
         return key
     
     def _serialize_value(self, value: Any) -> str:
+        """序列化值（仅 JSON，禁用 pickle 以防 RCE）
+
+        使用 ``_json_default`` 显式处理 datetime/Decimal/UUID 等常见非原生类型，
+        未知类型直接抛 TypeError（被 except 转为 ValueError 暴露），不再用
+        ``default=str`` 静默字符串化而丢失类型信息。
+        """
         try:
             return json.dumps(value, ensure_ascii=False, default=_json_default)
         except (TypeError, ValueError) as e:
@@ -91,6 +124,7 @@ class RedisCacheStorage(CacheStorage):
             raise ValueError(f"缓存值不支持序列化: {type(value)}")
     
     def _deserialize_value(self, value: str) -> Any:
+        """反序列化值（仅 JSON，禁用 pickle 以防 RCE）"""
         try:
             return json.loads(value)
         except (json.JSONDecodeError, TypeError) as e:
@@ -98,6 +132,7 @@ class RedisCacheStorage(CacheStorage):
             return None
     
     def get(self, key: str, default: Any = None) -> Any:
+        """获取缓存值"""
         if not self.redis_client:
             logger.warning("Redis客户端未初始化，无法获取缓存")
             return default
@@ -115,6 +150,7 @@ class RedisCacheStorage(CacheStorage):
             return default
     
     def set(self, key: str, value: Any, ttl: int = None) -> bool:
+        """设置缓存值"""
         if not self.redis_client:
             logger.warning("Redis客户端未初始化，无法设置缓存")
             return False
@@ -135,6 +171,7 @@ class RedisCacheStorage(CacheStorage):
             return False
     
     def delete(self, key: str) -> bool:
+        """删除缓存"""
         if not self.redis_client:
             logger.warning("Redis客户端未初始化，无法删除缓存")
             return False
@@ -149,6 +186,7 @@ class RedisCacheStorage(CacheStorage):
             return False
     
     def exists(self, key: str) -> bool:
+        """检查缓存是否存在"""
         if not self.redis_client:
             return False
 
@@ -160,6 +198,7 @@ class RedisCacheStorage(CacheStorage):
             return False
     
     def get_ttl(self, key: str) -> int:
+        """获取缓存剩余过期时间"""
         if not self.redis_client:
             return -2
 
@@ -171,6 +210,7 @@ class RedisCacheStorage(CacheStorage):
             return -2
     
     def increment(self, key: str, amount: int = 1) -> Optional[int]:
+        """增加计数器"""
         if not self.redis_client:
             return None
 
@@ -182,6 +222,7 @@ class RedisCacheStorage(CacheStorage):
             return None
     
     def get_many(self, keys: List[str]) -> Dict[str, Any]:
+        """批量获取缓存"""
         if not self.redis_client:
             return {}
 
@@ -200,6 +241,7 @@ class RedisCacheStorage(CacheStorage):
             return {}
     
     def set_many(self, mapping: Dict[str, Any], ttl: int = None) -> bool:
+        """批量设置缓存"""
         if not self.redis_client:
             return False
 
@@ -222,6 +264,10 @@ class RedisCacheStorage(CacheStorage):
             return False
     
     def delete_pattern(self, pattern: str) -> int:
+        """根据模式删除缓存
+
+        使用 SCAN 替代 KEYS，避免阻塞 Redis 事件循环。
+        """
         if not self.redis_client:
             logger.warning("Redis客户端未初始化，无法删除缓存")
             return 0
@@ -247,9 +293,11 @@ class RedisCacheStorage(CacheStorage):
             return 0
     
     def clear_all(self) -> bool:
+        """清空所有缓存"""
         return self.delete_pattern("*") > 0
     
     def get_stats(self) -> Dict[str, Any]:
+        """获取缓存统计信息"""
         if not self.redis_client:
             return {"status": "disconnected"}
 
@@ -272,6 +320,7 @@ class RedisCacheStorage(CacheStorage):
             return {"status": "error", "error": str(e)}
     
     def _calculate_hit_rate(self, hits: int, misses: int) -> float:
+        """计算缓存命中率"""
         total = hits + misses
         if total == 0:
             return 0.0
@@ -279,16 +328,23 @@ class RedisCacheStorage(CacheStorage):
 
 
 class MemoryCacheStorage(CacheStorage):
+    """内存缓存存储实现"""
     
-    MAX_ENTRIES = 10000
+    MAX_ENTRIES = 10000  # 默认最大条目数，防止内存泄漏
 
     def __init__(self, max_entries: int = MAX_ENTRIES):
+        """初始化内存缓存存储
+
+        Args:
+            max_entries: 最大缓存条目数，超过后自动淘汰过期和最久未访问的条目
+        """
         self._cache = {}
         self._ttl_data = {}
         self._lock = threading.RLock()
         self._max_entries = max_entries
     
     def _is_expired(self, key: str) -> bool:
+        """检查键是否过期"""
         if key not in self._ttl_data:
             return False
         
@@ -299,16 +355,19 @@ class MemoryCacheStorage(CacheStorage):
         return time.time() > expire_time
     
     def _cleanup_expired(self, key: str) -> None:
+        """清理过期的键"""
         if self._is_expired(key):
             self._cache.pop(key, None)
             self._ttl_data.pop(key, None)
     
     def get(self, key: str, default: Any = None) -> Any:
+        """获取缓存值"""
         with self._lock:
             self._cleanup_expired(key)
             return self._cache.get(key, default)
 
     def set(self, key: str, value: Any, ttl: int = None) -> bool:
+        """设置缓存值"""
         try:
             with self._lock:
                 if len(self._cache) >= self._max_entries:
@@ -327,6 +386,7 @@ class MemoryCacheStorage(CacheStorage):
             return False
     
     def delete(self, key: str) -> bool:
+        """删除缓存"""
         with self._lock:
             existed = key in self._cache
             self._cache.pop(key, None)
@@ -334,6 +394,7 @@ class MemoryCacheStorage(CacheStorage):
             return existed
 
     def _evict_expired(self) -> None:
+        """清理所有过期条目"""
         now = time.time()
         expired_keys = [
             k for k, ttl in self._ttl_data.items()
@@ -344,6 +405,7 @@ class MemoryCacheStorage(CacheStorage):
             self._ttl_data.pop(k, None)
 
     def _evict_oldest(self) -> None:
+        """淘汰最旧的条目（TTL 最小或最早的）"""
         if not self._ttl_data:
             return
         oldest_key = min(self._ttl_data, key=lambda k: self._ttl_data[k] or float('inf'))
@@ -351,10 +413,12 @@ class MemoryCacheStorage(CacheStorage):
         self._ttl_data.pop(oldest_key, None)
     
     def exists(self, key: str) -> bool:
+        """检查缓存是否存在"""
         self._cleanup_expired(key)
         return key in self._cache
     
     def get_ttl(self, key: str) -> int:
+        """获取缓存剩余过期时间"""
         if key not in self._cache:
             return -2
         
@@ -365,6 +429,7 @@ class MemoryCacheStorage(CacheStorage):
         return max(0, int(remaining))
     
     def increment(self, key: str, amount: int = 1) -> Optional[int]:
+        """增加计数器"""
         try:
             self._cleanup_expired(key)
             current = self._cache.get(key, 0)
@@ -378,6 +443,7 @@ class MemoryCacheStorage(CacheStorage):
             return None
     
     def get_many(self, keys: List[str]) -> Dict[str, Any]:
+        """批量获取缓存"""
         result = {}
         for key in keys:
             self._cleanup_expired(key)
@@ -386,6 +452,7 @@ class MemoryCacheStorage(CacheStorage):
         return result
     
     def set_many(self, mapping: Dict[str, Any], ttl: int = None) -> bool:
+        """批量设置缓存"""
         try:
             for key, value in mapping.items():
                 self.set(key, value, ttl)
@@ -395,6 +462,7 @@ class MemoryCacheStorage(CacheStorage):
             return False
     
     def delete_pattern(self, pattern: str) -> int:
+        """根据模式删除缓存"""
         import fnmatch
         
         count = 0
@@ -411,6 +479,7 @@ class MemoryCacheStorage(CacheStorage):
         return count
     
     def clear_all(self) -> bool:
+        """清空所有缓存"""
         try:
             self._cache.clear()
             self._ttl_data.clear()
@@ -420,6 +489,7 @@ class MemoryCacheStorage(CacheStorage):
             return False
     
     def get_stats(self) -> Dict[str, Any]:
+        """获取缓存统计信息"""
         expired_keys = []
         for key in list(self._cache.keys()):
             if self._is_expired(key):

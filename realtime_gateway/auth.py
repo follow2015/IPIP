@@ -26,6 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 def verify_token(token: str) -> dict | None:
+    """校验 JWT token，返回 payload 或 None。
+
+    与 Flask 侧 app/utils/auth.py 的 AuthenticationManager.verify_token 对齐：
+    - 共享 JWT_SECRET_KEY 和 JWT_ALGORITHM
+    - payload 中必须有 user_id 字段
+    - 过期/无效 token 返回 None
+    """
     if not config.JWT_SECRET_KEY:
         logger.error("JWT_SECRET_KEY 未配置，网关鉴权不可用")
         return None
@@ -49,6 +56,16 @@ def verify_token(token: str) -> dict | None:
 
 
 def extract_token_from_request(scope: dict) -> str | None:
+    """从 ASGI scope 中提取 token。
+
+    优先从 URL 查询参数提取，其次从 Authorization 请求头提取。
+
+    Args:
+        scope: ASGI 连接 scope 字典
+
+    Returns:
+        token 字符串，或 None
+    """
     query_string = scope.get("query_string", b"")
     if query_string:
         from urllib.parse import parse_qs

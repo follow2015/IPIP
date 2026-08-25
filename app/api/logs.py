@@ -22,6 +22,24 @@ logs_bp = Blueprint("logs", __name__)
 @rate_limit_api
 @api_exception_handler
 def log_error():
+    """接收前端错误日志
+
+    接收并记录前端JavaScript错误。
+
+    Request Body:
+        {
+            "message": "错误消息",
+            "url": "发生错误的URL",
+            "line": 行号,
+            "column": 列号,
+            "error": "错误堆栈",
+            "userAgent": "用户代理",
+            "timestamp": "时间戳"
+        }
+
+    Returns:
+        JSON响应
+    """
     try:
         data = request.get_json()
         
@@ -58,6 +76,21 @@ def log_error():
 @rate_limit_api
 @api_exception_handler
 def log_info():
+    """接收前端信息日志
+
+    接收并记录前端信息日志。
+
+    Request Body:
+        {
+            "message": "日志消息",
+            "level": "日志级别",
+            "data": "附加数据",
+            "timestamp": "时间戳"
+        }
+
+    Returns:
+        JSON响应
+    """
     try:
         data = request.get_json()
         
@@ -89,6 +122,15 @@ def log_info():
 @rate_limit_api
 @api_exception_handler
 def get_logs():
+    """获取最近日志
+    
+    Query Parameters:
+        limit: 返回数量（默认10，最大100）
+        level: 日志级别过滤（可选）
+    
+    Returns:
+        JSON响应，包含日志列表
+    """
     try:
         limit = request.args.get("limit", 10, type=int)
         level = request.args.get("level", type=str)
@@ -109,6 +151,11 @@ def get_logs():
 @rate_limit_api
 @api_exception_handler
 def get_log_stats():
+    """获取日志统计
+    
+    Returns:
+        JSON响应，包含日志统计信息
+    """
     try:
         stats = {
             "total": 0,

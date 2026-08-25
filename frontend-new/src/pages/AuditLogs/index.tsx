@@ -14,7 +14,6 @@ import { formatDateTime } from '@/utils/format';
 
 const { RangePicker } = DatePicker;
 
-
 const ACTION_OPTIONS = [
   { label: '创建', value: 'create' },
   { label: '更新', value: 'update' },
@@ -24,7 +23,6 @@ const ACTION_OPTIONS = [
   { label: '导入', value: 'import' },
   { label: '导出', value: 'export' },
 ];
-
 
 const RESOURCE_OPTIONS = [
   { label: '设备', value: 'device' },
@@ -39,7 +37,6 @@ const RESOURCE_OPTIONS = [
   { label: '角色', value: 'role' },
 ];
 
-
 const ACTION_COLOR_MAP: Record<string, string> = {
   create: 'green',
   update: 'blue',
@@ -50,7 +47,6 @@ const ACTION_COLOR_MAP: Record<string, string> = {
   export: 'orange',
 };
 
-
 function AuditLogs() {
   const [action, setAction] = useState<string | undefined>();
   const [resource, setResource] = useState<string | undefined>();
@@ -58,7 +54,6 @@ function AuditLogs() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
-  
   const queryParams: AuditLogQueryParams = {
     page,
     per_page: pageSize,
@@ -70,7 +65,6 @@ function AuditLogs() {
 
   const { data, isLoading, refetch } = useAuditLogs(queryParams);
 
-  
   const handleReset = () => {
     setAction(undefined);
     setResource(undefined);
@@ -78,7 +72,6 @@ function AuditLogs() {
     setPage(1);
   };
 
-  
   const columns = [
     {
       title: '时间',
@@ -139,7 +132,7 @@ function AuditLogs() {
 
   return (
     <Card>
-      {}
+      {/* 筛选栏 */}
       <Space style={{ marginBottom: 16 }} wrap>
         <span style={{ color: '#666' }}>时间：</span>
         <RangePicker
@@ -173,7 +166,7 @@ function AuditLogs() {
         </Button>
       </Space>
 
-      {}
+      {/* 日志表格 */}
       <Table<AuditLog>
         columns={columns}
         dataSource={data?.items ?? []}

@@ -29,29 +29,38 @@ logger = get_logger(__name__)
 
 
 class CustomerCreateSchema(Schema):
+    """创建客户请求验证Schema
+    
+    字段名与数据库模型保持一致：customer_name, customer_status
+    只有 customer_name 是必填，其他字段均可为空
+    """
     
     class Meta:
-        unknown = EXCLUDE
+        unknown = EXCLUDE  # 忽略未知字段
 
     customer_name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
     customer_status = fields.Int(load_default=CustomerStatus.ACTIVE.value)
     contact_person = fields.Str(allow_none=True, validate=validate.Length(max=50))
     contact_phone = fields.Str(allow_none=True, validate=validate.Length(max=20))
-    email = fields.Email(allow_none=True)
+    email = fields.Email(allow_none=True)  # 允许空值
     address = fields.Str(allow_none=True, validate=validate.Length(max=200))
     notes = fields.Str(allow_none=True, validate=validate.Length(max=500))
 
 
 class CustomerUpdateSchema(Schema):
+    """更新客户请求验证Schema
+    
+    字段名与数据库模型保持一致：customer_name, customer_status
+    """
     
     class Meta:
-        unknown = EXCLUDE
+        unknown = EXCLUDE  # 忽略未知字段
 
     customer_name = fields.Str(validate=validate.Length(min=1, max=100))
     customer_status = fields.Int()
     contact_person = fields.Str(allow_none=True, validate=validate.Length(max=50))
     contact_phone = fields.Str(allow_none=True, validate=validate.Length(max=20))
-    email = fields.Email(allow_none=True)
+    email = fields.Email(allow_none=True)  # 允许空值
     address = fields.Str(allow_none=True, validate=validate.Length(max=200))
     notes = fields.Str(allow_none=True, validate=validate.Length(max=500))
 
@@ -62,6 +71,14 @@ class CustomerUpdateSchema(Schema):
 @permission_required("customer:view")
 @rate_limit_api
 def list_customers():
+    """获取客户列表（支持分页、搜索过滤）
+
+    Query Parameters:
+        page: 页码（默认1）
+        per_page: 每页数量（默认20，最大1000）
+        search: 搜索关键词，模糊匹配客户名/联系人/邮箱（可选）
+        status: 按状态过滤（可选）
+    """
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 1000)
     search = request.args.get("search", type=str)
@@ -105,6 +122,14 @@ def list_customers():
 @permission_required("customer:view")
 @rate_limit_api
 def get_customer(customer_id):
+    """获取单个客户详情
+
+    Args:
+        customer_id: 客户ID
+
+    Returns:
+        JSON响应，包含客户详细信息
+    """
     customer = customer_service.get_by_id(customer_id)
 
     if not customer:
@@ -120,6 +145,21 @@ def get_customer(customer_id):
 @rate_limit_api
 @transactional
 def create_customer():
+    """创建新客户
+
+    Request Body:
+        name: 客户名称（必需）
+        contact_person: 联系人（可选）
+        contact_phone: 联系电话（可选）
+        contact_email: 联系邮箱（可选）
+        address: 地址（可选）
+        company_type: 公司类型（可选）
+        status: 状态（可选）
+        description: 描述（可选）
+
+    Returns:
+        JSON响应，包含新创建的客户信息
+    """
     data = validation_manager.validate_schema(request.json, CustomerCreateSchema())
 
     if "contact_phone" in data and data["contact_phone"]:
@@ -142,6 +182,24 @@ def create_customer():
 @rate_limit_api
 @transactional
 def update_customer(customer_id):
+    """更新客户信息
+
+    Args:
+        customer_id: 客户ID
+
+    Request Body:
+        name: 客户名称（可选）
+        contact_person: 联系人（可选）
+        contact_phone: 联系电话（可选）
+        contact_email: 联系邮箱（可选）
+        address: 地址（可选）
+        company_type: 公司类型（可选）
+        status: 状态（可选）
+        description: 描述（可选）
+
+    Returns:
+        JSON响应，包含更新后的客户信息
+    """
     data = validation_manager.validate_schema(request.json, CustomerUpdateSchema())
 
     customer = customer_service.get_by_id(customer_id)
@@ -184,6 +242,14 @@ def update_customer(customer_id):
 @rate_limit_api
 @transactional
 def delete_customer(customer_id):
+    """删除客户
+
+    Args:
+        customer_id: 客户ID
+
+    Returns:
+        JSON响应
+    """
     customer = customer_service.get_by_id(customer_id)
     if not customer:
         return APIResponse.error(message="客户不存在", error_code="CUSTOMER_NOT_FOUND", status_code=404)
@@ -204,6 +270,14 @@ def delete_customer(customer_id):
 @permission_required("customer:view")
 @rate_limit_api
 def get_customer_cabinets(customer_id):
+    """获取客户的所有机柜
+
+    Args:
+        customer_id: 客户ID
+
+    Returns:
+        JSON响应，包含机柜列表
+    """
     customer = customer_service.get_by_id(customer_id)
     if not customer:
         return APIResponse.error(message="客户不存在", error_code="CUSTOMER_NOT_FOUND", status_code=404)
@@ -221,6 +295,14 @@ def get_customer_cabinets(customer_id):
 @permission_required("customer:view")
 @rate_limit_api
 def get_customer_devices(customer_id):
+    """获取客户的所有设备
+
+    Args:
+        customer_id: 客户ID
+
+    Returns:
+        JSON响应，包含设备列表
+    """
     customer = customer_service.get_by_id(customer_id)
     if not customer:
         return APIResponse.error(message="客户不存在", error_code="CUSTOMER_NOT_FOUND", status_code=404)
@@ -236,6 +318,14 @@ def get_customer_devices(customer_id):
 @permission_required("customer:view")
 @rate_limit_api
 def get_customer_statistics(customer_id):
+    """获取客户统计信息
+
+    Args:
+        customer_id: 客户ID
+
+    Returns:
+        JSON响应，包含统计信息
+    """
     customer = customer_service.get_by_id(customer_id)
     if not customer:
         return APIResponse.error(message="客户不存在", error_code="CUSTOMER_NOT_FOUND", status_code=404)
@@ -249,6 +339,38 @@ def get_customer_statistics(customer_id):
 @doc(summary="获取客户资产统计", tags=["客户"], parameters=[{"name": "customer_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 500: "ApiError"})
 @login_required
 def get_customer_assets(customer_id):
+    """获取客户资产统计
+    
+    根据客户ID统计客户使用的机房、机柜、设备、网络信息。
+    如果整柜和整个网段均归属同一个客户,则不再单独显示U位和IP使用情况。
+    
+    Args:
+        customer_id: 客户ID
+    
+    Returns:
+        JSON: 客户资产统计信息,包括:
+            - customer_id: 客户ID
+            - customer_name: 客户名称
+            - rooms: 使用的机房列表
+            - cabinets: 机柜统计
+                - full_cabinets: 整柜租赁列表
+                - partial_cabinets: 部分使用机柜列表
+                - total_count: 机柜总数
+                - total_u_used: U位使用总数
+            - devices: 设备统计
+                - total_count: 设备总数
+                - by_type: 按类型统计
+                - by_cabinet: 按机柜统计
+            - networks: 网络统计
+                - full_networks: 整网段租赁列表
+                - partial_ips: 零散IP列表
+                - total_networks: 网段总数
+                - total_ips: IP总数
+            - summary: 汇总信息
+    
+    Example:
+        GET /api/customers/1/assets
+    """
     try:
         assets = customer_service.get_customer_assets(customer_id)
         return APIResponse.success(
@@ -268,6 +390,14 @@ def get_customer_assets(customer_id):
 @doc(summary="导出客户资源Excel", tags=["客户"], parameters=[{"name": "customer_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError", 500: "ApiError"})
 @login_required
 def export_customer_assets(customer_id):
+    """导出客户资源统计 Excel（5 个 Sheet：概览/机柜/设备/网段/端口）
+
+    Args:
+        customer_id: 客户ID
+
+    Returns:
+        Excel 文件下载
+    """
     from flask import send_file
     from datetime import datetime
 
@@ -293,6 +423,14 @@ def export_customer_assets(customer_id):
 @rate_limit_api
 @transactional
 def batch_delete_customers():
+    """批量删除客户
+    
+    Request Body:
+        ids: 客户ID列表
+    
+    Returns:
+        JSON响应，包含删除结果
+    """
     from app.services.customer_service import CustomerService
     
     data = request.get_json()
@@ -334,6 +472,7 @@ def batch_delete_customers():
 @login_required
 @permission_required("customer:view")
 def download_customer_import_template():
+    """下载客户导入模板（含表头+示例行）"""
     import pandas as pd
     from io import BytesIO
 
@@ -363,6 +502,7 @@ def download_customer_import_template():
     )
 
 
+
 @customer_bp.route("/<int:customer_id>/terminate", methods=["POST"])
 @doc(summary="终止客户（主入口，原子释放全部资源）", tags=["客户"], responses={200: "CustomerResponse", 404: "ApiError", 409: "ApiError"})
 @login_required
@@ -370,6 +510,14 @@ def download_customer_import_template():
 @rate_limit_api
 @transactional
 def terminate_customer(customer_id):
+    """终止客户。
+
+    原子释放该客户名下全部资源（IP/设备/机柜/端口/模板），生成终止存档记录，
+    事务提交后异步生成 PDF。幂等：已终止客户再次调用返回成功。
+
+    Request Body（可选）:
+        reason: 终止原因（P2-2，可选）
+    """
     data = request.get_json(silent=True) or {}
     reason = data.get("reason")
     operator_id = get_current_user_id()
@@ -391,6 +539,7 @@ def terminate_customer(customer_id):
 @login_required
 @permission_required("customer:view")
 def termination_preview(customer_id):
+    """终止前置预览：返回将释放的资源清单与计数，不执行释放。"""
     customer = customer_service.get_by_id(customer_id)
     if not customer:
         return APIResponse.error(message="客户不存在", error_code="CUSTOMER_NOT_FOUND", status_code=404)
@@ -407,6 +556,7 @@ def termination_preview(customer_id):
 @login_required
 @permission_required("customer:view")
 def download_termination_archive(customer_id):
+    """下载最近一份终止存档 PDF。"""
     from flask import send_file
     from io import BytesIO
     from datetime import datetime
@@ -436,6 +586,7 @@ def download_termination_archive(customer_id):
 @login_required
 @permission_required("customer:view")
 def list_termination_archives(customer_id):
+    """返回历史存档元数据（时间/操作人/资源计数/pdf_size/reason），不返回 BLOB。"""
     from app.persistence.customer_termination_archive_repository import CustomerTerminationArchiveRepository
 
     archive_repo = CustomerTerminationArchiveRepository()
@@ -461,6 +612,7 @@ def list_termination_archives(customer_id):
 @permission_required("customer:terminate")
 @transactional
 def rebuild_termination_archive(customer_id):
+    """凭 summary_json 重新生成 PDF 回填（应对 PDF 生成失败场景）。"""
     from app.persistence.customer_termination_archive_repository import CustomerTerminationArchiveRepository
 
     archive_repo = CustomerTerminationArchiveRepository()

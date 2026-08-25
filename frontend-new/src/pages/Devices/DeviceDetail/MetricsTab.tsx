@@ -39,12 +39,10 @@ import { ErrorBoundary } from '@/components/ErrorBoundary/ErrorBoundary';
 import TrafficChart from '@/components/Monitor/TrafficChart';
 import { formatDateTime } from '@/utils/format';
 
-
 interface MetricGroupDef {
   key: string;
   label: string;
   icon: React.ReactNode;
-  
   protocols?: string[];
 }
 
@@ -134,7 +132,6 @@ const METRIC_GROUPS: MetricGroupDef[] = [
   { key: 'monitor_interrupted', label: '监控中断', icon: <DisconnectOutlined /> }
 ];
 
-
 const SEVERITY_COLOR: Record<string, string> = {
   crit: 'red',
   critical: 'red',
@@ -144,7 +141,6 @@ const SEVERITY_COLOR: Record<string, string> = {
   ok: 'green'
 };
 
-
 const SEVERITY_LABEL: Record<string, string> = {
   crit: '严重',
   critical: '严重',
@@ -153,7 +149,6 @@ const SEVERITY_LABEL: Record<string, string> = {
   info: '信息',
   ok: '正常'
 };
-
 
 const OVERALL_STATUS_META: Record<
   string,
@@ -176,7 +171,6 @@ const OVERALL_STATUS_META: Record<
   normal: { text: '指标采集正常', type: 'success', icon: <CheckCircleOutlined /> }
 };
 
-
 const STATUS_ONLY_OVERALL = new Set(['unreachable', 'credential_error', 'no_data', 'not_probed']);
 
 interface MetricsTabProps {
@@ -197,7 +191,6 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
     );
   }
 
-  
   if (!dashboard?.has_credential) {
     return (
       <Card size="small" title="监控数据">
@@ -216,9 +209,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
     );
   }
 
-  
   const showTraffic = !trafficPortsLoading && !!trafficPortsData?.configured;
-  
   const grouped = dashboard?.grouped ?? false;
   const metricStatus = dashboard?.metric_status ?? [];
   const overall = dashboard?.overall_status ?? 'no_data';
@@ -226,7 +217,6 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
   const statusReason = dashboard?.status_reason ?? overallMeta.text;
 
   const items = alertData?.items ?? [];
-  
   const groupedAlerts = new Map<string, typeof items>();
   for (const item of items) {
     const list = groupedAlerts.get(item.metric_key) ?? [];
@@ -242,13 +232,12 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
       })
     : [];
 
-  
   const isStatusOnly = STATUS_ONLY_OVERALL.has(overall);
 
   return (
     <Card size="small" title="监控数据">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {}
+        {/* ── 上半部分：Zabbix 端口流量（仅关联 Zabbix 凭据时显示） ── */}
         {showTraffic && (
           <ErrorBoundary
             fallback={() => (
@@ -261,7 +250,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
           </ErrorBoundary>
         )}
 
-        {}
+        {/* ── 下半部分：监控指标信息 ── */}
         <div>
           <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
             <Typography.Text strong>监控指标</Typography.Text>
@@ -272,7 +261,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
             )}
           </Space>
 
-          {}
+          {/* 整体状态提示 */}
           <Alert
             type={overallMeta.type}
             showIcon
@@ -282,7 +271,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
           />
 
           {isStatusOnly ? (
-            
+            /* 不可达 / 凭据错误 / 无数据 / 未探测 → 指标区域直接展示对应状态（灰色卡片） */
             <Card size="small" style={{ background: '#fafafa', borderColor: '#d9d9d9' }}>
               <div style={{ textAlign: 'center', padding: 24 }}>
                 <Space direction="vertical" size={8} style={{ alignItems: 'center' }}>
@@ -309,7 +298,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
               </div>
             </Card>
           ) : grouped ? (
-            
+            /* 命中模板组且可展示指标 → 按模板指标表格展示（灰色卡片） */
             metricStatus.length > 0 ? (
               <Card
                 size="small"
@@ -366,7 +355,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
             ) : (
               <Empty description="该模板组暂未包含任何指标" image={Empty.PRESENTED_IMAGE_SIMPLE} />
             )
-          ) : 
+          ) : /* 未命中模板组 → 优先用 latest 数值表格；无 latest 时回退默认分组 + 告警卡片 */
           metricStatus.length > 0 ? (
             <Card
               size="small"
@@ -437,7 +426,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                   const notProbedYet = hasCredentials && dashboard?.overall_status === 'not_probed';
                   return (
                     <Col xs={24} md={12} key={group.key}>
-                      {}
+                      {/* 所有指标卡片灰色呈现 */}
                       <Card
                         size="small"
                         title={
@@ -509,7 +498,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
           )}
         </div>
 
-        {}
+        {/* ── 活跃告警明细区域（有告警才显示） ── */}
         {items.length > 0 && (
           <div>
             <Space style={{ marginBottom: 8 }}>

@@ -22,6 +22,11 @@ config = get_config()
 
 
 class UserService:
+    """用户服务类
+
+    提供用户的CRUD操作和业务逻辑。
+    使用Repository模式进行数据访问，支持依赖注入。
+    """
 
     def __init__(
         self,
@@ -86,6 +91,15 @@ class UserService:
 
 
     def create_user(self, data: Dict[str, Any]) -> User:
+        """创建用户
+
+        Args:
+            data: 用户数据字典，必须包含 username / password / email；
+                  role 字段可选，不再作为 User 列使用（通过角色关系赋予）。
+
+        Raises:
+            ValidationError: 数据验证失败
+        """
         if self.check_username_exists(data.get("username")):
             raise ValidationError(f"用户名 '{data.get('username')}' 已存在")
 
@@ -108,6 +122,11 @@ class UserService:
         return user
 
     def update_user(self, user_id: int, data: Dict[str, Any]) -> Optional[User]:
+        """更新用户
+
+        Raises:
+            ValidationError: 数据验证失败
+        """
         if "username" in data and self.check_username_exists(data["username"], exclude_id=user_id):
             raise ValidationError(f"用户名 '{data['username']}' 已存在")
 
@@ -131,6 +150,7 @@ class UserService:
         return user
 
     def delete_user(self, user_id: int, soft_delete: bool = True) -> bool:
+        """删除用户（默认软删除）"""
         if soft_delete:
             user = self.user_repository.update(user_id, {"status": 1})
             result = user is not None
@@ -159,6 +179,19 @@ class UserService:
         login_type: Optional[str] = "web",
         user_agent: Optional[str] = None,
     ) -> bool:
+        """记录用户登录信息到 users_log 表。
+
+        失败时只记录警告日志，不向上抛出异常，保证登录主流程不受影响。
+
+        Args:
+            user_id:    用户 ID
+            ip:         客户端 IP
+            login_type: 登录类型（auth_manager 返回的 auth_type）
+            user_agent: 登录设备/浏览器 User-Agent
+
+        Returns:
+            bool: 写入成功返回 True
+        """
         log = self.user_log_repository.create_log(
             user_id=user_id,
             login_ip=ip,
@@ -181,6 +214,10 @@ class UserService:
         page: int = 1,
         page_size: int = 20,
     ) -> Dict[str, Any]:
+        """获取登录日志（分页，支持按用户和时间范围过滤）
+
+        返回的每条日志会附带 username 和 name 字段。
+        """
         result = self.user_log_repository.get_paginated_logs(
             user_id=user_id, start_time=start_time, end_time=end_time,
             page=page, page_size=page_size,
@@ -205,11 +242,17 @@ class UserService:
         return result
 
     def get_last_login_info(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """获取用户最近一次登录信息"""
         log = self.user_log_repository.get_last_login(user_id)
         return log.to_dict() if log else None
 
 
     def change_password(self, user_id: int, old_password: str, new_password: str) -> bool:
+        """修改密码
+
+        Raises:
+            ValidationError, RecordNotFoundError
+        """
         user = self.get_by_id(user_id)
         if not user:
             raise RecordNotFoundError("users", {"id": user_id})
@@ -227,6 +270,7 @@ class UserService:
         return result is not None
 
     def reset_password(self, user_id: int, new_password: str) -> bool:
+        """重置密码（管理员操作）"""
         from app.services.security_service import SecurityService
         is_valid, msg = SecurityService.validate_password(new_password)
         if not is_valid:

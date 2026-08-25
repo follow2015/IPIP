@@ -59,7 +59,6 @@ import CredentialDetail from './CredentialDetail';
 
 const { Text, Paragraph } = Typography;
 
-
 const PROTOCOL_ICONS: Record<string, React.ReactNode> = {
   snmp: <DashboardOutlined />,
   ipmi: <SafetyCertificateOutlined />,
@@ -67,11 +66,9 @@ const PROTOCOL_ICONS: Record<string, React.ReactNode> = {
   ping: <ApiOutlined />
 };
 
-
 export default function MonitorCredentials() {
   const msg = useMessage();
 
-  
   const { data: creds = [], isLoading: credsLoading, refetch } = useMonitorCredentials();
   const [selectedCredId, setSelectedCredId] = useState<number | null>(null);
 
@@ -79,7 +76,6 @@ export default function MonitorCredentials() {
   const deleteCred = useDeleteCredential();
   const batchDeleteCred = useBatchDeleteCredentials();
 
-  
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [formOpen, setFormOpen] = useState(false);
@@ -87,16 +83,13 @@ export default function MonitorCredentials() {
   const [editOpen, setEditOpen] = useState(false);
   const [editCred, setEditCred] = useState<MonitorCredentialListItem | null>(null);
 
-  
   const [searchKeyword, setSearchKeyword] = useState('');
   const [protocolFilter, setProtocolFilter] = useState<string[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
   const credTable = useTable({ initialPerPage: 15 });
 
-  
   const selectedCred = (creds as MonitorCredentialListItem[]).find((c) => c.id === selectedCredId);
 
-  
   const stats = useMemo(() => {
     const list = creds as MonitorCredentialListItem[];
     const total = list.length;
@@ -110,7 +103,6 @@ export default function MonitorCredentials() {
     return { total, totalLinked, disabledCount, byProtocol };
   }, [creds]);
 
-  
   const filteredCreds = useMemo(() => {
     const list = creds as MonitorCredentialListItem[];
     return list.filter((c) => {
@@ -125,7 +117,6 @@ export default function MonitorCredentials() {
     });
   }, [creds, searchKeyword, protocolFilter]);
 
-  
   const handleToggleEnabled = async (credId: number, enabled: boolean) => {
     try {
       await patchCred.mutateAsync({ credentialId: credId, enabled });
@@ -135,7 +126,6 @@ export default function MonitorCredentials() {
     }
   };
 
-  
   const handleRename = async (credId: number, newName: string) => {
     try {
       await patchCred.mutateAsync({ credentialId: credId, name: newName || undefined });
@@ -145,7 +135,6 @@ export default function MonitorCredentials() {
     }
   };
 
-  
   const handleDeleteCred = async (credId: number) => {
     try {
       await deleteCred.mutateAsync(credId);
@@ -157,7 +146,6 @@ export default function MonitorCredentials() {
     }
   };
 
-  
   const handleBatchDelete = async () => {
     const list = creds as MonitorCredentialListItem[];
     const toDelete = selectedRowKeys
@@ -173,7 +161,6 @@ export default function MonitorCredentials() {
     try {
       const result = await batchDeleteCred.mutateAsync(toDelete.map((c) => c.id!));
       if (result.failed.length > 0) {
-        
         result.failed.forEach((f) => {
           msg.error(`凭据 #${f.id} 删除失败：${f.reason}`);
         });
@@ -193,13 +180,11 @@ export default function MonitorCredentials() {
     setSelectedRowKeys([]);
   };
 
-  
   const handleOpenEdit = (cred: MonitorCredentialListItem) => {
     setEditCred(cred);
     setEditOpen(true);
   };
 
-  
   const credColumns = [
     {
       title: '名称',
@@ -298,7 +283,7 @@ export default function MonitorCredentials() {
 
   return (
     <div>
-      {}
+      {/* ── 顶部统计概览 ─────────────────────────────────────── */}
       <Row gutter={12} style={{ marginBottom: 16 }}>
         {MONITOR_PROTOCOL_OPTIONS.map((opt) => {
           const count = stats.byProtocol[opt.value] || 0;
@@ -337,7 +322,7 @@ export default function MonitorCredentials() {
         })}
       </Row>
 
-      {}
+      {/* ── 汇总信息 ────────────────────────────────────────── */}
       <div style={{ marginBottom: 16, padding: '8px 0' }}>
         <Space size="large">
           <Text type="secondary">
@@ -356,7 +341,7 @@ export default function MonitorCredentials() {
       </div>
 
       <Row gutter={16}>
-        {}
+        {/* ── 左栏：凭据列表 ─────────────────────────────────── */}
         <Col xs={24} lg={10}>
           <Card
             title="共享凭据"
@@ -371,7 +356,7 @@ export default function MonitorCredentials() {
               </Space>
             }
           >
-            {}
+            {/* 搜索框 */}
             <Input
               placeholder="搜索凭据名称"
               prefix={<SearchOutlined />}
@@ -381,7 +366,7 @@ export default function MonitorCredentials() {
               style={{ marginBottom: 12 }}
             />
 
-            {}
+            {/* 协议筛选 Tags */}
             <Space size={[4, 8]} wrap style={{ marginBottom: 12 }}>
               <Tag
                 style={{ cursor: 'pointer', padding: '2px 8px' }}
@@ -408,7 +393,7 @@ export default function MonitorCredentials() {
               ))}
             </Space>
 
-            {}
+            {/* 批量操作栏 */}
             {selectedRowKeys.length > 0 && (
               <Alert
                 type="info"
@@ -458,13 +443,13 @@ export default function MonitorCredentials() {
           </Card>
         </Col>
 
-        {}
+        {/* ── 右栏：凭据详情 + 关联设备 ────────────────────── */}
         <Col xs={24} lg={14}>
           <CredentialDetail selectedCred={selectedCred} onOpenLink={() => setLinkOpen(true)} />
         </Col>
       </Row>
 
-      {}
+      {/* ── 新建凭据弹窗 ────────────────────────────────────── */}
       <CreateCredentialModal
         open={formOpen}
         form={form}
@@ -474,7 +459,7 @@ export default function MonitorCredentials() {
         }}
       />
 
-      {}
+      {/* ── 编辑密文弹窗 ────────────────────────────────────── */}
       <EditCredentialModal
         open={editOpen}
         editCred={editCred}
@@ -485,7 +470,7 @@ export default function MonitorCredentials() {
         }}
       />
 
-      {}
+      {/* ── 关联设备弹窗 ────────────────────────────────────── */}
       <LinkDeviceModal
         open={linkOpen}
         selectedCredId={selectedCredId}

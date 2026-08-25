@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState } from 'react';
 import { Button, Switch, Space, Drawer, Tag, Checkbox, Typography, Input, Modal } from 'antd';
 import {
@@ -29,7 +28,6 @@ import { useCrudPage } from '@/hooks/useCrudPage';
 import { useMessage } from '@/hooks/useMessage';
 import { formatDateTime } from '@/utils/format';
 
-
 function Users() {
   const navigate = useNavigate();
   const [roleDrawerOpen, setRoleDrawerOpen] = useState(false);
@@ -49,7 +47,6 @@ function Users() {
   const message = useMessage();
   const { data: roleOptions } = useRoleOptions();
 
-  
   const handleResetPassword = (r: User) => {
     confirm({
       title: '重置密码',
@@ -92,18 +89,15 @@ function Users() {
     });
   };
 
-  
   const handleViewLoginLogs = (r: User) => {
     navigate(`/login-logs?user_id=${r.id}`);
   };
 
-  
   const handleAssignRole = (r: User) => {
     setRoleUser(r);
     setRoleDrawerOpen(true);
   };
 
-  
   const handleSubmit = async (values: Record<string, unknown>) => {
     try {
       if (crud.editRecord) {
@@ -122,7 +116,6 @@ function Users() {
     }
   };
 
-  
   const handleToggle = (r: User) => {
     const newStatus = r.status === 1 ? 0 : 1;
     toggleStatus.mutateAsync({ id: r.id, status: newStatus }).then(() => {
@@ -131,7 +124,6 @@ function Users() {
     });
   };
 
-  
   const columns = [
     {
       title: 'ID',
@@ -248,7 +240,7 @@ function Users() {
         roleOptions={roleOptions}
       />
 
-      {}
+      {/* 分配角色抽屉 */}
       <RoleAssignDrawer
         open={roleDrawerOpen}
         user={roleUser}
@@ -270,7 +262,6 @@ interface RoleAssignDrawerProps {
   onSuccess: () => void;
 }
 
-
 function RoleAssignDrawer({ open, user, onClose, onSuccess }: RoleAssignDrawerProps) {
   const { data: userRoles, isLoading: rolesLoading } = useUserRoles(user?.id ?? 0);
   const { data: allRolesData } = useRoleList();
@@ -278,18 +269,15 @@ function RoleAssignDrawer({ open, user, onClose, onSuccess }: RoleAssignDrawerPr
   const message = useMessage();
 
   const allRoles = allRolesData?.items ?? [];
-  
   const currentRoleNames = (userRoles ?? []).map((r) => r.name);
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
 
-  
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && userRoles) {
       setSelectedNames(currentRoleNames);
     }
   };
 
-  
   const handleSubmit = async () => {
     if (!user) return;
     try {

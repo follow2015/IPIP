@@ -10,7 +10,6 @@ interface IPDetailModalProps {
   detail?: IPAddress;
 }
 
-
 export function IPDetailModal({
   open,
   onClose,

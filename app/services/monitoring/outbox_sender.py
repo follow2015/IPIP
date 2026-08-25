@@ -28,6 +28,14 @@ logger = get_logger(__name__)
 
 
 def _invoke_notify(notify, payload: dict) -> None:
+    """按「严格投递」语义调用通知服务，兼容多种注入形式。
+
+    优先 ``notify_strict``：真实投递失败会抛异常，可与幂等去重返回的 ``None``
+    区分开（P0-1）。若用 ``notify``，异常被吞成 ``None``，发件器无法判定结果，
+    会把失败行误标 ``sent`` → 告警静默丢失。
+
+    退化顺序：``notify_strict`` → ``.notify`` → 裸可调用（兼容测试假对象）。
+    """
     fn = getattr(notify, "notify_strict", None)
     if callable(fn):
         fn(**payload)
@@ -44,6 +52,7 @@ def _invoke_notify(notify, payload: dict) -> None:
 
 
 class MonitorOutboxSender:
+    """进程内发件轮询器：把 outbox 待发行转成真实通知。"""
 
     LOCK_NAME = "outbox"
 
@@ -67,9 +76,11 @@ class MonitorOutboxSender:
 
 
     def _lock_ttl(self) -> int:
+        """互斥锁 TTL：覆盖一轮发送耗时，同时保证崩溃后快速接管。"""
         return max(int(self.interval * 4), 60)
 
     def _get_redis(self, app):
+        """惰性解析 Redis 客户端（失败返回 None，走降级路径）。"""
         if self._redis_resolved:
             return self._redis
         self._redis_resolved = True
@@ -83,6 +94,17 @@ class MonitorOutboxSender:
         return self._redis
 
     def _acquire_round_lock(self, app) -> bool:
+        """抢占本轮发送的进程间互斥锁。
+
+        为什么需要（P0-3）：``find_pending`` 只是普通 SELECT，而发件线程在
+        **每个 gunicorn worker 里各起一个**，多进程并发会拉到同一批 pending 行 →
+        重复投递 + ``attempts`` 并发自增竞态（可能未满 max_attempts 就被判 failed）。
+
+        降级策略：Redis 不可用时**继续发送**（返回 True）而非跳过——告警投递
+        停摆的代价远高于重复投递，且重复投递会被 notify 的 ``idempotency_key``
+        幂等去重挡住（与探测循环 ``MONITOR_REDIS_DOWN_MODE`` 默认 skip 的取舍不同：
+        探测双跑会放大全网负载，发件双跑只是幂等重试）。
+        """
         from flask import current_app
 
         if not current_app.config.get("MONITOR_OUTBOX_LOCK_ENABLED", True):
@@ -105,6 +127,7 @@ class MonitorOutboxSender:
             return True
 
     def _release_round_lock(self) -> None:
+        """释放互斥锁（Lua CAS，仅当仍由本进程持有）。"""
         if self._redis is None:
             return
         try:
@@ -115,9 +138,16 @@ class MonitorOutboxSender:
             logger.warning("outbox 互斥锁释放失败（TTL 兜底过期）", exc_info=True)
 
     def send_pending(self, app, session=None) -> int:
+        """在 app context 内投递所有 pending 行，返回成功发送数。
+
+        ``session`` 缺省时用全局 db.session（线程局部，独立于轮询线程）。
+        每条：解析 payload → notify → 成功标记 sent，异常标记 failed/重试。
+        失败行单独 rollback 后继续处理其余行；成功行每 commit_every 条批量提交，
+        减少 DB 压力（替代逐行 commit）。
+        """
         notify = self._notify_service()
         sent = 0
-        commit_every = 10
+        commit_every = 10  # 每 10 条成功行批量提交一次
         with app.app_context():
             if session is None:
                 from extensions import db
@@ -133,16 +163,16 @@ class MonitorOutboxSender:
                     try:
                         payload = json.loads(row.payload_json)
                         _invoke_notify(notify, payload)
-                    except Exception as e:
+                    except Exception as e:  # 单条失败不影响其余行
                         try:
                             repo.mark_failed(row.id, str(e)[:500], self.max_attempts)
-                            session.commit()
+                            session.commit()  # 隔离提交 failed 标记
                         except Exception:
                             logger.warning(
                                 "监控告警 outbox mark_failed 也失败 row=%s，本条留待下次重试",
                                 row.id, exc_info=True,
                             )
-                            session.rollback()
+                            session.rollback()  # 仅回滚本条未决写入
                         else:
                             logger.warning(
                                 "监控告警 outbox 投递失败 row=%s device=%s: %s",
@@ -193,6 +223,10 @@ class MonitorOutboxSender:
         return sent
 
     def run_loop(self, app, stop_event: threading.Event) -> None:
+        """守护线程入口：周期性 send_pending，stop_event 置位即退出。
+
+        每轮动态读取 MONITOR_OUTBOX_INTERVAL（热重载，无需重启）。
+        """
         while not stop_event.is_set():
             try:
                 self.send_pending(app)

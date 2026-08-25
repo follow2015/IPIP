@@ -11,6 +11,7 @@ from extensions import db
 
 
 class MailSetting(BaseModel):
+    """邮件服务器配置（key-value 行存储）"""
 
     __tablename__ = "mail_settings"
     __table_args__ = (
@@ -38,6 +39,7 @@ class MailSetting(BaseModel):
 
     @classmethod
     def get(cls, key: str) -> str | None:
+        """获取单个配置值"""
         row = cls.query.filter_by(key=key).first()
         if row:
             return row.value
@@ -45,6 +47,7 @@ class MailSetting(BaseModel):
 
     @classmethod
     def get_all(cls) -> dict:
+        """获取所有邮件配置（密码脱敏），数值字段转为正确类型"""
         result = dict(cls.DEFAULTS)
         for row in cls.query.all():
             result[row.key] = row.value
@@ -59,6 +62,7 @@ class MailSetting(BaseModel):
 
     @classmethod
     def get_raw(cls, key: str) -> str | None:
+        """获取原始配置值（不脱敏），供 EmailChannel 内部使用"""
         row = cls.query.filter_by(key=key).first()
         if row:
             return row.value
@@ -66,6 +70,7 @@ class MailSetting(BaseModel):
 
     @classmethod
     def set(cls, key: str, value: str) -> None:
+        """设置单个配置值（仅允许白名单内的 key）"""
         if key not in cls.ALLOWED_KEYS:
             raise ValueError(f"不允许的配置键: {key}")
         row = cls.query.filter_by(key=key).first()
@@ -76,10 +81,12 @@ class MailSetting(BaseModel):
 
     @classmethod
     def bulk_set(cls, updates: dict) -> None:
+        """批量设置配置值"""
         for key, value in updates.items():
             if key in cls.ALLOWED_KEYS and value is not None:
                 cls.set(key, str(value))
 
     @classmethod
     def delete_all(cls) -> int:
+        """删除所有配置项，返回删除行数"""
         return cls.query.delete(synchronize_session=False)

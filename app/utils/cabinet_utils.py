@@ -11,15 +11,17 @@ from typing import Dict, List, Optional, Set, Tuple
 
 
 class UPositionStrategy(Enum):
+    """U位分配策略"""
 
     MANUAL          = "manual"
-    AUTO_BOTTOM_UP  = "auto_bottom_up"
-    AUTO_TOP_DOWN   = "auto_top_down"
-    AUTO_BEST_FIT   = "auto_best_fit"
-    AUTO_FIRST_FIT  = "auto_first_fit"
+    AUTO_BOTTOM_UP  = "auto_bottom_up"   # 从底部（1U）向上分配
+    AUTO_TOP_DOWN   = "auto_top_down"    # 从顶部（最大U）向下分配
+    AUTO_BEST_FIT   = "auto_best_fit"    # 最小空隙优先（减少碎片）
+    AUTO_FIRST_FIT  = "auto_first_fit"   # 选第一个合适空隙
 
 
 class DeviceType(Enum):
+    """设备类型"""
 
     SERVER      = "server"
     SWITCH      = "switch"
@@ -32,6 +34,7 @@ class DeviceType(Enum):
 
 @dataclass
 class UPositionRange:
+    """U位连续范围"""
 
     start: int
     end:   int
@@ -41,14 +44,17 @@ class UPositionRange:
         return self.end - self.start + 1
 
     def overlaps(self, other: "UPositionRange") -> bool:
+        """检查是否与另一个范围重叠"""
         return self.start <= other.end and other.start <= self.end
 
     def contains(self, u: int) -> bool:
+        """检查是否包含某个U位"""
         return self.start <= u <= self.end
 
 
 @dataclass
 class DeviceConstraint:
+    """设备约束条件"""
 
     min_u_position:       Optional[int]       = None
     max_u_position:       Optional[int]       = None
@@ -62,10 +68,12 @@ class DeviceConstraint:
 
 
 class CabinetUCalculator:
+    """机柜U位计算器"""
 
 
     @staticmethod
     def parse_u_position(u_position) -> Optional[int]:
+        """解析U位位置值（支持字符串 "U3"、数字 3 等形式）。"""
         if u_position is None:
             return None
         if isinstance(u_position, (int, float)):
@@ -79,12 +87,14 @@ class CabinetUCalculator:
 
     @staticmethod
     def is_valid_u_position(u_position: int, total_u: int) -> bool:
+        """验证U位是否在机柜有效范围内（1 ~ total_u）。"""
         return isinstance(u_position, int) and 1 <= u_position <= total_u
 
     @staticmethod
     def calculate_used_u_positions(
         devices: List[Dict], total_u: int, filter_parent_only: bool = True
     ) -> Set[int]:
+        """计算已占用的U位集合。"""
         used: Set[int] = set()
         for device in devices:
             if filter_parent_only and device.get("parent_device_id"):
@@ -102,6 +112,7 @@ class CabinetUCalculator:
     def calculate_u_usage(
         devices: List[Dict], total_u: int, filter_parent_only: bool = True
     ) -> Dict:
+        """计算U位使用情况（used / free / usage_rate）。"""
         used_positions = CabinetUCalculator.calculate_used_u_positions(
             devices, total_u, filter_parent_only
         )
@@ -121,6 +132,7 @@ class CabinetUCalculator:
         exclude_device_id: Optional[int] = None,
         filter_parent_only: bool = True,
     ) -> Dict:
+        """检查指定U位区间是否与已有设备冲突。"""
         if not CabinetUCalculator.is_valid_u_position(u_position, total_u):
             return {
                 "has_conflict":    True,
@@ -172,6 +184,7 @@ class CabinetUCalculator:
     def get_occupied_ranges(
         devices: List[Dict], total_u: int, filter_parent_only: bool = True
     ) -> List[UPositionRange]:
+        """获取已占用U位区间列表（已排序）。"""
         ranges: List[UPositionRange] = []
         for device in devices:
             if filter_parent_only and device.get("parent_device_id"):
@@ -186,6 +199,7 @@ class CabinetUCalculator:
 
     @staticmethod
     def _merge_ranges(ranges: List[UPositionRange]) -> List[UPositionRange]:
+        """合并重叠或相邻的U位区间。"""
         if not ranges:
             return []
         sorted_r = sorted(ranges, key=lambda r: r.start)
@@ -207,6 +221,7 @@ class CabinetUCalculator:
         device_spacing: int = 2,
         min_height_for_spacing: int = 2,
     ) -> List[UPositionRange]:
+        """获取空闲U位区间列表。"""
         occupied = CabinetUCalculator.get_occupied_ranges(devices, total_u, filter_parent_only)
 
         if include_spacing:
@@ -247,6 +262,7 @@ class CabinetUCalculator:
         filter_parent_only: bool = True,
         min_height_for_spacing: int = 2,
     ) -> Dict:
+        """获取可放置指定高度设备的起始U位列表及使用映射。"""
         used_positions = CabinetUCalculator.calculate_used_u_positions(
             devices, total_u, filter_parent_only
         )
@@ -293,6 +309,12 @@ class CabinetUCalculator:
         device_spacing: int = 2,
         min_height_for_spacing: int = 2,
     ) -> Dict:
+        """计算包含设备间距的总 U 位占用量。
+
+        基于设备实际物理位置计算间距：只在两个需要间距的设备
+        物理相邻（末端与下一个起始之间空隙 < device_spacing）时
+        才计入间距，避免对已隔开的设备重复计算。
+        """
         valid_devices: List[Dict] = []
         for device in devices:
             if filter_parent_only and device.get("parent_device_id"):
@@ -333,7 +355,7 @@ class CabinetUCalculator:
         free_u             = total_u - total_with_spacing
         usage_rate         = round(total_with_spacing / total_u * 100, 2) if total_u > 0 else 0
         device_count       = len(valid_devices)
-        spacing_count      = spacing_device_count
+        spacing_count      = spacing_device_count  # 保留用于兼容
 
         return {
             "total_u":             total_u,
@@ -357,6 +379,7 @@ class CabinetUCalculator:
         device_spacing: int = 2,
         min_height_for_spacing: int = 2,
     ) -> Dict:
+        """检查新增设备后是否超出机柜总 U 位（含间距）。"""
         current = CabinetUCalculator.calculate_total_u_with_spacing(
             devices, total_u, filter_parent_only, device_spacing, min_height_for_spacing
         )
@@ -396,6 +419,7 @@ class CabinetUCalculator:
         device_spacing: int = 2,
         min_height_for_spacing: int = 2,
     ) -> Optional[int]:
+        """自动分配U位，返回推荐起始U位，无可用位置时返回 None。"""
         if constraint is None:
             constraint = DeviceConstraint()
 
@@ -421,6 +445,7 @@ class CabinetUCalculator:
         constraint: DeviceConstraint,
         total_u: int,
     ) -> List[UPositionRange]:
+        """根据约束条件过滤可用区间。"""
         filtered: List[UPositionRange] = []
         for r in ranges:
             if constraint.min_u_position and r.start < constraint.min_u_position:
@@ -460,6 +485,13 @@ class CabinetUCalculator:
         strategy: UPositionStrategy,
         constraint: DeviceConstraint,
     ) -> int:
+        """根据策略从候选区间中选择起始 U 位。
+
+        修复：AUTO_TOP_DOWN 原来返回 ranges[-1].start，
+        这是最后一个空闲区间的起始位置（即区间底部），
+        对于"从顶向下"分配，应该返回区间末端倒推：
+            end - height_u + 1
+        """
         if not ranges:
             raise ValueError("没有可用的U位区间")
 
@@ -491,6 +523,7 @@ class CabinetUCalculator:
         device_spacing: int = 2,
         min_height_for_spacing: int = 2,
     ) -> Dict:
+        """批量为设备分配U位（按优先级排序，支持全量回滚）。"""
         allocated: List[Dict] = []
         failed:    List[Dict] = []
         working = list(existing_devices)
@@ -533,6 +566,13 @@ class CabinetUCalculator:
         min_height_for_spacing: int = 2,
         filter_parent_only: bool = True,
     ) -> Dict:
+        """优化机柜布局：对所有可移动设备重新紧凑排列以最大化空间利用率。
+
+        策略说明：
+        - 没有 u_position 的设备视为"待分配"，直接参与重排
+        - 有 u_position 的设备视为已定位，保留原位不动
+        优化方向：按设备高度降序（大设备优先），用 BEST_FIT 策略填充空隙
+        """
         fixed:    List[Dict] = []
         movable:  List[Dict] = []
         for device in devices:
@@ -590,6 +630,7 @@ class CabinetUCalculator:
         max_usage_rate: float = 90.0,
         filter_parent_only: bool = True,
     ) -> Dict:
+        """验证机柜容量与规划合理性，返回 warnings 和 recommendations。"""
         usage    = CabinetUCalculator.calculate_total_u_with_spacing(
             devices, total_u, filter_parent_only, device_spacing, min_height_for_spacing
         )
@@ -626,6 +667,7 @@ class CabinetUCalculator:
     def filter_valid_devices(
         devices: List[Dict], total_u: int, filter_parent_only: bool = True
     ) -> Tuple[List[Dict], List[Dict]]:
+        """过滤有效设备和无效设备，返回 (valid_list, invalid_list)。"""
         valid:   List[Dict] = []
         invalid: List[Dict] = []
         for device in devices:
@@ -643,6 +685,7 @@ class CabinetUCalculator:
 
 
 class DeviceFieldMapper:
+    """设备字段映射工具，统一处理不同命名约定的字段。"""
 
     FIELD_MAPPINGS: Dict[str, List[str]] = {
         "u_position":      ["u_position", "rack_position"],
@@ -656,6 +699,7 @@ class DeviceFieldMapper:
 
     @staticmethod
     def get_field_value(device: Dict, field_name: str, default=None):
+        """获取字段值，支持多个别名。"""
         if field_name in device:
             return device[field_name]
         for alias in DeviceFieldMapper.FIELD_MAPPINGS.get(field_name, []):
@@ -665,6 +709,7 @@ class DeviceFieldMapper:
 
     @staticmethod
     def normalize_device_fields(device: Dict) -> Dict:
+        """将设备字典的字段名统一为标准命名。"""
         normalized: Dict = {}
         for field_name, aliases in DeviceFieldMapper.FIELD_MAPPINGS.items():
             for alias in aliases:
@@ -678,4 +723,5 @@ class DeviceFieldMapper:
 
     @staticmethod
     def normalize_device_list(devices: List[Dict]) -> List[Dict]:
+        """标准化设备列表中的全部字段名。"""
         return [DeviceFieldMapper.normalize_device_fields(d) for d in devices]

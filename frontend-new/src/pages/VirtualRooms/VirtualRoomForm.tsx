@@ -15,7 +15,6 @@ interface VirtualRoomFormProps {
   onClose: () => void;
 }
 
-
 function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
   const [form] = Form.useForm();
   const message = useMessage();
@@ -23,7 +22,6 @@ function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
   const updateVirtualRoom = useUpdateVirtualRoom();
   const isEdit = !!editRecord;
 
-  
   useEffect(() => {
     if (open) {
       if (editRecord) {
@@ -37,7 +35,6 @@ function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
     }
   }, [open, editRecord, form]);
 
-  
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -55,7 +52,7 @@ function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
       onClose();
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) {
-        return; 
+        return; // 表单验证错误，antd 自动显示
       }
       if (err instanceof Error) {
         message.error(err.message);

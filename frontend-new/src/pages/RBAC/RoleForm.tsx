@@ -14,12 +14,10 @@ interface RoleFormProps {
   loading?: boolean;
 }
 
-
 function RoleForm({ open, editRecord, onCancel, onOk, loading }: RoleFormProps) {
   const [form] = Form.useForm();
   const isEdit = !!editRecord;
 
-  
   useEffect(() => {
     if (open && editRecord) {
       form.setFieldsValue({
@@ -32,7 +30,6 @@ function RoleForm({ open, editRecord, onCancel, onOk, loading }: RoleFormProps) 
     }
   }, [open, editRecord, form]);
 
-  
   const handleSubmit = async () => {
     const values = await form.validateFields();
     await onOk(values);

@@ -41,7 +41,6 @@ export function useG6Graph({
   const graphRef = useRef<Graph | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
 
-  
   const nodesRef = useRef<TopologyNode[]>(nodes);
   const edgesRef = useRef<TopologyEdge[]>(edges);
   useEffect(() => {
@@ -51,7 +50,6 @@ export function useG6Graph({
     edgesRef.current = edges;
   }, [edges]);
 
-  
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
@@ -59,11 +57,8 @@ export function useG6Graph({
         graphRef.current?.fitView();
       }
     };
-    
-    
     window.addEventListener('keydown', handleKey);
     return () => {
-      
       window.removeEventListener('keydown', handleKey);
     };
   }, []);
@@ -84,7 +79,6 @@ export function useG6Graph({
     []
   );
 
-  
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -100,7 +94,6 @@ export function useG6Graph({
     return () => observer.disconnect();
   }, []);
 
-  
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -133,7 +126,6 @@ export function useG6Graph({
 
     graphRef.current = graph;
 
-    
     let destroyed = false;
     if (nodesRef.current.length > 0) {
       graph.setData(
@@ -151,7 +143,6 @@ export function useG6Graph({
     };
   }, [containerSize, layout]);
 
-  
   useEffect(() => {
     const graph = graphRef.current;
     if (!graph || !nodesRef.current.length) return;
@@ -161,11 +152,9 @@ export function useG6Graph({
       );
       graph.render();
     } catch {
-      
     }
   }, [nodes, edges]);
 
-  
   const prevAffectedRef = useRef<{ nodes: Set<string>; edges: Set<string> }>({
     nodes: new Set(),
     edges: new Set()
@@ -177,7 +166,6 @@ export function useG6Graph({
     const currentNodes = nodesRef.current;
     const currentEdges = edgesRef.current;
 
-    
     const computeAffected = (nodeId: number | null) => {
       const nodes = new Set<string>();
       const edges = new Set<string>();
@@ -195,7 +183,6 @@ export function useG6Graph({
       return { nodes, edges };
     };
 
-    
     const existingNodeIds = new Set(currentNodes.map((n) => String(n.id)));
     const existingEdgeIds = new Set(currentEdges.map((e) => e.id));
     const revert = (affected: { nodes: Set<string>; edges: Set<string> }) => {
@@ -214,28 +201,23 @@ export function useG6Graph({
     };
 
     try {
-      
       revert(prevAffectedRef.current);
 
-      
       const newAffected = computeAffected(highlightNodeId ?? null);
       if (highlightNodeId != null) {
         apply(newAffected, highlightNodeId);
-        
         try {
           graph.focusElement(String(highlightNodeId), {
             duration: 400,
             easing: 'ease-in-out'
           });
         } catch {
-          
+          /* G6 v5 部分版本不支持 focusElement，静默降级 */
         }
       }
 
-      
       prevAffectedRef.current = newAffected;
     } catch {
-      
     }
   }, [highlightNodeId]);
 

@@ -24,9 +24,7 @@ import { PortManualCrud } from './PortManualCrud';
 interface UnifiedPortTabProps {
   deviceId: number;
   hasSsh: boolean;
-  
   renderPortActions?: RenderPortActionsFn;
-  
   renderBatchActions?: RenderBatchActionsFn;
 }
 
@@ -36,10 +34,8 @@ function UnifiedPortTab({
   renderPortActions,
   renderBatchActions
 }: UnifiedPortTabProps) {
-  
   const switchWithPorts = useSwitchWithPorts(deviceId, { enabled: hasSsh });
   const networkPorts = useNetworkPorts(deviceId, { enabled: !hasSsh });
-  
   const deviceMonitorStatus = useDeviceMonitorStatus(deviceId);
   const configuredProtocols = deviceMonitorStatus.data?.configured_protocols ?? [];
   const hasAutoPortCredential =
@@ -51,11 +47,9 @@ function UnifiedPortTab({
   const isLoading = hasSsh ? switchWithPorts.isLoading : networkPorts.isLoading;
   const refetch = hasSsh ? switchWithPorts.refetch : networkPorts.refetch;
 
-  
   const filterTable = useTable();
   const { sortedPorts, filteredPorts, portStats } = usePortSortFilter(rawPorts, filterTable);
 
-  
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const rowSelection: TableProps<SwitchPort>['rowSelection'] = {
     selectedRowKeys,
@@ -63,10 +57,8 @@ function UnifiedPortTab({
     preserveSelectedRowKeys: true
   };
 
-  
   const [highlightPort, setHighlightPort] = useState<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  
   const scheduleClearHighlight = useCallback(() => {
     clearTimeout(highlightTimerRef.current);
     highlightTimerRef.current = setTimeout(() => setHighlightPort(null), 3000);
@@ -80,7 +72,6 @@ function UnifiedPortTab({
   );
   useEffect(() => () => clearTimeout(highlightTimerRef.current), []);
 
-  
   const { handleSync, isPending, submitAction } = usePortSync({
     deviceId,
     refetch,

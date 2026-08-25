@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState, useEffect } from 'react';
 import type { DragEvent } from 'react';
 import {
@@ -47,7 +46,6 @@ interface NodeTabProps {
   nodeCols?: number;
 }
 
-
 function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeTabProps) {
   const navigate = useNavigate();
   const message = useMessage();
@@ -58,7 +56,6 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
   const updateDevice = useUpdateDevice();
   const swapNodePositions = useSwapNodePositions(deviceId);
 
-  
   const [dragSource, setDragSource] = useState<number | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<number | null>(null);
   const [swapping, setSwapping] = useState(false);
@@ -66,27 +63,20 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
   const [formOpen, setFormOpen] = useState(false);
   const [form] = Form.useForm();
 
-  
   const [fillOpen, setFillOpen] = useState(false);
   const [fillForm] = Form.useForm();
 
-  
   const { data: chassisDetail } = useDeviceDetail(deviceId);
 
-  
   const { data: nicComponentTemplates } = useComponentTemplates('nic');
 
-  
   const existingNodeCount = data?.items?.length ?? 0;
   const maxTotal = totalNodes ?? (nodeRows && nodeCols ? nodeRows * nodeCols : 0);
   const vacantCount = Math.max(0, maxTotal - existingNodeCount);
 
-  
   const watchedNodePosition = Form.useWatch('node_position', form);
   useEffect(() => {
     if (!formOpen || !watchedNodePosition || !deviceName) return;
-    
-    
     const pattern = chassisDetail?.node_naming_pattern || '{chassis}-Node{pos}';
     const nodeCols = chassisDetail?.node_cols || 1;
     const row = Math.ceil(watchedNodePosition / nodeCols);
@@ -104,9 +94,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     form.setFieldValue('notes', `${deviceName} 节点 ${watchedNodePosition}`);
   }, [formOpen, watchedNodePosition, deviceName, chassisDetail, form]);
 
-  
   const handleAdd = () => {
-    
     if (vacantCount === 0) {
       message.info('当前机箱节点位置已满，无法继续添加子节点');
       return;
@@ -124,7 +112,6 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     setFormOpen(true);
   };
 
-  
   const handleDelete = (record: Device) => {
     confirm({
       title: '确认删除',
@@ -140,7 +127,6 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     });
   };
 
-  
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -163,7 +149,6 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     }
   };
 
-  
   const handleFillOpen = () => {
     if (vacantCount === 0) {
       message.info('当前没有空余节点位置');
@@ -176,7 +161,6 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     setFillOpen(true);
   };
 
-  
   const handleFillSubmit = async () => {
     try {
       const values = await fillForm.validateFields();
@@ -263,7 +247,6 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       key: 'memory',
       render: (_: unknown, r: Device) => {
         const total = r.memory_size_gb;
-        
         const count = r.memory_dimm_count;
         const single = total && count ? Math.round(total / count) : undefined;
         return (
@@ -301,7 +284,6 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     }
   ];
 
-  
   const handleSwapDrop = async (sourcePos: number, targetPos: number) => {
     if (sourcePos === targetPos) return;
     setSwapping(true);
@@ -322,7 +304,6 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     }
   };
 
-  
   const renderNodeGrid = () => {
     if (!nodeRows || !nodeCols) return null;
     const nodes = data?.items ?? [];
@@ -405,7 +386,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
 
   return (
     <div>
-      {}
+      {/* 提示 banner：始终显示，引导用户到编辑机箱处操作 */}
       <Alert
         type="info"
         message="如需重新生成所有节点（覆盖已有），请在编辑机箱时勾选「生成子节点」"
@@ -453,7 +434,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
         size="small"
       />
 
-      {}
+      {/* 新增节点弹窗 */}
       <Modal
         title="新增节点"
         open={formOpen}
@@ -533,7 +514,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
         </Form>
       </Modal>
 
-      {}
+      {/* 填满空余节点弹窗 */}
       <Modal
         title="填满空余节点位置"
         open={fillOpen}

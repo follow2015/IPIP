@@ -19,11 +19,15 @@ from extensions import db
 
 
 class UserLog(db.Model):
+    """用户登录日志模型
+
+    对应 users_log 表。只追加，不修改，不继承 BaseModel。
+    """
 
     __tablename__ = "users_log"
     __table_args__ = (
         Index("idx_user_id", "user_id"),
-        Index("idx_user_login_time", "user_id", "login_time"),
+        Index("idx_user_login_time", "user_id", "login_time"),  # 按用户查登录历史+时间排序
         {"comment": "用户登录日志表"},
     )
 

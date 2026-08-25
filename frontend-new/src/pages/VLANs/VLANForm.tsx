@@ -20,12 +20,10 @@ interface VLANFormProps {
   onSuccess: () => void;
 }
 
-
 function useVLANFormSchema() {
   const { data: roomOptions } = useRoomOptions();
   const { data: switchList } = useSwitchList();
 
-  
   const unmanagedSwitchOptions = useMemo(
     () =>
       (switchList?.items ?? [])
@@ -97,7 +95,6 @@ function useVLANFormSchema() {
 
   return schema;
 }
-
 
 function VLANForm({ open, onCancel, onSuccess }: VLANFormProps) {
   const schema = useVLANFormSchema();

@@ -28,7 +28,6 @@ interface BasicTabProps {
   device: Device;
 }
 
-
 function IPEntryItem({
   entry,
   index,
@@ -61,12 +60,10 @@ function IPEntryItem({
   );
 }
 
-
 function BasicTab({ device }: BasicTabProps) {
   const statusInfo = DEVICE_STATUS_MAP[device.status as DeviceStatusCode];
   const updateDevice = useUpdateDevice();
   const message = useMessage();
-  
   const { data: vendorBrands } = useVendorBrands();
   const brandLabel = useMemo(() => {
     if (!device.brand) return '-';

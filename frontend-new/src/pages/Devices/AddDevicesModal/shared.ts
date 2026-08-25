@@ -14,14 +14,12 @@ import { DEVICE_STATUS_MAP, DEVICE_TYPE_MAP } from '@/types/enums';
 
 export const TYPE_CODE: Record<string, string> = { server: 'SRV', network: 'NET', other: 'OTH' };
 
-
 export function genBatchName(deviceType: string, index: number): string {
   const code = TYPE_CODE[deviceType] ?? 'DEV';
   const d = new Date();
   const ds = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
   return `${code}-${ds}-${String(index).padStart(3, '0')}`;
 }
-
 
 export function extractMaxIndex(names: string[]): number {
   let max = 0;
@@ -48,14 +46,19 @@ export function getStatusColor(code: number): string {
   return typeof e === 'object' && e && 'color' in e ? e.color : 'default';
 }
 
-
+/**
+ * 解析节点命名模板
+ *
+ * BatchAddTab / CloneTab / DeviceForm 三处共用的节点名称生成逻辑，
+ * 统一收敛到此纯函数，避免各处内联 replace 链不同步。
+ */
 export function resolveNodeName(
   pattern: string,
   chassisName: string,
   nodeRow?: number,
   nodeCol?: number
 ): string {
-  const nodeCols = 1; 
+  const nodeCols = 1; // 调用方应自行计算 pos 后传入，此处仅做模板替换
   const pos = nodeRow && nodeCol ? (nodeRow - 1) * nodeCols + nodeCol : 0;
   return pattern
     .replace('{chassis}', chassisName)
@@ -65,6 +68,12 @@ export function resolveNodeName(
 }
 
 
+/**
+ * 批量/克隆行类型（合并原 BatchRow + CloneRow）
+ *
+ * BatchRow 和 CloneRow 字段高度重叠，仅 BatchRow 多了 device_model。
+ * 合并为统一类型，device_model 为可选字段。
+ */
 export interface DeviceBatchRow {
   key: string;
   device_name: string;
@@ -73,15 +82,10 @@ export interface DeviceBatchRow {
   u_position: number | null;
   height_u: number;
   status: number;
-  
   node_rows?: number;
-  
   node_cols?: number;
-  
   parent_device_id?: number;
-  
   node_row?: number;
-  
   node_col?: number;
 }
 

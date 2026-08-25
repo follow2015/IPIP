@@ -28,6 +28,7 @@ _CISCO_RE_TRUNK_ALLOW = re.compile(r'^\s*switchport\s+trunk\s+allowed\s+vlan\s+(
 
 
 class CiscoAdapter(BaseDeviceAdapter):
+    """Cisco IOS 平台适配器"""
 
 
     def get_route_command(self) -> str:
@@ -43,18 +44,21 @@ class CiscoAdapter(BaseDeviceAdapter):
         return "show interface"
 
     def get_interface_status_command(self, port: str) -> str:
+        """Cisco 单端口链路状态查询命令（show interface <port>）"""
         return f"show interface {self._validate_port_name(port)}"
 
     def get_version_command(self) -> str:
         return "show version"
 
     def get_sysname_command(self) -> str:
+        """Cisco 使用 show hostname 获取主机名"""
         return "show hostname"
 
     def get_port_vlan_command(self) -> str:
         return "show interfaces switchport"
 
     def parse_port_vlans(self, raw_output: str) -> dict:
+        """解析 Cisco show interfaces switchport 输出，返回 {端口名: pvid}"""
         result = {}
         current_port = None
         for line in raw_output.splitlines():
@@ -73,6 +77,15 @@ class CiscoAdapter(BaseDeviceAdapter):
 
 
     def get_ban_commands(self, ip_address: str, device_model: str = "") -> BanCommands:
+        """获取 Cisco 黑洞路由封禁/解封命令（Null0 + 255.255.255.255 掩码）
+
+        Args:
+            ip_address: 需要封禁的IP地址
+            device_model: 设备型号（Cisco暂不区分型号，保留参数统一接口）
+
+        Returns:
+            BanCommands: 命令集合
+        """
         ip_address = self._validate_ip(ip_address)
         return BanCommands(
             ban_cmds=[
@@ -85,6 +98,17 @@ class CiscoAdapter(BaseDeviceAdapter):
         )
 
     def get_arp_ban_commands(self, ip_address: str, mac_address: str, vlan_id: int, device_model: str = "") -> ArpBanCommands:
+        """获取静态 ARP 封禁命令（Cisco IOS，全局 arp 命令，MAC 格式 xxxx.xxxx.xxxx）
+
+        Args:
+            ip_address: IP地址
+            mac_address: 真实MAC地址
+            vlan_id: VLAN ID（Cisco全局arp命令不使用此参数）
+            device_model: 设备型号（Cisco暂不区分型号，保留参数统一接口）
+
+        Returns:
+            ArpBanCommands: 命令集合
+        """
         BANNED_MAC = "0000.0000.0001"
         ip_address = self._validate_ip(ip_address)
         mac_address = self._validate_mac(mac_address)
@@ -100,6 +124,10 @@ class CiscoAdapter(BaseDeviceAdapter):
 
 
     def parse_routes(self, raw_output: str) -> List[ParsedRoute]:
+        """解析 Cisco show ip route 输出
+
+        支持动态/静态路由（via 格式）和直连路由（directly connected）。
+        """
         results = []
         proto_map = {"S": "Static", "C": "Direct", "O": "OSPF", "B": "BGP", "R": "RIP"}
 
@@ -129,6 +157,10 @@ class CiscoAdapter(BaseDeviceAdapter):
         return results
 
     def parse_arp(self, raw_output: str) -> List[ParsedArpEntry]:
+        """解析 Cisco show ip arp 输出
+
+        典型格式: Internet  10.10.1.1  5   abcd.ef01.2345  ARPA  GigabitEthernet0/0
+        """
         results = []
         pattern = re.compile(
             r"Internet\s+(\d+\.\d+\.\d+\.\d+)\s+\d+\s+"
@@ -146,6 +178,11 @@ class CiscoAdapter(BaseDeviceAdapter):
         return results
 
     def parse_mac_table(self, raw_output: str) -> List[ParsedMacEntry]:
+        """解析 Cisco show mac address-table 输出
+
+        格式: <vlan>  <xxxx.xxxx.xxxx>  <TYPE>  <port>
+        MAC 地址从 Cisco 格式（xxxx.xxxx.xxxx）转换为统一格式（xxxx-xxxx-xxxx）。
+        """
         from app.utils.network_utils import normalize_mac_address
         entries = []
         pattern = re.compile(
@@ -165,11 +202,16 @@ class CiscoAdapter(BaseDeviceAdapter):
         return entries
 
     def parse_ports(self, raw_output: str) -> List[ParsedPort]:
+        """解析 Cisco show interface 输出"""
         template_path = os.path.join(TEMPLATE_DIR, "cisco_ios_show_interfaces.textfsm")
         return self._parse_with_textfsm(raw_output, template_path, self._map_port_row)
 
     @staticmethod
     def _map_port_row(header, row) -> ParsedPort:
+        """映射接口信息行（TextFSM 行 → ParsedPort）
+
+        MAC 地址从 Cisco 格式（xxxx.xxxx.xxxx）转换为统一格式（xxxx-xxxx-xxxx）。
+        """
         from app.adapters.base_adapter import normalize_port_status
         h = header
         raw_status = CiscoAdapter._get_col(h, row, "LINK_STATUS")
@@ -192,6 +234,19 @@ class CiscoAdapter(BaseDeviceAdapter):
         return f"interface {self._validate_port_name(port)}"
 
     def get_interface_range_command(self, port_expr: str) -> str:
+        """Cisco interface range 命令，支持逗号分隔和连字符范围
+
+        Cisco 语法：
+        - 范围: interface range Gi1/0/1 - 10
+        - 离散: interface range Gi1/0/1 , Gi1/0/3 , Gi1/0/5
+        - 混合: interface range Gi1/0/1 - 3 , Gi1/0/5
+
+        Args:
+            port_expr: 端口范围表达式（已由 PortRangeParser 转换为 Cisco 格式）
+
+        Returns:
+            str: 完整的 interface range 命令
+        """
         return f"interface range {self._sanitize_cli_value(port_expr, max_len=256, field='port_range')}"
 
     def get_set_ip_command(self, ip: str, mask: str) -> str:
@@ -201,6 +256,7 @@ class CiscoAdapter(BaseDeviceAdapter):
         return f"ip address {self._validate_ip(ip)} {self._validate_ip(mask)} secondary"
 
     def get_undo_ip_command(self, ip: str, mask: str, is_secondary: bool = False) -> str:
+        """删除IP地址命令（Cisco格式）"""
         secondary = " secondary" if is_secondary else ""
         return f"no ip address {self._validate_ip(ip)} {self._validate_ip(mask)}{secondary}"
 
@@ -233,6 +289,7 @@ class CiscoAdapter(BaseDeviceAdapter):
         return f"switchport trunk allowed vlan {self._sanitize_cli_value(vlans, max_len=256, field='vlans')}"
 
     def get_trunk_pvid_command(self, vlan_id: int) -> str:
+        """Cisco: switchport trunk native vlan {vlan_id}"""
         return f"switchport trunk native vlan {self._validate_vlan_id(vlan_id)}"
 
     def get_check_vlan_command(self, vlan_id: int) -> str:
@@ -259,6 +316,7 @@ class CiscoAdapter(BaseDeviceAdapter):
 
 
     def get_clear_config_command(self, port: str) -> str:
+        """Cisco IOS 不支持 clear configuration interface，返回空字符串"""
         return ""
 
 
@@ -275,6 +333,7 @@ class CiscoAdapter(BaseDeviceAdapter):
         return "write memory"
 
     def get_commit_command(self) -> Optional[str]:
+        """Cisco IOS 无 commit 概念"""
         return None
 
     def get_system_view_command(self) -> str:
@@ -285,6 +344,7 @@ class CiscoAdapter(BaseDeviceAdapter):
 
 
     def parse_device_info(self, version_output: str, connection=None) -> ParsedDeviceInfo:
+        """解析 Cisco show version 输出"""
         model = version = serial = uptime = ""
         m = re.search(r'(\S+)\s+uptime\s+is', version_output, re.IGNORECASE)
         if m:
@@ -301,6 +361,7 @@ class CiscoAdapter(BaseDeviceAdapter):
         return ParsedDeviceInfo(model=model, version=version, serial=serial, uptime=uptime, brand="Cisco")
 
     def parse_existing_ips(self, config_text: str) -> list:
+        """从配置文本解析现有 IP 地址（Cisco secondary 关键字）"""
         results = []
         pattern = r'ip\s+address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)\s*(secondary)?'
         for m in re.finditer(pattern, config_text):
@@ -313,10 +374,18 @@ class CiscoAdapter(BaseDeviceAdapter):
 
 
     def parse_port_description(self, config_text: str) -> str:
+        """从端口配置文本解析描述（Cisco IOS）
+
+        格式: description <text>
+        """
         m = _CISCO_RE_DESCRIPTION.search(config_text)
         return m.group(1).strip() if m else ""
 
     def parse_qos_policies(self, config_text: str) -> list[tuple[str, str]]:
+        """从端口配置文本解析已应用的 QoS 策略（Cisco IOS）
+
+        Cisco IOS 使用 service-policy input/output 格式。
+        """
         results = []
         for m in _CISCO_RE_SERVICE_POLICY.finditer(config_text):
             direction = "inbound" if m.group(1) == "input" else "outbound"
@@ -324,10 +393,22 @@ class CiscoAdapter(BaseDeviceAdapter):
         return results
 
     def parse_trunk_id(self, config_text: str) -> Optional[int]:
+        """从端口配置文本解析 Port-channel ID（Cisco IOS）
+
+        格式: channel-group <id> mode <mode>
+        """
         m = _CISCO_RE_CHANNEL_GROUP.search(config_text)
         return int(m.group(1)) if m else None
 
     def parse_vlan_info(self, config_text: str) -> dict:
+        """从端口配置文本解析 VLAN 信息（Cisco IOS）
+
+        格式:
+        - Access: switchport access vlan <id>
+        - Trunk Native: switchport trunk native vlan <id>
+        - Trunk 允许: switchport trunk allowed vlan <range>
+        - 三层口: no switchport / ip address
+        """
         if _CISCO_RE_L3_PORT.search(config_text):
             return {"mode": None, "pvid": None, "allowed_vlans": None}
 

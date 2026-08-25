@@ -55,7 +55,6 @@ import dayjs from 'dayjs';
 const { Text } = Typography;
 const { useToken } = theme;
 
-
 const RANGE_OPTIONS = [
   { label: '1 小时', value: '1h', ms: 60 * 60 * 1000 },
   { label: '24 小时', value: '24h', ms: 24 * 60 * 60 * 1000 },
@@ -93,7 +92,6 @@ export default function MonitorHistory() {
   const [protocol, setProtocol] = useState<string>('');
   const table = useTable({ initialPerPage: 20 });
 
-  
   const { data: statusData, isLoading: devicesLoading } = useMonitorStatuses({ per_page: 200 });
   const deviceOptions = useMemo(
     () =>
@@ -107,7 +105,6 @@ export default function MonitorHistory() {
   const rangeMs = RANGE_OPTIONS.find((r) => r.value === range)?.ms ?? RANGE_OPTIONS[1].ms;
   const query = useMemo(() => buildQuery(rangeMs, protocol), [rangeMs, protocol]);
 
-  
   const handleDeviceChange = (id: number) => {
     setDeviceId(id);
     setSearchParams(
@@ -123,10 +120,8 @@ export default function MonitorHistory() {
   const { data: history, isLoading: historyLoading } = useProbeHistory(deviceId, query);
   const { data: trends, isLoading: trendsLoading } = useProbeTrends(deviceId, query);
 
-  
   const [selectedMetricKey, setSelectedMetricKey] = useState<string | undefined>(undefined);
   const { data: metricKeysData } = useDeviceMetricKeys(deviceId);
-  
   const { data: metricLatestData } = useDeviceMetricLatest(deviceId);
   const metricKeyOptions = (metricKeysData?.items ?? []).map((k) => ({ label: k, value: k }));
   const metricHistoryQuery = useMemo(
@@ -316,7 +311,7 @@ export default function MonitorHistory() {
               onChange={(v) => setProtocol(v)}
             />
           </Space>
-          {}
+          {/* G5: 导出探测历史 CSV */}
           {deviceId > 0 && (
             <Button
               icon={<DownloadOutlined />}
@@ -442,7 +437,7 @@ export default function MonitorHistory() {
             </Col>
           </Row>
 
-          {}
+          {/* P1-9: 指标当前值 */}
           {deviceId > 0 && (metricLatestData?.items ?? []).length > 0 && (
             <Card title="指标当前值" size="small" variant="borderless" style={{ marginTop: 16 }}>
               <Table<DeviceMetricLatestItem>
@@ -489,7 +484,7 @@ export default function MonitorHistory() {
             </Card>
           )}
 
-          {}
+          {/* P0-3d 指标值趋势图 */}
           {deviceId > 0 && metricKeyOptions.length > 0 && (
             <Card
               title="指标趋势"

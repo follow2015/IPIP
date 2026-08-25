@@ -15,8 +15,16 @@ logger = get_logger(__name__)
 
 
 class PortClearService:
+    """端口清除子服务"""
 
     def __init__(self, dispatcher, switch_repo: SwitchRepository, sync_coordinator, ssh_mgr=None):
+        """
+        Args:
+            dispatcher: CommandDispatcher 实例，用于命令下发
+            switch_repo: SwitchRepository 实例
+            sync_coordinator: SyncCoordinator 实例，用于 _get_port_members 等共享能力
+            ssh_mgr: SSHManager 实例（用于交互式命令）
+        """
         self.dispatcher = dispatcher
         self.switch_repo = switch_repo
         self.sync = sync_coordinator
@@ -25,6 +33,24 @@ class PortClearService:
 
     def _clear_port_config_on_device(self, switch, port: str,
                                      auto_save: bool = True) -> dict:
+        """在设备上清除端口配置（仅 SSH 操作，不更新数据库）
+
+        物理端口：在系统视图下执行 clear configuration interface <port>，
+        自动输入 Y 确认，清除后进入接口视图执行 undo shutdown 恢复端口开启。
+        若物理端口属于 Eth-Trunk 成员，先执行 undo eth-trunk 从 Trunk 中剥离。
+
+        Eth-Trunk 接口：进入接口视图后执行 clear configuration this，
+        无需先解绑成员（this 模式下设备自动处理成员关系），
+        清除后执行 undo shutdown 恢复端口开启。
+
+        Args:
+            switch: 交换机对象
+            port: 端口名称
+            auto_save: 是否在命令执行后自动保存配置（批量操作时关闭，最后统一保存）
+
+        Returns:
+            dict: {success: bool, error?: str}
+        """
         if not switch:
             return {"success": False, "message": "交换机不存在"}
         adapter = get_adapter(switch.device_type)
@@ -77,6 +103,15 @@ class PortClearService:
         return {"success": True}
 
     def _get_port_trunk_id(self, device_id: int, port: str):
+        """从配置缓存中解析端口所属的 Eth-Trunk ID
+
+        Args:
+            device_id: 交换机 device_id
+            port: 端口名称
+
+        Returns:
+            Eth-Trunk ID（如 10），不属于任何 Trunk 时返回 None
+        """
         config_text = self.switch_repo.get_port_config_text(device_id, port)
         if not config_text:
             return None
@@ -88,6 +123,20 @@ class PortClearService:
 
     def _batch_clear_ports(self, switch, ports: list[str],
                            auto_save: bool = True) -> None:
+        """批量清除端口配置（合并 SSH 交互步骤，一次连接完成所有端口）
+
+        将所有端口的 clear configuration 步骤合并为一条交互式命令序列，
+        一次 SSH 连接执行完毕，避免逐端口建立连接的开销。
+
+        Eth-Trunk 端口使用 clear configuration this（接口视图内），
+        物理端口使用 clear configuration interface <port>（系统视图下），
+        两者交互步骤不同，Eth-Trunk 端口单独逐个处理。
+
+        Args:
+            switch: 交换机对象
+            ports: 端口名称列表
+            auto_save: 是否在执行后自动保存（批量操作时关闭，由调用方统一保存）
+        """
         if not switch or not ports:
             return
 
@@ -133,3 +182,4 @@ class PortClearService:
                         self._clear_port_config_on_device(switch, port, auto_save=auto_save)
                     except Exception as ex:
                         logger.warning("降级清除端口 %s 失败: %s", port, ex)
+

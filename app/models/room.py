@@ -16,6 +16,12 @@ if TYPE_CHECKING:
 
 
 class Room(BaseModel):
+    """机房模型
+
+    管理机房的基本信息，包括名称、位置、联系人等。
+    一个机房可以包含多个机柜。
+    启用软删除：删除机房时设置 deleted_at，不物理删除。
+    """
 
     __tablename__ = "rooms"
     __soft_delete__ = True
@@ -43,6 +49,15 @@ class Room(BaseModel):
 
 
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> Dict[str, Any]:
+        """转换为字典
+
+        Args:
+            exclude: 要排除的字段列表
+            include_relations: 是否包含关联对象
+
+        Returns:
+            Dict: 机房数据字典
+        """
         data = super().to_dict(exclude=exclude)
 
         if include_relations:
@@ -55,9 +70,11 @@ class Room(BaseModel):
 
     @property
     def cabinet_count(self) -> int:
+        """机房内的机柜数量（使用已加载的 relationship）"""
         return len(self.cabinets)
 
     def get_cabinets(self) -> List["Cabinet"]:
+        """返回机房内的所有机柜（使用已加载的 relationship）"""
         return list(self.cabinets)
 
     def __repr__(self) -> str:

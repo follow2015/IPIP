@@ -19,6 +19,7 @@ _UNSIGNED_BIGINT = MYSQL_BIGINT(unsigned=True)
 
 
 class MonitorMetricTemplateGroup(BaseModel):
+    """监控指标模板组（运维自定义分组）"""
 
     __tablename__ = "monitor_metric_template_groups"
     __table_args__ = (
@@ -74,6 +75,7 @@ class MonitorMetricTemplateGroup(BaseModel):
 
 
 class MonitorMetricTemplateGroupItem(BaseModel):
+    """模板组-模板关联（多对多，勾选指标入组）"""
 
     __tablename__ = "monitor_metric_template_group_items"
     __table_args__ = (

@@ -28,7 +28,6 @@ export interface TopologyGraphProps {
   style?: CSSProperties;
 }
 
-
 export interface TopologyComboDatum {
   type: string;
   label: string;
@@ -38,13 +37,12 @@ export interface TopologyComboDatum {
 
 
 export const NODE_SIZES = {
-  core: 44, 
-  access: 34, 
-  server: 28 
+  core: 44, // 核心交换机
+  access: 34, // 接入交换机
+  server: 28 // 服务器
 };
 export const LABEL_FONT_SIZE = 10;
 export const MAX_LABEL_LEN = 14;
-
 
 export const COMBO_COLORS = [
   { fill: '#f0f5ff', stroke: '#adc6ff' },
@@ -117,12 +115,13 @@ export interface G6TopologyData {
   combos: { id: string; data: TopologyComboDatum }[];
 }
 
-
+/**
+ * 将拓扑节点/边转换为 G6 格式，并按 cabinet_id 生成 combo 机柜分组
+ */
 export function transformDataFromRefs(
   nodes: TopologyNode[],
   edges: TopologyEdge[]
 ): G6TopologyData {
-  
   const cabinetMap = new Map<number, { name: string; nodeIds: string[] }>();
   nodes.forEach((node) => {
     const cid = node.cabinet_id;
@@ -146,14 +145,12 @@ export function transformDataFromRefs(
     } satisfies TopologyComboDatum
   }));
 
-  
   const g6Nodes = nodes.map((node) => ({
     id: String(node.id),
     combo: node.cabinet_id != null ? `cabinet-${node.cabinet_id}` : undefined,
     data: { ...node }
   }));
 
-  
   const g6Edges = edges.map((edge) => ({
     id: edge.id,
     source: String(edge.source),

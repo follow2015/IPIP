@@ -7,7 +7,6 @@ interface DeviceHealthBadgeProps {
   deviceId: number;
 }
 
-
 export function DeviceHealthBadge({ deviceId }: DeviceHealthBadgeProps) {
   const { data } = useDeviceMonitorStatus(deviceId);
 
@@ -17,7 +16,6 @@ export function DeviceHealthBadge({ deviceId }: DeviceHealthBadgeProps) {
 
   const tags: React.ReactNode[] = [];
 
-  
   if (data.monitor_interrupted) {
     tags.push(
       <Tag key="interrupted" color="orange" icon={<EyeInvisibleOutlined />}>
@@ -26,7 +24,6 @@ export function DeviceHealthBadge({ deviceId }: DeviceHealthBadgeProps) {
     );
   }
 
-  
   if (data.status.reachable) {
     tags.push(
       <Tag key="reachable" color="green">
@@ -41,7 +38,6 @@ export function DeviceHealthBadge({ deviceId }: DeviceHealthBadgeProps) {
     );
   }
 
-  
   const alertCount = data.active_metric_alerts ?? 0;
   if (alertCount > 0) {
     const sev = data.max_alert_severity ?? 0;

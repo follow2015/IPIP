@@ -23,6 +23,15 @@ logger = get_logger(__name__)
 @login_required
 @rate_limit_api
 def report_error():
+    """接收前端错误报告
+    
+    Request Body:
+        errors: 错误列表
+        context: 错误上下文（可选）
+    
+    Returns:
+        JSON响应，包含处理结果
+    """
     try:
         data = request.get_json()
         

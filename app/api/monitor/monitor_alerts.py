@@ -26,6 +26,7 @@ from app.utils.transactional import transactional
 @login_required
 @permission_required("monitor:view")
 def get_overview():
+    """返回全网监控态势：总数/可达/不可达/抖动/告警盲区/从未可达 + 协议与设备类型分布 + 最近告警。"""
     from app.services.monitoring.monitor_service import get_overview as _get
     threshold = current_app.config.get("MONITOR_CONSECUTIVE_FAILURES_THRESHOLD", 2)
     data = _get(failure_threshold=threshold)
@@ -37,6 +38,7 @@ def get_overview():
 @login_required
 @permission_required("monitor:view")
 def list_statuses():
+    """分页返回监控状态列表（联表 device_name/type/ip），支持按状态过滤。"""
     status_filter = (request.args.get("status_filter") or "").strip() or None
     allowed_filters = ("unreachable", "flapping", "blindspot", "metric_alerting", "interrupted")
     if status_filter and status_filter not in allowed_filters:
@@ -60,6 +62,7 @@ def list_statuses():
 @login_required
 @permission_required("monitor:view")
 def list_alerts():
+    """分页查询告警投递历史。"""
     raw = {
         "alert_type": (request.args.get("alert_type") or "").strip() or None,
         "severity": (request.args.get("severity") or "").strip() or None,
@@ -91,6 +94,15 @@ def list_alerts():
 @login_required
 @permission_required("monitor:view")
 def list_alert_aggregations():
+    """P2-10: 告警聚合视图。按 (alert_type, severity, device_id) 聚类，返回风暴组。
+
+    query 参数:
+    - window_minutes: 聚类时间窗口（默认 5）
+    - severity: 仅聚合指定级别
+    - start_date / end_date: 时间范围
+    - only_active: 1/0 仅未关闭（默认 1）
+    - max_groups: 最多返回组数（默认 50）
+    """
     from app.services.monitoring.monitor_service import aggregate_alerts
 
     window_minutes = request.args.get("window_minutes", 5, type=int)
@@ -121,6 +133,15 @@ def list_alert_aggregations():
 @login_required
 @permission_required("monitor:view")
 def get_alert_statistics():
+    """P2-15: 告警多维度统计报表。
+
+    query 参数:
+    - start_date / end_date: 时间范围（ISO）
+    - device_id: 仅统计指定设备
+    - severity: 仅统计指定级别
+    - bucket: density 桶粒度（hour/day，默认 hour）
+    - top_n: Top N 取多少条（默认 10，最大 50）
+    """
     from app.services.monitoring.monitor_service import get_alert_statistics as _stat
 
     start_date = (request.args.get("start_date") or "").strip() or None
@@ -158,6 +179,7 @@ def get_alert_statistics():
 @login_required
 @permission_required("monitor:view")
 def get_alert_detail(alert_id: int):
+    """P1-6: 查询单条告警详情（含 device 展示字段 + acknowledged_* + payload 解析）。"""
     from app.services.monitoring.monitor_service import get_alert_detail as _detail
     data = _detail(alert_id)
     return APIResponse.success(data=data)
@@ -169,6 +191,7 @@ def get_alert_detail(alert_id: int):
 @permission_required("monitor:config")
 @transactional
 def retry_alert(alert_id: int):
+    """乐观锁重试：仅当告警处于 failed 状态时重置为 pending。"""
     from app.services.monitoring.monitor_service import retry_alert as _retry
     data = _retry(alert_id)
     return APIResponse.success(data=data)
@@ -180,6 +203,12 @@ def retry_alert(alert_id: int):
 @permission_required("monitor:config")
 @transactional
 def ack_alert(alert_id: int):
+    """G9: 人工确认/认领告警。
+
+    幂等：已确认告警再次确认将刷新 acknowledged_at 与 ack_note。
+    不变更 status（保持 sent），仅填充 acknowledged_by/at/note。
+    已确认告警不再进入升级扫描（escalation_service 通过 acknowledged_at IS NULL 过滤）。
+    """
     from flask import g
     from app.services.monitoring.monitor_service import ack_alert as _ack
 
@@ -212,6 +241,12 @@ def ack_alert(alert_id: int):
 @permission_required("monitor:config")
 @transactional
 def close_alert(alert_id: int):
+    """P2-16: 手动关闭告警。
+
+    幂等：已关闭告警再次关闭将刷新 closed_at 与 close_reason。
+    不变更 status（保持 sent），仅填充 closed_by/at/reason。
+    已关闭告警不再计入活跃告警（前端按 closed_at IS NULL 过滤）。
+    """
     from flask import g
     from app.services.monitoring.monitor_service import close_alert as _close
 
@@ -244,6 +279,7 @@ def close_alert(alert_id: int):
 @permission_required("monitor:config")
 @transactional
 def batch_ack_alerts():
+    """G9 批量确认/认领告警。幂等。"""
     from flask import g
     from app.services.monitoring.monitor_service import batch_ack_alert as _batch_ack
 
@@ -281,6 +317,7 @@ def batch_ack_alerts():
 @permission_required("monitor:config")
 @transactional
 def batch_retry_alerts():
+    """批量乐观锁重试：仅当 status=='failed' 时重置为 pending。"""
     from app.services.monitoring.monitor_service import batch_retry_alert as _batch_retry
 
     body = request.get_json(silent=True) or {}
@@ -312,6 +349,7 @@ def batch_retry_alerts():
 @permission_required("monitor:config")
 @transactional
 def batch_close_alerts():
+    """P2-16: 批量手动关闭告警。幂等。"""
     from flask import g
     from app.services.monitoring.monitor_service import batch_close_alert as _batch_close
 
@@ -349,6 +387,7 @@ def batch_close_alerts():
 @permission_required("monitor:config")
 @transactional
 def patch_device_monitor_enabled(device_id: int):
+    """设备级监控启停。"""
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")
@@ -369,6 +408,7 @@ def patch_device_monitor_enabled(device_id: int):
 @permission_required("monitor:config")
 @transactional
 def patch_batch_monitor_enabled():
+    """批量设备级监控启停。"""
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")

@@ -38,6 +38,7 @@ device_service = DeviceService(DeviceRepository())
 
 
 class EmptyExportError(InvalidOperationError):
+    """导出时没有任何设备数据。"""
 
     def __init__(self, message: str = "没有可导出的设备数据"):
         super().__init__(operation="export_devices", reason=message, message=message)
@@ -45,6 +46,14 @@ class EmptyExportError(InvalidOperationError):
 
 
 def build_import_template(template_type: str) -> BytesIO:
+    """生成设备导入模板字节流（按设备类型拆分，含表头+示例行）。
+
+    Args:
+        template_type: 设备类型（server/network/other），默认 server
+
+    Returns:
+        可被 flask.send_file 直接消费的 BytesIO 缓冲
+    """
     template_type = (template_type or "server").lower()
 
     if template_type == "server":
@@ -231,6 +240,18 @@ IMPORT_TEXT_COLUMNS = {
 
 
 def build_device_df(file_bytes: bytes, filename: str) -> pd.DataFrame:
+    """将上传的文件字节流解析为标准化 DataFrame。
+
+    包含：扩展名选择解析方式、NaN 清洗、中文列名→英文列名映射、
+    根据 device_subtype 自动推断 device_type。
+
+    Args:
+        file_bytes: 上传文件的原始字节
+        filename: 原始文件名（用于判断 csv/xlsx）
+
+    Returns:
+        清洗并补全列后的 DataFrame
+    """
     buf = BytesIO(file_bytes)
     fname = (filename or "").lower()
     if fname.endswith(".csv"):
@@ -261,6 +282,21 @@ def build_device_df(file_bytes: bytes, filename: str) -> pd.DataFrame:
 
 
 def _expand_storage_nic_from_templates(device_id: int, storage_template_id, nic_template_id) -> None:
+    """根据存储/网卡模板ID自动创建子记录（委托 DeviceService 的规范实现）。
+
+    与手动添加设备共用同一套模板ID驱动逻辑：
+    - 校验模板存在、类别正确（disk / nic）、未停用；
+    - 按模板 spec 自动填充 storage_type / capacity_gb / interface_type 等字段；
+    - 用 _format_capacity 生成可读容量（如 3840GB → 3.75TB）；
+    - 网卡按模板 port_count 展开多端口。
+
+    这样批量导入与页面添加在模板ID处理上行为完全一致，避免容量字段错填型号名等问题。
+
+    Args:
+        device_id: 已创建的设备ID
+        storage_template_id: 存储配件模板ID（可为空，空则跳过）
+        nic_template_id: 网卡配件模板ID（可为空，空则跳过）
+    """
     from extensions import db
 
     if storage_template_id:
@@ -283,15 +319,31 @@ def _expand_storage_nic_from_templates(device_id: int, storage_template_id, nic_
 
 
 def parse_and_import_devices(df: pd.DataFrame) -> dict:
+    """两遍导入核心：先建非节点设备建立 name→id 映射，再建节点设备。
+
+    Args:
+        df: 已由 build_device_df 处理好的 DataFrame
+
+    Returns:
+        {
+            "imported_count": int,
+            "failed_count": int,
+            "failed_rows": [{"row", "device_name", "error"}, ...],
+            "imported_ids": [int, ...],
+        }
+
+    Raises:
+        ValueError: 缺少必需列（device_name）时抛出，供路由层转 400
+    """
     required_columns = ["device_name"]
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         raise RequiredFieldError(missing_fields=missing_columns, message=f"缺少必需列: {', '.join(missing_columns)}")
 
     imported_count = 0
-    failed_rows = []
+    failed_rows = []  # [{row, device_name, error}]
     imported_ids = []
-    name_to_id = {}
+    name_to_id = {}   # device_name → device_id（本文件内映射）
 
     for index, row in df.iterrows():
         try:
@@ -472,6 +524,18 @@ def parse_and_import_devices(df: pd.DataFrame) -> dict:
 
 
 def export_devices_to_excel(cabinet_id=None, customer_id=None) -> BytesIO:
+    """分页拼接全部设备并生成 Excel 字节流。
+
+    Args:
+        cabinet_id: 机柜ID过滤（可选）
+        customer_id: 客户ID过滤（可选）
+
+    Returns:
+        可被 flask.send_file 直接消费的 BytesIO 缓冲
+
+    Raises:
+        EmptyExportError: 没有任何可导出的设备数据时
+    """
     all_devices = []
     page = 1
     page_size = 5000

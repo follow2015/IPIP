@@ -24,10 +24,10 @@ export default function MonitorOverview() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {}
+      {/* 1. KPI 概览区 + 健康度仪表盘 */}
       <StatCards overview={overview} loading={overviewLoading} />
 
-      {}
+      {/* 2. 告警趋势 + 分布区 */}
       <AlertTrend />
       <Row gutter={16}>
         <Col xs={24} md={8}>
@@ -52,10 +52,10 @@ export default function MonitorOverview() {
         </Col>
       </Row>
 
-      {}
+      {/* 3. 最近告警（设备状态表上方） */}
       <RecentAlerts loading={overviewLoading} />
 
-      {}
+      {/* 4. 设备监控状态表 */}
       <DeviceStatusTable />
     </div>
   );

@@ -16,7 +16,6 @@ import { StatusTag } from '@/components/StatusTag';
 import { CUSTOMER_STATUS_MAP, CustomerStatusCode } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
 
-
 function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -36,7 +35,6 @@ function CustomerDetail() {
   return <CustomerDetailContent customerId={customerId} />;
 }
 
-
 function CustomerDetailContent({ customerId }: { customerId: number }) {
   const navigate = useNavigate();
   const { data: customer } = useCustomerSuspenseDetail(customerId);
@@ -50,7 +48,6 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
 
   const s = assetsData?.summary;
 
-  
   const handleExport = async () => {
     try {
       await exportCustomerAssets(customerId, customer.customer_name);
@@ -69,7 +66,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
         返回列表
       </Button>
 
-      {}
+      {/* 基本信息 Card */}
       <Card title={`客户详情 - ${customer.customer_name}`}>
         <Descriptions column={2} bordered size="small">
           <Descriptions.Item label="客户名称">{customer.customer_name}</Descriptions.Item>
@@ -86,7 +83,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
         </Descriptions>
       </Card>
 
-      {}
+      {/* 资源统计 Card */}
       <Card
         title="资源统计"
         style={{ marginTop: 16 }}
@@ -118,7 +115,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
         )}
       </Card>
 
-      {}
+      {/* 终止存档 Card（仅终止态客户显示） */}
       {isTerminated && (
         <Card title="终止存档" style={{ marginTop: 16 }}>
           {archives && archives.length > 0 ? (

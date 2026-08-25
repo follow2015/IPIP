@@ -42,7 +42,6 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
     selectedCred?.id ?? null
   );
 
-  
   const filteredLinkedDevices = useMemo(() => {
     if (!deviceSearchKeyword) return linkedDevices;
     const kw = deviceSearchKeyword.toLowerCase();
@@ -53,7 +52,6 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
     );
   }, [linkedDevices, deviceSearchKeyword]);
 
-  
   const handleUnlink = async (deviceId: number) => {
     if (!selectedCred?.protocol) return;
     try {
@@ -64,7 +62,6 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
     }
   };
 
-  
   const linkedColumns = [
     {
       title: '设备名称',
@@ -126,7 +123,7 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
 
   return (
     <Space orientation="vertical" style={{ width: '100%' }} size={16}>
-      {}
+      {/* 凭据详情卡片 */}
       <Card size="small">
         <Row gutter={16} align="middle">
           <Col flex="auto">
@@ -163,7 +160,7 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
         </Row>
       </Card>
 
-      {}
+      {/* 关联设备表 */}
       <Card
         title="关联设备"
         extra={

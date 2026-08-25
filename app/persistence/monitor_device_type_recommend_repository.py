@@ -11,14 +11,17 @@ from app.models.monitor_device_type_recommend import MonitorDeviceTypeRecommend
 
 
 class MonitorDeviceTypeRecommendRepository:
+    """监控设备类型推荐配置仓库"""
 
     def __init__(self, session=None):
         self.session = session or db.session
 
     def list_all(self) -> List[MonitorDeviceTypeRecommend]:
+        """查询全部设备类型推荐配置。"""
         return self.session.query(MonitorDeviceTypeRecommend).all()
 
     def find_by_device_type(self, device_type: str) -> Optional[MonitorDeviceTypeRecommend]:
+        """按 device_type 查询；不存在返回 None。"""
         return (
             self.session.query(MonitorDeviceTypeRecommend)
             .filter_by(device_type=device_type)
@@ -26,9 +29,11 @@ class MonitorDeviceTypeRecommendRepository:
         )
 
     def add(self, row: MonitorDeviceTypeRecommend) -> MonitorDeviceTypeRecommend:
+        """新增并 flush。"""
         self.session.add(row)
         self.session.flush()
         return row
 
     def flush(self) -> None:
+        """flush 到数据库（事务提交由 @transactional 负责）。"""
         self.session.flush()

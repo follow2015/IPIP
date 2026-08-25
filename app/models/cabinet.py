@@ -16,6 +16,11 @@ if TYPE_CHECKING:
 
 
 class Cabinet(BaseModel):
+    """机柜模型
+
+    管理机柜的基本信息，包括编号、位置、容量等。
+    一个机柜属于一个机房，可以包含多个设备。
+    """
 
     __tablename__ = "cabinets"
     __table_args__ = (
@@ -23,7 +28,7 @@ class Cabinet(BaseModel):
         Index("idx_cabinet_customer",    "customer_id"),
         Index("idx_cabinet_status",      "status"),
         Index("idx_cabinet_created_at",  "created_at"),
-        Index("idx_cabinet_room_status", "room_id", "status"),
+        Index("idx_cabinet_room_status", "room_id", "status"),  # 前缀覆盖 idx_cabinet_room
         {"comment": "机柜信息表"},
     )
 
@@ -78,10 +83,19 @@ class Cabinet(BaseModel):
 
     @property
     def _parent_devices(self) -> List["Device"]:
+        """仅返回父设备（过滤机箱子节点），直接使用已加载的 relationship，无额外查询。
+
+        parent_device_id 存储在 DeviceServerExt 扩展表中，
+        通过 d.parent_device_id 代理属性访问（避免触发 server_ext 懒加载 N+1）。
+        """
         return [d for d in self.devices if d.deleted_at is None and not d.parent_device_id]
 
 
     def get_used_u_positions(self) -> List[int]:
+        """获取已占用 U 位编号列表（已排序、去重）。
+
+        直接遍历 self.devices（已由 selectin 预加载），无额外 DB 查询。
+        """
         used: set[int] = set()
         for device in self._parent_devices:
             if device.u_position and device.height_u:
@@ -91,9 +105,15 @@ class Cabinet(BaseModel):
         return sorted(used)
 
     def get_available_u_count(self) -> int:
+        """获取可用 U 位数量。"""
         return self.total_u - len(self.get_used_u_positions())
 
     def get_available_u_ranges(self) -> List[Dict[str, int]]:
+        """获取可用 U 位连续区间列表。
+
+        Returns:
+            List[Dict]: 每项含 start、end、count
+        """
         used      = set(self.get_used_u_positions())
         available = sorted(set(range(1, self.total_u + 1)) - used)
         if not available:
@@ -111,6 +131,15 @@ class Cabinet(BaseModel):
         return ranges
 
     def can_fit_device(self, u_height: int, preferred_position: Optional[int] = None) -> bool:
+        """检查能否容纳指定 U 高的设备。
+
+        Args:
+            u_height: 设备高度（U 位数）
+            preferred_position: 首选起始位置，None 表示任意位置均可
+
+        Returns:
+            bool
+        """
         if preferred_position is not None:
             try:
                 start_u = int(preferred_position)
@@ -128,6 +157,16 @@ class Cabinet(BaseModel):
         height_u: int,
         exclude_device_id: Optional[int] = None,
     ) -> Dict[str, Any]:
+        """检查指定 U 位区间是否与现有设备冲突。
+
+        Args:
+            u_position: 起始 U 位
+            height_u: 设备高度
+            exclude_device_id: 排除该设备 ID（用于更新场景）
+
+        Returns:
+            {"has_conflict": bool, "conflicting_devices": List[Dict]}
+        """
         required = set(range(u_position, u_position + height_u))
         conflicting: List[Dict[str, Any]] = []
 
@@ -147,6 +186,12 @@ class Cabinet(BaseModel):
         return {"has_conflict": bool(conflicting), "conflicting_devices": conflicting}
 
     def update_usage(self) -> None:
+        """重新计算并同步 used_u / used_power 冗余字段。
+
+        ⚠️ 本方法不提交事务，调用方负责 db.session.commit()，
+        以便融入外层事务，避免意外提交。
+        原代码在此处直接 db.session.commit()，导致无法与上层事务合并。
+        """
         self.used_u     = len(self.get_used_u_positions())
         self.used_power = int(sum(float(d.power or 0) for d in self._parent_devices))
 
@@ -155,6 +200,15 @@ class Cabinet(BaseModel):
         exclude: Optional[List[str]] = None,
         include_relations: bool = False,
     ) -> Dict[str, Any]:
+        """序列化为字典。
+
+        Args:
+            exclude: 要排除的字段列表
+            include_relations: True 时附加设备列表及 U 位详情
+
+        Returns:
+            Dict
+        """
         data = super().to_dict(exclude=exclude)
 
         data["available_u"] = self.get_available_u_count()

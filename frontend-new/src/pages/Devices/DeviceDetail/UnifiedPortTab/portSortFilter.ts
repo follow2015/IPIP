@@ -5,7 +5,6 @@
 import type { SwitchPort } from '@/types/models';
 import { classifyPortType, extractPortIndex, PORT_TYPE_SORT_WEIGHT } from '@/utils/portType';
 
-
 export function comparePorts(a: SwitchPort, b: SwitchPort): number {
   const typeA = classifyPortType(a.port_name);
   const typeB = classifyPortType(b.port_name);
@@ -14,7 +13,6 @@ export function comparePorts(a: SwitchPort, b: SwitchPort): number {
   if (weightA !== weightB) return weightA - weightB;
   return extractPortIndex(a.port_name) - extractPortIndex(b.port_name);
 }
-
 
 export function computePortStats(ports: SwitchPort[]): Record<string, number> {
   return ports.reduce(
@@ -27,13 +25,15 @@ export function computePortStats(ports: SwitchPort[]): Record<string, number> {
   );
 }
 
-
 export function filterPortsByStatus(ports: SwitchPort[], status?: string): SwitchPort[] {
   if (!status) return ports;
   return ports.filter((p) => p.usage_status === status);
 }
 
-
+/**
+ * 启动定时轮询，每 intervalMs 毫秒调用一次 callback，最多 maxCount 次。
+ * 返回取消函数，可提前停止。用于 SSH 同步提交后的回退刷新。
+ */
 export function startPolling(
   callback: () => void,
   intervalMs: number,

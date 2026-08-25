@@ -13,6 +13,18 @@ from sqlalchemy.sql import func
 
 
 class BaseModel(db.Model):
+    """模型基类
+
+    提供所有模型通用的字段和方法：
+    - 主键ID
+    - 创建时间和更新时间
+    - to_dict / update_from_dict 工具方法
+
+    软删除支持：
+    - 子类设置 __soft_delete__ = True
+    - 子类定义 deleted_at = db.Column(db.DateTime, nullable=True, comment="软删除时间")
+    - 即可使用 is_deleted / soft_delete() / restore() 方法
+    """
 
     __abstract__ = True
 
@@ -30,21 +42,38 @@ class BaseModel(db.Model):
 
     @property
     def is_deleted(self) -> bool:
+        """是否已被软删除（仅 __soft_delete__=True 的子类可用）"""
         return getattr(self, 'deleted_at', None) is not None
 
     def soft_delete(self) -> None:
+        """执行软删除（设置 deleted_at 为当前时间）"""
         if hasattr(self, 'deleted_at'):
             self.deleted_at = datetime.now(timezone.utc)
 
     def restore(self) -> None:
+        """恢复软删除"""
         if hasattr(self, 'deleted_at'):
             self.deleted_at = None
 
     @staticmethod
     def _serialize_value(value: Any) -> Any:
+        """序列化单个值：datetime → ISO 字符串，其余原样返回。
+
+        子类 to_dict() 中手动构建字段时，可调用此方法避免重复
+        isinstance(value, datetime) 判断。
+        """
         return value.isoformat() if isinstance(value, datetime) else value
 
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> Dict[str, Any]:
+        """将模型转换为字典
+
+        Args:
+            exclude: 要排除的字段列表
+            include_relations: 是否包含关联对象
+
+        Returns:
+            Dict: 模型数据字典
+        """
         exclude = exclude or []
         result = {}
         for column in self.__table__.columns:
@@ -63,6 +92,13 @@ class BaseModel(db.Model):
     ])
 
     def update_from_dict(self, data: Dict[str, Any], exclude: list = None, allowed: list = None) -> None:
+        """从字典更新模型属性
+
+        Args:
+            data: 包含更新数据的字典
+            exclude: 要排除的字段列表（默认保护主键、时间戳和敏感字段）
+            allowed: 允许更新的字段白名单。如果提供，仅更新白名单中的字段（优先级最高，可覆盖 _PROTECTED_FIELDS 但不可覆盖 _IMMUTABLE_FIELDS）
+        """
         if allowed is not None:
             for key in allowed:
                 if key in data and key not in self._IMMUTABLE_FIELDS and hasattr(self, key):

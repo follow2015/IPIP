@@ -2,7 +2,6 @@ import { Popover, Table, Tag, Spin, Empty } from 'antd';
 import { WarningOutlined } from '@ant-design/icons';
 import { useDeviceMetricAlerts } from '@/services/monitor';
 
-
 const METRIC_KEY_LABEL: Record<string, string> = {
   temperature: '温度',
   port_updown: '端口状态',
@@ -10,7 +9,6 @@ const METRIC_KEY_LABEL: Record<string, string> = {
   raid_failure: 'RAID故障',
   monitor_interrupted: '监控中断'
 };
-
 
 const SEVERITY_COLOR: Record<string, string> = {
   crit: 'red',
@@ -23,12 +21,9 @@ const SEVERITY_COLOR: Record<string, string> = {
 
 interface MetricAlertPopoverProps {
   deviceId: number;
-  
   alertCount: number;
-  
   maxSeverity: number;
 }
-
 
 export function MetricAlertPopover({ deviceId, alertCount, maxSeverity }: MetricAlertPopoverProps) {
   const { data, isLoading } = useDeviceMetricAlerts(deviceId);

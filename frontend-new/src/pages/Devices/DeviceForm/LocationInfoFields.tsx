@@ -9,7 +9,6 @@ import type { SelectProps } from 'antd';
 import { AimOutlined } from '@ant-design/icons';
 import UPositionView from './UPositionView';
 
-
 interface CabinetLayout {
   total_u: number;
   used_u: number;
@@ -29,11 +28,9 @@ interface CabinetLayout {
 interface LocationInfoFieldsProps {
   roomOptions?: SelectProps['options'];
   cabinetOptions?: SelectProps['options'];
-  
   uPositionStatus: number[] | null;
   selectedCabinetId?: number | string;
   availableUPositions?: number[];
-  
   onAutoAssignUPosition: () => void;
   cabinetLayout?: CabinetLayout | null;
   watchedUPosition?: number | null;
@@ -118,7 +115,7 @@ export default function LocationInfoFields({
           )}
         </Col>
       </Row>
-      {}
+      {/* U位视图 */}
       {selectedCabinetId && cabinetLayout && (
         <UPositionView
           layout={cabinetLayout}

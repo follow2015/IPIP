@@ -11,13 +11,11 @@ import type { LinkAggregationGroup } from '@/types/models';
 import type { PaginatedData } from '@/types/api';
 export type { LinkAggregationGroup } from '@/types/models';
 
-
 export interface LinkAggregationGroupWithDevice extends LinkAggregationGroup {
   device_name: string;
   room_id: number | null;
   has_ssh?: boolean;
 }
-
 
 export function useLinkAggregationGroups(deviceId: number) {
   return useQuery({
@@ -30,7 +28,6 @@ export function useLinkAggregationGroups(deviceId: number) {
   });
 }
 
-
 export interface LAGListParams {
   page?: number;
   per_page?: number;
@@ -38,7 +35,6 @@ export interface LAGListParams {
   room_id?: number;
   device_id?: number;
 }
-
 
 export function useAllLinkAggregationGroups(params?: LAGListParams) {
   return useQuery({
@@ -50,7 +46,6 @@ export function useAllLinkAggregationGroups(params?: LAGListParams) {
   });
 }
 
-
 export function useCreateLinkAggregationGroup() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -59,13 +54,11 @@ export function useCreateLinkAggregationGroup() {
     onSuccess: (_data, variables) => {
       const d = variables.deviceId;
       queryClient.invalidateQueries({ queryKey: queryKeys.linkAggregation.all });
-      
       queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(d) });
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.networkPorts(d) });
     },
   });
 }
-
 
 export function useDeleteLinkAggregationGroup() {
   const queryClient = useQueryClient();
@@ -75,7 +68,6 @@ export function useDeleteLinkAggregationGroup() {
     onSuccess: (_data, variables) => {
       const d = variables.deviceId;
       queryClient.invalidateQueries({ queryKey: queryKeys.linkAggregation.all });
-      
       queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(d) });
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.networkPorts(d) });
     },
@@ -90,13 +82,11 @@ export function useUpdateLAGMembers(deviceId: number) {
       put<LinkAggregationGroup>(`/devices/${deviceId}/port-channels/${lagId}/members`, { port_ids: portIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.linkAggregation.byDevice(deviceId) });
-      
       queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(deviceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.networkPorts(deviceId) });
     },
   });
 }
-
 
 export function useUpdateLinkAggregationGroup(deviceId: number) {
   const queryClient = useQueryClient();

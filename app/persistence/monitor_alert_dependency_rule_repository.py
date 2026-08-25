@@ -7,6 +7,7 @@ from app.models.monitor_alert_dependency_rule import MonitorAlertDependencyRule
 
 
 class MonitorAlertDependencyRuleRepository:
+    """监控告警依赖抑制规则仓库"""
 
     def __init__(self, session=None):
         self.session = session or db.session
@@ -19,6 +20,7 @@ class MonitorAlertDependencyRuleRepository:
         )
 
     def find_enabled_by_downstream(self, downstream_device_id: int) -> List[MonitorAlertDependencyRule]:
+        """查询指向某下游设备的启用规则"""
         return (
             self.session.query(MonitorAlertDependencyRule)
             .filter(

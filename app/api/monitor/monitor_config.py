@@ -33,6 +33,7 @@ logger = get_logger(__name__)
 @login_required
 @permission_required("monitor:view")
 def get_config():
+    """返回当前生效的监控运行参数。"""
     from app.services.monitoring.dynamic_config import get_all
     data = get_all()
     return APIResponse.success(data=data)
@@ -44,6 +45,7 @@ def get_config():
 @permission_required("monitor:config")
 @transactional
 def put_config():
+    """在线修改监控运行参数（白名单内 editable 项）。"""
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")
@@ -69,6 +71,7 @@ def put_config():
 @login_required
 @permission_required("monitor:view")
 def get_device_metric_alerts(device_id: int):
+    """返回某设备的活跃指标告警明细。"""
     device = device_repo.find_by_id(device_id)
     if not device:
         raise BusinessLogicError("设备不存在", status_code=404)
@@ -82,6 +85,7 @@ def get_device_metric_alerts(device_id: int):
 @login_required
 @permission_required("monitor:view")
 def list_metric_templates():
+    """列出全部指标模板。"""
     from app.services.monitoring.metric_template_service import list_metric_templates as _list
     data = _list()
     return APIResponse.paginated(data=data, page=1, per_page=len(data) or 1, total=len(data))
@@ -93,6 +97,7 @@ def list_metric_templates():
 @permission_required("monitor:config")
 @transactional
 def upsert_metric_template():
+    """按 (device_type, metric_key) 幂等新增/更新指标模板。"""
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")
@@ -118,6 +123,7 @@ def upsert_metric_template():
 @permission_required("monitor:config")
 @transactional
 def seed_metric_templates():
+    """写入内置默认指标模板（幂等）。"""
     from app.services.monitoring.metric_template_service import seed_defaults
     created = seed_defaults()
     return APIResponse.success(data={"created": created})
@@ -129,6 +135,7 @@ def seed_metric_templates():
 @permission_required("monitor:config")
 @transactional
 def delete_metric_template(template_id: int):
+    """删除指标模板。"""
     from app.services.monitoring.metric_template_service import delete as _delete
     data = _delete(template_id)
     return APIResponse.success(data=data)
@@ -140,6 +147,7 @@ def delete_metric_template(template_id: int):
 @permission_required("monitor:config")
 @transactional
 def batch_delete_metric_templates():
+    """批量删除指标模板。"""
     body = request.get_json(silent=True) or {}
     ids = body.get("ids")
     if not isinstance(ids, list) or not ids:
@@ -157,6 +165,7 @@ def batch_delete_metric_templates():
 @permission_required("monitor:config")
 @transactional
 def batch_toggle_metric_templates_enabled():
+    """批量启用/停用指标模板。"""
     body = request.get_json(silent=True) or {}
     ids = body.get("ids")
     enabled = body.get("enabled")
@@ -169,6 +178,7 @@ def batch_toggle_metric_templates_enabled():
     from app.services.monitoring.metric_template_service import batch_set_enabled
     data = batch_set_enabled(ids, enabled)
     return APIResponse.success(data=data)
+
 
 
 _graph_service = None
@@ -187,6 +197,7 @@ def _get_graph_service():
 @login_required
 @permission_required("monitor:view")
 def get_device_traffic_ports(device_id: int):
+    """返回设备所有有流量 item 的端口列表（轻量，不拉历史）。"""
     device = device_repo.find_by_id_or_404(device_id)
     try:
         cred = credential_service.get_decrypted(device_id, MonitorProtocolCode.ZABBIX.value)
@@ -208,6 +219,7 @@ def get_device_traffic_ports(device_id: int):
 @login_required
 @permission_required("monitor:view")
 def get_device_traffic(device_id: int):
+    """按设备+端口拉取 Zabbix 端口流量时间序列。"""
     device = device_repo.find_by_id_or_404(device_id)
     try:
         cred = credential_service.get_decrypted(device_id, MonitorProtocolCode.ZABBIX.value)
@@ -237,11 +249,14 @@ def get_device_traffic(device_id: int):
     return APIResponse.success(data=series)
 
 
+
+
 @monitor_bp.get("/metric-template-groups")
 @doc(summary="列出全部指标模板组", tags=["监控"], responses={200: "MetricTemplateGroupListResponse"})
 @login_required
 @permission_required("monitor:view")
 def list_metric_template_groups():
+    """列出全部指标模板组（含每组模板数）。"""
     from app.services.monitoring.metric_template_group_service import MetricTemplateGroupService
     data = MetricTemplateGroupService().list_groups()
     return APIResponse.success(data=data)
@@ -253,6 +268,7 @@ def list_metric_template_groups():
 @permission_required("monitor:config")
 @transactional
 def create_metric_template_group():
+    """新建指标模板组（校验 device_type+source 唯一性）。"""
     body = request.get_json(silent=True) or {}
     from app.services.monitoring.metric_template_group_service import MetricTemplateGroupService
     data = MetricTemplateGroupService().create_group(body)
@@ -264,6 +280,7 @@ def create_metric_template_group():
 @login_required
 @permission_required("monitor:view")
 def get_metric_template_group(group_id: int):
+    """查询模板组详情（含组内模板列表）。"""
     from app.services.monitoring.metric_template_group_service import MetricTemplateGroupService
     data = MetricTemplateGroupService().get_group_detail(group_id)
     return APIResponse.success(data=data)
@@ -275,6 +292,7 @@ def get_metric_template_group(group_id: int):
 @permission_required("monitor:config")
 @transactional
 def update_metric_template_group(group_id: int):
+    """更新指标模板组（校验组内模板兼容性）。"""
     body = request.get_json(silent=True) or {}
     from app.services.monitoring.metric_template_group_service import MetricTemplateGroupService
     data = MetricTemplateGroupService().update_group(group_id, body)
@@ -287,6 +305,7 @@ def update_metric_template_group(group_id: int):
 @permission_required("monitor:config")
 @transactional
 def delete_metric_template_group(group_id: int):
+    """删除指标模板组（级联删除组-模板关联）。"""
     from app.services.monitoring.metric_template_group_service import MetricTemplateGroupService
     data = MetricTemplateGroupService().delete_group(group_id)
     return APIResponse.success(data=data)
@@ -298,6 +317,7 @@ def delete_metric_template_group(group_id: int):
 @permission_required("monitor:config")
 @transactional
 def add_templates_to_group(group_id: int):
+    """批量勾选指标模板入组（幂等，校验 device_type+source 一致）。"""
     body = request.get_json(silent=True) or {}
     template_ids = body.get("template_ids") or []
     if not isinstance(template_ids, list) or not template_ids:
@@ -313,9 +333,12 @@ def add_templates_to_group(group_id: int):
 @permission_required("monitor:config")
 @transactional
 def remove_template_from_group(group_id: int, template_id: int):
+    """从组中移除指标模板。"""
     from app.services.monitoring.metric_template_group_service import MetricTemplateGroupService
     data = MetricTemplateGroupService().remove_template_from_group(group_id, template_id)
     return APIResponse.success(data=data)
+
+
 
 
 @monitor_bp.get("/devices/<int:device_id>/metric-latest")
@@ -323,6 +346,7 @@ def remove_template_from_group(group_id: int, template_id: int):
 @login_required
 @permission_required("monitor:view")
 def get_device_metric_latest(device_id: int):
+    """返回某设备的全部指标当前值（含正常值，按 metric_key 分组）。"""
     device = device_repo.find_by_id(device_id)
     if not device:
         raise BusinessLogicError("设备不存在", status_code=404)
@@ -332,7 +356,10 @@ def get_device_metric_latest(device_id: int):
     return APIResponse.success(data={"items": items})
 
 
+
+
 def _parse_iso_dt(value: str) -> datetime | None:
+    """解析查询参数中的 ISO 时间；非法格式抛 ValueError。"""
     if not value:
         return None
     v = value.strip()
@@ -347,6 +374,7 @@ def _parse_iso_dt(value: str) -> datetime | None:
 @login_required
 @permission_required("monitor:view")
 def get_device_metric_keys(device_id: int):
+    """返回设备有历史时序数据的所有 metric_key（供前端指标选择器）。"""
     device = device_repo.find_by_id(device_id)
     if not device:
         raise BusinessLogicError("设备不存在", status_code=404)
@@ -362,6 +390,7 @@ def get_device_metric_keys(device_id: int):
 @login_required
 @permission_required("monitor:view")
 def get_device_metric_history(device_id: int, metric_key: str):
+    """返回设备某指标的历史时序（时间升序），支持 index_key / 时间范围 / limit 过滤。"""
     device = device_repo.find_by_id(device_id)
     if not device:
         raise BusinessLogicError("设备不存在", status_code=404)

@@ -58,6 +58,15 @@ logger = get_logger(__name__)
 
 
 def create_headless_monitor_app(config_name: Optional[str] = None):
+    """构造 headless Flask app，并禁用「进程内监控 worker」。
+
+    复用 `create_app` 以加载 ORM / 蓝图 / 通知通道 / 投递线程，但通过设置
+    ``MONITOR_WORKER_IN_PROCESS=false`` 确保本进程**不再**启动 in-Flask 监控线程
+    （监控职责由本服务自己的 asyncio 循环承担，避免双跑）。
+
+    Args:
+        config_name: 环境名（development / testing / production），缺省读 FLASK_ENV。
+    """
     prev = os.environ.get("MONITOR_WORKER_IN_PROCESS")
     os.environ["MONITOR_WORKER_IN_PROCESS"] = "false"
     try:
@@ -72,6 +81,7 @@ def create_headless_monitor_app(config_name: Optional[str] = None):
 
 
 class StandaloneMonitorService:
+    """监控独立服务的核心：构建 MonitorService + 调度 asyncio 探测轮次。"""
 
     def __init__(
         self,
@@ -111,6 +121,12 @@ class StandaloneMonitorService:
 
 
     def collect_target_ids(self, loop_name: str) -> List[int]:
+        """按 loop 的协议 + 设备类型 + 白名单收集本轮要探测的设备 id。
+
+        若当前 loop 的 ProtocolSpec.excludes_loops 非空（如 zabbix 排除 snmp/bmc），
+        则减去这些直连 loop 已启用凭据的设备 id，避免对「双凭据设备」重复网络调用。
+        正确性不依赖此步（`_select_adapter` 已优先直连），它只是效率优化。
+        """
         protocols = protocols_for_loop(loop_name)
         allowed_types = device_types_for_loop(loop_name)
         with self.app.app_context():
@@ -134,6 +150,10 @@ class StandaloneMonitorService:
 
 
     def check_one(self, device_id: int) -> None:
+        """探测单个设备：worker 线程内 push app context，开独立 Session，落库后关闭。
+
+        任何异常被吞掉，不中断整轮（与 in-Flask worker 一致）。
+        """
         Session = self._sessionmaker
         try:
             with self.app.app_context():
@@ -150,6 +170,7 @@ class StandaloneMonitorService:
 
 
     def run_round_sync(self, loop_name: str) -> int:
+        """同步执行一轮探测（同 loop 下全部目标设备串行）。返回探测数量。"""
         target_ids = self.collect_target_ids(loop_name)
         for did in target_ids:
             self.check_one(did)
@@ -189,6 +210,7 @@ class StandaloneMonitorService:
 
 
     async def _run_async_round(self, loop_name: str) -> int:
+        """异步执行一轮探测（run_in_executor 并发）。返回本轮探测的设备数。"""
         if not self._try_acquire_lock(loop_name):
             logger.info("本轮监控锁被其他进程持有，跳过 loop=%s", loop_name)
             return 0
@@ -243,6 +265,7 @@ class StandaloneMonitorService:
 
 
     def run(self) -> None:
+        """阻塞运行：启动 asyncio 事件循环，按 worker_loops() 各起一个轮询任务。"""
         asyncio.run(self._serve())
 
     async def _serve(self) -> None:

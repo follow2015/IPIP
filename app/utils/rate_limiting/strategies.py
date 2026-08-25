@@ -15,9 +15,26 @@ logger = get_logger(__name__)
 
 
 class SlidingWindowStrategy(RateLimitStrategy):
+    """滑动窗口策略
+
+    使用滑动时间窗口算法实现频率限制，提供更精确的限制控制。
+    算法：记录每个请求的时间戳，只统计窗口内的请求数。
+    Redis 后端使用 ZSET 实现，内存后端使用 deque 实现。
+    """
 
     def check_limit(self, storage: RateLimitStorage, key: str,
                    limit: int, window: int) -> Tuple[bool, int]:
+        """检查限制（滑动窗口算法）
+
+        Args:
+            storage: 存储后端
+            key: 限制键
+            limit: 限制数量
+            window: 时间窗口（秒）
+
+        Returns:
+            Tuple[bool, int]: (是否允许, 剩余数量)
+        """
         current_time = time.time()
         window_start = current_time - window
         cache_key = f"ratelimit:sw:{key}"
@@ -30,6 +47,7 @@ class SlidingWindowStrategy(RateLimitStrategy):
     def _check_limit_redis(self, storage: RateLimitStorage, cache_key: str,
                           limit: int, window: int, current_time: float,
                           window_start: float) -> Tuple[bool, int]:
+        """Redis 滑动窗口实现（基于 ZSET）"""
         try:
             redis = storage.redis_client
 
@@ -54,6 +72,7 @@ class SlidingWindowStrategy(RateLimitStrategy):
     def _check_limit_memory(self, storage: RateLimitStorage, cache_key: str,
                            limit: int, window: int, current_time: float,
                            window_start: float) -> Tuple[bool, int]:
+        """内存滑动窗口实现（基于时间戳列表）"""
         try:
             timestamps = storage._store.get(cache_key, {}).get('timestamps', [])
 
@@ -88,9 +107,25 @@ class SlidingWindowStrategy(RateLimitStrategy):
 
 
 class FixedWindowStrategy(RateLimitStrategy):
+    """固定窗口策略
+
+    使用固定窗口算法实现频率限制，内存使用较少但精度稍低。
+    算法：将时间划分为固定窗口，每个窗口内独立计数。
+    """
 
     def check_limit(self, storage: RateLimitStorage, key: str,
                    limit: int, window: int) -> Tuple[bool, int]:
+        """检查限制（固定窗口算法）
+
+        Args:
+            storage: 存储后端
+            key: 限制键
+            limit: 限制数量
+            window: 时间窗口（秒）
+
+        Returns:
+            Tuple[bool, int]: (是否允许, 剩余数量)
+        """
         current_time = int(time.time())
         cache_key = f"ratelimit:fw:{key}"
 
@@ -101,6 +136,7 @@ class FixedWindowStrategy(RateLimitStrategy):
 
     def _check_limit_redis(self, storage: RateLimitStorage, cache_key: str,
                           limit: int, window: int, current_time: int) -> Tuple[bool, int]:
+        """Redis 固定窗口实现"""
         try:
             redis = storage.redis_client
             window_key = f"{cache_key}:{current_time // window}"
@@ -121,6 +157,7 @@ class FixedWindowStrategy(RateLimitStrategy):
 
     def _check_limit_memory(self, storage: RateLimitStorage, cache_key: str,
                            limit: int, window: int, current_time: int) -> Tuple[bool, int]:
+        """内存固定窗口实现"""
         try:
             if cache_key not in storage._store:
                 storage._store[cache_key] = {
@@ -164,12 +201,33 @@ class FixedWindowStrategy(RateLimitStrategy):
 
 
 class TokenBucketStrategy(RateLimitStrategy):
+    """令牌桶策略
+
+    使用令牌桶算法实现频率限制，支持突发流量。
+    算法：以固定速率向桶中添加令牌，每次请求消耗一个令牌。
+    """
 
     def __init__(self, bucket_size: int = None):
+        """初始化令牌桶策略
+
+        Args:
+            bucket_size: 桶大小，如果为None则使用limit作为桶大小
+        """
         self.bucket_size = bucket_size
 
     def check_limit(self, storage: RateLimitStorage, key: str,
                    limit: int, window: int) -> Tuple[bool, int]:
+        """检查限制（令牌桶算法）
+
+        Args:
+            storage: 存储后端
+            key: 限制键
+            limit: 限制数量（每窗口生成的令牌数）
+            window: 时间窗口（秒）
+
+        Returns:
+            Tuple[bool, int]: (是否允许, 剩余令牌数)
+        """
         current_time = time.time()
         bucket_size = self.bucket_size or limit
         tokens_per_second = limit / window
@@ -183,6 +241,7 @@ class TokenBucketStrategy(RateLimitStrategy):
     def _check_limit_redis(self, storage: RateLimitStorage, cache_key: str,
                           bucket_size: int, tokens_per_second: float,
                           current_time: float) -> Tuple[bool, int]:
+        """Redis 令牌桶实现"""
         try:
             redis = storage.redis_client
 
@@ -220,6 +279,7 @@ class TokenBucketStrategy(RateLimitStrategy):
     def _check_limit_memory(self, storage: RateLimitStorage, cache_key: str,
                            bucket_size: int, tokens_per_second: float,
                            current_time: float) -> Tuple[bool, int]:
+        """内存令牌桶实现"""
         try:
             if cache_key not in storage._store:
                 storage._store[cache_key] = {

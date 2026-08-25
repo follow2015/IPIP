@@ -16,14 +16,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-
 export interface TabInfo {
   key: string;
   title: string;
   path: string;
   closable: boolean;
 }
-
 
 interface UIState {
   theme: 'light' | 'dark';
@@ -36,7 +34,6 @@ interface UIState {
   removeTab: (key: string) => void;
   setActiveTab: (key: string) => void;
 }
-
 
 const HOME_TAB: TabInfo = {
   key: 'dashboard',
@@ -57,7 +54,6 @@ export const useUIStore = create<UIState>()(
 
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
-      
       addTab: (tab) =>
         set((s) => {
           if (s.openTabs.some((t) => t.key === tab.key)) {
@@ -66,23 +62,19 @@ export const useUIStore = create<UIState>()(
           return { openTabs: [...s.openTabs, tab], activeTabKey: tab.key };
         }),
 
-      
       removeTab: (key) =>
         set((s) => {
           const target = s.openTabs.find((t) => t.key === key);
-          
           if (target && target.closable === false) {
             return {};
           }
           const idx = s.openTabs.findIndex((t) => t.key === key);
           const tabs = s.openTabs.filter((t) => t.key !== key);
 
-          
           if (s.activeTabKey !== key) {
             return { openTabs: tabs };
           }
 
-          
           const adjacent = s.openTabs[idx + 1] ?? s.openTabs[idx - 1];
           const activeTabKey = adjacent?.key ?? HOME_TAB.key;
           return { openTabs: tabs, activeTabKey };
@@ -92,7 +84,6 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: 'ui-storage',
-      
       partialize: (s) => ({
         theme: s.theme,
         sidebarCollapsed: s.sidebarCollapsed

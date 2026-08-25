@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, Spin, Button, Space, Tag, Dropdown, Descriptions, Result } from 'antd';
@@ -42,11 +41,9 @@ import AssetTab from '@/pages/Devices/DeviceDetail/AssetTab';
 import CredentialTab from '@/pages/Devices/DeviceDetail/CredentialTab';
 import MetricsTab from '@/pages/Devices/DeviceDetail/MetricsTab';
 
-
 function SwitchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  
   const switchId = Number(id);
 
   if (Number.isNaN(switchId)) {
@@ -63,23 +60,19 @@ function SwitchDetail() {
   return <SwitchDetailContent switchId={switchId} />;
 }
 
-
 function SwitchDetailContent({ switchId }: { switchId: number }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  
   const hashTabKey = location.hash.replace('#', '') || undefined;
   const [activeTabKey, setActiveTabKey] = useState<string>(hashTabKey ?? 'basic');
 
-  
   useEffect(() => {
     if (hashTabKey) {
       setActiveTabKey(hashTabKey);
     }
   }, [hashTabKey]);
 
-  
   const { data: device, refetch } = useDeviceSuspenseDetail(switchId);
   const { data: switchWithPorts, isLoading: switchLoading } = useSwitchWithPorts(switchId);
   const switchData = switchWithPorts?.switch;
@@ -89,12 +82,9 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
   const updateStatus = useUpdateDeviceStatus();
   const message = useMessage();
 
-  
   const [formOpen, setFormOpen] = useState(false);
-  
   const [deviceFormOpen, setDeviceFormOpen] = useState(false);
 
-  
   const syncSwitchInfo = useSyncSwitchInfo();
   const handleRefreshDeviceInfo = () => {
     confirm({
@@ -111,7 +101,6 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
     });
   };
 
-  
   const handleDeviceEvent = useCallback(
     (event: any) => {
       if (event.op_type === 'info_refresh') {
@@ -127,10 +116,8 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
     [refetch]
   );
 
-  
   useDeviceEvents(switchId, 'ports' as const, handleDeviceEvent);
 
-  
   const renderPortActions: RenderPortActionsFn = useCallback(
     (port, { refetch, submitAction }) => (
       <PortActions
@@ -161,7 +148,6 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
     return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
   if (!device) return <div>设备不存在</div>;
 
-  
   const handleDelete = () => {
     confirm({
       title: '确认删除',
@@ -177,7 +163,6 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
     });
   };
 
-  
   const handleStatusChange = (newStatus: number) => {
     updateStatus.mutateAsync({ id: device.id, status: newStatus }).then(() => {
       message.success('状态已变更');
@@ -185,7 +170,6 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
     });
   };
 
-  
   const handleCopyDetail = () => {
     if (!switchData) return;
     const text = [
@@ -207,17 +191,15 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
     navigator.clipboard.writeText(text).then(() => message.success('详情已复制'));
   };
 
-  
   const tabItems = [];
 
-  
   tabItems.push({
     key: 'basic',
     label: '基本信息',
     children: (
       <div>
         <BasicTab device={device} />
-        {}
+        {/* 交换机专属信息 */}
         {switchData && (
           <Descriptions
             title="交换机配置"
@@ -270,7 +252,6 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
     )
   });
 
-  
   tabItems.push({
     key: 'ports',
     label: '端口',
@@ -284,49 +265,42 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
     )
   });
 
-  
   tabItems.push({
     key: 'vlans',
     label: 'VLAN',
     children: <VlanTab deviceId={switchId} hasSsh={hasSsh} />
   });
 
-  
   tabItems.push({
     key: 'lag',
     label: '链路聚合',
     children: <LagTab deviceId={switchId} hasSsh={hasSsh} />
   });
 
-  
   tabItems.push({
     key: 'connections',
     label: '连接',
     children: <ConnectionTab device={device} />
   });
 
-  
   tabItems.push({
     key: 'storage',
     label: '存储',
     children: <StorageTab deviceId={switchId} />
   });
 
-  
   tabItems.push({
     key: 'asset',
     label: '资产信息',
     children: <AssetTab device={device} />
   });
 
-  
   tabItems.push({
     key: 'metrics',
     label: '监控数据',
     children: <MetricsTab deviceId={switchId} />
   });
 
-  
   tabItems.push({
     key: 'credentials',
     label: '监控凭据',
@@ -335,7 +309,6 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
 
   const statusInfo = DEVICE_STATUS_MAP[device.status as DeviceStatusCode];
 
-  
   const statusMenuItems = Object.entries(DEVICE_STATUS_MAP)
     .filter(([k]) => Number(k) !== device.status)
     .map(([k, v]) => ({
@@ -343,7 +316,6 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
       label: v.label
     }));
 
-  
   const subtypeTag = device.device_subtype ? (
     <Tag color={DEVICE_SUBTYPE_COLORS[device.device_subtype as DeviceSubtype] ?? 'default'}>
       {DEVICE_SUBTYPE_LABELS[device.device_subtype as DeviceSubtype] ?? device.device_subtype}
@@ -352,7 +324,7 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
 
   return (
     <div>
-      {}
+      {/* 顶部导航栏 */}
       <div
         style={{
           display: 'flex',
@@ -396,7 +368,7 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
         </Space>
       </div>
 
-      {}
+      {/* 设备概要 */}
       <Descriptions column={3} size="small" style={{ marginBottom: 16 }}>
         <Descriptions.Item label="设备名称">
           <strong style={{ fontSize: 16 }}>{device.device_name}</strong>
@@ -423,7 +395,7 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
         items={tabItems}
       />
 
-      {}
+      {/* 编辑表单（简化版，仅交换机配置） */}
       <SwitchForm
         open={formOpen}
         editRecord={switchData ?? null}
@@ -433,7 +405,7 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
         }}
       />
 
-      {}
+      {/* 完整编辑表单（DeviceForm） */}
       <DeviceForm
         open={deviceFormOpen}
         editRecord={null}

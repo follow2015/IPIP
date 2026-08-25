@@ -5,7 +5,6 @@ interface IdCellProps {
   value: number | string | null | undefined;
 }
 
-
 export default function IdCell({ value }: IdCellProps) {
   const message = useMessage();
 

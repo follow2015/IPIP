@@ -28,11 +28,24 @@ _STATUS_LABELS: Dict[int, str] = {
 
 
 class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
+    """机柜 Repository
+
+    提供机柜全部数据访问方法。所有方法均通过 SQLAlchemy ORM，
+    不包含任何裸 SQL，确保数据库方言无关性。
+    """
 
     def __init__(self, session=None):
         super().__init__(Cabinet, session)
 
     def clear_customer(self, customer_id: int) -> int:
+        """批量解绑客户名下所有机柜（customer_id 置 NULL）。
+
+        注意：机柜下设备的 customer_id 由 DeviceRepository.clear_customer 统一解绑，
+        本方法仅处理 Cabinet 表本身。
+
+        Returns:
+            int: 受影响行数
+        """
         from extensions import db
         result = db.session.query(Cabinet).filter(
             Cabinet.customer_id == customer_id,
@@ -41,6 +54,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def find_by_id(self, entity_id: int) -> Optional[Cabinet]:
+        """根据ID查找机柜，预加载 devices/room/customer 避免懒加载 N+1"""
         try:
             return (
                 self._base_query()
@@ -57,6 +71,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError(f"查找机柜失败", original_error=e)
 
     def find_by_cabinet_number(self, cabinet_number: str) -> Optional[Cabinet]:
+        """根据机柜编号查找机柜。"""
         try:
             return (
                 self._base_query()
@@ -69,6 +84,10 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def find_by_room_id(self, room_id: int) -> List[Cabinet]:
+        """根据机房 ID 查找机柜，按编号排序。
+        
+        预加载 customer 关系，确保 to_dict() 能获取 customer_name。
+        """
         try:
             from sqlalchemy.orm import joinedload
             
@@ -84,6 +103,12 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找机柜失败", original_error=e)
 
     def find_all(self, filters: Optional[Dict[str, Any]] = None) -> List[Cabinet]:
+        """获取满足过滤条件的机柜列表（不分页）。
+
+        Args:
+            filters: 精确匹配字段字典，例如 {"status": 1, "room_id": 3}
+                     列表值自动使用 IN 查询，例如 {"status": [1, 2, 3]}
+        """
         try:
             query = self._base_query()
             if filters:
@@ -97,6 +122,12 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         self, room_id: Optional[int] = None, min_available_u: int = 1,
         all_status: bool = False, statuses: Optional[List[int]] = None,
     ) -> List[Cabinet]:
+        """查找可用机柜（默认status=1，且实际可用 U 位 >= min_available_u）。
+
+        all_status=True 时不限制状态，用于筛选场景。
+        statuses 优先级高于 all_status，指定允许的状态码列表。
+        可用 U 位需遍历设备数据计算，在 Python 侧过滤。
+        """
         try:
             query = self._base_query()
             if statuses:
@@ -118,6 +149,19 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         page: int = 1,
         page_size: int = 20,
     ) -> Dict[str, Any]:
+        """关键词多字段模糊搜索 + 精确过滤 + 分页。
+
+        Args:
+            search_fields: 参与模糊搜索的字段名，例如 ["cabinet_number", "location"]
+            keyword: 搜索关键词（对各字段做 ILIKE %keyword%）
+            filters: 精确匹配条件
+            page: 页码（从 1 开始）
+            page_size: 每页数量
+
+        Returns:
+            {"data": List[Cabinet], "total_count": int, "page": int,
+             "page_size": int, "total_pages": int}
+        """
         try:
             query = self._base_query()
 
@@ -154,6 +198,12 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         page_size: int = 20,
         filters: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """通用分页查询。
+
+        Returns:
+            {"data": List[Cabinet], "total_count": int, "page": int,
+             "page_size": int, "total_pages": int}
+        """
         return self.search(
             search_fields=[],
             keyword=None,
@@ -166,6 +216,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def check_cabinet_number_exists(
         self, cabinet_number: str, exclude_id: Optional[int] = None
     ) -> bool:
+        """检查机柜编号是否已存在（exclude_id 用于更新时跳过自身）。"""
         if not cabinet_number:
             return False
         try:
@@ -178,6 +229,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("检查机柜编号存在性失败", original_error=e)
 
     def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
+        """统计满足条件的机柜数量。"""
         try:
             query = self._base_query().with_entities(func.count(Cabinet.id))
             if filters:
@@ -189,6 +241,15 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def get_cabinet_statistics(self) -> Dict[str, Any]:
+        """获取机柜整体统计信息（全局汇总，单次 DB 往返）。
+
+        修复：原代码使用 SQLAlchemy 1.x 的 case([(cond, val)], else_=...) 元组语法，
+        在 SQLAlchemy 2.x 中已移除，改用关键字参数形式 case(value, whens) 或
+        SQLAlchemy 1.4/2.0 兼容的 case((cond, val), else_=...) 位置参数形式。
+
+        修复：原代码仅将 status!=1 的一律标记为"不可用"，
+        现在使用完整的状态标签映射，保留 2/3/4 等状态的粒度。
+        """
         try:
             basic = self._base_query().with_entities(
                 func.count(Cabinet.id).label("total_cabinets"),
@@ -250,6 +311,23 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("获取机柜统计信息失败", original_error=e)
 
     def get_room_cabinet_statistics(self, room_id: int) -> Dict[str, Any]:
+        """获取指定机房的机柜统计信息。
+
+        Args:
+            room_id: 机房ID
+
+        Returns:
+            {
+                "cabinet_count": int,
+                "available_cabinets": int,
+                "total_u": int,
+                "used_u": int,
+                "power_statistics": {
+                    "功率值(W)": int,  # 按实际功率值分组统计
+                    ...
+                }
+            }
+        """
         try:
             result = self._base_query().with_entities(
                 func.count(Cabinet.id).label("cabinet_count"),

@@ -11,7 +11,6 @@ import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
 
 interface PortGeneratePanelProps {
   form: ReturnType<typeof Form.useForm>[0];
-  
   portPreview: string[];
 }
 

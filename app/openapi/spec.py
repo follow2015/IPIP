@@ -9,6 +9,11 @@ from apispec.ext.marshmallow import MarshmallowPlugin
 
 
 def create_spec() -> APISpec:
+    """创建并配置 APISpec 实例
+
+    Returns:
+        APISpec: 配置好的 OpenAPI 3.0 规范实例
+    """
     spec = APISpec(
         title="IPIP 管理 API",
         version="2.1.0",
@@ -31,6 +36,13 @@ def create_spec() -> APISpec:
 
 
 def _register_common_schemas(spec: APISpec):
+    """注册通用 Schema 组件（分页、错误响应等）
+
+    使用 component 参数直接传入 dict schema，避免 MarshmallowPlugin 解析。
+
+    Args:
+        spec: APISpec 实例
+    """
     spec.components.schema("PaginationMeta", component={
         "type": "object",
         "properties": {
@@ -54,6 +66,15 @@ def _register_common_schemas(spec: APISpec):
 
 
 def register_marshmallow_schemas(spec: APISpec):
+    """注册所有 Marshmallow Schema 到 APISpec
+
+    注册请求验证 Schema（Create/Update）和响应 Schema（Response）。
+    响应 Schema 对齐各模型的 to_dict() 返回结构，
+    使 openapi-typescript 能生成完整的前端类型。
+
+    Args:
+        spec: APISpec 实例
+    """
     from app.api.device import DeviceCreateSchema, DeviceUpdateSchema
     from app.api.device import (
         BatchUpdateAssetSchema, BatchResetAssetSchema,
@@ -413,6 +434,11 @@ _spec_instance: APISpec | None = None
 
 
 def get_spec() -> APISpec:
+    """获取全局 APISpec 实例（懒初始化）
+
+    Returns:
+        APISpec: 全局规范实例
+    """
     global _spec_instance
     if _spec_instance is None:
         _spec_instance = create_spec()

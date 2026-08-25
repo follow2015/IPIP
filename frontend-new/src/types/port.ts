@@ -9,22 +9,22 @@
 import type { ReactNode } from 'react';
 import type { SwitchPort } from './models';
 
-
 export type SubmitActionFn = (
   action: string,
   port: string,
   params?: Record<string, unknown>
 ) => Promise<void>;
 
-
 export interface PortActionRenderCtx {
   refetch: () => void;
   submitAction: SubmitActionFn;
 }
 
-
+/**
+ * 端口操作列渲染函数（由 SwitchDetail 注入，捕获 switchId；
+ * 运行时 ctx 注入 refetch / submitAction，避免 Devices 域直接依赖 Switches 组件）
+ */
 export type RenderPortActionsFn = (port: SwitchPort, ctx: PortActionRenderCtx) => ReactNode;
-
 
 export interface BatchActionsRenderCtx {
   selectedPorts: string[];
@@ -33,6 +33,5 @@ export interface BatchActionsRenderCtx {
   refetch: () => void;
   onBatchLocalUpdate?: (portNames: string[], updates: Record<string, unknown>) => Promise<void>;
 }
-
 
 export type RenderBatchActionsFn = (ctx: BatchActionsRenderCtx) => ReactNode;

@@ -1,6 +1,5 @@
 import { Modal } from 'antd';
 
-
 type ConfirmOptions = Parameters<typeof Modal.confirm>[0];
 
 const CONFIRM_DEFAULTS = {

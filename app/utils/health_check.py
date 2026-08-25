@@ -17,9 +17,18 @@ logger = get_logger(__name__)
 
 
 class HealthChecker:
+    """健康检查器
+
+    提供各种系统健康检查功能。
+    """
 
     @staticmethod
     def check_database() -> Dict[str, Any]:
+        """检查数据库连接
+
+        Returns:
+            Dict: 检查结果
+        """
         try:
             db.session.execute(db.text("SELECT 1"))
             return {"status": "healthy", "message": "数据库连接正常"}
@@ -29,6 +38,11 @@ class HealthChecker:
 
     @staticmethod
     def check_redis() -> Dict[str, Any]:
+        """检查Redis连接
+
+        Returns:
+            Dict: 检查结果
+        """
         try:
             redis_client = None
             if hasattr(cache_manager, 'primary_storage') and hasattr(cache_manager.primary_storage, 'redis_client'):
@@ -44,6 +58,14 @@ class HealthChecker:
 
     @staticmethod
     def check_disk_space(threshold: float = 0.9) -> Dict[str, Any]:
+        """检查磁盘空间
+
+        Args:
+            threshold: 使用率阈值（0-1）
+
+        Returns:
+            Dict: 检查结果
+        """
         try:
             disk_usage = shutil.disk_usage("/")
 
@@ -68,6 +90,11 @@ class HealthChecker:
 
     @staticmethod
     def check_all() -> Dict[str, Any]:
+        """执行所有健康检查
+
+        Returns:
+            Dict: 所有检查结果
+        """
         results = {
             "timestamp": datetime.now().isoformat(),
             "checks": {
@@ -85,13 +112,25 @@ class HealthChecker:
 
 
 class ErrorStatistics:
+    """错误统计器
+
+    记录和统计错误信息。
+    """
 
     def __init__(self):
+        """初始化错误统计器"""
         self.error_counts = defaultdict(int)
         self.error_details = []
-        self.max_details = 100
+        self.max_details = 100  # 最多保留100条详细错误
 
     def record_error(self, error_type: str, message: str, context: Dict[str, Any] = None):
+        """记录错误
+
+        Args:
+            error_type: 错误类型
+            message: 错误消息
+            context: 上下文信息
+        """
         self.error_counts[error_type] += 1
 
         error_detail = {
@@ -113,6 +152,14 @@ class ErrorStatistics:
             logger.error(f"记录错误统计到Redis失败: {e}")
 
     def get_statistics(self, time_range: int = 3600) -> Dict[str, Any]:
+        """获取错误统计
+
+        Args:
+            time_range: 时间范围（秒）
+
+        Returns:
+            Dict: 统计信息
+        """
         cutoff_time = datetime.now() - timedelta(seconds=time_range)
 
         recent_errors = [
@@ -129,15 +176,24 @@ class ErrorStatistics:
             "time_range": time_range,
             "total_errors": len(recent_errors),
             "error_types": dict(type_counts),
-            "recent_errors": recent_errors[-10:],
+            "recent_errors": recent_errors[-10:],  # 最近10条
         }
 
     def get_top_errors(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """获取最频繁的错误
+
+        Args:
+            limit: 返回数量限制
+
+        Returns:
+            List[Dict]: 错误列表
+        """
         sorted_errors = sorted(self.error_counts.items(), key=lambda x: x[1], reverse=True)
 
         return [{"type": error_type, "count": count} for error_type, count in sorted_errors[:limit]]
 
     def clear_statistics(self):
+        """清空统计数据"""
         self.error_counts.clear()
         self.error_details.clear()
 

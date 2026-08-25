@@ -7,12 +7,10 @@ interface NodeGridProps {
   nodes: DeviceNode[];
   nodeRows: number;
   nodeCols: number;
-  
   draggable?: boolean;
   onNodeDragStart?: (nodeId: string, idx: number) => void;
   onNodeDrop?: (targetIdx: number) => void;
 }
-
 
 const NodeGrid: React.FC<NodeGridProps> = ({
   nodes,
@@ -24,7 +22,6 @@ const NodeGrid: React.FC<NodeGridProps> = ({
 }) => {
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
-  
   const grid: (DeviceNode | null)[][] = useMemo(() => {
     const g: (DeviceNode | null)[][] = Array.from({ length: nodeRows }, () =>
       Array(nodeCols).fill(null)

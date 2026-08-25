@@ -47,7 +47,6 @@ import NodeDetailPanel from './NodeDetailPanel';
 type ViewMode = 'network' | 'device';
 
 const TopologyPage: React.FC = () => {
-  
   const [viewMode, setViewMode] = useState<ViewMode>('network');
   const [roomId, setRoomId] = useState<number | undefined>(undefined);
   const [virtualRoomId, setVirtualRoomId] = useState<number | undefined>(undefined);
@@ -60,7 +59,6 @@ const TopologyPage: React.FC = () => {
   const [autoDetectModalOpen, setAutoDetectModalOpen] = useState(false);
   const graphRef = useRef<TopologyGraphHandle>(null);
 
-  
   const { data: roomOptions } = useRoomOptions();
   const { data: virtualRoomsData } = useVirtualRooms({ per_page: 200 });
   const networkQuery = useNetworkTopology(
@@ -77,23 +75,19 @@ const TopologyPage: React.FC = () => {
   const rooms = roomOptions ?? [];
   const virtualRooms = virtualRoomsData?.items ?? [];
 
-  
   const nodeMap = useMemo(
     () => Object.fromEntries((topologyData?.nodes ?? []).map((n) => [n.id, n])),
     [topologyData]
   );
 
-  
   const handleNodeClick = useCallback((node: TopologyNode) => {
     setSelectedNode(node);
     setDrawerOpen(true);
   }, []);
 
   const handleEdgeClick = useCallback((_edge: TopologyEdge) => {
-    
   }, []);
 
-  
   useEffect(() => {
     if (!deferredSearch.trim()) {
       setHighlightNodeId(null);
@@ -141,7 +135,6 @@ const TopologyPage: React.FC = () => {
     );
   }, [roomId, autoDetectMutation]);
 
-  
   const statsItems = useMemo(() => {
     if (!topologyData?.stats) return [];
     const s = topologyData.stats;
@@ -163,7 +156,6 @@ const TopologyPage: React.FC = () => {
     ];
   }, [topologyData?.stats, viewMode]);
 
-  
   const autoDetectColumns = [
     { title: '设备', dataIndex: 'device_name', key: 'device_name' },
     {
@@ -187,7 +179,7 @@ const TopologyPage: React.FC = () => {
 
   return (
     <div style={{ padding: 16, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {}
+      {/* 顶部控制栏 */}
       <Card
         size="small"
         style={{ marginBottom: 12, borderRadius: 8 }}
@@ -263,7 +255,7 @@ const TopologyPage: React.FC = () => {
 
           <Col>
             <Space size="middle">
-              {}
+              {/* 统计 */}
               {statsItems.map((item) => (
                 <Statistic
                   key={item.label}
@@ -290,7 +282,7 @@ const TopologyPage: React.FC = () => {
         </Row>
       </Card>
 
-      {}
+      {/* 图形区域 */}
       <Card
         size="small"
         style={{
@@ -356,7 +348,7 @@ const TopologyPage: React.FC = () => {
         </div>
       </Card>
 
-      {}
+      {/* 节点详情抽屉 */}
       <NodeDetailPanel
         node={selectedNode}
         edges={topologyData?.edges ?? []}
@@ -366,7 +358,7 @@ const TopologyPage: React.FC = () => {
         onLocateNode={(nodeId) => setHighlightNodeId(nodeId)}
       />
 
-      {}
+      {/* 自动推断预览 Modal */}
       <Modal
         title="自动推断结果预览"
         open={autoDetectModalOpen}

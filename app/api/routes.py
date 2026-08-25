@@ -23,11 +23,14 @@ logger = get_logger(__name__)
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 
+
 @api_bp.errorhandler(404)
 def not_found(error):
+    """404错误处理"""
     return APIResponse.error(message='接口不存在', error_code=ErrorCode.NOT_FOUND, status_code=404)
 
 
 @api_bp.errorhandler(500)
 def internal_error(error):
+    """500错误处理"""
     return APIResponse.error(message='服务器内部错误', status_code=500)

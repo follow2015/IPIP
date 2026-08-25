@@ -22,6 +22,7 @@ _PORTS_CACHE_TTL = 60.0
 
 
 def _to_number(value):
+    """把 Zabbix 返回的字符串数值转为 float/int，无法解析返回 None。"""
     if value is None:
         return None
     if isinstance(value, (int, float)):
@@ -33,12 +34,14 @@ def _to_number(value):
 
 
 class ZabbixGraphService:
+    """Zabbix 端口流量图形服务（只读拉取，不落库）"""
 
     def __init__(self, adapter: ZabbixAdapter | None = None):
         self._adapter = adapter or ZabbixAdapter()
 
 
     def _resolve_hostid(self, api_url: str, credential: dict, device) -> str | None:
+        """按设备 IP 匹配 Zabbix host，返回 hostid。"""
         host_ref = self._adapter._resolve_host_ref(device, credential)
         if not host_ref:
             return None
@@ -60,6 +63,13 @@ class ZabbixGraphService:
 
 
     def list_ports(self, credential: dict, device, use_cache: bool = True) -> list[dict]:
+        """返回设备所有有流量 item 的端口列表。
+
+        返回 ``[{"port": 接口名, "rx_itemid": "...", "tx_itemid": "..."}, ...]``
+
+        ``use_cache=True`` 时按 device.id 做 60s TTL 缓存，避免同一设备短时间内
+        重复调用 host.get + item.get（如 /traffic/ports 紧接 /traffic）。
+        """
         import time as _time
         device_id = getattr(device, "id", None)
         if use_cache and device_id is not None:
@@ -122,6 +132,13 @@ class ZabbixGraphService:
         time_till: int,
         ports: list[dict] | None = None,
     ) -> dict:
+        """按端口名返回 rx/tx 流量时间序列。
+
+        返回 ``{"port": 接口名, "time": [...], "rx_bps": [...], "tx_bps": [...]}``
+
+        ``ports`` 可传入已拉取的端口列表（来自 ``list_ports``），避免重复调用
+        ``host.get`` + ``item.get``。为 None 时内部自行调用 ``list_ports``。
+        """
         api_url = credential.get("api_url")
         if not api_url:
             return {"port": None, "time": [], "rx_bps": [], "tx_bps": []}
@@ -140,6 +157,19 @@ class ZabbixGraphService:
 
     @staticmethod
     def _align_series(port: str, rx_points: list, tx_points: list) -> dict:
+        """对齐 rx/tx 时间序列。
+
+        Zabbix 的 net.if.in / net.if.out 是两个独立 item，首采时间相差几秒到几十秒，
+        在固定采样周期下会形成永久相位差（如设备 107 实测 rx/tx 相差 21s，周期 180s，
+        永不重合）。旧逻辑取 clock 并集 + 缺失填 0，会导致每个时间点只有一条线有值、
+        另一条线被强制置 0，图表呈锯齿状跳变。
+
+        改进策略：
+        - 以点数较多的一方作为主时间轴（通常 rx/tx 点数相同，任选其一）
+        - 另一方用最近邻插值对齐到主轴（21s 偏移在 180s 周期内误差 < 3%）
+        - 主轴缺失的点（一方完全无数据）才填 0
+        - 双方都无数据时返回空序列
+        """
         rx_map = {int(p["clock"]): _to_number(p["value"]) for p in rx_points if p.get("clock")}
         tx_map = {int(p["clock"]): _to_number(p["value"]) for p in tx_points if p.get("clock")}
         rx_clocks = sorted(rx_map)
@@ -190,6 +220,7 @@ class ZabbixGraphService:
 
     def _pull_history(self, api_url: str, credential: dict, itemid: str,
                       time_from: int, time_till: int, value_type: int = 0) -> list:
+        """拉取单个 item 的数值历史（优先 history.get，空则 trend.get）。"""
         try:
             points = self._adapter._zabbix_call(api_url, credential, "history.get", {
                 "itemids": itemid,
@@ -219,6 +250,13 @@ class ZabbixGraphService:
 
     @staticmethod
     def _extract_port_name(label: str) -> str:
+        """从 item name / key 提取接口名。
+
+        支持格式：
+        - ``Interface 10GE1/0/6(): Bits received`` → ``10GE1/0/6()``
+        - ``Incoming network traffic on GigabitEthernet1/0/1`` → ``GigabitEthernet1/0/1``
+        - ``net.if.in[bps,ifHCInOctets,GigabitEthernet1/0/1]`` → ``GigabitEthernet1/0/1``
+        """
         label = label or ""
         if label.startswith("Interface ") and ":" in label:
             return label[len("Interface "):label.index(":")].strip()

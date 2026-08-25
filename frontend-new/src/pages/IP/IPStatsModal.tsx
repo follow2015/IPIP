@@ -1,6 +1,5 @@
 import { Modal, Row, Col, Card, Statistic, Spin } from 'antd';
 
-
 interface IPStats {
   total?: number;
   active?: number;
@@ -13,10 +12,8 @@ interface IPStatsModalProps {
   open: boolean;
   onClose: () => void;
   stats?: IPStats;
-  
   scopeLabel?: string;
 }
-
 
 export function IPStatsModal({ open, onClose, stats, scopeLabel }: IPStatsModalProps) {
   return (

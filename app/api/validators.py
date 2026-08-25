@@ -11,6 +11,15 @@ from app.api.base import APIResponse, ErrorCode
 
 
 def parse_ip_room(data: dict) -> tuple:
+    """解析并校验 ip_address + room_id 参数。
+
+    Args:
+        data: 请求体字典
+
+    Returns:
+        tuple: (ip_address, room_id) 或错误响应元组。
+               调用方需用 isinstance 检查第一个元素是否为 Response。
+    """
     ip_address = data.get("ip_address")
     room_id = data.get("room_id")
 

@@ -20,6 +20,7 @@ from extensions import db
 
 
 class DeviceMetricTimeseries(db.Model):
+    """设备指标值历史时序（每次采集每指标每 index 一行，分区表）"""
 
     __tablename__ = "device_metric_timeseries"
     __table_args__ = (

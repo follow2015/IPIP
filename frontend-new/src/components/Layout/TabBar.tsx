@@ -15,12 +15,10 @@ interface TabBarProps {
   onSetActiveTab: (key: string) => void;
 }
 
-
 function TabBar({ openTabs, activeTabKey, onRemoveTab, onSetActiveTab }: TabBarProps) {
   const navigate = useNavigate();
   const { token } = theme.useToken();
 
-  
   const handleTabChange = (key: string) => {
     onSetActiveTab(key);
     const tab = openTabs.find((t) => t.key === key);
@@ -29,7 +27,6 @@ function TabBar({ openTabs, activeTabKey, onRemoveTab, onSetActiveTab }: TabBarP
     }
   };
 
-  
   const handleTabEdit = (
     targetKey: string | React.MouseEvent | React.KeyboardEvent,
     action: 'add' | 'remove',

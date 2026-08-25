@@ -43,7 +43,6 @@ import { relativeTime } from '@/utils/format';
 
 const { Text } = Typography;
 
-
 const FILTER_OPTIONS = [
   { label: '全部', value: '' },
   { label: '连通异常', value: 'unreachable' },
@@ -52,9 +51,7 @@ const FILTER_OPTIONS = [
   { label: '告警盲区', value: 'blindspot' }
 ];
 
-
 const PROBE_COOLDOWN_SECONDS = 30;
-
 
 const CooldownButton = memo(function CooldownButton({
   deviceId,
@@ -103,7 +100,6 @@ export default function DeviceStatusTable() {
   const [statusFilter, setStatusFilter] = useState<MonitorStatusFilter>(undefined);
   const [keyword, setKeyword] = useState('');
   const [probingId, setProbingId] = useState<number | null>(null);
-  
   const [cooldownMap, setCooldownMap] = useState<Record<number, number>>({});
 
   const { data: statusData, isLoading: statusesLoading } = useMonitorStatuses({
@@ -113,13 +109,11 @@ export default function DeviceStatusTable() {
     keyword: keyword || undefined
   });
 
-  
   const batch = useBatchSelection<MonitorStatusItem>({
     dataSource: statusData?.items ?? [],
     getRowKey: (r) => String(r.device_id)
   });
 
-  
   const handleProbe = useCallback(
     async (deviceId: number) => {
       setProbingId(deviceId);
@@ -148,7 +142,6 @@ export default function DeviceStatusTable() {
     [checkDevice, message]
   );
 
-  
   const handleBatchProbe = async () => {
     if (batch.count === 0) return;
     const ids = batch.selectedKeys.map((k) => Number(k));
@@ -173,7 +166,6 @@ export default function DeviceStatusTable() {
     }
   };
 
-  
   const handleBatchToggleMonitor = async (enabled: boolean) => {
     if (batch.count === 0) return;
     const ids = batch.selectedKeys.map((k) => Number(k));
@@ -190,7 +182,6 @@ export default function DeviceStatusTable() {
     }
   };
 
-  
   const handleToggleMonitorEnabled = async (deviceId: number, enabled: boolean) => {
     try {
       await toggleMonitor.mutateAsync({ deviceId, enabled });
@@ -200,7 +191,6 @@ export default function DeviceStatusTable() {
     }
   };
 
-  
   const columns = [
     {
       title: '设备名称',

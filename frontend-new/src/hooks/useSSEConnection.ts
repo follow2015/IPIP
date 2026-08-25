@@ -27,25 +27,22 @@
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth';
 
-
 const FALLBACK_POLL_INTERVAL = 30_000;
-
 const SSE_MAX_FAILURES = 3;
 
 interface UseSSEConnectionOptions {
-  
   url: string;
-  
   enabled: boolean;
-  
   onMessage: (data: string) => void;
-  
   onFallbackPoll: () => void;
-  
   label?: string;
 }
 
-
+/**
+ * 管理 SSE EventSource 连接的公共 Hook
+ *
+ * @param options - 连接选项
+ */
 export function useSSEConnection({
   url,
   enabled,
@@ -53,15 +50,11 @@ export function useSSEConnection({
   onFallbackPoll,
   label = 'SSE',
 }: UseSSEConnectionOptions) {
-  
   const token = useAuthStore(s => s.token);
 
-  
   const lastTsRef = useRef<number>(0);
-  
   const failCountRef = useRef<number>(0);
 
-  
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
   const onFallbackPollRef = useRef(onFallbackPoll);
@@ -74,14 +67,12 @@ export function useSSEConnection({
     let es: EventSource | null = null;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
 
-    
     const startFallbackPolling = () => {
       if (fallbackTimer) return;
       console.warn(`[${label}] 连接不可用，已降级为定时轮询`);
       fallbackTimer = setInterval(() => onFallbackPollRef.current(), FALLBACK_POLL_INTERVAL);
     };
 
-    
     const stopFallbackPolling = () => {
       if (fallbackTimer) {
         clearInterval(fallbackTimer);
@@ -100,15 +91,12 @@ export function useSSEConnection({
       es.onmessage = (e: MessageEvent) => {
         try {
           const parsed = JSON.parse(e.data);
-          
           if (parsed.op_type !== 'port_action_result') {
-            
             if (parsed.ts && parsed.ts < lastTsRef.current) return;
             if (parsed.ts) lastTsRef.current = parsed.ts;
           }
           onMessageRef.current(e.data);
         } catch {
-          
         }
       };
 

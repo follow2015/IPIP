@@ -30,6 +30,7 @@ from app.utils.transactional import transactional
 
 
 def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+    """解析查询参数中的 ISO 时间；非法格式抛 ValueError。"""
     if not value:
         return None
     v = value.strip()
@@ -44,6 +45,7 @@ def _parse_dt(value: Optional[str]) -> Optional[datetime]:
 @login_required
 @permission_required("monitor:view")
 def get_device_status(device_id: int):
+    """查询设备监控状态（含指标告警聚合）。"""
     data = monitor_service.get_device_status_with_alerts(device_id)
     return APIResponse.success(data=data)
 
@@ -53,6 +55,11 @@ def get_device_status(device_id: int):
 @login_required
 @permission_required("monitor:view")
 def get_device_metric_dashboard(device_id: int):
+    """查询设备监控数据聚合：凭据/模板组命中情况 + 模板指标当前状态。
+
+    供前端「监控数据」卡片使用：上半部分为 Zabbix 端口流量（has_zabbix 控制），
+    下半部分为模板指标状态（metric_status，grouped 标记是否命中模板组）。
+    """
     data = monitor_service.get_device_metric_dashboard(device_id)
     return APIResponse.success(data=data)
 
@@ -63,6 +70,7 @@ def get_device_metric_dashboard(device_id: int):
 @permission_required("monitor:config")
 @transactional
 def put_credentials(device_id: int):
+    """配置（新增/更新）某设备的单协议监控凭据。"""
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")
@@ -90,6 +98,7 @@ def put_credentials(device_id: int):
 @login_required
 @permission_required("monitor:view")
 def get_probe_history(device_id: int):
+    """分页返回设备探测历史时序（时间升序），支持时间范围 / 协议过滤。"""
     raw_from = (request.args.get("from") or "").strip() or None
     raw_to = (request.args.get("to") or "").strip() or None
     protocol = (request.args.get("protocol") or "").strip() or None
@@ -130,6 +139,7 @@ def get_probe_history(device_id: int):
 @login_required
 @permission_required("monitor:view")
 def get_probe_trends(device_id: int):
+    """聚合统计（供趋势卡片）：可达率 / 延迟统计 / 不可达周期数。"""
     raw_from = (request.args.get("from") or "").strip() or None
     raw_to = (request.args.get("to") or "").strip() or None
     protocol = (request.args.get("protocol") or "").strip() or None
@@ -160,6 +170,11 @@ def get_probe_trends(device_id: int):
 @permission_required("monitor:config")
 @transactional
 def check_device_now(device_id: int):
+    """手动触发一次探测。网络 I/O 在事务外，落库 + 告警在事务内。
+
+    @transactional 收口状态 upsert + 时序事件 + 告警入箱的原子提交，
+    与 check_batch（独立 session 显式 commit）语义对齐。
+    """
     if not monitor_service.check_probe_cooldown(device_id):
         raise BusinessLogicError("该设备探测冷却中，请稍后再试", status_code=429)
 
@@ -181,6 +196,7 @@ def check_device_now(device_id: int):
 @login_required
 @permission_required("monitor:config")
 def check_batch():
+    """批量手动触发探测（最多 50 台）。"""
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")
@@ -195,6 +211,7 @@ def check_batch():
 
 
 def _probe_result_to_dict(result) -> dict:
+    """将 ProbeResult 序列化为响应字典。"""
     return {
         "reachable": result.reachable,
         "latency_ms": result.latency_ms,
@@ -207,6 +224,11 @@ def _probe_result_to_dict(result) -> dict:
 def _persist_and_alert(device, result, protocol: str, threshold=None,
                        re_alert_interval_minutes=None, fallback_role=None,
                        blindspot_role=None):
+    """事务内：落库 + 告警（apply_result 唯一入口），返回统一响应。
+
+    兼容性保留：check_device_now 已改用 monitor_service.probe_and_persist()，
+    但部分测试可能仍直接调用本函数。
+    """
     monitor_service.apply_result(
         device, result, protocol,
         threshold=threshold, re_alert_interval_minutes=re_alert_interval_minutes,

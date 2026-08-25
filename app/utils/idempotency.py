@@ -33,6 +33,10 @@ logger = get_logger(__name__)
 
 
 def _get_redis_client():
+    """获取可用的 Redis 客户端
+
+    优先使用 cache_manager 的 Redis，回退到 ScanOrchestrator。
+    """
     try:
         from app.utils.cache import cache_manager
         if cache_manager.primary_storage and cache_manager.primary_storage.redis_client:
@@ -50,6 +54,10 @@ def _get_redis_client():
 
 
 class IdempotencyError(Exception):
+    """幂等性冲突异常
+
+    当检测到重复的幂等键或无法获取分布式锁时抛出。
+    """
 
     def __init__(self, message: str, code: str = "IDEMPOTENCY_CONFLICT"):
         self.message = message
@@ -59,6 +67,27 @@ class IdempotencyError(Exception):
 
 def idempotent(prefix: str = "idem", ttl: int = 86400,
                key_func: Optional[Callable] = None):
+    """幂等键装饰器
+
+    基于 X-Idempotency-Key 请求头实现幂等保护。
+    如果请求携带了 X-Idempotency-Key，则：
+    - 首次请求：正常执行，将响应结果缓存到 Redis
+    - 重复请求：直接返回缓存的响应，不执行业务逻辑
+
+    如果请求未携带 X-Idempotency-Key，则不启用幂等保护，正常执行。
+
+    Args:
+        prefix: Redis key 前缀，用于区分不同业务场景
+        ttl: 幂等键过期时间（秒），默认 24 小时
+        key_func: 自定义键生成函数，接收 (*args, **kwargs)，返回字符串
+                  默认使用 X-Idempotency-Key 请求头
+
+    使用示例：
+        @idempotent(prefix="import_devices", ttl=86400)
+        def batch_import_devices():
+            data = request.get_json()
+            ...
+    """
 
     def decorator(f: Callable) -> Callable:
         @wraps(f)
@@ -140,6 +169,30 @@ def idempotent(prefix: str = "idem", ttl: int = 86400,
 def redis_lock(prefix: str, key_param: Optional[str] = None,
                key_func: Optional[Callable] = None, ttl: int = 300,
                error_message: str = "操作正在执行中，请稍后再试"):
+    """分布式锁装饰器
+
+    基于 Redis SETNX 实现分布式锁，防止同一资源的并发操作。
+    使用 UUID 所有权令牌 + Lua 脚本 compare-and-delete，避免锁过期后
+    被其他调用者误删。
+
+    适用于：异步扫描、配置备份等同一资源不可并发执行的场景。
+
+    Args:
+        prefix: Redis key 前缀
+        key_param: 从路由参数中提取锁键的参数名（如 "device_id"）
+        key_func: 自定义锁键生成函数，接收 (*args, **kwargs)，返回字符串
+        ttl: 锁过期时间（秒），默认 5 分钟
+        error_message: 获取锁失败时的错误消息
+
+    使用示例：
+        @redis_lock(prefix="config_backup", key_param="device_id", ttl=300)
+        def backup_config(device_id):
+            ...
+
+        @redis_lock(prefix="scan", key_func=lambda: f"room:{request.json['room_id']}", ttl=7200)
+        def trigger_scan():
+            ...
+    """
 
     _RELEASE_LOCK_SCRIPT = """
     if redis.call('get', KEYS[1]) == ARGV[1] then

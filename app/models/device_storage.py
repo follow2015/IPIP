@@ -14,10 +14,15 @@ from extensions import db
 
 
 class DeviceStorage(BaseModel):
+    """设备存储模型
+
+    表示设备的硬盘/存储配置信息。每条记录对应一块物理硬盘（count 固定为 1）。
+    批量统计时在 Repository 层通过 GROUP BY 聚合展示。
+    """
 
     __tablename__ = "device_storage"
     __table_args__ = (
-        Index("idx_storage_device_type", "device_id", "storage_type"),
+        Index("idx_storage_device_type", "device_id", "storage_type"),  # 按设备+存储类型聚合查询
         {"comment": "设备存储表"},
     )
 
@@ -54,6 +59,7 @@ class DeviceStorage(BaseModel):
     template    = relationship('ComponentTemplate', foreign_keys=[template_id], lazy='select')
 
     def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
         return {
             "id": self.id,
             "device_id": self.device_id,

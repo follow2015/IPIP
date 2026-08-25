@@ -9,12 +9,14 @@ import { Spin } from 'antd';
 import { useAuthStore } from '@/stores/auth';
 import { usePermission } from '@/hooks/usePermission';
 
-
 interface PrivateRouteProps {
   children: React.ReactNode;
 }
 
-
+/**
+ * 认证守卫：未登录时重定向到 /login
+ * token 验证期间显示 loading，避免短暂闪现后踢出
+ */
 export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isVerifying = useAuthStore((s) => s.isVerifying);
@@ -35,14 +37,15 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   return <>{children}</>;
 };
 
-
 interface PermissionRouteProps {
   requiredPermission: string;
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }
 
-
+/**
+ * 权限守卫：无指定权限时显示 403
+ */
 export const PermissionRoute: React.FC<PermissionRouteProps> = ({
   requiredPermission,
   children,

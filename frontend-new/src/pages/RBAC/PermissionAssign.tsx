@@ -18,14 +18,12 @@ interface PermissionAssignProps {
   onSuccess: () => void;
 }
 
-
 function PermissionAssign({ open, role, permissions, onClose, onSuccess }: PermissionAssignProps) {
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const { data: rolePerms, isLoading: permsLoading } = useRolePermissions(role?.id ?? 0);
   const setRolePermissions = useSetRolePermissions();
   const message = useMessage();
 
-  
   const treeData = useMemo<TreeProps['treeData']>(() => {
     const categoryMap = new Map<string, Permission[]>();
     permissions.forEach((p) => {
@@ -44,16 +42,13 @@ function PermissionAssign({ open, role, permissions, onClose, onSuccess }: Permi
     }));
   }, [permissions]);
 
-  
   const categoryKeys = useMemo(
     () => new Set((treeData ?? []).map((n) => n.key as string)),
     [treeData],
   );
 
-  
   useEffect(() => {
     if (open && rolePerms) {
-      
       const codes = Array.isArray(rolePerms)
         ? rolePerms.map((p) => (typeof p === 'string' ? p : p.code))
         : [];
@@ -61,10 +56,8 @@ function PermissionAssign({ open, role, permissions, onClose, onSuccess }: Permi
     }
   }, [open, rolePerms]);
 
-  
   const handleSubmit = async () => {
     if (!role) return;
-    
     const permCodes = checkedKeys.filter((k) => !categoryKeys.has(k));
     try {
       await setRolePermissions.mutateAsync({ roleId: role.id, permissions: permCodes });

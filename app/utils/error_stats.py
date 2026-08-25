@@ -18,10 +18,15 @@ logger = get_logger(__name__)
 
 
 class ErrorStats:
+    """错误统计器
+
+    记录和统计系统中发生的错误。
+    """
 
     def __init__(self):
+        """初始化错误统计器"""
         self.enabled = config.ERROR_STATS_ENABLED
-        self.window = config.ERROR_STATS_WINDOW
+        self.window = config.ERROR_STATS_WINDOW  # 统计窗口（秒）
 
         self._errors: Dict[str, List[tuple]] = defaultdict(list)
 
@@ -37,6 +42,13 @@ class ErrorStats:
         message: str,
         context: Optional[Dict[str, Any]] = None,
     ):
+        """记录错误
+
+        Args:
+            error_type: 错误类型（如异常类名）
+            message: 错误消息
+            context: 错误上下文信息
+        """
         if not self.enabled:
             return
 
@@ -54,6 +66,14 @@ class ErrorStats:
             logger.error(f"记录错误统计失败: {str(e)}", exc_info=True)
 
     def get_error_count(self, error_type: Optional[str] = None) -> int:
+        """获取错误计数
+
+        Args:
+            error_type: 错误类型，如果为 None 则返回所有错误的总数
+
+        Returns:
+            错误计数
+        """
         if not self.enabled:
             return 0
 
@@ -71,6 +91,11 @@ class ErrorStats:
             return 0
 
     def get_error_types(self) -> List[str]:
+        """获取所有错误类型
+
+        Returns:
+            错误类型列表
+        """
         if not self.enabled:
             return []
 
@@ -84,6 +109,11 @@ class ErrorStats:
             return []
 
     def get_error_stats(self) -> Dict[str, Any]:
+        """获取错误统计信息
+
+        Returns:
+            错误统计信息字典
+        """
         if not self.enabled:
             return {"enabled": False}
 
@@ -98,7 +128,7 @@ class ErrorStats:
                             "count": len(errors),
                             "first_seen": datetime.fromtimestamp(errors[0][0]).isoformat(),
                             "last_seen": datetime.fromtimestamp(errors[-1][0]).isoformat(),
-                            "recent_messages": [msg for _, msg, _ in errors[-5:]],
+                            "recent_messages": [msg for _, msg, _ in errors[-5:]],  # 最近5条消息
                         }
 
                 total_errors = sum(len(errors) for errors in self._errors.values())
@@ -117,6 +147,14 @@ class ErrorStats:
             return {"enabled": True, "error": str(e)}
 
     def get_top_errors(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """获取发生频率最高的错误
+
+        Args:
+            limit: 返回的错误数量限制
+
+        Returns:
+            错误列表，按频率降序排列
+        """
         if not self.enabled:
             return []
 
@@ -150,6 +188,7 @@ class ErrorStats:
             return []
 
     def clear_stats(self):
+        """清除所有统计数据"""
         if not self.enabled:
             return
 
@@ -163,6 +202,10 @@ class ErrorStats:
             logger.error(f"清除错误统计失败: {str(e)}", exc_info=True)
 
     def _cleanup_old_errors(self):
+        """清理过期的错误记录
+
+        只保留统计窗口内的错误记录。
+        """
         try:
             current_time = time.time()
             cutoff_time = current_time - self.window

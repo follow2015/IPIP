@@ -7,14 +7,17 @@
 from marshmallow import Schema, fields, validate
 
 
+
 class ApiResponseSchema(Schema):
+    """API 统一成功响应包装"""
     success = fields.Bool(dump_default=True)
     message = fields.Str()
-    data = fields.Dict()
+    data = fields.Dict()  # 实际使用时通过 schema 参数指定具体类型
     timestamp = fields.Str()
 
 
 class ApiErrorResponseSchema(Schema):
+    """API 统一错误响应包装"""
     success = fields.Bool(dump_default=False)
     message = fields.Str()
     error_code = fields.Str()
@@ -22,13 +25,16 @@ class ApiErrorResponseSchema(Schema):
 
 
 class PaginationMetaSchema(Schema):
+    """分页元数据（已在 spec.py 中用 dict 注册，此处提供 Marshmallow 版本）"""
     page = fields.Int()
     per_page = fields.Int()
     total = fields.Int()
     total_pages = fields.Int()
 
 
+
 class UserResponseSchema(Schema):
+    """用户响应（对齐 User.to_dict()）"""
     id = fields.Int()
     username = fields.Str()
     email = fields.Str(allow_none=True)
@@ -44,6 +50,7 @@ class UserResponseSchema(Schema):
 
 
 class LoginDataResponseSchema(Schema):
+    """登录响应数据（对齐 POST /auth/login）"""
     token = fields.Str()
     refresh_token = fields.Str()
     user = fields.Nested("LoginUserResponseSchema")
@@ -52,6 +59,7 @@ class LoginDataResponseSchema(Schema):
 
 
 class LoginUserResponseSchema(Schema):
+    """登录响应中的用户信息"""
     id = fields.Int()
     username = fields.Str()
     email = fields.Str(allow_none=True)
@@ -62,6 +70,7 @@ class LoginUserResponseSchema(Schema):
 
 
 class VerifyDataResponseSchema(Schema):
+    """Token 验证响应（对齐 GET /auth/verify）"""
     valid = fields.Bool()
     user_id = fields.Int()
     username = fields.Str()
@@ -69,7 +78,9 @@ class VerifyDataResponseSchema(Schema):
     roles = fields.List(fields.Str())
 
 
+
 class RoomResponseSchema(Schema):
+    """机房响应（对齐 Room.to_dict()）"""
     id = fields.Int()
     name = fields.Str()
     status = fields.Int()
@@ -81,7 +92,9 @@ class RoomResponseSchema(Schema):
     updated_at = fields.Str()
 
 
+
 class CabinetResponseSchema(Schema):
+    """机柜响应（对齐 Cabinet.to_dict()）"""
     id = fields.Int()
     cabinet_number = fields.Str()
     room_id = fields.Int()
@@ -109,13 +122,16 @@ class CabinetResponseSchema(Schema):
 
 
 class CabinetUtilizationResponseSchema(Schema):
+    """机柜利用率"""
     total_u = fields.Int()
     used_u = fields.Int()
     available_u = fields.Int()
     usage_rate = fields.Float()
 
 
+
 class SwitchCredentialEmbeddedSchema(Schema):
+    """交换机凭据嵌入信息（Device.to_dict() 中聚合）"""
     id = fields.Int()
     ip = fields.Str()
     has_ssh = fields.Bool()
@@ -135,12 +151,14 @@ class SwitchCredentialEmbeddedSchema(Schema):
 
 
 class PortSummaryEmbeddedSchema(Schema):
+    """端口汇总信息"""
     total = fields.Int()
     used = fields.Int()
     free = fields.Int()
 
 
 class DeviceResponseSchema(Schema):
+    """设备响应（对齐 Device.to_dict() — 1:1扩展表字段平铺）"""
     id = fields.Int()
     device_name = fields.Str()
     device_type = fields.Str()
@@ -221,7 +239,9 @@ class DeviceResponseSchema(Schema):
     deleted_children_snapshot = fields.List(fields.Dict(), allow_none=True)
 
 
+
 class DeviceNicPortResponseSchema(Schema):
+    """设备网卡端口（对齐 DeviceNicsPort.to_dict()）"""
     id = fields.Int()
     device_id = fields.Int()
     nic_number = fields.Int()
@@ -241,6 +261,7 @@ class DeviceNicPortResponseSchema(Schema):
 
 
 class DeviceConnectionResponseSchema(Schema):
+    """设备连接（对齐 DeviceConnection.to_dict()）"""
     id = fields.Int()
     device_id = fields.Int()
     switch_device_id = fields.Int(allow_none=True)
@@ -272,6 +293,7 @@ class DeviceConnectionResponseSchema(Schema):
 
 
 class DeviceStorageResponseSchema(Schema):
+    """设备存储详细（对齐 DeviceStorage.to_dict()）"""
     id = fields.Int()
     device_id = fields.Int()
     storage_type = fields.Str()
@@ -289,7 +311,9 @@ class DeviceStorageResponseSchema(Schema):
     updated_at = fields.Str()
 
 
+
 class CustomerResponseSchema(Schema):
+    """客户响应（对齐 Customer.to_dict()）"""
     id = fields.Int()
     customer_name = fields.Str()
     customer_status = fields.Int()
@@ -303,7 +327,9 @@ class CustomerResponseSchema(Schema):
     deleted_at = fields.Str(allow_none=True)
 
 
+
 class IPAddressResponseSchema(Schema):
+    """IP地址列表项（对齐 GET /ip_addresses — 5表JOIN扁平结果）"""
     ip_address = fields.Str()
     mac_address = fields.Str()
     switch_name = fields.Str(allow_none=True)
@@ -316,6 +342,7 @@ class IPAddressResponseSchema(Schema):
 
 
 class IPAddressDetailResponseSchema(Schema):
+    """IP地址详情（对齐 GET /ip/<address>）"""
     ip_address = fields.Str()
     room_id = fields.Int(allow_none=True)
     mac_address = fields.Str()
@@ -330,7 +357,9 @@ class IPAddressDetailResponseSchema(Schema):
     updated_at = fields.Str()
 
 
+
 class SwitchResponseSchema(Schema):
+    """交换机列表/详情（对齐 switch_credentials JOIN devices）"""
     id = fields.Int()
     device_id = fields.Int()
     name = fields.Str()
@@ -365,6 +394,7 @@ class SwitchResponseSchema(Schema):
 
 
 class SwitchPortIPResponseSchema(Schema):
+    """交换机端口IP"""
     id = fields.Int()
     switch_id = fields.Int()
     port = fields.Str()
@@ -376,6 +406,7 @@ class SwitchPortIPResponseSchema(Schema):
 
 
 class SwitchPortResponseSchema(Schema):
+    """交换机端口"""
     id = fields.Int()
     port_name = fields.Str()
     usage_status = fields.Str()
@@ -398,7 +429,9 @@ class SwitchPortResponseSchema(Schema):
     slot = fields.Int(allow_none=True)
 
 
+
 class PermissionResponseSchema(Schema):
+    """RBAC 权限（对齐 Permission.to_dict()）"""
     id = fields.Int()
     code = fields.Str()
     name = fields.Str()
@@ -409,6 +442,7 @@ class PermissionResponseSchema(Schema):
 
 
 class RoleResponseSchema(Schema):
+    """RBAC 角色（对齐 Role.to_dict()）"""
     id = fields.Int()
     name = fields.Str()
     display_name = fields.Str()
@@ -420,7 +454,9 @@ class RoleResponseSchema(Schema):
     user_count = fields.Int(allow_none=True)
 
 
+
 class IPStatusGroupResponseSchema(Schema):
+    """IP 状态分组统计"""
     total = fields.Int()
     active = fields.Int()
     inactive = fields.Int()
@@ -429,6 +465,7 @@ class IPStatusGroupResponseSchema(Schema):
 
 
 class DashboardStatsResponseSchema(Schema):
+    """仪表盘统计数据"""
     rooms = fields.Dict()
     cabinets = fields.Dict()
     devices = fields.Dict()
@@ -438,7 +475,9 @@ class DashboardStatsResponseSchema(Schema):
     percentages = fields.Dict()
 
 
+
 class AuditLogResponseSchema(Schema):
+    """审计日志（对齐 AuditLog.to_dict()）"""
     id = fields.Int()
     user_id = fields.Int(allow_none=True)
     action = fields.Str()
@@ -449,7 +488,9 @@ class AuditLogResponseSchema(Schema):
     created_at = fields.Str()
 
 
+
 class VLANResponseSchema(Schema):
+    """VLAN（对齐 VLAN.to_dict()）"""
     id = fields.Int()
     vlan_id = fields.Int()
     name = fields.Str()
@@ -465,7 +506,9 @@ class VLANResponseSchema(Schema):
     updated_at = fields.Str()
 
 
+
 class LinkAggregationGroupResponseSchema(Schema):
+    """链路聚合组（对齐 LinkAggregationGroup.to_dict()）"""
     id = fields.Int()
     device_id = fields.Int()
     lag_name = fields.Str()
@@ -479,7 +522,9 @@ class LinkAggregationGroupResponseSchema(Schema):
     updated_at = fields.Str()
 
 
+
 class IPNetworkResponseSchema(Schema):
+    """网段记录（对齐 IPNetwork.to_dict() + 关联字段）"""
     id = fields.Int()
     ip_network = fields.Str()
     switch_id = fields.Int(allow_none=True)
@@ -495,7 +540,9 @@ class IPNetworkResponseSchema(Schema):
     switch_name = fields.Str(allow_none=True)
 
 
+
 class DeviceConfigBackupResponseSchema(Schema):
+    """设备配置备份"""
     id = fields.Int()
     device_id = fields.Int()
     config_content = fields.Str()
@@ -506,6 +553,7 @@ class DeviceConfigBackupResponseSchema(Schema):
 
 
 class DeviceConfigChangeResponseSchema(Schema):
+    """设备配置变更"""
     id = fields.Int()
     device_id = fields.Int()
     backup_id = fields.Int(allow_none=True)
@@ -519,7 +567,9 @@ class DeviceConfigChangeResponseSchema(Schema):
     updated_at = fields.Str()
 
 
+
 class TopologyNodeSchema(Schema):
+    """拓扑节点"""
     id = fields.Int()
     name = fields.Str()
     device_type = fields.Str()
@@ -537,10 +587,11 @@ class TopologyNodeSchema(Schema):
 
 
 class TopologyEdgeSchema(Schema):
+    """拓扑边"""
     id = fields.Str()
     source = fields.Int()
     target = fields.Int()
-    edge_type = fields.Str()
+    edge_type = fields.Str()  # n2n / d2n / uplink
     connection_type = fields.Str(allow_none=True)
     bandwith = fields.Str(allow_none=True)
     bandwidth = fields.Str(allow_none=True)
@@ -552,6 +603,7 @@ class TopologyEdgeSchema(Schema):
 
 
 class TopologyStatsSchema(Schema):
+    """拓扑统计"""
     total_nodes = fields.Int()
     total_edges = fields.Int()
     core_count = fields.Int(allow_none=True)
@@ -565,28 +617,33 @@ class TopologyStatsSchema(Schema):
 
 
 class TopologyResponseSchema(Schema):
+    """拓扑响应"""
     nodes = fields.List(fields.Nested(TopologyNodeSchema))
     edges = fields.List(fields.Nested(TopologyEdgeSchema))
     stats = fields.Nested(TopologyStatsSchema)
 
 
 class TopologyAutoDetectChangeFieldSchema(Schema):
+    """自动推断字段变更"""
     old = fields.Raw(allow_none=True)
     new = fields.Raw(allow_none=True)
 
 
 class TopologyAutoDetectChangeSchema(Schema):
+    """自动推断变更项"""
     device_id = fields.Int()
     device_name = fields.Str()
     fields = fields.Dict(keys=fields.Str(), values=fields.Nested(TopologyAutoDetectChangeFieldSchema))
 
 
 class TopologyAutoDetectResponseSchema(Schema):
+    """自动推断响应"""
     changes = fields.List(fields.Nested(TopologyAutoDetectChangeSchema))
     dry_run = fields.Bool()
 
 
 class VirtualRoomResponseSchema(Schema):
+    """虚拟机房响应"""
     id = fields.Int()
     name = fields.Str()
     description = fields.Str(allow_none=True)
@@ -598,7 +655,9 @@ class VirtualRoomResponseSchema(Schema):
     last_scan_scope = fields.Str(allow_none=True)
 
 
+
 class MonitorStatusResponseSchema(Schema):
+    """监控状态快照（对齐 DeviceMonitorStatus.to_dict()）"""
     id = fields.Int()
     device_id = fields.Int()
     protocol = fields.Str()
@@ -618,6 +677,7 @@ class MonitorStatusResponseSchema(Schema):
 
 
 class DeviceMonitorStatusResponseSchema(Schema):
+    """GET /devices/<id>/status 完整响应"""
     monitored = fields.Bool()
     configured_protocols = fields.List(fields.Str())
     status = fields.Nested(MonitorStatusResponseSchema, allow_none=True)
@@ -627,16 +687,19 @@ class DeviceMonitorStatusResponseSchema(Schema):
 
 
 class MonitorCredentialConfigResponseSchema(Schema):
+    """PUT /credentials 响应"""
     configured = fields.Bool()
     protocol = fields.Str()
 
 
 class MonitorCredentialDeleteResponseSchema(Schema):
+    """DELETE /credentials 响应"""
     deleted = fields.Bool()
     protocol = fields.Str()
 
 
 class MonitorProbeResultResponseSchema(Schema):
+    """POST /check 响应（ProbeResult 序列化）"""
     reachable = fields.Bool()
     latency_ms = fields.Int(allow_none=True)
     extra = fields.Dict(allow_none=True)
@@ -644,6 +707,7 @@ class MonitorProbeResultResponseSchema(Schema):
 
 
 class MonitorCredentialListItemSchema(Schema):
+    """GET /credentials 列表项（不回显密文）"""
     id = fields.Int()
     name = fields.Str(allow_none=True)
     protocol = fields.Str()
@@ -653,18 +717,22 @@ class MonitorCredentialListItemSchema(Schema):
 
 
 class MonitorCredentialCreateSchema(Schema):
+    """POST /credentials 请求体"""
     protocol = fields.Str()
     payload = fields.Dict()
     name = fields.Str(required=True)
     device_ids = fields.List(fields.Int())
 
 
+
 class MonitorCredentialPatchResponseSchema(Schema):
+    """PATCH /credentials/<id> 响应（启用/停用/改名共享凭据）"""
     updated = fields.Bool()
     credential_id = fields.Int()
 
 
 class MonitorOverviewRecentAlertSchema(Schema):
+    """监控总览页最近告警项"""
     device_id = fields.Int()
     device_name = fields.Str(allow_none=True)
     device_type = fields.Str(allow_none=True)
@@ -679,6 +747,7 @@ class MonitorOverviewRecentAlertSchema(Schema):
 
 
 class MonitorOverviewResponseSchema(Schema):
+    """GET /overview 响应（全网监控态势）"""
     total_monitored = fields.Int()
     reachable = fields.Int()
     unreachable = fields.Int()
@@ -695,6 +764,7 @@ class MonitorOverviewResponseSchema(Schema):
 
 
 class MonitorStatusListItemSchema(Schema):
+    """GET /statuses 列表项（联表设备展示字段）"""
     device_id = fields.Int()
     device_name = fields.Str(allow_none=True)
     device_type = fields.Str(allow_none=True)
@@ -718,16 +788,27 @@ class MonitorStatusListItemSchema(Schema):
 
 
 class MonitorStatusListResponseSchema(Schema):
+    """GET /statuses 响应（分页列表）"""
     data = fields.List(fields.Nested(MonitorStatusListItemSchema))
     pagination = fields.Nested(PaginationMetaSchema)
 
 
 class MonitorCheckBatchResponseSchema(Schema):
+    """POST /check-batch 响应（批量探测结果）。
+
+    results 为每台被探测设备的 ProbeResult 序列化；
+    skipped 为因冷却 / 不存在而被跳过的设备 id 列表。
+    """
     results = fields.List(fields.Dict(), allow_none=True)
     skipped = fields.List(fields.Int(), allow_none=True)
 
 
 class MonitorCredentialPayloadUpdateResponseSchema(Schema):
+    """PUT /credentials/<id>/payload 与 /devices/<id>/credentials/<cid>/payload 响应。
+
+    updated_fields: 实际被修改的字段名；
+    credential_migrated: 本次是否触发「迁移到新凭据行」（hash 与其它设备不同）。
+    """
 
     id = fields.Int()
     protocol = fields.Str(allow_none=True)
@@ -736,6 +817,7 @@ class MonitorCredentialPayloadUpdateResponseSchema(Schema):
 
 
 class MonitorConfigItemSchema(Schema):
+    """单个配置项（GET /config 响应元素）。"""
 
     value = fields.Raw(allow_none=True)
     editable = fields.Bool()
@@ -744,6 +826,10 @@ class MonitorConfigItemSchema(Schema):
 
 
 class MonitorConfigResponseSchema(Schema):
+    """GET /config 响应：每个配置项为 {value, editable, type, description} 对象。
+
+    字段名 = 白名单 camel 别名（与 dynamic_config.KEY_TO_CAMEL 一致）。
+    """
 
     consecutive_failures_threshold = fields.Nested(MonitorConfigItemSchema)
     realert_interval_minutes = fields.Nested(MonitorConfigItemSchema)
@@ -759,12 +845,14 @@ class MonitorConfigResponseSchema(Schema):
 
 
 class MonitorConfigUpdateResponseSchema(Schema):
+    """PUT /config 响应。"""
 
     updated = fields.List(fields.Str())
     requires_restart = fields.List(fields.Str())
 
 
 class MonitorAlertListItemSchema(Schema):
+    """GET /alerts 列表项（outerjoin devices；设备删除后 device_* 为 None）。"""
 
     id = fields.Int()
     device_id = fields.Int(allow_none=True)
@@ -789,6 +877,7 @@ class MonitorAlertListItemSchema(Schema):
 
 
 class MonitorAlertDetailSchema(Schema):
+    """GET /alerts/<id> 详情（P1-6）：列表项 + payload 解析后的结构化对象。"""
 
     id = fields.Int()
     device_id = fields.Int(allow_none=True)
@@ -811,6 +900,7 @@ class MonitorAlertDetailSchema(Schema):
 
 
 class MonitorAlertAckResponseSchema(Schema):
+    """POST /alerts/<id>/ack 响应（G9 人工确认/认领）"""
 
     id = fields.Int()
     acknowledged_by = fields.Str()
@@ -819,29 +909,34 @@ class MonitorAlertAckResponseSchema(Schema):
 
 
 class MonitorAlertBatchAckRequestSchema(Schema):
+    """POST /alerts/batch-ack 请求"""
 
     alert_ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1, max=500))
     note = fields.Str(allow_none=True)
 
 
 class MonitorAlertBatchAckResponseSchema(Schema):
+    """POST /alerts/batch-ack 响应"""
 
     acknowledged = fields.Int()
     not_found = fields.Int()
 
 
 class MonitorAlertBatchRetryRequestSchema(Schema):
+    """POST /alerts/batch-retry 请求"""
 
     alert_ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1, max=500))
 
 
 class MonitorAlertBatchRetryResponseSchema(Schema):
+    """POST /alerts/batch-retry 响应"""
 
     retried = fields.Int()
     skipped = fields.Int()
 
 
 class MonitorAlertCloseResponseSchema(Schema):
+    """POST /alerts/<id>/close 响应（P2-16 manual_close）"""
 
     id = fields.Int()
     closed_by = fields.Str(allow_none=True)
@@ -850,18 +945,21 @@ class MonitorAlertCloseResponseSchema(Schema):
 
 
 class MonitorAlertBatchCloseRequestSchema(Schema):
+    """POST /alerts/batch-close 请求（P2-16）"""
 
     alert_ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1, max=500))
     reason = fields.Str(allow_none=True)
 
 
 class MonitorAlertBatchCloseResponseSchema(Schema):
+    """POST /alerts/batch-close 响应（P2-16）"""
 
     closed = fields.Int()
     not_found = fields.Int()
 
 
 class MonitorAlertAggregationItemSchema(Schema):
+    """P2-10: 告警聚合组"""
 
     alert_type = fields.Str()
     severity = fields.Str()
@@ -876,17 +974,20 @@ class MonitorAlertAggregationItemSchema(Schema):
 
 
 class MonitorAlertAggregationResponseSchema(Schema):
+    """GET /alerts/aggregations 响应（P2-10）"""
 
     data = fields.List(fields.Nested(MonitorAlertAggregationItemSchema))
 
 
 class MonitorAlertListResponseSchema(Schema):
+    """GET /alerts 响应（分页列表）"""
 
     data = fields.List(fields.Nested(MonitorAlertListItemSchema))
     pagination = fields.Nested(PaginationMetaSchema)
 
 
 class MonitorAlertRetryResponseSchema(Schema):
+    """POST /alerts/<id>/retry 响应"""
 
     retried = fields.Bool()
     alert_id = fields.Int()
@@ -894,12 +995,15 @@ class MonitorAlertRetryResponseSchema(Schema):
 
 
 class MonitorDeviceMonitorEnabledResponseSchema(Schema):
+    """PATCH /devices/<id>/monitor-enabled 响应"""
 
     device_id = fields.Int()
     monitor_enabled = fields.Bool()
 
 
+
 class MonitorProbeHistoryItemSchema(Schema):
+    """单条探测历史（对齐 DeviceMonitorProbeEvents.to_dict()）"""
 
     id = fields.Int()
     device_id = fields.Int()
@@ -916,6 +1020,7 @@ class MonitorProbeHistoryItemSchema(Schema):
 
 
 class MonitorProbeHistoryResponseSchema(Schema):
+    """GET /devices/<id>/history 响应（时间升序明细）"""
 
     items = fields.List(fields.Nested(MonitorProbeHistoryItemSchema))
     total = fields.Int()
@@ -925,6 +1030,7 @@ class MonitorProbeHistoryResponseSchema(Schema):
 
 
 class MonitorProbeTrendsResponseSchema(Schema):
+    """GET /devices/<id>/trends 响应（聚合统计，供趋势卡片）"""
 
     total = fields.Int()
     reachable = fields.Int()
@@ -939,6 +1045,7 @@ class MonitorProbeTrendsResponseSchema(Schema):
 
 
 class DeviceMetricAlertStateItemSchema(Schema):
+    """GET /monitor/devices/<id>/metric-alerts 响应项"""
 
     id = fields.Int()
     device_id = fields.Int()
@@ -953,11 +1060,15 @@ class DeviceMetricAlertStateItemSchema(Schema):
 
 
 class DeviceMetricAlertListResponseSchema(Schema):
+    """GET /monitor/devices/<id>/metric-alerts 响应"""
 
     items = fields.List(fields.Nested(DeviceMetricAlertStateItemSchema))
 
 
+
+
 class MetricTemplateItemSchema(Schema):
+    """GET /monitor/metric-templates 响应项"""
 
     id = fields.Int()
     metric_key = fields.Str()
@@ -983,12 +1094,14 @@ class MetricTemplateItemSchema(Schema):
 
 
 class MetricTemplateListResponseSchema(Schema):
+    """GET /monitor/metric-templates 响应"""
 
     data = fields.List(fields.Nested(MetricTemplateItemSchema))
     pagination = fields.Nested(PaginationMetaSchema)
 
 
 class MetricTemplateUpsertResponseSchema(Schema):
+    """PUT /monitor/metric-templates 响应"""
 
     id = fields.Int()
     metric_key = fields.Str()
@@ -996,16 +1109,21 @@ class MetricTemplateUpsertResponseSchema(Schema):
 
 
 class MetricTemplateSeedResponseSchema(Schema):
+    """POST /monitor/metric-templates/seed 响应"""
 
     created = fields.Int()
 
 
 class MetricTemplateDeleteResponseSchema(Schema):
+    """DELETE /monitor/metric-templates/<id> 响应"""
 
     deleted = fields.Int()
 
 
+
+
 class DeviceTrafficResponseSchema(Schema):
+    """GET /monitor/devices/<id>/traffic 响应"""
 
     port = fields.Str(allow_none=True)
     time = fields.List(fields.Int())
@@ -1015,6 +1133,7 @@ class DeviceTrafficResponseSchema(Schema):
 
 
 class DeviceTrafficPortItemSchema(Schema):
+    """端口流量 item"""
     port = fields.Str()
     rx_itemid = fields.Str()
     tx_itemid = fields.Str()
@@ -1023,12 +1142,14 @@ class DeviceTrafficPortItemSchema(Schema):
 
 
 class DeviceTrafficPortsResponseSchema(Schema):
+    """GET /monitor/devices/<id>/traffic/ports 响应"""
     ports = fields.List(fields.Nested(DeviceTrafficPortItemSchema))
     configured = fields.Bool()
     error = fields.Str(allow_none=True, metadata={"description": "凭据解密/拉取失败原因：credential_error / fetch_error"})
 
 
 class OidCategoryRuleItemSchema(Schema):
+    """OID 分类规则项"""
 
     id = fields.Int()
     prefix = fields.Str()
@@ -1041,17 +1162,20 @@ class OidCategoryRuleItemSchema(Schema):
 
 
 class OidCategoryRuleListResponseSchema(Schema):
+    """GET /monitor/oid-category-rules 响应"""
 
     data = fields.List(fields.Nested(OidCategoryRuleItemSchema))
     pagination = fields.Nested(PaginationMetaSchema)
 
 
 class OidCategoryRuleMutationResponseSchema(Schema):
+    """POST/PATCH/DELETE /monitor/oid-category-rules 响应"""
 
     id = fields.Int()
 
 
 class DeviceTypeRecommendItemSchema(Schema):
+    """设备类型推荐配置项"""
 
     id = fields.Int()
     device_type = fields.Str()
@@ -1059,18 +1183,21 @@ class DeviceTypeRecommendItemSchema(Schema):
 
 
 class DeviceTypeRecommendListResponseSchema(Schema):
+    """GET /monitor/device-type-recommends 响应"""
 
     data = fields.List(fields.Nested(DeviceTypeRecommendItemSchema))
     pagination = fields.Nested(PaginationMetaSchema)
 
 
 class RecommendConfigResponseSchema(Schema):
+    """GET /monitor/mib-scan/recommend-config 响应"""
 
     device_type = fields.Str()
     categories = fields.List(fields.Str())
 
 
 class VendorBrandItemSchema(Schema):
+    """厂商品牌项"""
 
     id = fields.Int()
     enterprise_no = fields.Str()
@@ -1082,17 +1209,20 @@ class VendorBrandItemSchema(Schema):
 
 
 class VendorBrandListResponseSchema(Schema):
+    """GET /monitor/vendor-brands 响应"""
 
     data = fields.List(fields.Nested(VendorBrandItemSchema))
     pagination = fields.Nested(PaginationMetaSchema)
 
 
 class VendorBrandMutationResponseSchema(Schema):
+    """POST/PATCH/DELETE /monitor/vendor-brands 响应"""
 
     id = fields.Int()
 
 
 class MibScanResponseSchema(Schema):
+    """POST /monitor/mib-scan 响应"""
 
     device_ip = fields.Str()
     oid_count = fields.Int()
@@ -1103,6 +1233,7 @@ class MibScanResponseSchema(Schema):
 
 
 class MonitorSilenceRuleItemSchema(Schema):
+    """静默规则项"""
 
     id = fields.Int()
     name = fields.Str()
@@ -1117,6 +1248,7 @@ class MonitorSilenceRuleItemSchema(Schema):
 
 
 class MonitorAlertDependencyRuleItemSchema(Schema):
+    """P2-17: 告警依赖抑制规则项"""
 
     id = fields.Int()
     name = fields.Str()
@@ -1129,6 +1261,7 @@ class MonitorAlertDependencyRuleItemSchema(Schema):
 
 
 class MonitorSlaTargetItemSchema(Schema):
+    """P2-13: SLA 目标项"""
 
     id = fields.Int()
     name = fields.Str()
@@ -1141,6 +1274,7 @@ class MonitorSlaTargetItemSchema(Schema):
 
 
 class MonitorSlaAchievementSchema(Schema):
+    """P2-13: SLA 达成度报表"""
 
     target_id = fields.Int()
     name = fields.Str()
@@ -1153,6 +1287,7 @@ class MonitorSlaAchievementSchema(Schema):
 
 
 class MonitorAlertStatisticsResponseSchema(Schema):
+    """P2-15: 告警统计报表响应"""
 
     class _SummarySchema(Schema):
         total = fields.Int()
@@ -1198,6 +1333,7 @@ class MonitorAlertStatisticsResponseSchema(Schema):
 
 
 class MonitorEscalationStepItemSchema(Schema):
+    """P2-11: 升级链步骤项"""
 
     id = fields.Int()
     policy_id = fields.Int()
@@ -1212,6 +1348,7 @@ class MonitorEscalationStepItemSchema(Schema):
 
 
 class MonitorEscalationPolicyItemSchema(Schema):
+    """升级策略项"""
 
     id = fields.Int()
     name = fields.Str()
@@ -1229,6 +1366,7 @@ class MonitorEscalationPolicyItemSchema(Schema):
 
 
 class DeviceMetricOverrideItemSchema(Schema):
+    """设备级阈值覆盖项"""
 
     id = fields.Int()
     device_id = fields.Int()
@@ -1240,7 +1378,10 @@ class DeviceMetricOverrideItemSchema(Schema):
     updated_at = fields.Str()
 
 
+
+
 class MetricTemplateGroupItemSchema(Schema):
+    """GET /monitor/metric-template-groups 响应项"""
 
     id = fields.Int()
     name = fields.Str()
@@ -1260,6 +1401,7 @@ class MetricTemplateGroupListResponseSchema(Schema):
 
 
 class MetricTemplateGroupDetailResponseSchema(Schema):
+    """GET /monitor/metric-template-groups/<id> 响应（含组内模板）"""
 
     id = fields.Int()
     name = fields.Str()
@@ -1275,6 +1417,7 @@ class MetricTemplateGroupDetailResponseSchema(Schema):
 
 
 class MetricTemplateGroupMutationResponseSchema(Schema):
+    """模板组增删改响应"""
 
     id = fields.Int(allow_none=True)
     name = fields.Str(allow_none=True)
@@ -1284,7 +1427,10 @@ class MetricTemplateGroupMutationResponseSchema(Schema):
     skipped = fields.Int(allow_none=True)
 
 
+
+
 class DeviceMetricLatestItemSchema(Schema):
+    """GET /monitor/devices/<id>/metric-latest 响应项"""
 
     id = fields.Int()
     device_id = fields.Int()
@@ -1297,11 +1443,13 @@ class DeviceMetricLatestItemSchema(Schema):
 
 
 class DeviceMetricLatestListResponseSchema(Schema):
+    """GET /monitor/devices/<id>/metric-latest 响应"""
 
     items = fields.List(fields.Nested(DeviceMetricLatestItemSchema))
 
 
 class DeviceMetricHistoryItemSchema(Schema):
+    """GET /monitor/devices/<id>/metrics/<metric_key>/history 响应项"""
 
     id = fields.Int()
     device_id = fields.Int()
@@ -1314,6 +1462,7 @@ class DeviceMetricHistoryItemSchema(Schema):
 
 
 class DeviceMetricHistoryResponseSchema(Schema):
+    """GET /monitor/devices/<id>/metrics/<metric_key>/history 响应"""
 
     items = fields.List(fields.Nested(DeviceMetricHistoryItemSchema))
     total = fields.Int()
@@ -1323,11 +1472,13 @@ class DeviceMetricHistoryResponseSchema(Schema):
 
 
 class DeviceMetricKeysResponseSchema(Schema):
+    """GET /monitor/devices/<id>/metric-keys 响应（设备有历史时序的 metric_key 列表）"""
 
     items = fields.List(fields.Str())
 
 
 class DeviceMetricDashboardItemSchema(Schema):
+    """GET /monitor/devices/<id>/metric-dashboard 指标状态项"""
 
     metric_key = fields.Str()
     metric_name = fields.Str()
@@ -1339,6 +1490,7 @@ class DeviceMetricDashboardItemSchema(Schema):
 
 
 class DeviceMetricDashboardResponseSchema(Schema):
+    """GET /monitor/devices/<id>/metric-dashboard 响应"""
 
     device_id = fields.Int()
     has_credential = fields.Bool()
@@ -1354,7 +1506,9 @@ class DeviceMetricDashboardResponseSchema(Schema):
     last_checked_at = fields.Str(allow_none=True)
 
 
+
 class DevicePortSyncEnabledResponseSchema(Schema):
+    """GET /devices/<id>/port-sync-enabled 响应"""
 
     port_sync_enabled = fields.Bool(allow_none=True, metadata={"description": "设备级开关：null=跟随全局"})
     global_enabled = fields.Bool(metadata={"description": "全局开关当前值"})
@@ -1362,14 +1516,17 @@ class DevicePortSyncEnabledResponseSchema(Schema):
 
 
 class DevicePortSyncEnabledUpdateResponseSchema(Schema):
+    """PUT /devices/<id>/port-sync-enabled 响应"""
 
     port_sync_enabled = fields.Bool(allow_none=True, metadata={"description": "更新后的设备级开关值"})
 
 
 class DeviceBatchPortSyncEnabledResponseSchema(Schema):
+    """POST /devices/batch-port-sync-enabled 响应"""
 
     updated = fields.Int()
     with_credential = fields.Int()
     without_credential = fields.Int()
     non_network = fields.Int()
     skipped = fields.Int()
+

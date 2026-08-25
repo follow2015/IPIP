@@ -19,6 +19,7 @@ import json
 
 
 class MonitorAlertOutbox(BaseModel):
+    """监控告警发件箱（outbox）"""
 
     __tablename__ = "monitor_alert_outbox"
     __table_args__ = (
@@ -123,6 +124,7 @@ class MonitorAlertOutbox(BaseModel):
     )
 
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> dict:
+        """序列化（不回显敏感字段）"""
         data = {
             "id": self.id,
             "device_id": self.device_id,

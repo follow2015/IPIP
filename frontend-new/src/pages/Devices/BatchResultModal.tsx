@@ -6,18 +6,12 @@ import type { BatchCreateResult, BatchCreateItemResult } from '@/types/models';
 const { Text } = Typography;
 
 interface BatchResultModalProps {
-  
   open: boolean;
-  
   onClose: () => void;
-  
   result: BatchCreateResult | null;
-  
   title?: string;
-  
   onRetry?: (failedItems: BatchCreateItemResult[]) => void;
 }
-
 
 const BatchResultModal: React.FC<BatchResultModalProps> = ({
   open,
@@ -31,7 +25,6 @@ const BatchResultModal: React.FC<BatchResultModalProps> = ({
   const failedItems = result.results.filter((r) => !r.success);
   const hasFailures = failedItems.length > 0;
 
-  
   const handleExportFailed = () => {
     const headers = ['序号', '设备名称', '失败原因'];
     const rows = failedItems.map((item) => [item.index + 1, item.device_name, item.error || '未知错误']);

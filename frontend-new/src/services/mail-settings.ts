@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, put, post, del } from '@/services/api-client';
 import { queryKeys } from '@/services/query-keys';
 
+/* ─── 类型 ──────────────────────────────────────────────────────── */
 
 export interface MailConfig {
   mail_server: string;
@@ -17,8 +18,8 @@ export interface MailConfig {
   mail_use_tls: boolean;
   mail_use_ssl: boolean;
   mail_username: string;
-  mail_password: string;       
-  mail_password_set: boolean;  
+  mail_password: string;       // 脱敏值 "****" 或空
+  mail_password_set: boolean;  // 后端是否已存密码
   mail_default_sender: string;
   mail_timeout: number;
 }
@@ -39,6 +40,7 @@ export interface MailTestResult {
   message: string;
 }
 
+/* ─── API 函数 ──────────────────────────────────────────────────── */
 
 async function fetchMailConfig(): Promise<MailConfig> {
   const res = await get<MailConfig>('/settings/mail');
@@ -60,10 +62,10 @@ export interface MailTestParams {
 
 async function testMailConfig(data: MailTestParams): Promise<MailTestResult> {
   const res = await post<MailTestResult>('/settings/mail/test', data);
-  
   return { success: res.success, message: res.message };
 }
 
+/* ─── Hooks ─────────────────────────────────────────────────────── */
 
 export function useMailConfig() {
   return useQuery({

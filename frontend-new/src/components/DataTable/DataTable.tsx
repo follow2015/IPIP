@@ -31,28 +31,22 @@ export interface DataTableProps<T> {
   dataSource: T[];
   loading?: boolean;
   rowKey: string | ((record: T) => string);
-  
   pagination?: false | TablePaginationConfig;
   rowSelection?: TableProps<T>['rowSelection'];
-  
   onRow?: TableProps<T>['onRow'];
-  
   toolbar?: React.ReactNode;
   emptyText?: string;
   searchable?: boolean;
   searchPlaceholder?: string;
   searchValue?: string;
   onSearch?: (value: string) => void;
-  
   searchDebounce?: number;
   onRefresh?: () => void;
   total?: number;
   page?: number;
   perPage?: number;
   onPageChange?: (page: number, perPage: number) => void;
-  
   showCard?: boolean;
-  
   tableProps?: UseTableReturn;
 }
 
@@ -79,8 +73,6 @@ function DataTable<T extends object>({
   showCard = true,
   tableProps
 }: DataTableProps<T>) {
-  
-  
   const resolvedPage = page ?? tableProps?.page;
   const resolvedPerPage = perPage ?? tableProps?.perPage;
   const resolvedTotal = total ?? tableProps?.total;
@@ -96,12 +88,10 @@ function DataTable<T extends object>({
     pagination === false
       ? false
       : {
-          
           showSizeChanger: true,
           showQuickJumper: true,
           showTotal: (t) => `共 ${t} 条`,
           ...pagination,
-          
           current: resolvedPage,
           pageSize: resolvedPerPage,
           total: resolvedTotal ?? 0,

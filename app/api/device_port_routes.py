@@ -41,6 +41,12 @@ router = Blueprint("device_port", __name__, url_prefix="/api/devices")
 
 
 def _reject_managed_or_400(device_id):
+    """网管设备拒绝手动 DB 写操作
+
+    网管设备端口由自动扫描获取，手动 CRUD 会与扫描结果冲突；
+    网管设备应经 /api/switch 走 SSH 同步（启用/关闭等）。
+    非网管设备端口为纯 DB 维护，允许这些写操作。
+    """
     from app.persistence.switch_repo import SwitchRepository
     switch = SwitchRepository().find_by_device_id(device_id)
     if switch and switch.has_ssh:
@@ -51,12 +57,15 @@ def _reject_managed_or_400(device_id):
     return None
 
 
+
+
 @router.route("/<int:device_id>/ports", methods=["POST"])
 @doc(summary="手动创建端口", tags=["设备"], responses={200: "ApiResponse", 409: "ApiError"})
 @login_required
 @permission_required("device:update")
 @transactional
 def create_port(device_id):
+    """手动创建端口"""
     guard = _reject_managed_or_400(device_id)
     if guard:
         return guard
@@ -75,6 +84,7 @@ def create_port(device_id):
 @doc(summary="获取端口详情", tags=["设备"], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
 def get_port(device_id, port_name):
+    """获取端口详情"""
     from app.persistence.switch_port_repository import NetworkPortRepository
     repo = NetworkPortRepository()
     port = repo.find_port_by_name(device_id, port_name)
@@ -89,6 +99,7 @@ def get_port(device_id, port_name):
 @permission_required("device:update")
 @transactional
 def update_port(device_id, port_name):
+    """更新端口（白名单字段）"""
     guard = _reject_managed_or_400(device_id)
     if guard:
         return guard
@@ -113,6 +124,7 @@ def update_port(device_id, port_name):
 @permission_required("device:update")
 @transactional
 def delete_port(device_id, port_name):
+    """删除端口"""
     guard = _reject_managed_or_400(device_id)
     if guard:
         return guard
@@ -130,10 +142,13 @@ def delete_port(device_id, port_name):
         raise
 
 
+
+
 @router.route("/<int:device_id>/vlans/<int:vlan_db_id>", methods=["GET"])
 @doc(summary="获取VLAN详情", tags=["设备"], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
 def get_vlan(device_id, vlan_db_id):
+    """获取 VLAN 详情"""
     from app.services.vlan_service import VLANService
     service = VLANService(VLANRepository())
     vlan = service.get_by_id(vlan_db_id)
@@ -148,6 +163,12 @@ def get_vlan(device_id, vlan_db_id):
 @permission_required("switch:config")
 @transactional
 def delete_vlan(device_id, vlan_db_id):
+    """删除 VLAN
+
+    注意：VLAN/LAG 是逻辑配置（"要不要这么配"的业务决策），与物理端口
+    是否真实存在无关；逻辑记录层（device.py 本文件）对所有设备（管/不管）
+    开放自由 CRUD，不按物理端口"扫描获取、禁手动"的规则拦截。
+    """
     try:
         port_management_service.delete_vlan(vlan_db_id)
         return APIResponse.success(message="VLAN 删除成功")
@@ -156,10 +177,13 @@ def delete_vlan(device_id, vlan_db_id):
         raise
 
 
+
+
 @router.route("/<int:device_id>/port-channels/<int:lag_id>", methods=["GET"])
 @doc(summary="获取LAG详情", tags=["设备"], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
 def get_lag(device_id, lag_id):
+    """获取 LAG 详情"""
     from app.services.link_aggregation_service import LinkAggregationService
     service = LinkAggregationService(LinkAggregationRepository())
     lag = service.repo.find_by_id(lag_id)
@@ -168,12 +192,15 @@ def get_lag(device_id, lag_id):
     return APIResponse.success(data=lag.to_dict())
 
 
+
+
 @router.route("/<int:device_id>/connections", methods=["POST"])
 @doc(summary="创建D2N连接", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError"})
 @login_required
 @permission_required("device:update")
 @transactional
 def create_connection(device_id):
+    """创建 D2N 连接"""
     data = request.get_json()
     try:
         conn_id = port_management_service.create_d2n_connection(device_id, data)
@@ -189,6 +216,7 @@ def create_connection(device_id):
 @permission_required("device:update")
 @transactional
 def update_connection(device_id, conn_id):
+    """更新连接"""
     from app.services.device_connection_service import device_connection_service
     data = request.get_json()
     try:
@@ -205,6 +233,7 @@ def update_connection(device_id, conn_id):
 @permission_required("device:update")
 @transactional
 def delete_connection(device_id, conn_id):
+    """删除连接"""
     conn_type = request.args.get("type", "d2n")
     try:
         result = port_management_service.delete_connection(conn_id, conn_type)
@@ -214,11 +243,22 @@ def delete_connection(device_id, conn_id):
         raise
 
 
+
+
 @router.route("/<int:device_id>/port-sync-enabled", methods=["GET"])
 @doc(summary="查询设备端口同步开关", tags=["设备"], responses={200: "DevicePortSyncEnabledResponse"})
 @login_required
 @permission_required("device:view")
 def get_port_sync_enabled(device_id: int):
+    """返回设备级端口同步开关状态。
+
+    Returns:
+        data: {
+            "port_sync_enabled": bool | null,  # None=跟随全局
+            "global_enabled": bool,            # 全局开关当前值
+            "effective_enabled": bool,         # 实际生效值
+        }
+    """
     from extensions import db
     from app.models.device_switch_ext import DeviceSwitchExt
     from app.services.monitoring.dynamic_config import MonitorDynamicConfig
@@ -240,6 +280,11 @@ def get_port_sync_enabled(device_id: int):
 @permission_required("device:update")
 @transactional
 def put_port_sync_enabled(device_id: int):
+    """设置设备级端口同步开关。
+
+    Body:
+        {"port_sync_enabled": bool | null}  # null=跟随全局
+    """
     from extensions import db
     from app.models.device_switch_ext import DeviceSwitchExt
     from app.models.device import Device
@@ -262,3 +307,4 @@ def put_port_sync_enabled(device_id: int):
     ext.port_sync_enabled = value
     db.session.flush()
     return APIResponse.success(data={"port_sync_enabled": value})
+

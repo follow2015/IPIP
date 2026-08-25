@@ -12,7 +12,6 @@ import { queryKeys } from './query-keys';
 import type { DeviceConfigBackup, DeviceConfigChange } from '@/types/models';
 import type { ApiResponse } from '@/types/api';
 
-
 export function useDeviceConfig(deviceId: number) {
   return useQuery({
     queryKey: queryKeys.deviceConfig.detail(deviceId),
@@ -23,7 +22,6 @@ export function useDeviceConfig(deviceId: number) {
     enabled: deviceId > 0,
   });
 }
-
 
 export function useDeviceConfigHistory(deviceId: number) {
   return useQuery({
@@ -36,7 +34,6 @@ export function useDeviceConfigHistory(deviceId: number) {
   });
 }
 
-
 export function useBackupDeviceConfig() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -47,7 +44,6 @@ export function useBackupDeviceConfig() {
     },
   });
 }
-
 
 export function useSubmitConfigChange() {
   const queryClient = useQueryClient();
@@ -60,7 +56,6 @@ export function useSubmitConfigChange() {
   });
 }
 
-
 export function useDeviceConfigChanges(deviceId: number) {
   return useQuery({
     queryKey: [...queryKeys.deviceConfig.history(deviceId), 'changes'],
@@ -71,7 +66,6 @@ export function useDeviceConfigChanges(deviceId: number) {
     enabled: deviceId > 0,
   });
 }
-
 
 export function useApproveConfigChange() {
   const queryClient = useQueryClient();

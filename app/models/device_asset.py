@@ -12,6 +12,7 @@ from app.models.base import BaseModel
 from extensions import db
 
 class DeviceAsset(BaseModel):
+    """设备资产台账（1:1 扩展）"""
 
     __tablename__ = "device_asset"
     __table_args__ = (
@@ -48,7 +49,7 @@ class DeviceAsset(BaseModel):
     device = relationship(
         "Device",
         back_populates="asset",
-        lazy="select",
+        lazy="select",     # ← 原 "joined"，改为 "select"
     )
 
     def __repr__(self):

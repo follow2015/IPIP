@@ -14,11 +14,16 @@ logger = get_logger(__name__)
 
 
 class IPAllocationLogRepository(SQLAlchemyRepository):
+    """IP分配日志 Repository
+
+    提供IP分配日志相关的数据访问方法。
+    """
 
     def __init__(self, session=None):
         super().__init__(IPAllocationLog, session)
 
     def find_by_ip(self, ip_address: str, room_id: Optional[int] = None) -> List[IPAllocationLog]:
+        """按IP地址查询分配历史"""
         filters = {'ip_address': ip_address}
         if room_id is not None:
             filters['room_id'] = room_id

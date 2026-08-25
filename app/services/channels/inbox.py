@@ -12,6 +12,7 @@ from app.models.user import User
 
 
 class InboxChannel(PersonalChannel):
+    """站内信渠道"""
 
     def get_channel_name(self) -> str:
         return ChannelType.INBOX

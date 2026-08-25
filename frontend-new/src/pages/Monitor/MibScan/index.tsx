@@ -35,13 +35,11 @@ import {
 
 const { Text, Paragraph } = Typography;
 
-
 const DEVICE_TYPE_OPTIONS = [
   { label: 'network（网络设备）', value: 'network' },
   { label: 'server（服务器）', value: 'server' },
   { label: 'other（其他）', value: 'other' }
 ];
-
 
 const METRIC_TYPE_OPTIONS = [
   { label: 'gauge（瞬时值）', value: 'gauge' },
@@ -54,10 +52,8 @@ export default function MibScanPage() {
   const [deviceId, setDeviceId] = useState<number | null>(null);
   const [deviceType, setDeviceType] = useState<string>('network');
   const [selectedOids, setSelectedOids] = useState<MibScanOid[]>([]);
-  
   const [metricKeys, setMetricKeys] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
-  
   const [oidKeyword, setOidKeyword] = useState('');
   const [oidTypeFilter, setOidTypeFilter] = useState<string | undefined>(undefined);
 
@@ -66,13 +62,11 @@ export default function MibScanPage() {
   const importMut = useImportOids();
   const persistRuleMut = usePersistHeuristicRule();
   const message = useMessage();
-  
   const { data: recommendCategories } = useRecommendConfig(deviceType);
 
   const devices = deviceList.data?.items ?? [];
   const scanResult = scanMut.data;
 
-  
   const rawDetected = scanResult?.detected ?? [];
   const kw = oidKeyword.trim().toLowerCase();
   const filteredDetected = rawDetected.filter((r) => {
@@ -81,19 +75,15 @@ export default function MibScanPage() {
     return r.oid.toLowerCase().includes(kw) || (r.value ?? '').toLowerCase().includes(kw);
   });
 
-  
   const recommendCatSet = new Set(recommendCategories ?? []);
 
-  
   const isRecommended = (r: MibScanOid): boolean => {
     return !!r.category && recommendCatSet.has(r.category);
   };
 
-  
   const [recommendSort, setRecommendSort] = useState(false);
   const table = useTable({ initialPerPage: 50 });
 
-  
   const displayDetected = recommendSort
     ? [...filteredDetected].sort((a, b) => {
         const aHit = isRecommended(a) ? 0 : 1;
@@ -102,7 +92,6 @@ export default function MibScanPage() {
       })
     : filteredDetected;
 
-  
   const handleRecommend = () => {
     const hits = rawDetected.filter((r) => isRecommended(r));
     if (hits.length === 0) {
@@ -114,7 +103,6 @@ export default function MibScanPage() {
     message.success(`已勾选 ${hits.length} 个推荐指标并置顶`);
   };
 
-  
   const handlePersistRule = async (r: MibScanOid) => {
     if (!r.category) return;
     try {
@@ -129,7 +117,6 @@ export default function MibScanPage() {
     }
   };
 
-  
   const handleScan = async () => {
     if (!deviceId) {
       message.warning('请先选择设备');
@@ -138,7 +125,6 @@ export default function MibScanPage() {
     setSelectedOids([]);
     setMetricKeys({});
     const t0 = Date.now();
-    
     const elapsedHint = message.loading('探测中，MIB walk 预计 10-40s，请稍候...', 0);
     try {
       await scanMut.mutateAsync({ device_id: deviceId, timeout: 15 });
@@ -151,25 +137,21 @@ export default function MibScanPage() {
     }
   };
 
-  
   const suggestMetricKey = (oid: string): string => {
     const parts = oid.split('.');
     return `oid_${parts.slice(-2).join('_')}`;
   };
 
-  
   const handleImport = async () => {
     if (selectedOids.length === 0) {
       message.warning('请先勾选要导入的 OID');
       return;
     }
-    
     const selectedDevice = devices.find((d) => d.id === deviceId);
     const vendor = selectedDevice?.brand ?? undefined;
     const items: MibImportItem[] = [];
     const autoFilled: string[] = [];
     for (const oid of selectedOids) {
-      
       const key = metricKeys[oid.oid]?.trim() || suggestMetricKey(oid.oid);
       if (!metricKeys[oid.oid]?.trim()) {
         autoFilled.push(oid.oid);
@@ -178,7 +160,6 @@ export default function MibScanPage() {
         oid: oid.oid,
         metric_key: key,
         device_type: deviceType,
-        
         category: oid.category ?? undefined,
         display_name: oid.category_label ?? undefined,
         vendor,
@@ -292,7 +273,6 @@ export default function MibScanPage() {
             showSearch
             optionFilterProp="label"
             options={devices.map((d) => ({
-              
               label: `${d.device_name}（${d.management_ip || d.ipmi_address || '-'}）`,
               value: d.id
             }))}
@@ -423,8 +403,6 @@ export default function MibScanPage() {
                 preserveSelectedRowKeys: true,
                 selectedRowKeys: selectedOids.map((o) => o.oid),
                 onChange: (keys) => {
-                  
-                  
                   const oidMap = new Map(rawDetected.map((r) => [r.oid, r]));
                   setSelectedOids(
                     (keys as string[]).map((k) => oidMap.get(k)).filter((r): r is MibScanOid => !!r)

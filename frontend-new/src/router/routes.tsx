@@ -11,7 +11,6 @@ import PageLoading from '@/components/PageLoading';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AppLayout from '@/components/Layout/AppLayout';
 
-
 const Login = React.lazy(() => import('@/pages/Login'));
 const Dashboard = React.lazy(() => import('@/pages/Dashboard'));
 const Rooms = React.lazy(() => import('@/pages/Rooms'));
@@ -53,16 +52,13 @@ const MonitorOverview = React.lazy(() => import('@/pages/Monitor/Overview'));
 const MonitorCredentials = React.lazy(() => import('@/pages/Monitor/Credentials'));
 const MonitorSettings = React.lazy(() => import('@/pages/Monitor/Settings'));
 const MonitorHistory = React.lazy(() => import('@/pages/Monitor/History'));
-
 const MonitorAlertCenter = React.lazy(() => import('@/pages/Monitor/AlertCenter'));
 const MonitorAlertRules = React.lazy(() => import('@/pages/Monitor/AlertRules'));
 const MonitorThresholds = React.lazy(() => import('@/pages/Monitor/Thresholds'));
 const MonitorOidTools = React.lazy(() => import('@/pages/Monitor/OidTools'));
-
 const MonitorNocScreenFullscreen = React.lazy(() => import('@/pages/Monitor/NocScreen'));
 const VendorBrandsPage = React.lazy(() => import('@/pages/Asset/VendorBrands'));
 const NotFound = React.lazy(() => import('@/pages/NotFound'));
-
 
 const withSuspense = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <ErrorBoundary>
@@ -72,14 +68,12 @@ const withSuspense = (Component: React.LazyExoticComponent<React.ComponentType>)
   </ErrorBoundary>
 );
 
-
 export const routes: RouteObject[] = [
   {
     path: '/login',
     element: withSuspense(Login)
   },
   {
-    
     path: '/monitor/noc-screen/fullscreen',
     element: <PrivateRoute>{withSuspense(MonitorNocScreenFullscreen)}</PrivateRoute>
   },
@@ -166,7 +160,6 @@ export const routes: RouteObject[] = [
           </PermissionRoute>
         )
       },
-      
       { path: 'monitor/reports', element: <Navigate to="/monitor/alerts?tab=reports" replace /> },
       { path: 'monitor/noc-screen', element: <Navigate to="/monitor/alerts?tab=noc" replace /> },
       {
@@ -185,7 +178,6 @@ export const routes: RouteObject[] = [
           </PermissionRoute>
         )
       },
-      
       {
         path: 'monitor/silence-rules',
         element: <Navigate to="/monitor/alert-rules?tab=silence" replace />
@@ -206,7 +198,6 @@ export const routes: RouteObject[] = [
           </PermissionRoute>
         )
       },
-      
       {
         path: 'monitor/metric-templates',
         element: <Navigate to="/monitor/thresholds?tab=templates" replace />
@@ -227,7 +218,6 @@ export const routes: RouteObject[] = [
           </PermissionRoute>
         )
       },
-      
       { path: 'monitor/mib-scan', element: <Navigate to="/monitor/oid-tools?tab=mib" replace /> },
       {
         path: 'monitor/oid-rule-config',

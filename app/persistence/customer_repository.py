@@ -24,11 +24,21 @@ logger = get_logger(__name__)
 
 
 class CustomerRepository(SQLAlchemyRepository):
+    """客户Repository实现
+    
+    提供客户相关的数据访问方法，包括客户查询、创建、更新等操作。
+    """
     
     def __init__(self, session=None):
+        """初始化客户Repository
+        
+        Args:
+            session: 数据库会话，默认使用全局会话
+        """
         super().__init__(Customer, session)
 
     def _customer_count_query(self):
+        """返回包含 cabinet_count / device_count 聚合的基础查询（可复用）。"""
         return (
             self.session.query(
                 Customer.id, Customer.customer_name, Customer.contact_person,
@@ -45,6 +55,7 @@ class CustomerRepository(SQLAlchemyRepository):
 
     @staticmethod
     def _map_customer_row(r) -> Dict[str, Any]:
+        """将聚合查询结果行转换为标准字典。"""
         return {
             "id": r.id,
             "name": r.customer_name,
@@ -60,6 +71,17 @@ class CustomerRepository(SQLAlchemyRepository):
         }
     
     def find_by_customer_name(self, customer_name: str) -> Optional[Customer]:
+        """根据客户名称查找客户
+        
+        Args:
+            customer_name: 客户名称
+            
+        Returns:
+            Optional[Customer]: 客户对象，不存在则返回None
+            
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
         try:
             return self._base_query().filter(Customer.customer_name == customer_name).first()
         except SQLAlchemyError as e:
@@ -67,6 +89,18 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError(f"查找客户失败", original_error=e)
     
     def check_customer_name_exists(self, customer_name: str, exclude_id: int = None) -> bool:
+        """检查客户名称是否已存在
+        
+        Args:
+            customer_name: 客户名称
+            exclude_id: 要排除的客户ID（用于更新时检查）
+            
+        Returns:
+            bool: 存在返回True
+            
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
         if not customer_name:
             return False
         
@@ -82,6 +116,14 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError(f"检查客户名称存在性失败", original_error=e)
     
     def get_customer_statistics(self) -> Dict[str, Any]:
+        """获取客户统计信息
+        
+        Returns:
+            Dict[str, Any]: 统计信息
+            
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
         try:
             total_customers = self.count()
             
@@ -108,6 +150,11 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError(f"获取客户统计信息失败", original_error=e)
 
     def get_all_customers_with_counts(self) -> List[Dict[str, Any]]:
+        """获取所有客户列表（含机柜数和设备数聚合）
+
+        Returns:
+            List[Dict]: 客户列表，每项包含 cabinet_count 和 device_count
+        """
         try:
             rows = (
                 self._customer_count_query()
@@ -121,6 +168,14 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError("获取客户列表失败", original_error=e)
 
     def get_customer_with_counts(self, customer_id: int) -> Optional[Dict[str, Any]]:
+        """根据客户ID获取客户信息（含机柜数和设备数）
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            Optional[Dict]: 客户信息字典，不存在返回None
+        """
         try:
             row = (
                 self._customer_count_query()
@@ -135,11 +190,19 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError("获取客户信息失败", original_error=e)
 
     def soft_delete(self, customer_id: int) -> bool:
+        """软删除客户（设置customer_status为非空表示停用）
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            bool: 成功返回True
+        """
         try:
             customer = self._base_query().filter(Customer.id == customer_id).first()
             if not customer:
                 return False
-            customer.customer_status = CustomerStatus.DISABLED
+            customer.customer_status = CustomerStatus.DISABLED  # 1=停用
             self.session.flush()
             return True
         except SQLAlchemyError as e:
@@ -147,6 +210,14 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError("软删除客户失败", original_error=e)
 
     def check_customer_has_resources(self, customer_id: int) -> Dict[str, int]:
+        """检查客户下是否有资源（机柜/设备）
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            Dict[str, int]: {"cabinet_count": int, "device_count": int}
+        """
         try:
             cabinet_count = (
                 self.session.query(func.count(Cabinet.id))
@@ -166,6 +237,14 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError("检查客户资源失败", original_error=e)
 
     def get_customer_cabinets(self, customer_id: int) -> List[Dict[str, Any]]:
+        """获取客户的机柜列表（含机房名和设备数）
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            List[Dict]: 机柜列表
+        """
         try:
             rows = (
                 self.session.query(
@@ -212,6 +291,14 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError("获取客户机柜列表失败", original_error=e)
 
     def get_customer_devices(self, customer_id: int) -> List[Dict[str, Any]]:
+        """获取客户的设备列表（含机柜号和机房名）
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            List[Dict]: 设备列表
+        """
         try:
             rows = (
                 self.session.query(
@@ -264,6 +351,17 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError("获取客户设备列表失败", original_error=e)
 
     def get_customer_resource_stats(self, customer_id: int) -> Dict[str, Any]:
+        """获取客户资源使用统计
+
+        同时统计整柜（Cabinet.customer_id）和部分机柜（Device.customer_id
+        但机柜不属于该客户）两种场景，避免少计。
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            Dict: 资源使用统计信息
+        """
         try:
             from sqlalchemy import case, distinct
 
@@ -332,24 +430,35 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError("获取客户资源统计失败", original_error=e)
 
     def get_customer_asset_statistics(self, customer_id: int) -> Dict[str, Any]:
+        """获取客户资产统计信息
+        
+        Args:
+            customer_id: 客户ID
+            
+        Returns:
+            Dict[str, Any]: 资产统计信息,包括机房、机柜、设备、网络等
+            
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
         try:
             result = {
                 'customer_id': customer_id,
-                'rooms': [],
+                'rooms': [],  # 使用的机房列表
                 'cabinets': {
-                    'full_cabinets': [],
-                    'partial_cabinets': [],
+                    'full_cabinets': [],  # 整柜租赁
+                    'partial_cabinets': [],  # 部分使用
                     'total_count': 0,
                     'total_u_used': 0
                 },
                 'devices': {
                     'total_count': 0,
-                    'by_type': {},
-                    'by_cabinet': {}
+                    'by_type': {},  # 按类型统计
+                    'by_cabinet': {}  # 按机柜统计
                 },
                 'networks': {
-                    'full_networks': [],
-                    'partial_ips': [],
+                    'full_networks': [],  # 整网段租赁
+                    'partial_ips': [],  # 零散IP
                     'total_networks': 0,
                     'total_ips': 0
                 }
@@ -383,7 +492,7 @@ class CustomerRepository(SQLAlchemyRepository):
                     'used_u': cabinet.used_u,
                     'room_id': cabinet.room_id,
                     'room_name': cabinet.room_name,
-                    'type': 'full'
+                    'type': 'full'  # 整柜
                 })
                 
                 if cabinet.room_id not in [r['room_id'] for r in result['rooms']]:
@@ -424,7 +533,7 @@ class CustomerRepository(SQLAlchemyRepository):
                     'device_count': cabinet.device_count,
                     'room_id': cabinet.room_id,
                     'room_name': cabinet.room_name,
-                    'type': 'partial'
+                    'type': 'partial'  # 部分使用
                 })
                 
                 if cabinet.room_id not in [r['room_id'] for r in result['rooms']]:
@@ -459,8 +568,8 @@ class CustomerRepository(SQLAlchemyRepository):
             )
             
             result['devices']['total_count'] = len(devices_query)
-            result['devices']['full_cabinet_count'] = 0
-            result['devices']['partial_cabinet_count'] = 0
+            result['devices']['full_cabinet_count'] = 0   # 整柜租赁机柜中的设备数
+            result['devices']['partial_cabinet_count'] = 0  # 部分使用机柜中的设备数
             
             for device in devices_query:
                 device_type = device.device_type or 'unknown'
@@ -512,7 +621,7 @@ class CustomerRepository(SQLAlchemyRepository):
                     'ip_count': ip_count,
                     'room_id': network.room_id,
                     'room_name': network.room_name,
-                    'type': 'full'
+                    'type': 'full'  # 整网段
                 })
                 
                 if network.room_id not in [r['room_id'] for r in result['rooms']]:
@@ -587,6 +696,19 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError(f"获取客户资产统计失败", original_error=e)
 
     def get_customer_switch_ports_data(self, customer_id: int) -> Dict[str, Any]:
+        """获取客户交换机端口IP地址段原始数据
+
+        处理场景：
+        1. 网段级分配：ip_network表中的整个网段
+        2. IP级分配：ip_manager表中的单个IP
+        3. 冲突处理：当网段分配给客户A，但部分IP分配给客户B时，自动拆分网段
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            Dict: 按机房分组的资源数据
+        """
         try:
             from app.models.switch_credentials import SwitchCredentials, IPSwitchInfo
             from app.models.network_port import NetworkPort
@@ -743,6 +865,14 @@ class CustomerRepository(SQLAlchemyRepository):
             raise QueryExecutionError(f"获取客户交换机端口数据失败", original_error=e)
 
     def find_id_name_map_by_ids(self, customer_ids: set[int]) -> Dict[int, str]:
+        """根据客户ID集合批量查询，返回 {id: customer_name} 映射
+
+        Args:
+            customer_ids: 客户ID集合
+
+        Returns:
+            Dict[int, str]: 客户ID→名称映射
+        """
         if not customer_ids:
             return {}
         try:

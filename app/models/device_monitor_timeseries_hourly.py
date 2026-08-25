@@ -16,6 +16,7 @@ from extensions import db
 
 
 class DeviceMonitorTimeseriesHourly(db.Model):
+    """监控时序小时级预聚合（device_id, metric, hour_bucket 复合主键）"""
 
     __tablename__ = "device_monitor_timeseries_hourly"
     __table_args__ = (

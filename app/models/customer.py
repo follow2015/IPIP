@@ -13,9 +13,14 @@ from app.core.enums import CustomerStatus
 
 
 class Customer(BaseModel):
+    """客户模型
+
+    管理客户的基本信息，包括名称、联系人、联系方式等。
+    一个客户可以拥有多个机柜和设备。
+    """
 
     __tablename__ = "customers"
-    __soft_delete__ = True
+    __soft_delete__ = True  # 启用软删除，客户注销改为设置 deleted_at
     __table_args__ = (
         {"comment": "客户信息表"},
     )
@@ -36,6 +41,15 @@ class Customer(BaseModel):
     devices = relationship("Device", back_populates="customer", lazy="select")
 
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> Dict[str, Any]:
+        """转换为字典
+
+        Args:
+            exclude: 要排除的字段列表
+            include_relations: 是否包含关联对象
+
+        Returns:
+            Dict: 客户数据字典
+        """
         data = super().to_dict(exclude=exclude, include_relations=include_relations)
 
         if include_relations:
@@ -45,4 +59,5 @@ class Customer(BaseModel):
         return data
 
     def __repr__(self) -> str:
+        """返回客户的字符串表示"""
         return f"<Customer(id={self.id}, name='{self.customer_name}')>"

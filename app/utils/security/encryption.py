@@ -20,6 +20,16 @@ _CIPHER_PREFIX = "ENC:AES256GCM:"
 
 
 def _get_encryption_key() -> bytes:
+    """获取加密密钥
+
+    从环境变量 SWITCH_SECRET_KEY 读取，支持 hex 编码（64字符）或 base64 编码。
+
+    Returns:
+        bytes: 32 字节 AES-256 密钥
+
+    Raises:
+        ValueError: 密钥未配置或格式无效
+    """
     key_str = os.environ.get("SWITCH_SECRET_KEY", "")
     if not key_str:
         raise ValueError(
@@ -49,12 +59,23 @@ def _get_encryption_key() -> bytes:
 
 
 def encrypt(plaintext: str) -> str:
+    """使用 AES-256-GCM 加密字符串
+
+    Args:
+        plaintext: 明文字符串
+
+    Returns:
+        str: 格式为 "ENC:AES256GCM:<base64(nonce+ciphertext+tag)>"
+
+    Raises:
+        ValueError: 加密失败
+    """
     if not plaintext:
         return ""
 
     try:
         key = _get_encryption_key()
-        nonce = os.urandom(12)
+        nonce = os.urandom(12)  # GCM 推荐 12 字节 nonce
         aesgcm = AESGCM(key)
         ciphertext = aesgcm.encrypt(nonce, plaintext.encode("utf-8"), None)
         encrypted = base64.b64encode(nonce + ciphertext).decode("ascii")
@@ -65,6 +86,17 @@ def encrypt(plaintext: str) -> str:
 
 
 def decrypt(encrypted_str: str) -> str:
+    """使用 AES-256-GCM 解密字符串
+
+    Args:
+        encrypted_str: encrypt() 返回的加密字符串
+
+    Returns:
+        str: 解密后的明文
+
+    Raises:
+        ValueError: 解密失败或数据格式无效
+    """
     if not encrypted_str:
         return ""
 
@@ -85,12 +117,34 @@ def decrypt(encrypted_str: str) -> str:
 
 
 def is_encrypted(value: str) -> bool:
+    """判断字符串是否为加密格式
+
+    Args:
+        value: 待判断的字符串
+
+    Returns:
+        bool: 是加密格式返回 True
+    """
     if not value:
         return False
     return value.startswith(_CIPHER_PREFIX)
 
 
 def is_likely_plaintext_password(value: str) -> bool:
+    """启发式判断密码值是否为明文
+
+    检测规则：
+    1. 已加密格式 → False
+    2. 长度 < 20 且不含 base64 字符 → 可能是明文
+    3. 包含常见密码模式（纯数字、admin/root 等）→ 可能是明文
+    4. 可读 ASCII 字符占比 > 80% → 可能是明文
+
+    Args:
+        value: 待判断的密码值
+
+    Returns:
+        bool: 可能是明文返回 True
+    """
     if not value:
         return False
 

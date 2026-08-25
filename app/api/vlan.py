@@ -25,7 +25,10 @@ vlan_bp = Blueprint("vlan", __name__)
 _vlan_service = VLANService(VLANRepository())
 
 
+
+
 class VLANCreateSchema(Schema):
+    """VLAN创建参数"""
     vlan_id = fields.Int(required=True, validate=validate.Range(min=1, max=4094))
     name = fields.Str(required=True, validate=validate.Length(min=1, max=64))
     purpose = fields.Str(load_default=None, validate=validate.Length(max=200))
@@ -36,11 +39,14 @@ class VLANCreateSchema(Schema):
 
 
 class VLANUpdateSchema(Schema):
+    """VLAN更新参数"""
     name = fields.Str(validate=validate.Length(min=1, max=64))
     purpose = fields.Str(validate=validate.Length(max=200))
     subnet_id = fields.Int()
     room_id = fields.Int()
     status = fields.Int()
+
+
 
 
 @vlan_bp.route("/", methods=["GET"])
@@ -49,6 +55,17 @@ class VLANUpdateSchema(Schema):
 @permission_required("switch:view")
 @rate_limit_api
 def list_vlans():
+    """查询VLAN列表
+
+    Query Parameters:
+        page (int): 页码，默认 1
+        per_page (int): 每页数量，默认 20
+        search (str, optional): 模糊搜索（匹配 VLAN ID、名称、用途）
+        device_id (int, optional): 按交换机筛选
+        room_id (int, optional): 按机房筛选
+
+    排序：按 device_id 分组，同设备内按 vlan_id 升序
+    """
     from app.models.vlan import VLAN
     from app.persistence.switch_ext_repository import SwitchExtRepository
 
@@ -90,6 +107,7 @@ def list_vlans():
 @login_required
 @permission_required("switch:view")
 def get_vlan(vlan_id):
+    """获取VLAN详情"""
     vlan = _vlan_service.get_by_id(vlan_id)
     if not vlan:
         return APIResponse.error("VLAN不存在", error_code="VLAN_NOT_FOUND", status_code=404)
@@ -102,6 +120,10 @@ def get_vlan(vlan_id):
 @permission_required("switch:create")
 @transactional
 def create_vlan():
+    """创建VLAN
+
+    Request Body: VLANCreateSchema
+    """
     schema = VLANCreateSchema()
     data = schema.load(request.get_json())
     try:
@@ -117,6 +139,10 @@ def create_vlan():
 @permission_required("switch:update")
 @transactional
 def update_vlan(vlan_id):
+    """更新VLAN
+
+    Request Body: VLANUpdateSchema（所有字段可选）
+    """
     schema = VLANUpdateSchema()
     data = schema.load(request.get_json())
     try:
@@ -134,6 +160,7 @@ def update_vlan(vlan_id):
 @permission_required("switch:delete")
 @transactional
 def delete_vlan(vlan_id):
+    """删除VLAN"""
     if _vlan_service.delete(vlan_id):
         return APIResponse.success(message="VLAN删除成功")
     return APIResponse.error("VLAN不存在", error_code="VLAN_NOT_FOUND", status_code=404)

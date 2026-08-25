@@ -29,6 +29,14 @@ NETWORK_DEVICE_TYPES: frozenset = frozenset({'network'})
 
 
 class PortMatchingEngine:
+    """端口匹配规则引擎
+
+    负责校验端口连接的合法性，包括：
+    - 端口类型匹配（电口连电口，光口连光口）
+    - 端口速率匹配（速率必须一致）
+    - 端口占用检查（端口不能重复连接）
+    - 设备类型限制（按 link_type 校验）
+    """
 
     NETWORK_DEVICE_TYPES = NETWORK_DEVICE_TYPES
 
@@ -38,6 +46,20 @@ class PortMatchingEngine:
         source_port: DeviceNicsPort,
         target_port: DeviceNicsPort,
     ) -> Tuple[bool, str]:
+        """校验两个端口是否可以建立连接
+
+        规则：
+          1. 端口类型必须相同（电口↔电口，光口↔光口）
+          2. 源端口速率不超过目标端口速率（源≤目标）
+          3. 两端端口均须处于 free 状态
+
+        Args:
+            source_port: 源端口（DeviceNicsPort 实例，设备侧）
+            target_port: 目标端口（DeviceNicsPort 实例，网络设备侧）
+
+        Returns:
+            (is_valid, error_message)
+        """
         if source_port.port_type != target_port.port_type:
             return (
                 False,
@@ -64,6 +86,16 @@ class PortMatchingEngine:
 
     @staticmethod
     def _parse_speed_to_mbps(speed_str: str) -> Optional[int]:
+        """将速率字符串解析为 Mbps 整数值
+
+        支持格式：10G/10GE/1G/1GE/100M/100ME/1000M/10000M/10Gbps/1Gbps/10T/10TE 等
+
+        Args:
+            speed_str: 速率字符串
+
+        Returns:
+            Mbps 整数值，无法解析时返回 None
+        """
         if not speed_str:
             return None
         import re
@@ -80,6 +112,14 @@ class PortMatchingEngine:
 
     @staticmethod
     def check_port_occupied(port_id: int) -> bool:
+        """检查端口是否已被某条 active 连接占用
+
+        Args:
+            port_id: device_nics_port 主键
+
+        Returns:
+            True = 已占用
+        """
         return (
             DeviceConnection.query
             .filter(
@@ -96,6 +136,22 @@ class PortMatchingEngine:
         target_device_type: str,
         link_type: str = "device_to_network",
     ) -> Tuple[bool, str]:
+        """校验设备类型组合是否允许建立连接
+
+        重构修复（Bug #11）：
+          原版只允许 server↔switch，路由器/防火墙被错误拒绝。
+          现在使用 NETWORK_DEVICE_TYPES 集合做统一判断。
+
+        Args:
+            source_device_type: 源设备类型（如 'server'）
+            target_device_type: 目标设备类型（如 'switch'/'router'）
+            link_type: 连接模式
+                - 'device_to_network'  服务器↔网络设备（默认）
+                - 'network_to_network' 网络设备间互联
+
+        Returns:
+            (is_valid, error_message)
+        """
         nd = NETWORK_DEVICE_TYPES
 
         if link_type == "device_to_network":
@@ -132,6 +188,16 @@ class PortMatchingEngine:
         port_type: Optional[str] = None,
         port_speed: Optional[str] = None,
     ) -> List[DeviceNicsPort]:
+        """获取设备的可用端口（BUG-4 修复：消除 N+1 查询）
+
+        Args:
+            device_id:  设备 ID
+            port_type:  端口类型过滤（可选）
+            port_speed: 端口速率过滤（可选）
+
+        Returns:
+            DeviceNicsPort 实例列表
+        """
         query = DeviceNicsPort.query.filter(
             DeviceNicsPort.device_id == device_id,
             DeviceNicsPort.port_status == "free",
@@ -166,6 +232,22 @@ class PortMatchingEngine:
         port_type: Optional[str] = None,
         port_speed: Optional[str] = None,
     ) -> List[Dict]:
+        """查找两台设备间可匹配的端口对
+
+        匹配规则：
+          - 端口类型必须相同
+          - 源端口速率≤目标端口速率（源=设备侧，目标=网络设备侧）
+          - 两端均可用
+
+        Args:
+            source_device_id: 源设备 ID
+            target_device_id: 目标设备 ID
+            port_type:  可选类型过滤
+            port_speed: 可选速率过滤
+
+        Returns:
+            匹配端口对列表，每项包含 source/target 端口 ID 及显示信息
+        """
         source_ports = PortMatchingEngine.get_available_ports(
             source_device_id, port_type, port_speed
         )
@@ -199,8 +281,10 @@ class PortMatchingEngine:
 
     @staticmethod
     def occupy_port(port: DeviceNicsPort) -> None:
+        """占用端口（事务由 API 层 @transactional 统一管理）"""
         port.occupy()
 
     @staticmethod
     def release_port(port: DeviceNicsPort) -> None:
+        """释放端口（事务由 API 层 @transactional 统一管理）"""
         port.release()

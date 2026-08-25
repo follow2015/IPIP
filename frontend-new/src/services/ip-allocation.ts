@@ -8,7 +8,6 @@ import { get } from './api-client';
 import { queryKeys } from './query-keys';
 import type { IPAllocationLog } from '@/types/models';
 
-
 export function useIPAllocationLogs(ipAddress: string, roomId?: number) {
   return useQuery({
     queryKey: [...queryKeys.ip.detail(ipAddress), 'allocation-logs', roomId],

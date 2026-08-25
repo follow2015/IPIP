@@ -15,26 +15,26 @@
  */
 import { useState, useCallback, useRef } from 'react';
 
-
 export interface EditableRow {
   key: string;
 }
 
-
+/**
+ * 通用行编辑 Hook
+ *
+ * @template T 行数据类型（必须包含 key: string）
+ * @param initialRows 初始行列表（可选，默认空数组）
+ */
 export function useEditableRows<T extends EditableRow>(initialRows: T[] = []) {
-  
   const counterRef = useRef(0);
 
-  
   const makeKey = useCallback((): string => {
     counterRef.current += 1;
-    
     return `row-${Date.now()}-${counterRef.current}`;
   }, []);
 
   const [rows, setRows] = useState<T[]>(initialRows);
 
-  
   const addRow = useCallback(
     (rowData: Omit<T, 'key'>): void => {
       setRows(prev => [...prev, { ...rowData, key: makeKey() } as T]);
@@ -42,7 +42,6 @@ export function useEditableRows<T extends EditableRow>(initialRows: T[] = []) {
     [makeKey],
   );
 
-  
   const addRows = useCallback(
     (rowsData: Omit<T, 'key'>[]): void => {
       setRows(prev => [
@@ -53,12 +52,10 @@ export function useEditableRows<T extends EditableRow>(initialRows: T[] = []) {
     [makeKey],
   );
 
-  
   const deleteRow = useCallback((key: string): void => {
     setRows(prev => prev.filter(r => r.key !== key));
   }, []);
 
-  
   const copyRow = useCallback(
     (key: string, overrides: Partial<Omit<T, 'key'>> = {}): void => {
       setRows(prev => {
@@ -73,7 +70,6 @@ export function useEditableRows<T extends EditableRow>(initialRows: T[] = []) {
     [makeKey],
   );
 
-  
   const updateRow = useCallback(
     <K extends keyof T>(key: string, field: K, value: T[K]): void => {
       setRows(prev => prev.map(r => (r.key === key ? { ...r, [field]: value } : r)));
@@ -81,7 +77,6 @@ export function useEditableRows<T extends EditableRow>(initialRows: T[] = []) {
     [],
   );
 
-  
   const resetRows = useCallback(
     (newRows: Omit<T, 'key'>[]): void => {
       setRows(newRows.map(r => ({ ...r, key: makeKey() } as T)));
@@ -89,7 +84,6 @@ export function useEditableRows<T extends EditableRow>(initialRows: T[] = []) {
     [makeKey],
   );
 
-  
   const transformRows = useCallback(
     (mapper: (row: T, index: number) => Omit<T, 'key'>): void => {
       setRows(prev =>
@@ -101,7 +95,6 @@ export function useEditableRows<T extends EditableRow>(initialRows: T[] = []) {
 
   return {
     rows,
-    
     setRows,
     addRow,
     addRows,

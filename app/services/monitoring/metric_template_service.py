@@ -12,11 +12,13 @@ _repo = MonitorMetricTemplateRepository()
 
 
 def list_metric_templates() -> List[dict]:
+    """列出全部指标模板（序列化为 dict 列表，排除 created_at/updated_at）。"""
     rows = _repo.list_all()
     return [t.to_dict(exclude=['created_at', 'updated_at']) for t in rows]
 
 
 def upsert(data: dict) -> dict:
+    """upsert 指标模板（I10：route handler 不再直接调 repo.upsert）。"""
     tpl = _repo.upsert(
         device_type=data["device_type"],
         metric_key=data["metric_key"],
@@ -43,10 +45,12 @@ def upsert(data: dict) -> dict:
 
 
 def seed_defaults() -> int:
+    """写入内置默认指标模板（幂等）。"""
     return _repo.seed_defaults()
 
 
 def delete(template_id: int) -> dict:
+    """删除指标模板。"""
     from app.exceptions.business import BusinessLogicError
     ok = _repo.delete(template_id)
     if not ok:
@@ -55,10 +59,12 @@ def delete(template_id: int) -> dict:
 
 
 def batch_delete(ids: list) -> dict:
+    """批量删除指标模板。"""
     deleted = _repo.batch_delete(ids)
     return {"deleted": deleted, "total": len(ids)}
 
 
 def batch_set_enabled(ids: list, enabled: bool) -> dict:
+    """批量启停指标模板。"""
     updated = _repo.batch_set_enabled(ids, enabled)
     return {"updated": updated, "total": len(ids), "enabled": enabled}

@@ -26,11 +26,12 @@ from app.services.monitoring.adapters.snmp_adapter import SNMPAdapter
 from app.services.monitoring.adapters.ipmi_adapter import IPMIAdapter
 from app.services.monitoring.adapters.zabbix_adapter import ZabbixAdapter
 from app.services.monitoring.adapters.ping_adapter import PingAdapter
-from app.services.monitoring.snmp_versions import SNMP_REQUIRED_BY_VERSION
+from app.services.monitoring.snmp_versions import SNMP_REQUIRED_BY_VERSION  # noqa: F401 — re-export
 
 
 @dataclass(frozen=True)
 class ProtocolSpec:
+    """单个监控协议的注册元数据。"""
 
     code: str
     adapter_class: Type[MonitorAdapter]
@@ -78,19 +79,29 @@ PROTOCOL_REGISTRY: Dict[str, ProtocolSpec] = {
 DEFAULT_LOOP_INTERVALS: Dict[str, int] = {"snmp": 60, "bmc": 60, "zabbix": 60, "ping": 60}
 
 
+
 def get_adapter_class(code: str) -> Type[MonitorAdapter]:
+    """按协议码返回适配器类（调用方负责实例化）。"""
     return PROTOCOL_REGISTRY[code].adapter_class
 
 
 def build_adapter(code: str) -> MonitorAdapter:
+    """按协议码实例化适配器（所有适配器均为无参构造）。"""
     return get_adapter_class(code)()
 
 
 def all_protocol_codes() -> List[str]:
+    """全部已注册协议码。"""
     return list(PROTOCOL_REGISTRY.keys())
 
 
 def device_type_to_protocols(device_type) -> List[str]:
+    """按设备类型给出候选协议顺序（注册顺序）。
+
+    未知 / None 设备类型回退为 [SNMP, ZABBIX, PING]（P7 扩展）：未明确归类的
+    设备仍优先走 SNMP（历史行为），但若其持有 Zabbix 凭据也应被 Zabbix 覆盖；
+    Ping 无凭据、始终可用，作为连通性触发源兜底。
+    """
     matched: List[str] = [
         spec.code
         for spec in PROTOCOL_REGISTRY.values()
@@ -106,6 +117,7 @@ def device_type_to_protocols(device_type) -> List[str]:
 
 
 def protocol_required_fields(code: str) -> Tuple[str, ...]:
+    """返回非 SNMP 协议的凭据必填字段；SNMP 返回空元组（由版本逻辑单独处理）。"""
     spec = PROTOCOL_REGISTRY.get(code)
     if spec is None:
         return ()
@@ -113,6 +125,11 @@ def protocol_required_fields(code: str) -> Tuple[str, ...]:
 
 
 def protocol_requires_credential(code: str) -> bool:
+    """该协议是否依赖凭据。
+
+    无凭据协议（如 ping，复用 ip_status_service）为 False，`_select_adapter`
+    据此在无凭据时仍可选用该适配器。
+    """
     spec = PROTOCOL_REGISTRY.get(code)
     if spec is None:
         return True
@@ -120,6 +137,7 @@ def protocol_requires_credential(code: str) -> bool:
 
 
 def worker_loops() -> List[str]:
+    """去重返回全部轮询循环名（按注册顺序）。"""
     seen: List[str] = []
     for spec in PROTOCOL_REGISTRY.values():
         if spec.worker_loop not in seen:
@@ -128,10 +146,12 @@ def worker_loops() -> List[str]:
 
 
 def protocols_for_loop(loop_name: str) -> List[str]:
+    """某轮询循环负责的全部协议码。"""
     return [spec.code for spec in PROTOCOL_REGISTRY.values() if spec.worker_loop == loop_name]
 
 
 def device_types_for_loop(loop_name: str) -> set:
+    """某轮询循环负责的全部设备类型集合。"""
     types: set = set()
     for spec in PROTOCOL_REGISTRY.values():
         if spec.worker_loop == loop_name:
@@ -139,7 +159,15 @@ def device_types_for_loop(loop_name: str) -> set:
     return types
 
 
+
 def _validate_registry() -> None:
+    """校验注册表完整性，配置错误立即报错。
+
+    A) 同一 worker_loop 下所有 ProtocolSpec 的 excludes_loops 必须一致，
+       否则 collect_target_ids 的排除逻辑语义冲突。
+    B) fallback 协议（有 excludes_loops）不能排在直连协议之前，
+       否则 device_type_to_protocols 会优先返回 fallback，抢占直连探测。
+    """
     loop_excludes_seen: Dict[str, Tuple[str, ...]] = {}
     for spec in PROTOCOL_REGISTRY.values():
         loop = spec.worker_loop

@@ -37,17 +37,14 @@ export interface UseRackLayoutResult {
   toggleCollapse: (deviceId: number) => void;
 }
 
-
 export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResult {
   const { totalU = 42, ratedPower = 8000, occupiedPositions, onPositionChange, onSelect } = props;
 
-  
   const [devices, setDevices] = useState<OccupiedPosition[]>(() =>
     occupiedPositions.map((p) => ({ ...p, uPosition: physicalToInternal(p.uPosition, totalU) }))
   );
-  const committedRef = useRef<Map<number, number>>(new Map()); 
+  const committedRef = useRef<Map<number, number>>(new Map()); // deviceId → physicalUPosition
 
-  
   const toInternal = useCallback(
     (physicalU: number): number => {
       return physicalToInternal(physicalU, totalU);
@@ -55,7 +52,6 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
     [totalU]
   );
 
-  
   const toPhysical = useCallback(
     (internalU: number): number => {
       return internalToPhysical(internalU, totalU);
@@ -63,18 +59,15 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
     [totalU]
   );
 
-  
   useEffect(() => {
     setDevices(() => {
       return occupiedPositions.map((incoming) => {
         const committedPhysical = committedRef.current.get(incoming.deviceId);
         if (committedPhysical !== undefined) {
-          
           if (incoming.uPosition === committedPhysical) {
             committedRef.current.delete(incoming.deviceId);
             return { ...incoming, uPosition: toInternal(incoming.uPosition) };
           }
-          
           return { ...incoming, uPosition: toInternal(committedPhysical) };
         }
         return { ...incoming, uPosition: toInternal(incoming.uPosition) };
@@ -87,14 +80,12 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
   const [dragOffsetInDevice, setDragOffsetInDevice] = useState(0);
   const [dropMsg, setDropMsg] = useState<DropMsg>({ text: '', type: '' });
   const [highlightUs, setHighlightUs] = useState<number[]>([]);
-  
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const msgTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  
   const [containerWidth, setContainerWidth] = useState(500);
   useEffect(() => {
     const el = containerRef.current;
@@ -110,7 +101,6 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
 
   const layout = useMemo(() => computeLayout(containerWidth), [containerWidth]);
 
-  
   const usedU = devices.reduce((s, d) => s + d.uSize, 0);
   const usedP = devices.reduce((s, d) => s + (d.power ?? 0), 0);
   const uPct = Math.round((usedU / totalU) * 100);
@@ -133,13 +123,12 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
     setHighlightUs([]);
   }, []);
 
-  
   const getDropTarget = useCallback(
     (e: React.DragEvent, device: OccupiedPosition): number => {
       if (!bodyRef.current) return device.uPosition;
       const rect = bodyRef.current.getBoundingClientRect();
       const relY = e.clientY - rect.top;
-      const mouseU = Math.floor(relY / layout.unit) + 1; 
+      const mouseU = Math.floor(relY / layout.unit) + 1; // 内部 U 坐标（从上到下 1-based）
       const newStart = mouseU - dragOffsetInDevice;
       return Math.max(1, Math.min(totalU - device.uSize + 1, newStart));
     },
@@ -159,7 +148,6 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
       setHighlightUs(hl);
       const conflict = checkConflict(devices, dragId, newStart, device.uSize);
 
-      
       const dispStart = displayLabel(newStart, totalU);
       const dispEnd = displayLabel(newStart + device.uSize - 1, totalU);
       const uRangeStr = `U${dispEnd}–U${dispStart}`;
@@ -187,7 +175,6 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
         return;
       }
 
-      
       const physicalPos = toPhysical(newStart);
       committedRef.current.set(dragId, physicalPos);
       const next = devices.map((d) => (d.deviceId === dragId ? { ...d, uPosition: newStart } : d));
@@ -195,7 +182,6 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
       setHighlightUs([]);
       setDragId(null);
 
-      
       const dispStart = displayLabel(newStart, totalU);
       const dispEnd = displayLabel(newStart + device.uSize - 1, totalU);
       const uRangeStr = `U${dispEnd}–U${dispStart}`;
@@ -203,7 +189,6 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
       clearTimeout(msgTimer.current);
       msgTimer.current = setTimeout(() => setDropMsg({ text: '', type: '' }), 2500);
 
-      
       onPositionChange?.(dragId, physicalPos);
     },
     [dragId, devices, getDropTarget, onPositionChange, totalU, toPhysical]
@@ -217,7 +202,6 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
     setHighlightUs([]);
   }, []);
 
-  
   const occupiedSet = useMemo(() => {
     const s = new Set<number>();
     devices.forEach((d) => {
@@ -228,7 +212,7 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
 
   const selectedDevice =
     selectedId != null ? (devices.find((d) => d.deviceId === selectedId) ?? null) : null;
-  const totalH = totalU * layout.unit - 2; 
+  const totalH = totalU * layout.unit - 2; // ROW_GAP
 
   return {
     devices,

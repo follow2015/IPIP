@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button, Space, Tag, Dropdown, Tooltip, Badge, Modal } from 'antd';
 import {
@@ -49,7 +48,6 @@ import { useTable } from '@/hooks/useTable';
 
 
 type ShowFor = (DeviceType | 'default')[] | undefined;
-
 type ColumnDef = any & { showFor?: ShowFor };
 
 function buildColumns(
@@ -110,7 +108,6 @@ function buildColumns(
       width: 120,
       render: (_: unknown, record: Device) => {
         const m = record.monitor_summary;
-        
         const pingDot = (() => {
           if (!m || m.ping_reachable === null) {
             return (
@@ -161,16 +158,13 @@ function buildColumns(
           );
         })();
 
-        
         const monitorTag = (() => {
           if (!m) {
             return <Tag color="default">未配置</Tag>;
           }
-          
           if (!m.has_monitor_credential) {
             return <Tag color="default">未配置</Tag>;
           }
-          
           if (m.monitor_interrupted) {
             return (
               <Tooltip title="监控中断：长时间未探测到">
@@ -180,7 +174,6 @@ function buildColumns(
               </Tooltip>
             );
           }
-          
           if (m.monitor_reachable === false) {
             return (
               <Tooltip title={`不可达（协议: ${m.monitor_protocol ?? '-'}）`}>
@@ -188,7 +181,6 @@ function buildColumns(
               </Tooltip>
             );
           }
-          
           if (m.monitor_reachable === true && m.active_metric_alerts > 0) {
             const color = m.max_alert_severity >= 3 ? 'magenta' : 'volcano';
             return (
@@ -199,7 +191,6 @@ function buildColumns(
               </Tooltip>
             );
           }
-          
           if (m.monitor_reachable === true) {
             return (
               <Tooltip title={`可达（协议: ${m.monitor_protocol ?? '-'}）`}>
@@ -207,7 +198,6 @@ function buildColumns(
               </Tooltip>
             );
           }
-          
           return (
             <Tooltip title="已配置凭据，等待首次探测">
               <Tag color="blue">待探测</Tag>
@@ -237,7 +227,6 @@ function buildColumns(
       width: 160,
       showFor: [DeviceType.SERVER, DeviceType.NETWORK, DeviceType.OTHER],
       render: (_: unknown, r: Device) => {
-        
         const brandLabel = getVendorLabel(r.brand);
         const parts = [brandLabel, r.device_model].filter(Boolean);
         return parts.length ? parts.join(' / ') : '-';
@@ -291,7 +280,6 @@ function buildColumns(
       key: 'u_position',
       width: 70,
       render: (_: unknown, r: Device) => {
-        
         const u = r.parent_u_position ?? r.u_position;
         return u ? `U${u}` : '-';
       }
@@ -403,7 +391,6 @@ function Devices() {
   const [formOpen, setFormOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<Device | null>(null);
 
-  
   const [addDevicesOpen, setAddDevicesOpen] = useState(false);
   const [addDevicesDefaultTab, setAddDevicesDefaultTab] = useState<'batch' | 'clone'>('batch');
   const [cloneTemplateId, setCloneTemplateId] = useState<number | undefined>();
@@ -426,7 +413,6 @@ function Devices() {
     if (urlRoomId) table.updateFilter('room_id', Number(urlRoomId));
   }, [urlCabinetId, urlRoomId]);
 
-  
   const { data: cabinetOptions } = useCabinetOptions(
     table.filters.room_id ? Number(table.filters.room_id) : undefined,
     true
@@ -451,7 +437,6 @@ function Devices() {
           : undefined
   });
 
-  
   const { data: vendorBrands } = useVendorBrands();
   const vendorLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -505,14 +490,12 @@ function Devices() {
     }
   };
 
-  
   const handleClone = (record: Device) => {
     setCloneTemplateId(record.id);
     setAddDevicesDefaultTab('clone');
     setAddDevicesOpen(true);
   };
 
-  
   const openAddDevices = (tab: 'batch' | 'clone') => {
     setCloneTemplateId(undefined);
     setAddDevicesDefaultTab(tab);
@@ -563,7 +546,6 @@ function Devices() {
     });
   };
 
-  
   const handleBatchConfig = () => {
     const devs = batch.selectedRows;
     if (devs.length === 0) {
@@ -578,7 +560,6 @@ function Devices() {
     setBatchConfigOpen(true);
   };
 
-  
   const handleBatchMonitor = () => {
     const devs = batch.selectedRows;
     if (devs.length === 0) {
@@ -765,7 +746,7 @@ function Devices() {
         }}
       />
 
-      {}
+      {/* 统一批量添加入口 — 替代原来的 BatchAddDeviceModal + QuickCloneDeviceModal */}
       <AddDevicesModal
         open={addDevicesOpen}
         onClose={handleAddDevicesClose}

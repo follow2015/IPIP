@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+# -*- coding: utf-8 -*-
 """
 端口变更事件发布模块（Flask 侧，仅发布，不再服务 SSE）
 
@@ -38,11 +38,18 @@ logger = get_logger(__name__)
 _GLOBAL_REDIS_CHANNEL = "events:global"
 
 _redis_client = None
-_redis_init_lock = threading.Lock()
-_redis_unavailable_logged = False
+_redis_init_lock = threading.Lock()  # 防止多线程并发初始化（double-checked locking）
+_redis_unavailable_logged = False  # 防止 REDIS_URL 未配置时日志刷屏（仅首次 ERROR，后续 DEBUG）
 
 
 def _get_redis():
+    """懒加载 Redis 客户端。
+
+    与旧版不同：这里不再是"可选优化，连不上就退回内存模式"——
+    退无可退，因为本进程（Flask）不再自己服务 SSE，事件必须经 Redis
+    才能到达 ASGI 网关。REDIS_URL 未配置或连接失败时，事件会被静默丢弃
+    （只记日志），但不会抛异常影响调用方的主业务事务。
+    """
     global _redis_client, _redis_unavailable_logged
     if _redis_client is not None:
         return _redis_client
@@ -83,6 +90,7 @@ def _get_redis():
 
 
 def _redis_publish(device_id: int, payload: str) -> None:
+    """通过 Redis Pub/Sub 广播事件。"""
     r = _get_redis()
     if not r:
         return
@@ -93,6 +101,7 @@ def _redis_publish(device_id: int, payload: str) -> None:
 
 
 def _redis_publish_global(payload: str) -> None:
+    """通过 Redis Pub/Sub 广播全局事件。"""
     r = _get_redis()
     if not r:
         return
@@ -100,6 +109,7 @@ def _redis_publish_global(payload: str) -> None:
         r.publish(_GLOBAL_REDIS_CHANNEL, payload)
     except Exception as exc:
         logger.warning("Redis global publish 失败: %s", exc)
+
 
 
 def emit_resource_change(
@@ -112,6 +122,19 @@ def emit_resource_change(
     affected_connections: list[int] = None,
     extra:                dict      = None,
 ) -> None:
+    """发布结构化资源变更事件（替代 emit_port_change）
+
+    必须在 db.session.commit() 成功之后调用。
+
+    Args:
+        device_id:            交换机 devices.id
+        op_type:              操作类型（见 OpType 常量）
+        affected_ports:       变更的端口名列表
+        affected_vlans:       变更的 VLAN 数据库 ID 列表（vlans.id，非 vlan_id 号码）
+        affected_lags:        变更的 LAG 数据库 ID 列表
+        affected_connections: 变更的连接 ID 列表
+        extra:                额外上下文（task_id、success、error 等）
+    """
     event_dict = {
         "event_id":            str(_uuid_mod.uuid4()),
         "device_id":           device_id,
@@ -132,6 +155,21 @@ def emit_port_action_result(
     success: bool, message: str = "", error: str = "",
     detail_op_type: str = "",
 ) -> None:
+    """发布端口操作结果事件（供异步端口操作使用）。
+
+    与 emit_resource_change 对齐结构化事件格式（不含 seq，由网关分配），
+    确保前端 DeviceEventBus 能正确分发到 'ports' 监听器。
+
+    Args:
+        device_id:      交换机 device_id（devices.id）
+        port:           端口名称
+        task_id:        异步任务 ID
+        action:         操作类型（如 enable_port / set_port_vlan）
+        success:        操作是否成功
+        message:        成功消息
+        error:          失败错误信息
+        detail_op_type: 原始操作类型（如 enable / vlan_set），供前端精确缓存失效
+    """
     event_dict = {
         "event_id":            str(_uuid_mod.uuid4()),
         "device_id":           device_id,
@@ -153,6 +191,7 @@ def emit_port_action_result(
     _redis_publish(device_id, payload)
 
 
+
 def emit_resource_change_global(
     resource: str,
     op: str,
@@ -160,6 +199,22 @@ def emit_resource_change_global(
     ids: list[int] | None = None,
     extra: dict | None = None,
 ) -> None:
+    """发布全局资源变更事件（不绑定特定交换机）。
+
+    用于设备、机柜、机房、客户等非交换机实体的 CRUD 变更通知，
+    通过 events:global channel 推送，前端 useGlobalEvents 消费后
+    自动失效对应 TanStack Query 缓存。
+
+    批量操作只发一条汇总事件（op 带 batch_ 前缀，ids 包含所有受影响 ID）。
+
+    必须在 db.session.commit() 成功之后调用。
+
+    Args:
+        resource: 资源类型（device / cabinet / room / customer / user / network / ip / virtual_room）
+        op:       操作类型（create / update / delete / batch_create / batch_update / batch_delete / status_change / location_change）
+        ids:      受影响的资源 ID 列表
+        extra:    额外上下文
+    """
     data = json.dumps({
         "event_type": "resource_change",
         "payload": {
@@ -173,7 +228,16 @@ def emit_resource_change_global(
     _redis_publish_global(data)
 
 
+
 def emit_global_event(event_type: str, payload: dict | None = None) -> None:
+    """广播全局事件（不绑定特定交换机）。
+
+    用于机房扫描完成、批量配置变更等影响多页面的场景。
+
+    Args:
+        event_type: 事件类型（如 room_scan_complete / bulk_config_change）
+        payload:    附加数据
+    """
     data = json.dumps({
         "event_type": event_type,
         "payload": payload or {},
@@ -187,10 +251,21 @@ def emit_global_event_with_targets(
     payload: dict | None = None,
     target_user_ids: list[int] | None = None,
 ) -> None:
+    """广播带目标过滤的全局事件。
+
+    与 emit_global_event 类似，但携带 target_user_ids 字段：
+    网关侧 _handle_global_event 会按订阅连接的 user_id 过滤 fan-out，
+    target_user_ids 为 None（或不传）时仍全局广播，对既有事件零影响。
+
+    Args:
+        event_type:      事件类型
+        payload:         附加数据
+        target_user_ids: 目标用户 id 列表；None = 全局广播
+    """
     data = json.dumps({
         "event_type": event_type,
         "payload": payload or {},
-        "target_user_ids": target_user_ids,
+        "target_user_ids": target_user_ids,  # None = 全局广播
         "ts": int(time.time() * 1000),
     }, ensure_ascii=False)
     _redis_publish_global(data)

@@ -17,14 +17,12 @@ export default function NetworkTopologyFields({ form, isEdit, editRecord }: {
   isEdit: boolean;
   editRecord: Device | null;
 }) {
-  
   const { data: switchPage } = useSwitchList({ page: 1, page_size: 500 });
   const switchOptions = useMemo(
     () => (switchPage?.items ?? []).map((s: Switch) => ({ label: s.name || s.ip_address, value: s.device_id })),
     [switchPage]
   );
 
-  
   const currentDeviceId = editRecord?.id ?? 0;
   const { data: localPorts } = useNetworkPorts(currentDeviceId, { enabled: !!editRecord?.id && isEdit });
   const localPortOptions = useMemo(
@@ -32,7 +30,6 @@ export default function NetworkTopologyFields({ form, isEdit, editRecord }: {
     [localPorts]
   );
 
-  
   const uplinkDeviceId = Form.useWatch(['switch_config', 'uplink_device_id'], form);
   const { data: uplinkDevicePorts } = useNetworkPorts(uplinkDeviceId, { enabled: !!uplinkDeviceId });
   const uplinkDevicePortOptions = useMemo(
@@ -75,8 +72,6 @@ export default function NetworkTopologyFields({ form, isEdit, editRecord }: {
               optionFilterProp="label"
               options={switchOptions}
               onChange={() => {
-                
-                
                 form.setFieldValue(['switch_config', 'peer_port_ids'], undefined);
               }}
             />

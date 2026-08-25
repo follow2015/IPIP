@@ -12,6 +12,7 @@ from extensions import db
 
 
 class Role(BaseModel):
+    """角色模型"""
 
     __tablename__ = "roles"
     __table_args__ = (
@@ -50,6 +51,14 @@ class Role(BaseModel):
         return f"<Role {self.name}>"
 
     def to_dict(self, include_relations=False):
+        """转换为字典
+
+        Args:
+            include_relations: 是否包含关联数据
+
+        Returns:
+            dict: 角色数据字典
+        """
         data = super().to_dict()
 
         if include_relations:
@@ -62,6 +71,7 @@ class Role(BaseModel):
 
 
 class Permission(BaseModel):
+    """权限模型"""
 
     __tablename__ = "permissions"
     __table_args__ = (
@@ -84,10 +94,16 @@ class Permission(BaseModel):
         return f"<Permission {self.code}>"
 
     def to_dict(self):
+        """转换为字典
+
+        Returns:
+            dict: 权限数据字典
+        """
         return super().to_dict()
 
 
 class UserRole(BaseModel):
+    """用户角色关联模型"""
 
     __tablename__ = "user_roles"
     __table_args__ = (
@@ -115,6 +131,7 @@ class UserRole(BaseModel):
 
 
 class RolePermission(BaseModel):
+    """角色权限关联模型"""
 
     __tablename__ = "role_permissions"
     __table_args__ = (

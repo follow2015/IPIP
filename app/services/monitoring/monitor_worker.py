@@ -40,6 +40,7 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+
 _RELEASE_LOCK_LUA = """
 if redis.call('get', KEYS[1]) == ARGV[1] then
     return redis.call('del', KEYS[1])
@@ -62,6 +63,11 @@ _LOCK_OWNER_MUTEX = threading.Lock()
 
 
 def lock_owner_token() -> str:
+    """返回本进程唯一的锁 owner token（`<host>:<pid>:<uuid4>`）。
+
+    host / pid 前缀仅为排障可读性（``redis-cli get monitor:lock:snmp`` 能直接
+    看出锁的归属进程）；唯一性由 uuid4 保证。
+    """
     global _LOCK_OWNER_TOKEN, _LOCK_OWNER_PID
     pid = os.getpid()
     if _LOCK_OWNER_TOKEN is None or _LOCK_OWNER_PID != pid:
@@ -77,10 +83,21 @@ def lock_owner_token() -> str:
 
 
 def _lock_ttl(interval: int) -> int:
+    """轮询锁 TTL：进程崩溃时的兜底过期时间。
+
+    正常路径由 `_LockWatchdog` 续期，故 TTL 不需要覆盖「一轮最长耗时」；
+    TTL 越短，崩溃后其他进程接管越快。
+    """
     return max(int(interval) * 2, 600)
 
 
 def _acquire_lock(r, loop_name: str, interval: int) -> bool:
+    """尝试用 SET NX EX 抢占轮询锁。
+
+    成功（key 不存在，写入本进程 owner token，TTL=安全上限）返回 True；
+    失败（锁已被其他进程持有）返回 False。锁在每轮成功结束后由 _release_lock 显式释放，
+    TTL 仅作为进程崩溃时的兜底（防止锁永不过期导致监控停摆）。
+    """
     return bool(
         r.set(f"monitor:lock:{loop_name}", lock_owner_token(),
               nx=True, ex=_lock_ttl(interval))
@@ -88,10 +105,18 @@ def _acquire_lock(r, loop_name: str, interval: int) -> bool:
 
 
 def _release_lock(r, loop_name: str) -> None:
+    """显式释放轮询锁（仅当仍由本进程持有时），避免 TTL 等待期内的空窗。
+
+    使用 Lua 脚本做原子 compare-and-delete，消除 GET 与 DELETE 之间的
+    TOCTOU 竞态：若锁恰好在此窗口内 TTL 过期、另一进程抢到新锁，
+    原实现会误删别人的锁导致双跑。Lua 脚本保证 compare+delete 在 Redis
+    单线程内原子执行。比对的 owner 是进程唯一 token（见 lock_owner_token）。
+    """
     r.eval(_RELEASE_LOCK_LUA, 1, f"monitor:lock:{loop_name}", lock_owner_token())
 
 
 def _renew_lock(r, loop_name: str, interval: int) -> bool:
+    """续期轮询锁；仍持有返回 True，已易主 / 已过期返回 False。"""
     res = r.eval(
         _RENEW_LOCK_LUA, 1, f"monitor:lock:{loop_name}",
         lock_owner_token(), str(_lock_ttl(interval)),
@@ -100,6 +125,15 @@ def _renew_lock(r, loop_name: str, interval: int) -> bool:
 
 
 class _LockWatchdog:
+    """轮次内锁续期看门狗（上下文管理器）。
+
+    背景（P0-2）：TTL = ``max(interval*2, 600)``；数千台设备一轮探测可能超过
+    600s，锁在轮次进行中过期 → 另一进程抢到锁开始双跑，且本进程结束时的
+    release 会误删对方的锁。看门狗按 TTL/3 周期做 CAS 续期，只要进程活着锁就
+    不会过期；进程崩溃则续期停止，TTL 到期后自然释放（兜底语义不变）。
+
+    `enabled=False` 时完全不起线程（供不支持 Lua eval 的降级环境/测试使用）。
+    """
 
     def __init__(self, r, loop_name: str, interval: int, enabled: bool = True):
         self._r = r
@@ -147,6 +181,12 @@ class _LockWatchdog:
 
 
 def _redis_client(app) -> "redis.Redis":
+    """构建 redis 客户端（含 fallback）。
+
+    config.REDIS_URL 通常已由 from_object 拷入 app.config；若为空或
+    非 str（ProductionConfig 的 @property 描述符未被调用时会存入 property
+    对象）则用 REDIS_HOST/PORT/PASSWORD/DB 构造客户端，密码不进字符串避免泄漏。
+    """
     url = app.config.get("REDIS_URL")
     if isinstance(url, str):
         return redis.from_url(url, decode_responses=True)
@@ -158,13 +198,28 @@ def _redis_client(app) -> "redis.Redis":
 
 
 def _parse_whitelist(app) -> set:
+    """解析 MONITOR_DEVICE_IDS_WHITELIST（逗号分隔 id，空=全部）。"""
     raw = (app.config.get("MONITOR_DEVICE_IDS_WHITELIST", "") or "").strip()
     if not raw:
         return set()
     return {int(x) for x in raw.split(",") if x.strip()}
 
 
+
 def _resolve_port_sync_enabled(device_id: int) -> bool:
+    """解析设备级端口同步开关。
+
+    优先级：DeviceSwitchExt.port_sync_enabled > 全局 MONITOR_NON_MANAGED_PORT_SYNC
+    - port_sync_enabled = True  → 强制开启
+    - port_sync_enabled = False → 强制关闭
+    - port_sync_enabled = NULL  → 跟随全局开关
+
+    Args:
+        device_id: 设备 ID
+
+    Returns:
+        bool: 是否启用端口同步
+    """
     from extensions import db
     from app.models.device_switch_ext import DeviceSwitchExt
     from app.services.monitoring.dynamic_config import MonitorDynamicConfig
@@ -181,6 +236,11 @@ def _resolve_port_sync_enabled(device_id: int) -> bool:
 
 
 def _resolve_monitor_credential(device_id: int):
+    """解析设备的监控凭据（SNMP 优先，无 SNMP 则 Zabbix）。
+
+    Returns:
+        (cred, collector) 或 (None, None)
+    """
     from app.services.monitoring.credential_service import MonitorCredentialService
     from app.core.enums import MonitorProtocolCode
 
@@ -199,6 +259,22 @@ def _resolve_monitor_credential(device_id: int):
 
 
 def _try_sync_non_managed_ports(device) -> None:
+    """网络设备端口自动同步（监控轮询期间）。
+
+    触发条件：
+    - 设备级/全局端口同步开关已打开
+    - device_type == "network"（网络设备）
+    - 有 SNMP 或 Zabbix 凭据（SNMP 优先，无 SNMP 则用 Zabbix）
+
+    分流：
+    - 非网管设备（has_ssh=False）：PortSyncService 四元组匹配全量替换
+    - 网管设备（has_ssh=True）：ManagedPortStatusSyncService 仅更新状态 + 不匹配告警
+
+    任何异常被吞掉，不阻断主探测流程。
+
+    注意：本函数在 _check_one_device 的 app context + db session 内调用，
+    复用当前 session，由调用方统一 commit / remove。
+    """
     try:
         device_type = getattr(device, "device_type", None)
         if device_type != "network":
@@ -222,7 +298,7 @@ def _try_sync_non_managed_ports(device) -> None:
 
         cred, collector = _resolve_monitor_credential(device.id)
         if cred is None or collector is None:
-            return
+            return  # 无 SNMP / Zabbix 凭据，无法采集
 
         if not has_ssh:
             from app.services.monitoring.port_sync_service import PortSyncService
@@ -238,7 +314,7 @@ def _try_sync_non_managed_ports(device) -> None:
                 device.id, port_rows,
             )
         db.session.commit()
-    except Exception:
+    except Exception:  # noqa: BLE001 - 端口同步失败不阻断主探测
         logger.warning(
             "网络设备端口同步失败 device_id=%s", getattr(device, "id", None),
             exc_info=True,
@@ -246,6 +322,12 @@ def _try_sync_non_managed_ports(device) -> None:
 
 
 def _check_one_device(app, monitor_service, device_id: int) -> bool:
+    """探测单个设备，返回是否成功（True=成功，False=异常已吞掉）。
+
+    在调用线程内 push app context（check_device 内部用 current_app.config），
+    重新按 id 取出 Device（不跨线程复用 ORM 对象），结束 finally 释放 session。
+    任何异常都被吞掉，不中断整轮，但返回 False 供调用方统计失败计数。
+    """
     from app.models.device import Device
     from extensions import db
 
@@ -254,7 +336,7 @@ def _check_one_device(app, monitor_service, device_id: int) -> bool:
             try:
                 device = db.session.get(Device, device_id)
                 if device is None:
-                    return True
+                    return True  # 设备不存在视为无操作成功
                 monitor_service.check_device(device)
                 collected = monitor_service.collect_device_metrics(device)
                 if collected:
@@ -264,7 +346,7 @@ def _check_one_device(app, monitor_service, device_id: int) -> bool:
                     )
                     try:
                         DeviceMetricLatestRepository().upsert_many(device.id, collected)
-                    except Exception:
+                    except Exception:  # noqa: BLE001 - latest 写入失败不阻断告警
                         db.session.rollback()
                         logger.warning("device_metric_latest upsert 失败 device_id=%s", device.id, exc_info=True)
                     try:
@@ -272,7 +354,7 @@ def _check_one_device(app, monitor_service, device_id: int) -> bool:
                             DeviceMetricTimeseriesRepository,
                         )
                         DeviceMetricTimeseriesRepository().add_many(device.id, collected)
-                    except Exception:
+                    except Exception:  # noqa: BLE001 - 时序写入失败不阻断告警
                         db.session.rollback()
                         logger.warning("device_metric_timeseries insert 失败 device_id=%s", device.id, exc_info=True)
                     MetricAlertService().process(device.id, collected)
@@ -286,7 +368,22 @@ def _check_one_device(app, monitor_service, device_id: int) -> bool:
         return False
 
 
+
 def _run_one_round(app, loop_name: str, monitor_service, executor=None, stop_event=None) -> dict:
+    """执行一轮探测，返回本轮统计 {checked, failed, total}。
+
+    - snmp 循环：protocols=["snmp"]，device_type ∈ {network, server, other}
+    - bmc 循环：protocols=["ipmi"]，device_type == server
+    - zabbix 循环：protocols=["zabbix"]，device_type ∈ {network, server, other}
+    - ping 循环：protocols=["ping"]，device_type ∈ {network, server, other}（无凭据，查全部启用设备）
+    按启用凭据（ping 除外）+ 设备类型 + 白名单过滤后，用 executor 并发提交 _check_one_device。
+
+    `executor` 可由调用方传入并跨轮复用（见 `_poll_loop`，与 standalone_service
+    一致，避免每轮新建销毁线程池）；缺省（直接调用 / 单测）则临时创建，保持向后兼容。
+
+    返回 {checked, failed, total}：失败计数用于可观测性，单设备异常虽不中断整轮，
+    但若无计数，探测静默失败将无法被监控（review 2.6 诉求）。
+    """
     protocols = protocols_for_loop(loop_name)
     allowed_types = device_types_for_loop(loop_name)
 
@@ -337,6 +434,14 @@ def _run_one_round(app, loop_name: str, monitor_service, executor=None, stop_eve
 
 
 def _check_monitor_interrupted(app, monitor_service, enabled_ids: list, loop_name: str) -> None:
+    """检测监控中断：启用监控的设备若 last_checked_at 超时，注入 monitor_interrupted 告警/恢复。
+
+    语义：设备启用了监控（monitor_enabled=True），但探测循环长时间未更新 last_checked_at
+    （如 worker 崩溃、配置错误导致设备被跳过、探测异常未落库）。这与"设备宕机"不同：
+    设备宕机是探测了但不可达（已有 device_unreachable 告警）；监控中断是根本没探测到。
+
+    阈值 = 3 × interval（默认 60s → 180s），可通过 MONITOR_INTERRUPTED_THRESHOLD_SECS 配置。
+    """
     from datetime import datetime, timedelta, timezone
     from app.persistence.device_monitor_status_repository import DeviceMonitorStatusRepository
 
@@ -376,7 +481,13 @@ def _check_monitor_interrupted(app, monitor_service, enabled_ids: list, loop_nam
             logger.error("监控中断告警注入异常 device_id=%s", did, exc_info=True)
 
 
+
 def _build_monitor_service():
+    """构造 MonitorService（无状态适配器 + 凭据服务 + 状态仓库）。
+
+    适配器实例化统一走协议注册表 `build_adapter`（OCP）：新增协议只需在
+    `ProtocolSpec` 注册，无需在此散点 new 具体适配器类。
+    """
     from app.services.monitoring.credential_service import MonitorCredentialService
     from app.persistence.device_monitor_status_repository import DeviceMonitorStatusRepository
     from app.services.monitoring.monitor_service import MonitorService
@@ -393,6 +504,12 @@ def _build_monitor_service():
 
 
 def _resolve_loop_interval(app, loop_name: str, current: int) -> int:
+    """热重载读取轮询间隔（每轮调用）。
+
+    优先动态配置 MONITOR_INTERVAL_<LOOP>（Redis/DB 双写），否则回退
+    app.config，再否则沿用当前值 current。读取出错（Redis 不可达等）时
+    降级到 app.config / current，保证 Worker 健壮不崩溃。
+    """
     cfg_key = f"MONITOR_INTERVAL_{loop_name.upper()}"
     try:
         with app.app_context():
@@ -412,6 +529,12 @@ def _resolve_loop_interval(app, loop_name: str, current: int) -> int:
 
 
 def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) -> None:
+    """单个轮询循环（daemon 线程入口）。
+
+    每轮：动态读取 MONITOR_INTERVAL_<LOOP>（热重载）→ 抢 Redis 锁（TTL 随 interval
+    同步）→ 抢到则跑一轮 → stop_event.wait(interval)（可被 set 提前唤醒）。
+    复用单一 ThreadPoolExecutor（与 standalone_service 一致），避免每轮新建销毁池。
+    """
     monitor_service = _build_monitor_service()
     r = _redis_client(app)
     pool_size = app.config.get("MONITOR_THREAD_POOL_SIZE", 20)
@@ -447,7 +570,16 @@ def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) 
         executor.shutdown(wait=False)
 
 
+
 def start_monitor_worker(app) -> tuple[list[threading.Thread], threading.Event]:
+    """启动全部轮询循环（由协议注册表 worker_loops() 驱动），返回 (threads, stop_event)。
+
+    每个 worker_loop 启动一个 daemon 线程；轮询间隔按 loop 名解析
+    `MONITOR_INTERVAL_<LOOP.upper()>`（回退默认值 snmp=60 / bmc=300）。
+    优雅退出由调用方（create_app）注册 atexit 置位 stop_event 并 join 全部线程。
+
+    新增协议只要注册表声明新的 worker_loop，此处自动多起一个线程，无需散点改动。
+    """
     from app.services.monitoring.dynamic_config import MonitorDynamicConfig
 
     try:

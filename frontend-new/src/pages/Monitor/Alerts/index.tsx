@@ -60,7 +60,6 @@ import { ALERT_TYPE_LABEL, ALERT_TYPE_COLOR } from '@/constants/monitor';
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
-
 const ALERT_TYPE_OPTIONS = [
   { label: '全部', value: '' },
   { label: '设备不可达', value: NotificationTypeCode.DEVICE_UNREACHABLE },
@@ -71,7 +70,6 @@ const ALERT_TYPE_OPTIONS = [
   { label: '监控中断', value: NotificationTypeCode.MONITOR_INTERRUPTED },
   { label: 'RAID故障', value: NotificationTypeCode.RAID_FAILURE_ALERT }
 ];
-
 
 const STATUS_OPTIONS = [
   { label: '全部', value: '' },
@@ -86,7 +84,6 @@ const STATUS_COLOR: Record<string, string> = {
   failed: 'red'
 };
 
-
 export default function MonitorAlerts() {
   const message = useMessage();
   const navigate = useNavigate();
@@ -99,7 +96,6 @@ export default function MonitorAlerts() {
   const batchCloseAlert = useBatchCloseAlert();
   const exportAlerts = useExportAlerts();
 
-  
   const [viewMode, setViewMode] = useState<'list' | 'aggregation'>('list');
 
   const [alertType, setAlertType] = useState<string>('');
@@ -111,16 +107,12 @@ export default function MonitorAlerts() {
     only_active: true,
     max_groups: 50
   });
-  
   const [detailId, setDetailId] = useState<number | null>(null);
   const detailQuery = useAlertDetail(detailId);
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
-  
   const [scope, setScope] = useState<'all' | 'mine'>('all');
-  
   const [metricKey, setMetricKey] = useState<string>('');
   const [indexKey, setIndexKey] = useState<string>('');
-  
   const [ackModalOpen, setAckModalOpen] = useState(false);
   const [ackTarget, setAckTarget] = useState<MonitorAlertItem | null>(null);
   const [ackNote, setAckNote] = useState('');
@@ -140,7 +132,6 @@ export default function MonitorAlerts() {
 
   const { data, isLoading, isFetching } = useMonitorAlerts(query);
 
-  
   const batch = useBatchSelection<MonitorAlertItem>({
     dataSource: data?.items ?? [],
     getRowKey: (r) => String(r.id)
@@ -194,7 +185,6 @@ export default function MonitorAlerts() {
     }
   };
 
-  
   const resetFilters = () => {
     setAlertType('');
     setSeverity('');
@@ -205,7 +195,6 @@ export default function MonitorAlerts() {
     table.setPage(1);
   };
 
-  
   const handleRetry = async (item: MonitorAlertItem) => {
     try {
       const res = await retryAlert.mutateAsync(item.id);
@@ -219,14 +208,12 @@ export default function MonitorAlerts() {
     }
   };
 
-  
   const openAckModal = (item: MonitorAlertItem) => {
     setAckTarget(item);
     setAckNote(item.ack_note ?? '');
     setAckModalOpen(true);
   };
 
-  
   const handleAckSubmit = async () => {
     if (!ackTarget) return;
     try {
@@ -288,7 +275,7 @@ export default function MonitorAlerts() {
               </Text>
             );
         } catch {
-          
+          /* ignore */
         }
         return '-';
       }
@@ -345,7 +332,7 @@ export default function MonitorAlerts() {
       fixed: 'right' as const,
       render: (_: unknown, record: MonitorAlertItem) => (
         <Space size="small">
-          {}
+          {/* P1-6: 告警详情 */}
           <Button size="small" onClick={() => setDetailId(record.id)}>
             详情
           </Button>
@@ -368,11 +355,11 @@ export default function MonitorAlerts() {
               重试
             </Button>
           )}
-          {}
+          {/* G9: 人工确认/认领 */}
           <Button size="small" icon={<CheckOutlined />} onClick={() => openAckModal(record)}>
             {record.acknowledged_by ? '已确认' : '确认'}
           </Button>
-          {}
+          {/* P2-16: 手动关闭 */}
           {!record.closed_at && (
             <Button
               size="small"
@@ -390,7 +377,7 @@ export default function MonitorAlerts() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {}
+      {/* 过滤栏 */}
       <Card variant="borderless" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
         <Space wrap size="middle">
           <Select
@@ -440,7 +427,7 @@ export default function MonitorAlerts() {
               table.setPage(1);
             }}
           />
-          {}
+          {/* P2-10: 聚合视图切换 */}
           <Segmented
             options={[
               { label: '列表视图', value: 'list' },
@@ -449,7 +436,7 @@ export default function MonitorAlerts() {
             value={viewMode}
             onChange={(v) => setViewMode(v as 'list' | 'aggregation')}
           />
-          {}
+          {/* P1-7: 按 metric_key/index_key 过滤 */}
           <Input
             allowClear
             placeholder="指标键（metric_key）"
@@ -474,7 +461,7 @@ export default function MonitorAlerts() {
             刷新
           </Button>
           <Button onClick={resetFilters}>重置</Button>
-          {}
+          {/* G5: 导出告警 CSV */}
           <Button
             icon={<DownloadOutlined />}
             loading={exportAlerts.isPending}
@@ -491,7 +478,7 @@ export default function MonitorAlerts() {
         </Space>
       </Card>
 
-      {}
+      {/* 告警历史表格 */}
       <Card
         title={viewMode === 'list' ? '告警历史' : '告警聚合（风暴组）'}
         variant="borderless"
@@ -592,7 +579,7 @@ export default function MonitorAlerts() {
         )}
       </Card>
 
-      {}
+      {/* G9: 确认告警 Modal */}
       <Modal
         title="确认告警"
         open={ackModalOpen}
@@ -625,7 +612,7 @@ export default function MonitorAlerts() {
         )}
       </Modal>
 
-      {}
+      {/* P1-6: 告警详情 Drawer */}
       <Drawer
         title="告警详情"
         open={detailId != null}
@@ -693,7 +680,7 @@ export default function MonitorAlerts() {
               </Descriptions.Item>
             </Descriptions>
 
-            {}
+            {/* 确认信息 */}
             <Descriptions column={1} bordered size="small" title="确认信息">
               <Descriptions.Item label="确认人">
                 {detailQuery.data.acknowledged_by ?? (
@@ -710,7 +697,7 @@ export default function MonitorAlerts() {
               </Descriptions.Item>
             </Descriptions>
 
-            {}
+            {/* Payload 解析 */}
             <Descriptions column={1} bordered size="small" title="告警载荷">
               <Descriptions.Item label="payload">
                 <pre style={{ margin: 0, maxHeight: 240, overflow: 'auto', fontSize: 12 }}>

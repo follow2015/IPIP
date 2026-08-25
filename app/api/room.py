@@ -39,6 +39,8 @@ _room_service = RoomService(
 _device_service = DeviceService(DeviceRepository())
 
 
+
+
 class RoomCreateSchema(Schema):
     name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
     location = fields.Str(load_default="", validate=validate.Length(max=200))
@@ -53,7 +55,10 @@ class RoomUpdateSchema(Schema):
     contact_phone = fields.Str(validate=validate.Length(max=50))
 
 
+
+
 def _get_room_or_404(room_id: int):
+    """获取机房，不存在时返回 (None, error_response)"""
     room = _room_service.get_by_id(room_id)
     if not room:
         return None, APIResponse.error(
@@ -62,12 +67,21 @@ def _get_room_or_404(room_id: int):
     return room, None
 
 
+
+
 @room_bp.route("/", methods=["GET"])
 @doc(summary="获取机房列表", tags=["机房"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}], responses={200: "RoomResponse", 500: "ApiError"})
 @login_required
 @permission_required("room:view")
 @rate_limit_api
 def list_rooms():
+    """获取机房列表（支持分页、搜索过滤）
+
+    Query Parameters:
+        page (int): 页码，默认 1
+        per_page (int): 每页数量，默认 20，最大 100
+        search (str): 搜索关键词，模糊匹配名称/位置（可选）
+    """
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 100)
     search = request.args.get("search", type=str)
@@ -104,6 +118,7 @@ def list_rooms():
 @permission_required("room:view")
 @rate_limit_api
 def get_room(room_id):
+    """获取单个机房详情"""
     room, err = _get_room_or_404(room_id)
     if err:
         return err
@@ -117,6 +132,10 @@ def get_room(room_id):
 @rate_limit_api
 @transactional
 def create_room():
+    """创建新机房
+
+    Request Body: RoomCreateSchema
+    """
     data = validation_manager.validate_schema(request.json, RoomCreateSchema())
     try:
         room = _room_service.create(data)
@@ -140,6 +159,10 @@ def create_room():
 @rate_limit_api
 @transactional
 def update_room(room_id):
+    """更新机房信息
+
+    Request Body: RoomUpdateSchema（所有字段可选）
+    """
     _, err = _get_room_or_404(room_id)
     if err:
         return err
@@ -174,6 +197,7 @@ def update_room(room_id):
 @rate_limit_api
 @transactional
 def delete_room(room_id):
+    """删除机房（软删除）"""
     _, err = _get_room_or_404(room_id)
     if err:
         return err
@@ -204,6 +228,11 @@ def delete_room(room_id):
 @rate_limit_api
 @transactional
 def batch_delete_rooms():
+    """批量删除机房
+
+    Request Body:
+        ids (List[int]): 机房 ID 列表
+    """
     body = request.get_json(silent=True) or {}
     ids = body.get("ids")
 
@@ -215,7 +244,7 @@ def batch_delete_rooms():
         try:
             _room_service.delete(room_id)
             deleted.append(room_id)
-            rid = room_id
+            rid = room_id  # 闭包捕获
             on_commit(lambda rid=rid: (
                 cache_manager.invalidate_pattern(f"room:{rid}"),
                 cache_manager.invalidate_pattern(f"room:active:{rid}"),
@@ -245,6 +274,7 @@ def batch_delete_rooms():
 @permission_required("room:view")
 @rate_limit_api
 def get_room_cabinets(room_id):
+    """获取机房下的所有机柜"""
     _, err = _get_room_or_404(room_id)
     if err:
         return err
@@ -256,12 +286,13 @@ def get_room_cabinets(room_id):
 
 
 @room_bp.route("/<int:room_id>/statistics", methods=["GET"])
-@room_bp.route("/<int:room_id>/stats", methods=["GET"])
+@room_bp.route("/<int:room_id>/stats", methods=["GET"])  # 前端兼容别名
 @doc(summary="获取机房统计信息", tags=["机房"], parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
 @permission_required("room:view")
 @rate_limit_api
 def get_room_statistics(room_id):
+    """获取机房统计信息（/statistics 和 /stats 均可访问）"""
     _, err = _get_room_or_404(room_id)
     if err:
         return err
@@ -276,6 +307,7 @@ def get_room_statistics(room_id):
 @permission_required("room:view")
 @rate_limit_api
 def get_room_devices(room_id):
+    """获取机房内的设备列表"""
     _, err = _get_room_or_404(room_id)
     if err:
         return err
@@ -284,12 +316,20 @@ def get_room_devices(room_id):
     return APIResponse.success(data=devices, message="获取机房设备列表成功")
 
 
+
 @room_bp.route("/all", methods=["GET"])
 @doc(summary="获取所有机房列表（不分页）", tags=["机房"], responses={200: "RoomResponse", 500: "ApiError"})
 @login_required
 @permission_required("room:view")
 @rate_limit_api
 def get_all_rooms():
+    """获取所有机房列表（不分页）
+    
+    用于下拉选择框等场景
+    
+    Returns:
+        JSON响应，包含所有机房列表
+    """
     try:
         rooms = _room_service.get_all_rooms()
         return APIResponse.success(

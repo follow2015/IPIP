@@ -26,10 +26,17 @@ logger = get_logger(__name__)
 
 
 class RouteIPInfoService:
+    """路由驱动的 IP switch_info 补填"""
 
     BATCH_SIZE = 500
 
     def fill_from_routes(self, scope: str, db_session) -> None:
+        """为路由覆盖网段内缺少 switch_info 的 IP 补填交换机归属
+
+        Args:
+            scope: 扫描范围标识，"r:{room_id}" 或 "vr:{virtual_room_id}"
+            db_session: 数据库 session
+        """
         room_ids = self._resolve_room_ids(scope, db_session)
         if not room_ids:
             return
@@ -61,6 +68,7 @@ class RouteIPInfoService:
 
     @staticmethod
     def _resolve_room_ids(scope: str, db_session=None) -> list[int]:
+        """从 scope 解析 room_id 列表"""
         if scope.startswith("r:"):
             return [int(scope[2:])]
         elif scope.startswith("vr:"):
@@ -71,6 +79,12 @@ class RouteIPInfoService:
 
     @staticmethod
     def _load_subnet_routes(room_ids: list[int], db_session) -> list[tuple]:
+        """加载 SUBNET 类型的直连路由
+
+        Returns:
+            list[tuple]: [(network, switch_id, room_id), ...]
+            注意：不再返回 port，因为路由表的 port 是 Vlanif，不是物理端口
+        """
         if not room_ids:
             return []
         rows = db_session.execute(
@@ -91,6 +105,20 @@ class RouteIPInfoService:
         self, net: ipaddress.IPv4Network, switch_id: int,
         room_id: int, db_session,
     ) -> int:
+        """为网段内缺少 ip_switch_info 的活跃/封禁 IP 补填交换机归属
+
+        只补填 switch_id，不补填 port（路由的 port 是 Vlanif，不是物理端口）。
+        只补填活跃（status=0）和封禁（status=2）的 IP，不补填未使用（status=3）的 IP。
+
+        Args:
+            net: 网段对象
+            switch_id: 交换机 device_id
+            room_id: 机房ID
+            db_session: 数据库 session
+
+        Returns:
+            int: 补填的记录数
+        """
         from app.models.ip_model import ip_to_int
 
         start_int = ip_to_int(str(net.network_address))

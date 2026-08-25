@@ -17,7 +17,6 @@ import { findMenuByPath } from '@/constants/menu';
 
 const { Sider, Content } = Layout;
 
-
 function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,11 +34,9 @@ function AppLayout() {
   const user             = useAuthStore((s) => s.user);
   const logout           = useAuthStore((s) => s.logout);
 
-  
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   useGlobalEvents({ enabled: isAuthenticated });
 
-  
   useEffect(() => {
     const menu = findMenuByPath(location.pathname);
     if (menu) {
@@ -47,7 +44,6 @@ function AppLayout() {
     }
   }, [location.pathname, addTab]);
 
-  
   const handleLogout = () => {
     logout();
     navigate('/login');

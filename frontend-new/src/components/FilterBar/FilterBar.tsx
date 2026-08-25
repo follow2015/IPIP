@@ -19,36 +19,22 @@ import type { UseTableReturn } from '@/hooks/useTable';
 
 const { RangePicker } = DatePicker;
 
-
 export interface FilterItem {
-  
   key: string;
-  
   label: string;
-  
   type: 'select' | 'rangePicker';
-  
   options?: { label: string; value: string | number | boolean }[];
-  
   width?: number;
-  
   visible?: (filters: Record<string, string | string[]>) => boolean;
-  
   showSearch?: boolean;
-  
   onSearch?: (value: string) => void;
-  
   placeholders?: [string, string];
 }
 
 export interface FilterBarProps {
-  
   filters: FilterItem[];
-  
   table: UseTableReturn;
-  
   extra?: React.ReactNode;
-  
   prefix?: React.ReactNode;
 }
 
@@ -59,13 +45,11 @@ function FilterBar({ filters, table, extra, prefix }: FilterBarProps) {
     <Space wrap>
       {prefix}
       {filters.map((item) => {
-        
         if (item.visible && !item.visible(filterValues)) return null;
 
         const currentValue = filterValues[item.key];
 
         if (item.type === 'select') {
-          
           const selectValue = currentValue !== undefined
             ? item.options?.find(o => String(o.value) === currentValue)?.value ?? currentValue
             : undefined;

@@ -1,5 +1,4 @@
 import { confirm } from '@/utils/confirm';
-
 import { useState, useCallback } from 'react';
 
 import { useTable, type UseTableReturn } from './useTable';
@@ -11,48 +10,31 @@ import type { ApiResponse } from '@/types/api';
 
 type TableParams = UseTableReturn['tableParams'];
 
-
 export interface UseCrudPageOptions<
   T extends { id: number },
   TListParams extends object = PaginationParams
 > {
-  
   useList: (params?: TListParams) => {
     data?: PaginatedData<T>;
     isLoading: boolean;
     refetch: () => void;
   };
-  
   useDelete: () => UseMutationResult<ApiResponse<unknown>, Error, number>;
-  
   nameKey: keyof T;
-  
   nameLabel: string;
-  
   buildListParams?: (tp: TableParams) => TListParams;
 }
 
-
 export interface UseCrudPageReturn<T extends { id: number }> {
-  
   table: UseTableReturn;
-  
   data: PaginatedData<T> | undefined;
-  
   isLoading: boolean;
-  
   refetch: () => void;
-  
   formOpen: boolean;
-  
   editRecord: T | null;
-  
   handleAdd: () => void;
-  
   handleEdit: (record: T) => void;
-  
   handleDelete: (record: T) => void;
-  
   closeForm: () => void;
 }
 
@@ -74,19 +56,16 @@ export function useCrudPage<
     : (table.tableParams as unknown as TListParams);
   const { data, isLoading, refetch } = useList(listParams);
 
-  
   const handleAdd = useCallback(() => {
     setEditRecord(null);
     setFormOpen(true);
   }, []);
 
-  
   const handleEdit = useCallback((record: T) => {
     setEditRecord(record);
     setFormOpen(true);
   }, []);
 
-  
   const handleDelete = useCallback(
     (record: T) => {
       const displayName = String(record[nameKey] ?? '');
@@ -109,7 +88,6 @@ export function useCrudPage<
     [deleteMutation, nameKey, nameLabel, message, refetch]
   );
 
-  
   const closeForm = useCallback(() => {
     setFormOpen(false);
     setEditRecord(null);

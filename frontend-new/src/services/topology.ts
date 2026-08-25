@@ -68,11 +68,10 @@ export function useNetworkTopology(params?: NetworkTopologyParams) {
   return useQuery({
     queryKey: queryKeys.topology.network(params),
     queryFn: () => fetchNetworkTopology(params),
-    staleTime: 5 * 60 * 1000, 
+    staleTime: 5 * 60 * 1000, // 5 分钟缓存
     enabled: params !== undefined && Object.values(params).some(v => v !== undefined),
   });
 }
-
 
 export function useDeviceTopology(params?: DeviceTopologyParams) {
   return useQuery({
@@ -83,14 +82,12 @@ export function useDeviceTopology(params?: DeviceTopologyParams) {
   });
 }
 
-
 export function useAutoDetectTopology() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: triggerAutoDetect,
     onSuccess: () => {
-      
       queryClient.invalidateQueries({ queryKey: queryKeys.topology.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.switches.all });
     },

@@ -15,14 +15,34 @@ logger = get_logger(__name__)
 
 
 class IPReconcileService:
+    """IP 全量对账：规划段 → ip_addresses 全量写入"""
 
-    MAX_NETWORK_SIZE = 4096
-    BATCH_SIZE = 500
+    MAX_NETWORK_SIZE = 4096   # 超过 /20（4094 主机）的网段跳过展开，防 OOM
+    BATCH_SIZE = 500          # 每批次 UPSERT 数量，平衡内存与事务大小
 
     def __init__(self, ip_repo: IPManagerRepository):
+        """初始化 IPReconcileService
+
+        Args:
+            ip_repo: IPManagerRepository 实例（必须由调用方注入，绑定正确的 session）
+        """
         self._ip_repo = ip_repo
 
     def reconcile(self, scope: str, active_ips: set[str], db_session, arp_banned_ips: set[str] | None = None):
+        """执行 IP 对账（逐网段流式处理）
+
+        将 ip_networks 中每个规划段的主机 IP 逐网段写入 ip_addresses，
+        并根据 ARP 扫描结果设置正确状态。逐网段处理降低内存峰值。
+
+        v5 陈旧度模型：只更新 active/banned + last_active_at，不做 inactive 降级。
+        inactive 降级挪到独立的陈旧度清理任务（sweep_stale_active_ips）。
+
+        Args:
+            scope: 扫描范围标识，"r:{room_id}" 或 "vr:{virtual_room_id}"
+            active_ips: 本次 ARP 扫描发现的活跃 IP 集合
+            db_session: 数据库 session
+            arp_banned_ips: ARP 中 MAC 为封禁标记(0000-0000-0001/0000-0000-0000)的 IP 集合
+        """
         if scope.startswith("r:"):
             room_ids = [int(scope[2:])]
         elif scope.startswith("vr:"):

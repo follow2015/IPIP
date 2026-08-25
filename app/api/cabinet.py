@@ -31,6 +31,7 @@ cabinet_service = CabinetService(CabinetRepository())
 
 
 class CabinetCreateSchema(Schema):
+    """创建机柜请求验证Schema"""
 
     cabinet_number = fields.Str(required=True, validate=validate.Length(min=1, max=255))
     room_id = fields.Int(required=True, validate=validate.Range(min=1))
@@ -46,6 +47,7 @@ class CabinetCreateSchema(Schema):
 
 
 class CabinetUpdateSchema(Schema):
+    """更新机柜请求验证Schema"""
 
     cabinet_number = fields.Str(validate=validate.Length(min=1, max=255))
     room_id = fields.Int(validate=validate.Range(min=1))
@@ -60,6 +62,7 @@ class CabinetUpdateSchema(Schema):
 
 
 class UPositionCheckSchema(Schema):
+    """检查U位是否可用请求Schema"""
     class Meta:
         unknown = EXCLUDE
     u_position = fields.Int(required=True)
@@ -68,12 +71,14 @@ class UPositionCheckSchema(Schema):
 
 
 class UAssignSchema(Schema):
+    """批量分配U位请求Schema"""
     class Meta:
         unknown = EXCLUDE
     devices = fields.List(fields.Dict(), required=True)
 
 
 class SmartUAssignSchema(Schema):
+    """智能分配U位请求Schema"""
     class Meta:
         unknown = EXCLUDE
     height_u = fields.Int(required=True)
@@ -84,6 +89,7 @@ class SmartUAssignSchema(Schema):
 
 
 class CabinetCapacityValidateSchema(Schema):
+    """验证机柜容量请求Schema"""
     class Meta:
         unknown = EXCLUDE
     new_device = fields.Dict(allow_none=True)
@@ -93,6 +99,7 @@ class CabinetCapacityValidateSchema(Schema):
 
 
 class CabinetOptimizeSchema(Schema):
+    """优化机柜布局请求Schema"""
     class Meta:
         unknown = EXCLUDE
     strategy = fields.Str(validate=validate.Length(max=50), allow_none=True)
@@ -100,6 +107,7 @@ class CabinetOptimizeSchema(Schema):
 
 
 class CabinetCustomerUpdateSchema(Schema):
+    """更新机柜客户请求Schema"""
     class Meta:
         unknown = EXCLUDE
     customer_id = fields.Int(allow_none=True)
@@ -111,6 +119,15 @@ class CabinetCustomerUpdateSchema(Schema):
 @permission_required("cabinet:view")
 @rate_limit_api
 def list_cabinets():
+    """获取机柜列表（支持分页、搜索过滤）
+
+    Query Parameters:
+        page: 页码（默认1）
+        per_page: 每页数量（默认20）
+        search: 搜索关键词，模糊匹配机柜编号/位置（可选）
+        room_id: 按机房ID过滤（可选）
+        status: 按状态过滤（可选）
+    """
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 100)
     search = request.args.get("search", type=str)
@@ -159,6 +176,14 @@ def list_cabinets():
 @permission_required("cabinet:view")
 @rate_limit_api
 def get_cabinet(cabinet_id):
+    """获取单个机柜详情
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Returns:
+        JSON响应，包含机柜详细信息
+    """
     cabinet = cabinet_service.get_by_id(cabinet_id)
 
     if not cabinet:
@@ -168,6 +193,20 @@ def get_cabinet(cabinet_id):
 
 
 def _parse_cabinet_numbers(input_str: str) -> list:
+    """解析机柜编号表达式，支持批量输入
+
+    支持格式：
+    - 单个：m11
+    - 多个逗号分隔：m11,m13,n10
+    - 范围展开：h1-10 → h1,h2,...,h10
+    - 混合：m11,m13,h1-3,n10
+
+    Args:
+        input_str: 用户输入的机柜编号字符串
+
+    Returns:
+        展开后的机柜编号列表
+    """
     if not input_str or not input_str.strip():
         return []
 
@@ -196,6 +235,26 @@ def _parse_cabinet_numbers(input_str: str) -> list:
 @rate_limit_api
 @transactional
 def create_cabinet():
+    """创建新机柜（支持批量）
+
+    Request Body:
+        cabinet_number: 机柜名称/编号（必需）
+        room_id: 机房ID（必需）
+        location: 位置（可选）
+        total_u: U位数量（可选）
+        total_power: 电力容量（可选）
+        customer_id: 客户ID（可选）
+        status: 状态（可选）
+        notes: 描述（可选）
+        batch: 是否批量模式（可选，默认false）
+            当 batch=true 时，cabinet_number 支持批量解析：
+            - 逗号分隔：m11,m13,n10
+            - 范围展开：h1-10 → h1,h2,...,h10
+            - 混合：m11,m13,h1-3,n10
+
+    Returns:
+        JSON响应，包含新创建的机柜信息（单条）或批量创建结果
+    """
     data = validation_manager.validate_schema(request.json, CabinetCreateSchema())
     is_batch = data.pop("batch", False)
 
@@ -258,6 +317,24 @@ def create_cabinet():
 @rate_limit_api
 @transactional
 def update_cabinet(cabinet_id):
+    """更新机柜信息
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Request Body:
+        name: 机柜名称（可选）
+        room_id: 机房ID（可选）
+        position: 位置（可选）
+        u_count: U位数量（可选）
+        power_capacity: 电力容量（可选）
+        customer_id: 客户ID（可选）
+        status: 状态（可选）
+        description: 描述（可选）
+
+    Returns:
+        JSON响应，包含更新后的机柜信息
+    """
     data = validation_manager.validate_schema(request.json, CabinetUpdateSchema())
 
     cabinet = cabinet_service.get_by_id(cabinet_id)
@@ -280,6 +357,14 @@ def update_cabinet(cabinet_id):
 @rate_limit_api
 @transactional
 def delete_cabinet(cabinet_id):
+    """删除机柜
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Returns:
+        JSON响应
+    """
     cabinet = cabinet_service.get_by_id(cabinet_id)
     if not cabinet:
         return APIResponse.error(message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404)
@@ -297,6 +382,14 @@ def delete_cabinet(cabinet_id):
 @permission_required("cabinet:view")
 @rate_limit_api
 def get_cabinet_devices(cabinet_id):
+    """获取机柜下的所有设备
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Returns:
+        JSON响应，包含设备列表
+    """
     cabinet = cabinet_service.get_by_id(cabinet_id)
     if not cabinet:
         return APIResponse.error(message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404)
@@ -312,6 +405,14 @@ def get_cabinet_devices(cabinet_id):
 @permission_required("cabinet:view")
 @rate_limit_api
 def get_cabinet_utilization(cabinet_id):
+    """获取机柜利用率
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Returns:
+        JSON响应，包含利用率信息
+    """
     cabinet = cabinet_service.get_by_id(cabinet_id)
     if not cabinet:
         return APIResponse.error(message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404)
@@ -327,6 +428,17 @@ def get_cabinet_utilization(cabinet_id):
 @permission_required("cabinet:view")
 @rate_limit_api
 def get_available_cabinets():
+    """获取可用机柜列表
+
+    Query Parameters:
+        room_id: 机房ID（可选）
+        min_available_u: 最小可用U位数（默认1）
+        all_status: 为1时返回所有状态机柜，不限status=1（默认0）
+        statuses: 逗号分隔的状态码列表，如"1,2"（可选，优先级高于all_status）
+
+    Returns:
+        JSON响应，包含可用机柜列表
+    """
     room_id = request.args.get("room_id", type=int)
     min_available_u = request.args.get("min_available_u", 1, type=int)
     all_status = request.args.get("all_status", 0, type=int)
@@ -355,6 +467,14 @@ def get_available_cabinets():
 @permission_required("cabinet:view")
 @rate_limit_api
 def get_cabinet_layout(cabinet_id):
+    """获取机柜布局信息
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Returns:
+        JSON响应，包含机柜布局信息
+    """
     cabinet = cabinet_service.get_by_id(cabinet_id)
     if not cabinet:
         return APIResponse.error(message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404)
@@ -370,6 +490,14 @@ def get_cabinet_layout(cabinet_id):
 @permission_required("cabinet:view")
 @rate_limit_api
 def get_available_u_positions(cabinet_id):
+    """获取机柜可用U位列表
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Returns:
+        JSON响应，包含可用U位列表
+    """
     cabinet = cabinet_service.get_by_id(cabinet_id)
     if not cabinet:
         return APIResponse.error(message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404)
@@ -385,6 +513,19 @@ def get_available_u_positions(cabinet_id):
 @permission_required("cabinet:view")
 @rate_limit_api
 def check_u_position(cabinet_id):
+    """检查U位是否可用
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Request Body:
+        u_position: U位起始位置
+        height_u: 设备高度U数
+        exclude_device_id: 排除的设备ID（可选）
+
+    Returns:
+        JSON响应
+    """
     data = request.get_json(silent=True) or {}
     u_position = data.get("u_position")
     height_u = data.get("height_u", 1)
@@ -416,6 +557,17 @@ def check_u_position(cabinet_id):
 @permission_required("cabinet:update")
 @rate_limit_api
 def batch_allocate_u_positions(cabinet_id):
+    """批量分配U位
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Request Body:
+        devices: 设备列表 [{device_id, height_u, preferred_position}, ...]
+
+    Returns:
+        JSON响应
+    """
     data = request.get_json(silent=True) or {}
     devices_data = data.get("devices", [])
 
@@ -449,6 +601,14 @@ def batch_allocate_u_positions(cabinet_id):
 @permission_required("cabinet:view")
 @rate_limit_api
 def get_u_position_usage_map(cabinet_id):
+    """获取U位使用情况映射
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Returns:
+        JSON响应
+    """
     cabinet = cabinet_service.get_by_id(cabinet_id)
     if not cabinet:
         return APIResponse.error(message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404)
@@ -484,10 +644,19 @@ def get_u_position_usage_map(cabinet_id):
     return APIResponse.success(data=result, message="获取成功")
 
 
+
 @cabinet_bp.route("/<int:cabinet_id>/stats", methods=["GET"])
 @doc(summary="获取机柜统计信息", tags=["机柜"], parameters=[{"name": "cabinet_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError", 500: "ApiError"})
 @login_required
 def get_cabinet_stats(cabinet_id):
+    """获取机柜统计信息
+    
+    Args:
+        cabinet_id: 机柜ID
+    
+    Returns:
+        JSON: 机柜统计信息,包括设备数、U位使用率、功率使用率等
+    """
     try:
         from app.services.cabinet_service import CabinetService
         
@@ -517,13 +686,28 @@ def get_cabinet_stats(cabinet_id):
 @login_required
 @permission_required('cabinet:update')
 def allocate_u_position(cabinet_id):
+    """智能分配U位
+
+    Args:
+        cabinet_id: 机柜ID
+
+    Request Body:
+        height_u: 设备高度(U)
+        device_spacing: 设备间距(U),默认0（设备编辑场景）
+        allocation_strategy: 分配策略: bottom_up, top_down, best_fit
+        min_u: 可用范围起始U位（保留区域）
+        max_u: 可用范围结束U位（保留区域）
+
+    Returns:
+        JSON: 分配结果,包含分配的U位
+    """
     try:
         data = request.get_json()
         height_u = data.get('height_u')
         allocation_strategy = data.get('allocation_strategy', 'bottom_up')
         device_spacing = data.get('device_spacing', 0)
         min_u = data.get('min_u', 1)
-        max_u = data.get('max_u')
+        max_u = data.get('max_u')  # 缺省时由机柜 total_u 决定
 
         if not height_u:
             return APIResponse.error(
@@ -595,6 +779,20 @@ def allocate_u_position(cabinet_id):
 @doc(summary="验证机柜容量", tags=["机柜"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/CabinetCapacityValidate"}}}}, parameters=[{"name": "cabinet_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError", 500: "ApiError"})
 @login_required
 def validate_cabinet_capacity(cabinet_id):
+    """验证机柜容量和规划合理性
+    
+    Args:
+        cabinet_id: 机柜ID
+    
+    Request Body:
+        new_device: 新设备信息(可选)
+        device_spacing: 设备间距(U),默认2
+        min_height_for_spacing: 需要间距的最小设备高度,默认2
+        max_usage_rate: 最大使用率(%),默认90
+    
+    Returns:
+        JSON: 容量验证结果
+    """
     try:
         from app.services.cabinet_service import CabinetService
         
@@ -648,6 +846,18 @@ def validate_cabinet_capacity(cabinet_id):
 @login_required
 @permission_required('cabinet:update')
 def optimize_cabinet_layout(cabinet_id):
+    """优化机柜布局
+    
+    Args:
+        cabinet_id: 机柜ID
+    
+    Request Body:
+        strategy: 优化策略(可选): compact, balance, power_optimized
+        device_spacing: 设备间距(U),默认2
+    
+    Returns:
+        JSON: 优化结果,包含优化建议
+    """
     try:
         from app.services.cabinet_service import CabinetService
         
@@ -681,6 +891,17 @@ def optimize_cabinet_layout(cabinet_id):
 @permission_required('cabinet:update')
 @transactional
 def update_cabinet_customer(cabinet_id):
+    """更新机柜客户
+    
+    Args:
+        cabinet_id: 机柜ID
+    
+    Request Body:
+        customer_id: 客户ID,None表示清除客户
+    
+    Returns:
+        JSON: 更新结果
+    """
     try:
         data = request.get_json()
         customer_id = data.get('customer_id')
@@ -711,6 +932,14 @@ def update_cabinet_customer(cabinet_id):
 @doc(summary="根据机房ID获取机柜列表", tags=["机柜"], parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "CabinetResponse", 500: "ApiError"})
 @login_required
 def get_cabinets_by_room(room_id):
+    """根据机房ID获取机柜列表
+    
+    Args:
+        room_id: 机房ID
+    
+    Returns:
+        JSON: 机柜列表
+    """
     try:
         from app.services.cabinet_service import CabinetService
         
@@ -734,6 +963,14 @@ def get_cabinets_by_room(room_id):
 @doc(summary="获取机柜总数", tags=["机柜"], parameters=[{"name": "room_id", "in": "query", "schema": {"type": "integer"}}], responses={200: "ApiResponse", 500: "ApiError"})
 @login_required
 def get_cabinet_count():
+    """获取机柜总数
+    
+    Query Parameters:
+        room_id: 机房ID(可选),如果提供则返回该机房的机柜数
+    
+    Returns:
+        JSON: 机柜数量
+    """
     try:
         from app.services.cabinet_service import CabinetService
         
@@ -767,6 +1004,14 @@ def get_cabinet_count():
 @rate_limit_api
 @transactional
 def batch_delete_cabinets():
+    """批量删除机柜
+    
+    Request Body:
+        ids: 机柜ID列表
+    
+    Returns:
+        JSON响应，包含删除结果
+    """
     from app.services.cabinet_service import CabinetService
     
     data = request.get_json()
@@ -806,12 +1051,18 @@ def batch_delete_cabinets():
     )
 
 
+
 @cabinet_bp.route("/global-statistics", methods=["GET"])
 @doc(summary="获取全局机柜统计汇总", tags=["机柜"], responses={200: "ApiResponse", 500: "ApiError"})
 @login_required
 @permission_required("cabinet:view")
 @rate_limit_api
 def get_global_statistics():
+    """获取全局机柜统计汇总
+    
+    Returns:
+        JSON响应，包含全局机柜统计数据
+    """
     try:
         stats = cabinet_service.get_global_statistics()
         return APIResponse.success(data=stats, message="获取全局机柜统计成功")
@@ -826,6 +1077,14 @@ def get_global_statistics():
 @permission_required("cabinet:view")
 @rate_limit_api
 def get_cabinet_with_devices(cabinet_id):
+    """获取机柜及设备详情
+    
+    Args:
+        cabinet_id: 机柜ID
+    
+    Returns:
+        JSON响应，包含机柜信息和设备列表
+    """
     try:
         cabinet = cabinet_service.get_cabinet_with_devices(cabinet_id)
         if not cabinet:
@@ -842,6 +1101,14 @@ def get_cabinet_with_devices(cabinet_id):
 @permission_required("cabinet:view")
 @rate_limit_api
 def cabinet_exists(cabinet_id):
+    """检查机柜是否存在
+    
+    Args:
+        cabinet_id: 机柜ID
+    
+    Returns:
+        JSON响应，包含是否存在的结果
+    """
     try:
         exists = cabinet_service.cabinet_exists(cabinet_id)
         return APIResponse.success(data={"exists": exists}, message="检查完成")
@@ -857,6 +1124,16 @@ def cabinet_exists(cabinet_id):
 @rate_limit_api
 @transactional
 def update_cabinet_usage(cabinet_id):
+    """更新机柜使用情况
+    
+    重新计算机柜的used_u和used_power
+    
+    Args:
+        cabinet_id: 机柜ID
+    
+    Returns:
+        JSON响应，包含更新结果
+    """
     try:
         cabinet_service.update_cabinet_usage(cabinet_id)
 
@@ -872,6 +1149,14 @@ def update_cabinet_usage(cabinet_id):
 @permission_required("cabinet:view")
 @rate_limit_api
 def get_cabinet_by_number(cabinet_number):
+    """根据机柜编号获取机柜
+    
+    Args:
+        cabinet_number: 机柜编号
+    
+    Returns:
+        JSON响应，包含机柜信息
+    """
     try:
         cabinet = cabinet_service.get_by_cabinet_number(cabinet_number)
         if not cabinet:

@@ -14,7 +14,6 @@ interface SpeedLimitModalProps {
   onSubmit: (values: SpeedLimitValues) => void;
 }
 
-
 export function SpeedLimitModal({
   open,
   onClose,
@@ -33,7 +32,6 @@ export function SpeedLimitModal({
       const values = await form.validateFields();
       onSubmit({ inbound: Number(values.inbound), outbound: Number(values.outbound) });
     } catch {
-      
     }
   };
 

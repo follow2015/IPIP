@@ -9,7 +9,6 @@ import { unwrapNested } from './service-utils';
 import { queryKeys } from './query-keys';
 import type { DeviceNicPort, DevicePortsResponse } from '@/types/models';
 
-
 interface NicPortRequest {
   nic_number: number;
   port_number: number;
@@ -20,22 +19,18 @@ interface NicPortRequest {
   description?: string;
 }
 
-
 interface BatchCreateNicRequest {
   ports: NicPortRequest[];
 }
-
 
 interface BatchDeleteNicRequest {
   port_ids: number[];
 }
 
-
 async function fetchDevicePorts(deviceId: number) {
   const res = await get<DevicePortsResponse>(`/devices/${deviceId}/nics`);
   return unwrapNested(res, 'ports');
 }
-
 
 export function useDeviceNics(deviceId: number) {
   return useQuery({
@@ -48,7 +43,6 @@ export function useDeviceNics(deviceId: number) {
   });
 }
 
-
 export function useCreateNic(deviceId: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -59,7 +53,6 @@ export function useCreateNic(deviceId: number) {
     }
   });
 }
-
 
 export function useUpdateNic(deviceId: number) {
   const queryClient = useQueryClient();
@@ -72,7 +65,6 @@ export function useUpdateNic(deviceId: number) {
   });
 }
 
-
 export function useDeleteNic(deviceId: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -82,7 +74,6 @@ export function useDeleteNic(deviceId: number) {
     }
   });
 }
-
 
 export function useBatchCreateNics(deviceId: number) {
   const queryClient = useQueryClient();
@@ -94,7 +85,6 @@ export function useBatchCreateNics(deviceId: number) {
     }
   });
 }
-
 
 export function useBatchDeleteNics(deviceId: number) {
   const queryClient = useQueryClient();
@@ -109,6 +99,5 @@ export function useBatchDeleteNics(deviceId: number) {
     }
   });
 }
-
 
 export type { NicPortRequest, BatchCreateNicRequest, BatchDeleteNicRequest };

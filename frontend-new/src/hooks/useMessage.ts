@@ -9,18 +9,15 @@
  */
 import { App } from 'antd';
 
-
 export function useMessage() {
   const { message } = App.useApp();
   return message;
 }
 
-
 export function useModal() {
   const { modal } = App.useApp();
   return modal;
 }
-
 
 export function useAppContext() {
   return App.useApp();

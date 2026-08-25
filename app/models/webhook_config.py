@@ -31,16 +31,17 @@ _PRIVATE_NETWORKS = [
     ipaddress.ip_network("192.168.0.0/16"),
     ipaddress.ip_network("127.0.0.0/8"),
     ipaddress.ip_network("169.254.0.0/16"),
-    ipaddress.ip_network("100.64.0.0/10"),
-    ipaddress.ip_network("0.0.0.0/8"),
-    ipaddress.ip_network("::1/128"),
-    ipaddress.ip_network("fe80::/10"),
-    ipaddress.ip_network("fc00::/7"),
-    ipaddress.ip_network("::ffff:0:0/96"),
+    ipaddress.ip_network("100.64.0.0/10"),       # CGNAT / 运营商级 NAT
+    ipaddress.ip_network("0.0.0.0/8"),            # 当前网络
+    ipaddress.ip_network("::1/128"),              # IPv6 loopback
+    ipaddress.ip_network("fe80::/10"),             # IPv6 link-local
+    ipaddress.ip_network("fc00::/7"),              # IPv6 unique-local
+    ipaddress.ip_network("::ffff:0:0/96"),         # IPv4-mapped IPv6
 ]
 
 
 def _is_private_ip(ip_str: str) -> bool:
+    """检查 IP 地址是否属于内网/私有地址段。"""
     try:
         ip = ipaddress.ip_address(ip_str)
         return any(ip in net for net in _PRIVATE_NETWORKS)
@@ -49,6 +50,20 @@ def _is_private_ip(ip_str: str) -> bool:
 
 
 def validate_webhook_url(url: str) -> None:
+    """校验 Webhook URL 安全性（CREATE/UPDATE/TEST 三处统一调用）。
+
+    防护措施：
+    1. 仅允许 https 协议
+    2. hostname 字符串快速匹配内网前缀
+    3. DNS 解析后校验 IP 地址（防 DNS rebinding）
+    4. 覆盖 CGNAT (100.64.0.0/10) 和 IPv6 内网段
+
+    Args:
+        url: Webhook URL
+
+    Raises:
+        ValueError: URL 不合法时抛出
+    """
     parsed = urlparse(url)
     if parsed.scheme != "https":
         raise ValueError("Webhook URL 必须使用 https 协议")
@@ -68,6 +83,7 @@ def validate_webhook_url(url: str) -> None:
 
 
 class WebhookConfig(BaseModel):
+    """Webhook 配置模型"""
 
     __tablename__ = "webhook_configs"
     __table_args__ = (

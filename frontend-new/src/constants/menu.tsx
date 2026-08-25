@@ -42,10 +42,8 @@ export interface MenuConfig {
   icon: React.ReactNode;
   path: string;
   permission?: string;
-  
   children?: MenuConfig[];
 }
-
 
 export const MENU_CONFIGS: MenuConfig[] = [
   { key: 'dashboard', label: '仪表盘', icon: <DashboardOutlined />, path: '/dashboard' },
@@ -302,20 +300,19 @@ export const MENU_CONFIGS: MenuConfig[] = [
   }
 ];
 
-
 export const FLATTENED_MENUS: MenuConfig[] = MENU_CONFIGS.flatMap((m) =>
   m.children ? [m, ...m.children] : [m]
 );
 
-
 export const PATH_TO_MENU = new Map(FLATTENED_MENUS.map((m) => [m.path, m]));
 
-
+/**
+ * 根据路径查找匹配的菜单配置
+ * 支持精确匹配和前缀匹配（如 /rooms/123 匹配 /rooms）
+ */
 export function findMenuByPath(pathname: string): MenuConfig | undefined {
-  
   const exact = PATH_TO_MENU.get(pathname);
   if (exact) return exact;
-  
   const segment = '/' + (pathname.split('/')[1] || '');
   return PATH_TO_MENU.get(segment);
 }

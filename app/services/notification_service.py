@@ -23,6 +23,7 @@ logger = get_logger(__name__)
 
 
 class NotificationService:
+    """统一消息通知服务"""
 
     def __init__(self, notif_repo: NotificationRepository = None,
                  receipt_repo: NotificationReceiptRepository = None,
@@ -36,10 +37,12 @@ class NotificationService:
 
     @classmethod
     def register_personal_channel(cls, channel: "PersonalChannel"):
+        """注册个人渠道"""
         cls._personal_channel_registry[channel.get_channel_name()] = channel
 
     @classmethod
     def register_broadcast_channel(cls, channel: "BroadcastChannel"):
+        """注册广播渠道"""
         cls._broadcast_channel_registry[channel.get_channel_name()] = channel
 
     @classmethod
@@ -66,6 +69,35 @@ class NotificationService:
         ack_required: bool = False,
         allow_broadcast: bool = True,
     ) -> Notification | None:
+        """产生一条通知并投递给目标用户。
+
+        Args:
+            type: 通知类型（业务语义标识）
+            severity: 严重程度 info/warning/critical
+            title: 通知标题
+            content: 通知正文
+            payload: 业务载荷（跳转用）
+            source_module: 来源模块
+            target_type: 目标类型 user/role/broadcast
+            target_id: 目标标识（user_id / role_name / None for broadcast）
+            channels: 投递渠道（inbox/email/wechat_work/feishu）
+            idempotency_key: 幂等键，防止重复通知
+            ack_required: 是否需要手动确认
+            allow_broadcast: 是否允许广播渠道（企微/飞书）投递。
+                设为 False 时，即使广播渠道已注册，也不会入队投递。
+                用于责任人缺失等场景，避免外部轰炸。
+
+        Returns:
+            Notification 实例；幂等去重、目标为空、或投递过程本身出错时返回 None。
+
+        注意：本方法内部捕获所有异常并回滚，不会向上抛出。
+        通知是主业务操作的附带效果，不应该因为通知投递失败（如目标用户解析出错、
+        DB 瞬时故障）而让一个已经成功提交的批量操作在 API 层面变成 500。
+
+        警告：返回 None 无法区分「幂等去重」与「投递出错」。需要据投递结果决定
+        重试/标记失败的调用方（如监控告警 outbox 发件器）必须改用
+        :meth:`notify_strict`，否则会把失败当成功，造成告警静默丢失。
+        """
         try:
             return self.notify_strict(
                 type=type, severity=severity, title=title, content=content,
@@ -96,6 +128,18 @@ class NotificationService:
         ack_required: bool = False,
         allow_broadcast: bool = True,
     ) -> Notification | None:
+        """与 :meth:`notify` 完全相同，但真实投递失败会向上抛出异常。
+
+        语义约定（调用方据此判定投递结果）：
+
+        - 返回 ``Notification``：投递成功；
+        - 返回 ``None``：幂等去重命中或目标为空——**属于成功语义**，无需重试；
+        - 抛出异常：真实投递失败（DB 故障、渠道入队异常等），调用方应重试或标记失败。
+
+        存在的原因：``notify`` 为保护主业务流程会把异常吞成 ``None``，与幂等去重
+        的 ``None`` 无法区分。监控告警 outbox 发件器若用 ``notify``，会把投递失败
+        的行误标为 ``sent``，告警永久丢失且无任何重试（P0 级静默故障）。
+        """
         try:
             return self._notify_inner(
                 type, severity, title, content, payload, source_module,
@@ -148,7 +192,7 @@ class NotificationService:
             idempotency_key=idempotency_key,
         )
         self._notif_repo.session.add(notification)
-        self._notif_repo.session.flush()
+        self._notif_repo.session.flush()  # 拿到 notification.id
 
         user_ids = self._resolve_targets(target_type, target_id)
 
@@ -191,7 +235,7 @@ class NotificationService:
                 "ts": int(_time.time() * 1000),
             }, ensure_ascii=False))
         except Exception:
-            pass
+            pass  # SSE 推送失败不影响通知创建
 
         has_personal_external = any(ch not in (ChannelType.INBOX,) for ch in channels)
         _broadcast_names = set(NotificationService._broadcast_channel_registry.keys())
@@ -211,6 +255,7 @@ class NotificationService:
 
 
     def get_unread_count(self, user_id: int) -> int:
+        """获取用户未读通知数。"""
         return self._receipt_repo.count(
             {"user_id": user_id, "read_at": None}
         )
@@ -222,6 +267,11 @@ class NotificationService:
         per_page: int = 20,
         unread_only: bool = False,
     ) -> dict:
+        """获取用户通知列表（分页）。
+
+        Returns:
+            {"items": [...], "total": N, "unread_count": M}
+        """
         items, total = self._receipt_repo.list_by_user_paginated(
             user_id, page=page, per_page=per_page, unread_only=unread_only,
         )
@@ -235,6 +285,7 @@ class NotificationService:
         }
 
     def mark_read(self, user_id: int, notification_ids: list[int] | None = None) -> int:
+        """标记通知为已读。"""
         if notification_ids:
             count = self._receipt_repo.mark_read_by_ids(user_id, notification_ids)
             self._receipt_repo.session.flush()
@@ -242,11 +293,13 @@ class NotificationService:
         return self._receipt_repo.mark_read(user_id)
 
     def delete_read(self, user_id: int) -> int:
+        """删除用户已读通知（保留未读）。"""
         count = self._receipt_repo.delete_read(user_id)
         self._receipt_repo.session.flush()
         return count
 
     def mark_acked(self, user_id: int, notification_id: int) -> bool:
+        """确认通知（ack_required 场景）。"""
         receipt = self._receipt_repo.find_by_user_and_notification(user_id, notification_id)
         if not receipt or not receipt.ack_required:
             return False
@@ -256,12 +309,14 @@ class NotificationService:
 
 
     def get_preferences(self, user_id: int) -> dict:
+        """获取用户通知偏好。"""
         user = self._user_repo.find_by_id(user_id)
         if not user:
             return NotificationService._default_prefs()
         return user.notification_prefs or NotificationService._default_prefs()
 
     def update_preferences(self, user_id: int, prefs: dict) -> dict:
+        """更新用户通知偏好（merge 语义）。"""
         user = self._user_repo.find_by_id(user_id)
         if not user:
             return NotificationService._default_prefs()
@@ -282,6 +337,7 @@ class NotificationService:
 
     @staticmethod
     def _default_prefs() -> dict:
+        """返回默认通知偏好。"""
         return {
             "channels": {ChannelType.INBOX: True, ChannelType.EMAIL: True},
             "subscribed_types": [],
@@ -290,6 +346,7 @@ class NotificationService:
 
 
     def _resolve_targets(self, target_type: str, target_id) -> list[int]:
+        """将 target_type/target_id 解析为 user_id 列表。"""
         session = self._user_repo.session
         if target_type == "user":
             if target_id is None:
@@ -318,6 +375,13 @@ class NotificationService:
     @staticmethod
     def _resolve_channels(user: User, requested_channels: tuple[str, ...],
                           notif_type: str, severity: str) -> list[str]:
+        """根据用户偏好和通知属性确定实际投递的个人渠道。
+
+        个人渠道：inbox / email
+        广播渠道（企微/飞书 Webhook）由 WebhookConfig.applicable_types/applicable_severities 独立控制，
+        不受个人偏好影响（当前为群机器人广播，不 @个人用户）。
+        inbox 始终不可关闭；email 受用户偏好开关控制。
+        """
         prefs = user.notification_prefs
         if not prefs:
             return [ch for ch in requested_channels if ch in PERSONAL_CHANNELS]
@@ -337,6 +401,11 @@ class NotificationService:
 
     @staticmethod
     def _in_quiet_hours(prefs: dict) -> bool:
+        """检查当前是否在免打扰时段。
+
+        quiet_hours 中的 start/end 是用户本地时间（前端 TimePicker 选择），
+        比较时需将 UTC 当前时间转换到应用时区后再取 .time()。
+        """
         qh = prefs.get("quiet_hours", {})
         if not qh.get("enabled"):
             return False
@@ -373,6 +442,7 @@ class NotificationService:
 
     @staticmethod
     def _format_receipt(receipt: NotificationReceipt) -> dict:
+        """格式化回执为前端友好的字典。"""
         n = receipt.notification
         return {
             "id": n.id,
@@ -395,6 +465,12 @@ notification_service = NotificationService()
 
 
 def _is_request_context() -> bool:
+    """判断当前是否在 Flask HTTP 请求上下文中。
+
+    后台线程（task_executor / threading.Thread）中没有请求上下文，
+    Flask-SQLAlchemy 的 after_request 自动 commit 不会触发，
+    因此 notify() 的 flush() 后必须显式 commit。
+    """
     try:
         from flask import has_request_context
         return has_request_context()

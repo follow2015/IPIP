@@ -23,6 +23,7 @@ from app.utils.auth import get_current_user_id
 from app.utils.transactional import transactional
 
 
+
 @monitor_bp.route("/silence-rules", methods=["GET"])
 @doc(summary="列出全部静默规则", tags=["监控"], responses={200: "MonitorSilenceRuleItem"})
 @login_required
@@ -80,6 +81,7 @@ def delete_silence_rule(rule_id: int):
     return APIResponse.success(data=data)
 
 
+
 @monitor_bp.route("/threshold-overrides", methods=["GET"])
 @doc(summary="列出阈值覆盖", tags=["监控"], responses={200: "DeviceMetricOverrideItem"})
 @login_required
@@ -119,6 +121,7 @@ def delete_threshold_override(override_id: int):
     from app.services.monitoring.threshold_override_service import delete as _delete
     data = _delete(override_id)
     return APIResponse.success(data=data)
+
 
 
 @monitor_bp.route("/escalation-policies", methods=["GET"])
@@ -178,6 +181,7 @@ def delete_escalation_policy(policy_id: int):
     return APIResponse.success(data=data)
 
 
+
 @monitor_bp.route("/alert-dependency-rules", methods=["GET"])
 @doc(summary="列出全部告警依赖抑制规则", tags=["监控"], responses={200: "MonitorAlertDependencyRuleItem"})
 @login_required
@@ -233,6 +237,7 @@ def delete_alert_dependency_rule(rule_id: int):
     from app.services.monitoring.alert_dependency_service import delete_rule as _delete
     data = _delete(rule_id)
     return APIResponse.success(data=data)
+
 
 
 @monitor_bp.route("/sla-targets", methods=["GET"])

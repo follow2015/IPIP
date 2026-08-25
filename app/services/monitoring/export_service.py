@@ -27,6 +27,7 @@ ALERT_CSV_HEADERS = [
 
 
 def _query_alerts(alert_type, severity, status, device_id, start_date, end_date):
+    """构造告警查询（outerjoin devices），返回 query 对象（未分页）"""
     q = (
         db.session.query(
             MonitorAlertOutbox.id,
@@ -70,6 +71,11 @@ def _query_alerts(alert_type, severity, status, device_id, start_date, end_date)
 def stream_alerts_csv(alert_type=None, severity=None, status=None,
                       device_id=None, start_date=None, end_date=None,
                       batch_size: int = 1000) -> Iterable[str]:
+    """流式生成告警 CSV。
+
+    用 yield_per 分批拉取，避免全量加载到内存。
+    每批 batch_size 行，CSV writer 写入 StringIO 后 yield。
+    """
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(ALERT_CSV_HEADERS)
@@ -104,6 +110,10 @@ def stream_alerts_csv(alert_type=None, severity=None, status=None,
 
 def stream_history_csv(device_id: int, start_date=None, end_date=None,
                        batch_size: int = 1000) -> Iterable[str]:
+    """流式生成设备探测历史 CSV。
+
+    复用 device_monitor_status 表的探测记录。
+    """
     from app.models.device_monitor_status import DeviceMonitorStatus
     buf = io.StringIO()
     writer = csv.writer(buf)

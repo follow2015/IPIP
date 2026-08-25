@@ -31,7 +31,6 @@ export default function MetricTemplateModal({
   const upsert = useUpsertMetricTemplate();
   const message = useMessage();
 
-  
   const handleSubmit = async (values: MetricTemplateFormValues) => {
     const threshold = buildThreshold(values);
     if (values.metric_type === 'event' && values.threshold_json) {
@@ -72,9 +71,7 @@ export default function MetricTemplateModal({
     }
   };
 
-  
   const currentMetricType = Form.useWatch('metric_type', form) ?? 'gauge';
-  
   const currentSource = Form.useWatch('source', form) ?? 'snmp';
 
   return (
@@ -195,7 +192,7 @@ export default function MetricTemplateModal({
           <Input placeholder="如 ifIndex（端口）" />
         </Form.Item>
 
-        {}
+        {/* 结构化阈值：按 metric_type 动态渲染 */}
         {(currentMetricType === 'gauge' || currentMetricType === 'counter') && (
           <Row gutter={16}>
             <Col span={12}>

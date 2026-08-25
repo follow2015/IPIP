@@ -21,35 +21,53 @@ config = get_config()
 
 
 class PasswordManager(ABC):
+    """密码管理器接口
+
+    提供密码加密、验证和强度检查功能。
+    """
 
     @abstractmethod
     def hash_password(self, password: str) -> str:
+        """加密密码"""
         pass
 
     @abstractmethod
     def verify_password(self, password: str, hashed_password: str) -> bool:
+        """验证密码"""
         pass
 
     @abstractmethod
     def check_strength(self, password: str) -> Dict[str, Any]:
+        """检查密码强度"""
         pass
 
     @abstractmethod
     def generate_password(self, length: int = 12,
                          include_symbols: bool = True) -> str:
+        """生成随机密码"""
         pass
 
     @abstractmethod
     def is_password_expired(self, last_changed: datetime,
                            max_age_days: int = 90) -> bool:
+        """检查密码是否过期"""
         pass
 
 
 class BCryptPasswordManager(PasswordManager):
+    """基于BCrypt的密码管理器实现
+    
+    提供密码加密、验证、强度检查和生成功能。
+    """
     
     DUMMY_HASH = "$2b$12$q2MUtXQE7jJmEVbk0AaJteVRD61g4DOk41kXptczzsdfk1b7tn6ze"
     
     def __init__(self, rounds: int = None):
+        """初始化密码管理器
+        
+        Args:
+            rounds: BCrypt加密轮数，默认从配置获取
+        """
         self.rounds = rounds or getattr(config, 'BCRYPT_LOG_ROUNDS', 12)
         
         self.strength_rules = {
@@ -63,10 +81,10 @@ class BCryptPasswordManager(PasswordManager):
         }
         
         self.weak_patterns = [
-            r'(.)\1{2,}',
-            r'(012|123|234|345|456|567|678|789|890)',
-            r'(abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)',
-            r'(qwe|asd|zxc)',
+            r'(.)\1{2,}',  # 连续重复字符
+            r'(012|123|234|345|456|567|678|789|890)',  # 连续数字
+            r'(abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)',  # 连续字母
+            r'(qwe|asd|zxc)',  # 键盘模式
         ]
         
         self.common_passwords = {
@@ -76,6 +94,17 @@ class BCryptPasswordManager(PasswordManager):
         }
     
     def hash_password(self, password: str) -> str:
+        """加密密码
+        
+        Args:
+            password: 明文密码
+            
+        Returns:
+            str: 加密后的密码
+            
+        Raises:
+            ValueError: 密码为空或格式无效
+        """
         if not password:
             raise ValueError("密码不能为空")
         
@@ -91,6 +120,15 @@ class BCryptPasswordManager(PasswordManager):
             raise ValueError(f"密码加密失败: {e}")
     
     def verify_password(self, password: str, hashed_password: str) -> bool:
+        """验证密码
+        
+        Args:
+            password: 明文密码
+            hashed_password: 加密后的密码
+            
+        Returns:
+            bool: 密码正确返回True
+        """
         if not password or not hashed_password:
             return False
         
@@ -104,6 +142,18 @@ class BCryptPasswordManager(PasswordManager):
             return False
     
     def check_strength(self, password: str) -> Dict[str, Any]:
+        """检查密码强度
+        
+        Args:
+            password: 明文密码
+            
+        Returns:
+            Dict[str, Any]: 密码强度信息
+                - score: 强度评分（0-100）
+                - level: 强度等级（weak, medium, strong）
+                - suggestions: 改进建议列表
+                - checks: 各项检查结果
+        """
         if not password:
             return {
                 'score': 0,
@@ -192,7 +242,7 @@ class BCryptPasswordManager(PasswordManager):
             score += 10
         else:
             suggestions.append('避免使用常见密码')
-            score = max(0, score - 20)
+            score = max(0, score - 20)  # 常见密码严重扣分
         
         weak_pattern_found = any(re.search(pattern, password.lower()) for pattern in self.weak_patterns)
         checks['no_weak_patterns'] = {
@@ -221,6 +271,18 @@ class BCryptPasswordManager(PasswordManager):
         }
     
     def generate_password(self, length: int = 12, include_symbols: bool = True) -> str:
+        """生成随机密码
+        
+        Args:
+            length: 密码长度
+            include_symbols: 是否包含特殊符号
+            
+        Returns:
+            str: 生成的密码
+            
+        Raises:
+            ValueError: 长度参数无效
+        """
         if length < 4:
             raise ValueError("密码长度至少为4个字符")
         if length > 128:
@@ -252,11 +314,20 @@ class BCryptPasswordManager(PasswordManager):
         return ''.join(password_chars)
     
     def is_password_expired(self, last_changed: datetime, max_age_days: int = 90) -> bool:
+        """检查密码是否过期
+        
+        Args:
+            last_changed: 最后修改时间
+            max_age_days: 最大有效天数
+            
+        Returns:
+            bool: 过期返回True
+        """
         if not last_changed:
-            return True
+            return True  # 没有修改时间记录，视为过期
         
         if max_age_days <= 0:
-            return False
+            return False  # 不限制过期时间
         
         expiry_date = last_changed + timedelta(days=max_age_days)
         return datetime.now() > expiry_date

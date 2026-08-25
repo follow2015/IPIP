@@ -12,7 +12,6 @@ interface TrunkModalProps {
   onSubmit: (values: TrunkValues) => void;
 }
 
-
 export function TrunkModal({ open, onClose, portName, onSubmit }: TrunkModalProps) {
   const [form] = Form.useForm();
 
@@ -25,7 +24,6 @@ export function TrunkModal({ open, onClose, portName, onSubmit }: TrunkModalProp
       const values = await form.validateFields();
       onSubmit({ trunk_id: Number(values.trunk_id) });
     } catch {
-      
     }
   };
 

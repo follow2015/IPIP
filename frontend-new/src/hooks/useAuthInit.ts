@@ -9,20 +9,16 @@ import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth';
 import { verifyToken } from '@/services/auth';
 
-
 function isJwtExpired(token: string): boolean {
   try {
-    
     const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    
     const payload = JSON.parse(decodeURIComponent(escape(atob(b64))));
     if (payload.exp && payload.exp * 1000 < Date.now()) return true;
     return false;
   } catch {
-    return true;  
+    return true;  // 解析失败视为过期
   }
 }
-
 
 export function useAuthInit() {
   const initRef = useRef(false);
@@ -33,16 +29,13 @@ export function useAuthInit() {
 
     const { token, isAuthenticated } = useAuthStore.getState();
 
-    
     if (!token || !isAuthenticated) return;
 
-    
     if (isJwtExpired(token)) {
       useAuthStore.getState().clearAuth();
       return;
     }
 
-    
     useAuthStore.getState().setVerifying(true);
 
     verifyToken()

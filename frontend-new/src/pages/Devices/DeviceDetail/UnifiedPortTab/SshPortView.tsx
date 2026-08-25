@@ -30,9 +30,7 @@ interface SshPortViewProps {
   handleSync: () => void;
   isPending: boolean;
   submitAction: SubmitActionFn;
-  
   renderPortActions?: RenderPortActionsFn;
-  
   renderBatchActions?: RenderBatchActionsFn;
   selectedRowKeys: React.Key[];
   rowSelection: TableProps<SwitchPort>['rowSelection'];
@@ -71,7 +69,6 @@ export function SshPortView({
     [deviceId, renderPortActions, refetch, submitAction]
   );
 
-  
   const message = useMessage();
   const portSyncQuery = useDevicePortSyncEnabled(deviceId);
   const setPortSync = useSetDevicePortSyncEnabled(deviceId);
@@ -110,7 +107,7 @@ export function SshPortView({
 
   return (
     <>
-      {}
+      {/* 工具栏 */}
       <div
         style={{
           display: 'flex',
@@ -169,10 +166,10 @@ export function SshPortView({
         </Space>
       </div>
 
-      {}
+      {/* 端口可视化面板 */}
       <SwitchPortPanel ports={sortedPorts} onPortClick={onPortPanelClick} />
 
-      {}
+      {/* 批量操作工具栏（图形化面板下方）— 由注入渲染器提供，避免 Devices→Switches 耦合 */}
       {renderBatchActions?.({
         selectedPorts: selectedRowKeys as string[],
         onClearSelection,
@@ -180,7 +177,7 @@ export function SshPortView({
         refetch
       })}
 
-      {}
+      {/* 端口列表 */}
       <PortTable
         columns={columns}
         dataSource={filteredPorts}

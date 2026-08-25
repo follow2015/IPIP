@@ -20,25 +20,17 @@ import { useComponentTemplates } from '@/services/component-template';
 import type { ComponentTemplate } from '@/services/component-template';
 import { useMemo } from 'react';
 
-
 export interface NicConfigFieldsProps {
-  
   form: FormInstance;
-  
   customerId?: number | null;
-  
   prefix?: string;
-  
   listName?: string;
-  
   showPreview?: boolean;
 }
-
 
 function prefixedName(prefix: string | undefined, field: string): string | (string | number)[] {
   return prefix ? [prefix, field] : field;
 }
-
 
 export default function NicConfigFields({
   form,
@@ -47,13 +39,10 @@ export default function NicConfigFields({
   listName = 'nic_ports',
   showPreview = true,
 }: NicConfigFieldsProps) {
-  
   const { data: nicTemplates = [], isLoading: nicTplLoading } = useComponentTemplates('nic', customerId);
 
-  
   const nicPortsValue = Form.useWatch(prefix ? [prefix, listName] : listName, form);
 
-  
   const portPreview = useMemo(() => {
     if (!nicPortsValue || !Array.isArray(nicPortsValue)) return [];
     const result: { nic_number: number; port_number: number; port_type: string; port_speed: string; nic_name: string; port_name: string; description: string }[] = [];
@@ -68,7 +57,6 @@ export default function NicConfigFields({
       const model = tpl.model ?? '';
       const formFactor = (tpl.spec.form_factor as string) ?? '';
       const remark = (tpl.remark as string) ?? '';
-      
       const combinedDesc = [remark, formFactor].filter(Boolean).join(' ');
       for (let i = 0; i < portCount; i++) {
         result.push({
@@ -116,7 +104,7 @@ export default function NicConfigFields({
         )}
       </Form.List>
 
-      {}
+      {/* 端口预览 */}
       {showPreview && portPreview.length > 0 && (
         <Alert
           type="info"
@@ -138,21 +126,24 @@ export default function NicConfigFields({
   );
 }
 
-
 export interface ExpandedNicPort {
   nic_number: number;
   port_number: number;
   port_type: string;
   port_speed: string;
-  
   nic_name: string;
-  
   port_name: string;
-  
   description: string;
 }
 
-
+/**
+ * 从 Form.List 的 nic_ports 值展开为后端需要的端口列表
+ * 供提交时使用，替代 AddDevicesModal 中硬编码的 expandNicTemplates
+ *
+ * nic_name 格式: {model}:端口{N}（如 X710-DA2:端口1）
+ * port_name 格式: port{N}（如 port1，留给客户自定义）
+ * description 取自 remark + spec.form_factor 合并（如 "双口网卡 PCIe"）
+ */
 export function expandNicPorts(
   nicPortsFormVal: { template_id?: number }[] | undefined,
   nicTemplates: ComponentTemplate[],
@@ -170,7 +161,6 @@ export function expandNicPorts(
     const model = tpl.model ?? '';
     const formFactor = (tpl.spec.form_factor as string) ?? '';
     const remark = (tpl.remark as string) ?? '';
-    
     const combinedDesc = [remark, formFactor].filter(Boolean).join(' ');
     for (let i = 0; i < portCount; i++) {
       result.push({

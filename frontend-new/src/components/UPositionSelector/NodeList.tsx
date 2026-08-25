@@ -10,7 +10,6 @@ interface NodeListProps {
   onNodeDrop?: (targetIdx: number) => void;
 }
 
-
 const NodeList: React.FC<NodeListProps> = ({ nodes, draggable, onNodeDragStart, onNodeDrop }) => {
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 

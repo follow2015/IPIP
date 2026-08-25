@@ -30,7 +30,6 @@ import { useMessage } from '@/hooks/useMessage';
 
 type ConfigValue = number | string | boolean;
 
-
 const CONFIG_GROUPS: { key: string; title: string; fields: string[] }[] = [
   {
     key: 'probe',
@@ -62,7 +61,6 @@ const CONFIG_GROUPS: { key: string; title: string; fields: string[] }[] = [
   }
 ];
 
-
 const FIELD_LABELS: Record<string, string> = {
   consecutive_failures_threshold: '连续失败阈值',
   timeout_seconds: '探测超时(秒)',
@@ -83,7 +81,6 @@ const FIELD_LABELS: Record<string, string> = {
   scan_auto_grace_period: 'INACTIVE降级宽限期(秒)'
 };
 
-
 export default function MonitorSettings() {
   const { data: config, isLoading } = useMonitorConfig();
   const updateConfig = useUpdateMonitorConfig();
@@ -92,7 +89,6 @@ export default function MonitorSettings() {
   const message = useMessage();
   const { token } = theme.useToken();
 
-  
   const { data: roomOptions } = useRoomOptions();
   const { data: virtualRoomsData } = useVirtualRooms({ per_page: 200 });
   const virtualRoomOptions = useMemo(
@@ -100,7 +96,6 @@ export default function MonitorSettings() {
     [virtualRoomsData]
   );
 
-  
   useEffect(() => {
     if (!config) return;
     const init: Record<string, ConfigValue> = {};
@@ -188,7 +183,6 @@ export default function MonitorSettings() {
     } else if (item.type === 'bool') {
       control = <Switch checked={Boolean(values[key])} onChange={(v) => handleChange(key, v)} />;
     } else if (key === 'scan_auto_room_ids' || key === 'scan_auto_vr_ids') {
-      
       const opts = key === 'scan_auto_room_ids' ? (roomOptions ?? []) : virtualRoomOptions;
       const strVal = String(values[key] ?? '');
       const arrVal = strVal

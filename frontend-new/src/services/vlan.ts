@@ -13,16 +13,13 @@ import type { VLAN } from '@/types/models';
 import type { PaginationParams } from '@/types/api';
 import type { VLANCreate, VLANUpdate } from '@/types/api-bridge';
 
-
 export interface VLANQueryParams extends PaginationParams {
   room_id?: number;
   device_id?: number;
   status?: number;
 }
 
-
 export type CreateVLANRequest = VLANCreate;
-
 
 export type UpdateVLANRequest = VLANUpdate & { id: number };
 
@@ -50,7 +47,6 @@ export function useVLANsByRoom(roomId: number) {
   });
 }
 
-
 export function useVLANsByDevice(deviceId: number) {
   return useQuery({
     queryKey: queryKeys.vlans.byDevice(deviceId),
@@ -70,7 +66,6 @@ export function useUpdateVLANMembers(deviceId: number) {
       put<VLAN>(`/devices/${deviceId}/vlans/${vlanId}/members`, { port_ids: portIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.vlans.byDevice(deviceId) });
-      
       queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(deviceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.networkPorts(deviceId) });
     },
@@ -86,7 +81,6 @@ interface CreateDeviceVLANRequest {
   status?: number;
 }
 
-
 export function useCreateDeviceVLAN(deviceId: number) {
   return useInvalidatingMutation(
     (data: CreateDeviceVLANRequest) =>
@@ -95,9 +89,7 @@ export function useCreateDeviceVLAN(deviceId: number) {
   );
 }
 
-
 export const useCreateVLANLegacy = vlanHooks.useCreate;
-
 
 export function useUpdateDeviceVLAN(deviceId: number) {
   const queryClient = useQueryClient();

@@ -32,7 +32,9 @@ logger = get_logger(__name__)
 router = Blueprint("switch", __name__, url_prefix="/api/switch")
 
 
+
 def _notify_port_action_result(user_id, switch_device_id, port, action, *, success, message="", error=""):
+    """端口操作结果创建站内信通知（不阻塞主流程）"""
     if not user_id:
         logger.warning("端口操作结果通知跳过：user_id 为空")
         return
@@ -78,6 +80,7 @@ def _notify_port_action_result(user_id, switch_device_id, port, action, *, succe
 
 
 def _notify_async_result(user_id, action_type, label, *, success, error="", device_id=None):
+    """异步操作结果创建站内信通知（不阻塞主流程）"""
     if not user_id:
         logger.warning("异步操作结果通知跳过：user_id 为空")
         return
@@ -122,7 +125,13 @@ def _notify_async_result(user_id, action_type, label, *, success, error="", devi
         logger.exception("异步操作结果通知创建失败（不影响主流程）")
 
 
+
+
 def _find_switch_or_404(device_id):
+    """查找交换机，不存在则返回 404 APIResponse
+
+    统一使用 device_id（devices.id）作为交换机标识。
+    """
     repo = SwitchRepository()
     switch = repo.find_by_device_id(device_id)
     if not switch:
@@ -131,6 +140,7 @@ def _find_switch_or_404(device_id):
 
 
 def _build_customer_map(ports):
+    """批量查询端口关联的 customer_name，返回 {customer_id: customer_name}"""
     customer_ids = {p.customer_id for p in ports if p.customer_id}
     if not customer_ids:
         return {}
@@ -138,6 +148,12 @@ def _build_customer_map(ports):
 
 
 def _map_port_fields(ports, adapter, customer_map, device_id=None):
+    """端口字段映射：对齐前端 SwitchPort 类型定义
+
+    字段重命名：mac→mac_address, description→notes
+    补充字段：customer_name, port_info, max_speed, ip_list
+    V2.0: 保留 port_name/port_type 原字段名（对齐 network_ports 表）
+    """
     port_ip_map = {}
     if device_id is not None and ports:
         port_names = [p.port_name for p in ports if p.port_name]
@@ -158,6 +174,13 @@ def _map_port_fields(ports, adapter, customer_map, device_id=None):
 
 
 def _map_switch_data(switch, ports):
+    """交换机字段映射：对齐前端 Switch 类型定义
+
+    字段重命名：ip→ip_address
+    补充字段：name, device_model, room_name, mac_address(数组)
+    V2.0: 保留 switch_role（不再改回 status），补充 device_id/layer/has_ssh/uplink_device_id
+    V2.1: 聚合 SwitchStatusCache 的 device_version/device_uptime + Device.serial_number 作为 device_serial
+    """
 
     switch_data = switch.to_dict(exclude=["password"])
     if switch.device:
@@ -210,10 +233,17 @@ def _map_switch_data(switch, ports):
     return switch_data
 
 
+
+
 @router.route("/list", methods=["GET"])
 @doc(summary="查询交换机列表（分页）", tags=["交换机"], responses={200: "SwitchResponse", 401: "ApiError"})
 @login_required
 def list_switches():
+    """查询交换机列表（分页）
+
+    支持按机房、状态、设备类型过滤，支持关键词搜索。
+    字段映射对齐前端 Switch 类型：ip→ip_address, 补充 name/device_model/room_name。
+    """
     room_id = request.args.get("room_id", type=int)
     cabinet_id = request.args.get("cabinet_id", type=int)
     switch_role = request.args.get("switch_role", type=int)
@@ -241,6 +271,15 @@ def list_switches():
 @doc(summary="获取交换机详情", tags=["交换机"], responses={200: "SwitchResponse", 404: "ApiError"})
 @login_required
 def get_switch(device_id):
+    """获取交换机详情包含端口列表
+
+    返回结构对齐前端 SwitchWithPortsResponse 类型定义：
+    - switch: 补充 name/ip_address/status/device_model/room_name/mac_address(数组)
+    - ports:  字段映射 port_name→port_number, mac→mac_address, description→notes, port_type→type
+              补充 customer_name, max_speed
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     from app.adapters.adapter_factory import get_adapter
 
     switch, err = _find_switch_or_404(device_id)
@@ -264,6 +303,11 @@ def get_switch(device_id):
 @api_exception_handler
 @transactional
 def create_switch():
+    """创建交换机
+
+    请求体: {"name": "...", "ip": "...", "port": 22, ...}
+    字段映射：name→Device.device_name
+    """
     data = request.get_json()
     repo = SwitchRepository()
 
@@ -343,6 +387,13 @@ def create_switch():
 @api_exception_handler
 @transactional
 def update_switch(device_id):
+    """更新交换机信息
+
+    请求体: 需要更新的字段
+    字段映射：name→Device.device_name
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     data = request.get_json()
     repo = SwitchRepository()
 
@@ -436,6 +487,10 @@ def update_switch(device_id):
 @api_exception_handler
 @transactional
 def delete_switch(device_id):
+    """删除交换机
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     repo = SwitchRepository()
 
     switch, _err = _find_switch_or_404(device_id)
@@ -456,6 +511,11 @@ def delete_switch(device_id):
 @doc(summary="获取交换机端口列表", tags=["交换机"], responses={200: "SwitchPortResponse", 404: "ApiError"})
 @login_required
 def get_switch_ports(device_id):
+    """获取交换机端口列表（含 max_speed 字段）
+
+    字段映射对齐前端 SwitchPort 类型定义。
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     from app.adapters.adapter_factory import get_adapter
 
     switch, err = _find_switch_or_404(device_id)
@@ -475,6 +535,18 @@ def get_switch_ports(device_id):
 @doc(summary="获取交换机详情及端口列表", tags=["交换机"], responses={200: "SwitchResponse", 404: "ApiError"})
 @login_required
 def get_switch_detail_with_ports(device_id):
+    """获取交换机详情及端口列表（前端 viewDetail 使用）
+
+    旧版在打开详情时会异步触发 SSH 更新，新版通过 no_update 参数控制：
+    - no_update=1（默认）：仅查数据库，不触发 SSH
+    - no_update=0：异步触发 SSH 采集交换机信息
+
+    Returns:
+        {switch: {...}, ports: [...]}
+    字段映射与 get_switch() 保持一致，对齐前端 SwitchWithPortsResponse。
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     from app.adapters.adapter_factory import get_adapter
 
     switch, err = _find_switch_or_404(device_id)
@@ -535,6 +607,13 @@ def get_switch_detail_with_ports(device_id):
 @doc(summary="异步同步交换机端口信息", tags=["交换机"], responses={200: "ApiResponse", 404: "ApiError"})
 @permission_required("switch:config")
 def sync_switch_ports(device_id):
+    """异步同步交换机端口信息（仅执行 display interface，立即返回，后台执行）
+
+    与 /scan 不同，此接口仅采集端口信息（display interface）并增量更新，
+    不执行路由表、MAC、ARP 等全量扫描阶段。
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     switch, _err = _find_switch_or_404(device_id)
     if _err:
         return _err
@@ -609,6 +688,10 @@ def sync_switch_ports(device_id):
 @doc(summary="异步触发交换机扫描", tags=["交换机"], responses={200: "ApiResponse", 404: "ApiError"})
 @permission_required("switch:config")
 def scan_switch(device_id):
+    """异步触发交换机扫描（立即返回，后台执行）
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
 
     switch, _err = _find_switch_or_404(device_id)
     if _err:
@@ -663,6 +746,7 @@ def scan_switch(device_id):
 @doc(summary="触发机房扫描（异步）", tags=["交换机"], responses={200: "ApiResponse", 400: "ApiError"})
 @permission_required("switch:config")
 def scan_room(room_id):
+    """触发机房扫描（异步，立即返回，前端轮询进度 API）"""
     from app.services.network_scanner_service import get_scan_progress
     scope = f"r:{room_id}"
     existing_progress = get_scan_progress(scope)
@@ -839,6 +923,12 @@ def scan_room(room_id):
 @doc(summary="查询机房扫描实时进度", tags=["交换机"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def scan_room_progress(room_id):
+    """查询机房扫描实时进度
+
+    从 Redis 读取 ScanProgress 数据，供前端轮询展示进度条。
+    返回格式：{ room_id, total, completed, failed, phase, elapsed_seconds, eta_seconds }
+    无进行中的扫描时返回 { progress: null }。
+    """
     from app.services.network_scanner_service import get_scan_progress
     progress = get_scan_progress(f"r:{room_id}")
     return APIResponse.success(data={"progress": progress})
@@ -848,6 +938,10 @@ def scan_room_progress(room_id):
 @doc(summary="异步采集交换机设备信息", tags=["交换机"], responses={200: "ApiResponse", 404: "ApiError"})
 @permission_required("switch:config")
 def collect_switch_info(device_id):
+    """异步采集交换机设备信息（立即返回，后台执行）
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
 
     switch, _err = _find_switch_or_404(device_id)
     if _err:
@@ -902,6 +996,15 @@ def collect_switch_info(device_id):
 @doc(summary="获取端口详情", tags=["交换机"], responses={200: "SwitchPortResponse", 404: "ApiError"})
 @login_required
 def get_port_detail(device_id, port_number):
+    """获取端口详情（仅从 sw_info + sw_info_ip 读取，不触发 SSH）
+
+    数据来源：
+    - sw_info 表：端口状态/VLAN/MAC/速率/描述等摘要信息
+    - sw_info_ip 表：端口 IP 列表（支持多 IP）
+    - sw_port_info 表：端口配置文本的缓存状态（仅返回是否有缓存 + updated_at）
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     sw_repo = SwitchRepository()
     cached = sw_repo.get_port_info_cache(device_id, port_number)
     if not cached:
@@ -951,6 +1054,24 @@ def get_port_detail(device_id, port_number):
 @permission_required("switch:config")
 @transactional
 def update_port_info(device_id, port_number):
+    """更新端口信息（客户归属 + 描述）
+
+    逻辑：
+    - customer_id 有值：设置客户归属（纯 SQL 操作）
+    - customer_id 为 null/0：删除客户归属（纯 SQL 操作，置空 customer_id）
+    - description 有值：
+      - 网管设备：通过 SSH 设置端口描述
+      - 非网管设备：直接更新数据库
+    - description 为空字符串：
+      - 网管设备：通过 SSH 删除端口描述（undo description）
+      - 非网管设备：直接清空数据库描述字段
+    - 描述变更后自动刷新端口配置缓存
+    - 客户/描述与数据库当前值一致时跳过执行，避免无意义的 SSH 操作
+
+    注意：客户归属和描述是独立操作，任一失败不影响另一个。
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     data = request.get_json()
     repo = SwitchRepository()
     service = SwitchConfigService()
@@ -1001,6 +1122,16 @@ def update_port_info(device_id, port_number):
 @login_required
 @transactional
 def fetch_port_config(device_id, port_number):
+    """获取端口配置文本
+
+    流程：
+    1. 先查 sw_port_info 缓存，命中则直接返回
+    2. 未命中则 SSH 获取 display current-configuration interface <port>
+    3. 写入 sw_port_info 表
+    4. 从配置文本解析 VLAN/IP，同步回 sw_info / sw_info_ip 表
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     service = SwitchConfigService()
     result = service.fetch_port_config(device_id, port_number)
     if result.get("success") is False:
@@ -1013,6 +1144,10 @@ def fetch_port_config(device_id, port_number):
 @login_required
 @transactional
 def refresh_port_detail(device_id, port_number):
+    """强制刷新端口配置（跳过缓存，从设备实时读取并同步）
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     service = SwitchConfigService()
     result = service.fetch_port_config(device_id, port_number, force_refresh=True)
     if result.get("success") is False:
@@ -1024,6 +1159,13 @@ def refresh_port_detail(device_id, port_number):
 @doc(summary="批量同步VLAN/链路聚合成员端口", tags=["交换机"], responses={200: "ApiResponse", 401: "ApiError"})
 @permission_required("switch:config")
 def sync_members(device_id):
+    """异步批量同步 VLAN 和链路聚合的成员端口（立即返回，后台执行）
+
+    使用 display vlan / display eth-trunk（不带 ID）一次性获取所有成员，
+    仅需 2 次 SSH 连接即可完成全部同步。
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     switch, _err = _find_switch_or_404(device_id)
     if _err:
         return _err
@@ -1092,6 +1234,13 @@ def sync_members(device_id):
 @permission_required("switch:config")
 @transactional
 def clear_port_config(device_id, port_number):
+    """清除端口配置
+
+    SSH 执行 clear configuration this（带 Y 确认），
+    清除后通过 _sync_port_from_device 自动同步三表。
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     switch, _err = _find_switch_or_404(device_id)
     if _err:
         return _err
@@ -1114,6 +1263,10 @@ def clear_port_config(device_id, port_number):
 @doc(summary="获取端口名称列表", tags=["交换机"], responses={200: "SwitchPortResponse", 401: "ApiError"})
 @login_required
 def get_ports_list(device_id):
+    """端口名称列表
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     repo = SwitchRepository()
     ports = repo.get_switch_ports_list(device_id)
     return APIResponse.success(ports)
@@ -1124,6 +1277,18 @@ def get_ports_list(device_id):
 @permission_required("switch:config")
 @transactional
 def port_action(device_id):
+    """异步端口操作（提交后台线程执行，通过SSE推送结果）
+
+    网管设备(has_ssh=true): SSH下发 + DB同步（异步）
+    非网管设备(has_ssh=false): 纯DB操作（同步返回）
+
+    请求体:
+    {
+        "action": "enable_port",
+        "port": "GigabitEthernet0/0/1",
+        "params": {}
+    }
+    """
     from flask import current_app
     from app.services.switch_events import emit_port_action_result
     from app.utils.concurrency.task_executor import task_executor
@@ -1164,6 +1329,12 @@ def port_action(device_id):
         })
 
     def _execute_and_notify():
+        """后台线程：执行操作 + 推送SSE结果 + 创建站内信通知
+
+        无论操作成功或异常，都通过 emit_port_action_result 推送结果，
+        确保前端不会因事件丢失而超时。同时通过 notify() 创建站内信，
+        确保不在当前页面的用户也能收到操作结果。
+        """
         with app_ref.app_context():
             try:
                 service = SwitchConfigService()
@@ -1218,6 +1389,19 @@ def port_action(device_id):
 @doc(summary="异步批量端口操作", tags=["交换机"], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
 @permission_required("switch:config")
 def batch_port_action(device_id):
+    """异步批量端口操作（提交后台线程执行，通过SSE推送结果）
+
+    请求体:
+    {
+        "action": "set_port_vlan",
+        "ports": ["10GE1/0/1", "10GE1/0/2", "10GE1/0/3"],
+        "port_range": "10GE1/0/5 to 10GE1/0/10",
+        "params": {"vlan_id": 100, "mode": "access"}
+    }
+
+    立即返回:
+    {"task_id": "batch_port_action_xxxx", "action": "set_port_vlan", "status": "pending"}
+    """
     from flask import current_app
     from app.services.switch_events import emit_port_action_result
     from app.utils.concurrency.task_executor import task_executor
@@ -1253,6 +1437,7 @@ def batch_port_action(device_id):
     user_id = g.current_user["user_id"] if hasattr(g, 'current_user') else None
 
     def _execute_and_notify():
+        """后台线程：执行批量操作 + 推送SSE结果 + 创建站内信通知"""
         with app_ref.app_context():
             try:
                 service = SwitchConfigService()
@@ -1305,6 +1490,10 @@ def batch_port_action(device_id):
 @permission_required("switch:config")
 @transactional
 def enable_port(device_id, port_number):
+    """启用端口
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     switch, _err = _find_switch_or_404(device_id)
     if _err:
         return _err
@@ -1328,6 +1517,10 @@ def enable_port(device_id, port_number):
 @permission_required("switch:config")
 @transactional
 def disable_port(device_id, port_number):
+    """禁用端口
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     switch, _err = _find_switch_or_404(device_id)
     if _err:
         return _err
@@ -1351,6 +1544,14 @@ def disable_port(device_id, port_number):
 @permission_required("switch:config")
 @transactional
 def set_port_speed(device_id, port_number):
+    """设置端口限速（QoS 策略方式）
+
+    统一使用 traffic-policy（华为）或 qos policy（H3C）方式限速。
+    inbound/outbound 单位为 Mbps，0 表示取消该方向限速。
+    限速值范围由前端根据端口速率动态控制，后端不做范围限制。
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     data = request.get_json()
     inbound = data.get("inbound_speed", 0)
     outbound = data.get("outbound_speed", 0)
@@ -1373,6 +1574,10 @@ def set_port_speed(device_id, port_number):
 @permission_required("switch:config")
 @transactional
 def set_port_vlan(device_id, port_number):
+    """配置端口VLAN
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     data = request.get_json()
     vlan_id = data.get("vlan_id")
     mode = data.get("mode", "access")
@@ -1402,6 +1607,10 @@ def set_port_vlan(device_id, port_number):
 @permission_required("switch:config")
 @transactional
 def delete_vlan(device_id, vlan_id):
+    """删除VLAN
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     switch, _err = _find_switch_or_404(device_id)
     if _err:
         return _err
@@ -1421,6 +1630,10 @@ def delete_vlan(device_id, vlan_id):
 @permission_required("switch:config")
 @transactional
 def add_port_to_trunk(device_id, trunk_id):
+    """加入Eth-Trunk
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     data = request.get_json()
     port = data.get("port")
     switch, _err = _find_switch_or_404(device_id)
@@ -1450,6 +1663,10 @@ def add_port_to_trunk(device_id, trunk_id):
 @permission_required("switch:config")
 @transactional
 def delete_trunk(device_id, trunk_id):
+    """删除Eth-Trunk
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     switch, _err = _find_switch_or_404(device_id)
     if _err:
         return _err
@@ -1469,6 +1686,10 @@ def delete_trunk(device_id, trunk_id):
 @permission_required("switch:config")
 @transactional
 def set_port_ip(device_id, port_number):
+    """配置端口IP
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     data = request.get_json()
     ip_address = data.get("ip_address")
     subnet_mask = data.get("subnet_mask")
@@ -1491,6 +1712,10 @@ def set_port_ip(device_id, port_number):
 @doc(summary="查询端口IP", tags=["交换机"], responses={200: "SwitchPortIPResponse", 401: "ApiError"})
 @login_required
 def get_port_ips(device_id, port_number):
+    """查询端口IP
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     service = SwitchConfigService()
     ips = service.get_port_ips(device_id, port_number)
     return APIResponse.success(ips)
@@ -1501,6 +1726,10 @@ def get_port_ips(device_id, port_number):
 @permission_required("switch:config")
 @transactional
 def delete_port_ip(device_id, port_number):
+    """删除端口IP
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     data = request.get_json()
     ip_address = data.get("ip_address")
     subnet_mask = data.get("subnet_mask")
@@ -1524,6 +1753,10 @@ def delete_port_ip(device_id, port_number):
 @permission_required("switch:config")
 @transactional
 def delete_interface(device_id, port_number):
+    """删除接口（LoopBack等虚拟接口）
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     switch, _err = _find_switch_or_404(device_id)
     if _err:
         return _err
@@ -1543,6 +1776,12 @@ def delete_interface(device_id, port_number):
 @permission_required("switch:config")
 @transactional
 def create_port_channel(device_id):
+    """创建链路聚合组(Eth-Trunk)
+
+    请求体: {"channel_id": 10, "member_ports": ["XGigabitEthernet0/0/1"]}
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     data = request.get_json()
     channel_id = data.get("channel_id")
     member_ports = data.get("member_ports", [])
@@ -1567,6 +1806,10 @@ def create_port_channel(device_id):
 @permission_required("switch:config")
 @transactional
 def remove_port_from_channel(device_id, port_number):
+    """从链路聚合组移除端口
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     switch, _err = _find_switch_or_404(device_id)
     if _err:
         return _err
@@ -1587,6 +1830,10 @@ def remove_port_from_channel(device_id, port_number):
 @doc(summary="获取扫描任务状态", tags=["交换机"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
 def scan_status():
+    """获取扫描任务状态
+
+    返回当前是否有扫描任务运行中，以及进度信息。
+    """
     service = NetworkScannerService()
     status_info = service.get_scan_status()
     return APIResponse.success(data=status_info)
@@ -1595,6 +1842,17 @@ def scan_status():
 @router.route("/events", methods=["GET"])
 @doc(summary="SSE全局事件流（已迁移至ASGI网关）", tags=["交换机"], responses={410: "ApiError"})
 def global_events():
+    """SSE 全局事件流 — 已迁移至独立 ASGI 推送网关
+
+    此端点已废弃（410 Gone）。SSE 服务已从 Flask 移出，
+    由独立的 realtime_gateway (uvicorn) 进程提供。
+    新端点：GET /sse/global?token=xxx
+
+    迁移原因：
+    - SSE 长连接占用 Flask worker 线程
+    - 多进程部署下 seq/环形缓冲区不一致
+    - 网关单进程持有 seq，天然全局唯一、天然支持重放
+    """
     return APIResponse.error(
         "SSE 服务已迁移至 ASGI 推送网关，请使用 /sse/global?token=xxx",
         error_code="GONE",
@@ -1605,6 +1863,14 @@ def global_events():
 @router.route("/<int:device_id>/events", methods=["GET"])
 @doc(summary="SSE端口变更事件流（已迁移至ASGI网关）", tags=["交换机"], responses={410: "ApiError"})
 def switch_events(device_id):
+    """SSE 端口变更事件流 — 已迁移至独立 ASGI 推送网关
+
+    此端点已废弃（410 Gone）。SSE 服务已从 Flask 移出，
+    由独立的 realtime_gateway (uvicorn) 进程提供。
+    新端点：GET /sse/switch/{device_id}?since_seq=0&token=xxx
+
+    迁移原因同 global_events。
+    """
     return APIResponse.error(
         f"SSE 服务已迁移至 ASGI 推送网关，请使用 /sse/switch/{device_id}?token=xxx",
         error_code="GONE",
@@ -1612,10 +1878,16 @@ def switch_events(device_id):
     )
 
 
+
+
 @router.route("/<int:device_id>/ext", methods=["GET"])
 @doc(summary="查询交换机扩展信息", tags=["交换机"], responses={200: "SwitchResponse", 404: "ApiError"})
 @login_required
 def get_switch_ext(device_id):
+    """查询交换机扩展信息
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     from app.persistence.switch_ext_repository import SwitchExtRepository
     sw, _err = _find_switch_or_404(device_id)
     if _err:
@@ -1632,6 +1904,10 @@ def get_switch_ext(device_id):
 @permission_required("switch:create")
 @transactional
 def create_switch_ext(device_id):
+    """创建交换机扩展信息
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     from app.persistence.switch_ext_repository import SwitchExtRepository
     from app.utils.port_name_utils import normalize_port
     sw, _err = _find_switch_or_404(device_id)
@@ -1670,6 +1946,12 @@ def create_switch_ext(device_id):
 @permission_required("switch:update")
 @transactional
 def update_switch_ext(device_id):
+    """更新交换机扩展信息
+
+    当 has_ssh=False 且 uplink_* 有值时，自动写 Redis fallback。
+
+    路由参数 device_id 对应 devices.id（统一交换机标识）。
+    """
     from app.persistence.switch_ext_repository import SwitchExtRepository
     from app.utils.port_name_utils import normalize_port
     repo = SwitchExtRepository()
@@ -1737,6 +2019,26 @@ def update_switch_ext(device_id):
 @permission_required("switch:update")
 @transactional
 def batch_update_switches():
+    """批量修改交换机远程信息
+
+    请求体:
+    {
+        "device_ids": [1, 2, 3],
+        "updates": {
+            "port": 22,
+            "protocol": "ssh",
+            "username": "admin",
+            "password": "new_password",
+            "device_type": SwitchDeviceTypeCode.HUAWEI,
+            "switch_role": 1,
+            "layer": 2,
+            "authentication_method": "password"
+        }
+    }
+
+    updates 中仅包含需要修改的字段，未包含的字段不会被更新。
+    password 为空时不修改密码（避免用空字符串覆盖加密密码）。
+    """
     data = request.get_json()
     device_ids = data.get("device_ids", [])
     updates = data.get("updates", {})
@@ -1766,7 +2068,7 @@ def batch_update_switches():
 
     for device_id in device_ids:
         try:
-            sp = db.session.begin_nested()
+            sp = db.session.begin_nested()  # savepoint 隔离每台设备的修改
             switch = repo.find_by_device_id(device_id)
             if not switch:
                 sp.rollback()

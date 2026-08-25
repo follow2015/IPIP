@@ -16,7 +16,7 @@ app = create_app(env)
 if __name__ == '__main__':
     debug = env == 'development'
     port = int(os.getenv('PORT', 5000))
-    host = os.getenv('HOST', '127.0.0.1')
+    host = os.getenv('HOST', '127.0.0.1')  # 默认仅监听本地回环
 
     if debug and host == '0.0.0.0':
         print("FATAL: debug=True + host=0.0.0.0 is forbidden (Werkzeug RCE risk)")

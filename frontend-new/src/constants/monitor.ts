@@ -4,7 +4,6 @@
  * 抽到 constants/monitor.ts 共享。
  */
 
-
 export const ALERT_TYPE_LABEL: Record<string, string> = {
   device_unreachable: '设备不可达',
   device_recovered: '设备恢复',
@@ -14,7 +13,6 @@ export const ALERT_TYPE_LABEL: Record<string, string> = {
   monitor_interrupted: '监控中断',
   raid_failure_alert: 'RAID故障'
 };
-
 
 export const ALERT_TYPE_COLOR: Record<string, string> = {
   device_unreachable: 'red',

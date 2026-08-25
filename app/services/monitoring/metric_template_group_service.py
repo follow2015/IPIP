@@ -26,6 +26,7 @@ _ALLOWED_SOURCE = {"snmp", "ipmi", "zabbix"}
 
 
 class MetricTemplateGroupService:
+    """指标模板组服务"""
 
     def __init__(self, group_repo=None, template_repo=None):
         self._group_repo = group_repo or MonitorMetricTemplateGroupRepository()
@@ -146,6 +147,7 @@ class MetricTemplateGroupService:
         return {"removed": removed}
 
     def batch_add_templates(self, group_id: int, template_ids: List[int]) -> dict:
+        """批量勾选模板入组（幂等，跳过已存在的）。"""
         group = self._group_repo.find_by_id(group_id)
         if not group:
             raise BusinessLogicError("模板组不存在", status_code=404)

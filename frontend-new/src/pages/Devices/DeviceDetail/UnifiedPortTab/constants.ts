@@ -10,7 +10,6 @@ export const USAGE_STATUS_FILTER_OPTIONS = [
   { label: '异常', value: 'error' }
 ];
 
-
 export const USAGE_STATUS_FORM_OPTIONS = [
   { value: 'free', label: '空闲' },
   { value: 'occupied', label: '占用' },

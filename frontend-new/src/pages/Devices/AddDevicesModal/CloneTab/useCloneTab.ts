@@ -31,36 +31,27 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
   const batchCreate = useBatchDeviceCreate();
   const queryClient = useQueryClient();
 
-  
   const [step, setStep] = useState(0);
 
-  
   const [templateId, setTemplateId] = useState<number | null>(null);
   const [searchText, setSearchText] = useState('');
   const [cloneCount, setCloneCount] = useState(1);
   const [targetCabinetId, setTargetCabinetId] = useState<number | null>(null);
 
-  
   const { data: templateDetail, isLoading: isTemplateLoading } = useDeviceDetail(templateId ?? 0);
-  
   const isChassisTemplate = templateDetail?.device_subtype === DeviceSubtype.CHASSIS;
-  
   const isNodeTemplate = templateDetail?.device_subtype === DeviceSubtype.NODE;
 
-  
   const [cloneChassisId, setCloneChassisId] = useState<number | undefined>();
-  
   const { data: chassisData } = useDeviceList({
     is_chassis: isNodeTemplate ? 1 : undefined,
     room_id: undefined,
     per_page: 200
   });
-  
   const { data: chassisNodesData } = useDeviceList({
     parent_device_id: cloneChassisId ?? 0,
     per_page: 999
   });
-  
   const cloneChassisOptions = useMemo(() => {
     const list = chassisData?.items ?? [];
     const allNodes = chassisNodesData?.items ?? [];
@@ -79,12 +70,10 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
         };
       });
   }, [chassisData, chassisNodesData]);
-  
   const selectedChassis = useMemo(
     () => chassisData?.items?.find((d: Device) => d.id === cloneChassisId),
     [chassisData, cloneChassisId]
   );
-  
   const cloneAvailablePositions = useMemo(() => {
     if (!cloneChassisId || !selectedChassis) return [];
     const maxNodes = selectedChassis.total_nodes ?? 0;
@@ -99,7 +88,6 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
     }
     return positions;
   }, [cloneChassisId, selectedChassis, chassisNodesData]);
-  
   const genCloneNodeName = useCallback(
     (nodeRow?: number, nodeCol?: number): string => {
       if (!selectedChassis || !nodeRow || !nodeCol) return '';
@@ -115,18 +103,14 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
     [selectedChassis]
   );
 
-  
   const { rows: diffRows, updateRow, resetRows, transformRows } = useEditableRows<DeviceBatchRow>();
 
-  
   const effectiveCabinetId = targetCabinetId ?? templateDetail?.cabinet_id ?? 0;
   const { data: availableUPositions } = useCabinetAvailableUPositions(effectiveCabinetId);
-  
   const { data: cabinetOptionsData } = useCabinetOptions(undefined, false, [1, 2]);
   const cabinetOptions = cabinetOptionsData ?? [];
   const { assign: assignU, available: availableUCount } = useUPositionAssigner(availableUPositions);
 
-  
   const { data: deviceListData, isLoading: isDeviceListLoading } = useDeviceList({
     search: searchText || undefined,
     per_page: 20
@@ -141,7 +125,6 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
     [deviceListData]
   );
 
-  
   const prevActiveRef = useRef(false);
   useEffect(() => {
     if (active && !prevActiveRef.current) {
@@ -155,10 +138,8 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
       setTemplateId(templateDeviceId && templateDeviceId > 0 ? templateDeviceId : null);
     }
     prevActiveRef.current = active;
-    
   }, [active, templateDeviceId]);
 
-  
   const handleNext = () => {
     if (!templateDetail) {
       message.warning('请先选择模板设备');
@@ -169,13 +150,11 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
       return;
     }
 
-    
     if (isNodeTemplate && !cloneChassisId) {
       message.warning('节点设备克隆必须选择目标机箱');
       return;
     }
 
-    
     if (isNodeTemplate && cloneChassisId && cloneAvailablePositions.length < cloneCount) {
       message.warning(
         `目标机箱空余节点位置不足：仅剩 ${cloneAvailablePositions.length} 个空位，需要 ${cloneCount} 个`
@@ -187,7 +166,6 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
     const heightU = templateDetail.height_u ?? 1;
 
     const initRows: Omit<DeviceBatchRow, 'key'>[] = Array.from({ length: cloneCount }, (_, i) => {
-      
       if (isNodeTemplate && cloneChassisId && selectedChassis) {
         const pos = cloneAvailablePositions[i];
         const nodeCols = selectedChassis.node_cols || 1;
@@ -210,7 +188,6 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
           node_col: nodeCol
         };
       }
-      
       if (isChassisTemplate) {
         return {
           device_name: genCloneName(baseName, i + 1),
@@ -222,7 +199,6 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
           node_cols: templateDetail.node_cols ?? 2
         };
       }
-      
       return {
         device_name: genCloneName(baseName, i + 1),
         serial_number: '',
@@ -235,7 +211,6 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
     setStep(1);
   };
 
-  
   const handleAutoAssignU = () => {
     if (!availableUCount) {
       message.warning('当前机柜无可用 U 位');
@@ -245,7 +220,6 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
     resetRows(updated.map(({ key: _k, ...r }) => r));
   };
 
-  
   const handleRegenerateNames = () => {
     if (!templateDetail) return;
     const startIdx = extractMaxIndex(diffRows.map((r) => r.device_name)) + 1;
@@ -255,11 +229,9 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
     }));
   };
 
-  
   const handleSubmit = async () => {
     if (!templateDetail) return;
 
-    
     if (isNodeTemplate && cloneChassisId) {
       if (checkNodePositionConflict(diffRows, selectedChassis)) {
         message.error('存在重复的节点位置，请检查');
@@ -298,17 +270,14 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
     if (batchCreate.result && batchCreate.result.success_count > 0) onClose(true);
   };
 
-  
   const diffColumns = useMemo(
     () => buildCloneColumns({ updateRow, genCloneNodeName, isChassisTemplate, isNodeTemplate }),
     [updateRow, genCloneNodeName, isChassisTemplate, isNodeTemplate]
   );
 
   return {
-    
     step,
     setStep,
-    
     templateId,
     setTemplateId,
     searchText,
@@ -317,40 +286,32 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
     setCloneCount,
     targetCabinetId,
     setTargetCabinetId,
-    
     templateDetail,
     isTemplateLoading,
     isChassisTemplate,
     isNodeTemplate,
-    
     cloneChassisId,
     setCloneChassisId,
     cloneChassisOptions,
     selectedChassis,
     cloneAvailablePositions,
-    
     diffRows,
     updateRow,
     resetRows,
     transformRows,
-    
     effectiveCabinetId,
     availableUPositions,
     cabinetOptions,
     availableUCount,
-    
     deviceSelectOptions,
     isDeviceListLoading,
-    
     handleNext,
     handleAutoAssignU,
     handleRegenerateNames,
     handleSubmit,
     handleRetry,
     handleResultClose,
-    
     diffColumns,
-    
     batchCreate
   };
 }

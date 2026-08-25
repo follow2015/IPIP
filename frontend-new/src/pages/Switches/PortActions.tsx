@@ -40,25 +40,17 @@ import { VlanConfigModal, type VlanConfigValues } from './VlanConfigModal';
 import { TrunkModal, type TrunkValues } from './TrunkModal';
 import { IpConfigModal, type IpConfigValues } from './IpConfigModal';
 
-
 export type { SubmitActionFn } from '@/types/port';
 
 interface PortActionsProps {
-  
   switchId: number;
-  
   port: SwitchPort;
-  
   onRefresh?: () => void;
-  
   submitAction: SubmitActionFn;
-  
   hasSsh?: boolean;
 }
 
-
 type ModalKey = 'detail' | 'assign' | 'speed' | 'vlan' | 'trunk' | 'ip';
-
 
 const VLAN_IF_RE = /^(?:vlan|vlanif|vlan-interface)\d+$/i;
 const TRUNK_IF_RE = /^(?:eth-trunk|bridge-aggregation|port-channel|link-aggregation)\d+$/i;
@@ -66,41 +58,34 @@ const LOOPBACK_RE = /^LoopBack\d+$/i;
 const METH_RE = /^MEth\d+$/i;
 const NULL_RE = /^NULL0$/i;
 
-
 const extractInterfaceId = (name: string): number | null => {
   const m = name.match(/\d+$/);
   return m ? Number(m[0]) : null;
 };
-
 
 function PortActions({ switchId, port, submitAction, hasSsh = true }: PortActionsProps) {
   const updatePortCustomer = useUpdatePortCustomer();
   const fetchPortConfig = useFetchPortConfig();
   const refreshPortConfig = useRefreshPortConfig();
   const msg = useMessage();
-  
   const msgRef = useRef(msg);
   msgRef.current = msg;
   const { data: customerOptions } = useAllocatableCustomerOptions();
 
   const portName = port.port_name;
 
-  
   const [activeModal, setActiveModal] = useState<ModalKey | null>(null);
   const openModal = (key: ModalKey) => setActiveModal(key);
   const closeModal = () => setActiveModal(null);
 
-  
   const [portConfig, setPortConfig] = useState<PortConfigResult | null>(null);
 
-  
   const { data: portDetail, isLoading: loadingDetail } = useSwitchPortDetail(
     switchId,
     portName,
     activeModal === 'detail' || activeModal === 'ip'
   );
 
-  
   const portType = NULL_RE.test(portName)
     ? 'null'
     : VLAN_IF_RE.test(portName)
@@ -113,7 +98,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
             ? 'meth'
             : 'normal';
 
-  
+
   const handleTogglePort = (action: 'enable' | 'disable') => {
     const isEnable = action === 'enable';
     confirm({
@@ -125,7 +110,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     });
   };
 
-  
+
   const handleAssignSubmit = async (values: AssignCustomerValues) => {
     try {
       const rawCustomerId = values.customer_id;
@@ -133,14 +118,12 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
       const description = values.description ?? '';
       closeModal();
 
-      
       if (customerId !== (port.customer_id ?? null)) {
         updatePortCustomer
           .mutateAsync({ switchId, port: portName, data: { customer_id: customerId } })
           .catch((err) => msg.error(extractErrorMessage(err)));
       }
 
-      
       if (description !== (port.notes ?? '')) {
         submitAction('update_port_info', portName, { description });
       }
@@ -149,7 +132,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     }
   };
 
-  
+
   const maxSpeed = port.max_speed ?? 10000;
 
   const handleSpeedSubmit = async (values: SpeedLimitValues) => {
@@ -170,7 +153,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     }
   };
 
-  
+
   const handleVlanSubmit = async (values: VlanConfigValues) => {
     try {
       const vlanId = Number(values.vlan_id);
@@ -182,7 +165,6 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
       submitAction('set_port_vlan', portName, {
         vlan_id: vlanId,
         mode: values.mode,
-        
         allowed_vlans:
           values.mode === 'trunk' && values.allowed_vlans ? values.allowed_vlans.trim() : null
       });
@@ -191,7 +173,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     }
   };
 
-  
+
   const handleTrunkSubmit = async (values: TrunkValues) => {
     try {
       const trunkId = Number(values.trunk_id);
@@ -206,7 +188,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     }
   };
 
-  
+
   const handleIPSubmit = async (values: IpConfigValues) => {
     try {
       closeModal();
@@ -220,14 +202,12 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     }
   };
 
-  
+
   const handleDeleteIP = (ipAddress: string, subnetMask: string, isSecondary: boolean = false) => {
-    
     if (!portDetail) {
       msg.warning('端口详情未加载，请稍候再试');
       return;
     }
-    
     if (!isSecondary && portDetail.ip_list && portDetail.ip_list.length > 1) {
       Modal.warning({
         title: '无法删除主IP',
@@ -248,7 +228,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     });
   };
 
-  
+
   const handleGetConfig = useCallback(
     async (forceRefresh = false) => {
       try {
@@ -272,7 +252,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     [fetchPortConfig, refreshPortConfig, switchId, portName]
   );
 
-  
+
   const handleClearConfig = () => {
     confirm({
       title: '确认清除端口配置',
@@ -285,7 +265,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     });
   };
 
-  
+
   const handleDeleteVlanIf = () => {
     const vlanId = extractInterfaceId(portName);
     if (!vlanId) {
@@ -303,7 +283,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     });
   };
 
-  
+
   const handleDeleteTrunkIf = () => {
     const trunkId = extractInterfaceId(portName);
     if (!trunkId) {
@@ -321,7 +301,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     });
   };
 
-  
+
   const handleDeleteInterface = () => {
     confirm({
       title: '确认删除接口',
@@ -337,7 +317,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
   return (
     <>
       <Space size={0} wrap>
-        {}
+        {/* NULL0 不显示任何操作 */}
         {portType !== 'null' && (
           <>
             <Button
@@ -426,7 +406,6 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
                     return;
                   }
                   const currentVlan = portDetail?.vlan ?? port.vlan;
-                  
                   if (currentVlan != null && Number(currentVlan) !== 1) {
                     msg.warning(
                       `端口属于 VLAN ${currentVlan}，不能直接配置 IP。请先去端口详情页清除配置。`

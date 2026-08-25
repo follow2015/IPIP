@@ -12,16 +12,13 @@ import type { Room, Cabinet } from '@/types/models';
 import type { PaginationParams } from '@/types/api';
 import type { RoomCreate, RoomUpdate } from '@/types/api-bridge';
 
-
 interface RoomQueryParams extends PaginationParams {
   search?: string;
   name?: string;
   status?: number;
 }
 
-
 export type CreateRoomRequest = RoomCreate;
-
 
 export type UpdateRoomRequest = RoomUpdate & { id: number };
 
@@ -55,7 +52,6 @@ export function useRoomCabinets(roomId: number) {
     enabled: roomId > 0,
   });
 }
-
 
 export function useRoomStatistics(roomId: number) {
   return useQuery({

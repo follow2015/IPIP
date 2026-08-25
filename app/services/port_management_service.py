@@ -29,6 +29,10 @@ logger = get_logger(__name__)
 
 
 class PortManagementService:
+    """统一端口管理服务
+
+    适配有权限/无权限交换机，所有写操作 commit 后广播结构化事件。
+    """
 
     def __init__(
         self,
@@ -48,6 +52,20 @@ class PortManagementService:
 
 
     def create_port(self, device_id: int, data: Dict) -> NetworkPort:
+        """手动创建端口
+
+        使用 parse_port_name 解析端口名，data_source="manual"。
+
+        Args:
+            device_id: 设备ID
+            data: 端口字段字典，必须包含 port_name
+
+        Returns:
+            NetworkPort: 创建的端口对象
+
+        Raises:
+            ValidationError: 端口名已存在
+        """
         port_name = data.get("port_name")
         if not port_name:
             raise ValidationError("端口名称不能为空")
@@ -82,6 +100,20 @@ class PortManagementService:
         return port
 
     def update_port(self, port_id: int, data: Dict) -> NetworkPort:
+        """白名单字段更新端口
+
+        允许更新字段: usage_status, description, vlan, customer_id, port_type, speed
+
+        Args:
+            port_id: 端口ID
+            data: 待更新字段字典
+
+        Returns:
+            NetworkPort: 更新后的端口对象
+
+        Raises:
+            ValidationError: 端口不存在
+        """
         port = self.port_repo.find_by_id_orm(port_id)
         if not port:
             raise ValidationError(f"端口不存在 (ID: {port_id})")
@@ -99,6 +131,17 @@ class PortManagementService:
         return port
 
     def delete_port(self, port_id: int) -> bool:
+        """删除端口，自动清理 LAG/VLAN 成员关系
+
+        Args:
+            port_id: 端口ID
+
+        Returns:
+            bool: 是否删除成功
+
+        Raises:
+            ValidationError: 端口不存在
+        """
         port = self.port_repo.find_by_id_orm(port_id)
         if not port:
             raise ValidationError(f"端口不存在 (ID: {port_id})")
@@ -111,7 +154,7 @@ class PortManagementService:
             port.lag_group_id = None
             lag = self.lag_repo.find_by_id(lag_id)
             if lag:
-                lag.member_count = self.port_repo.count_ports_by_lag_group_id(lag_id) - 1
+                lag.member_count = self.port_repo.count_ports_by_lag_group_id(lag_id) - 1  # 当前端口还未删除，所以 -1
 
         self.vpm_repo.delete_by_port_id(port_id)
 
@@ -129,6 +172,18 @@ class PortManagementService:
 
 
     def create_vlan(self, device_id: int, data: Dict) -> VLAN:
+        """创建 VLAN
+
+        Args:
+            device_id: 设备ID
+            data: VLAN 字段字典，必须包含 vlan_id
+
+        Returns:
+            VLAN: 创建的 VLAN 对象
+
+        Raises:
+            ValidationError: VLAN ID 已存在
+        """
         data["device_id"] = device_id
 
         existing = self.vlan_repo.find_by_device_and_vlan_id(device_id, data["vlan_id"])
@@ -148,6 +203,18 @@ class PortManagementService:
         return vlan
 
     def update_vlan(self, vlan_db_id: int, data: Dict) -> VLAN:
+        """更新 VLAN
+
+        Args:
+            vlan_db_id: VLAN 数据库 ID
+            data: 待更新字段字典
+
+        Returns:
+            VLAN: 更新后的 VLAN 对象
+
+        Raises:
+            ValidationError: VLAN 不存在
+        """
         vlan = self.vlan_repo.find_by_id(vlan_db_id)
         if not vlan:
             raise ValidationError(f"VLAN 不存在 (ID: {vlan_db_id})")
@@ -164,6 +231,17 @@ class PortManagementService:
         return vlan
 
     def delete_vlan(self, vlan_db_id: int) -> bool:
+        """删除 VLAN
+
+        Args:
+            vlan_db_id: VLAN 数据库 ID
+
+        Returns:
+            bool: 是否删除成功
+
+        Raises:
+            ValidationError: VLAN 不存在
+        """
         vlan = self.vlan_repo.find_by_id(vlan_db_id)
         if not vlan:
             raise ValidationError(f"VLAN 不存在 (ID: {vlan_db_id})")
@@ -185,6 +263,12 @@ class PortManagementService:
         return True
 
     def update_vlan_members(self, vlan_db_id: int, port_ids: List[int]) -> None:
+        """全量替换 VLAN 成员端口 + 回写 NetworkPort.vlan 字段
+
+        Args:
+            vlan_db_id: VLAN 数据库 ID
+            port_ids: 端口 ID 列表（全量替换）
+        """
         vlan = self.vlan_repo.find_by_id(vlan_db_id)
         if not vlan:
             raise ValidationError(f"VLAN 不存在 (ID: {vlan_db_id})")
@@ -217,6 +301,18 @@ class PortManagementService:
 
 
     def create_lag(self, device_id: int, data: Dict) -> LinkAggregationGroup:
+        """创建 LAG
+
+        Args:
+            device_id: 设备ID
+            data: LAG 字段字典，必须包含 lag_name
+
+        Returns:
+            LinkAggregationGroup: 创建的 LAG 对象
+
+        Raises:
+            ValidationError: LAG 名称已存在
+        """
         data["device_id"] = device_id
 
         lag_name = data.get("lag_name")
@@ -235,6 +331,18 @@ class PortManagementService:
         return lag
 
     def update_lag(self, lag_id: int, data: Dict) -> LinkAggregationGroup:
+        """更新 LAG
+
+        Args:
+            lag_id: LAG ID
+            data: 待更新字段字典
+
+        Returns:
+            LinkAggregationGroup: 更新后的 LAG 对象
+
+        Raises:
+            ValidationError: LAG 不存在
+        """
         lag = self.lag_repo.find_by_id(lag_id)
         if not lag:
             raise ValidationError(f"LAG 不存在 (ID: {lag_id})")
@@ -252,6 +360,17 @@ class PortManagementService:
         return lag
 
     def delete_lag(self, lag_id: int) -> bool:
+        """删除 LAG，自动清理成员端口的 lag_group_id
+
+        Args:
+            lag_id: LAG ID
+
+        Returns:
+            bool: 是否删除成功
+
+        Raises:
+            ValidationError: LAG 不存在
+        """
         lag = self.lag_repo.find_by_id(lag_id)
         if not lag:
             raise ValidationError(f"LAG 不存在 (ID: {lag_id})")
@@ -274,6 +393,12 @@ class PortManagementService:
         return True
 
     def update_lag_members(self, lag_id: int, port_ids: List[int]) -> None:
+        """全量替换 LAG 成员端口 + 同步 member_count
+
+        Args:
+            lag_id: LAG ID
+            port_ids: 端口 ID 列表（全量替换）
+        """
         lag = self.lag_repo.find_by_id(lag_id)
         if not lag:
             raise ValidationError(f"LAG 不存在 (ID: {lag_id})")
@@ -303,6 +428,15 @@ class PortManagementService:
 
 
     def create_d2n_connection(self, device_id: int, data: Dict) -> int:
+        """创建 D2N 连接，更新端口 usage_status="occupied"
+
+        Args:
+            device_id: 设备ID
+            data: 连接字段字典
+
+        Returns:
+            int: 创建的连接 ID
+        """
         from app.services.device_connection_service import device_connection_service
 
         data.setdefault("device_id", device_id)
@@ -324,6 +458,17 @@ class PortManagementService:
         return connection_id
 
     def delete_connection(self, conn_id: int, conn_type: str = "d2n") -> bool:
+        """删除连接，释放端口 usage_status="free"
+
+        支持 d2n 和 n2n 两种类型。
+
+        Args:
+            conn_id: 连接 ID
+            conn_type: 连接类型，"d2n" 或 "n2n"
+
+        Returns:
+            bool: 是否删除成功
+        """
         from app.services.device_connection_service import device_connection_service
 
         affected_port_names = []

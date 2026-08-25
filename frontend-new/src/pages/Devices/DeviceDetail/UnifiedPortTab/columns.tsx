@@ -14,14 +14,12 @@ import type { SubmitActionFn, RenderPortActionsFn } from '@/types/port';
 
 type ColumnType = TableProps<SwitchPort>['columns'];
 
-
 function renderUsageStatus(v: string) {
   return <StatusTag status={v} statusMap={PORT_USAGE_STATUS_MAP} />;
 }
 
 interface SshColumnDeps {
   deviceId: number;
-  
   renderPortActions: RenderPortActionsFn;
   refetch: () => void;
   submitAction: SubmitActionFn;

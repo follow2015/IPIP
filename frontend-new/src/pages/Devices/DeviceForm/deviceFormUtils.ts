@@ -13,7 +13,6 @@ import { TYPE_CODE } from '../AddDevicesModal/shared';
 
 export { generateAssetNumber } from '@/components/AssetInfoFields';
 
-
 export function generateDeviceName(deviceType?: string): string {
   const code = (deviceType && TYPE_CODE[deviceType]) || 'DEV';
   const now = new Date();
@@ -51,7 +50,7 @@ function parseStorageSegment(seg: string): {
   if (ifaceMatch) {
     const u = ifaceMatch[1].toUpperCase();
     if (u === 'NVME' && storage_type !== 'NVME') {
-      
+      /* skip */
     } else {
       interface_type = ifaceMatch[1];
     }
@@ -60,14 +59,12 @@ function parseStorageSegment(seg: string): {
   return { storage_type, capacity, interface_type, count };
 }
 
-
 export interface StorageItem {
   storage_type: string;
   capacity: string;
   interface_type: string | null;
   count: number;
 }
-
 
 export function parseStorageConfig(text: string): {
   valid: boolean;
@@ -100,7 +97,6 @@ export function parseStorageConfig(text: string): {
 
   return { valid: errors.length === 0, preview, items, errors };
 }
-
 
 export function computeStorageSummary(items: StorageItem[]): {
   totalGb: number;

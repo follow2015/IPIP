@@ -7,7 +7,6 @@
 
 import { LINK_STATUS_MAP } from '@/types/enums';
 
-
 export function getStatusLabel(status: string | null | undefined): string {
   const lower = (status || '').toLowerCase();
   if (lower === 'admin_down' || lower.includes('administratively') || lower === '*down') {
@@ -16,7 +15,10 @@ export function getStatusLabel(status: string | null | undefined): string {
   return LINK_STATUS_MAP[lower]?.label ?? (status || '未知');
 }
 
-
+/**
+ * 端口状态 → Ant Design Tag 预设色名
+ * 使用内置预设色，自动处理背景与文字对比度。
+ */
 export function getStatusTagPreset(status: string | null | undefined): string {
   const lower = (status || '').toLowerCase();
   if (lower === 'admin_down' || lower.includes('administratively') || lower === '*down') {
@@ -25,12 +27,10 @@ export function getStatusTagPreset(status: string | null | undefined): string {
   return LINK_STATUS_MAP[lower]?.color ?? 'default';
 }
 
-
 export function isAdminDown(status: string | null | undefined): boolean {
   const lower = (status || '').toLowerCase();
   return lower === 'admin_down' || lower.includes('administratively') || lower === '*down';
 }
-
 
 export function extractErrorMessage(err: unknown): string {
   if (err instanceof Error) {

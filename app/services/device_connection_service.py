@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+# -*- coding: utf-8 -*-
 """
 设备连接服务
 
@@ -34,6 +34,7 @@ _NETWORK_DEVICE_TYPES = PortMatchingEngine.NETWORK_DEVICE_TYPES
 
 
 class DeviceConnectionService:
+    """设备连接服务"""
 
     def __init__(
         self,
@@ -53,6 +54,17 @@ class DeviceConnectionService:
     @staticmethod
     def derive_connection_status(local_link_status: str | None, peer_link_status: str | None,
                                   local_port_name: str | None = None, peer_port_name: str | None = None) -> str:
+        """根据两端端口的物理链路状态推导连接状态（委托给 NetworkPort）
+
+        Args:
+            local_link_status: 本机端口链路状态 (up/down/...)
+            peer_link_status: 对端端口链路状态 (up/down/...)
+            local_port_name: 本机端口名称（用于判断逻辑端口）
+            peer_port_name: 对端端口名称（用于判断逻辑端口）
+
+        Returns:
+            "active" 或 "inactive"
+        """
         from app.models.network_port import NetworkPort
         return NetworkPort.derive_connection_status(
             local_link_status, peer_link_status, local_port_name, peer_port_name,
@@ -60,27 +72,54 @@ class DeviceConnectionService:
 
     @staticmethod
     def _set_physical_port_up(port_id: int) -> None:
+        """标记物理端口为 up（已弃用 link_status 操作，保留接口兼容）
+
+        link_status 由 SSH 采集维护，连接管理仅通过 usage_status 表示占用。
+        此方法保留为空操作，避免调用方报错。
+
+        Args:
+            port_id: 网络端口 ID
+        """
         pass
 
     @staticmethod
     def _set_physical_port_down(port_id: int) -> None:
+        """标记物理端口为 down（已弃用 link_status 操作，保留接口兼容）
+
+        link_status 由 SSH 采集维护，连接管理仅通过 usage_status 表示占用。
+        此方法保留为空操作，避免调用方报错。
+
+        Args:
+            port_id: 网络端口 ID
+        """
         pass
 
 
     def get_connection(self, connection_id: int) -> Optional[Dict]:
+        """查询 D2N 连接详情"""
         return self.connection_repo.find_by_id(connection_id)
 
     def get_device_connections(self, device_id: int) -> List[Dict]:
+        """查询设备的 D2N 连接列表"""
         return self.connection_repo.find_by_device(device_id)
 
     def get_switch_connections(self, switch_device_id: int) -> List[Dict]:
+        """查询交换机的 D2N 连接列表"""
         return self.connection_repo.find_by_switch_device(switch_device_id)
 
     def get_network_connections(self, device_id: int) -> List[Dict]:
+        """查询设备的 N2N 连接列表（从 network_connections 表）"""
         return self.n2n_repo.find_by_device(device_id)
 
 
     def create_connection(self, data: Dict) -> int:
+        """创建设备连接
+
+        D2N：写入 device_connections 表 + 更新端口 usage_status
+        N2N：写入 network_connections 表 + 更新端口 usage_status
+
+        事务由 API 层 @transactional 统一管理，本方法不再 commit/rollback。
+        """
         device_id        = data.get("device_id")
         switch_device_id = data.get("switch_device_id")
         switch_port_id   = data.get("switch_port_id")
@@ -160,6 +199,10 @@ class DeviceConnectionService:
 
 
     def update_connection(self, connection_id: int, data: Dict) -> bool:
+        """更新 D2N 连接
+
+        事务由 API 层 @transactional 统一管理，本方法不再 commit/rollback。
+        """
         old = self.connection_repo.find_by_id(connection_id)
         if not old:
             raise ValidationError(f"连接不存在 (ID: {connection_id})")
@@ -208,6 +251,10 @@ class DeviceConnectionService:
 
 
     def delete_connection(self, connection_id: int) -> bool:
+        """删除单条 D2N 连接，释放端口
+
+        事务由 API 层 @transactional 统一管理，本方法不再 commit/rollback。
+        """
         conn = self.connection_repo.find_by_id(connection_id)
         if not conn:
             logger.warning("连接不存在: connection_id=%d", connection_id)
@@ -237,6 +284,10 @@ class DeviceConnectionService:
         return result
 
     def delete_network_connection(self, port_id: int) -> bool:
+        """删除 N2N 连接（通过端口ID），释放两端端口
+
+        事务由 API 层 @transactional 统一管理，本方法不再 commit/rollback。
+        """
         conn = self.n2n_repo.find_by_port_for_update_orm(port_id)
         if not conn:
             logger.warning("端口 %d 无 N2N 连接", port_id)
@@ -254,6 +305,10 @@ class DeviceConnectionService:
         return True
 
     def delete_network_connection_by_id(self, connection_id: int) -> bool:
+        """删除 N2N 连接（通过连接ID），释放两端端口
+
+        事务由 API 层 @transactional 统一管理，本方法不再 commit/rollback。
+        """
         conn = self.n2n_repo.find_by_id_for_update_orm(connection_id)
         if not conn:
             logger.warning("连接 %d 不存在", connection_id)
@@ -271,6 +326,13 @@ class DeviceConnectionService:
         return True
 
     def delete_device_connections(self, device_id: int) -> int:
+        """删除设备的全部连接
+
+        D2N：删除 device_connections 记录 + 释放端口
+        N2N：删除 network_connections 记录 + 释放端口
+
+        事务由 API 层 @transactional 统一管理，本方法不再 commit/rollback。
+        """
         connections = self.connection_repo.find_by_device(device_id)
         port_ids_to_invalidate = []
         count = self.connection_repo.delete_device_connections(device_id)
@@ -304,13 +366,22 @@ class DeviceConnectionService:
 
 
     def _occupy_network_port(self, port_id: int) -> None:
+        """占用网络端口（仅更新 usage_status，跳过 disabled 端口）
+
+        委托给 port_repo.occupy_port()，flush 由 repo 内部处理。
+        """
         self.port_repo.occupy_port(port_id)
 
     def _release_network_port(self, port_id: int) -> None:
+        """释放网络端口（仅更新 usage_status）
+
+        委托给 port_repo.release_port()，flush 由 repo 内部处理。
+        """
         self.port_repo.release_port(port_id)
 
 
     def _validate_nics_port(self, nics_port_id: int, device_id: int) -> None:
+        """校验 NIC 端口存在性、归属和可用性"""
         port = self.nics_port_repo.find_by_id_orm(nics_port_id)
         if not port:
             raise ValidationError(f"NIC 端口不存在 (ID: {nics_port_id})")
@@ -324,6 +395,7 @@ class DeviceConnectionService:
             )
 
     def _validate_nics_speed_limit(self, nics_port_id: int, switch_port_id: int) -> None:
+        """校验设备网卡速率不超过网络设备端口速率"""
         nics_port = self.nics_port_repo.find_by_id_orm(nics_port_id)
         switch_port_data = self.port_repo.find_by_id(switch_port_id)
         if not nics_port or not switch_port_data:
@@ -344,6 +416,16 @@ class DeviceConnectionService:
 
     @staticmethod
     def _parse_speed_to_mbps(speed_str: str) -> Optional[int]:
+        """将速率字符串解析为 Mbps 整数值
+
+        支持格式：10G/10GE/1G/1GE/100M/100ME/1000M/10000M/10Gbps/1Gbps/10T/10TE 等
+
+        Args:
+            speed_str: 速率字符串
+
+        Returns:
+            Mbps 整数值，无法解析时返回 None
+        """
         if not speed_str:
             return None
         s = speed_str.strip().upper().replace(" ", "")
@@ -359,9 +441,17 @@ class DeviceConnectionService:
         return value
 
     def _occupy_nics_port(self, nics_port_id: int) -> None:
+        """占用 NIC 端口
+
+        委托给 nics_port_repo.occupy_port()，flush 由 repo 内部处理。
+        """
         self.nics_port_repo.occupy_port(nics_port_id)
 
     def _release_nics_port(self, nics_port_id: int) -> None:
+        """释放 NIC 端口
+
+        委托给 nics_port_repo.release_port()，flush 由 repo 内部处理。
+        """
         self.nics_port_repo.release_port(nics_port_id)
 
 
@@ -373,6 +463,11 @@ class DeviceConnectionService:
         switch_device_id: int,
         for_update: bool = False,
     ) -> dict:
+        """校验 N2N 连接的本机端口和对端端口
+
+        Returns:
+            dict: 包含推导的连接状态 {"derived_status": "active"|"inactive"}
+        """
         if not local_port_id:
             raise ValidationError("network_to_network 必须指定本机端口")
         if not peer_port_id:
@@ -429,6 +524,7 @@ class DeviceConnectionService:
     def _validate_device_type_for_link(
         self, device_id: int, switch_device_id: int, link_type: str
     ) -> None:
+        """校验设备类型与连接类型的匹配性"""
         device = self.device_repo.find_by_id(device_id)
         target = self.device_repo.find_by_id(switch_device_id)
         if not device or not target:
@@ -443,6 +539,7 @@ class DeviceConnectionService:
     def _validate_port_for_connect(
         self, switch_port_id: int, switch_device_id: int, for_update: bool = False
     ) -> None:
+        """校验对端端口可用性"""
         find_fn = self.port_repo.find_by_id_for_update if for_update else self.port_repo.find_by_id
         port = find_fn(switch_port_id)
         if not port:
@@ -459,6 +556,7 @@ class DeviceConnectionService:
     def _validate_switch_port_limit(
         self, switch_device_id: int, exclude_port_id: int = None
     ) -> None:
+        """校验交换机端口容量"""
         active_ports = self.port_repo.find_active_ports(switch_device_id)
         total_active = len(active_ports)
         used_count   = sum(1 for p in active_ports if p.get("usage_status") == "occupied")
@@ -475,6 +573,7 @@ class DeviceConnectionService:
         device_ids: List[Optional[int]] = None,
         switch_port_ids: List[Optional[int]] = None,
     ) -> None:
+        """按语义分别清理 device:* 和 switch_port:* 缓存"""
         seen_devices = set()
         for did in (device_ids or []):
             if did is not None and did not in seen_devices:

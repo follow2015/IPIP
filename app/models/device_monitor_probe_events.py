@@ -15,6 +15,7 @@ from extensions import db
 
 
 class DeviceMonitorProbeEvents(db.Model):
+    """设备探测历史时序（每次探测一行，分区表）"""
 
     __tablename__ = "device_monitor_probe_events"
     __table_args__ = (

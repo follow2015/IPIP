@@ -74,7 +74,7 @@ __all__ = [
     "HealthChecker",
     "ErrorStatistics",
     "health_checker",
-    "error_statistics",
+    "error_statistics",    # 网络工具函数
     "validate_ip_address",
     "validate_ip_network",
     "normalize_mac_address",

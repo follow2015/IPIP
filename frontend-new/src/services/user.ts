@@ -12,7 +12,6 @@ import { queryKeys } from './query-keys';
 import type { User, Permission } from '@/types/models';
 import type { PaginatedData, PaginationParams } from '@/types/api';
 
-
 export interface CreateUserRequest {
   username: string;
   password: string;
@@ -22,12 +21,10 @@ export interface CreateUserRequest {
   contact_phone?: string;
 }
 
-
 export interface UpdateUserRequest {
   id: number;
   data: Partial<Omit<CreateUserRequest, 'password'>> & { status?: number };
 }
-
 
 export interface UserQueryParams extends PaginationParams {
   search?: string;
@@ -75,7 +72,12 @@ export function useUserOptions() {
   });
 }
 
-
+/**
+ * 使用当前用户信息
+ *
+ * 使用 /users/me 获取完整用户数据（包含 contact_phone/department/status/updated_at 等字段），
+ * /auth/profile 仅用于登录初始化（返回 permissions 但缺少部分字段）。
+ */
 export function useCurrentUser() {
   return useQuery({
     queryKey: queryKeys.users.me,
@@ -85,7 +87,6 @@ export function useCurrentUser() {
     },
   });
 }
-
 
 export interface LoginLog {
   id: number;
@@ -98,7 +99,6 @@ export interface LoginLog {
   user_agent: string | null;
 }
 
-
 export function useLoginLogs(params?: PaginationParams) {
   return useQuery({
     queryKey: queryKeys.users.loginLogs(params),
@@ -109,13 +109,11 @@ export function useLoginLogs(params?: PaginationParams) {
   });
 }
 
-
 export interface LoginLogQueryParams extends PaginationParams {
   user_id?: number;
   start_time?: string;
   end_time?: string;
 }
-
 
 export function useAllLoginLogs(params?: LoginLogQueryParams) {
   return useQuery({
@@ -126,7 +124,6 @@ export function useAllLoginLogs(params?: LoginLogQueryParams) {
     },
   });
 }
-
 
 export function useUserLoginLogs(userId: number, params?: PaginationParams) {
   return useQuery({
@@ -139,7 +136,6 @@ export function useUserLoginLogs(userId: number, params?: PaginationParams) {
   });
 }
 
-
 export function useUserPermissions(userId: number) {
   return useQuery({
     queryKey: queryKeys.users.permissions(userId),
@@ -150,7 +146,6 @@ export function useUserPermissions(userId: number) {
     enabled: userId > 0,
   });
 }
-
 
 export function useToggleUserStatus() {
   const queryClient = useQueryClient();
@@ -163,7 +158,6 @@ export function useToggleUserStatus() {
   });
 }
 
-
 export function useChangePassword() {
   return useMutation({
     mutationFn: ({ old_password, new_password }: { old_password: string; new_password: string }) =>
@@ -171,14 +165,12 @@ export function useChangePassword() {
   });
 }
 
-
 export interface UpdateMyProfileRequest {
   username?: string;
   name?: string;
   email?: string;
   contact_phone?: string;
 }
-
 
 export function useUpdateMyProfile() {
   const queryClient = useQueryClient();
@@ -190,7 +182,6 @@ export function useUpdateMyProfile() {
     },
   });
 }
-
 
 export function useResetPassword() {
   const queryClient = useQueryClient();

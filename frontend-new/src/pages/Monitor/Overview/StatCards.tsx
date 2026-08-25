@@ -29,7 +29,6 @@ interface StatCardsProps {
   loading: boolean;
 }
 
-
 function calcHealthScore(overview: MonitorOverviewData): number {
   const total = overview.total_monitored || 0;
   if (total === 0) return 100;
@@ -42,7 +41,6 @@ function calcHealthScore(overview: MonitorOverviewData): number {
   const score = availability * 60 + (1 - alertRatio) * 30 + (1 - interruptRatio) * 10;
   return Math.round(Math.max(0, Math.min(100, score)));
 }
-
 
 function healthColor(score: number): string {
   if (score >= 90) return '#52c41a';
@@ -130,7 +128,7 @@ export default function StatCards({ overview, loading }: StatCardsProps) {
           </Card>
         </Col>
       ))}
-      {}
+      {/* 健康度评分（紧凑卡片，与 KPI 同行） */}
       <Col xs={24} sm={12} md={8} lg={4} xl={4}>
         <Card
           loading={loading}

@@ -30,6 +30,7 @@ _PROC_SELF_FD = "/proc/self/fd"
 
 
 def _count_open_fds() -> "int | None":
+    """返回当前进程打开的 FD 数；不支持的平台（无 /proc）返回 None。"""
     if not os.path.isdir(_PROC_SELF_FD):
         return None
     try:
@@ -51,7 +52,7 @@ def _fd_monitor_loop(threshold: int, interval: float, stop_event: threading.Even
                     "请排查对端或网络，必要时人工重启监控进程回收资源。",
                     count, threshold,
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001 - 监控线程自身不得因异常退出
             logger.warning("FD 监控线程异常", exc_info=True)
         stop_event.wait(interval)
 
@@ -61,13 +62,17 @@ def start_fd_monitor(
     interval: float = DEFAULT_FD_CHECK_INTERVAL,
     stop_event: "threading.Event | None" = None,
 ) -> bool:
+    """启动 FD 监控后台线程（幂等，全程仅启动一次）。
+
+    返回 True 表示本次实际新建并启动了线程；已在运行 / 平台不支持则返回 False。
+    """
     global _fd_monitor_thread, _fd_monitor_started
     with _fd_monitor_lock:
         if _fd_monitor_started:
             return False
         if _count_open_fds() is None:
             logger.debug("FD 监控：当前平台不支持 %s，跳过启动", _PROC_SELF_FD)
-            _fd_monitor_started = True
+            _fd_monitor_started = True  # 已决策，避免重复尝试
             return False
         if stop_event is None:
             stop_event = threading.Event()
@@ -84,6 +89,7 @@ def start_fd_monitor(
 
 
 def reset_fd_monitor_for_test() -> None:
+    """测试专用：重置单例状态，允许再次 start（不停止已运行的线程）。"""
     global _fd_monitor_thread, _fd_monitor_started
     with _fd_monitor_lock:
         _fd_monitor_thread = None

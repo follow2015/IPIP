@@ -27,7 +27,6 @@ interface NicTabProps {
   deviceId: number;
 }
 
-
 const PORT_TYPE_OPTIONS = [
   { label: 'RJ45 (电口)', value: 'RJ45' },
   { label: 'SFP (1G光口)', value: 'SFP' },
@@ -39,7 +38,6 @@ const PORT_TYPE_OPTIONS = [
   { label: 'QSFP-DD (400G光口)', value: 'QSFP-DD' }
 ];
 
-
 const PORT_SPEED_OPTIONS = [
   { label: '100M', value: '100M' },
   { label: '1G', value: '1G' },
@@ -50,13 +48,11 @@ const PORT_SPEED_OPTIONS = [
   { label: '400G', value: '400G' }
 ];
 
-
 const PORT_STATUS_OPTIONS = [
   { label: '空闲', value: 'free' },
   { label: '占用', value: 'occupied' },
   { label: '禁用', value: 'disabled' }
 ];
-
 
 function NicTab({ deviceId }: NicTabProps) {
   const { data: nics, isLoading } = useDeviceNics(deviceId);
@@ -65,32 +61,25 @@ function NicTab({ deviceId }: NicTabProps) {
   const batchCreateNics = useBatchCreateNics(deviceId);
   const message = useMessage();
 
-  
   const { data: nicTemplates = [] } = useComponentTemplates('nic');
 
-  
   const [formOpen, setFormOpen] = useState(false);
   const [editingNic, setEditingNic] = useState<DeviceNicPort | null>(null);
   const [form] = Form.useForm();
 
-  
   const [templateOpen, setTemplateOpen] = useState(false);
   const [templateForm] = Form.useForm();
 
-  
   const batch = useBatchSelection<DeviceNicPort>({ dataSource: nics ?? [] });
 
-  
   const batchDeleteNics = useBatchDeleteNics(deviceId);
 
-  
   const handleEdit = (record: DeviceNicPort) => {
     setEditingNic(record);
     form.setFieldsValue(record);
     setFormOpen(true);
   };
 
-  
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -104,7 +93,6 @@ function NicTab({ deviceId }: NicTabProps) {
     }
   };
 
-  
   const handleBatchDelete = async () => {
     if (batch.count === 0) return;
     try {
@@ -121,7 +109,6 @@ function NicTab({ deviceId }: NicTabProps) {
     }
   };
 
-  
   const handleTemplateSubmit = async () => {
     try {
       await templateForm.validateFields();
@@ -145,7 +132,6 @@ function NicTab({ deviceId }: NicTabProps) {
     }
   };
 
-  
   const columns = [
     { title: '显示名', dataIndex: 'display_name', key: 'display_name' },
     { title: '网卡号', dataIndex: 'nic_number', key: 'nic_number', width: 80 },
@@ -216,7 +202,7 @@ function NicTab({ deviceId }: NicTabProps) {
 
   return (
     <div>
-      {}
+      {/* 批量操作浮条（勾选后浮出，统一批量删除入口） */}
       <BatchActionBar count={batch.count} unit="个端口" onClear={batch.clear}>
         <Popconfirm title={`确定删除选中的 ${batch.count} 个端口？`} onConfirm={handleBatchDelete}>
           <Button danger icon={<DeleteOutlined />}>
@@ -225,7 +211,7 @@ function NicTab({ deviceId }: NicTabProps) {
         </Popconfirm>
       </BatchActionBar>
 
-      {}
+      {/* 操作栏 */}
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
         <Space>
           <Button
@@ -249,7 +235,7 @@ function NicTab({ deviceId }: NicTabProps) {
         rowSelection={batch.rowSelection}
       />
 
-      {}
+      {/* ─── 编辑 Modal ─── */}
       <Modal
         title="编辑端口"
         open={formOpen}
@@ -290,7 +276,7 @@ function NicTab({ deviceId }: NicTabProps) {
         </Form>
       </Modal>
 
-      {}
+      {/* ─── 模板配置 Modal（复用 NicConfigFields） ─── */}
       <Modal
         title="模板配置"
         open={templateOpen}

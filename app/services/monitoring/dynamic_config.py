@@ -37,6 +37,7 @@ _redis_clients: Dict[int, "tuple[int, object]"] = {}
 
 
 def reset_dynamic_config_redis_cache() -> None:
+    """测试/重载专用：清空 Redis 客户端缓存。"""
     with _redis_cache_lock:
         _redis_clients.clear()
 
@@ -44,6 +45,7 @@ REDIS_KEY = "monitor:dynamic_config"
 
 
 class _Entry:
+    """白名单条目。"""
 
     def __init__(
         self,
@@ -63,7 +65,7 @@ class _Entry:
         self.editable = editable
         self.min = min_
         self.max = max_
-        self.camel = camel
+        self.camel = camel  # API 边界驼峰字段名
 
 
 _WHITELIST: Dict[str, _Entry] = {
@@ -148,10 +150,12 @@ _NON_EDITABLE: Dict[str, _Entry] = {
 
 
 def whitelist_entries() -> Dict[str, _Entry]:
+    """可编辑白名单（PUT 校验用）。"""
     return dict(_WHITELIST)
 
 
 def all_entries() -> Dict[str, _Entry]:
+    """全部条目（含不可编辑，GET 展示用）。"""
     return {**_WHITELIST, **_NON_EDITABLE}
 
 
@@ -164,6 +168,14 @@ KEY_TO_CAMEL: Dict[str, str] = {
 
 
 def _coerce(raw: str, type_: str) -> Any:
+    """按类型解析动态配置原始字符串。
+
+    P2-5：包 try/except 回退 None——Redis/DB 被手工写入脏值（如 `HSET key abc`）
+    时，原 `int(raw)` 抛 ValueError 会经 `_cfg` → `apply_result` → `check_device`
+    冒泡，使该设备（乃至 worker 主循环）每轮探测异常、永久静默。解析失败回退 None
+    后，`MonitorDynamicConfig.get` 返回 None，`_cfg` 据此回退 current_app.config 默认值，
+    单点脏值不再拖垮探测。
+    """
     try:
         if type_ == "int":
             return int(raw)
@@ -190,6 +202,10 @@ def _stringify(value: Any, type_: str) -> str:
 
 
 class MonitorDynamicConfig:
+    """进程间共享的动态配置存储。
+
+    必须在 Flask app context 内调用（Redis 客户端依赖 current_app）。
+    """
 
     @staticmethod
     def _redis(app=None):
@@ -209,6 +225,14 @@ class MonitorDynamicConfig:
 
     @classmethod
     def get(cls, key: str, app=None, session=None) -> Optional[Any]:
+        """读取动态配置值（已按 value_type 解析）。
+
+        miss（Redis 与 DB 皆无）返回 None，由 MonitorService._cfg 回退 current_app.config。
+
+        `session`：可选注入的 SQLAlchemy Session（每任务独立 Session 场景）。传入时 DB
+        回退读走该 session，避免与调用方独立事务争用 StaticPool 单连接（测试 / 批量路径）；
+        缺省回落到 scoped db.session。
+        """
         entry = all_entries().get(key)
         if entry is None:
             return None
@@ -216,13 +240,13 @@ class MonitorDynamicConfig:
         r = None
         try:
             r = cls._redis(app)
-        except Exception as e:
+        except Exception as e:  # Redis 不可用：降级到 DB
             logger.warning("动态配置读 Redis 失败 key=%s: %s", key, e)
 
         if r is not None:
             try:
                 raw = r.hget(REDIS_KEY, key)
-            except Exception as e:
+            except Exception as e:  # Redis 不可达：降级到 DB fallback
                 logger.warning("动态配置读 Redis 失败 key=%s: %s", key, e)
                 raw = None
             if raw is not None:
@@ -251,6 +275,14 @@ class MonitorDynamicConfig:
 
     @classmethod
     def get_batch(cls, keys: list[str], app=None, session=None) -> Dict[str, Optional[Any]]:
+        """批量读取动态配置值（单次 HMGET 替代 N 次 HGET）。
+
+        返回 {key: parsed_value}，miss 的 key 值为 None（由调用方回退默认值）。
+        Redis 不可用时逐个降级到 DB fallback。
+
+        用途：monitor_service.check_device 每设备读 4 个配置项，
+        N=2000 设备时从 8000 次 HGET 降至 2000 次 HMGET。
+        """
         entries = all_entries()
         valid_keys = [k for k in keys if k in entries]
         if not valid_keys:
@@ -304,6 +336,10 @@ class MonitorDynamicConfig:
 
     @classmethod
     def set(cls, key: str, value: Any, updated_by: str = "", app=None) -> None:
+        """双写 Redis + DB。调用方需保证 key 在白名单且 editable（API 层校验）。
+
+        DB 侧的 commit 由外层事务（PUT 路由的 @transactional）收口。
+        """
         entry = all_entries().get(key)
         if entry is None:
             raise ValidationError(f"配置项 {key} 不在白名单内")
@@ -325,6 +361,7 @@ class MonitorDynamicConfig:
 
     @classmethod
     def load_all_from_db(cls, app=None) -> None:
+        """启动路径：DB 全量加载 -> 批量 HSET 回填 Redis。"""
         from extensions import db
 
         with app.app_context():
@@ -340,11 +377,12 @@ class MonitorDynamicConfig:
         if mapping:
             try:
                 r.hset(REDIS_KEY, mapping=mapping)
-            except Exception as e:
+            except Exception as e:  # Redis 不可达：放弃回填，下次读走 DB fallback
                 logger.warning("动态配置启动回填 Redis 失败: %s", e)
 
 
 def get_all() -> dict:
+    """返回当前生效的全部监控运行参数（I11：route handler 不再编排业务逻辑）。"""
     from flask import current_app
     data = {}
     for key, entry in all_entries().items():
@@ -361,6 +399,10 @@ def get_all() -> dict:
 
 
 def update_batch(updates: dict, updated_by: str = "unknown") -> list:
+    """批量在线修改监控运行参数（I12：route handler 不再编排业务逻辑）。
+
+    返回已更新的 camel key 列表。
+    """
     updated = []
     for camel, value in updates.items():
         key = CAMEL_TO_KEY[camel]

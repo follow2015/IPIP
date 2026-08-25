@@ -19,6 +19,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class QueryAnalysisResult:
+    """查询分析结果"""
     query_pattern: str
     execution_count: int
     total_time: float
@@ -32,6 +33,7 @@ class QueryAnalysisResult:
 
 @dataclass
 class N1QueryPattern:
+    """N+1查询模式"""
     pattern: str
     count: int
     related_queries: List[str]
@@ -39,14 +41,23 @@ class N1QueryPattern:
 
 
 class QueryPerformanceAnalyzer:
+    """查询性能分析器"""
     
     def __init__(self, session: Session):
         self.session = session
-        self.slow_query_threshold = 0.1
-        self.n_plus_1_threshold = 5
-        self.query_counts = query_monitor.query_counts
+        self.slow_query_threshold = 0.1  # 100ms
+        self.n_plus_1_threshold = 5  # 同一查询执行5次以上认为可能是N+1
+        self.query_counts = query_monitor.query_counts  # 引用 QueryMonitor 的查询计数（单一数据源）
     
     def analyze_query_patterns(self, time_window_minutes: int = 60) -> List[QueryAnalysisResult]:
+        """分析查询模式
+        
+        Args:
+            time_window_minutes: 分析时间窗口（分钟）
+            
+        Returns:
+            List[QueryAnalysisResult]: 分析结果列表
+        """
         stats = query_monitor.get_statistics()
         
         pattern_stats = defaultdict(list)
@@ -96,6 +107,15 @@ class QueryPerformanceAnalyzer:
         return results
     
     def detect_n_plus_1_patterns(self) -> List[N1QueryPattern]:
+        """检测N+1查询模式
+
+        委托给 QueryMonitor 的运行时检测结果，避免重复实现。
+        QueryMonitor._detect_n_plus_1 在每次查询时实时检测，
+        此方法将其结果转换为 N1QueryPattern 列表并补充修复建议。
+
+        Returns:
+            List[N1QueryPattern]: N+1查询模式列表
+        """
         stats = query_monitor.get_statistics()
         patterns = []
 
@@ -129,6 +149,14 @@ class QueryPerformanceAnalyzer:
         return patterns
     
     def analyze_slow_queries(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """分析慢查询
+        
+        Args:
+            limit: 返回数量限制
+            
+        Returns:
+            List[Dict[str, Any]]: 慢查询分析结果
+        """
         stats = query_monitor.get_statistics()
         slow_queries = stats.get('slow_queries', [])
         
@@ -148,6 +176,11 @@ class QueryPerformanceAnalyzer:
         return results
     
     def generate_performance_report(self) -> Dict[str, Any]:
+        """生成性能报告
+        
+        Returns:
+            Dict[str, Any]: 性能报告
+        """
         stats = query_monitor.get_statistics()
         query_patterns = self.analyze_query_patterns()
         n_plus_1_patterns = self.detect_n_plus_1_patterns()
@@ -181,7 +214,7 @@ class QueryPerformanceAnalyzer:
                     'is_n_plus_1': p.is_n_plus_1,
                     'suggestions': p.optimization_suggestions
                 }
-                for p in query_patterns[:10]
+                for p in query_patterns[:10]  # 前10个最耗时的模式
             ],
             'n_plus_1_patterns': [
                 {
@@ -191,13 +224,14 @@ class QueryPerformanceAnalyzer:
                 }
                 for p in n_plus_1_patterns
             ],
-            'slow_queries': slow_queries[:5],
+            'slow_queries': slow_queries[:5],  # 前5个最慢的查询
             'recommendations': self._generate_general_recommendations(
                 query_patterns, n_plus_1_patterns, slow_queries
             )
         }
     
     def _normalize_query_pattern(self, statement: str) -> str:
+        """标准化查询模式"""
         import re
         
         normalized = re.sub(r'\b\d+\b', '?', statement)
@@ -211,6 +245,7 @@ class QueryPerformanceAnalyzer:
     def _generate_optimization_suggestions(self, pattern: str, count: int, 
                                          avg_time: float, is_slow: bool, 
                                          is_n_plus_1: bool) -> List[str]:
+        """生成优化建议"""
         suggestions = []
         
         if is_n_plus_1:
@@ -233,6 +268,7 @@ class QueryPerformanceAnalyzer:
         return suggestions
     
     def _find_related_queries(self, pattern: str) -> List[str]:
+        """查找相关查询"""
         stats = query_monitor.get_statistics()
         related = []
         
@@ -240,12 +276,13 @@ class QueryPerformanceAnalyzer:
         for other_pattern, _ in stats.get('frequent_queries', []):
             if other_pattern != pattern:
                 other_tables = self._extract_table_names(other_pattern)
-                if tables & other_tables:
+                if tables & other_tables:  # 有共同表名
                     related.append(other_pattern)
         
-        return related[:3]
+        return related[:3]  # 最多返回3个相关查询
     
     def _extract_table_names(self, query: str) -> set:
+        """提取查询中的表名"""
         import re
         
         tables = set()
@@ -259,6 +296,7 @@ class QueryPerformanceAnalyzer:
         return tables
     
     def _suggest_n_plus_1_fix(self, pattern: str) -> str:
+        """建议N+1查询修复方案"""
         if 'SELECT' in pattern.upper() and 'WHERE' in pattern.upper():
             return "使用JOIN查询或SQLAlchemy的joinedload/selectinload预加载关联数据"
         elif 'COUNT' in pattern.upper():
@@ -267,11 +305,12 @@ class QueryPerformanceAnalyzer:
             return "考虑批量查询或使用IN子句替代循环查询"
     
     def _analyze_slow_query(self, query_info: Dict[str, Any]) -> List[str]:
+        """分析慢查询并提供建议"""
         suggestions = []
         statement = query_info.get('statement', '').upper()
         duration = query_info.get('duration', 0)
         
-        if duration > 1.0:
+        if duration > 1.0:  # 超过1秒
             suggestions.append("查询执行时间超过1秒，需要紧急优化")
         
         if 'SELECT *' in statement:
@@ -290,6 +329,7 @@ class QueryPerformanceAnalyzer:
     
     def _calculate_performance_score(self, avg_time: float, slow_count: int, 
                                    total_queries: int, n_plus_1_count: int) -> int:
+        """计算性能评分"""
         score = 100
         
         if avg_time > 0.5:
@@ -320,6 +360,7 @@ class QueryPerformanceAnalyzer:
     def _generate_general_recommendations(self, query_patterns: List[QueryAnalysisResult],
                                         n_plus_1_patterns: List[N1QueryPattern],
                                         slow_queries: List[Dict[str, Any]]) -> List[str]:
+        """生成通用优化建议"""
         recommendations = []
         
         if n_plus_1_patterns:
@@ -343,11 +384,27 @@ class QueryPerformanceAnalyzer:
 
 
 def create_performance_report(session: Session) -> Dict[str, Any]:
+    """创建性能报告的便捷函数
+    
+    Args:
+        session: 数据库会话
+        
+    Returns:
+        Dict[str, Any]: 性能报告
+    """
     analyzer = QueryPerformanceAnalyzer(session)
     return analyzer.generate_performance_report()
 
 
 def analyze_repository_performance(repository_class: Any) -> Dict[str, Any]:
+    """分析Repository类的查询性能
+    
+    Args:
+        repository_class: Repository类
+        
+    Returns:
+        Dict[str, Any]: 性能分析结果
+    """
     from app.utils.query_optimizer import query_analyzer
     
     relationships = getattr(repository_class, 'default_eager_load', [])

@@ -20,6 +20,7 @@ from .base import BaseModel
 
 
 class MonitorOidCategoryRule(BaseModel):
+    """OID 分类规则（前缀 → category 映射）"""
 
     __tablename__ = "monitor_oid_category_rules"
     __table_args__ = (

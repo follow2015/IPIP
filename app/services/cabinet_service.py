@@ -37,10 +37,22 @@ _STRATEGY_MAP: Dict[str, UPositionStrategy] = {
 
 
 def _parse_strategy(strategy: str) -> UPositionStrategy:
+    """将策略字符串转换为枚举，未知策略降级为 AUTO_BOTTOM_UP。"""
     return _STRATEGY_MAP.get(str(strategy).lower(), UPositionStrategy.AUTO_BOTTOM_UP)
 
 
 class CabinetService:
+    """机柜服务
+
+    提供机柜的 CRUD、U 位管理、布局优化、容量验证等全部业务逻辑。
+
+    重构说明：
+    1. 全部 @staticmethod 方法迁移为实例方法，通过 repository 访问数据，
+       消除直接 db_manager / 裸 SQL 调用
+    2. 修复 update_cabinet 中字段映射方向矛盾（total_u↔u_count）
+    3. 删除重复 @staticmethod 装饰器及方法末尾的死代码块
+    4. 统一缓存失效逻辑至 _invalidate_cabinet_cache
+    """
 
     def __init__(self, cabinet_repository: CabinetRepository):
         self.cabinet_repository = cabinet_repository
@@ -48,15 +60,18 @@ class CabinetService:
 
 
     def get_by_id(self, cabinet_id: int) -> Optional[Cabinet]:
+        """根据 ID 获取机柜，不存在时返回 None。"""
         return self.cabinet_repository.find_by_id(cabinet_id)
 
     def get_by_id_or_raise(self, cabinet_id: int) -> Cabinet:
+        """根据 ID 获取机柜，不存在时抛出 RecordNotFoundError。"""
         cabinet = self.get_by_id(cabinet_id)
         if cabinet is None:
             raise RecordNotFoundError(f"机柜 {cabinet_id} 不存在")
         return cabinet
 
     def get_by_cabinet_number(self, cabinet_number: str) -> Optional[Cabinet]:
+        """根据机柜编号查找机柜。"""
         return self.cabinet_repository.find_by_cabinet_number(cabinet_number)
 
     def get_paginated(
@@ -65,12 +80,14 @@ class CabinetService:
         per_page: int = 20,
         filters: Optional[Dict[str, Any]] = None,
     ) -> tuple[list[Cabinet], int]:
+        """获取分页机柜列表。"""
         normalized = self._normalize_filters(filters)
         result = self.cabinet_repository.paginate(page=page, page_size=per_page, filters=normalized)
         return result["data"], result["total_count"]
 
     @cached(key_pattern="cabinet:with_devices:{cabinet_id}")
     def get_cabinet_with_devices(self, cabinet_id: int) -> Optional[Dict[str, Any]]:
+        """获取机柜及设备详情（含缓存）。"""
         cabinet = self.get_by_id(cabinet_id)
         return cabinet.to_dict(include_relations=True) if cabinet else None
 
@@ -82,6 +99,7 @@ class CabinetService:
         page: int = 1,
         page_size: int = 20,
     ) -> Dict[str, Any]:
+        """搜索机柜（关键词 + 精确过滤 + 分页）。"""
         filters: Dict[str, Any] = {}
         if room_id is not None:
             filters["room_id"] = room_id
@@ -99,15 +117,22 @@ class CabinetService:
         return result
 
     def get_cabinets_by_room(self, room_id: int) -> List[Dict[str, Any]]:
+        """获取指定机房的全部机柜（含使用统计）。"""
         return [c.to_dict() for c in self.cabinet_repository.find_by_room_id(room_id)]
 
     def get_all_cabinets_list(self) -> List[Dict[str, Any]]:
+        """获取全部机柜列表（用于导出等场景）。"""
         return [c.to_dict() for c in self.cabinet_repository.find_all()]
 
     def get_available_cabinets(
         self, room_id: Optional[int] = None, min_available_u: int = 1,
         all_status: bool = False, statuses: Optional[List[int]] = None,
     ) -> List[Dict[str, Any]]:
+        """获取可用机柜列表（默认status=1 且可用 U 位 >= min_available_u）。
+
+        all_status=True 时不限制状态，用于筛选场景。
+        statuses 优先级高于 all_status，指定允许的状态码列表。
+        """
         cabinets = self.cabinet_repository.find_available_cabinets(
             room_id, min_available_u, all_status=all_status, statuses=statuses,
         )
@@ -119,19 +144,27 @@ class CabinetService:
         return result
 
     def get_cabinet_count(self, room_id: Optional[int] = None) -> int:
+        """获取机柜总数，可按机房过滤。"""
         filters = {"room_id": room_id} if room_id is not None else None
         return self.cabinet_repository.count(filters)
 
     def cabinet_exists(self, cabinet_id: int) -> bool:
+        """检查机柜是否存在。"""
         return self.get_by_id(cabinet_id) is not None
 
 
     def check_cabinet_number_exists(
         self, cabinet_number: str, exclude_id: Optional[int] = None
     ) -> bool:
+        """检查机柜编号是否已存在。"""
         return self.cabinet_repository.check_cabinet_number_exists(cabinet_number, exclude_id)
 
     def create_cabinet(self, data: Dict[str, Any]) -> Cabinet:
+        """创建机柜。
+
+        Raises:
+            ValidationError: 机柜编号已存在
+        """
         payload = self._normalize_cabinet_payload(data)
         if self.check_cabinet_number_exists(payload.get("cabinet_number", "")):
             raise ValidationError(f"机柜编号 '{payload.get('cabinet_number')}' 已存在")
@@ -142,6 +175,16 @@ class CabinetService:
         return cabinet
 
     def update_cabinet(self, cabinet_id: int, data: Dict[str, Any]) -> Cabinet:
+        """更新机柜。
+
+        修复：原代码在此处将 total_u 映射为 u_count（data["u_count"] = data.pop("total_u")），
+        与 _normalize_cabinet_payload 中 u_count→total_u 的方向相反，导致字段错乱。
+        现统一通过 _normalize_cabinet_payload 处理，不再在此单独映射。
+
+        Raises:
+            RecordNotFoundError: 机柜不存在
+            ValidationError: 编号已被其他机柜占用
+        """
         old_cabinet = self.get_by_id_or_raise(cabinet_id)
         payload     = self._normalize_cabinet_payload(data)
 
@@ -172,6 +215,15 @@ class CabinetService:
         return cabinet
 
     def _sync_devices_customer(self, cabinet_id: int, customer_id: Optional[int]) -> None:
+        """机柜客户变更时，同步更新该机柜下所有设备的客户ID。
+
+        使用批量 UPDATE 语句，避免逐条加载设备对象导致 N+1 查询。
+        本方法不提交事务，由 API 层 @transactional 统一管理。
+
+        Args:
+            cabinet_id: 机柜ID
+            customer_id: 新的客户ID（可为 None，表示清除客户）
+        """
         from app.models.device import Device
 
         self.cabinet_repository.session.query(Device).filter(
@@ -185,6 +237,15 @@ class CabinetService:
         )
 
     def delete_cabinet(self, cabinet_id: int, force: bool = False) -> bool:
+        """删除机柜。
+
+        Args:
+            force: True 时强制删除（即使有关联设备）
+
+        Raises:
+            RecordNotFoundError: 机柜不存在
+            ValidationError: 有关联设备且非强制删除
+        """
         cabinet = self.get_by_id_or_raise(cabinet_id)
         room_id = cabinet.room_id
 
@@ -203,6 +264,7 @@ class CabinetService:
     def batch_delete_cabinets(
         self, cabinet_ids: List[int], force: bool = False
     ) -> Dict[str, Any]:
+        """批量删除机柜，返回各 ID 的成功/失败情况。"""
         deleted: List[int]         = []
         failed:  List[int]         = []
         errors:  Dict[int, str]    = {}
@@ -221,6 +283,14 @@ class CabinetService:
     def update_cabinet_customer(
         self, cabinet_id: int, new_customer_id: Optional[int]
     ) -> Cabinet:
+        """更新机柜绑定客户（整柜租赁）。
+
+        Args:
+            new_customer_id: 新客户 ID；None 表示解绑
+
+        Raises:
+            RecordNotFoundError: 机柜不存在
+        """
         old_cabinet = self.get_by_id_or_raise(cabinet_id)
         if new_customer_id is not None:
             from app.services.customer_service import CustomerService
@@ -238,10 +308,12 @@ class CabinetService:
 
 
     def get_devices(self, cabinet_id: int) -> List:
+        """获取机柜下的全部设备。"""
         cabinet = self.get_by_id(cabinet_id)
         return cabinet.devices if cabinet else []
 
     def update_cabinet_usage(self, cabinet_id: int) -> bool:
+        """重新计算并持久化 used_u / used_power 冗余字段。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return False
@@ -259,6 +331,7 @@ class CabinetService:
         height_u: int,
         exclude_device_id: Optional[int] = None,
     ) -> Dict[str, Any]:
+        """检查指定 U 位区间是否可用（无冲突）。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return {"available": False, "message": "机柜不存在"}
@@ -285,6 +358,7 @@ class CabinetService:
     def get_available_u_positions(
         self, cabinet_id: int, height_u: int = 1, device_spacing: int = 2
     ) -> Optional[Dict[str, Any]]:
+        """获取可放置指定高度设备的 U 位列表。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
@@ -301,6 +375,7 @@ class CabinetService:
         strategy: str = "auto_bottom_up",
         device_spacing: int = 2,
     ) -> Optional[int]:
+        """智能分配 U 位，返回推荐起始 U 位。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
@@ -319,6 +394,7 @@ class CabinetService:
         allow_partial: bool = False,
         device_spacing: int = 2,
     ) -> Optional[Dict[str, Any]]:
+        """批量为多个设备分配 U 位。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
@@ -334,6 +410,7 @@ class CabinetService:
 
 
     def get_utilization(self, cabinet_id: int) -> Optional[Dict[str, Any]]:
+        """获取机柜 U 位与功率利用率。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
@@ -358,6 +435,7 @@ class CabinetService:
 
     @cached(key_pattern="cabinet:layout:{cabinet_id}")
     def get_cabinet_layout(self, cabinet_id: int) -> Optional[Dict[str, Any]]:
+        """获取机柜布局（含 U 位占用映射）。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
@@ -396,6 +474,7 @@ class CabinetService:
         }
 
     def get_u_usage_map(self, cabinet_id: int) -> Optional[Dict[str, Any]]:
+        """获取完整 U 位使用映射（每个 U 位的状态与设备信息）。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
@@ -434,6 +513,7 @@ class CabinetService:
         }
 
     def get_cabinet_stats(self, cabinet_id: int) -> Optional[Dict[str, Any]]:
+        """获取机柜统计信息（设备数、U 位、功率）。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
@@ -468,6 +548,7 @@ class CabinetService:
     def get_cabinet_usage_with_spacing(
         self, cabinet_id: int, device_spacing: int = 2
     ) -> Optional[Dict[str, Any]]:
+        """获取机柜使用情况（含设备间距）。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
@@ -496,6 +577,7 @@ class CabinetService:
     def optimize_cabinet_layout(
         self, cabinet_id: int, strategy: str = "compact", device_spacing: int = 2
     ) -> Optional[Dict[str, Any]]:
+        """优化机柜布局。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
@@ -512,6 +594,7 @@ class CabinetService:
         device_spacing: int = 2,
         max_usage_rate: float = 90.0,
     ) -> Optional[Dict[str, Any]]:
+        """验证机柜容量规划，支持模拟新增设备后的预检。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
@@ -553,6 +636,7 @@ class CabinetService:
     def check_capacity_with_spacing(
         self, cabinet_id: int, new_height: int, device_spacing: int = 2
     ) -> Dict[str, Any]:
+        """检查添加新设备后是否超出容量（含间距）。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return {"can_fit": False, "message": "机柜不存在"}
@@ -583,6 +667,7 @@ class CabinetService:
         height_u: int,
         exclude_device_id: Optional[int] = None,
     ) -> Dict[str, Any]:
+        """检查指定U位区间是否与已有设备冲突。"""
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return {
@@ -609,6 +694,7 @@ class CabinetService:
         strategy: str = "auto_bottom_up",
         device_spacing: int = 2,
     ) -> Optional[int]:
+        """智能分配U位（兼容旧API）。"""
         return self.auto_allocate_u_position(
             cabinet_id=cabinet_id,
             height_u=height_u,
@@ -617,15 +703,22 @@ class CabinetService:
         )
 
     def get_global_statistics(self) -> Dict[str, Any]:
+        """获取全局机柜统计汇总。"""
         return self.cabinet_repository.get_cabinet_statistics()
 
 
     def _normalize_cabinet_payload(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """统一字段命名（兼容旧 API 字段名 → 标准字段名）。
+
+        修复：原代码 _normalize_cabinet_payload 将 u_count 映射到 total_u，
+        但 update_cabinet 同时又把 total_u 映射回 u_count，两者方向矛盾。
+        现统一：旧字段 u_count → 标准字段 total_u（单向）。
+        """
         payload = dict(data or {})
         for src, dst in {
             "name":           "cabinet_number",
             "position":       "location",
-            "u_count":        "total_u",
+            "u_count":        "total_u",       # 旧字段兼容
             "power_capacity": "total_power",
             "description":    "notes",
         }.items():
@@ -638,6 +731,7 @@ class CabinetService:
         return payload
 
     def _normalize_filters(self, filters: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """标准化过滤条件（状态字符串转整数）。"""
         normalized = dict(filters or {})
         if "status" in normalized and isinstance(normalized["status"], str):
             normalized["status"] = self._convert_cabinet_status(normalized["status"])
@@ -645,6 +739,7 @@ class CabinetService:
 
     @staticmethod
     def _convert_cabinet_status(status_value: Any) -> int:
+        """将字符串状态转换为机柜状态码。"""
         if isinstance(status_value, int):
             return status_value
         return {
@@ -656,6 +751,7 @@ class CabinetService:
         }.get(str(status_value).lower(), 1)
 
     def _invalidate_cabinet_cache(self, cabinet_id: int, room_id: Optional[int] = None) -> None:
+        """统一失效机柜相关全部缓存。"""
         cache_manager.invalidate_pattern(f"cabinet:{cabinet_id}:*")
         cache_manager.invalidate_pattern(f"cabinet:with_devices:{cabinet_id}")
         cache_manager.invalidate_pattern(f"cabinet:layout:{cabinet_id}")

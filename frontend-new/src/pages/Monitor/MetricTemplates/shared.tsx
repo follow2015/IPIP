@@ -8,20 +8,17 @@ import { Typography } from 'antd';
 
 const { Text } = Typography;
 
-
 export const DEVICE_TYPE_LABEL: Record<string, string> = {
   network: '网络设备',
   server: '服务器',
   other: '其他'
 };
 
-
 export const SOURCE_LABEL: Record<string, string> = {
   snmp: 'SNMP',
   ipmi: 'IPMI',
   zabbix: 'Zabbix'
 };
-
 
 export const METRIC_TYPE_LABEL: Record<string, string> = {
   gauge: '瞬时值',
@@ -49,7 +46,6 @@ export const METRIC_TYPE_OPTIONS = [
   { label: '事件（event）', value: 'event' }
 ];
 
-
 export interface MetricTemplateFormValues {
   device_type: string;
   metric_key: string;
@@ -60,26 +56,21 @@ export interface MetricTemplateFormValues {
   mib?: string;
   oid_symbol?: string;
   oid?: string;
-  
   zabbix_item_key?: string;
   index_kind?: string;
   metric_type: string;
   unit?: string;
   poll_interval?: number;
-  
   warn?: number;
   crit?: number;
   expected?: string;
-  threshold_json?: string; 
+  threshold_json?: string; // event 类型用自由 JSON
   severity_default?: string;
   enabled?: boolean;
   description?: string;
-  
   runbook_url?: string;
-  
   runbook_title?: string;
 }
-
 
 export function buildThreshold(values: MetricTemplateFormValues): Record<string, unknown> | null {
   if (values.metric_type === 'gauge' || values.metric_type === 'counter') {
@@ -91,7 +82,6 @@ export function buildThreshold(values: MetricTemplateFormValues): Record<string,
   if (values.metric_type === 'state') {
     return values.expected ? { expected: values.expected } : null;
   }
-  
   if (values.threshold_json) {
     try {
       return JSON.parse(values.threshold_json);
@@ -101,7 +91,6 @@ export function buildThreshold(values: MetricTemplateFormValues): Record<string,
   }
   return null;
 }
-
 
 export function parseThreshold(
   threshold: Record<string, unknown> | null | undefined,
@@ -119,7 +108,6 @@ export function parseThreshold(
   }
   return { threshold_json: JSON.stringify(threshold, null, 2) };
 }
-
 
 export function renderThreshold(
   threshold: Record<string, unknown> | null | undefined,

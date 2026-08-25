@@ -10,6 +10,10 @@ from .base import BaseAppException
 
 
 class SystemError(BaseAppException):
+    """系统异常基类
+    
+    当系统级错误发生时抛出此类异常。
+    """
     
     def __init__(
         self,
@@ -18,6 +22,14 @@ class SystemError(BaseAppException):
         details: Optional[Dict[str, Any]] = None,
         status_code: int = 500
     ):
+        """初始化系统异常
+        
+        Args:
+            message: 异常消息
+            code: 异常代码
+            details: 异常详情
+            status_code: HTTP状态码
+        """
         super().__init__(
             message=message,
             code=code or "SYSTEM_ERROR",
@@ -27,6 +39,10 @@ class SystemError(BaseAppException):
 
 
 class CacheError(SystemError):
+    """缓存异常
+    
+    当缓存操作失败时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -35,6 +51,14 @@ class CacheError(SystemError):
         cache_backend: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化缓存异常
+        
+        Args:
+            operation: 缓存操作（GET、SET、DELETE等）
+            cache_key: 缓存键
+            cache_backend: 缓存后端（Redis、Memory等）
+            message: 自定义异常消息
+        """
         if not message:
             if cache_key and cache_backend:
                 message = f"缓存{operation}操作失败：{cache_backend} 后端，键 {cache_key}"
@@ -59,6 +83,10 @@ class CacheError(SystemError):
 
 
 class ConfigurationError(SystemError):
+    """配置异常
+    
+    当配置错误或缺失时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -67,6 +95,14 @@ class ConfigurationError(SystemError):
         reason: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化配置异常
+        
+        Args:
+            config_key: 配置键
+            config_file: 配置文件
+            reason: 错误原因
+            message: 自定义异常消息
+        """
         if not message:
             if config_key and reason:
                 message = f"配置错误：{config_key} - {reason}"
@@ -93,6 +129,10 @@ class ConfigurationError(SystemError):
 
 
 class ExternalServiceError(SystemError):
+    """外部服务异常
+    
+    当外部服务调用失败时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -102,6 +142,15 @@ class ExternalServiceError(SystemError):
         response_body: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化外部服务异常
+        
+        Args:
+            service_name: 服务名称
+            operation: 操作名称
+            status_code: HTTP状态码
+            response_body: 响应体
+            message: 自定义异常消息
+        """
         if not message:
             if operation and status_code:
                 message = f"外部服务 {service_name} 调用失败：{operation}，状态码 {status_code}"
@@ -126,6 +175,10 @@ class ExternalServiceError(SystemError):
 
 
 class FileSystemError(SystemError):
+    """文件系统异常
+    
+    当文件系统操作失败时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -134,6 +187,14 @@ class FileSystemError(SystemError):
         reason: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化文件系统异常
+        
+        Args:
+            operation: 文件操作（READ、WRITE、DELETE等）
+            file_path: 文件路径
+            reason: 失败原因
+            message: 自定义异常消息
+        """
         if not message:
             if file_path and reason:
                 message = f"文件{operation}操作失败：{file_path} - {reason}"
@@ -156,6 +217,10 @@ class FileSystemError(SystemError):
 
 
 class NetworkError(SystemError):
+    """网络异常
+    
+    当网络操作失败时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -165,6 +230,15 @@ class NetworkError(SystemError):
         reason: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化网络异常
+        
+        Args:
+            operation: 网络操作（REQUEST、CONNECT等）
+            endpoint: 端点地址
+            timeout: 超时时间
+            reason: 失败原因
+            message: 自定义异常消息
+        """
         if not message:
             if endpoint and reason:
                 message = f"网络{operation}操作失败：{endpoint} - {reason}"
@@ -189,6 +263,10 @@ class NetworkError(SystemError):
 
 
 class ResourceExhaustionError(SystemError):
+    """资源耗尽异常
+    
+    当系统资源耗尽时抛出此异常。
+    """
     
     def __init__(
         self,
@@ -197,6 +275,14 @@ class ResourceExhaustionError(SystemError):
         limit: Optional[str] = None,
         message: Optional[str] = None
     ):
+        """初始化资源耗尽异常
+        
+        Args:
+            resource_type: 资源类型（MEMORY、DISK、CONNECTION等）
+            current_usage: 当前使用量
+            limit: 限制值
+            message: 自定义异常消息
+        """
         if not message:
             resource_names = {
                 "MEMORY": "内存",
@@ -226,8 +312,13 @@ class ResourceExhaustionError(SystemError):
 
 
 class SSHConnectionError(NetworkError):
+    """SSH 连接异常
+    
+    当 SSH 连接失败时抛出此异常。
+    """
     
     def __init__(self, host: str = "", reason: str = "", message: Optional[str] = None):
+        """初始化 SSH 连接异常"""
         if not message:
             if host and reason:
                 message = f"SSH 连接失败 {host}：{reason}"
@@ -239,8 +330,13 @@ class SSHConnectionError(NetworkError):
 
 
 class SwitchConfigError(SystemError):
+    """交换机配置异常
+    
+    当交换机配置操作失败时抛出此异常。
+    """
     
     def __init__(self, switch_id: Optional[int] = None, reason: str = "", message: Optional[str] = None):
+        """初始化交换机配置异常"""
         if not message:
             if switch_id and reason:
                 message = f"交换机 {switch_id} 配置失败：{reason}"

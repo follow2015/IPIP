@@ -8,7 +8,6 @@ import { Form, Input, InputNumber, Select, Card, Row, Col } from 'antd';
 import { SWITCH_DEVICE_TYPE_OPTIONS, SSH_PROTOCOL_OPTIONS } from '@/types/enums';
 
 interface SwitchConfigFieldsProps {
-  
   isEdit: boolean;
 }
 

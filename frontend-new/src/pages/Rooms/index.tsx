@@ -15,7 +15,6 @@ import type { Room } from '@/types/models';
 import { useCrudPage } from '@/hooks/useCrudPage';
 import { formatDateTime } from '@/utils/format';
 
-
 function Rooms() {
   const navigate = useNavigate();
   const crud = useCrudPage<Room>({
@@ -25,12 +24,10 @@ function Rooms() {
     nameLabel: '机房'
   });
 
-  
   const handleDetail = (record: Room) => {
     navigate(`/rooms/${record.id}`);
   };
 
-  
   const columns = [
     {
       title: 'ID',

@@ -19,7 +19,6 @@ import ChassisConfigPanel from './ChassisConfigPanel';
 import PortGeneratePanel from './PortGeneratePanel';
 
 interface BatchAddTabProps {
-  
   active: boolean;
   onClose: (refresh?: boolean) => void;
 }
@@ -130,7 +129,7 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
           )}
         </Space>
 
-        {}
+        {/* ── 硬件配置区域（独立服务器 + 子节点） ── */}
         {isServerType && !isChassisMode && (
           <Card
             title="硬件配置（统一设置）"
@@ -142,7 +141,7 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
           </Card>
         )}
 
-        {}
+        {/* ── 网卡配置区域（独立服务器 + 子节点） ── */}
         {isServerType && !isChassisMode && (
           <Card
             title="网卡配置"
@@ -154,10 +153,10 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
           </Card>
         )}
 
-        {}
+        {/* ── 机箱配置区域：生成子节点选项 ── */}
         {isChassisMode && <ChassisConfigPanel form={form} />}
 
-        {}
+        {/* ── 网络设备：管理权限开关 ── */}
         {isNetworkType && (
           <div style={{ marginBottom: 12 }}>
             <Form.Item
@@ -172,7 +171,7 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
           </div>
         )}
 
-        {}
+        {/* ── 端口生成区域（非网管型网络设备） ── */}
         {isUnmanagedNetwork && <PortGeneratePanel form={form} portPreview={portPreview} />}
       </Form>
 

@@ -30,6 +30,15 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
         name: str,
         strict_name_conflict: bool = False,
     ) -> MonitorCredential:
+        """创建或复用共享凭据。
+
+        Args:
+            strict_name_conflict: 为 True 时，若明文已存在但调用方传入的 name 与
+                旧行 name 不同（且旧行 name 非空），抛 ResourceConflictError 而非
+                静默丢弃 name。仅用于「用户主动创建/配置」路径（create_shared_credential、
+                upsert），内部迁移复用路径（update_payload、update_shared_payload）
+                应保持 False 以支持合并后命中已有行的复用语义。
+        """
         existing = (
             self.session.query(MonitorCredential)
             .filter(
@@ -74,7 +83,7 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
         )
         self.session.add(cred)
         try:
-            with self.session.begin_nested():
+            with self.session.begin_nested():  # SAVEPOINT：仅回滚本条 INSERT
                 self.session.flush()
         except Exception as exc:
             from sqlalchemy.exc import IntegrityError
@@ -122,6 +131,12 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
         ]
 
     def linked_devices_detail(self, credential_id: int) -> List[dict]:
+        """返回某共享凭据关联的设备详情（id/name/type/ip），供凭据管理页右栏展示。
+
+        JOIN devices 表取展示字段；不返回任何凭据密文。
+        对服务器类型设备，management_ip 优先取 hardware.ipmi_address（BMC 地址），
+        与 device_monitor_status_repository.list_with_device 保持一致。
+        """
         from app.models.device import Device
         from app.models.device_hardware import DeviceHardware
 
@@ -164,6 +179,10 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
     def update_credential(
         self, credential_id: int, enabled: Optional[bool] = None, name: Optional[str] = None,
     ) -> Optional[MonitorCredential]:
+        """更新共享凭据的启用状态或名称（不触及密文）。
+
+        仅更新非 None 字段；enabled/name 均为 None 时为 no-op。
+        """
         cred = self.find_by_id(credential_id)
         if cred is None:
             return None
@@ -177,6 +196,15 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
     def find_enabled_device_ids(
         self, protocols: List[str], monitor_enabled_only: bool = False
     ) -> List[int]:
+        """返回持有指定协议启用凭据的设备 ID 列表。
+
+        Args:
+            protocols: 仅含这些协议的凭据计入（如 ["snmp","bmc"]）。
+            monitor_enabled_only: 为 True 时按设备级开关过滤——只纳入
+                monitor_enabled=1 或【无状态行（视为默认启用）】的设备。
+                必须用 outer join：状态行是懒创建的（首次探测才生成），
+                若 inner join 会把新设备永远挡在监控外，形成死循环。
+        """
         if not protocols:
             return []
         from app.models.device import Device
@@ -218,6 +246,12 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
     def find_enabled_device_ids_all(
         self, monitor_enabled_only: bool = False
     ) -> List[int]:
+        """返回启用监控的全部设备 ID 列表（不区分协议，供无凭据触发源如 ping）。
+
+        无凭据协议（ping）不依赖凭据关联表，应对所有开启设备级监控开关的设备
+        （或尚无状态行视为默认启用）探测。复用与 find_enabled_device_ids 相同的
+        外连过滤语义，避免把新设备挡在监控外。
+        """
         from app.models.device import Device
 
         q = self.session.query(Device.id).filter(Device.deleted_at.is_(None))
@@ -238,6 +272,7 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
         return [r[0] for r in rows]
 
     def find_by_id(self, credential_id: int) -> Optional[MonitorCredential]:
+        """按主键查凭据（不返回密文，调用方自行 get_decrypted）。"""
         return (
             self.session.query(MonitorCredential)
             .filter(MonitorCredential.id == credential_id)
@@ -260,6 +295,7 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
         )
 
     def find_enabled_protocols(self, device_id: int) -> List[str]:
+        """返回某设备已启用的协议列表（供 get_device_status 用；本任务新增）"""
         rows = (
             self.session.query(MonitorCredential.protocol)
             .join(

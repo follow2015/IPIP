@@ -9,10 +9,8 @@ interface IPBatchEditModalProps {
   customerOptions?: SelectOption[];
   submitting: boolean;
   onClose: () => void;
-  
   onSubmit: (values: { customer_id?: number | null; notes?: string }) => void;
 }
-
 
 export function IPBatchEditModal({
   open,

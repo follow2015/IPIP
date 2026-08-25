@@ -30,38 +30,29 @@ import type { LoginLog } from '@/services/user';
 import { LOGIN_TYPE_MAP } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
 
-
 const PASSWORD_TIPS = '至少8位，需包含大写字母、小写字母、数字和特殊字符';
-
 
 function ProfilePage() {
   const { message: messageApi } = App.useApp();
   const authUser = useAuthStore((s) => s.user);
   const setAuth = useAuthStore((s) => s.setAuth);
 
-  
   const { data: currentUser, isLoading: profileLoading, refetch: refetchProfile } = useCurrentUser();
   const userData = currentUser ?? authUser;
 
-  
   const updateProfile = useUpdateMyProfile();
 
-  
   const changePassword = useChangePassword();
 
-  
   const [logPage, setLogPage] = useState(1);
   const [logPageSize, setLogPageSize] = useState(10);
   const { data: loginLogsData, isLoading: logsLoading } = useLoginLogs({ page: logPage, per_page: logPageSize });
 
-  
   const [profileForm] = Form.useForm();
   const [profileEditing, setProfileEditing] = useState(false);
 
-  
   const [passwordForm] = Form.useForm();
 
-  
   useEffect(() => {
     if (userData) {
       profileForm.setFieldsValue({
@@ -73,13 +64,11 @@ function ProfilePage() {
     }
   }, [userData, profileForm]);
 
-  
   const handleSaveProfile = async () => {
     const values = await profileForm.validateFields();
     try {
       const result = await updateProfile.mutateAsync(values);
       if (result.data) {
-        
         const token = useAuthStore.getState().token ?? '';
         const permissions = useAuthStore.getState().permissions;
         setAuth(result.data, token, permissions);
@@ -93,7 +82,6 @@ function ProfilePage() {
     }
   };
 
-  
   const handleChangePassword = async () => {
     const values = await passwordForm.validateFields();
     if (values.new_password !== values.confirm_password) {
@@ -113,7 +101,6 @@ function ProfilePage() {
     }
   };
 
-  
   const logColumns = [
     {
       title: '登录时间',
@@ -148,12 +135,10 @@ function ProfilePage() {
     },
   ];
 
-  
   const rolesDisplay = userData?.roles?.length
     ? userData.roles.map((r) => <Tag key={r} color="blue">{r}</Tag>)
     : <Tag>无角色</Tag>;
 
-  
   const statusDisplay = userData?.status === 0
     ? <Tag color="success">正常</Tag>
     : <Tag color="error">禁用</Tag>;
@@ -207,26 +192,26 @@ function ProfilePage() {
                     <Input placeholder="手机号码" />
                   </Form.Item>
 
-                  {}
+                  {/* 只读字段：部门 */}
                   <Form.Item label="部门">
                     <Input value={userData?.department || '-'} disabled style={{ background: '#f5f5f5', color: 'rgba(0,0,0,0.45)' }} />
                   </Form.Item>
 
-                  {}
+                  {/* 只读字段：角色 */}
                   <Form.Item label="角色">
                     <div style={{ minHeight: 32, display: 'flex', alignItems: 'center', background: '#f5f5f5', borderRadius: 6, padding: '4px 11px', color: 'rgba(0,0,0,0.45)' }}>
                       {rolesDisplay}
                     </div>
                   </Form.Item>
 
-                  {}
+                  {/* 只读字段：状态 */}
                   <Form.Item label="状态">
                     <div style={{ minHeight: 32, display: 'flex', alignItems: 'center', background: '#f5f5f5', borderRadius: 6, padding: '4px 11px' }}>
                       {statusDisplay}
                     </div>
                   </Form.Item>
 
-                  {}
+                  {/* 只读字段：更新时间 */}
                   <Form.Item label="更新时间">
                     <Input value={formatDateTime(userData?.updated_at)} disabled style={{ background: '#f5f5f5', color: 'rgba(0,0,0,0.45)' }} />
                   </Form.Item>

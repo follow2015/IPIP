@@ -27,7 +27,6 @@ export default function AlertCenter() {
     ? (raw as AlertTabKey)
     : DEFAULT_TAB;
 
-  
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -39,7 +38,6 @@ export default function AlertCenter() {
     setParams({ tab: key }, { replace: true });
   };
 
-  
   const hideTabBar = activeKey === 'noc' && isFullscreen;
 
   if (hideTabBar) {

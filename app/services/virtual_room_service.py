@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 """虚拟机房服务模块"""
 from app.utils.logging import get_logger
 from typing import Dict, List, Optional, Tuple
@@ -12,19 +12,23 @@ logger = get_logger(__name__)
 
 
 class VirtualRoomService:
+    """虚拟机房服务"""
 
     def __init__(self, repo: VirtualRoomRepository):
         self.repo = repo
 
     def get_all(self) -> List[VirtualRoom]:
+        """获取所有虚拟机房"""
         return self.repo.find_all(order_by="name")
 
     def get_by_id(self, virtual_room_id: int) -> Optional[VirtualRoom]:
+        """根据ID获取虚拟机房"""
         return self.repo.find_with_members(virtual_room_id)
 
     def get_paginated(
         self, page: int = 1, per_page: int = 20, **filters
     ) -> Tuple[List[dict], int]:
+        """分页获取虚拟机房列表"""
         result = self.repo.paginate(
             page=page, page_size=per_page, filters=filters, order_by="name"
         )
@@ -32,6 +36,7 @@ class VirtualRoomService:
         return items, result.get("total_count", 0)
 
     def create(self, data: Dict) -> VirtualRoom:
+        """创建虚拟机房"""
         name = data.get("name", "").strip()
         if not name:
             raise ValidationError("虚拟机房名称不能为空")
@@ -49,6 +54,7 @@ class VirtualRoomService:
         return self.repo.find_with_members(vr.id)
 
     def update(self, virtual_room_id: int, data: Dict) -> VirtualRoom:
+        """更新虚拟机房基本信息"""
         vr = self.repo.find_with_members(virtual_room_id)
         if not vr:
             raise ValidationError("虚拟机房不存在")
@@ -74,6 +80,7 @@ class VirtualRoomService:
         return self.repo.find_with_members(virtual_room_id)
 
     def update_members(self, virtual_room_id: int, device_ids: List[int]) -> VirtualRoom:
+        """更新虚拟机房成员（全量替换）"""
         vr = self.repo.find_by_id(virtual_room_id)
         if not vr:
             raise ValidationError("虚拟机房不存在")
@@ -86,6 +93,7 @@ class VirtualRoomService:
         return self.repo.find_with_members(virtual_room_id)
 
     def delete(self, virtual_room_id: int) -> bool:
+        """删除虚拟机房"""
         vr = self.repo.find_by_id(virtual_room_id)
         if not vr:
             raise ValidationError("虚拟机房不存在")
@@ -95,7 +103,9 @@ class VirtualRoomService:
         return result
 
     def get_member_device_ids(self, virtual_room_id: int) -> List[int]:
+        """获取虚拟机房成员 device_id 列表"""
         return self.repo.get_member_device_ids(virtual_room_id)
 
     def get_covered_room_ids(self, virtual_room_id: int) -> set[int]:
+        """获取虚拟机房涉及的机房ID集合"""
         return self.repo.get_covered_room_ids(virtual_room_id)

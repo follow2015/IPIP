@@ -19,13 +19,11 @@ import type { DeviceConfigBackup, DeviceConfigChange } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
 import { formatDateTime } from '@/utils/format';
 
-
 const BACKUP_TYPE_MAP: Record<string, { label: string; color: string }> = {
   manual: { label: '手动', color: 'blue' },
   scheduled: { label: '定时', color: 'green' },
   pre_change: { label: '变更前', color: 'orange' },
 };
-
 
 const CHANGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
   draft: { label: '草稿', color: 'default' },
@@ -36,10 +34,8 @@ const CHANGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
 };
 
 interface ConfigTabProps {
-  
   deviceId: number;
 }
-
 
 function ConfigTab({ deviceId }: ConfigTabProps) {
   const message = useMessage();
@@ -51,7 +47,6 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
   const backupConfig = useBackupDeviceConfig();
   const approveChange = useApproveConfigChange();
 
-  
   const handleBackup = async () => {
     try {
       await backupConfig.mutateAsync(deviceId);
@@ -62,12 +57,10 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
     }
   };
 
-  
   const handleView = (record: DeviceConfigBackup) => {
     setViewContent(record.config_content);
   };
 
-  
   const handleDiff = (record: DeviceConfigBackup) => {
     const latest = (backups ?? [])[0];
     if (latest && latest.id !== record.id) {
@@ -77,7 +70,6 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
     }
   };
 
-  
   const handleApprove = async (record: DeviceConfigChange, action: 'approve' | 'reject') => {
     try {
       await approveChange.mutateAsync({ deviceId, changeId: record.id, action });
@@ -88,7 +80,6 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
     }
   };
 
-  
   const backupColumns = [
     {
       title: '时间',
@@ -135,7 +126,6 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
     },
   ];
 
-  
   const changeColumns = [
     {
       title: '时间',
@@ -186,7 +176,6 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
     },
   ];
 
-  
   const tabItems = [
     {
       key: 'backups',
@@ -227,7 +216,7 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
     <div>
       <Tabs items={tabItems} />
 
-      {}
+      {/* 查看配置内容弹窗 */}
       <Modal
         title="配置内容"
         open={viewContent !== null}
@@ -240,7 +229,7 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
         </pre>
       </Modal>
 
-      {}
+      {/* 配置对比弹窗 */}
       <Modal
         title="配置对比"
         open={diffContent !== null}

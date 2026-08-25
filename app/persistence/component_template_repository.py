@@ -12,6 +12,7 @@ from app.persistence.base import BaseRepository
 
 
 class ComponentTemplateRepository(BaseRepository):
+    """配件模板仓储"""
 
     def __init__(self, session=None):
         super().__init__(ComponentTemplate, session=session)
@@ -23,6 +24,7 @@ class ComponentTemplateRepository(BaseRepository):
         customer_id: Optional[int] = None,
         include_global: bool = True,
     ) -> List[ComponentTemplate]:
+        """按类别、启用状态和客户筛选模板。"""
         query = self._base_query()
         if category:
             query = query.filter_by(category=category)
@@ -43,11 +45,20 @@ class ComponentTemplateRepository(BaseRepository):
     def find_by_category_customer_model(
         self, category: str, customer_id: Optional[int], model: str
     ) -> Optional[ComponentTemplate]:
+        """检查 (category, customer_id, model) 三元组是否已存在。"""
         return self._base_query().filter_by(
             category=category, customer_id=customer_id, model=model
         ).first()
 
     def delete_customer_templates(self, customer_id: int) -> int:
+        """硬删除客户专属组件模板（scope='customer'）。
+
+        终止客户时调用。scope='customer' 的模板 customer_id 为必填，
+        置 NULL 会违反模型验证，故采用硬删除（终止后模板不可恢复）。
+
+        Returns:
+            int: 删除行数
+        """
         from extensions import db
         result = db.session.query(ComponentTemplate).filter(
             ComponentTemplate.customer_id == customer_id,

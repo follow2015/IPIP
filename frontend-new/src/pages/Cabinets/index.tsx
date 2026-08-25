@@ -19,7 +19,6 @@ import type { Cabinet } from '@/types/models';
 import { useCrudPage } from '@/hooks/useCrudPage';
 import { formatDateTime, formatPercent } from '@/utils/format';
 
-
 function Cabinets() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -30,8 +29,6 @@ function Cabinets() {
     useDelete: useDeleteCabinet,
     nameKey: 'cabinet_number',
     nameLabel: '机柜',
-    
-    
     buildListParams: (tp) =>
       ({
         ...tp,
@@ -39,10 +36,8 @@ function Cabinets() {
       }) as CabinetQueryParams
   });
 
-  
   const initialRoomId = searchParams.get('roomId');
 
-  
   useEffect(() => {
     const roomId = searchParams.get('roomId');
     if (roomId) {
@@ -50,12 +45,10 @@ function Cabinets() {
     }
   }, [searchParams]);
 
-  
   const handleDetail = (record: Cabinet) => {
     navigate(`/cabinets/${record.id}`);
   };
 
-  
   const columns = [
     {
       title: 'ID',

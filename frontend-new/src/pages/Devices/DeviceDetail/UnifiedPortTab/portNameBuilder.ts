@@ -26,7 +26,10 @@ export interface PortGroupInput {
   usage_status?: string;
 }
 
-
+/**
+ * 展开多组端口模板为端口规格列表。
+ * 跳过不合法组（缺模板/缺起止端口/起>止）与无前缀组。
+ */
 export function expandPortGroups(groups: PortGroupInput[] | undefined): PortNameSpec[] {
   if (!groups) return [];
   const result: PortNameSpec[] = [];
@@ -62,7 +65,6 @@ export function expandPortGroups(groups: PortGroupInput[] | undefined): PortName
   }
   return result;
 }
-
 
 export function previewPortNames(groups: PortGroupInput[] | undefined, limit = 500): string[] {
   return expandPortGroups(groups)

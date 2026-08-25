@@ -5,10 +5,8 @@ interface IPBatchBanModalProps {
   open: boolean;
   onClose: () => void;
   submitting: boolean;
-  
   onSubmit: (ips: string[]) => void;
 }
-
 
 export function IPBatchBanModal({ open, onClose, submitting, onSubmit }: IPBatchBanModalProps) {
   const [ips, setIps] = useState('');

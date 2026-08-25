@@ -12,6 +12,11 @@ from extensions import db
 
 
 class ComponentTemplate(BaseModel):
+    """配件模板模型
+
+    按类别预定义常用配件规格，设备创建时通过下拉选择引用。
+    支持 CPU/内存/硬盘/网卡/GPU 五大类别，spec JSON 存储类别特有属性。
+    """
     __tablename__ = "component_templates"
 
     category = db.Column(
@@ -40,11 +45,17 @@ class ComponentTemplate(BaseModel):
     )
 
     def validate_scope_customer(self) -> None:
+        """验证 scope='customer' 时 customer_id 不为空。
+
+        MySQL 不允许在 CHECK 约束中引用 FK 列的 referential action，
+        因此在 ORM 层做验证。
+        """
         if self.scope == 'customer' and self.customer_id is None:
             from app.exceptions.validation import ValidationError
             raise ValidationError("客户专属模板(scope='customer')必须指定 customer_id")
 
     def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
         return {
             "id": self.id,
             "category": self.category,

@@ -19,12 +19,21 @@ logger = get_logger(__name__)
 
 
 class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
+    """机房 Repository
+
+    提供机房相关的数据访问方法，包括查询、创建、更新、删除等操作。
+    """
 
     def __init__(self, session=None):
         super().__init__(Room, session)
 
 
     def find_by_room_name(self, room_name: str) -> Optional[Room]:
+        """根据机房名称查找机房（不过滤状态，供内部使用）
+
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
         try:
             return self._base_query().filter(Room.name == room_name).first()
         except SQLAlchemyError as e:
@@ -32,6 +41,15 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("查找机房失败", original_error=e)
 
     def check_room_name_exists(self, room_name: str, exclude_id: Optional[int] = None) -> bool:
+        """检查机房名称是否已存在（排除已软删除的机房）
+
+        Args:
+            room_name: 机房名称
+            exclude_id: 排除的机房 ID（用于更新时去重）
+
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
         if not room_name:
             return False
 
@@ -49,10 +67,18 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
 
     def check_room_dependencies(self, room_id: int) -> Dict[str, int]:
+        """检查机房的依赖关系（交换机数量 + 机柜数量）
+
+        Returns:
+            {"switch_count": int, "cabinet_count": int}
+
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
         try:
-            from app.models.switch_credentials import SwitchCredentials
-            from app.models.cabinet import Cabinet
-            from app.models.device import Device
+            from app.models.switch_credentials import SwitchCredentials  # 避免循环导入
+            from app.models.cabinet import Cabinet  # 避免循环导入
+            from app.models.device import Device  # 避免循环导入
 
             from app.models.device_switch_ext import DeviceSwitchExt
             switch_count = (
@@ -78,12 +104,31 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             raise QueryExecutionError("检查机房依赖关系失败", original_error=e)
 
     def get_room_statistics(self, room_id: int) -> Dict[str, int]:
+        """获取单个机房统计信息（机柜数 + 交换机数）
+
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
         return self.check_room_dependencies(room_id)
 
     def get_all_room_statistics(self) -> Dict[str, Any]:
+        """获取所有机房的汇总统计信息
+
+        Returns:
+            {
+                "total_rooms": int,
+                "rooms_with_cabinets": int,
+                "rooms_with_switches": int,
+                "empty_rooms": int,         # 既无机柜也无交换机的机房数
+                "status_statistics": dict,
+            }
+
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
         try:
-            from app.models.cabinet import Cabinet
-            from app.models.switch_credentials import SwitchCredentials
+            from app.models.cabinet import Cabinet  # 避免循环导入
+            from app.models.switch_credentials import SwitchCredentials  # 避免循环导入
 
             total_rooms: int = self.count({"status": RoomStatus.NORMAL})
 

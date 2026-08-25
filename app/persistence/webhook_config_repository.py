@@ -10,11 +10,13 @@ from app.persistence.base import BaseRepository
 
 
 class WebhookConfigRepository(BaseRepository):
+    """Webhook 配置仓储"""
 
     def __init__(self, session=None):
         super().__init__(WebhookConfig, session=session)
 
     def find_all_ordered(self) -> List[WebhookConfig]:
+        """按创建时间倒序列出所有配置。"""
         return (
             self._base_query()
             .order_by(WebhookConfig.created_at.desc())
@@ -22,4 +24,5 @@ class WebhookConfigRepository(BaseRepository):
         )
 
     def find_by_name_channel(self, name: str, channel: str) -> Optional[WebhookConfig]:
+        """按 name + channel 联合唯一查找。"""
         return self._base_query().filter_by(name=name, channel=channel).first()

@@ -19,6 +19,7 @@ from app.utils.port_name_utils import get_trunk_name, normalize_port
 logger = get_logger(__name__)
 
 class BatchActionService:
+    """批量操作子服务"""
 
     _CLEAR_FIRST_ACTIONS = {"set_port_vlan", "add_port_to_trunk"}
 
@@ -38,6 +39,16 @@ class BatchActionService:
     def __init__(self, dispatcher, switch_repo: SwitchRepository, sync_coordinator,
                  clear_service=None, vlan_service=None, lag_service=None,
                  action_labels: dict = None):
+        """
+        Args:
+            dispatcher: CommandDispatcher 实例，用于命令下发
+            switch_repo: SwitchRepository 实例
+            sync_coordinator: SyncCoordinator 实例，用于事务与同步
+            clear_service: PortClearService 实例，用于端口清除
+            vlan_service: VlanConfigService 实例，用于 VLAN 操作
+            lag_service: LagConfigService 实例，用于 LAG 操作
+            action_labels: 操作标签映射（从 Facade 的 ACTION_LABELS 传入）
+        """
         self.dispatcher = dispatcher
         self.switch_repo = switch_repo
         self.sync = sync_coordinator
@@ -48,6 +59,26 @@ class BatchActionService:
 
     def batch_port_action(self, switch, action: str, ports: list[str],
                           params: dict = None) -> dict:
+        """批量端口操作（网管交换机，通过 interface range 命令）
+
+        流程：
+        1. 获取设备操作锁
+        2. 对 set_port_vlan / add_port_to_trunk：先逐端口 clear configuration
+        3. 构造 interface range 命令 + 配置命令
+        4. SSH 下发（关闭自动保存）
+        5. 统一保存配置
+        6. 逐端口 _sync_port_from_device 同步三表
+        7. 返回每个端口的操作结果
+
+        Args:
+            switch: 交换机对象（SwitchCredentials）
+            action: 操作类型
+            ports: 端口名称列表（已展开、去重）
+            params: 操作参数
+
+        Returns:
+            dict: {total, succeeded, failed, details: [{port, success, error?}]}
+        """
         params = params or {}
         op_type = self._BATCH_OP_TYPE_MAP.get(action, OpType.PORT_UPDATE)
         adapter = get_adapter(switch.device_type)
@@ -438,6 +469,27 @@ class BatchActionService:
 
     def batch_port_action_db(self, device_id: int, action: str,
                              ports: list[str], params: dict = None) -> dict:
+        """批量端口操作（非网管交换机，直接操作数据库）
+
+        支持的操作：
+        - enable_port:  批量更新 link_status='up'
+        - disable_port: 批量更新 link_status='admin_down'
+        - set_port_vlan: 批量更新 vlan
+        - update_port_info: 批量更新 description
+        - assign_customer: 批量更新 customer_id
+        - add_port_to_trunk: 批量更新 lag_group_id
+        - remove_port_from_channel: 批量清除 lag_group_id
+        - clear_port_config: 批量恢复默认（清除vlan/description/lag，恢复为空闲启用）
+
+        Args:
+            device_id: 交换机 device_id
+            action: 操作类型
+            ports: 端口名称列表
+            params: 操作参数
+
+        Returns:
+            dict: {total, succeeded, failed, details}
+        """
         params = params or {}
         op_type = self._BATCH_OP_TYPE_MAP.get(action, OpType.PORT_UPDATE)
         details = []
@@ -511,6 +563,29 @@ class BatchActionService:
 
     def _batch_enable_disable(self, switch, action: str, ports: list[str],
                               op_type: str, adapter) -> dict:
+        """批量启用/禁用端口：单 SSH 连接完成 config + save + 状态查询
+
+        优化：将 undo shutdown / shutdown 下发、保存配置、读取实际链路状态
+        合并到同一个 SSH 连接，避免硬编码 link_status。
+
+        流程：
+        1. 构造 interface range + undo/shutdown 命令（含 CE commit）
+        2. 同一连接下发配置命令
+        3. 同一连接保存配置
+        4. 同一连接执行 display interface，解析实际链路状态
+        5. 按实际状态更新 DB（update_port_status → derive_usage_status）
+        6. 批量同步端口配置缓存 + 广播 SSE
+
+        Args:
+            switch: 交换机对象
+            action: "enable_port" 或 "disable_port"
+            ports: 端口名称列表
+            op_type: OpType.PORT_ENABLE / OpType.PORT_DISABLE
+            adapter: 设备适配器
+
+        Returns:
+            dict: {success, total, succeeded, failed, details}
+        """
         inner_cmd = adapter.get_undo_shutdown_command() if action == "enable_port" else adapter.get_shutdown_command()
         port_expr = self._build_port_expr(ports, switch.device_type)
         range_commands = [
@@ -607,6 +682,19 @@ class BatchActionService:
 
     def _build_batch_inner_cmds(self, switch, action: str,
                                 params: dict) -> Optional[list[str]]:
+        """构造 interface range 视图内的配置命令
+
+        该方法不处理 add_port_to_trunk（由 batch_port_action 独立路径处理，
+        因 trunkport 聚合语法需要特殊处理）。
+
+        Args:
+            switch: 交换机对象
+            action: 操作类型
+            params: 操作参数
+
+        Returns:
+            list[str]: 接口视图内的命令列表，不支持的操作返回 None
+        """
         adapter = get_adapter(switch.device_type)
 
         if action == "enable_port":
@@ -631,6 +719,17 @@ class BatchActionService:
 
     def _build_batch_vlan_cmds(self, switch, vlan_id: int, mode: str,
                                allowed_vlans: str = None) -> list[str]:
+        """构造批量 VLAN 配置命令（interface range 视图内）
+
+        Args:
+            switch: 交换机对象
+            vlan_id: VLAN ID
+            mode: "access" 或 "trunk"
+            allowed_vlans: Trunk 允许的 VLAN 列表
+
+        Returns:
+            list[str]: 接口视图内的 VLAN 配置命令
+        """
         adapter = get_adapter(switch.device_type)
         device_model = switch.device.device_model or ""
 
@@ -648,6 +747,10 @@ class BatchActionService:
 
     @staticmethod
     def _coerce_speed(val) -> Optional[int]:
+        """将入参限速值规整为大于 0 的 int，非法/缺失/非正数返回 None
+
+        兼容 JSON 传入的字符串（"1000"）或浮点（1000.0），并排除布尔值。
+        """
         if val is None or isinstance(val, bool):
             return None
         try:
@@ -657,6 +760,12 @@ class BatchActionService:
         return iv if iv > 0 else None
 
     def _qos_policy_exists_on_device(self, switch, adapter, policy_name: str) -> bool:
+        """查询设备上是否已存在指定 QoS 策略（批量限速去重）
+
+        复用底层 ssh_mgr 的 show 命令，逻辑与 SwitchConfigService 保持一致：
+        已存在则跳过创建、直接引用。查询失败（超时/异常/无回显）时保守返回 False
+        触发创建——重定义相同内容的策略在华为/H3C 上是幂等的，不会破坏其它引用端口。
+        """
         try:
             output = self.dispatcher.ssh_mgr.send_show_command(
                 switch, adapter.get_qos_policy_query_command(policy_name),
@@ -669,6 +778,16 @@ class BatchActionService:
         return not adapter.is_qos_policy_missing(output)
 
     def _get_applied_qos_policies_multi(self, switch, ports: list, timeout: int = 120) -> dict:
+        """单连接复用读取多个端口已应用的 QoS 策略（批量取消限速用）
+
+        仅建 1 个 SSH 连接，循环 execute_show_on_conn 读取各端口配置并解析，
+        替代逐端口 _get_applied_qos_policies（后者每次 send_show_command 都新建连接，
+        N 端口 = N 次 SSH 握手）。返回 {port: [(policy_name, direction), ...]}。
+
+        单端口读取失败（超时/异常/无回显）保守返回该端口 [] 并跳过撤销，
+        不影响其它端口；建立连接失败则所有端口返回 []（由上层走幂等成功分支）。
+        与 SwitchConfigService._get_applied_qos_policies 解析逻辑保持一致。
+        """
         adapter = get_adapter(switch.device_type)
         result: dict = {}
         try:
@@ -692,15 +811,24 @@ class BatchActionService:
 
     @staticmethod
     def _is_range_structural_error(error: str) -> bool:
+        """判断 interface range 下发失败时是否应降级为逐端口模式重试
+
+        逐端口模式与单端口操作路径完全一致（单端口已验证可用），且按端口细粒度下发，
+        能规避 interface range 的跨板 / 类型混杂 / 端口不存在 / 超数量 / 读超时确认提示
+        等问题。因此默认「range 失败即降级」——这正解决「单端口成功、多端口失败」的
+        典型场景（多端口在 range 视图下常因确认提示导致 netmiko 读超时，而逐端口不会）。
+
+        仅排除少数与 range 无关、逐端口同样必败的连接 / 鉴权故障，避免无谓的二次 SSH 尝试。
+        """
         if not error:
             return False
         low = error.lower()
         no_fallback_hints = (
-            "authentication failed",
-            "connection refused",
-            "name or service not known",
-            "no route to host",
-            "tcp connection to device failed",
+            "authentication failed",      # 认证失败
+            "connection refused",         # 连接被拒
+            "name or service not known",  # DNS 解析失败
+            "no route to host",           # 路由不可达
+            "tcp connection to device failed",  # 套接字级连接失败
         )
         if any(h in low for h in no_fallback_hints):
             return False
@@ -711,6 +839,26 @@ class BatchActionService:
         range_commands: list, per_port_cmds_builder,
         err_label: str, port_count: int,
     ) -> tuple[bool, str, Optional[str]]:
+        """公用 range 降级执行器：优先 interface range，失败降级逐端口
+
+        抽取自 _send_with_range_fallback（独立连接）与 _batch_enable_disable（连接复用），
+        统一降级判断与日志，支持任意发送函数。
+
+        Args:
+            send_range_fn: range 模式发送函数 (commands: list[str]) -> str，失败抛异常
+            send_per_port_fn: 逐端口模式发送函数 (commands: list[str]) -> str，失败抛异常
+            range_commands: interface range 视图命令序列
+            per_port_cmds_builder: 无参可调用，仅当降级逐端口时才调用，返回逐端口命令序列
+                                   （惰性构造：range 成功时零开销）
+            err_label: 操作标签（日志用）
+            port_count: 端口数（日志用）
+
+        Returns:
+            tuple: (success, mode, error)
+            - success: 是否成功
+            - mode: "range" 或 "per_port"
+            - error: 失败时的错误信息，成功时为 None
+        """
         try:
             send_range_fn(range_commands)
             return True, "range", None
@@ -731,6 +879,23 @@ class BatchActionService:
 
     def _send_with_range_fallback(self, switch, port_count: int, range_commands: list,
                                   build_per_port_cmds, err_label: str, read_timeout: int):
+        """优先用 interface range 一次下发；若设备拒绝 range（结构性失败），
+        自动切换为逐端口模式（每条端口 interface <port> 块）重试，切换时打印日志。
+
+        委托 _execute_config_with_range_fallback 公用降级逻辑，
+        适配 _send_config_no_save 的 result_dict 返回结构与超时差异。
+
+        Args:
+            switch: 交换机对象
+            port_count: 端口数（仅用于日志）
+            range_commands: interface range 视图命令序列
+            build_per_port_cmds: 无参可调用，返回逐端口命令序列
+            err_label: 操作标签（用于日志）
+            read_timeout: 超时（秒）
+
+        Returns:
+            tuple: (result_dict, mode)  mode ∈ {"range", "per_port"}
+        """
         def _send_range(cmds):
             r = self.dispatcher._send_config_no_save(
                 switch, cmds, err_label=err_label, read_timeout=read_timeout,
@@ -755,6 +920,17 @@ class BatchActionService:
     @staticmethod
     def _build_per_port_commands(adapter, ports: list[str], inner_cmds: list,
                                  prefix_cmds: list = None) -> list:
+        """将 inner_cmds 包裹为逐端口 interface <port> ... quit 块（单次 config set 内）
+
+        Args:
+            adapter: 设备适配器
+            ports: 端口列表
+            inner_cmds: 接口视图内命令（每条端口相同）
+            prefix_cmds: 全局视图前置命令（如共享 QoS 策略定义），仅发送一次
+
+        Returns:
+            list: 逐端口命令序列
+        """
         commands = list(prefix_cmds or [])
         for port in ports:
             commands.append(adapter.get_enter_interface_command(port))
@@ -764,5 +940,14 @@ class BatchActionService:
 
     @staticmethod
     def _build_port_expr(ports: list[str], device_type: str) -> str:
+        """将端口列表构造为 interface range 表达式
+
+        Args:
+            ports: 端口名称列表
+            device_type: 设备类型
+
+        Returns:
+            str: 厂商格式的端口表达式
+        """
         from app.utils.port_range_parser import PortRangeParser
         return PortRangeParser.build_range_expr(ports, device_type)

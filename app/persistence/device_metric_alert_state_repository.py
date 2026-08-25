@@ -22,12 +22,20 @@ _SEVERITY_RANK = {"ok": 0, "info": 1, "warn": 2, "warning": 2, "crit": 3, "criti
 
 
 class DeviceMetricAlertStateRepository:
+    """指标告警状态仓库"""
 
     def __init__(self, session=None):
         self.session = session or db.session
 
 
     def overview_alert_stats(self) -> Dict[str, int]:
+        """返回活跃指标告警的全网统计（基于 breached=True 且按设备去重）。
+
+        - alerting_devices：存在任一活跃指标告警（含监控中断）的设备数
+        - crit_alert_devices：活跃告警中最高 severity 为 crit/critical 的设备数
+        - warn_alert_devices：最高为 warn/warning 的设备数
+        - interrupted_devices：处于监控中断的设备数
+        """
         rows = (
             self.session.query(
                 DeviceMetricAlertState.device_id,
@@ -59,6 +67,10 @@ class DeviceMetricAlertStateRepository:
 
 
     def active_alerts_by_device(self) -> Dict[int, Dict[str, int]]:
+        """返回各设备活跃指标告警聚合：{device_id: {alert_count, max_severity}}。
+
+        仅统计 breached=True 的行；max_severity 取该设备活跃告警的最高级别数字。
+        """
         rows = (
             self.session.query(
                 DeviceMetricAlertState.device_id,
@@ -79,6 +91,7 @@ class DeviceMetricAlertStateRepository:
         return result
 
     def active_metric_alerts(self, device_id: int) -> List[DeviceMetricAlertState]:
+        """返回某设备的活跃指标告警明细。"""
         return (
             self.session.query(DeviceMetricAlertState)
             .filter(
@@ -92,6 +105,7 @@ class DeviceMetricAlertStateRepository:
         return device_id in self.interrupted_device_ids()
 
     def interrupted_device_ids(self) -> set:
+        """返回当前处于监控中断态的设备 ID 集合（基于 alert_type=monitor_interrupted 且 breached）。"""
         rows = (
             self.session.query(DeviceMetricAlertState.device_id)
             .filter(
