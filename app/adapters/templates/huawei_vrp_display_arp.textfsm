@@ -1,0 +1,22 @@
+Value IP_ADDRESS (\d+\.\d+\.\d+\.\d+)
+Value MAC_ADDRESS ([0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4})
+Value EXPIRE (\d+)
+Value TYPE_VLAN (\S+)
+Value INTERFACE (\S+)
+
+Start
+  # 跳过头部行
+  ^IP\s+ADDRESS.*$$
+  ^ARP\s+Entry.*$$
+  ^EXP:.*$$
+  ^---*$$
+  # 匹配: IP MAC EXP TYPE/VLAN INTERFACE (动态ARP，有过期时间)
+  ^${IP_ADDRESS}\s+${MAC_ADDRESS}\s+${EXPIRE}\s+${TYPE_VLAN}\s+${INTERFACE}\s*$$ -> Record
+  # 匹配: IP MAC EXP TYPE/VLAN (无接口，有过期时间)
+  ^${IP_ADDRESS}\s+${MAC_ADDRESS}\s+${EXPIRE}\s+${TYPE_VLAN}\s*$$ -> Record
+  # 匹配: IP MAC TYPE/VLAN INTERFACE (静态/接口ARP，无过期时间)
+  ^${IP_ADDRESS}\s+${MAC_ADDRESS}\s+${TYPE_VLAN}\s+${INTERFACE}\s*$$ -> Record
+  # 匹配: IP MAC TYPE/VLAN (无过期时间，无接口)
+  ^${IP_ADDRESS}\s+${MAC_ADDRESS}\s+${TYPE_VLAN}\s*$$ -> Record
+  # 空行
+  ^\s*$$

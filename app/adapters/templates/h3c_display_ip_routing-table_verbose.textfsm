@@ -1,0 +1,17 @@
+Value PROTOCOL (\S+)
+Value PREFERENCE (\d+)
+Value COST (\d+)
+Value DESTINATION (\d+\.\d+\.\d+\.\d+)
+Value PREFIX_LENGTH (\d+)
+Value NEXT_HOP (\d+\.\d+\.\d+\.\d+)
+Value INTERFACE (\S+)
+Value FLAGS (\S*)
+
+Start
+  # Destination/Mask    Proto   Pre  Cost      NextHop         Interface
+  ^${DESTINATION}/${PREFIX_LENGTH}\s+${PROTOCOL}\s+${PREFERENCE}\s+${COST}\s+${NEXT_HOP}\s+${INTERFACE} -> Record
+  ^${DESTINATION}/${PREFIX_LENGTH}\s+${PROTOCOL}\s+${PREFERENCE}\s+${COST}\s+${INTERFACE} -> Record
+  ^${DESTINATION}/${PREFIX_LENGTH}\s+Static\s+${PREFERENCE}\s+${COST}\s+${NEXT_HOP}\s+${INTERFACE} -> Record
+  ^\s*Destination -> Continue
+  ^\s*-+ -> Continue
+  ^\s*${DESTINATION}\s*/${PREFIX_LENGTH}\s+${PROTOCOL}\s+${PREFERENCE}\s+${COST}\s+${NEXT_HOP}?\s*${INTERFACE}? -> Record

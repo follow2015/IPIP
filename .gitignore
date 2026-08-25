@@ -1,0 +1,72 @@
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+*.egg
+dist/
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+wheels/
+*.whl
+
+# ── 测试与覆盖率 ──────────────────────────────────────────
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+coverage/
+
+# ── 前端 ──────────────────────────────────────────────────
+frontend-new/node_modules/
+frontend-new/dist/
+frontend-new/coverage/
+frontend-new/*.tsbuildinfo
+frontend-new/vite.config.d.ts
+frontend-new/vite.config.js
+node_modules/
+
+# ── 环境与密钥 ────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.local
+
+# ── 日志与运行时 ──────────────────────────────────────────
+logs/
+*.log
+*.pid
+logs/run/
+
+# ── IDE 与编辑器 ──────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ── 数据库 ────────────────────────────────────────────────
+*.sqlite3
+*.db
+
+# ── 缓存与图谱 ────────────────────────────────────────────
+.graphify_cache/
+graphify-out/
+.benchmarks/
