@@ -1,0 +1,12 @@
+Value MODEL (((?!\sRouter).)+)
+Value VERSION (\S+(?:\s+\S+)*)
+Value UPTIME (.+)
+
+
+Start
+  ^HUAWEI\s+${MODEL}\s+(Router\s+)?uptime\s+is\s+${UPTIME}$$ -> Record
+  ^Huawei\s+${MODEL}\s+(Router\s+)?uptime\s+is\s+${UPTIME}$$ -> Record
+  ^Quidway\s+${MODEL}\s+(Router\s+)?uptime\s+is\s+${UPTIME}$$ -> Record
+  ^${MODEL}\(Master\).*uptime\s+is\s+${UPTIME}$$ -> Record
+  ^${MODEL}\(\w+\)\s+\d+\s+:\s+uptime\s+is\s+${UPTIME}$$ -> Record
+  ^VRP.*Version\s+${VERSION}

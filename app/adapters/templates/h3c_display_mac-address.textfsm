@@ -1,0 +1,10 @@
+Value MAC_ADDRESS ([0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4})
+Value VLAN (\d+)
+Value PORT ([^,\s]+)
+Value TYPE (\S+)
+Value AGING (\S+)
+
+Start
+  ^${MAC_ADDRESS}\s+${VLAN}\s+${PORT}\s+${TYPE}\s+${AGING} -> Record
+  ^\s*MAC\s+Address -> Continue
+  ^\s*-+ -> Continue

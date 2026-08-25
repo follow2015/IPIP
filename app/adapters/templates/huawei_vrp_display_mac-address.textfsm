@@ -1,0 +1,28 @@
+Value DESTINATION_ADDRESS ([0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4})
+Value VLAN_ID (\d+)
+Value DESTINATION_PORT ([^,\s]+)
+Value TYPE (\S+)
+Value FLAG (\S+)
+
+Start
+  ^\s*-+$$
+  ^\s+$$
+  ^\s*Flags.*$$
+  ^\s*BD\s+.*$$
+  ^\s*Age\s+.*$$
+  ^\s*MAC\s+Address\s+VLAN\s+Learned-From\s+Type\s*$$
+  ^\s*MAC\s+Address\s+VLAN/BD\s+Learned-From\s+Type\s*$$
+  ^\s*MAC\s+Address\s+VLAN/VSI/BD\s+Learned-From\s+Type\s*$$
+  ^\s*MAC\s+Address\s+VLAN/VSI\s+Learned-From\s+Type\s*$$
+  ^\s*MAC\s+Address\s+VLAN\s+Learned-From\s+Type\s+Flag\s*$$
+  ^\s*MAC\s+Address\s+VLAN/BD\s+Learned-From\s+Type\s+Flag\s*$$
+  ^\s*MAC\s+Address\s+VLAN/VSI/BD\s+Learned-From\s+Type\s+Flag\s*$$
+  ^\s*MAC\s+Address\s+VLAN/VSI\s+Learned-From\s+Type\s+Flag\s*$$
+  ^\s*${DESTINATION_ADDRESS}\s+${VLAN_ID}\s+${DESTINATION_PORT}\s+${TYPE}\s+${FLAG}\s*$$ -> Record
+  ^\s*${DESTINATION_ADDRESS}\s+${VLAN_ID}/\S+\s+${DESTINATION_PORT}\s+${TYPE}\s+${FLAG}\s*$$ -> Record
+  ^\s*${DESTINATION_ADDRESS}\s+${VLAN_ID}/\S+/\S+\s+${DESTINATION_PORT}\s+${TYPE}\s+${FLAG}\s*$$ -> Record
+  ^\s*${DESTINATION_ADDRESS}\s+${VLAN_ID}\s+${DESTINATION_PORT}\s+${TYPE}\s*$$ -> Record
+  ^\s*${DESTINATION_ADDRESS}\s+${VLAN_ID}/\S+\s+${DESTINATION_PORT}\s+${TYPE}\s*$$ -> Record
+  ^\s*${DESTINATION_ADDRESS}\s+${VLAN_ID}/\S+/\S+\s+${DESTINATION_PORT}\s+${TYPE}\s*$$ -> Record
+  ^\s*Total\s+items\s*displayed\s*=\s*\d+\s*$$
+  ^\s*Total\s+items\s+displayed\s*=\s*\d+\s*$$

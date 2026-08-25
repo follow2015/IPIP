@@ -1,0 +1,4 @@
+starlette>=0.37.0
+uvicorn>=0.30.0
+redis[hiredis]>=5.0.0
+PyJWT>=2.8.0
