@@ -13,13 +13,11 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { useAuthInit } from '@/hooks/useAuthInit';
 import { useUIStore } from '@/stores/ui';
 
-
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
   return '请求失败，请稍后重试';
 }
-
 
 const queryCache = new QueryCache({
   onError: (error, query) => {
@@ -35,7 +33,6 @@ const mutationCache = new MutationCache({
   }
 });
 
-
 const queryClient = new QueryClient({
   queryCache,
   mutationCache,
@@ -48,7 +45,6 @@ const queryClient = new QueryClient({
     }
   }
 });
-
 
 function App() {
   useAuthInit();

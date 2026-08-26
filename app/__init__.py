@@ -21,7 +21,15 @@ logger = get_logger(__name__)
 
 
 def create_app(config_name: str = None) -> Flask:
-    app = Flask(__name__,
+    """创建Flask应用实例（应用工厂模式）
+
+    Args:
+        config_name: 配置名称（development、testing、production）
+
+    Returns:
+        Flask: Flask应用实例
+    """
+    app = Flask(__name__, 
                 static_folder='../frontend-new/dist',
                 static_url_path='')
     
@@ -94,6 +102,11 @@ def create_app(config_name: str = None) -> Flask:
 
 
 def init_extensions(app: Flask):
+    """初始化Flask扩展
+
+    Args:
+        app: Flask应用实例
+    """
     db.init_app(app)
 
     CORS(
@@ -108,40 +121,54 @@ def init_extensions(app: Flask):
 
 
 def register_blueprints(app: Flask):
+    """注册蓝图
+
+    按子域分组注册，便于维护和路由冲突检测。
+
+    Args:
+        app: Flask应用实例
+    """
     @app.route("/")
     def frontend_index():
+        """前端首页"""
         from flask import send_from_directory
         return send_from_directory(app.static_folder, 'index.html')
     
     @app.route("/index.html")
     def frontend_index_html():
+        """前端首页（HTML文件）"""
         from flask import send_from_directory
         return send_from_directory(app.static_folder, 'index.html')
     
     @app.route("/auth")
     def frontend_auth():
+        """前端登录页"""
         from flask import send_from_directory
         return send_from_directory(app.static_folder, 'auth.html')
     
     @app.route("/auth.html")
     def frontend_auth_html():
+        """前端登录页（HTML文件）"""
         from flask import send_from_directory
         return send_from_directory(app.static_folder, 'auth.html')
     
     @app.route("/assets/<path:filename>")
     def frontend_assets(filename):
+        """前端资源文件"""
         from flask import send_from_directory
         import os
         return send_from_directory(os.path.join(app.static_folder, 'assets'), filename)
     
     @app.route("/config/<path:filename>")
     def frontend_config(filename):
+        """前端配置文件"""
         from flask import send_from_directory
         import os
         return send_from_directory(os.path.join(app.static_folder, 'config'), filename)
     
     @app.route("/<path:filename>")
     def frontend_files(filename):
+        """前端静态文件（HTML、JS、CSS等）"""
         from flask import send_from_directory
         import os
         
@@ -154,6 +181,7 @@ def register_blueprints(app: Flask):
     
     @app.route("/api")
     def api_index():
+        """API根路径处理器"""
         from app.api.base import APIResponse
         return APIResponse.success(
             data={
@@ -174,12 +202,12 @@ def register_blueprints(app: Flask):
 
     from app.api import auth_bp, cabinet_bp, customer_bp, device_bp, health_bp, room_bp, user_bp
     from app.api.wechat import wechat_bp
-    from app.api.routes import api_bp
-    from app.api.logs import logs_bp
-    from app.api.device_connection import device_connection_bp
-    from app.api.rbac import register_rbac_routes
-    from app.api.device_storage import device_storage_bp
-    from app.api.device_nics_port import device_nics_port_bp, _port_bp, _template_bp
+    from app.api.routes import api_bp  # 导入高级功能路由
+    from app.api.logs import logs_bp  # 导入日志API
+    from app.api.device_connection import device_connection_bp  # 导入设备连接API
+    from app.api.rbac import register_rbac_routes  # 导入RBAC路由
+    from app.api.device_storage import device_storage_bp  # 导入设备存储API
+    from app.api.device_nics_port import device_nics_port_bp, _port_bp, _template_bp  # 导入网卡端口API
 
     from app.api.ip_routes import router as ip_new_bp
     from app.api.network_routes import router as network_new_bp
@@ -187,24 +215,24 @@ def register_blueprints(app: Flask):
 
     app.register_blueprint(health_bp, url_prefix="/api/health")
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
-    app.register_blueprint(logs_bp, url_prefix="/api/logs")
+    app.register_blueprint(logs_bp, url_prefix="/api/logs")  # 注册日志API
     app.register_blueprint(user_bp, url_prefix="/api/users")
-    app.register_blueprint(wechat_bp)
+    app.register_blueprint(wechat_bp)  # wechat_bp 已经在定义时设置了 url_prefix
     app.register_blueprint(room_bp, url_prefix="/api/rooms")
     app.register_blueprint(device_bp, url_prefix="/api/devices")
-    from app.api.device_import import device_import_bp
+    from app.api.device_import import device_import_bp  # 设备导入导出（从 device.py 拆分）
     app.register_blueprint(device_import_bp, url_prefix="/api/devices")
     app.register_blueprint(cabinet_bp, url_prefix="/api/cabinets")
-    from app.api.cabinet_import import cabinet_import_bp
+    from app.api.cabinet_import import cabinet_import_bp  # 机柜导入导出（从 cabinet.py 拆分）
     app.register_blueprint(cabinet_import_bp, url_prefix="/api/cabinets")
     app.register_blueprint(customer_bp, url_prefix="/api/customers")
-    from app.api.customer_import import customer_import_bp
+    from app.api.customer_import import customer_import_bp  # 客户导入导出（从 customer.py 拆分）
     app.register_blueprint(customer_import_bp, url_prefix="/api/customers")
-    app.register_blueprint(device_connection_bp)
-    app.register_blueprint(device_storage_bp)
-    app.register_blueprint(device_nics_port_bp)
-    app.register_blueprint(_port_bp)
-    app.register_blueprint(_template_bp)
+    app.register_blueprint(device_connection_bp)  # 注册设备连接API
+    app.register_blueprint(device_storage_bp)  # 注册设备存储API
+    app.register_blueprint(device_nics_port_bp)  # 注册网卡端口API
+    app.register_blueprint(_port_bp)  # 注册单端口操作API
+    app.register_blueprint(_template_bp)  # 注册网卡模板API
 
     app.register_blueprint(ip_new_bp)
     app.register_blueprint(network_new_bp)
@@ -232,7 +260,7 @@ def register_blueprints(app: Flask):
     from app.api.topology_routes import router as topology_router
     app.register_blueprint(topology_router)
 
-    app.register_blueprint(api_bp)
+    app.register_blueprint(api_bp)  # 注册主API蓝图（仅含错误处理）
     from app.api.dashboard import dashboard_bp
     from app.api.errors import errors_bp
 
@@ -263,6 +291,11 @@ def register_blueprints(app: Flask):
 
 
 def register_middlewares(app: Flask):
+    """注册中间件
+
+    Args:
+        app: Flask应用实例
+    """
     from app.middleware.audit_middleware import AuditMiddleware
     AuditMiddleware(app)
 
@@ -270,6 +303,11 @@ def register_middlewares(app: Flask):
 
 
 def create_tables(app: Flask):
+    """创建数据库表
+
+    Args:
+        app: Flask应用实例
+    """
     with app.app_context():
         from app.models import Cabinet, Customer, Device, Room, User
         from app.models.rbac import Role, Permission, UserRole, RolePermission
@@ -280,6 +318,16 @@ def create_tables(app: Flask):
 
 
 def drop_tables(app: Flask, confirm: bool = False):
+    """删除所有数据库表（谨慎使用，不可逆！）
+
+    Args:
+        app: Flask应用实例
+        confirm: 必须为 True 才会真正执行删除。任何调用路径都必须显式确认，
+                 以防在代码或交互式终端中误清空数据库。
+
+    Raises:
+        RuntimeError: 未确认、或生产环境缺少强制环境变量时拒绝执行。
+    """
     if not confirm:
         raise RuntimeError(
             "拒绝执行 drop_tables：该操作会删除全部数据库表且不可逆。"
@@ -298,6 +346,7 @@ def drop_tables(app: Flask, confirm: bool = False):
 
 
 def _is_production(app: Flask) -> bool:
+    """粗略判断当前是否为生产环境。"""
     env = (
         app.config.get("ENV") or os.getenv("ENV") or os.getenv("FLASK_ENV") or "production"
     ).lower()
@@ -305,11 +354,17 @@ def _is_production(app: Flask) -> bool:
 
 
 def _register_db_cli(app: Flask):
+    """注册数据库维护相关的 Flask CLI 命令。
+
+    - drop-tables  : 删除所有表，必须 --confirm（生产环境还需 FORCE_DROP_PRODUCTION=1）
+    - create-tables: 创建所有表（幂等，已存在则跳过）
+    """
     import click
 
     @app.cli.command("drop-tables")
     @click.option("--confirm", is_flag=True, help="必须显式传入才会执行删除（不可逆）")
     def drop_tables_cmd(confirm):
+        """删除所有数据库表（谨慎使用，不可逆）"""
         try:
             drop_tables(app, confirm=confirm)
         except RuntimeError as e:
@@ -318,10 +373,18 @@ def _register_db_cli(app: Flask):
 
     @app.cli.command("create-tables")
     def create_tables_cmd():
+        """创建所有数据库表（幂等，已存在则跳过）"""
         create_tables(app)
 
 
 def _register_monitor_cli(app: Flask):
+    """注册监控时序归档 / 分区管理相关的 Flask CLI 命令。
+
+    - monitor-archive          : 降采样 + 事件分区清理 + 预聚合表清理（cron 03:00）
+    - monitor-manage-partitions: 预创建未来事件分区（cron 02:00，在归档前执行）
+
+    分区 / 降采样 DDL 仅 MySQL 生效；非 MySQL（本地 SQLite 等）下命令为空跑（no-op）。
+    """
     import click
 
     from extensions import db
@@ -329,6 +392,10 @@ def _register_monitor_cli(app: Flask):
 
     @app.cli.command("monitor-archive")
     def monitor_archive_cmd():
+        """监控时序归档：降采样 + 事件分区清理 + 预聚合表清理（建议 cron 03:00）
+
+        架构3 分层保留：events(30s,7d) → hourly(1h,90d) → daily(1d,730d)
+        """
         repo = MonitorTimeseriesRepository(db.session)
         try:
             repo.downsample_to_hourly()
@@ -336,7 +403,7 @@ def _register_monitor_cli(app: Flask):
             dropped = repo.drop_expired_event_partitions()
             deleted = repo.cleanup_hourly()
             daily_deleted = repo.cleanup_daily()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
             click.echo(f"ERROR: {e}", err=True)
             raise SystemExit(1)
         click.echo(
@@ -347,10 +414,11 @@ def _register_monitor_cli(app: Flask):
 
     @app.cli.command("monitor-manage-partitions")
     def monitor_manage_partitions_cmd():
+        """预创建未来事件分区（建议 cron 02:00，在归档前执行）"""
         repo = MonitorTimeseriesRepository(db.session)
         try:
             added = repo.add_future_event_partitions()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
             click.echo(f"ERROR: {e}", err=True)
             raise SystemExit(1)
         click.echo(f"monitor-manage-partitions done: added={added}")
@@ -369,6 +437,10 @@ def _register_monitor_cli(app: Flask):
         help="failed 行保留天数（默认 90）",
     )
     def monitor_outbox_cleanup_cmd(sent_days, failed_days):
+        """清理超期 sent/failed 告警 outbox 行（建议 cron 04:00）
+
+        用法: flask monitor-outbox-cleanup [--sent-days 30] [--failed-days 90]
+        """
         from app.persistence.monitor_alert_outbox_repository import (
             MonitorAlertOutboxRepository,
         )
@@ -380,7 +452,7 @@ def _register_monitor_cli(app: Flask):
                 failed_retention_days=failed_days,
             )
             db.session.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
             db.session.rollback()
             click.echo(f"ERROR: {e}", err=True)
             raise SystemExit(1)
@@ -396,6 +468,10 @@ def _register_monitor_cli(app: Flask):
     @click.option("--community", default="public", help="SNMP v2c community")
     @click.option("--out", default=None, help="输出 JSON 文件路径")
     def snmp_mib_scan_cmd(ip, protocol, community, out):
+        """SNMP MIB 扫描：自动探测设备支持的 OID，生成指标接入清单。
+
+        用法: flask snmp-mib-scan <ip> [v2c|v3] [--community public] [--out metrics.json]
+        """
         from app.services.monitoring.snmp_mib_service import scan_to_file
 
         if protocol == "v3":
@@ -405,7 +481,7 @@ def _register_monitor_cli(app: Flask):
         out_path = out or f"detected_metrics_{ip.replace('.', '_')}.json"
         try:
             scan_to_file(ip, cred, out_path)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
             click.echo(f"ERROR: {e}", err=True)
             raise SystemExit(1)
         click.echo(f"snmp-mib-scan done: 清单已写入 {out_path}（登记 OID 到指标模板即完成接入）")
