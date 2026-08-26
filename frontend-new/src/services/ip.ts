@@ -15,6 +15,7 @@ export interface IPQueryParams extends PaginationParams {
   status?: number;
   room_id?: number;
   customer_id?: number;
+  switch_id?: number;
 }
 
 interface IPCustomerRequest {

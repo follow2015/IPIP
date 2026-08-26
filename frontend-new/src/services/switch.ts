@@ -98,6 +98,19 @@ export function useSwitchList(params?: SwitchQueryParams) {
   });
 }
 
+export function useSwitchOptions(roomId?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.switches.all, 'options', roomId ?? null],
+    queryFn: async () => {
+      const params: Record<string, unknown> = { per_page: 1000 };
+      if (roomId) params.room_id = roomId;
+      const res = await get<PaginatedData<Switch>>('/switch/list', params);
+      const items = res.data?.items ?? [];
+      return items.map((s) => ({ label: s.name, value: s.id }));
+    }
+  });
+}
+
 
 export function useSwitchWithPorts(id: number, options?: { enabled?: boolean }) {
   return useQuery({

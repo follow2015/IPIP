@@ -29,6 +29,7 @@ import {
 import { useScanNetwork } from '@/services/network';
 import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useRoomOptions } from '@/services/room';
+import { useSwitchOptions } from '@/services/switch';
 import type { IPAddress, PingResult, IPScanResult } from '@/types/models';
 import { IP_STATUS_MAP, IPStatusCode } from '@/types/enums';
 import { useTable } from '@/hooks/useTable';
@@ -80,6 +81,9 @@ function IP() {
   const copyInfo = useCopyInfo();
   const { data: customerOptions } = useAllocatableCustomerOptions();
   const { data: roomOptions } = useRoomOptions();
+  const { data: switchOptions } = useSwitchOptions(
+    table.filters.room_id ? Number(table.filters.room_id) : undefined
+  );
 
   const { data: ipStats } = useIPStatistics(
     table.filters.room_id ? Number(table.filters.room_id) : undefined,
@@ -93,7 +97,9 @@ function IP() {
     per_page: table.perPage,
     search: table.search || undefined,
     status: table.filters.status ? Number(table.filters.status) : undefined,
-    room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined
+    room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined,
+    customer_id: table.filters.customer_id ? Number(table.filters.customer_id) : undefined,
+    switch_id: table.filters.switch_id ? Number(table.filters.switch_id) : undefined
   });
 
   const batch = useBatchSelection<IPAddress>({
@@ -556,6 +562,8 @@ function IP() {
           <IPTableToolbar
             table={table}
             roomOptions={roomOptions ?? []}
+            customerOptions={customerOptions ?? []}
+            switchOptions={switchOptions ?? []}
             scanNetworkPending={scanNetwork.isPending}
             onOpenBatchBan={() => {
               setBatchBanOpen(true);
