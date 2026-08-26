@@ -1,4 +1,3 @@
-/** 404 页面 */
 function NotFound() {
   return (
     <div style={{ textAlign: 'center', padding: '100px 0' }}>
