@@ -258,6 +258,7 @@ def list_ips():
     room_id = request.args.get("room_id", type=int)
     status = request.args.get("status", type=int)
     customer_id = request.args.get("customer_id", type=int)
+    switch_id = request.args.get("switch_id", type=int)
     page = request.args.get("page", 1, type=int)
     page_size = request.args.get("per_page", 20, type=int)
     search = request.args.get("search", type=str)
@@ -270,6 +271,8 @@ def list_ips():
         filters["status"] = status
     if customer_id is not None:
         filters["customer_id"] = customer_id
+    if switch_id is not None:
+        filters["switch_id"] = switch_id
 
     result = repo.paginate_with_relations(
         page=page, page_size=page_size,

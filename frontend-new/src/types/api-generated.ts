@@ -4889,6 +4889,7 @@ export interface paths {
                     per_page?: number;
                     search?: string;
                     room_id?: number;
+                    customer_id?: number;
                     status?: string;
                 };
                 header?: never;
@@ -17053,10 +17054,12 @@ export interface components {
         };
         IPAddressResponse: {
             ip_address?: string;
+            room_id?: number | null;
             mac_address?: string;
             switch_name?: string | null;
             port?: string | null;
             room_name?: string | null;
+            customer_id?: number | null;
             customer_name?: string | null;
             notes?: string | null;
             status?: number;

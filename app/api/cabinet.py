@@ -114,7 +114,7 @@ class CabinetCustomerUpdateSchema(Schema):
 
 
 @cabinet_bp.route("/", methods=["GET"])
-@doc(summary="获取机柜列表", tags=["机柜"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}, {"name": "room_id", "in": "query", "schema": {"type": "integer"}}, {"name": "status", "in": "query", "schema": {"type": "string"}}], responses={200: "CabinetResponse", 500: "ApiError"})
+@doc(summary="获取机柜列表", tags=["机柜"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}, {"name": "room_id", "in": "query", "schema": {"type": "integer"}}, {"name": "customer_id", "in": "query", "schema": {"type": "integer"}}, {"name": "status", "in": "query", "schema": {"type": "string"}}], responses={200: "CabinetResponse", 500: "ApiError"})
 @login_required
 @permission_required("cabinet:view")
 @rate_limit_api
@@ -126,12 +126,14 @@ def list_cabinets():
         per_page: 每页数量（默认20）
         search: 搜索关键词，模糊匹配机柜编号/位置（可选）
         room_id: 按机房ID过滤（可选）
+        customer_id: 按客户ID过滤（可选）
         status: 按状态过滤（可选）
     """
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 100)
     search = request.args.get("search", type=str)
     room_id = request.args.get("room_id", type=int)
+    customer_id = request.args.get("customer_id", type=int)
     status = request.args.get("status", type=str)
 
     try:
@@ -139,6 +141,8 @@ def list_cabinets():
             filters = {}
             if room_id:
                 filters["room_id"] = room_id
+            if customer_id:
+                filters["customer_id"] = customer_id
             if status:
                 filters["status"] = status
             result = cabinet_service.cabinet_repository.search(
@@ -154,6 +158,8 @@ def list_cabinets():
             filters = {}
             if room_id:
                 filters["room_id"] = room_id
+            if customer_id:
+                filters["customer_id"] = customer_id
             if status:
                 filters["status"] = status
             cabinets, total = cabinet_service.get_paginated(page=page, per_page=per_page, filters=filters)

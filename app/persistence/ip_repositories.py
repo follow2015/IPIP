@@ -585,7 +585,7 @@ class IPManagerRepository(BaseRepository):
         Args:
             page: 页码
             page_size: 每页数量
-            filters: 过滤条件（room_id, status, customer_id）
+            filters: 过滤条件（room_id, status, customer_id, switch_id）
             search: 搜索关键词（IP地址或MAC地址）
         """
         query = self.session.query(IPManager).outerjoin(
@@ -602,6 +602,8 @@ class IPManagerRepository(BaseRepository):
                 query = query.filter(IPManager.status == filters["status"])
             if filters.get("customer_id") is not None:
                 query = query.filter(IPManager.customer_id == filters["customer_id"])
+            if filters.get("switch_id") is not None:
+                query = query.filter(IPSwitchInfo.switch_id == filters["switch_id"])
 
         if search:
             if '/' in search:
