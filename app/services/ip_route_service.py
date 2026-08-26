@@ -80,6 +80,8 @@ class RouteSync:
             route.port = normalize_port(route.interface)
             if self._is_broadcast_host_route(route.network):
                 continue
+            if self._is_excluded_network(route.network):
+                continue
             key = (route.network, ctx.sw_id, route.port)
             current_keys.add(key)
             route_type = self._classify_route(route)
@@ -429,6 +431,32 @@ class RouteSync:
             except ValueError:
                 continue
         return False
+
+    @staticmethod
+    def _is_excluded_network(network: str) -> bool:
+        """判断是否为应排除的特殊网段
+
+        交换机路由表中常出现 loopback / link-local / 未指定地址段 等无业务
+        意义的直连路由（如华为/H3C LoopBack 接口的 127.0.0.0/8），这些网段
+        不应在网段管理中展示，需在 sync() 入口跳过。
+
+        注意：0.0.0.0/0（默认路由）不在此排除，由 _classify_route 分类为
+        RouteNotes.DEFAULT 单独处理。
+
+        Args:
+            network: 路由网段字符串（如 "127.0.0.0/8"）
+
+        Returns:
+            bool: 是否应排除
+        """
+        try:
+            net = ipaddress.ip_network(network, strict=False)
+        except ValueError:
+            return False
+        addr = net.network_address
+        if addr.is_unspecified and net.prefixlen == 0:
+            return False
+        return addr.is_loopback or addr.is_link_local or addr.is_unspecified
 
     def _load_existing_keys(self, sw_id: int, room_id: int, db_session) -> set[tuple]:
         """加载现有路由的五元组键集合
