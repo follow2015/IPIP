@@ -1015,6 +1015,18 @@ class NetworkScannerService:
         """
         return self._orchestrator.scan_room(room_id)
 
+    def full_scan(self, room_id: int = None, virtual_room_id: int = None) -> dict:
+        """全量扫描（物理机房或虚拟机房，二选一）
+
+        Args:
+            room_id: 物理机房ID（与 virtual_room_id 互斥）
+            virtual_room_id: 虚拟机房ID（优先于 room_id）
+
+        Returns:
+            dict: 扫描结果
+        """
+        return self._orchestrator.full_scan(room_id=room_id, virtual_room_id=virtual_room_id)
+
     def get_scan_status(self) -> dict:
         """获取扫描任务状态
 
