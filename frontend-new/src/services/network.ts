@@ -57,11 +57,15 @@ interface RouteItem {
   id: number;
   switch_id: number;
   destination: string;
-  nexthop: string;
-  route_type: string;
-  interface: string;
-  notes: number;
-  updated_at: string;
+  ip_network: string;
+  nexthop: string | null;
+  route_type: number | null;
+  interface: string | null;
+  port: string | null;
+  notes: string | null;
+  room_id: number;
+  customer_id: number | null;
+  updated_at: string | null;
 }
 
 interface NetworkUsageResult {

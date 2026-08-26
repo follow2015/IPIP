@@ -59,8 +59,10 @@ def list_routes():
     for r in routes:
         d = r.to_dict()
         sr = sr_map.get(r.id)
-        d["route_type"] = sr.route_type if sr else None
+        d["destination"] = sr.destination if sr else r.network
         d["nexthop"] = sr.nexthop if sr else None
+        d["interface"] = sr.port if sr else (r.port or None)
+        d["route_type"] = sr.route_type if sr else None
         data.append(d)
     return APIResponse.success(data=data)
 
