@@ -8,6 +8,8 @@ import { IP_STATUS_MAP } from '@/types/enums';
 interface IPTableToolbarProps {
   table: UseTableReturn;
   roomOptions: SelectOption[];
+  customerOptions: SelectOption[];
+  switchOptions: SelectOption[];
   scanNetworkPending: boolean;
   onOpenBatchBan: () => void;
   onOpenStats: () => void;
@@ -19,6 +21,8 @@ export function IPTableToolbar(props: IPTableToolbarProps) {
   const {
     table,
     roomOptions,
+    customerOptions,
+    switchOptions,
     scanNetworkPending,
     onOpenBatchBan,
     onOpenStats,
@@ -40,7 +44,21 @@ export function IPTableToolbar(props: IPTableToolbarProps) {
               value: Number(k)
             }))
           },
-          { key: 'room_id', label: '按机房筛选', type: 'select', options: roomOptions, width: 160 }
+          { key: 'room_id', label: '按机房筛选', type: 'select', options: roomOptions, width: 160 },
+          {
+            key: 'customer_id',
+            label: '按客户筛选',
+            type: 'select',
+            options: customerOptions,
+            width: 160
+          },
+          {
+            key: 'switch_id',
+            label: '按交换机筛选',
+            type: 'select',
+            options: switchOptions,
+            width: 160
+          }
         ]}
         table={table}
         extra={

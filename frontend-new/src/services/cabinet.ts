@@ -8,13 +8,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, put } from './api-client';
 import { createCrudHooks } from './crud-factory';
 import { queryKeys } from './query-keys';
-import type { Cabinet, Device, CabinetUtilization, CabinetUsageMap, CabinetStats } from '@/types/models';
+import type {
+  Cabinet,
+  Device,
+  CabinetUtilization,
+  CabinetUsageMap,
+  CabinetStats
+} from '@/types/models';
 import type { PaginationParams } from '@/types/api';
 import type { CabinetCreate, CabinetUpdate } from '@/types/api-bridge';
 
 export interface CabinetQueryParams extends PaginationParams {
   search?: string;
   room_id?: number;
+  customer_id?: number;
   cabinet_number?: string;
   status?: number;
 }
@@ -32,12 +39,17 @@ type CreateCabinetRequest = CabinetCreate;
 type UpdateCabinetRequest = CabinetUpdate & { id: number };
 
 
-const cabinetHooks = createCrudHooks<Cabinet, CreateCabinetRequest, UpdateCabinetRequest, CabinetQueryParams>({
+const cabinetHooks = createCrudHooks<
+  Cabinet,
+  CreateCabinetRequest,
+  UpdateCabinetRequest,
+  CabinetQueryParams
+>({
   basePath: '/cabinets',
-  queryKey: queryKeys.cabinets.all,
+  queryKey: queryKeys.cabinets.all
 });
 
-export const useCabinetList   = cabinetHooks.useList;
+export const useCabinetList = cabinetHooks.useList;
 export const useCabinetDetail = cabinetHooks.useDetail;
 export const useCabinetSuspenseDetail = cabinetHooks.useSuspenseDetail;
 export const useCreateCabinet = cabinetHooks.useCreate;
@@ -53,7 +65,7 @@ export function useUpdateCabinet() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-    },
+    }
   });
 }
 
@@ -64,7 +76,7 @@ export function useBatchCreateCabinet() {
       post<BatchCreateCabinetResponse, CreateCabinetRequest>('/cabinets', { ...data, batch: true }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
-    },
+    }
   });
 }
 
@@ -78,7 +90,7 @@ export function useCabinetWithDevices(id: number) {
     },
     enabled: id > 0,
     staleTime: 0,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: true
   });
 }
 
@@ -89,7 +101,7 @@ export function useCabinetDevices(id: number) {
       const res = await get<Device[]>(`/cabinets/${id}/devices`);
       return res.data;
     },
-    enabled: id > 0,
+    enabled: id > 0
   });
 }
 
@@ -100,7 +112,7 @@ export function useCabinetUtilization(id: number) {
       const res = await get<CabinetUtilization>(`/cabinets/${id}/utilization`);
       return res.data;
     },
-    enabled: id > 0,
+    enabled: id > 0
   });
 }
 
@@ -111,7 +123,7 @@ export function useCabinetUsageMap(id: number) {
       const res = await get<CabinetUsageMap>(`/cabinets/${id}/u-positions/usage-map`);
       return res.data;
     },
-    enabled: id > 0,
+    enabled: id > 0
   });
 }
 
@@ -126,7 +138,7 @@ export function useCabinetAvailableUPositions(id: number) {
       }>(`/cabinets/${id}/u-positions`);
       return res.data?.available_positions ?? [];
     },
-    enabled: id > 0,
+    enabled: id > 0
   });
 }
 
@@ -143,19 +155,22 @@ export function useCabinetLayout(id: number) {
         available_u: number;
         usage_rate: number;
         device_count: number;
-        u_map: Record<number, {
-          device_id: number;
-          device_name: string;
-          device_type: string;
-          is_start: boolean;
-          height_u: number;
-          power: number | null;
-        }>;
+        u_map: Record<
+          number,
+          {
+            device_id: number;
+            device_name: string;
+            device_type: string;
+            is_start: boolean;
+            height_u: number;
+            power: number | null;
+          }
+        >;
         available_ranges: Array<{ start: number; end: number; height: number }>;
       }>(`/cabinets/${id}/layout`);
       return res.data;
     },
-    enabled: id > 0,
+    enabled: id > 0
   });
 }
 
@@ -166,7 +181,7 @@ export function useCabinetStats(id: number) {
       const res = await get<CabinetStats>(`/cabinets/${id}/stats`);
       return res.data;
     },
-    enabled: id > 0,
+    enabled: id > 0
   });
 }
 
@@ -182,7 +197,11 @@ export function useCabinetStats(id: number) {
  * @param forFilter 是否用于筛选场景（默认false）
  * @param statuses 允许的机柜状态码列表（可选，如[1,2]）
  */
-export function useCabinetOptions(roomId?: number, forFilter: boolean = false, statuses?: number[]) {
+export function useCabinetOptions(
+  roomId?: number,
+  forFilter: boolean = false,
+  statuses?: number[]
+) {
   return useQuery({
     queryKey: queryKeys.cabinets.options(roomId),
     queryFn: async () => {
@@ -202,8 +221,8 @@ export function useCabinetOptions(roomId?: number, forFilter: boolean = false, s
       const res = await get<Cabinet[]>('/cabinets/available', params);
       return (res.data ?? []).map((c) => ({
         label: `${c.cabinet_number} (U${c.used_u ?? 0}/${c.total_u})`,
-        value: c.id,
+        value: c.id
       }));
-    },
+    }
   });
 }

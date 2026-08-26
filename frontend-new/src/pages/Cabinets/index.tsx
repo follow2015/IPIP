@@ -14,6 +14,7 @@ import FilterBar from '@/components/FilterBar';
 import CabinetForm from './CabinetForm';
 import { useCabinetList, useDeleteCabinet, type CabinetQueryParams } from '@/services/cabinet';
 import { useRoomOptions } from '@/services/room';
+import { useAllocatableCustomerOptions } from '@/services/customer';
 import { CABINET_STATUS_MAP } from '@/types/enums';
 import type { Cabinet } from '@/types/models';
 import { useCrudPage } from '@/hooks/useCrudPage';
@@ -23,6 +24,7 @@ function Cabinets() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { data: roomOptions } = useRoomOptions();
+  const { data: customerOptions } = useAllocatableCustomerOptions();
 
   const crud = useCrudPage<Cabinet, CabinetQueryParams>({
     useList: useCabinetList,
@@ -32,7 +34,8 @@ function Cabinets() {
     buildListParams: (tp) =>
       ({
         ...tp,
-        room_id: tp.filters?.room_id ? Number(tp.filters.room_id) : undefined
+        room_id: tp.filters?.room_id ? Number(tp.filters.room_id) : undefined,
+        customer_id: tp.filters?.customer_id ? Number(tp.filters.customer_id) : undefined
       }) as CabinetQueryParams
   });
 
@@ -157,6 +160,13 @@ function Cabinets() {
                 label: '按机房筛选',
                 type: 'select',
                 options: roomOptions ?? [],
+                width: 200
+              },
+              {
+                key: 'customer_id',
+                label: '按客户筛选',
+                type: 'select',
+                options: customerOptions ?? [],
                 width: 200
               }
             ]}

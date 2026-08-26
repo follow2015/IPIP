@@ -39,7 +39,7 @@ import {
 } from '@/services/network';
 import { queryKeys } from '@/services/query-keys';
 import { useRoomOptions } from '@/services/room';
-import { useCustomerOptions, useAllocatableCustomerOptions } from '@/services/customer';
+import { useAllocatableCustomerOptions } from '@/services/customer';
 import { ROUTE_NOTES_MAP } from '@/types/enums';
 import { useCopyInfo } from '@/utils/clipboard';
 import { useTable } from '@/hooks/useTable';
@@ -192,7 +192,6 @@ function Network() {
   const updateNetworkCustomer = useUpdateNetworkCustomer();
   const scanNetwork = useScanNetwork();
   const { data: roomOptions } = useRoomOptions();
-  const { data: customerOptions } = useCustomerOptions();
   const { data: allocatableCustomerOptions } = useAllocatableCustomerOptions();
 
 
@@ -580,7 +579,7 @@ function Network() {
                 key: 'customer_id',
                 label: '客户',
                 type: 'select',
-                options: customerOptions ?? [],
+                options: allocatableCustomerOptions ?? [],
                 width: 140
               }
             ]}

@@ -331,10 +331,12 @@ class CustomerResponseSchema(Schema):
 class IPAddressResponseSchema(Schema):
     """IP地址列表项（对齐 GET /ip_addresses — 5表JOIN扁平结果）"""
     ip_address = fields.Str()
+    room_id = fields.Int(allow_none=True)
     mac_address = fields.Str()
     switch_name = fields.Str(allow_none=True)
     port = fields.Str(allow_none=True)
     room_name = fields.Str(allow_none=True)
+    customer_id = fields.Int(allow_none=True)
     customer_name = fields.Str(allow_none=True)
     notes = fields.Str(allow_none=True)
     status = fields.Int()

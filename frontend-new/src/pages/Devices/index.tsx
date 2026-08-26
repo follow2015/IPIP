@@ -31,6 +31,7 @@ import { useMessage, useModal } from '@/hooks/useMessage';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
 import { BatchActionBar } from '@/components/BatchActionBar';
 import { useRoomOptions } from '@/services/room';
+import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useCabinetOptions } from '@/services/cabinet';
 import { useVendorBrands } from '@/services/monitor';
 import type { Device } from '@/types/models';
@@ -405,6 +406,7 @@ function Devices() {
   const message = useMessage();
   const modal = useModal();
   const { data: roomOptions } = useRoomOptions();
+  const { data: customerOptions } = useAllocatableCustomerOptions();
 
   const urlCabinetId = searchParams.get('cabinetId');
   const urlRoomId = searchParams.get('roomId');
@@ -429,6 +431,7 @@ function Devices() {
     status: table.filters.status ? Number(table.filters.status) : undefined,
     room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined,
     cabinet_id: table.filters.cabinet_id ? Number(table.filters.cabinet_id) : undefined,
+    customer_id: table.filters.customer_id ? Number(table.filters.customer_id) : undefined,
     has_ssh:
       table.filters.has_ssh === 'true'
         ? true
@@ -652,6 +655,13 @@ function Devices() {
           label: '按机房筛选',
           type: 'select',
           options: roomOptions ?? [],
+          width: 150
+        },
+        {
+          key: 'customer_id',
+          label: '按客户筛选',
+          type: 'select',
+          options: customerOptions ?? [],
           width: 150
         },
         {
