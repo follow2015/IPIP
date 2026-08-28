@@ -6,6 +6,7 @@ ScanOrchestrator 替换原 NetworkScannerService，
 严格按 Phase 1→2→3→4→5 顺序执行。
 """
 from app.utils.logging import get_logger
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -256,6 +257,11 @@ class ScanOrchestrator:
             logger.warning("full_scan: 无可用交换机，scope=%s", scope)
             return {"scope": scope, "status": "skipped", "reason": "no_switches"}
 
+        if sys.is_finalizing():
+            logger.info("full_scan 跳过：进程正在退出 scope=%s", scope)
+            return {"scope": scope, "status": "aborted",
+                    "reason": "interpreter_shutdown", "completed": 0, "failed": 0}
+
         scan_start = time.time()
         sr = self.scan_redis
 
@@ -366,6 +372,11 @@ class ScanOrchestrator:
                     finally:
                         db.session.remove()  # 归还连接到池
 
+            if sys.is_finalizing():
+                logger.info("[Phase0] 进程退出，中止端口并发采集 scope=%s", scope)
+                return {"scope": scope, "status": "aborted",
+                        "reason": "interpreter_shutdown", "completed": 0, "failed": 0}
+
             with ThreadPoolExecutor(max_workers=min(10, len(authorized))) as pool:
                 futures = {pool.submit(collect_port_one, sw.id): sw
                            for sw in authorized}
@@ -390,6 +401,11 @@ class ScanOrchestrator:
                             return svc.collect_device_info(device_id)
                     finally:
                         db.session.remove()
+
+            if sys.is_finalizing():
+                logger.info("[Phase0b] 进程退出，中止设备信息并发采集 scope=%s", scope)
+                return {"scope": scope, "status": "aborted",
+                        "reason": "interpreter_shutdown", "completed": 0, "failed": 0}
 
             with ThreadPoolExecutor(max_workers=min(5, len(authorized))) as pool:
                 futures = {pool.submit(collect_info_one, sw.id): sw
@@ -730,6 +746,10 @@ class ScanOrchestrator:
             """复用主线程 app context 执行采集"""
             with app_ref.app_context():
                 return self._collect_single(sw)
+
+        if sys.is_finalizing():
+            logger.info("[CollectAll] 进程退出，中止交换机采集")
+            return [], []
 
         with ThreadPoolExecutor(max_workers=min(10, len(authorized))) as pool:
             futures = {pool.submit(collect_one, sw): sw for sw in authorized}
