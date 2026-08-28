@@ -11,8 +11,9 @@ ASGI 应用入口 — Starlette 路由 + 启停生命周期
     GET /healthz                  健康检查
 
 鉴权：
-    浏览器 EventSource 不支持自定义 Header，token 通过 ?token= 传递。
-    同时兼容 Authorization: Bearer 请求头。
+    浏览器 EventSource 不支持自定义 Header，凭据通过 URL 传递。
+    优先使用一次性 ticket（?ticket=，由 Flask POST /api/sse/ticket 签发，短效且单用），
+    回退兼容长期 access token（?token= / Authorization: Bearer 头）。
 """
 import asyncio
 import logging
@@ -88,16 +89,13 @@ class SSEAuthMiddleware:
             await self.app(scope, receive, send)
             return
 
-        token = auth.extract_token_from_request(scope)
-        if not token:
-            response = JSONResponse(
-                {"error": "缺少认证令牌"},
-                status_code=401,
-            )
-            await response(scope, receive, send)
-            return
+        ticket = auth.extract_ticket(scope)
+        if ticket:
+            payload = await auth.verify_sse_ticket(ticket)
+        else:
+            token = auth.extract_token_from_request(scope)
+            payload = auth.verify_token(token) if token else None
 
-        payload = auth.verify_token(token)
         if not payload:
             response = JSONResponse(
                 {"error": "无效或已过期的令牌"},

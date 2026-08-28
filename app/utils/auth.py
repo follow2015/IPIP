@@ -43,6 +43,33 @@ def get_current_user_id() -> Optional[int]:
     return None
 
 
+def get_user_permissions(user_id: int) -> set:
+    """获取用户通过角色继承的所有权限码集合。
+
+    供技能引擎权限聚合校验使用，与 permission_required 装饰器复用同一份查询逻辑。
+
+    Args:
+        user_id: 用户 ID
+
+    Returns:
+        set[str]: 权限码集合；用户不存在返回空集。
+    """
+    from app.models.user import User
+    try:
+        user = User.query.get(user_id)
+    except Exception:  # noqa: BLE001
+        return set()
+    if not user:
+        return set()
+    perms = set()
+    for role in getattr(user, "roles", []) or []:
+        for permission in getattr(role, "permissions", []) or []:
+            code = getattr(permission, "code", None)
+            if code:
+                perms.add(code)
+    return perms
+
+
 class AuthenticationManager:
     """认证管理器
 
@@ -168,6 +195,51 @@ class AuthenticationManager:
             f"auth_type={auth_type}, "
             f"identifier={identifier})")
 
+        return token
+
+    def generate_sse_ticket(
+        self,
+        user_id: int,
+        username: str = None,
+        roles: list = None,
+        auth_type: str = "web",
+        openid: str = None,
+        expires_delta: timedelta = None,
+    ) -> str:
+        """生成 SSE 一次性票据（短有效期、type=sse_ticket）。
+
+        用于替代 SSE URL 中的长期 access token，避免凭据明文出现在代理访问日志 /
+        浏览器历史 / Referer。票据不写入撤销缓存与 refresh set，依赖短 TTL +
+        网关（realtime_gateway）一次性消费（Redis SETNX 防重放）。
+        """
+        import uuid
+
+        if expires_delta is None:
+            expires_delta = timedelta(seconds=60)
+
+        expires_at = datetime.now(timezone.utc) + expires_delta
+        payload = {
+            "user_id": user_id,
+            "roles": roles or ["user"],
+            "type": "sse_ticket",
+            "auth_type": auth_type,
+            "exp": expires_at,
+            "iat": datetime.now(timezone.utc),
+            "jti": str(uuid.uuid4()),
+        }
+        if auth_type == "wx":
+            payload["openid"] = openid
+            payload["user_identifier"] = openid
+        else:
+            payload["username"] = username
+            payload["user_identifier"] = username
+
+        token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
+        if isinstance(token, bytes):
+            token = token.decode("utf-8")
+        logger.info(
+            "生成 SSE 票据 (user_id=%s, auth_type=%s)", user_id, auth_type
+        )
         return token
 
     def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
@@ -961,12 +1033,28 @@ def login_required(f):
     return decorated_function
 
 
+def _sse_error_response(message: str, status_code: int = 401):
+    """SSE 鉴权失败专用响应：返回 SSE 错误事件而非 JSON。
+
+    浏览器 EventSource 客户端 onmessage 会收到 type=error 事件，
+    避免 JSON.parse 失败被吞（I3 修复）。
+    """
+    import json as _json
+    from flask import Response
+    event_data = _json.dumps({"type": "error", "message": message}, ensure_ascii=False)
+    body = f"data: {event_data}\n\n"
+    return Response(body, status=status_code, mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
 def sse_login_required(f):
     """SSE 端点专用认证装饰器
 
     EventSource API 不支持自定义 HTTP 头，因此同时支持：
     1. Authorization 请求头（常规方式）
     2. ?token=xxx URL 查询参数（SSE 专用方式）
+
+    鉴权失败时返回 SSE 错误事件（而非 JSON），便于前端 EventSource 客户端处理。
 
     使用方法:
         @sse_login_required
@@ -976,25 +1064,24 @@ def sse_login_required(f):
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        from app.api.base import APIResponse, ErrorCode
         auth_header = request.headers.get("Authorization")
         if auth_header:
             parts = auth_header.split()
             if len(parts) == 2 and parts[0].lower() == "bearer":
                 token = parts[1]
             else:
-                return APIResponse.error("无效的认证令牌格式", ErrorCode.AUTHENTICATION_ERROR, 401)
+                return _sse_error_response("无效的认证令牌格式", 401)
         else:
             token = request.args.get("token")
             if not token:
-                return APIResponse.error("缺少认证令牌", ErrorCode.AUTHENTICATION_ERROR, 401)
+                return _sse_error_response("缺少认证令牌", 401)
 
         payload = auth_manager.verify_token(token)
         if not payload:
-            return APIResponse.error("无效或已过期的令牌", ErrorCode.AUTHENTICATION_ERROR, 401)
+            return _sse_error_response("无效或已过期的令牌", 401)
 
-        if payload.get("type") != "access":
-            return APIResponse.error("无效的令牌类型", ErrorCode.AUTHENTICATION_ERROR, 401)
+        if payload.get("type") not in ("access", "sse_ticket"):
+            return _sse_error_response("无效的令牌类型", 401)
 
         auth_type = payload.get("auth_type", "web")
         g.current_user = {
@@ -1041,6 +1128,44 @@ def permission_required(*permissions):
                 user, list(permissions)
             ):
                 return APIResponse.error("权限不足", ErrorCode.AUTHORIZATION_ERROR, 403)
+
+            return f(*args, **kwargs)
+
+        return decorated_function
+
+    return decorator
+
+
+def sse_permission_required(*permissions):
+    """SSE 端点专用权限装饰器。
+
+    与 permission_required 的区别：
+    - 内嵌 sse_login_required（支持 ?token=xxx 查询参数），而非 login_required
+      （login_required 仅读 Authorization 头，浏览器 EventSource 无法设置自定义头）。
+    - 鉴权失败时返回 SSE 错误事件而非 JSON，避免前端 EventSource 客户端 JSON.parse 失败被吞。
+
+    使用方法:
+        @sse_permission_required('ai:admin')
+        def sse_view():
+            pass
+    """
+
+    def decorator(f):
+        @wraps(f)
+        @sse_login_required
+        def decorated_function(*args, **kwargs):
+            from app.models.user import User
+
+            user_id = g.current_user.get("user_id")
+            user = User.query.get(user_id)
+
+            if not user:
+                return _sse_error_response("用户不存在", 401)
+
+            if not permission_manager.check_user_permissions(
+                user, list(permissions)
+            ):
+                return _sse_error_response("权限不足", 403)
 
             return f(*args, **kwargs)
 
