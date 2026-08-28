@@ -21,6 +21,7 @@ import logging
 import jwt
 
 from . import config
+from . import redis_bus
 
 logger = logging.getLogger(__name__)
 
@@ -82,3 +83,62 @@ def extract_token_from_request(scope: dict) -> str | None:
                 return parts[1]
 
     return None
+
+
+def extract_ticket(scope: dict) -> str | None:
+    """从 ASGI scope 提取 ?ticket= 一次性票据（优先于 token）。
+
+    Args:
+        scope: ASGI 连接 scope 字典
+
+    Returns:
+        ticket 字符串，或 None
+    """
+    query_string = scope.get("query_string", b"")
+    if query_string:
+        from urllib.parse import parse_qs
+
+        params = parse_qs(query_string.decode())
+        tickets = params.get("ticket")
+        if tickets:
+            return tickets[0]
+    return None
+
+
+async def verify_sse_ticket(ticket: str) -> dict | None:
+    """校验 SSE 一次性票据。
+
+    与 verify_token 的区别：
+    - 要求 payload.type == "sse_ticket"
+    - 通过 Redis SETNX 强制一次性消费（防重放），键为 jti、TTL 取票据剩余有效期
+
+    Redis 不可用时降级为放行（网关本身依赖 Redis 投递 SSE 事件，此时已无实质影响）。
+
+    Args:
+        ticket: JWT 票据字符串
+
+    Returns:
+        payload 字典，或 None（校验失败 / 已被消费）
+    """
+    payload = verify_token(ticket)
+    if not payload:
+        return None
+
+    if payload.get("type") != "sse_ticket":
+        logger.warning("SSE ticket 类型非法: %s", payload.get("type"))
+        return None
+
+    jti = payload.get("jti")
+    if jti:
+        try:
+            import time
+
+            r = await redis_bus.get_redis()
+            ttl = max(int(payload.get("exp", 0) - time.time()), 1)
+            if await r.set(f"sse_ticket:{jti}", "1", nx=True, ex=ttl) is None:
+                logger.warning("SSE ticket 已被消费（疑似重放）: jti=%s", jti)
+                return None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("SSE ticket 一次性校验失败（放行）: %s", exc)
+
+    return payload

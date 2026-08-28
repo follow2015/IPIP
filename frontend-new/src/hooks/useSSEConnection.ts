@@ -26,6 +26,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth';
+import { fetchSSETicket } from '@/services/sseTicket';
 
 const FALLBACK_POLL_INTERVAL = 30_000;
 const SSE_MAX_FAILURES = 3;
@@ -48,9 +49,9 @@ export function useSSEConnection({
   enabled,
   onMessage,
   onFallbackPoll,
-  label = 'SSE',
+  label = 'SSE'
 }: UseSSEConnectionOptions) {
-  const token = useAuthStore(s => s.token);
+  const token = useAuthStore((s) => s.token);
 
   const lastTsRef = useRef<number>(0);
   const failCountRef = useRef<number>(0);
@@ -63,8 +64,8 @@ export function useSSEConnection({
   useEffect(() => {
     if (!enabled || !token) return;
 
-    const sseUrl = `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
     let es: EventSource | null = null;
+    let cancelled = false;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
 
     const startFallbackPolling = () => {
@@ -80,37 +81,47 @@ export function useSSEConnection({
       }
     };
 
-    try {
-      es = new EventSource(sseUrl);
+    (async () => {
+      const ticket = await fetchSSETicket();
+      if (cancelled || !ticket) {
+        if (ticket === null && token) startFallbackPolling();
+        return;
+      }
+      const sseUrl = `${url}${url.includes('?') ? '&' : '?'}ticket=${encodeURIComponent(ticket)}`;
 
-      es.onopen = () => {
-        failCountRef.current = 0;
-        stopFallbackPolling();
-      };
+      try {
+        es = new EventSource(sseUrl);
 
-      es.onmessage = (e: MessageEvent) => {
-        try {
-          const parsed = JSON.parse(e.data);
-          if (parsed.op_type !== 'port_action_result') {
-            if (parsed.ts && parsed.ts < lastTsRef.current) return;
-            if (parsed.ts) lastTsRef.current = parsed.ts;
+        es.onopen = () => {
+          failCountRef.current = 0;
+          stopFallbackPolling();
+        };
+
+        es.onmessage = (e: MessageEvent) => {
+          try {
+            const parsed = JSON.parse(e.data);
+            if (parsed.op_type !== 'port_action_result') {
+              if (parsed.ts && parsed.ts < lastTsRef.current) return;
+              if (parsed.ts) lastTsRef.current = parsed.ts;
+            }
+            onMessageRef.current(e.data);
+          } catch {
           }
-          onMessageRef.current(e.data);
-        } catch {
-        }
-      };
+        };
 
-      es.onerror = () => {
-        failCountRef.current += 1;
-        if (failCountRef.current >= SSE_MAX_FAILURES) {
-          startFallbackPolling();
-        }
-      };
-    } catch {
-      startFallbackPolling();
-    }
+        es.onerror = () => {
+          failCountRef.current += 1;
+          if (failCountRef.current >= SSE_MAX_FAILURES) {
+            startFallbackPolling();
+          }
+        };
+      } catch {
+        startFallbackPolling();
+      }
+    })();
 
     return () => {
+      cancelled = true;
       es?.close();
       stopFallbackPolling();
     };

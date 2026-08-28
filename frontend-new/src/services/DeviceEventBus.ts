@@ -12,6 +12,7 @@
  * 通过反向代理 /realtime/ 路径访问。seq 由网关单进程分配，天然全局唯一。
  */
 import { useAuthStore } from '@/stores/auth';
+import { fetchSSETicket } from '@/services/sseTicket';
 export interface DeviceChangeEvent {
   event_id: string;
   device_id: number;
@@ -45,7 +46,7 @@ class DeviceEventBus {
     this.connect();
   }
 
-  private connect(): void {
+  private async connect(): Promise<void> {
     if (this.destroyed || this.unrecoverable) return;
 
     if (this.source) {
@@ -54,10 +55,20 @@ class DeviceEventBus {
     }
     const token = useAuthStore.getState().token;
     if (!token) {
-      this.reconnectTimer = setTimeout(() => this.connect(), 1000);
+      this.reconnectTimer = setTimeout(() => {
+        void this.connect();
+      }, 1000);
       return;
     }
-    const url = `/realtime/sse/switch/${this.deviceId}?since_seq=${this.seq}&token=${encodeURIComponent(token)}`;
+    const ticket = await fetchSSETicket();
+    if (!ticket) {
+      this.reconnectTimer = setTimeout(() => {
+        void this.connect();
+      }, this.reconnectDelay);
+      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
+      return;
+    }
+    const url = `/realtime/sse/switch/${this.deviceId}?since_seq=${this.seq}&ticket=${encodeURIComponent(ticket)}`;
     this.source = new EventSource(url);
 
     this.source.onmessage = (e) => {
@@ -79,14 +90,16 @@ class DeviceEventBus {
   }
 
   private async checkRecoverable(): Promise<void> {
-    const token = useAuthStore.getState().token;
-    if (!token) {
-      this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectDelay);
+    const ticket = await fetchSSETicket();
+    if (!ticket) {
+      this.reconnectTimer = setTimeout(() => {
+        void this.connect();
+      }, this.reconnectDelay);
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
       return;
     }
     try {
-      const url = `/realtime/sse/switch/${this.deviceId}?token=${encodeURIComponent(token)}`;
+      const url = `/realtime/sse/switch/${this.deviceId}?ticket=${encodeURIComponent(ticket)}`;
       const res = await fetch(url, { method: 'HEAD' });
       if (res.status === 404 || res.status === 410) {
         this.unrecoverable = true;

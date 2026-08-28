@@ -282,6 +282,9 @@ def register_blueprints(app: Flask):
     from app.api.mail_settings_routes import router as mail_settings_bp
     app.register_blueprint(mail_settings_bp)
 
+    from app.api.sse import sse_bp
+    app.register_blueprint(sse_bp, url_prefix="/api/sse")
+
     register_rbac_routes(app)
 
     from app.openapi.views import openapi_bp
