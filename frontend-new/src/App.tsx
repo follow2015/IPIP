@@ -4,7 +4,7 @@
  * - QueryClientProvider（TanStack Query 全局配置）
  * - AppRouter（路由）
  */
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
 import { App as AntApp, ConfigProvider, theme, message } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
@@ -61,6 +61,10 @@ function App() {
     }),
     [themeMode]
   );
+
+  useEffect(() => {
+    ConfigProvider.config({ theme: themeConfig });
+  }, [themeConfig]);
 
   return (
     <ErrorBoundary>

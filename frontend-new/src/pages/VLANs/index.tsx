@@ -44,12 +44,13 @@ function VLANs() {
       }) as VLANQueryParams
   });
   const { table, data, isLoading, refetch, handleAdd, handleDelete, closeForm, formOpen } = crud;
+  const { filters, updateFilter } = table;
 
   useEffect(() => {
-    if (!table.filters.room_id && roomOptions && roomOptions.length > 0) {
-      table.updateFilter('room_id', roomOptions[0].value as number);
+    if (!filters.room_id && roomOptions && roomOptions.length > 0) {
+      updateFilter('room_id', roomOptions[0].value as number);
     }
-  }, [roomOptions, table.filters.room_id]);
+  }, [roomOptions, filters, updateFilter]);
 
   const switchNameMap = useMemo(
     () => new Map((switchList?.items ?? []).map((sw: any) => [sw.id, sw.name || sw.ip])),

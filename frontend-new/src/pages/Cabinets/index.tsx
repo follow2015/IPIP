@@ -41,12 +41,14 @@ function Cabinets() {
 
   const initialRoomId = searchParams.get('roomId');
 
+  const { filters, updateFilter } = crud.table;
+
   useEffect(() => {
     const roomId = searchParams.get('roomId');
-    if (roomId) {
-      crud.table.updateFilter('room_id', Number(roomId));
+    if (roomId && filters.room_id !== roomId) {
+      updateFilter('room_id', Number(roomId));
     }
-  }, [searchParams]);
+  }, [searchParams, filters, updateFilter]);
 
   const handleDetail = (record: Cabinet) => {
     navigate(`/cabinets/${record.id}`);
