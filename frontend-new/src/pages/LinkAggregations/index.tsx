@@ -29,13 +29,14 @@ function LinkAggregations() {
   const navigate = useNavigate();
   const message = useMessage();
   const table = useTable();
+  const { filters, updateFilter } = table;
   const { data: roomOptions } = useRoomOptions();
 
   useEffect(() => {
-    if (!table.filters.room_id && roomOptions && roomOptions.length > 0) {
-      table.updateFilter('room_id', roomOptions[0].value as number);
+    if (!filters.room_id && roomOptions && roomOptions.length > 0) {
+      updateFilter('room_id', roomOptions[0].value as number);
     }
-  }, [roomOptions, table.filters.room_id]);
+  }, [roomOptions, filters, updateFilter]);
 
   const {
     data: lagData,
