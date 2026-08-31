@@ -31,6 +31,8 @@ export interface UseTableOptions {
   filterResets?: Record<string, string[]>;
 }
 
+const EMPTY_FILTER_RESETS: Record<string, string[]> = {};
+
 export interface UseTableReturn {
   page: number;
   perPage: number;
@@ -48,30 +50,32 @@ export interface UseTableReturn {
   setFilters: (filters: Record<string, string | string[]>) => void;
   updateFilter: (key: string, value: string | number | boolean | undefined) => void;
   reset: () => void;
-  tableParams: PaginationParams & SortParams & { search?: string; filters?: Record<string, string | string[]> };
+  tableParams: PaginationParams &
+    SortParams & { search?: string; filters?: Record<string, string | string[]> };
 }
 
 export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableReturn {
-  const options: UseTableOptions = typeof optionsOrPerPage === 'number'
-    ? { initialPerPage: optionsOrPerPage }
-    : (optionsOrPerPage ?? {});
+  const options: UseTableOptions =
+    typeof optionsOrPerPage === 'number'
+      ? { initialPerPage: optionsOrPerPage }
+      : (optionsOrPerPage ?? {});
   const initialPerPage = options.initialPerPage ?? 20;
-  const filterResets = options.filterResets ?? {};
+  const filterResets = options.filterResets ?? EMPTY_FILTER_RESETS;
   const pagination = usePagination(initialPerPage);
 
   const { setPage, setPerPage, setTotal, reset: resetPagination } = pagination;
 
-  const [search,    setSearchRaw]  = useState('');
-  const [sortBy,    setSortBy]     = useState('');
-  const [sortOrder, setSortOrder]  = useState<'asc' | 'desc'>('asc');
-  const [filters,   setFiltersRaw] = useState<Record<string, string | string[]>>({});
+  const [search, setSearchRaw] = useState('');
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [filters, setFiltersRaw] = useState<Record<string, string | string[]>>({});
 
   const setSearch = useCallback(
     (value: string) => {
       setSearchRaw(value);
       setPage(1);
     },
-    [setPage], // ✅ setPage 是 useState setter，引用永远稳定
+    [setPage] // ✅ setPage 是 useState setter，引用永远稳定
   );
 
   const setSort = useCallback(
@@ -80,7 +84,7 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
       setSortOrder(order);
       setPage(1);
     },
-    [setPage],
+    [setPage]
   );
 
   const setFilters = useCallback(
@@ -88,7 +92,7 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
       setFiltersRaw(newFilters);
       setPage(1);
     },
-    [setPage],
+    [setPage]
   );
 
   const updateFilter = useCallback(
@@ -106,7 +110,7 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
       setFiltersRaw(newFilters);
       setPage(1);
     },
-    [filters, filterResets, setPage],
+    [filters, filterResets, setPage]
   );
 
   const reset = useCallback(() => {
@@ -119,20 +123,20 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
 
   const tableParams = useMemo(
     () => ({
-      page:       pagination.page,
-      per_page:   pagination.perPage,
-      search:     search    || undefined,
-      sort_by:    sortBy    || undefined,
-      sort_order: sortBy    ? sortOrder : undefined,
-      filters:    Object.keys(filters).length > 0 ? filters : undefined,
+      page: pagination.page,
+      per_page: pagination.perPage,
+      search: search || undefined,
+      sort_by: sortBy || undefined,
+      sort_order: sortBy ? sortOrder : undefined,
+      filters: Object.keys(filters).length > 0 ? filters : undefined
     }),
-    [pagination.page, pagination.perPage, search, sortBy, sortOrder, filters],
+    [pagination.page, pagination.perPage, search, sortBy, sortOrder, filters]
   );
 
   return {
-    page:       pagination.page,
-    perPage:    pagination.perPage,
-    total:      pagination.total,
+    page: pagination.page,
+    perPage: pagination.perPage,
+    total: pagination.total,
     totalPages: pagination.totalPages,
     search,
     sortBy,
@@ -146,6 +150,6 @@ export function useTable(optionsOrPerPage?: UseTableOptions | number): UseTableR
     setFilters,
     updateFilter,
     reset,
-    tableParams,
+    tableParams
   };
 }

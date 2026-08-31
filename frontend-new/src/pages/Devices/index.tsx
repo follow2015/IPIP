@@ -380,13 +380,13 @@ const BATCH_STATUS_MENU = Object.entries(DEVICE_STATUS_MAP).map(([k, v]) => ({
 }));
 
 
+const DEVICE_FILTER_RESETS = {
+  device_type: ['device_subtype', 'has_ssh'],
+  room_id: ['cabinet_id']
+};
+
 function Devices() {
-  const table = useTable({
-    filterResets: {
-      device_type: ['device_subtype', 'has_ssh'],
-      room_id: ['cabinet_id']
-    }
-  });
+  const table = useTable({ filterResets: DEVICE_FILTER_RESETS });
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
