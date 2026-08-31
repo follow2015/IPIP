@@ -54,7 +54,6 @@ const deviceTypeOptions = Object.entries(DEVICE_TYPE_MAP).map(([value, { label }
 }));
 
 
- 
 function buildColumns(handlers: {
   onRestore: (r: Device) => void;
   onPermanentDelete: (r: Device) => void;
@@ -138,12 +137,12 @@ function buildColumns(handlers: {
 }
 
 
+const RECYCLE_BIN_FILTER_RESETS = {
+  room_id: ['cabinet_id']
+};
+
 export default function DeviceRecycleBin() {
-  const table = useTable({
-    filterResets: {
-      room_id: ['cabinet_id']
-    }
-  });
+  const table = useTable({ filterResets: RECYCLE_BIN_FILTER_RESETS });
   const msg = useMessage();
 
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
