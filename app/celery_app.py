@@ -34,7 +34,7 @@ from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-_TASK_MODULES = ("app.tasks.ai_tasks", "app.tasks.voice_tasks")
+_ALL_TASK_MODULES = ("app.tasks.ai_tasks", "app.tasks.voice_tasks")
 
 celery = Celery("ipip")
 
@@ -47,7 +47,16 @@ try:
 except Exception as e:  # noqa: BLE001
     logger.warning("celery.config_load_failed %s", e)
 
-celery.conf.imports = tuple(celery.conf.imports or ()) + _TASK_MODULES
+import importlib.util
+
+_TASK_MODULES = []
+for _mod in _ALL_TASK_MODULES:
+    if importlib.util.find_spec(_mod) is not None:
+        _TASK_MODULES.append(_mod)
+    else:
+        logger.warning("celery task module %s not found, skipping (deploy without AI?)", _mod)
+
+celery.conf.imports = tuple(celery.conf.imports or ()) + tuple(_TASK_MODULES)
 
 
 def _get_flask_app():
