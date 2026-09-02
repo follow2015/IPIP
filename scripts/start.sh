@@ -6,7 +6,7 @@
 #   1. Flask HTTP API  (gunicorn 优先，回退 Flask dev server)
 #   2. realtime_gateway (uvicorn ASGI SSE 网关)
 #   3. monitor service  (独立设备健康监控进程)
-#   4. celery worker    (AI 长任务异步执行，队列 ai)
+#   4. celery worker    (语音通知异步执行，队列 voice；deploy 无 AI 代码)
 #
 # 用法:
 #   bash scripts/start.sh           # 启动全部
@@ -159,27 +159,27 @@ start_monitor() {
 }
 
 start_celery() {
-  # Celery worker（AI 长任务异步执行，方案 §Phase 5）
-  # 队列 ai 与监控/通知隔离；--concurrency=2 适配 LLM IO 密集 + 重上下文。
-  # env 段必须含 AI_API_KEY/AI_BASE_URL/AI_MODEL（Phase 0 硬前提，C1），
-  # 由 .env 加载（脚本顶部 set -a; . .env; set +a）。
+  # Celery worker（语音通知异步执行）
+  # deploy 不含 AI 业务代码，仅启 voice 队列。AI 队列需 ai_tasks 模块，
+  # deploy 无该模块（sync --with-ai 排除），启 -Q ai 会空跑。
+  # AI 开发完成后，从主仓同步 ai_tasks 并改回 -Q ai,voice。
   if is_running "$PID_CELERY"; then
     warn "celery worker 已在运行 (PID $(pid_of "$PID_CELERY"))"
     return 0
   fi
   if [ "${AI_ASYNC_ENABLED:-1}" != "1" ]; then
-    warn "AI_ASYNC_ENABLED != 1，跳过 celery worker（AI 任务走同步路径）"
+    warn "AI_ASYNC_ENABLED != 1，跳过 celery worker（异步任务走同步路径）"
     return 0
   fi
   CELERY_BIN="$PROJECT_ROOT/.venv/bin/celery"
   if [ ! -x "$CELERY_BIN" ]; then
-    warn "celery 未安装，跳过 celery worker（AI 异步任务不可用）"
+    warn "celery 未安装，跳过 celery worker（语音异步任务不可用）"
     return 0
   fi
-  log "启动 celery worker (queue ai, concurrency ${CELERY_CONCURRENCY:-2})..."
+  log "启动 celery worker (queue voice, concurrency ${CELERY_CONCURRENCY:-4})..."
   nohup "$CELERY_BIN" -A app.celery_app.celery worker \
-    -Q ai \
-    --concurrency="${CELERY_CONCURRENCY:-2}" \
+    -Q voice \
+    --concurrency="${CELERY_CONCURRENCY:-4}" \
     --loglevel="${CELERY_LOGLEVEL:-info}" \
     --chdir "$PROJECT_ROOT" \
     > "$LOG_CELERY" 2>&1 &
