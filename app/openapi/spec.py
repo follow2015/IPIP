@@ -263,6 +263,9 @@ def register_marshmallow_schemas(spec: APISpec):
         MetricTemplateUpsertResponseSchema,
         MetricTemplateSeedResponseSchema,
         MetricTemplateDeleteResponseSchema,
+        MetricTemplateBatchDeleteResponseSchema,
+        MetricTemplateBatchToggleResponseSchema,
+        MonitorCredentialBatchDeleteResponseSchema,
         DeviceTrafficResponseSchema,
         DeviceTrafficPortItemSchema,
         DeviceTrafficPortsResponseSchema,
@@ -316,6 +319,8 @@ def register_marshmallow_schemas(spec: APISpec):
         AIRagQaRequestSchema,
         AIRagQaResponseSchema,
         AIRagResetRequestSchema,
+        VoiceConfigSchema,
+        VoiceChannelStatusSchema,
     )
 
     response_schema_map = {
@@ -401,6 +406,9 @@ def register_marshmallow_schemas(spec: APISpec):
         "MetricTemplateUpsertResponse": MetricTemplateUpsertResponseSchema,
         "MetricTemplateSeedResponse": MetricTemplateSeedResponseSchema,
         "MetricTemplateDeleteResponse": MetricTemplateDeleteResponseSchema,
+        "MetricTemplateBatchDeleteResponse": MetricTemplateBatchDeleteResponseSchema,
+        "MetricTemplateBatchToggleResponse": MetricTemplateBatchToggleResponseSchema,
+        "MonitorCredentialBatchDeleteResponse": MonitorCredentialBatchDeleteResponseSchema,
         "DeviceTrafficResponse": DeviceTrafficResponseSchema,
         "DeviceTrafficPortItem": DeviceTrafficPortItemSchema,
         "DeviceTrafficPortsResponse": DeviceTrafficPortsResponseSchema,
@@ -453,6 +461,8 @@ def register_marshmallow_schemas(spec: APISpec):
         "AIRagQaRequest": AIRagQaRequestSchema,
         "AIRagQaResponse": AIRagQaResponseSchema,
         "AIRagResetRequest": AIRagResetRequestSchema,
+        "VoiceConfig": VoiceConfigSchema,
+        "VoiceChannelStatus": VoiceChannelStatusSchema,
     }
     for name, schema_cls in response_schema_map.items():
         try:

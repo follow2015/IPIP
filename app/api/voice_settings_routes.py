@@ -38,7 +38,7 @@ def _require_admin():
 
 
 @router.route("", methods=["GET"])
-@doc(summary="获取语音通知配置", tags=["语音配置"], responses={200: "ApiResponse"})
+@doc(summary="获取语音通知配置", tags=["语音配置"], responses={200: "VoiceConfig"})
 @login_required
 def get_voice_config():
     """获取语音通知配置（管理员），敏感字段脱敏。"""
@@ -51,7 +51,7 @@ def get_voice_config():
 
 
 @router.route("", methods=["PUT"])
-@doc(summary="更新语音通知配置", tags=["语音配置"], responses={200: "ApiResponse"})
+@doc(summary="更新语音通知配置", tags=["语音配置"], responses={200: "VoiceConfig"})
 @login_required
 @transactional
 def update_voice_config():
@@ -180,7 +180,7 @@ def test_voice_call():
 
 
 @router.route("/status", methods=["GET"])
-@doc(summary="查询语音渠道就绪状态", tags=["语音配置"], responses={200: "ApiResponse"})
+@doc(summary="查询语音渠道就绪状态", tags=["语音配置"], responses={200: "VoiceChannelStatus"})
 @login_required
 def voice_channel_status():
     """返回语音渠道是否就绪及缺失的配置项，便于前端引导配置。"""

@@ -415,10 +415,19 @@ class NotificationService:
 
         注意：本方法是 @staticmethod，无 cls，须写 NotificationService.xxx。
         """
+        channel_names = NotificationService.get_personal_channel_names()
+
+        if (ChannelType.VOICE in requested_channels
+                and ChannelType.VOICE not in channel_names):
+            logger.warning(
+                "语音渠道被请求但未注册到 registry，本次不会投递语音: "
+                "user_id=%s registry=%s（检查 VoiceChannel 注册链路）",
+                getattr(user, "id", None), list(channel_names),
+            )
+
         prefs = user.notification_prefs
         if not prefs:
-            return [ch for ch in requested_channels
-                    if ch in NotificationService.get_personal_channel_names()]
+            return [ch for ch in requested_channels if ch in channel_names]
 
         channel_prefs = prefs.get("channels", {})
 
@@ -427,15 +436,26 @@ class NotificationService:
             if (ChannelType.VOICE in requested_channels
                     and channel_prefs.get(ChannelType.VOICE, False)):
                 result.append(ChannelType.VOICE)
+            logger.debug(
+                "渠道降级: user_id=%s reason=quiet_hours severity=%s "
+                "requested=%s effective=%s",
+                getattr(user, "id", None), severity, list(requested_channels), result,
+            )
             return result
 
         result = [ch for ch in requested_channels
-                  if ch in NotificationService.get_personal_channel_names()
+                  if ch in channel_names
                   and (ch == ChannelType.INBOX or channel_prefs.get(ch, True))]
 
         subscribed = prefs.get("subscribed_types", [])
         if subscribed and notif_type not in subscribed and severity != SeverityLevel.CRITICAL:
-            return [ChannelType.INBOX] if ChannelType.INBOX in result else []
+            result = [ChannelType.INBOX] if ChannelType.INBOX in result else []
+            logger.debug(
+                "渠道降级: user_id=%s reason=not_subscribed type=%s "
+                "severity=%s effective=%s",
+                getattr(user, "id", None), notif_type, severity, result,
+            )
+            return result
 
         return result
 

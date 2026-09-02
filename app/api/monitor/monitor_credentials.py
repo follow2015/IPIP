@@ -127,7 +127,9 @@ def delete_credential(credential_id: int):
 
 
 @monitor_bp.route("/credentials/batch-delete", methods=["POST"])
-@doc(summary="批量删除共享凭据", tags=["监控"])
+@doc(summary="批量删除共享凭据", tags=["监控"],
+     responses={200: "MonitorCredentialBatchDeleteResponse", 400: "ApiError",
+                401: "ApiError", 403: "ApiError"})
 @login_required
 @permission_required("monitor:config")
 @transactional

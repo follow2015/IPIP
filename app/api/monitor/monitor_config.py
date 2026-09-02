@@ -142,7 +142,7 @@ def delete_metric_template(template_id: int):
 
 
 @monitor_bp.route("/metric-templates/batch", methods=["DELETE"])
-@doc(summary="批量删除指标模板", tags=["监控"], responses={200: "MetricTemplateDeleteResponse"})
+@doc(summary="批量删除指标模板", tags=["监控"], responses={200: "MetricTemplateBatchDeleteResponse"})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -160,7 +160,8 @@ def batch_delete_metric_templates():
 
 
 @monitor_bp.route("/metric-templates/batch-enabled", methods=["PATCH"])
-@doc(summary="批量启停指标模板", tags=["监控"], responses={200: "MetricTemplateDeleteResponse"})
+@doc(summary="批量启停指标模板", tags=["监控"],
+     responses={200: "MetricTemplateBatchToggleResponse"})
 @login_required
 @permission_required("monitor:config")
 @transactional
