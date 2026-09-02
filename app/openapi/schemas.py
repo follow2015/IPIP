@@ -1178,6 +1178,43 @@ class MetricTemplateDeleteResponseSchema(Schema):
     deleted = fields.Int()
 
 
+class MetricTemplateBatchDeleteResponseSchema(Schema):
+    """DELETE /monitor/metric-templates/batch 响应
+
+    与单删端点不同，批量删除额外返回 total（请求条数），
+    便于前端区分「请求 10 条实际删掉 7 条」的部分成功场景。
+    """
+    deleted = fields.Int()
+    total = fields.Int()
+
+
+class MetricTemplateBatchToggleResponseSchema(Schema):
+    """PATCH /monitor/metric-templates/batch-enabled 响应
+
+    此前误用 MetricTemplateDeleteResponse（只有 deleted 字段），
+    契约与实际返回 {updated,total,enabled} 完全不匹配。
+    """
+    updated = fields.Int()
+    total = fields.Int()
+    enabled = fields.Bool()
+
+
+class MonitorCredentialBatchDeleteFailureSchema(Schema):
+    """批量删除凭据中单条的失败明细"""
+    id = fields.Int()
+    reason = fields.Str(metadata={"description": "失败原因（不存在 / 仍关联 N 台设备 / 异常信息）"})
+
+
+class MonitorCredentialBatchDeleteResponseSchema(Schema):
+    """POST /monitor/credentials/batch-delete 响应
+
+    部分成功语义：deleted 为成功条数，failed 逐条给出失败原因，
+    前端据此展示明细而非静默吞掉失败。
+    """
+    deleted = fields.Int()
+    failed = fields.List(fields.Nested(MonitorCredentialBatchDeleteFailureSchema))
+
+
 
 
 class DeviceTrafficResponseSchema(Schema):
@@ -1715,4 +1752,39 @@ class AIRagQaResponseSchema(Schema):
 class AIRagResetRequestSchema(Schema):
     """POST /ai/rag/reset 请求体"""
     confirm = fields.Bool(required=True)
+
+
+
+class VoiceConfigSchema(Schema):
+    """GET /api/settings/voice 响应 data（对齐前端 VoiceConfig interface）"""
+    provider = fields.Str(validate=validate.OneOf(["aliyun", "tencent"]))
+    aliyun_access_key_id = fields.Str()
+    aliyun_access_key_secret = fields.Str()  # 脱敏值 "****" 或空
+    aliyun_access_key_secret_set = fields.Bool()
+    aliyun_caller_number = fields.Str()
+    aliyun_tts_code = fields.Str()
+    aliyun_tts_param = fields.Str()
+    tencent_secret_id = fields.Str()
+    tencent_secret_key = fields.Str()  # 脱敏值 "****" 或空
+    tencent_secret_key_set = fields.Bool()
+    tencent_app_id = fields.Str()
+    tencent_template_id = fields.Str()
+    play_times = fields.Int()
+    volume = fields.Int()
+    speed = fields.Int()
+    call_timeout = fields.Int()
+    callback_token = fields.Str()  # 脱敏值 "****" 或空
+    callback_token_set = fields.Bool()
+    callback_verify_mode = fields.Str(validate=validate.OneOf(["ip_only", "signature_and_ip", "off"]))
+    enabled = fields.Bool()
+
+
+class VoiceChannelStatusSchema(Schema):
+    """GET /api/settings/voice/status 响应 data"""
+    enabled = fields.Bool()
+    provider = fields.Str()
+    ready = fields.Bool()
+    missing = fields.List(fields.Str())
+    supports_ack = fields.Bool()
+    error = fields.Str(allow_none=True)
 

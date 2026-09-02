@@ -7,14 +7,8 @@
 """
 from app.models.base import BaseModel
 
-# AI 模型容错加载：deploy 无 AI 业务代码（ai_conversation/ai_diagnosis_session 被
-# sync --with-ai 排除），缺失则跳过。主仓有则正常 import。
-try:
-    from app.models.ai_conversation import AIConversation
-    from app.models.ai_diagnosis_session import AIDiagnosisSession
-except ImportError:  # noqa: BLE001
-    AIConversation = None  # type: ignore[assignment]
-    AIDiagnosisSession = None  # type: ignore[assignment]
+from app.models.ai_conversation import AIConversation
+from app.models.ai_diagnosis_session import AIDiagnosisSession
 from app.models.audit_log import AuditLog
 from app.models.cabinet import Cabinet
 from app.models.component_template import ComponentTemplate

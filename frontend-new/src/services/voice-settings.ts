@@ -1,42 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, put, post } from '@/services/api-client';
 import { queryKeys } from '@/services/query-keys';
+import type { components } from '@/types/api-generated';
 
-/* ─── 类型 ──────────────────────────────────────────────────────── */
+/* ─── 类型（从 api-generated 桥接，Required 还原必选语义） ─────── */
 
-export interface VoiceConfig {
-  provider: 'aliyun' | 'tencent';
-  aliyun_access_key_id: string;
-  aliyun_access_key_secret: string; // 脱敏值 "****" 或空
-  aliyun_access_key_secret_set: boolean;
-  aliyun_caller_number: string;
-  aliyun_tts_code: string; // 语音模板 ID（TTS 路线）
-  aliyun_tts_param: string;
-  tencent_secret_id: string;
-  tencent_secret_key: string; // 脱敏值 "****" 或空
-  tencent_secret_key_set: boolean;
-  tencent_app_id: string;
-  tencent_template_id: string;
-  play_times: number; // 1~3
-  volume: number; // 0~100，腾讯云不支持
-  speed: number; // -500~500，腾讯云不支持
-  call_timeout: number;
-  callback_token: string; // 脱敏值 "****" 或空
-  callback_token_set: boolean;
-  callback_verify_mode: 'ip_only' | 'signature_and_ip' | 'off';
-  enabled: boolean;
-}
-
+export type VoiceConfig = Required<components['schemas']['VoiceConfig']>;
 export type VoiceConfigUpdate = Partial<Record<keyof VoiceConfig, unknown>>;
-
-export interface VoiceChannelStatus {
-  enabled: boolean;
-  provider: string;
-  ready: boolean;
-  missing: string[];
-  supports_ack: boolean;
-  error?: string;
-}
+export type VoiceChannelStatus = Required<components['schemas']['VoiceChannelStatus']>;
 
 /* ─── API 函数 ──────────────────────────────────────────────────── */
 

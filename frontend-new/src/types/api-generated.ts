@@ -12235,7 +12235,40 @@ export interface paths {
                 cookie?: never;
             };
             requestBody?: never;
-            responses: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MonitorCredentialBatchDeleteResponse"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
         };
         delete?: never;
         options?: never;
@@ -13085,7 +13118,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["MetricTemplateDeleteResponse"];
+                        "application/json": components["schemas"]["MetricTemplateBatchDeleteResponse"];
                     };
                 };
             };
@@ -13122,7 +13155,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["MetricTemplateDeleteResponse"];
+                        "application/json": components["schemas"]["MetricTemplateBatchToggleResponse"];
                     };
                 };
             };
@@ -14596,7 +14629,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AISkillCreateResponse"];
                     };
                 };
                 400: {
@@ -14666,7 +14699,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AISkillRunResponse"];
                     };
                 };
                 401: {
@@ -14784,7 +14817,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIAgenticSkillsListResponse"];
                     };
                 };
                 401: {
@@ -14836,7 +14869,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIAgenticRunResponse"];
                     };
                 };
                 202: {
@@ -14844,7 +14877,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIAsyncTaskResponse"];
                     };
                 };
                 401: {
@@ -14894,7 +14927,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIRemedialPreviewResponse"];
                     };
                 };
                 400: {
@@ -14952,7 +14985,15 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIRemedialExecuteResponse"];
+                    };
+                };
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AIAsyncTaskResponse"];
                     };
                 };
                 400: {
@@ -15010,7 +15051,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIRemedialRollbackResponse"];
                     };
                 };
                 400: {
@@ -15066,7 +15107,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIDiagnosisSessionsResponse"];
                     };
                 };
                 401: {
@@ -15118,7 +15159,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIVerificationResponse"];
                     };
                 };
                 400: {
@@ -15176,7 +15217,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AISuccessResponse"];
                     };
                 };
                 401: {
@@ -15224,7 +15265,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIRollbackFailuresResponse"];
                     };
                 };
                 401: {
@@ -15309,6 +15350,110 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/rag/ingest/progress/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    task_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/task/progress/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    task_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -15439,7 +15584,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIOkResponse"];
                     };
                 };
                 401: {
@@ -15492,7 +15637,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIOkResponse"];
                     };
                 };
                 400: {
@@ -15660,7 +15805,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AISkillDetailResponse"];
                     };
                 };
                 401: {
@@ -15703,7 +15848,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIOkResponse"];
                     };
                 };
                 400: {
@@ -15747,7 +15892,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIOkResponse"];
                     };
                 };
                 401: {
@@ -15804,7 +15949,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AISkillsReloadResponse"];
                     };
                 };
                 401: {
@@ -15853,7 +15998,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIOkResponse"];
                     };
                 };
                 400: {
@@ -16066,7 +16211,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiResponse"];
+                        "application/json": components["schemas"]["AIOkResponse"];
                     };
                 };
                 400: {
@@ -17493,6 +17638,126 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/voice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["VoiceConfig"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["VoiceConfig"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/voice/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/voice/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["VoiceChannelStatus"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -19435,6 +19700,23 @@ export interface components {
         MetricTemplateDeleteResponse: {
             deleted?: number;
         };
+        MetricTemplateBatchDeleteResponse: {
+            deleted?: number;
+            total?: number;
+        };
+        MetricTemplateBatchToggleResponse: {
+            updated?: number;
+            total?: number;
+            enabled?: boolean;
+        };
+        MonitorCredentialBatchDeleteFailure: {
+            id?: number;
+            reason?: string;
+        };
+        MonitorCredentialBatchDeleteResponse: {
+            deleted?: number;
+            failed?: components["schemas"]["MonitorCredentialBatchDeleteFailure"][];
+        };
         DeviceTrafficResponse: {
             port?: string | null;
             time?: number[];
@@ -19766,6 +20048,98 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        AISkillRunResponse: {
+            result?: unknown;
+        };
+        AIOkResponse: {
+            ok?: boolean;
+        };
+        AISuccessResponse: {
+            success?: boolean;
+        };
+        AISkillDetailResponse: {
+            skill?: {
+                [key: string]: unknown;
+            };
+        };
+        AISkillCreateResponse: {
+            ok?: boolean;
+            name?: string;
+        };
+        AISkillsReloadResponse: {
+            count?: number;
+        };
+        AIAgenticSkillSummary: {
+            name?: string;
+            title?: string;
+            description?: string;
+            category?: string;
+            triggers?: string[];
+            _path?: string;
+        };
+        AIAgenticSkillsListResponse: {
+            skills?: components["schemas"]["AIAgenticSkillSummary"][];
+        };
+        AIAsyncTaskResponse: {
+            task_id?: string;
+            duplicate?: boolean;
+            finished?: boolean;
+        };
+        AIAgenticRunResponse: {
+            answer?: string;
+            session_id?: number | null;
+        };
+        AIRemedialPreviewResponse: {
+            command_key?: string;
+            command?: string;
+            risk?: string;
+            rollback_command_key?: string | null;
+            requires_confirmation?: boolean;
+            platform_note?: string | null;
+        };
+        AIRemedialExecuteResponse: {
+            success?: boolean;
+            output?: string;
+            backup_id?: number | null;
+            rollback_command_key?: string | null;
+        };
+        AIRemedialRollbackResponse: {
+            success?: boolean;
+            output?: string;
+        };
+        AIDiagnosisSession: {
+            id?: number;
+            device_id?: number | null;
+            user_id?: number;
+            skill_name?: string;
+            question?: string;
+            status?: string;
+            token_cost?: number | null;
+            duration_ms?: number | null;
+            remedial_executed?: boolean;
+            rollback_failed?: boolean;
+            created_at?: string | null;
+            updated_at?: string | null;
+        };
+        AIDiagnosisSessionsResponse: {
+            sessions?: components["schemas"]["AIDiagnosisSession"][];
+        };
+        AIRollbackFailuresResponse: {
+            rollback_failures?: components["schemas"]["AIDiagnosisSession"][];
+            count?: number;
+        };
+        AIVerificationResponse: {
+            status?: string;
+            post_snapshot?: {
+                [key: string]: unknown;
+            };
+            comparison?: {
+                [key: string]: unknown;
+            }[];
+        };
+        AICircuitResetResponse: {
+            ok?: boolean;
+        };
         AIAskRequest: {
             question: string;
         };
@@ -19832,6 +20206,36 @@ export interface components {
         };
         AIRagResetRequest: {
             confirm: boolean;
+        };
+        VoiceConfig: {
+            provider?: "aliyun" | "tencent";
+            aliyun_access_key_id?: string;
+            aliyun_access_key_secret?: string;
+            aliyun_access_key_secret_set?: boolean;
+            aliyun_caller_number?: string;
+            aliyun_tts_code?: string;
+            aliyun_tts_param?: string;
+            tencent_secret_id?: string;
+            tencent_secret_key?: string;
+            tencent_secret_key_set?: boolean;
+            tencent_app_id?: string;
+            tencent_template_id?: string;
+            play_times?: number;
+            volume?: number;
+            speed?: number;
+            call_timeout?: number;
+            callback_token?: string;
+            callback_token_set?: boolean;
+            callback_verify_mode?: "ip_only" | "signature_and_ip" | "off";
+            enabled?: boolean;
+        };
+        VoiceChannelStatus: {
+            enabled?: boolean;
+            provider?: string;
+            ready?: boolean;
+            missing?: string[];
+            supports_ack?: boolean;
+            error?: string | null;
         };
         LinkedDevicesResponse: {
             device_id?: number;

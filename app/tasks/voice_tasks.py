@@ -95,6 +95,7 @@ def send_voice_call(self, receipt_id: int) -> dict:
         return {"status": "budget_exhausted"}
 
     status["voice"] = "calling"
+    _t0 = time.perf_counter()
     try:
         call_id = provider.make_call(
             callee=callee_user.contact_phone,
@@ -102,20 +103,28 @@ def send_voice_call(self, receipt_id: int) -> dict:
             config=config,
             template_vars=_build_template_vars(receipt),
         )
+        _duration_ms = int((time.perf_counter() - _t0) * 1000)
+        logger.info("语音呼叫已发起: receipt_id=%s call_id=%s provider=%s duration_ms=%d",
+                    receipt_id, call_id, provider_name, _duration_ms)
     except PermanentVoiceError as exc:
         status["voice"] = f"failed:permanent:{type(exc).__name__}"
         receipt.channel_status = status
         flag_modified(receipt, "channel_status")
         db.session.commit()
-        logger.error("语音呼叫永久失败 receipt_id=%s: %s", receipt_id, exc)
+        logger.error("语音呼叫永久失败 receipt_id=%s duration_ms=%d: %s",
+                     receipt_id, int((time.perf_counter() - _t0) * 1000), exc)
         return {"status": "permanent_error", "error": str(exc)}
-    except TransientVoiceError:
+    except TransientVoiceError as exc:
+        logger.warning("语音呼叫瞬态失败 receipt_id=%s duration_ms=%d: %s",
+                       receipt_id, int((time.perf_counter() - _t0) * 1000), exc)
         raise  # 交由 Celery autoretry
     except Exception as exc:
         status["voice"] = f"failed:{type(exc).__name__}"
         receipt.channel_status = status
         flag_modified(receipt, "channel_status")
         db.session.commit()
+        logger.error("语音呼叫未知失败 receipt_id=%s duration_ms=%d: %s",
+                     receipt_id, int((time.perf_counter() - _t0) * 1000), exc)
         raise TransientVoiceError(f"make_call failed: {exc}") from exc
 
     status["voice_call_id"] = call_id
@@ -236,6 +245,11 @@ def _check_and_consume_budget(redis_client, phone: str, config: dict) -> bool:
             overrides[86400] = int(config["voice_budget_day"])
         if overrides:
             windows = [(span, overrides.get(span, budget)) for span, budget in windows]
+    elif config.get("voice_budget_hour") or config.get("voice_budget_day"):
+        logger.warning(
+            "voice_budget_hour/day 仅对 aliyun 生效，当前 provider=%s 将忽略该覆盖"
+            "（腾讯云夜间 1 条为厂商硬限制，不可调）", provider,
+        )
 
     now = int(time.time())
 

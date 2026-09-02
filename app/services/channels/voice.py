@@ -45,21 +45,35 @@ class VoiceChannel(PersonalChannel):
 
         条件：偏好显式开启 + 用户有 contact_phone + 总开关开 + provider 配置就绪。
         """
+        user_id = getattr(user, "id", None)
+
         prefs = user.notification_prefs or {}
         if not prefs.get("channels", {}).get(ChannelType.VOICE, False):
+            logger.debug("语音渠道不可用: user_id=%s reason=pref_disabled", user_id)
             return False
         if not user.contact_phone:
+            logger.debug("语音渠道不可用: user_id=%s reason=no_contact_phone", user_id)
             return False
 
         try:
             config = get_voice_config_from_db()
             if (config.get("enabled") or "false").lower() != "true":
+                logger.debug(
+                    "语音渠道不可用: user_id=%s reason=global_switch_off", user_id,
+                )
                 return False
 
             from app.services.channels.voice_providers import get_voice_provider
 
             provider = get_voice_provider(config.get("provider", "aliyun"))
-            return provider.is_config_ready(config)
+            ready = provider.is_config_ready(config)
+            if not ready:
+                logger.warning(
+                    "语音渠道不可用: user_id=%s reason=provider_unconfigured "
+                    "provider=%s（检查语音配置页凭据是否完整）",
+                    user_id, config.get("provider", "aliyun"),
+                )
+            return ready
         except Exception:
             logger.exception("语音渠道可用性校验失败")
             return False
