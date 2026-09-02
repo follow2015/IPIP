@@ -274,8 +274,11 @@ def register_blueprints(app: Flask):
     from app.api.monitor import monitor_bp
     app.register_blueprint(monitor_bp, url_prefix="/api/monitor")
 
-    from app.api.ai.ai_routes import bp as ai_bp
-    app.register_blueprint(ai_bp, url_prefix="/api/ai")
+    try:
+        from app.api.ai.ai_routes import bp as ai_bp
+        app.register_blueprint(ai_bp, url_prefix="/api/ai")
+    except ImportError:  # deploy 无 AI 业务代码，跳过
+        logger.warning("ai.routes skipped (deploy without AI)")
 
     from app.api.topology_routes import router as topology_router
     app.register_blueprint(topology_router)
