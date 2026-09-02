@@ -2,10 +2,11 @@
 # ============================================================
 # start.sh - ipip 一键启动/停止/状态脚本
 # ------------------------------------------------------------
-# 管理三个进程:
+# 管理四个进程:
 #   1. Flask HTTP API  (gunicorn 优先，回退 Flask dev server)
 #   2. realtime_gateway (uvicorn ASGI SSE 网关)
 #   3. monitor service  (独立设备健康监控进程)
+#   4. celery worker    (AI 长任务异步执行，队列 ai)
 #
 # 用法:
 #   bash scripts/start.sh           # 启动全部
@@ -16,6 +17,7 @@
 #   bash scripts/start.sh flask     # 仅启动 Flask
 #   bash scripts/start.sh gateway   # 仅启动 realtime_gateway
 #   bash scripts/start.sh monitor   # 仅启动 monitor
+#   bash scripts/start.sh celery    # 仅启动 celery worker
 #
 # PID 文件存放于 logs/run/，日志输出到 logs/*.log
 # ============================================================
@@ -45,11 +47,13 @@ mkdir -p "$RUN_DIR" "$PROJECT_ROOT/logs"
 PID_FLASK="$RUN_DIR/flask.pid"
 PID_GATEWAY="$RUN_DIR/gateway.pid"
 PID_MONITOR="$RUN_DIR/monitor.pid"
+PID_CELERY="$RUN_DIR/celery.pid"
 
 # 日志文件
 LOG_FLASK="$PROJECT_ROOT/logs/flask.log"
 LOG_GATEWAY="$PROJECT_ROOT/logs/gateway.log"
 LOG_MONITOR="$PROJECT_ROOT/logs/monitor.log"
+LOG_CELERY="$PROJECT_ROOT/logs/celery.log"
 
 # Python 解释器
 VENV_PY="$PROJECT_ROOT/.venv/bin/python"
@@ -154,9 +158,47 @@ start_monitor() {
   fi
 }
 
+start_celery() {
+  # Celery worker（AI 长任务异步执行，方案 §Phase 5）
+  # 队列 ai 与监控/通知隔离；--concurrency=2 适配 LLM IO 密集 + 重上下文。
+  # env 段必须含 AI_API_KEY/AI_BASE_URL/AI_MODEL（Phase 0 硬前提，C1），
+  # 由 .env 加载（脚本顶部 set -a; . .env; set +a）。
+  if is_running "$PID_CELERY"; then
+    warn "celery worker 已在运行 (PID $(pid_of "$PID_CELERY"))"
+    return 0
+  fi
+  if [ "${AI_ASYNC_ENABLED:-1}" != "1" ]; then
+    warn "AI_ASYNC_ENABLED != 1，跳过 celery worker（AI 任务走同步路径）"
+    return 0
+  fi
+  CELERY_BIN="$PROJECT_ROOT/.venv/bin/celery"
+  if [ ! -x "$CELERY_BIN" ]; then
+    warn "celery 未安装，跳过 celery worker（AI 异步任务不可用）"
+    return 0
+  fi
+  log "启动 celery worker (queue ai, concurrency ${CELERY_CONCURRENCY:-2})..."
+  nohup "$CELERY_BIN" -A app.celery_app.celery worker \
+    -Q ai \
+    --concurrency="${CELERY_CONCURRENCY:-2}" \
+    --loglevel="${CELERY_LOGLEVEL:-info}" \
+    --chdir "$PROJECT_ROOT" \
+    > "$LOG_CELERY" 2>&1 &
+  echo $! > "$PID_CELERY"
+  sleep 2
+  if is_running "$PID_CELERY"; then
+    log "celery worker 已启动 (PID $(pid_of "$PID_CELERY"))"
+  else
+    err "celery worker 启动失败，查看日志: $LOG_CELERY"
+    tail -20 "$LOG_CELERY" 2>/dev/null || true
+    return 1
+  fi
+}
+
 # ── 停止函数 ────────────────────────────────────────────────
 stop_one() {
   local name="$1" pidfile="$2"
+  # 可选第三参数：等待超时秒数（默认 10，celery worker 需更长以等当前任务完成）
+  local timeout="${3:-10}"
   if ! is_running "$pidfile"; then
     warn "$name 未在运行"
     rm -f "$pidfile"
@@ -165,13 +207,12 @@ stop_one() {
   local pid; pid=$(cat "$pidfile")
   log "停止 $name (PID $pid)..."
   kill -TERM "$pid" 2>/dev/null || true
-  # 等待最多 10 秒
-  for i in $(seq 1 10); do
+  for i in $(seq 1 "$timeout"); do
     if ! kill -0 "$pid" 2>/dev/null; then break; fi
     sleep 1
   done
   if kill -0 "$pid" 2>/dev/null; then
-    warn "$name 未在 10s 内退出，发送 SIGKILL"
+    warn "$name 未在 ${timeout}s 内退出，发送 SIGKILL"
     kill -9 "$pid" 2>/dev/null || true
   fi
   rm -f "$pidfile"
@@ -179,6 +220,10 @@ stop_one() {
 }
 
 stop_all() {
+  # celery worker 等 30s：SIGTERM 后 celery 会等当前任务完成才退出，
+  # 诊断 task time_limit=1800 但 soft_time_limit=1500 会先优雅退出，
+  # 30s 覆盖绝大多数场景；超时 SIGKILL 对 acks_late=True 安全（重投）。
+  stop_one "celery worker"    "$PID_CELERY" 30
   stop_one "monitor service" "$PID_MONITOR"
   stop_one "realtime_gateway" "$PID_GATEWAY"
   stop_one "Flask" "$PID_FLASK"
@@ -198,6 +243,7 @@ status_all() {
   status_one "Flask"            "$PID_FLASK"   "$FLASK_PORT"
   status_one "realtime_gateway" "$PID_GATEWAY" "$GATEWAY_PORT"
   status_one "monitor service"  "$PID_MONITOR"
+  status_one "celery worker"    "$PID_CELERY"
 }
 
 # ── 主入口 ──────────────────────────────────────────────────
@@ -207,6 +253,7 @@ case "$CMD" in
     start_flask
     start_gateway
     start_monitor
+    start_celery
     log "全部服务已启动。状态: bash scripts/start.sh status"
     ;;
   stop)
@@ -219,6 +266,7 @@ case "$CMD" in
     start_flask
     start_gateway
     start_monitor
+    start_celery
     log "全部服务已重启"
     ;;
   status)
@@ -233,7 +281,10 @@ case "$CMD" in
   monitor)
     start_monitor
     ;;
+  celery)
+    start_celery
+    ;;
   *)
-    die "未知命令: $CMD（可用: start|stop|restart|status|flask|gateway|monitor）"
+    die "未知命令: $CMD（可用: start|stop|restart|status|flask|gateway|monitor|celery）"
     ;;
 esac

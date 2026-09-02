@@ -103,6 +103,9 @@ PERMISSIONS = {
     "rbac:delete": ("删除角色", "rbac", "删除角色"),
     "audit:view": ("查看审计日志", "audit", "查看审计日志记录"),
     "import:view": ("查看导入导出", "import", "查看导入导出记录"),
+    # AI 能力
+    "ai:use": ("AI 助手使用", "ai", "使用告警解读/NL 查询/RAG/巡查"),
+    "ai:admin": ("AI 知识库管理", "ai", "RAG 文档入库"),
 }
 
 ROLES = {
@@ -131,6 +134,7 @@ ROLE_PERMISSIONS = {
         "rbac:view", "rbac:create", "rbac:update", "rbac:delete",
         "audit:view",
         "import:view",
+        "ai:use", "ai:admin",
     ],
     "operator": [
         "room:view", "room:create", "room:update",
@@ -143,6 +147,7 @@ ROLE_PERMISSIONS = {
         "ip:view", "ip:update", "ip:scan",
         "system:scan", "system:stats",
         "monitor:view", "monitor:config",
+        "ai:use",
     ],
     "viewer": [
         "room:view", "cabinet:view", "device:view", "customer:view", "user:view",
