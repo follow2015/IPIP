@@ -1,15 +1,3 @@
-/**
- * NotificationPreferences — 通知偏好设置组件
- *
- * 集成到用户设置页面，使用 Ant Design Form + Switch + TimePicker + Select 构建。
- * 渠道开关：inbox（默认开启，不可调整）、email
- * 订阅类型：多选通知类别（空=接收全部，critical 始终穿透）
- * 免打扰时段：Switch 启用 + TimePicker 选择时段
- *
- * 注：企业微信/飞书当前为广播渠道（群机器人 Webhook），不 @个人用户，
- * 个人开关无实际效果，故不在此暴露。待集成企微/飞书应用 API
- * （通过手机号查 userid 实现 @mention）后再添加。
- */
 import React, { useCallback } from 'react';
 import {
   Form,
@@ -22,9 +10,16 @@ import {
   Divider,
   message,
   Spin,
-  Select
+  Select,
+  Alert
 } from 'antd';
-import { BellOutlined, MailOutlined, MoonOutlined, FilterOutlined } from '@ant-design/icons';
+import {
+  BellOutlined,
+  MailOutlined,
+  MoonOutlined,
+  FilterOutlined,
+  PhoneOutlined
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   useNotificationPreferences,
@@ -46,13 +41,18 @@ const NotificationPreferences: React.FC = () => {
   const handleSave = useCallback(
     async (values: {
       emailEnabled: boolean;
+      voiceEnabled: boolean;
       subscribedTypes: string[];
       quietHoursEnabled: boolean;
       quietHoursRange?: [dayjs.Dayjs, dayjs.Dayjs];
     }) => {
       const quietHours = prefs?.quiet_hours ?? DEFAULT_QUIET_HOURS;
       const update: Partial<NotificationPrefs> = {
-        channels: { inbox: true, email: values.emailEnabled },
+        channels: {
+          inbox: true,
+          email: values.emailEnabled,
+          voice: values.voiceEnabled
+        },
         subscribed_types: values.subscribedTypes
       };
 
@@ -107,6 +107,7 @@ const NotificationPreferences: React.FC = () => {
           onFinish={handleSave}
           initialValues={{
             emailEnabled: prefs?.channels?.email ?? true,
+            voiceEnabled: prefs?.channels?.voice ?? false,
             subscribedTypes: prefs?.subscribed_types ?? [],
             quietHoursEnabled,
             quietHoursRange: [dayjs(quietHours.start, 'HH:mm'), dayjs(quietHours.end, 'HH:mm')]
@@ -129,6 +130,41 @@ const NotificationPreferences: React.FC = () => {
             <MailOutlined style={{ marginRight: 4 }} />
             接收邮件推送（需在个人资料中设置邮箱地址）
           </Text>
+
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, cur) =>
+              prev.quietHoursEnabled !== cur.quietHoursEnabled ||
+              prev.voiceEnabled !== cur.voiceEnabled
+            }
+          >
+            {({ getFieldValue }) => {
+              const quietOn = getFieldValue('quietHoursEnabled');
+              const voiceOn = getFieldValue('voiceEnabled');
+              return (
+                <>
+                  <Form.Item label="语音通知" name="voiceEnabled" valuePropName="checked">
+                    <Switch />
+                  </Form.Item>
+                  <Text
+                    type="secondary"
+                    style={{ marginTop: -8, marginBottom: 16, display: 'block' }}
+                  >
+                    <PhoneOutlined style={{ marginRight: 4 }} />
+                    语音电话呼叫（需管理员启用语音渠道，并在个人资料中设置手机号； 默认关闭）
+                  </Text>
+                  {quietOn && voiceOn && (
+                    <Alert
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 16 }}
+                      message="免打扰时段内，语音通知仍会呼出（深夜告警叫醒场景）。若不希望夜间接到电话，请关闭语音通知。"
+                    />
+                  )}
+                </>
+              );
+            }}
+          </Form.Item>
 
           <Divider />
 

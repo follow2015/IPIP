@@ -8,6 +8,7 @@ import {
   DashboardOutlined,
   HomeOutlined,
   DatabaseOutlined,
+  MedicineBoxOutlined,
   CloudServerOutlined,
   GlobalOutlined,
   SwapOutlined,
@@ -25,14 +26,17 @@ import {
   DeploymentUnitOutlined,
   ClusterOutlined,
   BellOutlined,
+  ThunderboltOutlined,
   ApiOutlined,
   MailOutlined,
+  PhoneOutlined,
   MonitorOutlined,
   LineChartOutlined,
   SettingOutlined,
   AlertOutlined,
   ControlOutlined,
   ReadOutlined,
+  RobotOutlined,
   SafetyCertificateOutlined
 } from '@ant-design/icons';
 
@@ -185,6 +189,13 @@ export const MENU_CONFIGS: MenuConfig[] = [
         permission: 'monitor:view'
       },
       {
+        key: 'monitor-incidents',
+        label: '事件中心',
+        icon: <ThunderboltOutlined />,
+        path: '/monitor/incidents',
+        permission: 'monitor:view'
+      },
+      {
         key: 'monitor-history',
         label: '历史趋势',
         icon: <LineChartOutlined />,
@@ -225,6 +236,64 @@ export const MENU_CONFIGS: MenuConfig[] = [
         icon: <ReadOutlined />,
         path: '/monitor/oid-tools',
         permission: 'monitor:config'
+      }
+    ]
+  },
+  {
+    key: 'ai',
+    label: 'AI 助手',
+    icon: <RobotOutlined />,
+    path: '/ai/nlq',
+    permission: 'ai:use',
+    children: [
+      {
+        key: 'ai-nlq',
+        label: '智能查询',
+        icon: <RobotOutlined />,
+        path: '/ai/nlq',
+        permission: 'ai:use'
+      },
+      {
+        key: 'ai-skills',
+        label: '技能管理',
+        icon: <ApiOutlined />,
+        path: '/ai/skills',
+        permission: 'ai:admin'
+      },
+      {
+        key: 'ai-config',
+        label: 'AI 配置',
+        icon: <SettingOutlined />,
+        path: '/ai/config',
+        permission: 'ai:admin'
+      },
+      {
+        key: 'ai-monitor',
+        label: '运行监控',
+        icon: <MonitorOutlined />,
+        path: '/ai/monitor',
+        permission: 'ai:admin'
+      },
+      {
+        key: 'ai-audit',
+        label: '审计日志',
+        icon: <SafetyCertificateOutlined />,
+        path: '/ai/audit',
+        permission: 'ai:admin'
+      },
+      {
+        key: 'ai-rag',
+        label: '知识库',
+        icon: <DatabaseOutlined />,
+        path: '/ai/rag',
+        permission: 'ai:use'
+      },
+      {
+        key: 'ai-diagnosis',
+        label: '智能诊断',
+        icon: <MedicineBoxOutlined />,
+        path: '/ai/diagnosis',
+        permission: 'ai:agentic'
       }
     ]
   },
@@ -281,6 +350,13 @@ export const MENU_CONFIGS: MenuConfig[] = [
         label: '邮件配置',
         icon: <MailOutlined />,
         path: '/settings/mail',
+        permission: 'user:view'
+      },
+      {
+        key: 'voice-settings',
+        label: '语音配置',
+        icon: <PhoneOutlined />,
+        path: '/settings/voice',
         permission: 'user:view'
       },
       {

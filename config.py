@@ -15,6 +15,29 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _redis_url_for_db(db: int) -> str:
+    """构造指向指定 Redis db 的连接 URL（Celery broker / backend 用）。
+
+    复用 REDIS_HOST / REDIS_PORT / REDIS_PASSWORD（与 Config.REDIS_URL 同源），
+    仅替换 db 编号——Celery 的 broker 与 result backend 需用独立 db，避免与
+    应用缓存键混杂。
+
+    不能直接用 Config.REDIS_URL：它是 property，类体定义阶段无法访问。
+
+    Args:
+        db: 目标 db 编号。
+
+    Returns:
+        redis:// URL 字符串。
+    """
+    host = os.getenv("REDIS_HOST", "localhost")
+    port = os.getenv("REDIS_PORT", "6379")
+    password = os.getenv("REDIS_PASSWORD", "")
+    if password:
+        return f"redis://:{password}@{host}:{port}/{db}"
+    return f"redis://{host}:{port}/{db}"
+
+
 def _generate_dev_key(key_name: str) -> str:
     """为开发环境生成随机密钥并打印警告"""
     key = secrets.token_urlsafe(32)
@@ -35,6 +58,8 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY")
     VERSION = "1.0.0"
 
+    APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Asia/Shanghai")
+
     FLASK_HOST = os.getenv("FLASK_HOST", "0.0.0.0")
     FLASK_PORT = int(os.getenv("FLASK_PORT", 5000))
     DEBUG = False
@@ -47,6 +72,47 @@ class Config:
     MYSQL_USER = os.getenv("MYSQL_USER", "root")
     MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
     MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "ip_management")
+
+    AI_PROVIDER = os.getenv("AI_PROVIDER", "openai")  # openai/anthropic/custom
+    AI_API_KEY = os.getenv("AI_API_KEY", "")
+    AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1")
+    AI_MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
+    AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", 30))
+    AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", 1024))
+    AI_TEMPERATURE = float(os.getenv("AI_TEMPERATURE", 0.2))
+
+    _AI_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "app", "services", "ai", "skills")
+    AI_BUILTIN_SKILLS_DIR = os.path.join(_AI_BASE, "builtin")
+    AI_CUSTOM_SKILLS_DIR = os.environ.get(
+        "AI_CUSTOM_SKILLS_DIR", os.path.join(_AI_BASE, "custom"))
+    AI_AGENTIC_SKILLS_DIR = os.path.join(_AI_BASE, "agentic")
+
+    AI_DOCS_ROOT = os.environ.get(
+        "AI_DOCS_ROOT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs"))
+
+    AI_STREAM_TIMEOUT = int(os.getenv("AI_STREAM_TIMEOUT", 120))
+    MAX_STREAM_CONNECTIONS = int(os.getenv("MAX_STREAM_CONNECTIONS", 100))
+
+    AI_CIRCUIT_FAILURE_THRESHOLD = int(os.getenv("AI_CIRCUIT_FAILURE_THRESHOLD", 5))
+    AI_CIRCUIT_COOLDOWN_SECONDS = int(os.getenv("AI_CIRCUIT_COOLDOWN_SECONDS", 30))
+
+    AI_ASYNC_ENABLED = os.getenv("AI_ASYNC_ENABLED", "1") == "1"
+
+    CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL") or _redis_url_for_db(1)
+    CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or _redis_url_for_db(2)
+    CELERY_TASK_SERIALIZER = "json"
+    CELERY_RESULT_SERIALIZER = "json"
+    CELERY_ACCEPT_CONTENT = ["json"]
+    CELERY_TASK_TRACK_STARTED = True
+    CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # 长任务：一次只取一个，避免饿死
+    CELERY_TASK_ACKS_LATE = True  # 崩溃后重投；remedial task 单独覆盖为 False
+    CELERY_TASK_REJECT_ON_WORKER_LOST = True
+    CELERY_TASK_DEFAULT_QUEUE = "ai"
+    CELERY_TASK_TIME_LIMIT = 1800  # 硬上限 30min，杀失控 agentic 循环
+    CELERY_TASK_SOFT_TIME_LIMIT = 1500
+    CELERY_WORKER_MAX_TASKS_PER_CHILD = int(
+        os.getenv("CELERY_WORKER_MAX_TASKS_PER_CHILD", 100))
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -168,6 +234,10 @@ class Config:
     MONITOR_SUPPRESSION_WINDOW = int(os.getenv("MONITOR_SUPPRESSION_WINDOW", "60"))  # 滑动窗口秒
     MONITOR_SUPPRESSION_MAX = int(os.getenv("MONITOR_SUPPRESSION_MAX", "5"))  # 窗口内最大告警数
     MONITOR_SUPPRESSION_THROTTLE = int(os.getenv("MONITOR_SUPPRESSION_THROTTLE", "300"))  # 抑制后降频通知间隔秒
+
+    MONITOR_INCIDENT_ENABLED = os.getenv("MONITOR_INCIDENT_ENABLED", "true").lower() == "true"
+    MONITOR_INCIDENT_WINDOW = int(os.getenv("MONITOR_INCIDENT_WINDOW", "300"))  # L1 归并时间窗秒
+    MONITOR_INCIDENT_CHANGE_WINDOW = int(os.getenv("MONITOR_INCIDENT_CHANGE_WINDOW", "300"))  # L3 变更回溯窗秒
 
     MONITOR_WORKER_IN_PROCESS = os.getenv("MONITOR_WORKER_IN_PROCESS", "true").lower() == "true"
 

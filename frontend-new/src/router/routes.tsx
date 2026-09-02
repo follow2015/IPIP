@@ -44,6 +44,7 @@ const WebhookConfigManagement = React.lazy(
   () => import('@/pages/Settings/WebhookConfigManagement')
 );
 const MailSettings = React.lazy(() => import('@/pages/Settings/MailSettings'));
+const VoiceSettings = React.lazy(() => import('@/pages/Settings/VoiceSettings'));
 const Licenses = React.lazy(() => import('@/pages/Settings/Licenses'));
 const DeviceRecycleBin = React.lazy(() => import('@/pages/DeviceRecycleBin'));
 const Topology = React.lazy(() => import('@/pages/Topology'));
@@ -53,10 +54,18 @@ const MonitorCredentials = React.lazy(() => import('@/pages/Monitor/Credentials'
 const MonitorSettings = React.lazy(() => import('@/pages/Monitor/Settings'));
 const MonitorHistory = React.lazy(() => import('@/pages/Monitor/History'));
 const MonitorAlertCenter = React.lazy(() => import('@/pages/Monitor/AlertCenter'));
+const MonitorIncidents = React.lazy(() => import('@/pages/Monitor/Incidents'));
 const MonitorAlertRules = React.lazy(() => import('@/pages/Monitor/AlertRules'));
 const MonitorThresholds = React.lazy(() => import('@/pages/Monitor/Thresholds'));
 const MonitorOidTools = React.lazy(() => import('@/pages/Monitor/OidTools'));
 const MonitorNocScreenFullscreen = React.lazy(() => import('@/pages/Monitor/NocScreen'));
+const AIPage = React.lazy(() => import('@/pages/AI'));
+const AISkillsPage = React.lazy(() => import('@/pages/AI/Skills'));
+const AIConfigPage = React.lazy(() => import('@/pages/AI/AIConfig'));
+const AIMonitorPage = React.lazy(() => import('@/pages/AI/AIMonitor'));
+const AIAuditPage = React.lazy(() => import('@/pages/AI/AIAudit'));
+const AIRAGPage = React.lazy(() => import('@/pages/AI/RAG'));
+const AIDiagnosisPage = React.lazy(() => import('@/pages/AIDiagnosis'));
 const VendorBrandsPage = React.lazy(() => import('@/pages/Asset/VendorBrands'));
 const NotFound = React.lazy(() => import('@/pages/NotFound'));
 
@@ -160,6 +169,14 @@ export const routes: RouteObject[] = [
           </PermissionRoute>
         )
       },
+      {
+        path: 'monitor/incidents',
+        element: (
+          <PermissionRoute requiredPermission="monitor:view">
+            {withSuspense(MonitorIncidents)}
+          </PermissionRoute>
+        )
+      },
       { path: 'monitor/reports', element: <Navigate to="/monitor/alerts?tab=reports" replace /> },
       { path: 'monitor/noc-screen', element: <Navigate to="/monitor/alerts?tab=noc" replace /> },
       {
@@ -223,6 +240,59 @@ export const routes: RouteObject[] = [
         path: 'monitor/oid-rule-config',
         element: <Navigate to="/monitor/oid-tools?tab=oid-rules" replace />
       },
+      { path: 'ai', element: <Navigate to="/ai/nlq" replace /> },
+      {
+        path: 'ai/nlq',
+        element: (
+          <PermissionRoute requiredPermission="ai:use">{withSuspense(AIPage)}</PermissionRoute>
+        )
+      },
+      {
+        path: 'ai/skills',
+        element: (
+          <PermissionRoute requiredPermission="ai:admin">
+            {withSuspense(AISkillsPage)}
+          </PermissionRoute>
+        )
+      },
+      {
+        path: 'ai/config',
+        element: (
+          <PermissionRoute requiredPermission="ai:admin">
+            {withSuspense(AIConfigPage)}
+          </PermissionRoute>
+        )
+      },
+      {
+        path: 'ai/monitor',
+        element: (
+          <PermissionRoute requiredPermission="ai:admin">
+            {withSuspense(AIMonitorPage)}
+          </PermissionRoute>
+        )
+      },
+      {
+        path: 'ai/audit',
+        element: (
+          <PermissionRoute requiredPermission="ai:admin">
+            {withSuspense(AIAuditPage)}
+          </PermissionRoute>
+        )
+      },
+      {
+        path: 'ai/rag',
+        element: (
+          <PermissionRoute requiredPermission="ai:use">{withSuspense(AIRAGPage)}</PermissionRoute>
+        )
+      },
+      {
+        path: 'ai/diagnosis',
+        element: (
+          <PermissionRoute requiredPermission="ai:agentic">
+            {withSuspense(AIDiagnosisPage)}
+          </PermissionRoute>
+        )
+      },
       { path: 'audit-logs', element: withSuspense(AuditLogsPage) },
       {
         path: 'asset/vendor-brands',
@@ -250,6 +320,14 @@ export const routes: RouteObject[] = [
         element: (
           <PermissionRoute requiredPermission="user:view">
             {withSuspense(MailSettings)}
+          </PermissionRoute>
+        )
+      },
+      {
+        path: 'settings/voice',
+        element: (
+          <PermissionRoute requiredPermission="user:view">
+            {withSuspense(VoiceSettings)}
           </PermissionRoute>
         )
       },

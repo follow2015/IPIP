@@ -27,6 +27,7 @@ class MonitorAlertOutbox(BaseModel):
         Index("ix_mao_dedup_key", "dedup_key"),
         Index("ix_mao_created_at", "created_at"),
         Index("ix_mao_acknowledged_at", "acknowledged_at"),
+        Index("ix_mao_incident", "incident_id"),
         {"comment": "监控告警发件箱（outbox 模式，解耦状态落库与告警投递）"},
     )
 
@@ -122,6 +123,16 @@ class MonitorAlertOutbox(BaseModel):
         nullable=True,
         comment="关闭原因（P2-16）",
     )
+    incident_id = db.Column(
+        db.BigInteger,
+        nullable=True,
+        comment="归属事件ID（事件聚合；NULL 表示未聚合或聚合失败）",
+    )
+    reason_code = db.Column(
+        db.String(40),
+        nullable=True,
+        comment="归并原因：L1_rule / L2_topology / L2_manual_rule / L3_change",
+    )
 
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> dict:
         """序列化（不回显敏感字段）"""
@@ -144,6 +155,8 @@ class MonitorAlertOutbox(BaseModel):
             "closed_by": self.closed_by,
             "closed_at": self.closed_at.isoformat() if self.closed_at else None,
             "close_reason": self.close_reason,
+            "incident_id": self.incident_id,
+            "reason_code": self.reason_code,
         }
         if exclude:
             for k in exclude:

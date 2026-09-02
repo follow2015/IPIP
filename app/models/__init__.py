@@ -7,6 +7,8 @@
 """
 from app.models.base import BaseModel
 
+from app.models.ai_conversation import AIConversation
+from app.models.ai_diagnosis_session import AIDiagnosisSession
 from app.models.audit_log import AuditLog
 from app.models.cabinet import Cabinet
 from app.models.component_template import ComponentTemplate
@@ -18,6 +20,7 @@ from app.models.device_config_backup import DeviceConfigBackup, DeviceConfigChan
 from app.models.device_connection import DeviceConnection
 from app.models.device_hardware import DeviceHardware
 from app.models.device_metric_alert_state import DeviceMetricAlertState
+from app.models.device_metric_baseline import DeviceMetricBaseline
 from app.models.device_metric_latest import DeviceMetricLatest
 from app.models.device_metric_override import DeviceMetricOverride
 from app.models.device_metric_timeseries import DeviceMetricTimeseries
@@ -40,11 +43,13 @@ from app.models.monitor_device_type_recommend import MonitorDeviceTypeRecommend
 from app.models.monitor_dynamic_config import MonitorDynamicConfig
 from app.models.monitor_escalation_policy import MonitorEscalationPolicy
 from app.models.monitor_escalation_step import MonitorEscalationStep
+from app.models.monitor_incident import MonitorIncident
 from app.models.monitor_metric_template import MonitorMetricTemplate
 from app.models.monitor_metric_template_group import MonitorMetricTemplateGroup, MonitorMetricTemplateGroupItem
 from app.models.monitor_oid_category_rule import MonitorOidCategoryRule
 from app.models.monitor_silence_rule import MonitorSilenceRule
 from app.models.monitor_sla_target import MonitorSlaTarget
+from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
 from app.models.monitor_vendor_brand import MonitorVendorBrand
 from app.models.network_connection import NetworkConnection
 from app.models.network_port import NetworkPort
@@ -58,10 +63,13 @@ from app.models.user_log import UserLog
 from app.models.virtual_room import VirtualRoom, VirtualRoomMember
 from app.models.vlan import VLAN
 from app.models.vlan_port_member import VLANPortMember
+from app.models.voice_setting import VoiceSetting
 from app.models.webhook_config import WebhookConfig
 
 __all__ = [
     "BaseModel",
+    "AIConversation",
+    "AIDiagnosisSession",
     "AuditLog",
     "Cabinet",
     "ComponentTemplate",
@@ -74,6 +82,7 @@ __all__ = [
     "DeviceConnection",
     "DeviceHardware",
     "DeviceMetricAlertState",
+    "DeviceMetricBaseline",
     "DeviceMetricLatest",
     "DeviceMetricOverride",
     "DeviceMetricTimeseries",
@@ -100,12 +109,14 @@ __all__ = [
     "MonitorDynamicConfig",
     "MonitorEscalationPolicy",
     "MonitorEscalationStep",
+    "MonitorIncident",
     "MonitorMetricTemplate",
     "MonitorMetricTemplateGroup",
     "MonitorMetricTemplateGroupItem",
     "MonitorOidCategoryRule",
     "MonitorSilenceRule",
     "MonitorSlaTarget",
+    "MonitorSuppressedAlertLog",
     "MonitorVendorBrand",
     "NetworkConnection",
     "NetworkPort",
@@ -126,5 +137,6 @@ __all__ = [
     "VLANPortMember",
     "VirtualRoom",
     "VirtualRoomMember",
+    "VoiceSetting",
     "WebhookConfig",
 ]

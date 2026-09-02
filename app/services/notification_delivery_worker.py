@@ -19,8 +19,7 @@ import time
 logger = get_logger(__name__)
 
 _delivery_queue: "queue.Queue[dict]" = queue.Queue(maxsize=1000)
-_cooldown_cache: dict[str, float] = {}  # f"{type}:{source_module}" -> 上次外部投递时间戳
-_COOLDOWN_SECONDS = 300  # 同 type+source 5 分钟内只对外部渠道投递一次，inbox 不受影响
+_COOLDOWN_SECONDS = 300  # 同 type+source+channel 5 分钟内只投递一次，inbox 不受影响
 
 _RATE_LIMIT_POLL_INTERVAL = 60  # RateLimitMonitor 轮询间隔（秒）
 DELIVERY_TIMEOUT = 5  # 投递队列拉取超时时间（秒）
@@ -67,19 +66,40 @@ def _drain_queue(app) -> None:
         logger.info("通知投递队列停机排空完成: %d 条", drained)
 
 
-def _should_skip_cooldown(type_: str, source_module: str | None) -> bool:
-    """检查同 type+source 是否在冷却窗口内。
+def _get_cooldown_redis():
+    """获取冷却用 Redis 客户端；不可用时返回 None。
+
+    项目没有 `extensions.redis_client`：Redis 统一经
+    `app.services.switch_events._get_redis()` 获取，与 AI 模块的
+    task_state / task_idempotency / circuit_breaker 同一惯例。
+    """
+    from app.services.switch_events import _get_redis
+
+    try:
+        return _get_redis()
+    except Exception:
+        logger.warning("冷却 Redis 客户端获取失败，本次不冷却", exc_info=True)
+        return None
+
+
+def _should_skip_cooldown(type_: str, source_module: str | None, channel_name: str) -> bool:
+    """检查同 type+source+channel 是否在冷却窗口内（Redis 化）。
+
+    P1-fix: 冷却键加渠道维度，避免邮件挡住语音；Redis 实现多 worker 共享冷却状态。
 
     Returns:
-        True = 应跳过外部渠道（在冷却窗口内），False = 可以发送
+        True = 应跳过（在冷却窗口内），False = 可以发送
     """
-    key = f"{type_}:{source_module or ''}"
-    now = time.time()
-    last = _cooldown_cache.get(key)
-    if last is not None and now - last < _COOLDOWN_SECONDS:
-        return True
-    _cooldown_cache[key] = now
-    return False
+    redis_client = _get_cooldown_redis()
+    if redis_client is None:
+        return False  # 降级：宁可多发，不可因 Redis 故障中断全部外部渠道
+
+    key = f"cooldown:{type_}:{source_module or ''}:{channel_name}"
+    try:
+        return not redis_client.set(key, str(time.time()), ex=_COOLDOWN_SECONDS, nx=True)
+    except Exception:
+        logger.warning("冷却状态读写失败，降级为不冷却 key=%s", key, exc_info=True)
+        return False
 
 
 def _process_one(app, task: dict) -> None:
@@ -95,14 +115,28 @@ def _process_one(app, task: dict) -> None:
             if not notification:
                 return
 
-            in_cooldown = _should_skip_cooldown(notification.type, notification.source_module)
+            for channel in NotificationService.get_broadcast_channels():
+                ch_name = channel.get_channel_name()
+                if _should_skip_cooldown(notification.type, notification.source_module, ch_name):
+                    logger.debug("广播渠道 %s 命中冷却，跳过", ch_name)
+                    continue
+                try:
+                    ok = channel.send(notification)
+                    if not ok:
+                        logger.warning(
+                            "广播渠道 %s 投递未成功（无匹配配置或全部失败）"
+                            " notification_id=%s", ch_name, notification.id,
+                        )
+                except Exception:
+                    logger.exception("广播渠道 %s 投递失败", ch_name)
 
-            if not in_cooldown:
-                for channel in NotificationService.get_broadcast_channels():
-                    try:
-                        channel.send(notification)
-                    except Exception:
-                        logger.exception("广播渠道 %s 投递失败", channel.get_channel_name())
+            cooldown_decisions: dict[str, bool] = {
+                ch.get_channel_name(): _should_skip_cooldown(
+                    notification.type, notification.source_module, ch.get_channel_name()
+                )
+                for ch in NotificationService.get_personal_channels()
+                if ch.get_channel_name() != ChannelType.INBOX
+            }
 
             for uid in task["user_ids"]:
                 receipt = NotificationReceipt.query.filter_by(
@@ -122,15 +156,23 @@ def _process_one(app, task: dict) -> None:
                     if not channel.is_available(user):
                         status[name] = "skipped:unavailable"
                         continue
-                    if in_cooldown:
+                    if cooldown_decisions.get(name):
                         status[name] = "skipped:cooldown"
                         continue
                     try:
+                        _t0 = time.perf_counter()
                         ok = channel.send(notification, receipt, user)
+                        _duration_ms = int((time.perf_counter() - _t0) * 1000)
+                        status.update(dict(receipt.channel_status or {}))
                         status[name] = "ok" if ok else "failed:unknown"
+                        logger.info(
+                            "渠道投递完成 channel=%s user_id=%s duration_ms=%d ok=%s",
+                            name, uid, _duration_ms, ok,
+                        )
                     except Exception as exc:
                         logger.exception("渠道 %s 投递失败 user_id=%s", name, uid)
-                        status[name] = f"failed:{exc}"
+                        status.update(dict(receipt.channel_status or {}))
+                        status[name] = f"failed:{type(exc).__name__}"
 
                 from sqlalchemy.orm.attributes import flag_modified
                 receipt.channel_status = status

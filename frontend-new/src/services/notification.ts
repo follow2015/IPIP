@@ -125,6 +125,7 @@ export interface NotificationPrefs {
   channels: {
     inbox: boolean;
     email: boolean;
+    voice?: boolean;
   };
   subscribed_types: string[];
   quiet_hours: {

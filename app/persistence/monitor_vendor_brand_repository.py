@@ -44,6 +44,20 @@ class MonitorVendorBrandRepository:
             .all()
         )
 
+    def find_by_enterprise_no(self, enterprise_no: str) -> Optional[MonitorVendorBrand]:
+        """按 enterprise 号查启用品牌；不存在返回 None。
+
+        供 AI 诊断把 device.brand（存的是 enterprise 号）解析为命令族时使用。
+        同一 enterprise 号可能存在多行（如 2011 同时登记了服务器与网络设备），
+        此处只取 sort_order 最小的一行 —— 命令族只取决于厂商，与设备类别无关。
+        """
+        return (
+            self.session.query(MonitorVendorBrand)
+            .filter_by(enterprise_no=str(enterprise_no), enabled=True)
+            .order_by(MonitorVendorBrand.sort_order.asc())
+            .first()
+        )
+
     def find_by_id(self, brand_id: int) -> Optional[MonitorVendorBrand]:
         """按 ID 查询；不存在返回 None。"""
         return self.session.get(MonitorVendorBrand, brand_id)

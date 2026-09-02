@@ -14,16 +14,37 @@
 - alert_types 为 null 的规则匹配全部告警类型
 - fail-open：判定失败不阻断告警
 
+事件聚合（Incident）适配：
+被抑制的告警不入 outbox、零留痕，会导致事件无法统计「这起事故影响了
+多少台设备」。故 check_dependency 返回结构化的 upstream_device_id，
+调用方据此写入留痕表（见 monitor_suppressed_alert_log），使 L2 拓扑
+聚合能还原影响面。
+
 缓存：Redis key `monitor:dep_rules:active` 缓存启用的手动规则列表，TTL 60s。
 """
 import json
 from app.utils.logging import get_logger
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, TypedDict
 
 logger = get_logger(__name__)
 
 _CACHE_KEY = "monitor:dep_rules:active"
 _CACHE_TTL = 60  # 秒
+
+
+class DependencyDecision(TypedDict):
+    """依赖抑制判定结果"""
+    suppressed: bool
+    """抑制原因（人读），未抑制时为空字符串"""
+    reason: str
+    """命中的上游设备 ID（未抑制时为 None）。
+
+    事件聚合的 L2 拓扑聚合与影响面统计依赖此字段 —— 没有它，被抑制的
+    下游告警无法归属到根因事件。
+    """
+    upstream_device_id: Optional[int]
+    """抑制来源：manual_rule / topology / 空字符串（未抑制）"""
+    source: str
 
 
 def _get_redis():
@@ -103,20 +124,33 @@ def _upstream_has_active_alert(upstream_device_id: int, alert_type: str) -> bool
 
 
 
-def is_suppressed_by_dependency(
-    device_id: int,
-    alert_type: str,
-) -> Tuple[bool, str]:
-    """判定告警是否被依赖关系抑制。
+def _get_parent_device_id(device_id: int) -> Optional[int]:
+    """取设备的拓扑父设备 ID（DeviceServerExt.parent_device_id）。
+
+    独立成函数便于测试替身注入，避免测试必须 mock db.session.get 的
+    内部调用细节。
+    """
+    from app.models.device_server_ext import DeviceServerExt
+    from extensions import db
+    ext = db.session.get(DeviceServerExt, device_id)
+    if ext is None:
+        return None
+    return ext.parent_device_id
+
+
+def check_dependency(device_id: int, alert_type: str) -> DependencyDecision:
+    """判定告警是否被依赖关系抑制，并返回结构化上游信息。
+
+    相比 is_suppressed_by_dependency 增加了 upstream_device_id 与 source，
+    供事件聚合把被抑制的下游告警归属到根因事件、统计影响面。
 
     Args:
         device_id: 下游设备 ID（待判定告警的设备）
         alert_type: 告警类型
 
     Returns:
-        (suppressed, reason):
-        - suppressed=True：被抑制（不入箱），reason 描述抑制来源
-        - suppressed=False：放行，reason 为空字符串
+        DependencyDecision：见类型定义。判定异常时 fail-open 放行
+        （suppressed=False），不因依赖服务故障丢弃告警。
     """
     try:
         rules = _get_active_rules()
@@ -126,20 +160,44 @@ def is_suppressed_by_dependency(
             types = rule.get("alert_types")
             if types and alert_type not in types:
                 continue
-            if _upstream_has_active_alert(rule["upstream_device_id"], alert_type):
-                return True, f"manual rule #{rule['id']}: upstream device {rule['upstream_device_id']} has active alert"
+            upstream = rule["upstream_device_id"]
+            if _upstream_has_active_alert(upstream, alert_type):
+                return DependencyDecision(
+                    suppressed=True,
+                    reason=f"manual rule #{rule['id']}: upstream device {upstream} has active alert",
+                    upstream_device_id=upstream,
+                    source="manual_rule",
+                )
 
-        from app.models.device_server_ext import DeviceServerExt
-        from extensions import db
-        ext = db.session.get(DeviceServerExt, device_id)
-        if ext is not None and ext.parent_device_id is not None:
-            if _upstream_has_active_alert(ext.parent_device_id, alert_type):
-                return True, f"topology: parent device {ext.parent_device_id} has active alert"
+        parent = _get_parent_device_id(device_id)
+        if parent is not None and _upstream_has_active_alert(parent, alert_type):
+            return DependencyDecision(
+                suppressed=True,
+                reason=f"topology: parent device {parent} has active alert",
+                upstream_device_id=parent,
+                source="topology",
+            )
 
-        return False, ""
+        return DependencyDecision(
+            suppressed=False, reason="", upstream_device_id=None, source=""
+        )
     except Exception as exc:
-        logger.warning("is_suppressed_by_dependency 失败（fail-open 放行）: %s", exc, exc_info=True)
-        return False, ""
+        logger.warning("check_dependency 失败（fail-open 放行）: %s", exc, exc_info=True)
+        return DependencyDecision(
+            suppressed=False, reason="", upstream_device_id=None, source=""
+        )
+
+
+def is_suppressed_by_dependency(
+    device_id: int,
+    alert_type: str,
+) -> Tuple[bool, str]:
+    """兼容旧调用方：仅返回 (suppressed, reason)。
+
+    新代码请用 check_dependency 以获取 upstream_device_id。
+    """
+    d = check_dependency(device_id, alert_type)
+    return d["suppressed"], d["reason"]
 
 
 

@@ -996,6 +996,62 @@ class MonitorAlertRetryResponseSchema(Schema):
     status = fields.Str()
 
 
+class MonitorIncidentItemSchema(Schema):
+    """GET /incidents 列表项（对齐 MonitorIncident.to_dict()）"""
+
+    id = fields.Int()
+    incident_key = fields.Str()
+    title = fields.Str()
+    severity = fields.Str()
+    status = fields.Str()
+    reason_code = fields.Str(allow_none=True)
+    root_device_id = fields.Int(allow_none=True)
+    alert_count = fields.Int()
+    device_count = fields.Int()
+    first_alert_at = fields.Str(allow_none=True)
+    last_alert_at = fields.Str(allow_none=True)
+    closed_at = fields.Str(allow_none=True)
+
+
+class MonitorIncidentListResponseSchema(Schema):
+    """GET /incidents 响应（分页列表）"""
+
+    data = fields.List(fields.Nested(MonitorIncidentItemSchema))
+    pagination = fields.Nested(PaginationMetaSchema)
+
+
+class MonitorIncidentSuppressedLogSchema(Schema):
+    """事件详情中被抑制的下游设备留痕项"""
+
+    id = fields.Int()
+    device_id = fields.Int(allow_none=True)
+    alert_type = fields.Str()
+    severity = fields.Str()
+    reason_code = fields.Str()
+    upstream_device_id = fields.Int(allow_none=True)
+    incident_id = fields.Int(allow_none=True)
+    created_at = fields.Str(allow_none=True)
+
+
+class MonitorIncidentDetailResponseSchema(Schema):
+    """GET /incidents/<id> 响应（详情含关联告警 + 被抑制下游设备）"""
+
+    id = fields.Int()
+    incident_key = fields.Str()
+    title = fields.Str()
+    severity = fields.Str()
+    status = fields.Str()
+    reason_code = fields.Str(allow_none=True)
+    root_device_id = fields.Int(allow_none=True)
+    alert_count = fields.Int()
+    device_count = fields.Int()
+    first_alert_at = fields.Str(allow_none=True)
+    last_alert_at = fields.Str(allow_none=True)
+    closed_at = fields.Str(allow_none=True)
+    related_alerts = fields.List(fields.Dict())
+    suppressed_logs = fields.List(fields.Nested(MonitorIncidentSuppressedLogSchema))
+
+
 class MonitorDeviceMonitorEnabledResponseSchema(Schema):
     """PATCH /devices/<id>/monitor-enabled 响应"""
 
@@ -1531,4 +1587,132 @@ class DeviceBatchPortSyncEnabledResponseSchema(Schema):
     without_credential = fields.Int()
     non_network = fields.Int()
     skipped = fields.Int()
+
+
+
+class AISkillSummarySchema(Schema):
+    """AI 技能元数据"""
+    name = fields.Str()
+    title = fields.Str()
+    description = fields.Str()
+    category = fields.Str()
+    version = fields.Int()
+    params = fields.List(fields.Dict())
+    triggers = fields.List(fields.Str())
+    source = fields.Str()
+    enabled = fields.Bool()
+
+
+class AISkillsListResponseSchema(Schema):
+    """GET /ai/skills 响应 data"""
+    skills = fields.List(fields.Nested(AISkillSummarySchema))
+
+
+class AISkillRunRequestSchema(Schema):
+    """POST /ai/skills/<name>/run 请求体"""
+    args = fields.Dict(metadata={"description": "技能参数，按技能定义的 params 传入"})
+
+
+class AIAskRequestSchema(Schema):
+    """POST /ai/ask 请求体"""
+    question = fields.Str(required=True, validate=validate.Length(max=2000),
+                          metadata={"description": "自然语言问题（≤2000 字）"})
+
+
+class AIAskResponseSchema(Schema):
+    """POST /ai/ask 响应 data"""
+    answer = fields.Str()
+
+
+class AIHealthResponseSchema(Schema):
+    """GET /ai/health 响应 data"""
+    configured = fields.Bool()
+
+
+class AIRagIngestRequestSchema(Schema):
+    """POST /ai/rag/ingest 请求体"""
+    docs_dir = fields.Str(metadata={"description": "文档目录（必须在 AI_DOCS_ROOT 之下）"})
+
+
+class AIRagIngestResponseSchema(Schema):
+    """POST /ai/rag/ingest 响应 data"""
+    task_id = fields.Str()
+
+
+class AIConfigResponseSchema(Schema):
+    """GET /ai/config 响应 data"""
+    provider = fields.Str()
+    base_url = fields.Str()
+    model = fields.Str()
+    timeout = fields.Int()
+    stream_timeout = fields.Int()
+    max_tokens = fields.Int()
+    temperature = fields.Float()
+    api_key_masked = fields.Str()
+    api_key_configured = fields.Bool()
+
+
+class AIConfigUpdateRequestSchema(Schema):
+    """PUT /ai/config 请求体"""
+    provider = fields.Str(allow_none=True)
+    base_url = fields.Str(allow_none=True)
+    model = fields.Str(allow_none=True)
+    timeout = fields.Int(allow_none=True, validate=validate.Range(min=1, max=600))
+    stream_timeout = fields.Int(allow_none=True, validate=validate.Range(min=1, max=600))
+    max_tokens = fields.Int(allow_none=True, validate=validate.Range(min=1, max=32768))
+    temperature = fields.Float(allow_none=True, validate=validate.Range(min=0.0, max=2.0))
+    api_key = fields.Str(allow_none=True)
+
+
+class AICircuitStatusResponseSchema(Schema):
+    """GET /ai/circuit 响应 data"""
+    providers = fields.Dict()
+
+
+class AIMetricsResponseSchema(Schema):
+    """GET /ai/metrics 响应 data
+
+    M2 修复：对齐 get_metrics() 真实返回结构。
+    两种分支：
+    - Prometheus 可用时：{"raw": str}（exposition 格式文本）
+    - Prometheus 不可用时：{"ai_tokens_total": int, "ai_errors_total": int, "ai_skill_runs_total": int}
+    所有字段可选（partial），适配两种分支。
+    """
+    raw = fields.String(required=False, metadata={"description": "Prometheus exposition 格式文本（有 prometheus_client 时）"})
+    ai_tokens_total = fields.Integer(required=False, metadata={"description": "AI token 总消耗（无 Prometheus 时扁平计数）"})
+    ai_errors_total = fields.Integer(required=False, metadata={"description": "AI 调用错误总数"})
+    ai_skill_runs_total = fields.Integer(required=False, metadata={"description": "AI 技能执行总数"})
+
+
+
+class AIRagStatusResponseSchema(Schema):
+    """GET /ai/rag/status 响应 data"""
+    available = fields.Bool()
+    doc_count = fields.Int()
+
+
+class AIRagDocSchema(Schema):
+    """RAG 文档单项"""
+    doc_id = fields.Str()
+    preview = fields.Str()
+
+
+class AIRagDocsListResponseSchema(Schema):
+    """GET /ai/rag/docs 响应 data"""
+    docs = fields.List(fields.Nested(AIRagDocSchema))
+
+
+class AIRagQaRequestSchema(Schema):
+    """POST /ai/rag/qa 请求体"""
+    question = fields.Str(required=True, validate=validate.Length(min=1, max=2000))
+
+
+class AIRagQaResponseSchema(Schema):
+    """POST /ai/rag/qa 响应 data"""
+    answer = fields.Str()
+
+
+class AIRagResetRequestSchema(Schema):
+    """POST /ai/rag/reset 请求体"""
+    confirm = fields.Bool(required=True)
 

@@ -81,6 +81,8 @@ def governance_should_emit(
     alert_type: str,
     idempotency_key: str,
     now: Optional[float] = None,
+    severity: str = "warning",
+    skip_maintenance_cache: bool = False,
 ) -> Tuple[bool, bool, int]:
     """统一告警治理判定：静默检查（G4.1）+ 风暴抑制（G13）。
 
@@ -89,6 +91,11 @@ def governance_should_emit(
         alert_type: 告警类型（字符串）
         idempotency_key: 告警幂等/去重键（供风暴抑制窗口计数）
         now: 当前时间戳（测试注入）
+        severity: 告警严重级别（被依赖抑制时写入留痕表需要）
+        skip_maintenance_cache: 跳过维护态 Redis 缓存判定。调用方已用内存
+            device 对象判过维护态时传 True，避免缓存 stale 误静默（如
+            monitor_service 路径已有 device.status，且测试场景下缓存可能
+            跨用例污染）。
 
     Returns:
         (should_emit, aggregated, suppressed_count):
@@ -97,28 +104,29 @@ def governance_should_emit(
         - aggregated=True：这是抑制窗口累计后放行的一条聚合告警（应标注 suppressed_count）；
         - suppressed_count：聚合时累计被抑制的告警数。
     """
-    try:
-        from app.core.enums import DeviceStatus
+    if not skip_maintenance_cache:
+        try:
+            from app.core.enums import DeviceStatus
 
-        cached = _is_maintenance_cached(device_id)
-        if cached is True:
-            logger.info(
-                "设备维护中（缓存命中），告警静默 device=%s alert_type=%s", device_id, alert_type
-            )
-            return False, False, 0
-        if cached is None:
-            from app.models.device import Device
-            from extensions import db
-            device = db.session.get(Device, device_id)
-            is_maint = device is not None and device.status == DeviceStatus.MAINTENANCE
-            _set_maintenance_cache(device_id, is_maint)
-            if is_maint:
+            cached = _is_maintenance_cached(device_id)
+            if cached is True:
                 logger.info(
-                    "设备维护中，告警静默 device=%s alert_type=%s", device_id, alert_type
+                    "设备维护中（缓存命中），告警静默 device=%s alert_type=%s", device_id, alert_type
                 )
                 return False, False, 0
-    except Exception:
-        logger.warning("维护模式判定失败（fail-open 不阻断）", exc_info=True)
+            if cached is None:
+                from app.models.device import Device
+                from extensions import db
+                device = db.session.get(Device, device_id)
+                is_maint = device is not None and device.status == DeviceStatus.MAINTENANCE
+                _set_maintenance_cache(device_id, is_maint)
+                if is_maint:
+                    logger.info(
+                        "设备维护中，告警静默 device=%s alert_type=%s", device_id, alert_type
+                    )
+                    return False, False, 0
+        except Exception:
+            logger.warning("维护模式判定失败（fail-open 不阻断）", exc_info=True)
 
     try:
         from app.services.monitoring.silence_service import is_silenced
@@ -131,13 +139,38 @@ def governance_should_emit(
         logger.warning("告警抑制判定失败（fail-open 不阻断）", exc_info=True)
 
     try:
-        from app.services.monitoring.alert_dependency_service import is_suppressed_by_dependency
-        suppressed, dep_reason = is_suppressed_by_dependency(device_id, alert_type)
-        if suppressed:
+        from app.services.monitoring.alert_dependency_service import check_dependency
+        decision = check_dependency(device_id, alert_type)
+        if decision["suppressed"]:
             logger.info(
                 "告警被依赖抑制 device=%s alert_type=%s reason=%s",
-                device_id, alert_type, dep_reason,
+                device_id, alert_type, decision["reason"],
             )
+            try:
+                from app.persistence.monitor_suppressed_alert_log_repository import (
+                    SuppressedAlertLogRepository,
+                )
+                SuppressedAlertLogRepository().add(
+                    device_id=device_id,
+                    alert_type=alert_type,
+                    severity=severity,
+                    reason_code=("L2_topology" if decision["source"] == "topology"
+                                 else "L2_manual_rule"),
+                    upstream_device_id=decision["upstream_device_id"],
+                )
+                try:
+                    from app.services.monitoring.incident_aggregator import (
+                        attach_suppressed_to_incident,
+                    )
+                    attach_suppressed_to_incident(
+                        decision["upstream_device_id"], alert_type,
+                    )
+                except Exception:
+                    logger.warning("L2 拓扑聚合调用失败（不阻断）device=%s",
+                                   device_id, exc_info=True)
+            except Exception:
+                logger.warning("依赖抑制留痕失败（不阻断治理）device=%s",
+                               device_id, exc_info=True)
             return False, False, 0
     except Exception:
         logger.warning("告警依赖抑制判定失败（fail-open 不阻断）", exc_info=True)

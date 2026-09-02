@@ -18,6 +18,7 @@ from app.core.enums import UserStatus
 from app.models.rbac import Role, UserRole
 from app.persistence.notification_repository import NotificationRepository, NotificationReceiptRepository
 from app.persistence.user_repository import UserRepository
+from app.services.channels.base import PersonalChannel, BroadcastChannel
 
 logger = get_logger(__name__)
 
@@ -32,26 +33,38 @@ class NotificationService:
         self._receipt_repo = receipt_repo or NotificationReceiptRepository()
         self._user_repo = user_repo or UserRepository()
 
-    _personal_channel_registry: dict[str, "PersonalChannel"] = {}
-    _broadcast_channel_registry: dict[str, "BroadcastChannel"] = {}
+    _personal_channel_registry: dict[str, PersonalChannel] = {}
+    _broadcast_channel_registry: dict[str, BroadcastChannel] = {}
 
     @classmethod
-    def register_personal_channel(cls, channel: "PersonalChannel"):
+    def register_personal_channel(cls, channel: PersonalChannel):
         """注册个人渠道"""
         cls._personal_channel_registry[channel.get_channel_name()] = channel
 
     @classmethod
-    def register_broadcast_channel(cls, channel: "BroadcastChannel"):
+    def register_broadcast_channel(cls, channel: BroadcastChannel):
         """注册广播渠道"""
         cls._broadcast_channel_registry[channel.get_channel_name()] = channel
 
     @classmethod
-    def get_personal_channels(cls) -> list["PersonalChannel"]:
+    def get_personal_channels(cls) -> list[PersonalChannel]:
         return list(cls._personal_channel_registry.values())
 
     @classmethod
-    def get_broadcast_channels(cls) -> list["BroadcastChannel"]:
+    def get_broadcast_channels(cls) -> list[BroadcastChannel]:
         return list(cls._broadcast_channel_registry.values())
+
+    @classmethod
+    def get_personal_channel_names(cls) -> tuple[str, ...]:
+        """个人渠道名（registry 优先，registry 为空时回退 PERSONAL_CHANNELS）。
+
+        app/__init__.py 在 testing 配置下不注册任何渠道，registry 恒为空。
+        若纯 registry 派生，_resolve_channels 会过滤掉包括 inbox 在内的
+        全部渠道，造成通知零投递，故此处提供常量兜底默认值。
+        """
+        if cls._personal_channel_registry:
+            return tuple(cls._personal_channel_registry.keys())
+        return tuple(PERSONAL_CHANNELS)
 
 
     def notify(
@@ -196,6 +209,13 @@ class NotificationService:
 
         user_ids = self._resolve_targets(target_type, target_id)
 
+        if not user_ids and target_type in ("user", "role") and target_id is not None:
+            logger.warning(
+                "通知目标解析为 0 个用户: type=%s target_type=%s target_id=%s"
+                "（检查目标是否存在/角色是否有成员）",
+                type, target_type, target_id,
+            )
+
         for uid in user_ids:
             user = self._user_repo.find_by_id(uid)
             effective_channels = NotificationService._resolve_channels(
@@ -210,6 +230,11 @@ class NotificationService:
                 ack_required=ack_required,
             )
             self._receipt_repo.session.add(receipt)
+            logger.info(
+                "渠道选择结果: user_id=%s requested=%s effective=%s"
+                " type=%s severity=%s",
+                uid, list(channels), effective_channels, type, severity,
+            )
 
         self._notif_repo.session.flush()
 
@@ -339,7 +364,8 @@ class NotificationService:
     def _default_prefs() -> dict:
         """返回默认通知偏好。"""
         return {
-            "channels": {ChannelType.INBOX: True, ChannelType.EMAIL: True},
+            "channels": {ChannelType.INBOX: True, ChannelType.EMAIL: True,
+                         ChannelType.VOICE: False},
             "subscribed_types": [],
             "quiet_hours": {"enabled": False, "start": "22:00", "end": "08:00"},
         }
@@ -355,7 +381,12 @@ class NotificationService:
             return [int(target_id)]
         elif target_type == "role":
             role = session.query(Role).filter_by(name=str(target_id)).first()
+            if not role and str(target_id).isdigit():
+                role = session.query(Role).get(int(target_id))
             if not role:
+                logger.warning(
+                    "通知目标角色不存在: target_type=role target_id=%s", target_id
+                )
                 return []
             user_ids = [
                 ur.user_id
@@ -366,7 +397,7 @@ class NotificationService:
             ).all()
             return [u.id for u in active]
         elif target_type == "broadcast":
-            active = session.query(User).filter_by(status=0).all()
+            active = session.query(User).filter_by(status=UserStatus.ACTIVE).all()
             return [u.id for u in active]
         else:
             logger.warning("未知 target_type: %s", target_type)
@@ -381,17 +412,26 @@ class NotificationService:
         广播渠道（企微/飞书 Webhook）由 WebhookConfig.applicable_types/applicable_severities 独立控制，
         不受个人偏好影响（当前为群机器人广播，不 @个人用户）。
         inbox 始终不可关闭；email 受用户偏好开关控制。
+
+        注意：本方法是 @staticmethod，无 cls，须写 NotificationService.xxx。
         """
         prefs = user.notification_prefs
         if not prefs:
-            return [ch for ch in requested_channels if ch in PERSONAL_CHANNELS]
-
-        if NotificationService._in_quiet_hours(prefs) and severity != SeverityLevel.CRITICAL:
-            return [ChannelType.INBOX]
+            return [ch for ch in requested_channels
+                    if ch in NotificationService.get_personal_channel_names()]
 
         channel_prefs = prefs.get("channels", {})
+
+        if NotificationService._in_quiet_hours(prefs) and severity != SeverityLevel.CRITICAL:
+            result = [ChannelType.INBOX]
+            if (ChannelType.VOICE in requested_channels
+                    and channel_prefs.get(ChannelType.VOICE, False)):
+                result.append(ChannelType.VOICE)
+            return result
+
         result = [ch for ch in requested_channels
-                  if ch in PERSONAL_CHANNELS and (ch == ChannelType.INBOX or channel_prefs.get(ch, True))]
+                  if ch in NotificationService.get_personal_channel_names()
+                  and (ch == ChannelType.INBOX or channel_prefs.get(ch, True))]
 
         subscribed = prefs.get("subscribed_types", [])
         if subscribed and notif_type not in subscribed and severity != SeverityLevel.CRITICAL:

@@ -70,6 +70,7 @@ class ChannelType(str, Enum):
     """
     INBOX = "inbox"             # 站内信（个人渠道，始终开启）
     EMAIL = "email"             # 邮件（个人渠道）
+    VOICE = "voice"             # 语音通知（个人渠道，默认关闭，需显式开启）
     WECHAT_WORK = "wechat_work"  # 企业微信（广播渠道，群机器人）
     FEISHU = "feishu"           # 飞书（广播渠道，群机器人）
     CUSTOM = "custom"           # 自定义 Webhook（广播渠道）

@@ -62,8 +62,9 @@ def _publish_escalation(alert: MonitorAlertOutbox,
     escalate_to_role_id = (step.escalate_to_role_id if step else policy.escalate_to_role_id)
     escalate_webhook_url = (step.escalate_webhook_url if step else policy.escalate_webhook_url)
 
+    payload: dict = {}
     try:
-        from app.services.monitoring.redis_bus import redis_bus
+        from app.services.switch_events import emit_global_event_with_targets
         target_user_ids = None
         if escalate_to_role_id:
             target_user_ids = _get_role_user_ids(escalate_to_role_id)
@@ -80,8 +81,7 @@ def _publish_escalation(alert: MonitorAlertOutbox,
             "step_no": (step.step_no if step else None),
             "escalated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         }
-        redis_bus.publish(
-            channel="events:global",
+        emit_global_event_with_targets(
             event_type="monitor_escalation",
             payload=payload,
             target_user_ids=target_user_ids,
@@ -99,6 +99,33 @@ def _publish_escalation(alert: MonitorAlertOutbox,
         except Exception as exc:
             logger.warning("升级 webhook 失败 alert_id=%s url=%s: %s",
                            alert.id, escalate_webhook_url, exc)
+
+    try:
+        from extensions import db
+
+        db.session.commit()
+    except Exception as exc:
+        logger.warning("升级状态提交失败 alert_id=%s: %s", alert.id, exc)
+
+    from app.services.notification_service import NotificationService
+    from app.core.enums import ChannelType
+
+    NotificationService().notify_strict(
+        type="monitor_escalation",
+        severity=escalate_severity or alert.severity,
+        title=f"告警升级: {alert.alert_type}",
+        content=(
+            f"设备 {alert.device_id} 告警 {alert.alert_type} 已升级至 "
+            f"{escalate_severity or alert.severity}"
+        ),
+        payload=payload,
+        source_module="monitoring.escalation",
+        target_type="role",
+        target_id=escalate_to_role_id,
+        channels=(ChannelType.INBOX, ChannelType.EMAIL, ChannelType.VOICE),
+        idempotency_key=f"escalation:{alert.id}:{escalation_count}",
+        ack_required=True,
+    )
 
 
 def _apply_escalation_step(alert: MonitorAlertOutbox,

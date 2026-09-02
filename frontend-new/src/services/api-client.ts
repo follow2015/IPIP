@@ -7,7 +7,12 @@
  * - Token 自动刷新：401 时尝试用 refresh_token 换新 access_token
  * - 消除 as any：使用 ApiErrorData 接口替代
  */
-import axios, { AxiosError, InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
+import axios, {
+  AxiosError,
+  InternalAxiosRequestConfig,
+  type AxiosResponse,
+  type AxiosRequestConfig
+} from 'axios';
 import type { ApiResponse, BackendPaginatedData } from '@/types/api';
 import { adaptPaginatedResponse } from '@/types/api';
 
@@ -198,52 +203,58 @@ function handleUnauthorized(): void {
 
 export async function get<T>(
   url: string,
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>,
+  config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> {
-  const res = await apiClient.get<ApiResponse<T>>(url, { params });
+  const res = await apiClient.get<ApiResponse<T>>(url, { params, ...config });
   return res.data;
 }
 
-/**
- * POST：D 默认 object，传入具名接口时无需强制转换
- *
- * @example
- * post<Device, CreateDeviceRequest>('/devices', payload)
- * // 或让 TypeScript 自动推断 D：
- * post<Device>('/devices', payload)
- */
 export async function post<T, D extends object = object>(
   url: string,
-  data?: D
+  data?: D,
+  config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> {
-  const res = await apiClient.post<ApiResponse<T>>(url, data as unknown as Record<string, unknown>);
+  const res = await apiClient.post<ApiResponse<T>>(
+    url,
+    data as unknown as Record<string, unknown>,
+    config
+  );
   return res.data;
 }
 
 export async function put<T, D extends object = object>(
   url: string,
-  data?: D
+  data?: D,
+  config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> {
-  const res = await apiClient.put<ApiResponse<T>>(url, data as unknown as Record<string, unknown>);
+  const res = await apiClient.put<ApiResponse<T>>(
+    url,
+    data as unknown as Record<string, unknown>,
+    config
+  );
   return res.data;
 }
 
 export async function patch<T, D extends object = object>(
   url: string,
-  data?: D
+  data?: D,
+  config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> {
   const res = await apiClient.patch<ApiResponse<T>>(
     url,
-    data as unknown as Record<string, unknown>
+    data as unknown as Record<string, unknown>,
+    config
   );
   return res.data;
 }
 
 export async function del<T, D extends object = object>(
   url: string,
-  data?: D
+  data?: D,
+  config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> {
-  const res = await apiClient.delete<ApiResponse<T>>(url, data ? { data } : undefined);
+  const res = await apiClient.delete<ApiResponse<T>>(url, { data, ...config });
   return res.data;
 }
 

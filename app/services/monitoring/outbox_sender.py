@@ -181,6 +181,11 @@ class MonitorOutboxSender:
                         continue
                     repo.mark_sent(row.id, datetime.now(timezone.utc))
                     sent += 1
+                    try:
+                        from app.services.ai.alert_ai_push import push_alert_with_ai
+                        push_alert_with_ai(payload)
+                    except Exception:  # noqa: BLE001
+                        pass
                     if sent % commit_every == 0:
                         try:
                             session.commit()

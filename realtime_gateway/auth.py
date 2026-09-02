@@ -112,13 +112,18 @@ async def verify_sse_ticket(ticket: str) -> dict | None:
     - 要求 payload.type == "sse_ticket"
     - 通过 Redis SETNX 强制一次性消费（防重放），键为 jti、TTL 取票据剩余有效期
 
-    Redis 不可用时降级为放行（网关本身依赖 Redis 投递 SSE 事件，此时已无实质影响）。
+    Redis 不可用时**拒绝**（fail-closed，N1 修复）：原实现降级放行，导致一次性
+    消费与防重放保护失效——票据虽仍经 JWT 签名与 60s TTL 校验（故非鉴权绕过），
+    但该 60s 窗口内同一票据可被重复用于建立多条 SSE 连接。安全默认值应为拒绝。
+
+    权衡说明：网关依赖 Redis 投递 SSE 事件，Redis 完全宕机时 SSE 本已不可用，
+    故拒绝不会造成额外可用性损失；若为瞬时抖动，客户端重新申请票据即可恢复。
 
     Args:
         ticket: JWT 票据字符串
 
     Returns:
-        payload 字典，或 None（校验失败 / 已被消费）
+        payload 字典，或 None（校验失败 / 已被消费 / Redis 不可用）
     """
     payload = verify_token(ticket)
     if not payload:
@@ -139,6 +144,7 @@ async def verify_sse_ticket(ticket: str) -> dict | None:
                 logger.warning("SSE ticket 已被消费（疑似重放）: jti=%s", jti)
                 return None
         except Exception as exc:  # noqa: BLE001
-            logger.warning("SSE ticket 一次性校验失败（放行）: %s", exc)
+            logger.error("SSE ticket 一次性校验失败（拒绝，fail-closed）: %s", exc)
+            return None
 
     return payload
