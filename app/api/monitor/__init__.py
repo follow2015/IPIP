@@ -148,3 +148,4 @@ from app.api.monitor import monitor_alerts  # noqa: E402,F401
 from app.api.monitor import monitor_config  # noqa: E402,F401
 from app.api.monitor import monitor_rules  # noqa: E402,F401
 from app.api.monitor import monitor_oid  # noqa: E402,F401
+from app.api.monitor import incident_routes  # noqa: E402,F401

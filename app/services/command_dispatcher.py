@@ -137,12 +137,12 @@ class CommandDispatcher:
         commands = self._maybe_append_commit(
             commands, adapter, getattr(switch.device, "device_model", "") or "")
         try:
-            self.ssh_mgr.send_config_commands(
+            output = self.ssh_mgr.send_config_commands(
                 switch=switch,
                 commands=commands,
                 save_cmd=adapter.get_save_command(getattr(switch.device, "device_model", "") or ""),
             )
-            return {"success": True, **(ok_extra or {})}
+            return {"success": True, "output": output or "", **(ok_extra or {})}
         except Exception as e:
             logger.error("%s失败: %s", err_label, e)
             return {"success": False, "error": self._classify_error(e)}

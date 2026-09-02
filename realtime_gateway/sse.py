@@ -32,7 +32,7 @@ async def device_event_stream(device_id: int, since_seq: int = 0) -> asyncio.Asy
     Yields:
         str: SSE 格式的文本帧
     """
-    missed = redis_bus.get_events_since(device_id, since_seq)
+    missed = await redis_bus.get_events_since(device_id, since_seq)
     for event_dict in missed:
         import json
         yield f"data: {json.dumps(event_dict, ensure_ascii=False)}\n\n"

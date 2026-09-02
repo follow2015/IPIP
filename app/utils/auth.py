@@ -1052,7 +1052,14 @@ def sse_login_required(f):
 
     EventSource API 不支持自定义 HTTP 头，因此同时支持：
     1. Authorization 请求头（常规方式）
-    2. ?token=xxx URL 查询参数（SSE 专用方式）
+    2. ?ticket=xxx URL 查询参数（一次性票据，SSE 专用方式）
+
+    安全说明（S1 修复）：原实现回退到 ?token= 长期 access token，JWT 出现在 URL
+    会被代理访问日志、浏览器历史、Referer 记录，泄露面远大于短期票据。
+    现改为只接受 POST /api/sse/ticket 签发的一次性票据（TTL 默认 60s，
+    网关侧经 Redis SETNX 强制一次性消费防重放）。前端三处 SSE 客户端
+    （services/ai.ts、DeviceEventBus.ts、hooks/useSSEConnection.ts）
+    均已改用 ?ticket=，无遗留 ?token= 调用方。
 
     鉴权失败时返回 SSE 错误事件（而非 JSON），便于前端 EventSource 客户端处理。
 
@@ -1072,7 +1079,7 @@ def sse_login_required(f):
             else:
                 return _sse_error_response("无效的认证令牌格式", 401)
         else:
-            token = request.args.get("token")
+            token = request.args.get("ticket")
             if not token:
                 return _sse_error_response("缺少认证令牌", 401)
 
@@ -1140,8 +1147,12 @@ def sse_permission_required(*permissions):
     """SSE 端点专用权限装饰器。
 
     与 permission_required 的区别：
-    - 内嵌 sse_login_required（支持 ?token=xxx 查询参数），而非 login_required
-      （login_required 仅读 Authorization 头，浏览器 EventSource 无法设置自定义头）。
+    - 内嵌 sse_login_required（支持 ?ticket=xxx 一次性票据查询参数），而非
+      login_required（login_required 仅读 Authorization 头，浏览器 EventSource
+      无法设置自定义头）。
+
+      N2 修复：docstring 原写「支持 ?token=xxx 长期令牌」，与实际实现不符
+      （sse_login_required 自 S1 修复后仅读 ?ticket=）。功能性正确，仅文档误导。
     - 鉴权失败时返回 SSE 错误事件而非 JSON，避免前端 EventSource 客户端 JSON.parse 失败被吞。
 
     使用方法:

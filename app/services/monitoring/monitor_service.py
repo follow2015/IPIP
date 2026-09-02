@@ -39,6 +39,38 @@ from app.utils.transactional import transactional
 
 logger = get_logger(__name__)
 
+
+_BATCH_EXECUTORS: set = set()
+_BATCH_EXECUTORS_LOCK = threading.Lock()
+_atexit_registered = False
+
+
+def _register_batch_executor(executor):
+    """登记线程池并（首次）注册 atexit 统一 shutdown。"""
+    global _atexit_registered
+    with _BATCH_EXECUTORS_LOCK:
+        _BATCH_EXECUTORS.add(executor)
+        if not _atexit_registered:
+            import atexit
+
+            atexit.register(shutdown_batch_executors)
+            _atexit_registered = True
+
+
+def shutdown_batch_executors():
+    """关闭全部已登记的批量探测线程池（幂等）。
+
+    进程退出由 atexit 调用；测试亦可显式调用以回收常驻线程。
+    """
+    with _BATCH_EXECUTORS_LOCK:
+        executors = list(_BATCH_EXECUTORS)
+        _BATCH_EXECUTORS.clear()
+    for ex in executors:
+        try:
+            ex.shutdown(wait=False)
+        except Exception:  # noqa: BLE001 - 退出路径不应抛出
+            pass
+
 _ROLE_ACTIVE_USER_CACHE: dict = {}
 _ROLE_ACTIVE_USER_TTL = 300  # 5 分钟
 _ROLE_ACTIVE_USER_CACHE_LOCK = threading.Lock()
@@ -524,6 +556,7 @@ class MonitorService:
             self._batch_executor = ThreadPoolExecutor(
                 max_workers=pool_size, thread_name_prefix="monitor-batch"
             )
+            _register_batch_executor(self._batch_executor)
         results = list(self._batch_executor.map(_check_one, targets))
         return {"results": results, "skipped": skipped}
 
@@ -1261,63 +1294,40 @@ class MonitorService:
         except Exception:
             logger.warning("维护模式判定失败（fail-open 不阻断）", exc_info=True)
 
-        try:
-            from app.services.monitoring.silence_service import is_silenced
-            alert_type_str = getattr(alert_type, "value", alert_type)
-            if is_silenced(device.id, alert_type_str):
-                logger.info(
-                    "告警被静默规则命中 device=%s alert_type=%s",
-                    device.id, alert_type_str,
-                )
-                return
-        except Exception:
-            logger.warning("告警抑制判定失败（fail-open 不阻断）", exc_info=True)
-
-        try:
-            from app.services.monitoring.alert_suppression_service import should_emit
-            decision = should_emit(payload["idempotency_key"])
-            if decision["suppressed"]:
-                logger.info(
-                    "告警被风暴抑制 device=%s alert_type=%s dedup_key=%s next_allowed_at=%s",
-                    device.id, alert_type, payload["idempotency_key"],
-                    decision.get("next_allowed_at"),
-                )
-                return
-            if decision["aggregated"]:
-                payload = dict(payload)
-                payload["suppressed_count"] = decision["suppressed_count"]
-        except Exception:
-            logger.warning("告警抑制判定失败（fail-open 不阻断入箱）", exc_info=True)
+        from app.services.monitoring.alert_ingress import governance_should_emit
+        alert_type_str = getattr(alert_type, "value", alert_type)
+        should_emit, aggregated, suppressed_count = governance_should_emit(
+            device.id, alert_type_str, payload["idempotency_key"],
+            severity=severity,
+            skip_maintenance_cache=True,  # 维护态已用内存 device 对象判过
+        )
+        if not should_emit:
+            return
+        if aggregated:
+            payload = dict(payload)
+            payload["suppressed_count"] = suppressed_count
 
         outbox_row = MonitorAlertOutboxRepository(session=session).add(
             device.id, alert_type, severity, payload["idempotency_key"], payload,
         )
 
         try:
-            import json
-            import time as _time
-            from app.services.monitoring.data_scope_service import (
-                get_users_with_device_access,
+            from app.services.monitoring.alert_ingress import publish_monitor_alert_event
+            publish_monitor_alert_event(
+                device.id, alert_type_str, severity,
+                payload["idempotency_key"], outbox_row.id, payload,
             )
-            from app.services.switch_events import _redis_publish_global
-
-            target_user_ids = get_users_with_device_access(device.id)
-            alert_type_str = getattr(alert_type, "value", alert_type)
-            _redis_publish_global(json.dumps({
-                "event_type": "monitor_alert",
-                "device_id": device.id,
-                "alert_type": alert_type_str,
-                "severity": severity,
-                "dedup_key": payload["idempotency_key"],
-                "outbox_id": outbox_row.id,
-                "timestamp": _time.strftime(
-                    "%Y-%m-%dT%H:%M:%SZ", _time.gmtime()
-                ),
-                "target_user_ids": target_user_ids if target_user_ids else None,
-                "payload": payload,
-            }, ensure_ascii=False))
         except Exception:
             logger.warning("SSE 推送失败（不影响告警入箱）", exc_info=True)
+
+        try:
+            from app.services.monitoring.incident_aggregator import aggregate_alert
+            alert_type_str = getattr(alert_type, "value", alert_type)
+            aggregate_alert(device.id, alert_type_str, severity,
+                            outbox_id=outbox_row.id)
+        except Exception:
+            logger.warning("monitor 事件聚合失败 device_id=%s", device.id,
+                           exc_info=True)
 
 
 

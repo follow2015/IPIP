@@ -361,8 +361,20 @@ class MonitorDynamicConfig:
 
     @classmethod
     def load_all_from_db(cls, app=None) -> None:
-        """启动路径：DB 全量加载 -> 批量 HSET 回填 Redis。"""
+        """启动路径：DB 全量加载 -> 批量 HSET 回填 Redis。
+
+        `app` 省略时回退到 `current_app`（与 `_redis()` 语义一致）；既无显式
+        app 又不在 app context 内则明确报错，而不是抛晦涩的 AttributeError。
+        """
         from extensions import db
+        from flask import current_app, has_app_context
+
+        if app is None:
+            if not has_app_context():
+                raise RuntimeError(
+                    "load_all_from_db 需要显式传入 app，或调用时处于 app context 内"
+                )
+            app = current_app._get_current_object()
 
         with app.app_context():
             repo = MonitorDynamicConfigRepository(session=db.session)

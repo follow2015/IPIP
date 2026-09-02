@@ -225,7 +225,7 @@ class MetricAlertService:
 
         from app.services.monitoring.alert_ingress import governance_should_emit
         should_emit, aggregated, suppressed_count = governance_should_emit(
-            device_id, alert_type, idem_key,
+            device_id, alert_type, idem_key, severity=severity,
         )
         if not should_emit:
             return
@@ -251,6 +251,12 @@ class MetricAlertService:
             )
         except Exception:
             logger.warning("metric_alert SSE 发布失败 device_id=%s alert_type=%s", device_id, alert_type, exc_info=True)
+
+        try:
+            from app.services.monitoring.incident_aggregator import aggregate_alert
+            aggregate_alert(device_id, alert_type, severity, outbox_id=new_row.id)
+        except Exception:
+            logger.warning("metric_alert 事件聚合失败 device_id=%s", device_id, exc_info=True)
 
 
     @staticmethod

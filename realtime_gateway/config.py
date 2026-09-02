@@ -50,6 +50,8 @@ MAX_CONNECTIONS: int = int(os.environ.get("SSE_MAX_CONNECTIONS", "500"))  # G2: 
 
 RING_BUFFER_SIZE: int = int(os.environ.get("SSE_RING_BUFFER_SIZE", "200"))
 
+RING_KEY_FMT: str = "ring:{device_id}"   # 断线重放 ring（List，发布侧写入）
+
 GLOBAL_CHANNEL: str = "events:global"
 
 LOG_LEVEL: str = os.environ.get("GATEWAY_LOG_LEVEL", "INFO")

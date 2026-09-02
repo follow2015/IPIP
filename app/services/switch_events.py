@@ -11,10 +11,11 @@ from __future__ import annotations
     断线重连大概率被路由到另一个 worker，历史事件对不上，"断线重放"名不副实。
 
     现在 SSE 服务完全移交给独立的 ASGI 推送网关（见 realtime_gateway/），
-    该网关是 Redis Pub/Sub 的唯一订阅者，seq 分配和环形缓冲区在网关侧
-    单进程持有，天然全局唯一、天然支持重放。本模块只保留"发布"职责：
-    组装事件 payload，通过 Redis Pub/Sub 广播出去，不再关心谁在订阅、
-    不再自己维护 Queue/线程/环形缓冲区。
+    该网关是 Redis Pub/Sub 的订阅者之一（可多副本）。seq 分配和环形缓冲区
+    由本模块（发布侧）负责：seq 用 Redis INCR 原子分配（多 worker/多副本安全），
+    ring 用 Redis List + Lua 原子写入（LPUSH+LTRIM+EXPIRE 滑动 TTL），
+    多副本网关共享同一份 ring，断线重连路由到任一副本都能重放。本模块只保留
+    "发布"职责：组装事件 payload，不再自己维护 Queue/线程/进程内环形缓冲区。
 
     Redis 从"可选优化"变成硬依赖：本模块不再有进程内内存 Queue 兜底模式，
     因为发布方（Flask）和消费方（ASGI 网关）现在总是不同进程。
@@ -25,9 +26,11 @@ from __future__ import annotations
 架构约定：本模块统一使用 device_id（devices.id）作为交换机标识，
 与 network_ports / switch_port_status / switch_port_ips 等表保持一致。
 
-注意：事件里不再携带 seq（由网关分配），只携带 event_id（uuid，供网关/前端去重）。
+注意：事件携带发布侧分配的 seq（Redis INCR，网关透传不重新分配），
+同时携带 event_id（uuid，供前端去重）。
 """
 import json
+import os
 from app.utils.logging import get_logger
 import threading
 import time
@@ -36,6 +39,17 @@ import uuid as _uuid_mod
 logger = get_logger(__name__)
 
 _GLOBAL_REDIS_CHANNEL = "events:global"
+
+RING_BUFFER_SIZE = int(os.environ.get("SSE_RING_BUFFER_SIZE", "200"))
+RING_TTL_SECONDS = int(os.environ.get("SSE_RING_TTL_SECONDS", "3600"))
+
+_RING_LUA = """
+redis.call('LPUSH', KEYS[1], ARGV[1])
+redis.call('LTRIM', KEYS[1], 0, ARGV[2])
+redis.call('EXPIRE', KEYS[1], ARGV[3])
+"""
+
+_ring_script = None
 
 _redis_client = None
 _redis_init_lock = threading.Lock()  # 防止多线程并发初始化（double-checked locking）
@@ -89,15 +103,45 @@ def _get_redis():
             return None
 
 
-def _redis_publish(device_id: int, payload: str) -> None:
-    """通过 Redis Pub/Sub 广播事件。"""
+def _get_ring_script(r):
+    """懒注册 ring Lua 脚本（与 Redis 客户端单例绑定）。"""
+    global _ring_script
+    if _ring_script is None:
+        _ring_script = r.register_script(_RING_LUA)
+    return _ring_script
+
+
+def _publish_device_event(device_id: int, event_dict: dict) -> None:
+    """设备事件发布：INCR 分配 seq → Lua 原子落 ring → PUBLISH。
+
+    seq 由发布侧分配（Redis INCR 原子，多 gunicorn worker 安全），
+    网关副本只消费不分配——这是网关多副本部署的硬性前提。
+
+    ⚠️ 顺序硬约束：必须先落 ring 再 PUBLISH。若先 publish，客户端可能在
+    publish 之后、ring 写入完成之前断线重连，该事件既不在 ring
+    （LRANGE 读不到）、也未建立实时订阅，导致永久丢失。
+
+    Args:
+        device_id:  交换机 devices.id
+        event_dict: 事件 dict（不含 seq，本函数负责分配并注入）
+    """
     r = _get_redis()
     if not r:
         return
     try:
+        seq_key = f"seq:{device_id}"
+        r.set(seq_key, int(time.time()), nx=True)
+        event_dict["seq"] = r.incr(seq_key)
+        payload = json.dumps(event_dict, ensure_ascii=False)
+
+        _get_ring_script(r)(
+            keys=[f"ring:{device_id}"],
+            args=[payload, RING_BUFFER_SIZE - 1, RING_TTL_SECONDS],
+        )
+
         r.publish(f"sw:{device_id}", payload)
     except Exception as exc:
-        logger.warning("Redis publish 失败: %s", exc)
+        logger.warning("Redis 设备事件发布失败: %s", exc)
 
 
 def _redis_publish_global(payload: str) -> None:
@@ -146,8 +190,7 @@ def emit_resource_change(
         "affected_connections": affected_connections or [],
         **(extra or {}),
     }
-    payload = json.dumps(event_dict, ensure_ascii=False)
-    _redis_publish(device_id, payload)
+    _publish_device_event(device_id, event_dict)
 
 
 def emit_port_action_result(
@@ -157,8 +200,8 @@ def emit_port_action_result(
 ) -> None:
     """发布端口操作结果事件（供异步端口操作使用）。
 
-    与 emit_resource_change 对齐结构化事件格式（不含 seq，由网关分配），
-    确保前端 DeviceEventBus 能正确分发到 'ports' 监听器。
+    与 emit_resource_change 对齐结构化事件格式（seq 由 _publish_device_event
+    发布侧分配），确保前端 DeviceEventBus 能正确分发到 'ports' 监听器。
 
     Args:
         device_id:      交换机 device_id（devices.id）
@@ -187,8 +230,7 @@ def emit_port_action_result(
         "error":               error,
         "detail_op_type":      detail_op_type,
     }
-    payload = json.dumps(event_dict, ensure_ascii=False)
-    _redis_publish(device_id, payload)
+    _publish_device_event(device_id, event_dict)
 
 
 

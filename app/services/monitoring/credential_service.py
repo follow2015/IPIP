@@ -79,7 +79,7 @@ class MonitorCredentialService:
         credential_id: int,
         partial_payload: dict,
         name: Optional[str] = None,
-    ) -> tuple[List[str], bool]:
+    ) -> tuple[List[str], bool, int, Optional[str]]:
         """按【设备】维度部分更新凭据密文（P0-2 设备级编辑）。
 
         语义：只影响 `device_id` 这一台设备，其余共享该凭据的设备保持不变。
@@ -95,7 +95,9 @@ class MonitorCredentialService:
         """
         cred = self._repo.find_by_id(credential_id)
         if cred is None or device_id not in self._repo.linked_device_ids(credential_id):
-            raise BusinessLogicError(f"凭据 {credential_id} 未关联到设备 {device_id}")
+            raise BusinessLogicError(
+                f"凭据 {credential_id} 未关联到设备 {device_id}", status_code=404
+            )
 
         old_payload = json.loads(decrypt(cred.encrypted_payload))
         merged, updated_fields = self._merge_payload(old_payload, partial_payload)
@@ -138,7 +140,7 @@ class MonitorCredentialService:
         """
         cred = self._repo.find_by_id(credential_id)
         if cred is None:
-            raise BusinessLogicError(f"凭据 {credential_id} 不存在")
+            raise BusinessLogicError(f"凭据 {credential_id} 不存在", status_code=404)
 
         old_payload = json.loads(decrypt(cred.encrypted_payload))
         merged, updated_fields = self._merge_payload(old_payload, partial_payload)

@@ -53,6 +53,13 @@ def create_app(config_name: str = None) -> Flask:
     report_netmiko_log_switch()
 
     if config_name != "testing":
+        try:
+            from app.services.ai.config_admin_service import start_config_sync
+            start_config_sync()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("ai.config.start_sync_failed %s", e)
+
+    if config_name != "testing":
         from app.services.notification_cleanup import start_cleanup_scheduler
         start_cleanup_scheduler(app)
 
@@ -67,6 +74,8 @@ def create_app(config_name: str = None) -> Flask:
 
         NotificationService.register_personal_channel(InboxChannel())
         NotificationService.register_personal_channel(EmailChannel())
+        from app.services.channels.voice import VoiceChannel
+        NotificationService.register_personal_channel(VoiceChannel())
         NotificationService.register_broadcast_channel(WeChatWorkWebhookChannel())
         NotificationService.register_broadcast_channel(FeishuWebhookChannel())
 
@@ -92,6 +101,14 @@ def create_app(config_name: str = None) -> Flask:
         if config_name != "testing":
             from app.services.scan_scheduler_service import start_scan_scheduler
             start_scan_scheduler(app)
+
+    try:
+        from app.celery_app import init_celery
+        init_celery(app)
+        app.extensions["celery"] = True
+    except Exception as e:  # noqa: BLE001
+        logger.warning("celery.init_failed %s", e)
+        app.extensions["celery"] = False
 
     _register_db_cli(app)
     _register_monitor_cli(app)
@@ -257,6 +274,9 @@ def register_blueprints(app: Flask):
     from app.api.monitor import monitor_bp
     app.register_blueprint(monitor_bp, url_prefix="/api/monitor")
 
+    from app.api.ai.ai_routes import bp as ai_bp
+    app.register_blueprint(ai_bp, url_prefix="/api/ai")
+
     from app.api.topology_routes import router as topology_router
     app.register_blueprint(topology_router)
 
@@ -281,6 +301,11 @@ def register_blueprints(app: Flask):
 
     from app.api.mail_settings_routes import router as mail_settings_bp
     app.register_blueprint(mail_settings_bp)
+
+    from app.api.voice_settings_routes import router as voice_settings_bp
+    from app.api.voice_callback_routes import router as voice_callback_bp
+    app.register_blueprint(voice_settings_bp)
+    app.register_blueprint(voice_callback_bp)
 
     from app.api.sse import sse_bp
     app.register_blueprint(sse_bp, url_prefix="/api/sse")
@@ -488,3 +513,29 @@ def _register_monitor_cli(app: Flask):
             click.echo(f"ERROR: {e}", err=True)
             raise SystemExit(1)
         click.echo(f"snmp-mib-scan done: 清单已写入 {out_path}（登记 OID 到指标模板即完成接入）")
+
+    @app.cli.command("baseline-recompute")
+    @click.option(
+        "--window-days",
+        default=28,
+        type=int,
+        help="滑动窗口天数（默认 28）",
+    )
+    def baseline_recompute_cmd(window_days):
+        """重算所有设备指标基线（建议 cron 01:00，与 monitor-archive 错开）
+
+        Phase 3.1：从 device_metric_timeseries 按近 window_days 样本计算滑动基线。
+        样本 ≥28 天按 hour×weekday 分桶；7-28 天降级全局均值；<7 天标记 insufficient_samples。
+
+        用法: flask baseline-recompute [--window-days 28]
+        """
+        from app.services.ai.baseline_service import BaselineService
+
+        try:
+            service = BaselineService()
+            updated = service.recompute_all_baselines(window_days=window_days)
+        except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
+            db.session.rollback()
+            click.echo(f"ERROR: {e}", err=True)
+            raise SystemExit(1)
+        click.echo(f"baseline-recompute done: updated_rows={updated}")

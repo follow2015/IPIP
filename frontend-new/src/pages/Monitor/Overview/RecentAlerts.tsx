@@ -18,6 +18,7 @@ import {
 import { useMessage } from '@/hooks/useMessage';
 import { relativeTime } from '@/utils/format';
 import { ALERT_TYPE_LABEL, ALERT_TYPE_COLOR } from '@/constants/monitor';
+import AlertInterpret from './AlertInterpret';
 
 const { Text } = Typography;
 
@@ -146,32 +147,46 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
             {
               title: '操作',
               key: 'action',
-              width: 80,
+              width: 120,
               render: (_: unknown, r: MonitorAlertItem) => {
                 const isPending = r.status === 'pending' || r.status === 'sent';
-                if (!isPending) return <Text type="secondary">已处理</Text>;
                 return (
-                  <Space size={4}>
-                    <Tooltip title="确认">
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<CheckOutlined />}
-                        loading={ackAlert.isPending}
-                        onClick={() => handleAck(r.id)}
-                        style={{ color: token.colorSuccess }}
-                      />
-                    </Tooltip>
-                    <Tooltip title="关闭">
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<CloseOutlined />}
-                        loading={closeAlert.isPending}
-                        onClick={() => handleClose(r.id)}
-                        style={{ color: token.colorError }}
-                      />
-                    </Tooltip>
+                  <Space size={4} direction="vertical" align="start">
+                    <Space size={4}>
+                      {isPending ? (
+                        <>
+                          <Tooltip title="确认">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<CheckOutlined />}
+                              loading={ackAlert.isPending}
+                              onClick={() => handleAck(r.id)}
+                              style={{ color: token.colorSuccess }}
+                            />
+                          </Tooltip>
+                          <Tooltip title="关闭">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<CloseOutlined />}
+                              loading={closeAlert.isPending}
+                              onClick={() => handleClose(r.id)}
+                              style={{ color: token.colorError }}
+                            />
+                          </Tooltip>
+                        </>
+                      ) : (
+                        <Text type="secondary">已处理</Text>
+                      )}
+                    </Space>
+                    <AlertInterpret
+                      alert={{
+                        alert_type: r.alert_type,
+                        device_name: r.device_name ?? undefined,
+                        severity: r.severity ?? undefined
+                      }}
+                    />
                   </Space>
                 );
               }

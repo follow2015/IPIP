@@ -155,6 +155,12 @@ export const queryKeys = {
     config: ['mailSettings', 'config'] as const
   },
 
+  voiceSettings: {
+    all: ['voiceSettings'] as const,
+    config: ['voiceSettings', 'config'] as const,
+    status: ['voiceSettings', 'status'] as const
+  },
+
   monitor: {
     status: (deviceId: number) => ['monitor', 'status', deviceId] as const,
     credentials: () => ['monitor', 'credentials'] as const,
@@ -164,6 +170,8 @@ export const queryKeys = {
     config: ['monitor', 'config'] as const,
     alerts: (params?: unknown) => ['monitor', 'alerts', params] as const,
     alertsAll: ['monitor', 'alerts'] as const,
+    incidents: (params?: unknown) => ['monitor', 'incidents', 'list', params] as const,
+    incidentDetail: (incidentId: number) => ['monitor', 'incident-detail', incidentId] as const,
     alertDetail: (alertId: number) => ['monitor', 'alerts', alertId] as const,
     alertAggregations: (params: Record<string, unknown> | object) =>
       ['monitor', 'alerts', 'aggregations', params] as const,

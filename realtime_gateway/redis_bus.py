@@ -4,20 +4,24 @@ Redis 订阅总线 — 网关核心模块
 
 职责：
 1. 订阅 Redis Pub/Sub（sw:{device_id} 和 events:global）
-2. 为每条事件分配全局唯一 seq（单进程持有，天然全局唯一）
-3. 维护每台设备的环形缓冲区（断线重放）
-4. 将事件分发到本地 asyncio.Queue（fan-out 给 SSE 连接）
+2. 将事件分发到本地 asyncio.Queue（fan-out 给本副本的 SSE 连接）
+3. 断线重放：get_events_since 从 Redis 共享 ring 读取（ring 由发布侧
+   app/services/switch_events.py 通过 Lua LPUSH+LTRIM+EXPIRE 维护）
+
+seq 归属说明（多副本硬性前提）：
+  seq 由发布侧（Flask switch_events.py）通过 Redis INCR 分配并写入 payload，
+  网关只透传、绝不重新分配——若网关分配，多副本会各自 INCR 导致 seq 重复。
+  ring 也在 Redis 共享，断线重连路由到任一副本都能重放。
 
 线程安全说明：
   本模块运行在 uvicorn 单进程 asyncio 事件循环中，
-  所有状态（_device_seqs / _device_rings / _subscribers）都是单线程访问，
-  无需加锁。这也是网关必须单进程运行的根本原因。
+  本地订阅者状态（_subscribers / _global_subscribers）都是单线程访问，
+  无需加锁。seq/ring 已外移至 Redis，本模块无跨副本共享的进程内状态，
+  支持多副本水平扩容（每副本独立订阅 Pub/Sub，Redis 自然广播）。
 """
 import asyncio
-import collections
 import json
 import logging
-import time
 
 import redis.asyncio as aioredis
 
@@ -26,35 +30,11 @@ from . import config
 logger = logging.getLogger(__name__)
 
 
-_device_seqs: dict[int, int] = {}
-
-_device_rings: dict[int, collections.deque] = {}
-
 _subscribers: dict[int, list[asyncio.Queue]] = {}
 
 _global_subscribers: list[tuple[asyncio.Queue, int | None]] = []
 
 _redis: aioredis.Redis | None = None
-
-
-def _next_seq(device_id: int) -> int:
-    """获取设备下一个序列号（单调递增，单进程保证全局唯一）"""
-    seq = _device_seqs.get(device_id, 0) + 1
-    _device_seqs[device_id] = seq
-    return seq
-
-
-def _ring_store(device_id: int, event_dict: dict) -> None:
-    """将事件存入设备环形缓冲区"""
-    if device_id not in _device_rings:
-        _device_rings[device_id] = collections.deque(maxlen=config.RING_BUFFER_SIZE)
-    _device_rings[device_id].append(event_dict)
-
-
-def get_events_since(device_id: int, since_seq: int) -> list[dict]:
-    """从环形缓冲区取出 seq > since_seq 的事件（供断线重放）"""
-    ring = _device_rings.get(device_id, collections.deque())
-    return [e for e in ring if e.get("seq", 0) > since_seq]
 
 
 def subscribe(device_id: int) -> asyncio.Queue:
@@ -119,29 +99,63 @@ async def get_redis() -> aioredis.Redis:
 
 
 
+async def get_events_since(device_id: int, since_seq: int) -> list[dict]:
+    """从 Redis 共享 ring 取出 seq > since_seq 的事件（供断线重放）。
+
+    ring 由发布侧 switch_events.py 维护（LPUSH 头插，LRANGE 返回新→旧），
+    这里统一按 seq 升序返回，与迁移前进程内 deque（旧→新）的语义一致。
+
+    Redis 异常时返回空列表（重放是 best-effort，不阻断连接建立）。
+    """
+    try:
+        r = await get_redis()
+        raw_events = await r.lrange(config.RING_KEY_FMT.format(device_id=device_id), 0, -1)
+    except Exception as exc:
+        logger.warning("读取 ring 失败 device=%d: %s", device_id, exc)
+        return []
+
+    events: list[dict] = []
+    for raw in raw_events:
+        try:
+            e = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("ring 内存在无效 JSON 事件，跳过 device=%d", device_id)
+            continue
+        if e.get("seq", 0) > since_seq:
+            events.append(e)
+    events.sort(key=lambda e: e.get("seq", 0))
+    return events
+
+
+
 def _handle_device_event(device_id: int, raw_data: str) -> None:
-    """处理交换机级事件：分配 seq → 存环形缓冲区 → fan-out"""
+    """处理交换机级事件：透传 seq（发布侧已分配）→ fan-out 到本地订阅者。
+
+    缺 seq 的兼容处理（发布方未迁移的部署窗口期）：注入 seq=0，
+    保证前端 DeviceEventBus 的 Math.max 游标不被 undefined 污染成 NaN。
+    """
     try:
         event_dict = json.loads(raw_data)
     except json.JSONDecodeError:
         logger.warning("无效 JSON 事件，device=%d", device_id)
         return
 
-    seq = _next_seq(device_id)
-    event_dict["seq"] = seq
-
-    _ring_store(device_id, event_dict)
-
-    payload = json.dumps(event_dict, ensure_ascii=False)
+    if "seq" not in event_dict:
+        logger.warning(
+            "事件缺少 seq（发布方未迁移？），device=%d event_id=%s",
+            device_id, event_dict.get("event_id"),
+        )
+        event_dict["seq"] = 0
+        raw_data = json.dumps(event_dict, ensure_ascii=False)
 
     queues = list(_subscribers.get(device_id, []))
     for q in queues:
         try:
-            q.put_nowait(payload)
+            q.put_nowait(raw_data)
         except asyncio.QueueFull:
             logger.warning(
-                "SSE 客户端队列已满，丢弃事件 device=%d seq=%d",
-                device_id, seq,
+                "SSE 客户端队列已满，丢弃事件 device=%d seq=%s",
+                device_id, event_dict.get("seq"),
             )
 
 
@@ -172,7 +186,8 @@ async def start_subscriber() -> None:
 
     使用 psubscribe("sw:*") 模式订阅所有交换机事件，
     同时 subscribe 全局 channel。
-    断线自动重连（5s 间隔）。
+    断线自动重连（5s 间隔）。多副本部署时每个副本独立运行本循环，
+    Redis Pub/Sub 自然广播到所有副本。
     """
     while True:
         try:
