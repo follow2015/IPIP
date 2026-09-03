@@ -18,7 +18,7 @@ from app.utils.logging import get_logger
 from datetime import datetime, timedelta, timezone
 from typing import List
 
-import requests
+from app.utils.http_client import post_json
 from app.models.monitor_alert_outbox import MonitorAlertOutbox
 from app.models.monitor_escalation_policy import MonitorEscalationPolicy
 from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
@@ -28,7 +28,6 @@ from app.persistence.rbac_repository import RoleRepository
 logger = get_logger(__name__)
 
 _WEBHOOK_TIMEOUT = 5  # 秒
-_webhook_session = requests.Session()
 
 _policy_repo = MonitorEscalationPolicyRepository()
 _outbox_repo = MonitorAlertOutboxRepository()
@@ -91,11 +90,8 @@ def _publish_escalation(alert: MonitorAlertOutbox,
 
     if escalate_webhook_url:
         try:
-            _webhook_session.post(
-                escalate_webhook_url,
-                json=payload,
-                timeout=_WEBHOOK_TIMEOUT,
-            )
+            post_json(escalate_webhook_url, payload, timeout=_WEBHOOK_TIMEOUT,
+                      allow_redirects=True)
         except Exception as exc:
             logger.warning("升级 webhook 失败 alert_id=%s url=%s: %s",
                            alert.id, escalate_webhook_url, exc)

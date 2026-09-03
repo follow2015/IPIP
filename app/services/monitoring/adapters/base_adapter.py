@@ -1,5 +1,5 @@
 import ipaddress
-import logging
+from app.utils.logging import get_logger
 import socket
 import threading
 import time
@@ -9,7 +9,7 @@ from typing import Any, Optional, Tuple
 
 from app.core.enums import MonitorProtocolCode, ProbeErrorCode
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _orphan_lock = threading.Lock()
 _orphan_count = 0

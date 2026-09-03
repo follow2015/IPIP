@@ -79,6 +79,7 @@ class AuditService:
 
     def get_logs(self, user_id: Optional[int] = None, action: Optional[str] = None,
                  resource: Optional[str] = None, resource_id: Optional[int] = None,
+                 start_time: Optional[str] = None, end_time: Optional[str] = None,
                  page: int = 1, per_page: int = 20) -> dict:
         """查询审计日志（分页）
 
@@ -89,6 +90,8 @@ class AuditService:
             action: 操作类型（可选）
             resource: 资源类型（可选）
             resource_id: 资源ID（可选）
+            start_time: 起始时间 ISO8601（可选）
+            end_time: 结束时间 ISO8601（可选）
             page: 页码
             per_page: 每页数量
 
@@ -102,11 +105,21 @@ class AuditService:
         if user_id is not None:
             filters['user_id'] = user_id
         if action is not None:
-            filters['action'] = action
+            if action.endswith('.'):
+                filters['action'] = {'startswith': action}
+            else:
+                filters['action'] = action
         if resource is not None:
             filters['resource'] = resource
         if resource_id is not None:
             filters['resource_id'] = resource_id
+        if start_time is not None:
+            filters['created_at'] = {'gte': start_time}
+        if end_time is not None:
+            if 'created_at' in filters:
+                filters['created_at']['lte'] = end_time
+            else:
+                filters['created_at'] = {'lte': end_time}
         return self.audit_repo.paginate(page=page, page_size=per_page, filters=filters, order_by='-created_at')
 
     def log_and_notify(self, user_id: Optional[int], action: str, resource: str,

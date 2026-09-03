@@ -16,7 +16,7 @@
 **不使用 `concurrent.futures` 私有内部 API**（如 `_threads_queues` / `_worker`）。
 """
 
-import logging
+from app.utils.logging import get_logger
 import threading
 import time
 
@@ -29,7 +29,7 @@ from app.services.monitoring.adapters.base_adapter import (
 )
 from app.core.enums import ProbeErrorCode
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _DEFAULT_IPMI_PORT = 623
 

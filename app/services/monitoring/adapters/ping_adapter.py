@@ -17,7 +17,7 @@
   （daemon 子线程 + join(timeout)），保证 probe() 有界返回。
 - `probe()` 保持同步接口不变，兼容 MonitorService 线程池模型。
 """
-import logging
+from app.utils.logging import get_logger
 import time
 
 from app.core.enums import IPStatus, ProbeErrorCode
@@ -30,7 +30,7 @@ from app.services.monitoring.adapters.base_adapter import (
     run_with_timeout,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _resolve_ping_ports(credential: dict) -> tuple:

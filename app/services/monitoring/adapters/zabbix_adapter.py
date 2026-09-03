@@ -11,12 +11,12 @@ probe() 命中缓存时 O(1) 字典查找，未命中时重建索引。
 """
 import hashlib
 import itertools
-import logging
+from app.utils.logging import get_logger
 import threading
 import time
 from typing import Any
 
-import requests
+from app.utils.http_client import post_json
 
 from app.exceptions.system import ExternalServiceError
 from app.services.monitoring.adapters.base_adapter import (
@@ -28,7 +28,7 @@ from app.services.monitoring.adapters.base_adapter import (
 )
 from app.core.enums import ProbeErrorCode
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _zabbix_cache: dict[str, tuple[float, dict[str, dict]]] = {}
 _cache_lock = threading.Lock()  # ThreadPoolExecutor 并发 probe 共享缓存
@@ -57,7 +57,6 @@ class ZabbixAdapter(MonitorAdapter):
 
     def __init__(self):
         super().__init__()
-        self._session = requests.Session()
 
     def probe(self, device, credential) -> ProbeResult:
         """探测单设备：从批量缓存查 Zabbix 主机可用性 + 活跃问题。
@@ -242,9 +241,10 @@ class ZabbixAdapter(MonitorAdapter):
             "id": self._next_rpc_id(),
         }
         verify_ssl = credential.get("verify_ssl", True)
-        resp = self._session.post(
-            api_url, json=body, headers=headers,
+        resp = post_json(
+            api_url, body, headers=headers,
             timeout=monitor_timeout_seconds(), verify=verify_ssl,
+            allow_redirects=True,
         )
         resp.raise_for_status()
         data = resp.json()

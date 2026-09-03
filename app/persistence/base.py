@@ -499,6 +499,10 @@ class BaseRepository:
                             query = query.filter(column.like(f"%{operand}%"))
                         elif operator == 'ilike':
                             query = query.filter(column.ilike(f"%{operand}%"))
+                        elif operator == 'startswith':
+                            query = query.filter(column.like(f"{operand}%"))
+                        elif operator == 'endswith':
+                            query = query.filter(column.like(f"%{operand}"))
                         elif operator == 'in':
                             query = query.filter(column.in_(operand))
                         elif operator == 'not_in':

@@ -82,18 +82,36 @@ def unsubscribe_global(q: asyncio.Queue) -> None:
 
 
 
+async def close_redis() -> None:
+    """关闭 Redis 客户端（lifespan 退出时调用，优雅停机不遗留连接）。"""
+    global _redis
+    if _redis is None:
+        return
+    client, _redis = _redis, None
+    try:
+        await client.aclose()
+    except Exception as exc:
+        logger.warning("关闭 Redis 客户端失败: %s", exc)
+
+
 async def get_redis() -> aioredis.Redis:
-    """获取 Redis 异步客户端（懒加载单例）"""
+    """获取 Redis 异步客户端（懒加载单例，ping 成功才缓存）。
+
+    S1 配套：连接必须先 ping 通过再赋给全局。原实现先赋值再 ping，
+    ping 失败时 _redis 已指向坏客户端并被后续调用直接复用——start_subscriber
+    的重试循环会永远拿到同一个坏连接，Redis 恢复后也无法自动订阅。
+    """
     global _redis
     if _redis is not None:
         return _redis
-    _redis = aioredis.Redis.from_url(
+    client = aioredis.Redis.from_url(
         config.REDIS_URL,
         decode_responses=True,
         socket_timeout=None,          # PubSub 长连接不能有读取超时
         socket_connect_timeout=5,     # 连接超时 5s
     )
-    await _redis.ping()
+    await client.ping()  # 失败不缓存：下次调用重新建连
+    _redis = client
     logger.info("网关 Redis 已连接: %s", config.REDIS_URL)
     return _redis
 
@@ -190,6 +208,7 @@ async def start_subscriber() -> None:
     Redis Pub/Sub 自然广播到所有副本。
     """
     while True:
+        pubsub = None
         try:
             r = await get_redis()
             pubsub = r.pubsub()
@@ -224,3 +243,9 @@ async def start_subscriber() -> None:
         except Exception as exc:
             logger.warning("网关 Redis 订阅异常，5s 后重连: %s", exc)
             await asyncio.sleep(5)
+        finally:
+            if pubsub is not None:
+                try:
+                    await pubsub.aclose()
+                except Exception as exc:
+                    logger.warning("关闭 pubsub 失败: %s", exc)

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Button, Typography, Spin, App } from 'antd';
+import { Button, Typography, Spin } from 'antd';
 import { runSkill } from '@/services/ai';
+import { useMessage } from '@/hooks/useMessage';
 
 export interface AlertPayload {
   alert_type: string;
@@ -18,7 +19,7 @@ interface AlertInterpretProps {
 export default function AlertInterpret({ alert }: AlertInterpretProps) {
   const [text, setText] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const { message } = App.useApp();
+  const message = useMessage();
 
   const run = async () => {
     setLoading(true);

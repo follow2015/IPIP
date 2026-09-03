@@ -32,7 +32,6 @@ from __future__ import annotations
 import json
 import os
 from app.utils.logging import get_logger
-import threading
 import time
 import uuid as _uuid_mod
 
@@ -51,56 +50,18 @@ redis.call('EXPIRE', KEYS[1], ARGV[3])
 
 _ring_script = None
 
-_redis_client = None
-_redis_init_lock = threading.Lock()  # 防止多线程并发初始化（double-checked locking）
-_redis_unavailable_logged = False  # 防止 REDIS_URL 未配置时日志刷屏（仅首次 ERROR，后续 DEBUG）
 
 
 def _get_redis():
-    """懒加载 Redis 客户端。
+    """获取 Redis 客户端（委托全局单例入口）。
 
     与旧版不同：这里不再是"可选优化，连不上就退回内存模式"——
     退无可退，因为本进程（Flask）不再自己服务 SSE，事件必须经 Redis
     才能到达 ASGI 网关。REDIS_URL 未配置或连接失败时，事件会被静默丢弃
     （只记日志），但不会抛异常影响调用方的主业务事务。
     """
-    global _redis_client, _redis_unavailable_logged
-    if _redis_client is not None:
-        return _redis_client
-    with _redis_init_lock:
-        if _redis_client is not None:
-            return _redis_client
-        try:
-            from config import get_config
-            _config = get_config()
-            config_instance = _config() if isinstance(_config, type) else _config
-            redis_url = config_instance.REDIS_URL
-        except Exception:
-            redis_url = None
-        if not redis_url:
-            if not _redis_unavailable_logged:
-                logger.error("REDIS_URL 未配置，实时事件推送不可用（事件将被静默丢弃）")
-                _redis_unavailable_logged = True
-            else:
-                logger.debug("REDIS_URL 未配置，实时事件推送不可用")
-            return None
-        try:
-            import redis as _redis_lib
-            _redis_client = _redis_lib.Redis.from_url(
-                redis_url,
-                decode_responses=True,
-                socket_connect_timeout=5,
-                socket_timeout=5,
-                retry_on_timeout=True,
-                health_check_interval=30,
-                socket_keepalive=True,
-            )
-            _redis_client.ping()
-            logger.info("SSE Redis Pub/Sub 已启用: %s", redis_url)
-            return _redis_client
-        except Exception as exc:
-            logger.warning("REDIS_URL 已配置但连接失败，事件将被静默丢弃: %s", exc)
-            return None
+    from app.utils.redis_client import get_redis_client
+    return get_redis_client()
 
 
 def _get_ring_script(r):

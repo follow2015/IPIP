@@ -164,7 +164,10 @@ def _process_one(app, task: dict) -> None:
                         ok = channel.send(notification, receipt, user)
                         _duration_ms = int((time.perf_counter() - _t0) * 1000)
                         status.update(dict(receipt.channel_status or {}))
-                        status[name] = "ok" if ok else "failed:unknown"
+                        if name == ChannelType.VOICE and ok:
+                            pass
+                        else:
+                            status[name] = "ok" if ok else "failed:unknown"
                         logger.info(
                             "渠道投递完成 channel=%s user_id=%s duration_ms=%d ok=%s",
                             name, uid, _duration_ms, ok,

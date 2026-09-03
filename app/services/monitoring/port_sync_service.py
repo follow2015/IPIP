@@ -19,7 +19,7 @@
 """
 from __future__ import annotations
 
-import logging
+from app.utils.logging import get_logger
 from datetime import datetime
 from typing import Optional
 
@@ -30,7 +30,7 @@ from app.models.network_port import NetworkPort
 from app.persistence.switch_port_repository import NetworkPortRepository
 from app.services.monitoring.snmp_port_collector import SnmpPortCollector
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PortSyncService:

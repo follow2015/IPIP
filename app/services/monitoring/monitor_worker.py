@@ -181,15 +181,16 @@ class _LockWatchdog:
 
 
 def _redis_client(app) -> "redis.Redis":
-    """构建 redis 客户端（含 fallback）。
+    """构建 redis 客户端（host/port fallback，签名保留供 fakeredis patch）。
 
-    config.REDIS_URL 通常已由 from_object 拷入 app.config；若为空或
-    非 str（ProductionConfig 的 @property 描述符未被调用时会存入 property
-    对象）则用 REDIS_HOST/PORT/PASSWORD/DB 构造客户端，密码不进字符串避免泄漏。
+    注意：不复用 app.utils.redis_client 的共享单例——app.config["REDIS_URL"]
+    经 from_object(配置类) 拷入的是 @property 描述符对象而非 str（生产路径
+    拿不到 URL 字符串），曾尝试的「URL 一致时复用共享池」分支实为死分支，
+    已在 code review 中移除。用 REDIS_HOST/PORT/PASSWORD/DB 构造客户端，
+    密码不进字符串避免泄漏；连接异常在使用时暴露，由调用方降级
+    （锁续期失败、直查 DB 等），语义与收敛前一致。
+    连接复用由 dynamic_config 的 per-app 缓存兜住（worker 每轮多次读配置）。
     """
-    url = app.config.get("REDIS_URL")
-    if isinstance(url, str):
-        return redis.from_url(url, decode_responses=True)
     host = app.config.get("REDIS_HOST", "localhost")
     port = app.config.get("REDIS_PORT", 6379)
     password = app.config.get("REDIS_PASSWORD", "") or None

@@ -23,7 +23,7 @@
 """
 from __future__ import annotations
 
-import logging
+from app.utils.logging import get_logger
 from typing import Optional
 
 from app.services.monitoring.adapters.base_adapter import (
@@ -36,7 +36,7 @@ from app.services.monitoring.adapters.snmp_adapter import (
 )
 from app.utils.port_name_parser import parse_port_name
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _IF_NAME_OID = "1.3.6.1.2.1.31.1.1.1.1"        # ifName
 _IF_DESCR_OID = "1.3.6.1.2.1.2.2.1.2"          # ifDescr

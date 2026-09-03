@@ -19,7 +19,7 @@
 """
 
 import asyncio
-import logging
+from app.utils.logging import get_logger
 import threading
 import time
 
@@ -33,7 +33,7 @@ from app.services.monitoring.adapters.base_adapter import (
 from app.core.enums import ProbeErrorCode
 from app.services.monitoring.snmp_versions import SNMP_REQUIRED_BY_VERSION
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _SYS_UPTIME_OID = "1.3.6.1.2.1.1.3.0"
 

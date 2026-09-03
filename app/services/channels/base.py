@@ -13,6 +13,41 @@ from abc import ABC, abstractmethod
 
 from app.models.notification import Notification, NotificationReceipt
 from app.models.user import User
+from app.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+def ensure_webhook_success(resp, channel_name: str) -> None:
+    """N3：校验 webhook 业务的返回码——HTTP 200 不等于投递成功。
+
+    企微返回 `errcode`、飞书返回 `code`；关键词不匹配、签名错误、机器人被
+    移除等场景均返回 **HTTP 200 + 非零业务码**。仅凭 HTTP 状态码会把这些
+    失败误记为成功，导致广播告警静默丢失且无任何重试。
+
+    Args:
+        resp: requests 响应对象。
+        channel_name: 渠道名，仅用于错误信息可读。
+
+    Raises:
+        RuntimeError: 业务码非 0（由调用方的 try/except 记为投递失败）。
+    """
+    try:
+        body = resp.json()
+    except Exception:  # noqa: BLE001
+        return  # 非 JSON 响应（如网关 HTML 拦截页）：以 HTTP 状态为准
+    if not isinstance(body, dict):
+        return
+    code = body.get("errcode", body.get("code"))
+    if code is None:
+        return
+    try:
+        failed = int(code) != 0
+    except (TypeError, ValueError):
+        return
+    if failed:
+        msg = body.get("errmsg") or body.get("msg") or ""
+        raise RuntimeError(f"{channel_name} Webhook 业务失败 code={code} {msg}".strip())
 
 
 class PersonalChannel(ABC):
