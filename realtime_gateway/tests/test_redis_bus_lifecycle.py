@@ -91,8 +91,13 @@ class _FakePubSub:
         self._closed.append("aclose")
 
 
-def _run_subscriber(errors: list[BaseException], closed: list) -> None:
-    """驱动 start_subscriber 循环若干次后以 CancelledError 终止。"""
+def _run_subscriber(errors: list[BaseException], closed: list) -> list:
+    """驱动 start_subscriber 循环若干次后以 CancelledError 终止。
+
+    返回循环中创建的 pubsub 列表——断言口径是"每个创建的 pubsub 都被关闭"，
+    而不是固定条数（异常重连一次 = 旧 pubsub 关闭 + 新 pubsub 建起，
+    终止时新 pubsub 也要关闭，故条数随循环次数变化）。
+    """
     pubsubs = []
 
     async def fake_get_redis():
@@ -107,20 +112,24 @@ def _run_subscriber(errors: list[BaseException], closed: list) -> None:
             patch.object(redis_bus.asyncio, "sleep", new=AsyncMock()):
         asyncio.run(redis_bus.start_subscriber())
 
+    return pubsubs
+
 
 def test_pubsub_closed_on_reconnect():
     """S3：订阅异常重连前必须关闭旧 pubsub（否则每次重连泄漏一条连接）。"""
     closed: list[str] = []
-    _run_subscriber([RuntimeError("boom")], closed)
+    pubsubs = _run_subscriber([RuntimeError("boom")], closed)
 
-    assert closed == ["aclose"], (
-        "重连前必须 aclose 旧 pubsub，避免 Pub/Sub 连接泄漏"
+    assert len(pubsubs) == 2, "一次异常应触发重连：旧 pubsub + 新 pubsub"
+    assert len(closed) == len(pubsubs), (
+        "每个创建的 pubsub 都必须关闭：重连前 aclose 旧的，终止时 aclose 当前的"
     )
 
 
 def test_pubsub_closed_on_cancel():
     """S3：任务被取消（优雅停机）时同样要关闭 pubsub。"""
     closed: list[str] = []
-    _run_subscriber([asyncio.CancelledError()], closed)
+    pubsubs = _run_subscriber([asyncio.CancelledError()], closed)
 
-    assert closed == ["aclose"], "优雅停机时不得遗留 pubsub 连接"
+    assert len(pubsubs) == 1
+    assert len(closed) == len(pubsubs), "优雅停机时不得遗留 pubsub 连接"
