@@ -60,6 +60,7 @@ class MonitorOutboxSender:
                  redis_client=None, dead_letter_retry_hours: int = 24):
         self._notify = notify
         self._repo = repo
+        self._repo_session_key = id(repo.session) if repo is not None else None
         self.batch_size = batch_size
         self.max_attempts = max_attempts
         self.interval = interval
@@ -154,8 +155,9 @@ class MonitorOutboxSender:
             if not self._acquire_round_lock(app):
                 return 0
             try:
-                if self._repo is None:
+                if self._repo is None or self._repo_session_key != id(session):
                     self._repo = MonitorAlertOutboxRepository(session=session)
+                    self._repo_session_key = id(session)
                 repo = self._repo
                 rows = repo.find_pending(self.batch_size)
                 for row in rows:
@@ -200,7 +202,8 @@ class MonitorOutboxSender:
                 try:
                     if self._repo is not None:
                         reset_count = self._repo.reset_all_failed(
-                            max_age_hours=self.dead_letter_retry_hours
+                            max_age_hours=self.dead_letter_retry_hours,
+                            max_attempts=self.max_attempts,  # M5：收敛上限
                         )
                         if reset_count > 0:
                             session.commit()

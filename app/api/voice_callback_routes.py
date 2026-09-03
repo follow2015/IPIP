@@ -170,12 +170,15 @@ def voice_callback():
             logger.warning("语音回调无法定位 receipt: call_id=%s", call_id)
             continue
 
-        receipt = NotificationReceipt.query.get(receipt_id)
+        receipt = db.session.get(
+            NotificationReceipt, receipt_id, with_for_update=True
+        )
         if not receipt:
             continue
 
         if not redis_client.set(f"voice:cb:{call_id}:{event}", "1", nx=True, ex=3600):
             logger.debug("语音回调重复，已处理: call_id=%s event=%s", call_id, event)
+            db.session.rollback()  # I-3：该分支无未决写入，立即释放行锁
             continue
 
         status = dict(receipt.channel_status or {})
@@ -183,6 +186,7 @@ def voice_callback():
         if current in _TERMINAL_EVENTS and event != "acked":
             logger.debug("语音终态已存在，忽略新事件: call_id=%s current=%s new=%s",
                          call_id, current, event)
+            db.session.rollback()  # I-3：立即释放行锁（腾讯云双回调并发时避免排队）
             continue
 
         is_ack = event == "acked" or bool(parsed.get("key_press"))
@@ -197,12 +201,13 @@ def voice_callback():
         receipt.channel_status = status
         flag_modified(receipt, "channel_status")
 
+        db.session.commit()  # 行锁随 commit 释放
+
         task_id = status.get("voice_task_id")
         if task_id:
             from app.tasks.voice_tasks import cancel_voice_retry_task
             cancel_voice_retry_task.apply_async(args=[task_id], countdown=1)
 
-        db.session.commit()
         handled.append({"call_id": call_id, "event": event, "receipt_id": receipt_id})
 
     logger.info("语音回调处理完成: provider=%s handled=%s", provider_name, handled)

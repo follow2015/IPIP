@@ -292,25 +292,24 @@ class ZabbixAdapter(MonitorAdapter):
 
 
     def _resolve_hostid_for_metrics(self, api_url: str, credential: dict, device) -> str | None:
-        """按设备 IP/hostname 匹配 Zabbix host，返回 hostid（供 item.get 查询）。"""
+        """按设备 IP/hostname 匹配 Zabbix host，返回 hostid（供 item.get 查询）。
+
+        M3：复用 probe 路径的进程级 _zabbix_cache（经 _get_host_data，缓存条目
+        已含 hostid）——探测循环刚重建过索引时本调用为纯字典查找（0 API 调用），
+        消除原「每设备一次无 limit 全量 host.get」的 N×1 放大。
+        """
         host_ref = self._resolve_host_ref(device, credential)
         if not host_ref:
             return None
+        ckey = _cache_key(api_url, credential)
         try:
-            hosts = self._zabbix_call(api_url, credential, "host.get", {
-                "output": ["hostid", "host"],
-                "selectInterfaces": ["ip"],
-            }) or []
-        except Exception:
-            logger.warning("zabbix metrics host.get 失败 api_url=%s", api_url, exc_info=True)
+            host_data, _from_cache = self._get_host_data(ckey, api_url, credential, host_ref)
+        except _ZabbixEmptyHostError:
             return None
-        matched = next(
-            (h for h in hosts
-             if any(i.get("ip") == host_ref for i in h.get("interfaces", []))),
-            None,
-        )
-        host = matched or (hosts[0] if hosts else None)
-        return host.get("hostid") if host else None
+        except Exception:
+            logger.warning("zabbix metrics host 查询失败 api_url=%s", api_url, exc_info=True)
+            return None
+        return host_data.get("hostid") if host_data else None
 
     def collect_metrics(self, device, credential, templates: list) -> dict:
         """按指标模板采集 Zabbix 指标（连通性之外的业务指标采集）。
@@ -319,9 +318,11 @@ class ZabbixAdapter(MonitorAdapter):
         ``[{metric_key, zabbix_item_key, metric_type, ...}]``，仅处理含 zabbix_item_key 的模板。
 
         流程：
-        1. 解析 hostid（host.get 按 IP/hostname 匹配）
-        2. 对每个模板，item.get 按 hostids + search key_ 找 itemid（可能多个实例）
-        3. history.get 拉每个 item 最新值（limit=1, sortfield=clock, sortorder=DESC）
+        1. 解析 hostid（M3：复用 probe 的 _zabbix_cache，缓存命中 0 API 调用）
+        2. 对每个模板，item.get 按 hostids + search key_ 找 itemid（M 次，M=模板数）
+        3. M3：history.get 按 value_type 分组批量拉取（Zabbix history 表按
+           value_type 分表，跨类型不可合并；原逐 item K 次调用 → 每类型 1 次
+           + 未命中 item 逐项兜底），批量按 clock 降序取各 itemid 首个点即最新值
         4. 返回 ``{metric_key: {item_name: value}}``，item_name 作为 index
 
         采集失败/无模板返回空 dict，不抛出（与 SNMP 一致，静默降级）。
@@ -337,7 +338,7 @@ class ZabbixAdapter(MonitorAdapter):
         if not hostid:
             return {}
 
-        result: dict = {}
+        flat_items: list[tuple[str, dict]] = []
         for tpl in zabbix_templates:
             metric_key = tpl["metric_key"]
             item_key = tpl["zabbix_item_key"]
@@ -354,50 +355,82 @@ class ZabbixAdapter(MonitorAdapter):
                     metric_key, item_key, hostid, exc_info=True,
                 )
                 continue
-            if not items:
-                continue
-
-            index_map: dict = {}
             for item in items:
-                itemid = item.get("itemid")
-                value_type = int(item.get("value_type", 0))
-                index_name = item.get("name") or item.get("key_", "") or itemid
-                try:
-                    points = self._zabbix_call(api_url, credential, "history.get", {
-                        "itemids": itemid,
-                        "history": value_type,
-                        "sortfield": "clock",
-                        "sortorder": "DESC",
-                        "limit": 1,
-                        "output": "extend",
-                    }) or []
-                except Exception:
-                    logger.warning(
-                        "zabbix metrics history.get 失败 itemid=%s", itemid, exc_info=True,
-                    )
-                    continue
-                if not points:
-                    try:
-                        trends = self._zabbix_call(api_url, credential, "trend.get", {
-                            "itemids": itemid,
-                            "sortfield": "clock",
-                            "sortorder": "DESC",
-                            "limit": 1,
-                            "output": "extend",
-                        }) or []
-                    except Exception:
-                        trends = []
-                    if not trends:
-                        continue
-                    val = trends[0].get("value_avg") or trends[0].get("value_max")
-                else:
-                    val = points[0].get("value")
-                try:
-                    val_num = float(val) if val is not None else None
-                except (TypeError, ValueError):
-                    val_num = None
-                if val_num is not None:
-                    index_map[index_name] = val_num
-            if index_map:
-                result[metric_key] = index_map
+                flat_items.append((metric_key, item))
+
+        latest: dict[str, str | None] = {}  # itemid -> 最新值（降序首个）
+        by_vt: dict[int, list[dict]] = {}
+        for _mk, item in flat_items:
+            vt = int(item.get("value_type", 0) or 0)
+            by_vt.setdefault(vt, []).append(item)
+        for vt, group in by_vt.items():
+            ids = [it["itemid"] for it in group if it.get("itemid")]
+            if not ids:
+                continue
+            try:
+                points = self._zabbix_call(api_url, credential, "history.get", {
+                    "itemids": ids,
+                    "history": vt,
+                    "sortfield": "clock",
+                    "sortorder": "DESC",
+                    "limit": max(len(ids) * 10, 100),
+                    "output": ["itemid", "value", "clock"],
+                }) or []
+            except Exception:
+                logger.warning(
+                    "zabbix metrics 批量 history.get 失败 value_type=%s hostid=%s",
+                    vt, hostid, exc_info=True,
+                )
+                points = []
+            for p in points:
+                iid = p.get("itemid")
+                if iid and iid not in latest:
+                    latest[iid] = p.get("value")
+
+        result: dict = {}
+        for metric_key, item in flat_items:
+            index_name = item.get("name") or item.get("key_", "") or item.get("itemid")
+            val = latest.get(item.get("itemid"))
+            if val is None:
+                val = self._fetch_latest_with_fallback(api_url, credential, item)
+            try:
+                val_num = float(val) if val is not None else None
+            except (TypeError, ValueError):
+                val_num = None
+            if val_num is not None:
+                result.setdefault(metric_key, {})[index_name] = val_num
         return result
+
+    def _fetch_latest_with_fallback(self, api_url: str, credential: dict, item: dict):
+        """批量 history 未命中时的逐项兜底（原逻辑）：history.get → trend.get。"""
+        itemid = item.get("itemid")
+        value_type = int(item.get("value_type", 0) or 0)
+        try:
+            points = self._zabbix_call(api_url, credential, "history.get", {
+                "itemids": itemid,
+                "history": value_type,
+                "sortfield": "clock",
+                "sortorder": "DESC",
+                "limit": 1,
+                "output": "extend",
+            }) or []
+        except Exception:
+            logger.warning(
+                "zabbix metrics history.get 失败 itemid=%s", itemid, exc_info=True,
+            )
+            return None
+        if points:
+            return points[0].get("value")
+        try:
+            trends = self._zabbix_call(api_url, credential, "trend.get", {
+                "itemids": itemid,
+                "sortfield": "clock",
+                "sortorder": "DESC",
+                "limit": 1,
+                "output": "extend",
+            }) or []
+        except Exception:
+            trends = []
+        if not trends:
+            return None
+        return trends[0].get("value_avg") or trends[0].get("value_max")

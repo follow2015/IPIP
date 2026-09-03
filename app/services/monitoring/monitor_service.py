@@ -441,28 +441,20 @@ class MonitorService:
         result = adapter.probe(device, cred)
         return result, adapter.protocol.value
 
-    def probe_and_persist(self, device) -> Optional[tuple[ProbeResult, str]]:
-        """手动探测 + 落库 + 告警的统一入口（I2：route handler 不再调 _cfg 私有方法）。
+    def get_probe_runtime_config(self) -> dict:
+        """事务外预读手动探测落库所需的运行时配置（批量 HMGET）。
 
-        在事务外调用：先 probe_device（网络 I/O），再读取运行时配置并 apply_result。
-        返回 (result, protocol) 或 None（设备未配置凭据）。
+        返回可直接 **kwargs 展开**传给 apply_result 的字典。调用方须在开启
+        事务之前调用（避免事务内触发动态配置 Redis I/O，与 check_device 的
+        事务外预读口径一致）。
         """
-        probed = self.probe_device(device)
-        if probed is None:
-            return None
-        result, protocol = probed
-        if getattr(result, "skipped", False):
-            return result, protocol
-        threshold = self._cfg("MONITOR_CONSECUTIVE_FAILURES_THRESHOLD", 2)
-        re_alert = self._cfg("MONITOR_REALERT_INTERVAL_MINUTES", 360)
-        fallback_role = self._cfg("MONITOR_FALLBACK_ROLE", "admin")
-        blindspot_role = self._cfg("MONITOR_BLINDSPOT_ROLE", "admin")
-        self.apply_result(
-            device, result, protocol,
-            threshold=threshold, re_alert_interval_minutes=re_alert,
-            fallback_role=fallback_role, blindspot_role=blindspot_role,
-        )
-        return result, protocol
+        threshold, re_alert, fallback_role, blindspot_role = self._batch_cfg()
+        return {
+            "threshold": threshold,
+            "re_alert_interval_minutes": re_alert,
+            "fallback_role": fallback_role,
+            "blindspot_role": blindspot_role,
+        }
 
     def check_probe_cooldown(self, device_id: int) -> bool:
         """per-device 探测冷却限流（Redis SET NX EX）。
