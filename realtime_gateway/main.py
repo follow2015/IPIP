@@ -214,6 +214,40 @@ async def global_events(request: Request) -> StreamingResponse:
     )
 
 
+async def ai_task_events(request: Request) -> StreamingResponse:
+    """SSE AI 任务进度流（P0-7：自 Flask sync worker 迁入网关）。
+
+    归属校验在流内进行（任务状态缺失 / user_id 不符 → SSE error 帧后结束），
+    与 Flask 版行为对齐；`ai:admin` 跨用户排障仍走 Flask 端点。
+    """
+    if not _connection_counter.acquire():
+        logger.warning(
+            "SSE 连接超限拒绝 ai-task 路由 current=%d limit=%d",
+            _connection_counter.current,
+            _connection_counter.limit,
+        )
+        return JSONResponse(
+            {
+                "error": "too_many_connections",
+                "current": _connection_counter.current,
+                "limit": _connection_counter.limit,
+            },
+            status_code=503,
+        )
+
+    task_id = request.path_params["task_id"]
+    user_id = request.scope.get("state", {}).get("user_id")
+    return StreamingResponse(
+        _wrap_stream_with_counter(ai_task_stream.ai_task_event_stream(task_id, user_id)),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
 async def healthz(request: Request) -> JSONResponse:
     """健康检查"""
     return JSONResponse({"status": "ok"})

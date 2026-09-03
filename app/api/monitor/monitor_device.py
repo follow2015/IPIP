@@ -5,6 +5,8 @@ from typing import Optional
 
 from flask import request
 
+from extensions import db
+
 from app.api.base import APIResponse, ErrorCode
 from app.exceptions.business import BusinessLogicError
 from app.exceptions.validation import ValidationError
@@ -168,18 +170,27 @@ def get_probe_trends(device_id: int):
 @doc(summary="手动触发设备探测", tags=["监控"], responses={200: "MonitorProbeResultResponse"})
 @login_required
 @permission_required("monitor:config")
-@transactional
 def check_device_now(device_id: int):
-    """手动触发一次探测。网络 I/O 在事务外，落库 + 告警在事务内。
+    """手动触发一次探测。网络 I/O 在事务外，落库 + 告警在事务内（P0-6）。
 
-    @transactional 收口状态 upsert + 时序事件 + 告警入箱的原子提交，
-    与 check_batch（独立 session 显式 commit）语义对齐。
+    事务边界（勿合并回整体 @transactional）：
+    1. 事务外：读设备 + 预加载探测所需 lazy 关系，随后 db.session.remove()
+       释放 DB 连接；
+    2. 事务外：probe_device 执行最长 timeout+3s 的网络探测——期间不持有
+       DB 连接与未提交事务，探测风暴不致耗尽连接池；
+    3. 事务内：_persist_check_result 以 @transactional 收口 apply_result
+       （状态 upsert + 时序事件 + 告警入箱原子提交）。
     """
     if not monitor_service.check_probe_cooldown(device_id):
         raise BusinessLogicError("该设备探测冷却中，请稍后再试", status_code=429)
 
     device = device_repo.find_by_id_or_404(device_id)
-    probed = monitor_service.probe_and_persist(device)
+    _ = device.hardware
+    _ = getattr(device.hardware, "ipmi_address", None) if device.hardware else None
+    db.session.expunge(device)
+    db.session.commit()
+
+    probed = monitor_service.probe_device(device)
     if probed is None:
         raise BusinessLogicError("设备未配置监控凭据", status_code=400)
     result, protocol = probed
@@ -188,6 +199,19 @@ def check_device_now(device_id: int):
             f"本轮探测被跳过：{result.error}（监控基础设施 / DNS 解析问题，非设备不可达）",
             status_code=409,
         )
+    cfg = monitor_service.get_probe_runtime_config()
+    return _persist_check_result(device_id, result, protocol, cfg)
+
+
+@transactional
+def _persist_check_result(device_id: int, result, protocol: str, cfg: dict):
+    """事务内收口：落库 + 告警（apply_result 唯一入口）。
+
+    设备可能在探测期间被删除 → find_by_id_or_404 抛 404，由 @transactional
+    统一回滚上浮。
+    """
+    device = device_repo.find_by_id_or_404(device_id)
+    monitor_service.apply_result(device, result, protocol, **cfg)
     return APIResponse.success(data=_probe_result_to_dict(result))
 
 
@@ -226,8 +250,8 @@ def _persist_and_alert(device, result, protocol: str, threshold=None,
                        blindspot_role=None):
     """事务内：落库 + 告警（apply_result 唯一入口），返回统一响应。
 
-    兼容性保留：check_device_now 已改用 monitor_service.probe_and_persist()，
-    但部分测试可能仍直接调用本函数。
+    兼容性保留：check_device_now 已拆分为事务外探测 + _persist_check_result
+    事务内落库（P0-6），本函数暂无调用方，保留待 m9 清理时裁决。
     """
     monitor_service.apply_result(
         device, result, protocol,

@@ -161,6 +161,9 @@ class StandaloneMonitorService:
                     device = session.get(Device, device_id)
                     if device is None:
                         return
+                    _ = device.hardware
+                    session.expunge(device)
+                    session.commit()
                     try:
                         self.service.check_device_in_session(device, session)
                     except Exception:

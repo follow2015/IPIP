@@ -338,6 +338,9 @@ def _check_one_device(app, monitor_service, device_id: int) -> bool:
                 device = db.session.get(Device, device_id)
                 if device is None:
                     return True  # 设备不存在视为无操作成功
+                _ = device.hardware
+                db.session.expunge(device)
+                db.session.commit()
                 monitor_service.check_device(device)
                 collected = monitor_service.collect_device_metrics(device)
                 if collected:
@@ -441,6 +444,11 @@ def _check_monitor_interrupted(app, monitor_service, enabled_ids: list, loop_nam
     （如 worker 崩溃、配置错误导致设备被跳过、探测异常未落库）。这与"设备宕机"不同：
     设备宕机是探测了但不可达（已有 device_unreachable 告警）；监控中断是根本没探测到。
 
+    P0-5：「从未探测」（无状态行或 last_checked_at 为 None）≠「探测中断」。
+    新启用、尚未首探的设备首轮即判 critical 会造成批量启用时的告警风暴，
+    故从未探测的设备不告警（恢复态），仅记录 info 供观测配置遗漏；
+    只有探测过但 last_checked_at 超时的设备才注入 monitor_interrupted。
+
     阈值 = 3 × interval（默认 60s → 180s），可通过 MONITOR_INTERRUPTED_THRESHOLD_SECS 配置。
     """
     from datetime import datetime, timedelta, timezone
@@ -453,13 +461,21 @@ def _check_monitor_interrupted(app, monitor_service, enabled_ids: list, loop_nam
     status_repo = DeviceMonitorStatusRepository()
     status_map = status_repo.find_by_device_ids(list(enabled_ids))
     interrupted_result: dict = {}
+    never_probed: list = []
     for did in enabled_ids:
         status = status_map.get(did)
         if status is None or status.last_checked_at is None:
-            interrupted_result[did] = True
+            interrupted_result[did] = False
+            never_probed.append(did)
         else:
             last = status.last_checked_at.replace(tzinfo=None) if status.last_checked_at.tzinfo else status.last_checked_at
             interrupted_result[did] = (now - last) > threshold
+
+    if never_probed:
+        logger.info(
+            "监控中断检测：%s 台设备已启用但从未被探测（不注入中断告警，等待首轮探测） device_ids=%s",
+            len(never_probed), never_probed[:20],
+        )
 
     collector_result = {}
     for did, interrupted in interrupted_result.items():

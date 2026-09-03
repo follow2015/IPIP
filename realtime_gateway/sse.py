@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 async def device_event_stream(device_id: int, since_seq: int = 0) -> asyncio.AsyncGenerator[str, None]:
     """SSE 事件流生成器（交换机级别，含断线重放）
 
-    连接建立时先推送 since_seq 之后的历史事件，再进入实时监听。
+    连接建立时**先建立订阅**，再推送 since_seq 之后的历史事件（从 Redis 共享
+    ring 读取），最后进入实时监听。先订阅可保证「重放」与「实时」之间没有空隙。
 
     Args:
         device_id:  交换机 device_id（devices.id）
@@ -33,19 +34,44 @@ async def device_event_stream(device_id: int, since_seq: int = 0) -> asyncio.Asy
     Yields:
         str: SSE 格式的文本帧
     """
-    missed = await redis_bus.get_events_since(device_id, since_seq)
-    for event_dict in missed:
-        import json
-        yield f"data: {json.dumps(event_dict, ensure_ascii=False)}\n\n"
-
     q = redis_bus.subscribe(device_id)
 
     try:
+        already: list[str] = []
+        while True:
+            try:
+                already.append(q.get_nowait())
+            except asyncio.QueueEmpty:
+                break
+
+        seen_seq = set()
+        for payload in already:
+            try:
+                seen_seq.add(json.loads(payload).get("seq"))
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+        for event_dict in await redis_bus.get_events_since(device_id, since_seq):
+            if event_dict.get("seq") in seen_seq:
+                continue  # 订阅后已推送过，避免重复投递
+            seen_seq.add(event_dict.get("seq"))
+            yield f"data: {json.dumps(event_dict, ensure_ascii=False)}\n\n"
+
+        for payload in already:
+            yield f"data: {payload}\n\n"
+
         last_active = time.monotonic()
         while True:
             try:
                 payload = await asyncio.wait_for(q.get(), timeout=config.KEEPALIVE_INTERVAL)
                 last_active = time.monotonic()
+                if seen_seq:
+                    try:
+                        seq = json.loads(payload).get("seq")
+                    except (json.JSONDecodeError, AttributeError):
+                        seq = None
+                    if seq is not None and seq in seen_seq:
+                        continue
                 yield f"data: {payload}\n\n"
             except asyncio.TimeoutError:
                 idle = time.monotonic() - last_active

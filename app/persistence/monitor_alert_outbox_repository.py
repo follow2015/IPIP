@@ -240,7 +240,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         dedup_key 格式：{alert_type}:{device_id}:{metric_key}:{index}:{raise|recover}
         """
         try:
-            from app.extensions import db
+            from extensions import db
             dialect = db.session.bind.dialect.name
         except Exception:
             dialect = "sqlite"
@@ -253,7 +253,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
     def _payload_index_key_filter(index_key: str):
         """P1-7: 按 payload.payload.index 过滤。"""
         try:
-            from app.extensions import db
+            from extensions import db
             dialect = db.session.bind.dialect.name
         except Exception:
             dialect = "sqlite"
@@ -457,11 +457,22 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
             .all()
         )
 
-    def reset_all_failed(self, max_age_hours: int = 24) -> int:
+    def reset_all_failed(self, max_age_hours: int = 24,
+                         max_attempts: int = 5, extra_resets: int = 3) -> int:
         """批量重置超过 max_age_hours 小时的失败行为 pending（死信恢复）。
 
-        仅重置较旧的失败行，避免刚失败的行被立即重试。
-        返回重置行数。
+        M5 修复：增加收敛上限。原实现无条件把**所有** failed 行重置重投，
+        webhook URL 配错这类配置型失败的告警每 24h 被永久复活，max_attempts
+        语义被击穿，风暴永不收敛。
+
+        现以 `attempts` 字段承载复位预算：只有 attempts < max_attempts +
+        extra_resets 的行才允许被复活。每轮「复位→投递失败→mark_failed」都会
+        累加 attempts，故最多额外重投 extra_resets 轮（默认 3，即约 3 天），
+        之后保持 failed 等待人工处置（模型已有 acknowledged_by/ack_note/
+        close_reason 供人工闭环），无需新增数据库列。
+
+        注意：复活行的 attempts 已 >= max_attempts，mark_failed 会立即重新置
+        failed——即每轮复位只有**一次**投递机会、无退避重试。
         """
         from datetime import datetime, timedelta, timezone
         cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=max_age_hours)
@@ -470,6 +481,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
             .where(
                 MonitorAlertOutbox.status == "failed",
                 MonitorAlertOutbox.created_at < cutoff,
+                MonitorAlertOutbox.attempts < max_attempts + extra_resets,
             )
             .values(status="pending", last_error=None)
         )

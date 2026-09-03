@@ -110,8 +110,8 @@ _WHITELIST: Dict[str, _Entry] = {
         "告警发件箱轮询间隔（秒）", True, 1, 3600, "outbox_interval",
     ),
     "MONITOR_NON_MANAGED_PORT_SYNC": _Entry(
-        "MONITOR_NON_MANAGED_PORT_SYNC", "bool", True,
-        "网络设备端口自动同步（默认打开；非网管设备全量同步，网管设备仅更新状态）",
+        "MONITOR_NON_MANAGED_PORT_SYNC", "bool", False,
+        "非网管网络设备端口自动同步（默认关闭，开启后按 IF-MIB/Zabbix 全量替换端口表）",
         True, camel="non_managed_port_sync",
     ),
     "SCAN_AUTO_ENABLED": _Entry(
