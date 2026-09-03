@@ -224,31 +224,37 @@ async def healthz(request: Request) -> JSONResponse:
 async def lifespan(app):
     """应用启动：初始化 Redis 连接并启动订阅
 
-    Redis 不可用时网关仍可启动（降级模式），
-    SSE 端点会返回空流，不会报错。等 Redis 恢复后订阅会自动重连。
+    Redis 不可用时网关仍以降级模式启动：SSE 端点不报错但推不出事件。
+    S1 修复：无论 Redis 是否可用都启动订阅任务——start_subscriber 内部是
+    while 重试循环，Redis 恢复后由其自行建连订阅，无需重启进程（这是本函数
+    docstring 一直承诺的行为，修复前降级分支不建任务，承诺落空）。
     """
     logger.info("ASGI 推送网关启动中...")
-    subscriber_task = None
+    degraded = False
     try:
         await redis_bus.get_redis()
-        subscriber_task = asyncio.create_task(redis_bus.start_subscriber())
-        logger.info("ASGI 推送网关已启动（Redis 已连接）")
     except Exception as exc:
+        degraded = True
         logger.warning(
-            "网关 Redis 连接失败: %s，以降级模式启动（SSE 推送不可用）",
+            "网关 Redis 连接失败: %s，以降级模式启动（SSE 推送暂不可用，订阅任务持续重试）",
             exc,
         )
-        logger.info("ASGI 推送网关已启动（降级模式）")
+
+    subscriber_task = asyncio.create_task(redis_bus.start_subscriber())
+    logger.info(
+        "ASGI 推送网关已启动（%s）",
+        "降级模式" if degraded else "Redis 已连接",
+    )
 
     yield
 
     logger.info("ASGI 推送网关正在关闭...")
-    if subscriber_task:
-        subscriber_task.cancel()
-        try:
-            await subscriber_task
-        except asyncio.CancelledError:
-            pass
+    subscriber_task.cancel()
+    try:
+        await subscriber_task
+    except asyncio.CancelledError:
+        pass
+    await redis_bus.close_redis()
     logger.info("ASGI 推送网关已关闭")
 
 

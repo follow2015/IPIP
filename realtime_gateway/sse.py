@@ -11,6 +11,7 @@ SSE 帧封装 — asyncio.Queue → SSE 文本帧
 - MAX_IDLE_SECONDS = 300s（5分钟无数据主动断开，防止客户端无声断连导致 Queue 泄漏）
 """
 import asyncio
+import json
 import logging
 import time
 

@@ -153,21 +153,27 @@ class NotificationService:
         的 ``None`` 无法区分。监控告警 outbox 发件器若用 ``notify``，会把投递失败
         的行误标为 ``sent``，告警永久丢失且无任何重试（P0 级静默故障）。
         """
+        session = self._notif_repo.session
+        savepoint = session.begin_nested()
         try:
-            return self._notify_inner(
+            result = self._notify_inner(
                 type, severity, title, content, payload, source_module,
                 target_type, target_id, channels, idempotency_key, ack_required,
                 allow_broadcast,
             )
+            if savepoint.is_active:
+                savepoint.commit()
+            return result
         except Exception:
             logger.error(
                 "通知投递失败: type=%s target=%s:%s",
                 type, target_type, target_id, exc_info=True,
             )
-            try:
-                self._notif_repo.session.rollback()
-            except Exception:
-                logger.warning("通知投递失败后回滚数据库失败", exc_info=True)
+            if savepoint.is_active:
+                try:
+                    savepoint.rollback()
+                except Exception:
+                    logger.warning("通知投递失败后回滚保存点失败", exc_info=True)
             raise
 
     def _notify_inner(
