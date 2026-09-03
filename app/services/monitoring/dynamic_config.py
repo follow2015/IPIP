@@ -19,7 +19,6 @@
   本模块不知道驼峰，避免双层映射导致「线上改了但读取端 key 对不上、不生效」。
 """
 import json
-import logging
 import threading
 from typing import Any, Dict, Optional
 

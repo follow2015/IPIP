@@ -21,13 +21,13 @@
 """
 from __future__ import annotations
 
-import logging
+from app.utils.logging import get_logger
 
 from app.services.monitoring.adapters.zabbix_adapter import ZabbixAdapter
 from app.services.monitoring.zabbix_graph_service import ZabbixGraphService
 from app.utils.port_name_parser import parse_port_name
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _STATUS_ITEM_KEY_PREFIXES = ("net.if.status", "agent.ifstatus", "zabbix.if.status")
 

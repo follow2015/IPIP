@@ -7,10 +7,10 @@
 """
 from app.utils.logging import get_logger
 
-import requests
+from app.utils.http_client import post_json
 
 from app.core.enums import ChannelType
-from app.services.channels.base import BroadcastChannel
+from app.services.channels.base import BroadcastChannel, ensure_webhook_success
 from app.models.notification import Notification
 from app.models.webhook_config import WebhookConfig
 
@@ -72,8 +72,9 @@ class WeChatWorkWebhookChannel(BroadcastChannel):
             "markdown": {"content": content},
         }
 
-        resp = requests.post(cfg.url, json=payload, timeout=WECHAT_WORK_API_TIMEOUT, allow_redirects=False)
+        resp = post_json(cfg.url, payload, timeout=WECHAT_WORK_API_TIMEOUT)
         resp.raise_for_status()
+        ensure_webhook_success(resp, "企微")
         logger.info("企微 Webhook 投递成功 config_id=%s", cfg.id)
 
 

@@ -18661,6 +18661,8 @@ export interface components {
             action: string | null;
             resource: string | null;
             resource_id: number | null;
+            start_time: string | null;
+            end_time: string | null;
             page: number;
             per_page: number;
         };
@@ -20027,18 +20029,51 @@ export interface components {
             non_network?: number;
             skipped?: number;
         };
+        AISkillParam: {
+            name: string;
+            type?: string;
+            required?: boolean;
+            description?: string | null;
+        };
+        AISkillStep: {
+            id: string;
+            type?: string;
+            call: string;
+            args?: {
+                [key: string]: unknown;
+            };
+            output?: string | null;
+            when?: string | null;
+            max_tokens?: number;
+            branches?: {
+                [key: string]: unknown;
+            };
+        };
         AISkillSummary: {
             name?: string;
             title?: string;
             description?: string;
             category?: string;
             version?: number;
-            params?: {
-                [key: string]: unknown;
-            }[];
+            params?: components["schemas"]["AISkillParam"][];
             triggers?: string[];
             source?: string;
             enabled?: boolean;
+        };
+        AISkillDetail: {
+            name?: string;
+            title?: string;
+            description?: string;
+            category?: string;
+            version?: number;
+            max_llm_steps?: number;
+            params?: components["schemas"]["AISkillParam"][];
+            triggers?: string[];
+            steps?: components["schemas"]["AISkillStep"][];
+            return?: unknown;
+            source?: string;
+            enabled?: boolean;
+            _path?: string;
         };
         AISkillsListResponse: {
             skills?: components["schemas"]["AISkillSummary"][];
@@ -20058,9 +20093,7 @@ export interface components {
             success?: boolean;
         };
         AISkillDetailResponse: {
-            skill?: {
-                [key: string]: unknown;
-            };
+            skill?: components["schemas"]["AISkillDetail"];
         };
         AISkillCreateResponse: {
             ok?: boolean;
@@ -20108,18 +20141,18 @@ export interface components {
             output?: string;
         };
         AIDiagnosisSession: {
-            id?: number;
-            device_id?: number | null;
-            user_id?: number;
-            skill_name?: string;
-            question?: string;
-            status?: string;
-            token_cost?: number | null;
-            duration_ms?: number | null;
-            remedial_executed?: boolean;
-            rollback_failed?: boolean;
-            created_at?: string | null;
-            updated_at?: string | null;
+            id: number;
+            device_id: number | null;
+            user_id: number;
+            skill_name: string;
+            question: string;
+            status: string;
+            token_cost: number | null;
+            duration_ms: number | null;
+            remedial_executed: boolean;
+            rollback_failed: boolean;
+            created_at: string | null;
+            updated_at: string | null;
         };
         AIDiagnosisSessionsResponse: {
             sessions?: components["schemas"]["AIDiagnosisSession"][];
@@ -20128,14 +20161,19 @@ export interface components {
             rollback_failures?: components["schemas"]["AIDiagnosisSession"][];
             count?: number;
         };
+        AIVerificationComparison: {
+            metric?: string;
+            pre?: number | null;
+            post?: number | null;
+            recovered?: boolean | null;
+            note?: string;
+        };
         AIVerificationResponse: {
             status?: string;
             post_snapshot?: {
                 [key: string]: unknown;
             };
-            comparison?: {
-                [key: string]: unknown;
-            }[];
+            comparison?: components["schemas"]["AIVerificationComparison"][];
         };
         AICircuitResetResponse: {
             ok?: boolean;
@@ -20165,6 +20203,7 @@ export interface components {
             temperature?: number;
             api_key_masked?: string;
             api_key_configured?: boolean;
+            api_key_local_only?: boolean;
         };
         AIConfigUpdateRequest: {
             provider?: string | null;
@@ -20176,10 +20215,17 @@ export interface components {
             temperature?: number | null;
             api_key?: string | null;
         };
+        AICircuitStatusItem: {
+            name?: string;
+            failures?: number;
+            threshold?: number;
+            open?: boolean;
+            cooldown_seconds?: number;
+            cooldown_remaining?: number;
+            storage?: string;
+        };
         AICircuitStatusResponse: {
-            providers?: {
-                [key: string]: unknown;
-            };
+            providers?: components["schemas"]["AICircuitStatusItem"][];
         };
         AIMetricsResponse: {
             raw?: string;

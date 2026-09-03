@@ -16,8 +16,9 @@ from flask import Blueprint, g
 
 from app.api.base import APIResponse, api_exception_handler
 from app.utils.auth import auth_manager, login_required
+from app.utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 sse_bp = Blueprint("sse", __name__)
 

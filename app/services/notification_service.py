@@ -270,11 +270,7 @@ class NotificationService:
             and bool(NotificationService._broadcast_channel_registry)
         )
         if (has_personal_external or has_broadcast_channels) and user_ids:
-            try:
-                from app.services.notification_delivery_worker import enqueue_delivery
-                enqueue_delivery(notification.id, user_ids)
-            except Exception:
-                logger.exception("外部渠道投递入队失败（inbox 已投递，不影响用户）")
+            _schedule_delivery_enqueue(notification.id, user_ids)
 
         return notification
 
@@ -536,3 +532,53 @@ def _is_request_context() -> bool:
         return has_request_context()
     except Exception:
         return False
+
+
+_PENDING_DELIVERY_KEY = "_pending_delivery_enqueue"
+_delivery_commit_hook_registered = False
+
+
+def _flush_pending_deliveries(session) -> None:
+    """after_commit 回调：把本事务内待投递的通知真正入队。"""
+    pending = session.info.pop(_PENDING_DELIVERY_KEY, None)
+    if not pending:
+        return
+    for notification_id, user_ids in pending:
+        try:
+            from app.services.notification_delivery_worker import enqueue_delivery
+            enqueue_delivery(notification_id, user_ids)
+        except Exception:
+            logger.exception("外部渠道投递入队失败（inbox 已投递，不影响用户）")
+
+
+def _register_delivery_commit_hook() -> None:
+    """注册 after_commit 钩子（延迟到运行时，避免 import 期 extensions 未就绪）。"""
+    global _delivery_commit_hook_registered
+    if _delivery_commit_hook_registered:
+        return
+    from sqlalchemy import event
+    from extensions import db
+
+    event.listen(db.session, "after_commit", _flush_pending_deliveries)
+    _delivery_commit_hook_registered = True
+
+
+def _schedule_delivery_enqueue(notification_id: int, user_ids) -> None:
+    """N1：请求上下文内延迟到事务提交后入队；已提交场景（后台线程）立即入队。
+
+    Args:
+        notification_id: 通知 ID。
+        user_ids: 目标用户 ID 列表。
+    """
+    _register_delivery_commit_hook()
+    if _is_request_context():
+        from extensions import db
+        db.session.info.setdefault(_PENDING_DELIVERY_KEY, []).append(
+            (notification_id, list(user_ids))
+        )
+        return
+    try:
+        from app.services.notification_delivery_worker import enqueue_delivery
+        enqueue_delivery(notification_id, user_ids)
+    except Exception:
+        logger.exception("外部渠道投递入队失败（inbox 已投递，不影响用户）")

@@ -16,7 +16,6 @@ daemon 线程内启动一个 ``MonitorOutboxSender.run_loop``：周期性读取
   产生重复通知（见 notification_service.notify 的幂等检查）。
 """
 import json
-import logging
 import threading
 from datetime import datetime, timezone
 

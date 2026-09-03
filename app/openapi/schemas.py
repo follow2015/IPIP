@@ -1627,14 +1627,37 @@ class DeviceBatchPortSyncEnabledResponseSchema(Schema):
 
 
 
+class AISkillParamSchema(Schema):
+    """技能参数声明（对应 app/services/ai/skills/schema.py 的 ParamSpec）"""
+    name = fields.Str(required=True)
+    type = fields.Str(
+        required=False,
+        metadata={"description": "string/int/number/bool/array/object"},
+    )
+    required = fields.Bool(required=False)
+    description = fields.Str(required=False, allow_none=True)
+
+
+class AISkillStepSchema(Schema):
+    """技能执行步骤（对应 app/services/ai/skills/schema.py 的 StepSpec）"""
+    id = fields.Str(required=True)
+    type = fields.Str(required=False, metadata={"description": "capability/llm/route"})
+    call = fields.Str(required=True)
+    args = fields.Dict(required=False)
+    output = fields.Str(required=False, allow_none=True)
+    when = fields.Str(required=False, allow_none=True)
+    max_tokens = fields.Int(required=False)
+    branches = fields.Dict(required=False)
+
+
 class AISkillSummarySchema(Schema):
-    """AI 技能元数据"""
+    """AI 技能元数据（list_skills 仅返回摘要，不含 steps / max_llm_steps）"""
     name = fields.Str()
     title = fields.Str()
     description = fields.Str()
     category = fields.Str()
     version = fields.Int()
-    params = fields.List(fields.Dict())
+    params = fields.List(fields.Nested(AISkillParamSchema))
     triggers = fields.List(fields.Str())
     source = fields.Str()
     enabled = fields.Bool()
@@ -1648,6 +1671,186 @@ class AISkillsListResponseSchema(Schema):
 class AISkillRunRequestSchema(Schema):
     """POST /ai/skills/<name>/run 请求体"""
     args = fields.Dict(metadata={"description": "技能参数，按技能定义的 params 传入"})
+
+
+class AISkillRunResponseSchema(Schema):
+    """POST /ai/skills/<name>/run 响应 data
+
+    result 的结构由具体技能定义决定（可能是字符串、对象或数组），
+    无法静态约束，故用 Raw；契约价值在于标明「data 下只有 result 一个键」。
+    """
+    result = fields.Raw(metadata={"description": "技能执行结果，结构由技能定义决定"})
+
+
+class AIOkResponseSchema(Schema):
+    """通用「操作成功」响应 data（仅 ok 标志）。
+
+    供技能启停/删除/编辑、RAG 文档删除与清空、熔断器重置等「只回 ok」的
+    端点复用，避免为每个端点各建一个同构 Schema。
+    """
+    ok = fields.Bool()
+
+
+class AISuccessResponseSchema(Schema):
+    """通用「操作结果」响应 data（success 布尔标志）。
+
+    用于返回执行成败而非简单 ok 的端点（如处置案例回流 RAG），
+    与 AIOkResponse 的区别在于语义：ok 表示「请求已受理」，
+    success 表示「业务动作本身是否成功」。
+    """
+    success = fields.Bool()
+
+
+class AISkillDetailSchema(Schema):
+    """技能 YAML 原文 + get_skill() 注入的运行时字段。
+
+    精确化依据：skills/schema.py 的 SkillSpec（pydantic，技能加载时强制校验），
+    因此字段并非"随技能而异"——此前用自由对象是为了回避建模成本，代价是前端
+    无法走契约只能手写类型，字段名漂移时无任何校验。
+    """
+    name = fields.Str()
+    title = fields.Str(required=False)
+    description = fields.Str(required=False)
+    category = fields.Str(required=False)
+    version = fields.Int(required=False)
+    max_llm_steps = fields.Int(required=False)
+    params = fields.List(fields.Nested(AISkillParamSchema), required=False)
+    triggers = fields.List(fields.Str(), required=False)
+    steps = fields.List(fields.Nested(AISkillStepSchema), required=False)
+    return_ = fields.Raw(required=False, data_key="return")
+    source = fields.Str(required=False, metadata={"description": "builtin/custom"})
+    enabled = fields.Bool(required=False)
+    _path = fields.Str(required=False, metadata={"description": "技能文件路径"})
+
+
+class AISkillDetailResponseSchema(Schema):
+    """GET /ai/skills/<name> 响应 data"""
+    skill = fields.Nested(AISkillDetailSchema)
+
+
+class AISkillCreateResponseSchema(Schema):
+    """POST /ai/skills 响应 data（201）"""
+    ok = fields.Bool()
+    name = fields.Str()
+
+
+class AISkillsReloadResponseSchema(Schema):
+    """POST /ai/skills/reload 响应 data"""
+    count = fields.Int(metadata={"description": "热加载后技能总数"})
+
+
+class AIAgenticSkillSummarySchema(Schema):
+    """agentic 技能元数据（Markdown frontmatter，字段少于 YAML 技能）"""
+    name = fields.Str()
+    title = fields.Str()
+    description = fields.Str()
+    category = fields.Str()
+    triggers = fields.List(fields.Str())
+    _path = fields.Str(required=False, metadata={"description": "技能文件路径"})
+
+
+class AIAgenticSkillsListResponseSchema(Schema):
+    """GET /ai/agentic/skills 响应 data"""
+    skills = fields.List(fields.Nested(AIAgenticSkillSummarySchema))
+
+
+class AIAsyncTaskResponseSchema(Schema):
+    """异步任务受理响应 data（202 入队 / 200 重复请求）。
+
+    幂等键命中时返回首次的 task_id 并置 duplicate=true；若原任务进度已
+    清理（完成超 1h 被删）则额外置 finished=true，前端据此停止订阅。
+    """
+    task_id = fields.Str()
+    duplicate = fields.Bool(required=False,
+                            metadata={"description": "该幂等键已被占用，返回的是首次的 task_id"})
+    finished = fields.Bool(required=False,
+                           metadata={"description": "重复请求且原任务进度已清理（任务已完成）"})
+
+
+class AIAgenticRunResponseSchema(Schema):
+    """POST /ai/agentic/skills/<name>/run 响应 data（AI_ASYNC_ENABLED=0 同步分支）"""
+    answer = fields.Str()
+    session_id = fields.Int(allow_none=True)
+
+
+class AIRemedialPreviewResponseSchema(Schema):
+    """POST /ai/diagnosis/remedial/preview 响应 data"""
+    command_key = fields.Str()
+    command = fields.Str(metadata={"description": "渲染后的实际命令字符串"})
+    risk = fields.Str(metadata={"description": "high/medium/low"})
+    rollback_command_key = fields.Str(allow_none=True)
+    requires_confirmation = fields.Bool()
+    platform_note = fields.Str(allow_none=True,
+                               metadata={"description": "平台前置/后置条件说明"})
+
+
+class AIRemedialExecuteResponseSchema(Schema):
+    """POST /ai/diagnosis/remedial/execute 响应 data（AI_ASYNC_ENABLED=0 同步分支）"""
+    success = fields.Bool()
+    output = fields.Str(metadata={"description": "设备命令回显"})
+    backup_id = fields.Int(allow_none=True, metadata={"description": "执行前配置备份 ID"})
+    rollback_command_key = fields.Str(allow_none=True)
+
+
+class AIRemedialRollbackResponseSchema(Schema):
+    """POST /ai/diagnosis/remedial/rollback 响应 data"""
+    success = fields.Bool()
+    output = fields.Str()
+
+
+class AIDiagnosisSessionSchema(Schema):
+    """AI 诊断会话（AIDiagnosisSession.to_dict()）
+
+    to_dict() 遍历所有列，**键必然存在**（可为 None），故统一 required=True；
+    仅列声明 nullable=True 的字段额外 allow_none。
+    若沿用默认 required=False，生成的 TS 全部字段 optional，消费端被迫
+    到处写 `?.` 或断言，反而丧失契约价值。
+    """
+    id = fields.Int(required=True)
+    device_id = fields.Int(required=True, allow_none=True)
+    user_id = fields.Int(required=True)
+    skill_name = fields.Str(required=True)
+    question = fields.Str(required=True)
+    status = fields.Str(required=True,
+                        metadata={"description": "running/completed/incomplete/failed"})
+    token_cost = fields.Int(required=True, allow_none=True)
+    duration_ms = fields.Int(required=True, allow_none=True)
+    remedial_executed = fields.Bool(required=True)
+    rollback_failed = fields.Bool(required=True)
+    created_at = fields.Str(required=True, allow_none=True)
+    updated_at = fields.Str(required=True, allow_none=True)
+
+
+class AIDiagnosisSessionsResponseSchema(Schema):
+    """GET /ai/diagnosis/sessions 响应 data"""
+    sessions = fields.List(fields.Nested(AIDiagnosisSessionSchema))
+
+
+class AIRollbackFailuresResponseSchema(Schema):
+    """GET /ai/diagnosis/rollback-failures 响应 data"""
+    rollback_failures = fields.List(fields.Nested(AIDiagnosisSessionSchema))
+    count = fields.Int()
+
+
+class AIVerificationComparisonSchema(Schema):
+    """逐指标处置前后对比（post_remediation_verifier.verify 逐条构建）"""
+    metric = fields.Str()
+    pre = fields.Float(required=False, allow_none=True)
+    post = fields.Float(required=False, allow_none=True)
+    recovered = fields.Bool(required=False, allow_none=True)
+    note = fields.Str(required=False, metadata={"description": "无法对比等原因说明"})
+
+
+class AIVerificationResponseSchema(Schema):
+    """POST /ai/diagnosis/verify 响应 data"""
+    status = fields.Str(metadata={"description": "recovered/partial/not_recovered"})
+    post_snapshot = fields.Dict(metadata={"description": "处置后指标快照"})
+    comparison = fields.List(fields.Nested(AIVerificationComparisonSchema))
+
+
+class AICircuitResetResponseSchema(Schema):
+    """POST /ai/circuit/reset 响应 data"""
+    ok = fields.Bool()
 
 
 class AIAskRequestSchema(Schema):
@@ -1687,6 +1890,10 @@ class AIConfigResponseSchema(Schema):
     temperature = fields.Float()
     api_key_masked = fields.Str()
     api_key_configured = fields.Bool()
+    api_key_local_only = fields.Bool(
+        required=False,
+        metadata={"description": "别处配过 api_key 但本进程未同步（多 worker 部署）"},
+    )
 
 
 class AIConfigUpdateRequestSchema(Schema):
@@ -1701,9 +1908,24 @@ class AIConfigUpdateRequestSchema(Schema):
     api_key = fields.Str(allow_none=True)
 
 
+class AICircuitStatusItemSchema(Schema):
+    """单个 provider 的熔断器快照（CircuitBreaker.snapshot() 返回结构）"""
+    name = fields.Str()
+    failures = fields.Int()
+    threshold = fields.Int()
+    open = fields.Bool()
+    cooldown_seconds = fields.Int()
+    cooldown_remaining = fields.Float()
+    storage = fields.Str(metadata={"description": "存储后端；降级模式下读数仅反映本进程"})
+
+
 class AICircuitStatusResponseSchema(Schema):
-    """GET /ai/circuit 响应 data"""
-    providers = fields.Dict()
+    """GET /ai/circuit 响应 data
+
+    providers 是**数组**（monitor_admin_service.get_circuit_status 返回
+    List[Dict]），此前误定义为 Dict，导致前端必须绕过契约手写类型。
+    """
+    providers = fields.List(fields.Nested(AICircuitStatusItemSchema))
 
 
 class AIMetricsResponseSchema(Schema):

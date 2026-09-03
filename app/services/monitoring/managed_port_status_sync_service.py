@@ -15,12 +15,12 @@
 """
 from __future__ import annotations
 
-import logging
+from app.utils.logging import get_logger
 from datetime import datetime
 
 from app.services.monitoring.port_status_update_service import PortStatusUpdateService
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ManagedPortStatusSyncService:

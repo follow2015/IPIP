@@ -10,10 +10,10 @@ import hmac
 from app.utils.logging import get_logger
 import time
 
-import requests
+from app.utils.http_client import post_json
 
 from app.core.enums import ChannelType
-from app.services.channels.base import BroadcastChannel
+from app.services.channels.base import BroadcastChannel, ensure_webhook_success
 from app.models.notification import Notification
 from app.models.webhook_config import WebhookConfig
 
@@ -95,8 +95,9 @@ class FeishuWebhookChannel(BroadcastChannel):
             card["timestamp"] = timestamp
             card["sign"] = sign
 
-        resp = requests.post(url, json=card, headers=headers, timeout=FEISHU_API_TIMEOUT, allow_redirects=False)
+        resp = post_json(url, card, headers=headers, timeout=FEISHU_API_TIMEOUT)
         resp.raise_for_status()
+        ensure_webhook_success(resp, "飞书")
         logger.info("飞书 Webhook 投递成功 config_id=%s", cfg.id)
 
 

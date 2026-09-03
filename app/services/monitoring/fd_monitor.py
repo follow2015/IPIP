@@ -12,12 +12,12 @@ daemon 线程，周期读取 Linux 的 ``/proc/self/fd`` 目录计数，超过�
 
 非 Linux 平台（macOS / Windows 开发机）无 ``/proc/self/fd``，自动降级为 no-op。
 """
-import logging
+from app.utils.logging import get_logger
 import os
 import threading
 import time
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _fd_monitor_lock = threading.Lock()
 _fd_monitor_thread = None
