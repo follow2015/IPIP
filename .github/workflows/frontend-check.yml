@@ -24,21 +24,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 由 package.json 的 packageManager 字段安装 pnpm@10.34.5（与主仓 corepack 强制版本一致）
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Enable pnpm via corepack
-        run: corepack enable
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend-new/pnpm-lock.yaml
 
       - name: 安装依赖（frozen lockfile）
         working-directory: frontend-new
         run: pnpm install --frozen-lockfile
 
-      - name: 类型检查（tsc --noEmit）
+      # 与本地验证口径一致：tsc -b 会连带检查 references 中的 tsconfig.node.json（vite.config.js）
+      - name: 类型检查（tsc -b）
         working-directory: frontend-new
-        run: pnpm exec tsc --noEmit
+        run: pnpm exec tsc -b
 
       - name: ESLint
         working-directory: frontend-new
