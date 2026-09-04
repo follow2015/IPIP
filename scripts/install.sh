@@ -197,14 +197,11 @@ c.close()
 print("    数据库 $DB_NAME 就绪")
 PYEOF
 
-  # 全新安装的权威 DDL 源是迁移基线条目（0000_baseline.sql，生产库真实导出，
-  # 含分区表与 15 个触发器）。database/schema.sql 由 SQLAlchemy 模型生成，
-  # 表达不了触发器/分区，仅作模型漂移参考，不作为安装源。
+  # 全新安装的权威 DDL 源是迁移基线（0000_baseline.sql，生产库真实导出，
+  # 含分区表与 15 个触发器）。快照已包含 0000_baseline.covers 清单中
+  # 各迁移的效果，导入后按清单 stamp 版本即可与升级过的库保持一致。
   SCHEMA_FILE="$PROJECT_ROOT/migrations/versions/0000_baseline.sql"
-  if [ ! -f "$SCHEMA_FILE" ]; then
-    warn "未找到 $SCHEMA_FILE，回退到 database/schema.sql（缺触发器/分区表）"
-    SCHEMA_FILE="$PROJECT_ROOT/database/schema.sql"
-  fi
+  COVERS_FILE="$PROJECT_ROOT/migrations/versions/0000_baseline.covers"
   if [ -f "$SCHEMA_FILE" ]; then
     log "导入 $(basename "$SCHEMA_FILE")..."
     if [ -n "$MYSQL_CLIENT" ]; then
@@ -216,14 +213,19 @@ PYEOF
     fi
     log "schema 导入完成"
 
-    # 版本登记：baseline 快照 = 迁移链 "0000 已应用、0001+ 未应用" 的状态。
-    # 必须把 0000 stamp 进 schema_migrations 版本表，之后 `flask db-upgrade`
-    # 才会只 apply 真正的增量迁移（0001、0002...），新库由此逐版本升级到
-    # 与生产库一致。若不 stamp，db-status 会误报"未应用任何迁移"，且版本
-    # 正确性只能依赖每个迁移都幂等。
-    # 纪律：若将来重导 baseline 且快照已含某迁移的效果，须同步 stamp 该版本。
+    # 版本登记：按 covers 清单把"已体现进基线快照"的迁移版本 stamp 进
+    # schema_migrations。之后 `flask db-upgrade` 只 apply 清单之外的增量
+    # 迁移，新库逐版本升级到与生产库一致。
+    # 纪律：重导 baseline 时必须同步更新 covers 清单（覆盖到链头就列到链头）。
+    if [ -f "$COVERS_FILE" ]; then
+      COVERED="$(grep -Ev '^[[:space:]]*(#|$)' "$COVERS_FILE" | tr -d ' \r' | paste -sd, -)"
+    else
+      warn "未找到 covers 清单，回退只 stamp 0000"
+      COVERED="0000"
+    fi
     "$VENV_PY" - << PYEOF || die "schema_migrations 版本登记失败"
 import pymysql, os
+covered = "${COVERED}".split(",")
 c = pymysql.connect(host="$DB_HOST", port=int("$DB_PORT"), user="$DB_USER",
                     database="$DB_NAME", password=os.getenv("MYSQL_PASSWORD",""),
                     charset="utf8mb4", autocommit=True)
@@ -233,9 +235,12 @@ cur.execute("""CREATE TABLE IF NOT EXISTS schema_migrations (
     description VARCHAR(255) NOT NULL DEFAULT '',
     applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
-cur.execute("INSERT IGNORE INTO schema_migrations (version, description) VALUES ('0000', 'baseline')")
+for v in covered:
+    cur.execute(
+        "INSERT IGNORE INTO schema_migrations (version, description)"
+        " VALUES (%s, 'baseline')", (v,))
 c.close()
-print("    版本登记完成: 0000 baseline 已应用")
+print("    版本登记完成: baseline covers =", ",".join(covered))
 PYEOF
   else
     warn "未找到任何 schema 文件，跳过（假设数据库已建表）"
