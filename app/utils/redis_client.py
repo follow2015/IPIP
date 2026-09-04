@@ -11,7 +11,9 @@ ai._runtime（AI 缓存/审计）三处各自实现「读 REDIS_URL → redis.fr
   降级策略属于各业务域语义（事件静默丢弃 / 直查 DB / 无互斥），本模块不代管。
 - monitor_worker._redis_client(app) 不走本入口：其 app.config["REDIS_URL"]
   是 property 描述符对象（from_object 拷贝配置类所致），拿不到 URL 字符串，
-  维持 host/port fallback；连接复用由 dynamic_config 的 per-app 缓存兜住。
+  维持 host/port fallback。N-AI-1 后其内部已按 app 弱引用缓存客户端——
+  监控组件（dynamic_config / alert_ingress / outbox 等）每 app 每进程共享
+  一池；测试经 monkeypatch 替换 _redis_client 符号注入 fakeredis。
 """
 import threading
 

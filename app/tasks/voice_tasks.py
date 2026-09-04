@@ -4,6 +4,7 @@
 与 AI task 共用 ContextTask 基类，但用独立 queue "voice" 隔离
 （由独立 -Q voice worker 消费，否则本 task 无人消费）。
 """
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -245,11 +246,12 @@ def _check_and_consume_budget(redis_client, phone: str, config: dict) -> bool:
     """被叫号码呼叫预算，按 provider 分档（全局单一预算在腾讯云侧必然超限）。
 
     窗口按「固定分片」近似（而非严格滑动窗口），告警低频场景下足够。
-    Redis 不可用时放行（不做无谓阻断，由厂商侧流控兜底）。
+    Redis 不可用（异常 / 客户端获取失败）时降级为**进程内计数**兜底
+    （N-NOTIF-1）：同窗口预算语义不变，被拒尝试零消耗；调用方语义
+    「宁可本次放弃并告警，也不能透支」（呼叫失败同样计数，厂商侧额度
+    烧光 = 该号码告警哑火）。多 worker 下各进程独立计数，实际额度按
+    进程数放大——降级兜底不是精确限流，厂商侧流控仍是最后防线。
     """
-    if not redis_client:
-        return True
-
     provider = (config.get("provider") or "aliyun").strip().lower()
     windows = list(_VOICE_BUDGET_WINDOWS.get(provider, _VOICE_BUDGET_WINDOWS["aliyun"]))
 
@@ -282,6 +284,9 @@ def _check_and_consume_budget(redis_client, phone: str, config: dict) -> bool:
                 (f"voice:budget:{provider}:night:{phone}:{night_id}", night_budget, 14 * 3600)
             )
 
+    if not redis_client:
+        return _consume_budget_fallback(now, checks)
+
     try:
         pipe = redis_client.pipeline()
         for key, _budget, ttl in checks:
@@ -298,5 +303,33 @@ def _check_and_consume_budget(redis_client, phone: str, config: dict) -> bool:
             return False
         return True
     except Exception:
-        logger.warning("语音预算 Redis 不可用，放行本次呼叫", exc_info=True)
+        logger.warning("语音预算 Redis 不可用，降级为进程内计数兜底", exc_info=True)
+        return _consume_budget_fallback(now, checks)
+
+
+_VOICE_FALLBACK_BUDGET: dict[str, tuple[int, float]] = {}
+_VOICE_FALLBACK_LOCK = threading.Lock()
+
+
+def _consume_budget_fallback(now: int, checks: list[tuple[str, int, int]]) -> bool:
+    """Redis 不可用时的进程内预算兜底：检查 + 计数，语义对齐 Redis 路径。
+
+    - 窗口分片键、预算、TTL 与 Redis 路径共用同一份 checks；
+    - 任一窗口超预算 → 拒绝且**零消耗**（对齐 n5「被拒尝试不污染」纪律）；
+    - 全部窗口通过 → 各窗口计数 +1，过期时刻 = now + TTL。
+    """
+    with _VOICE_FALLBACK_LOCK:
+        expired = [k for k, (_c, exp) in _VOICE_FALLBACK_BUDGET.items() if exp <= now]
+        for key in expired:
+            del _VOICE_FALLBACK_BUDGET[key]
+
+        for key, budget, _ttl in checks:
+            entry = _VOICE_FALLBACK_BUDGET.get(key)
+            if entry is not None and entry[0] >= budget:
+                return False
+
+        for key, _budget, ttl in checks:
+            entry = _VOICE_FALLBACK_BUDGET.get(key)
+            count = entry[0] + 1 if entry is not None else 1
+            _VOICE_FALLBACK_BUDGET[key] = (count, now + ttl)
         return True
