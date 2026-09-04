@@ -80,6 +80,59 @@ jobs:
         run: |
           python3 scripts/import_sql.py migrations/versions/0000_baseline.sql
 
+      # 全新安装的真实升级路径端到端验证：baseline 导入后 stamp 版本 0000
+      # （与 install.sh 行为一致），再由 MigrationRunner 重放迁移链，
+      # 断言 pending=0 收敛。可捕获"迁移不幂等/依赖错误前置状态"类问题。
+      - name: stamp 0000 + 迁移链重放（全新安装升级路径）
+        run: |
+          python3 - <<'PYEOF'
+          import importlib.util, os, pymysql
+
+          # 独立加载 runner（仅标准库依赖，避免触发 Flask 应用初始化）
+          spec = importlib.util.spec_from_file_location(
+              "schema_migration_service", "app/services/schema_migration_service.py")
+          sms = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(sms)
+
+          conn = pymysql.connect(
+              host=os.environ["MYSQL_HOST"], port=int(os.environ["MYSQL_PORT"]),
+              user=os.environ["MYSQL_USER"], password=os.environ["MYSQL_PASSWORD"],
+              database=os.environ["MYSQL_DATABASE"], charset="utf8mb4",
+              autocommit=True)
+
+          runner = sms.MigrationRunner(conn, "migrations/versions")
+          assert runner.applied_versions() == set(), "预期全新库无任何版本记录"
+
+          # 复现 install.sh 的 stamp 动作
+          cur = conn.cursor()
+          cur.execute(sms.VERSION_TABLE_DDL)
+          cur.execute(
+              "INSERT INTO schema_migrations (version, description)"
+              " VALUES ('0000', 'baseline')")
+          conn.commit()
+          cur.close()
+
+          plan = [m.version for m in runner.pending()]
+          print("迁移计划:", plan)
+          assert plan == ["0001"], f"迁移计划不符合预期: {plan}"
+
+          applied_now = runner.run()
+          print("本次应用:", applied_now)
+          assert applied_now == plan
+          assert runner.pending() == [], f"仍有未应用迁移: {runner.pending()}"
+
+          # 验证 0001 确实生效（冗余索引已被删除）
+          cur = conn.cursor()
+          cur.execute(
+              "SELECT COUNT(*) FROM information_schema.statistics"
+              " WHERE table_schema = DATABASE()"
+              " AND index_name = 'idx_audit_resource_id'")
+          left = cur.fetchone()[0]
+          cur.close()
+          assert left == 0, "0001 未生效：idx_audit_resource_id 仍存在"
+          print("✅ baseline → 迁移链重放收敛，pending=0，0001 已生效")
+          PYEOF
+
       - name: 验证表数量与关键表存在
         run: |
           q() { mysql -h 127.0.0.1 -uroot ip_manager -N -B -e "$1"; }

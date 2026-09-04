@@ -215,6 +215,28 @@ PYEOF
       "$VENV_PY" "$PROJECT_ROOT/scripts/import_sql.py" "$SCHEMA_FILE"
     fi
     log "schema 导入完成"
+
+    # 版本登记：baseline 快照 = 迁移链 "0000 已应用、0001+ 未应用" 的状态。
+    # 必须把 0000 stamp 进 schema_migrations 版本表，之后 `flask db-upgrade`
+    # 才会只 apply 真正的增量迁移（0001、0002...），新库由此逐版本升级到
+    # 与生产库一致。若不 stamp，db-status 会误报"未应用任何迁移"，且版本
+    # 正确性只能依赖每个迁移都幂等。
+    # 纪律：若将来重导 baseline 且快照已含某迁移的效果，须同步 stamp 该版本。
+    "$VENV_PY" - << PYEOF || die "schema_migrations 版本登记失败"
+import pymysql, os
+c = pymysql.connect(host="$DB_HOST", port=int("$DB_PORT"), user="$DB_USER",
+                    database="$DB_NAME", password=os.getenv("MYSQL_PASSWORD",""),
+                    charset="utf8mb4", autocommit=True)
+cur = c.cursor()
+cur.execute("""CREATE TABLE IF NOT EXISTS schema_migrations (
+    version VARCHAR(16) NOT NULL PRIMARY KEY,
+    description VARCHAR(255) NOT NULL DEFAULT '',
+    applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
+cur.execute("INSERT IGNORE INTO schema_migrations (version, description) VALUES ('0000', 'baseline')")
+c.close()
+print("    版本登记完成: 0000 baseline 已应用")
+PYEOF
   else
     warn "未找到任何 schema 文件，跳过（假设数据库已建表）"
   fi
