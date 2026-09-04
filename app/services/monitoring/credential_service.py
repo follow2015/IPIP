@@ -35,10 +35,27 @@ class MonitorCredentialService:
         self._status_repo = status_repo or DeviceMonitorStatusRepository()
 
     def get_decrypted(self, device_id: int, protocol: str) -> Optional[dict]:
-        cred = self._repo.find_enabled(device_id, protocol)
-        if not cred:
-            return None
-        return json.loads(decrypt(cred.encrypted_payload))
+        """读取设备某协议的启用凭据并解密为 payload dict（短事务）。
+
+        P0-MDL（2026-09-04 生产实测）：SELECT 后立即 commit 再返回明文 dict。
+        SNMP/Zabbix 等探测可持续分钟级，若凭据事务横跨探测期，
+        monitor_credentials 的共享 MDL 会一直被持有，该表的任何 DDL
+        （如 0001 清理冗余索引）都拿不到排他锁，表现为 db-upgrade 卡死。
+        返回值为纯 dict、无 ORM 对象逃逸，提前提交不引发过期刷新。
+
+        前提：调用时本 session 无未提交写操作——已逐一核对全部调用点
+        （monitor_worker._resolve_monitor_credential / monitor_service.
+        _select_adapter / monitor_oid、monitor_config 路由），均为探测或
+        读取前的只读阶段。
+        """
+        try:
+            cred = self._repo.find_enabled(device_id, protocol)
+            if not cred:
+                return None
+            payload = json.loads(decrypt(cred.encrypted_payload))
+        finally:
+            self._repo.session.commit()
+        return payload
 
     def create_shared_credential(self, protocol: str, payload: dict, name: str):
         """仅创建共享凭据（不关联设备），供 post_credentials 路由在无 device_ids 时调用。
