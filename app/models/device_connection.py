@@ -8,9 +8,10 @@
 from typing import Any, Dict
 
 from sqlalchemy import Index
+from sqlalchemy.dialects.mysql import SMALLINT
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, MEDIUMTEXT
 from extensions import db
 
 
@@ -60,9 +61,9 @@ class DeviceConnection(BaseModel):
     )
 
     connection_type = db.Column(db.String(50), nullable=True, comment="连接类型")
-    vlan_id = db.Column(db.Integer, nullable=True, comment="VLAN ID(逻辑关联vlans.vlan_id,不加FK因D2N连接可能引用采集缓存值)")
+    vlan_id = db.Column(SMALLINT(unsigned=True), nullable=True, comment="VLAN ID(逻辑关联vlans.vlan_id,不加FK因D2N连接可能引用采集缓存值)")
     status = db.Column(db.String(20), nullable=True, default="active", comment="连接状态(active/inactive)")
-    notes = db.Column(db.Text, nullable=True, comment="备注")
+    notes = db.Column(MEDIUMTEXT, nullable=True, comment="备注")
 
     bandwidth = db.Column(db.String(20), nullable=True, comment="带宽")
     description = db.Column(db.String(200), nullable=True, comment="描述")
@@ -79,7 +80,7 @@ class DeviceConnection(BaseModel):
         db.Enum('access', 'trunk', 'hybrid', name='vlan_mode_enum'),
         nullable=False, default='access', comment="VLAN模式"
     )
-    native_vlan = db.Column(db.SmallInteger, nullable=True, comment="Native VLAN(trunk口用)")
+    native_vlan = db.Column(SMALLINT(unsigned=True), nullable=True, comment="Native VLAN(trunk口用)")
 
     device = relationship(
         "Device",

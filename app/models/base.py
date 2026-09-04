@@ -9,7 +9,38 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 from extensions import db
+from sqlalchemy import Integer, SmallInteger, Text
+from sqlalchemy.dialects.mysql import (
+    BIGINT as _MYSQL_BIGINT,
+    MEDIUMTEXT as _MYSQL_MEDIUMTEXT,
+    LONGTEXT as _MYSQL_LONGTEXT,
+    TINYINT as _MYSQL_TINYINT,
+)
 from sqlalchemy.sql import func
+
+MEDIUMTEXT = Text().with_variant(_MYSQL_MEDIUMTEXT(), "mysql")
+LONGTEXT = Text().with_variant(_MYSQL_LONGTEXT(), "mysql")
+
+
+def BIGINT_UNSIGNED():
+    """MySQL BIGINT UNSIGNED 自增主键（跨方言安全）。
+
+    - MySQL：渲染 BIGINT UNSIGNED（对齐 5 张监控表的库侧真实类型）。
+    - sqlite：退化为 Integer——sqlite 仅在列类型恰为 INTEGER 时才把
+      主键作为 rowid 别名实现自增，BIGINT 主键会导致插入 NULL。
+    """
+    return _MYSQL_BIGINT(unsigned=True).with_variant(Integer(), "sqlite")
+
+
+def TINYINT(unsigned: bool = False):
+    """MySQL TINYINT 列类型（跨方言安全）。
+
+    - MySQL：渲染为 TINYINT [UNSIGNED]，与生产库真实 DDL 对齐
+      （docs/2026-09-04-Schema差异评估与修改计划.md §1.3）。
+    - sqlite（测试内存库 create_all）：退化为 SmallInteger，
+      因 sqlite 方言编译器不识别 mysql.TINYINT。
+    """
+    return _MYSQL_TINYINT(unsigned=unsigned).with_variant(SmallInteger(), "sqlite")
 
 
 class BaseModel(db.Model):

@@ -6,9 +6,8 @@ rounds_json 存每轮 tool/args/result 摘要；final_answer_json 存结构化�
 SSH 原始输出快照走对象存储/文件（大文本不进数据库正文字段），此处只存摘要。
 """
 from sqlalchemy import ForeignKey, Index, Integer, String, Text
-from sqlalchemy.dialects.mysql import LONGTEXT
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, LONGTEXT
 from extensions import db
 
 

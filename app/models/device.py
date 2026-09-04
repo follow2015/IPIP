@@ -8,7 +8,7 @@ from sqlalchemy import CheckConstraint, ForeignKey, Index
 from sqlalchemy.orm import relationship
 
 from app.core.enums import DeviceStatus
-from app.models.base import BaseModel
+from app.models.base import BaseModel, MEDIUMTEXT
 from extensions import db
 
 
@@ -62,7 +62,7 @@ class Device(BaseModel):
         comment="设备状态: 0-报废 1-可用 2-在线 3-离线 4-维护中 5-预留",
     )
     responsible_person = db.Column(db.BigInteger, ForeignKey("users.id", ondelete="SET NULL"), comment="责任人ID")
-    notes = db.Column(db.Text, comment="备注")
+    notes = db.Column(MEDIUMTEXT, comment="备注")
 
     customer_id = db.Column(db.BigInteger, ForeignKey("customers.id"), comment="客户ID")
 

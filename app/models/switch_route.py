@@ -7,9 +7,10 @@ import struct
 import socket
 
 from sqlalchemy import Index
+from sqlalchemy.dialects.mysql import INTEGER
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, TINYINT
 from extensions import db
 
 
@@ -54,8 +55,8 @@ class IPNetwork(BaseModel):
     gateway = db.Column(db.String(45), comment="网关地址")
     notes = db.Column(db.String(255), nullable=True, comment="人工备注（文本）")
     room_id = db.Column(db.Integer, db.ForeignKey("rooms.id"), nullable=False, comment="机房ID")
-    network_int = db.Column(db.Integer, nullable=True, comment="网段起始IP整数(INET_ATON)")
-    prefix = db.Column(db.SmallInteger, nullable=True, comment="子网掩码位数(如24)")
+    network_int = db.Column(INTEGER(unsigned=True), nullable=True, comment="网段起始IP整数(INET_ATON)")
+    prefix = db.Column(TINYINT(unsigned=True), nullable=True, comment="子网掩码位数(如24)")
 
     def __init__(self, **kwargs):
         """自动填充 network_int 和 prefix"""
@@ -91,15 +92,15 @@ class SwitchRoute(BaseModel):
     switch_id = db.Column(db.BigInteger, db.ForeignKey("devices.id"), nullable=False, comment="交换机设备ID")
     destination = db.Column(db.String(45), nullable=False, comment="目标网段")
     nexthop = db.Column(db.String(45), nullable=False, comment="下一跳IP")
-    route_type = db.Column(db.SmallInteger, nullable=False, default=0, comment="路由类型(RouteNotes): 0=默认 1=互联 2=子网 3=网络 4=黑洞 5=网关 6=主机")
+    route_type = db.Column(TINYINT(), nullable=False, default=0, comment="路由类型(RouteNotes): 0=默认 1=互联 2=子网 3=网络 4=黑洞 5=网关 6=主机")
     port = db.Column(db.String(50), comment="出接口")
     room_id = db.Column(db.Integer, db.ForeignKey("rooms.id"), comment="机房ID FK→rooms")
     network_id = db.Column(db.BigInteger, db.ForeignKey("ip_networks.id"), comment="所属网段 FK→ip_networks")
     customer_id = db.Column(db.BigInteger, db.ForeignKey("customers.id"), comment="客户ID FK→customers")
     notes = db.Column(db.String(255), comment="备注")
-    destination_int = db.Column(db.Integer, nullable=True, comment="目标网段起始IP整数(INET_ATON)")
-    destination_prefix = db.Column(db.SmallInteger, nullable=True, comment="目标网段前缀长度(如24)")
-    nexthop_int = db.Column(db.Integer, nullable=True, comment="下一跳IP整数(INET_ATON)")
+    destination_int = db.Column(INTEGER(unsigned=True), nullable=True, comment="目标网段起始IP整数(INET_ATON)")
+    destination_prefix = db.Column(TINYINT(unsigned=True), nullable=True, comment="目标网段前缀长度(如24)")
+    nexthop_int = db.Column(INTEGER(unsigned=True), nullable=True, comment="下一跳IP整数(INET_ATON)")
 
     def __init__(self, **kwargs):
         """自动填充 destination_int/destination_prefix/nexthop_int"""

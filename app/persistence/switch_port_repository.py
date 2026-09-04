@@ -321,8 +321,8 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             for field in allowed:
                 if field in data:
                     value = data[field]
-                    if field == "raw_info" and value == "":
-                        value = None
+                    if field == "raw_info":
+                        value = NetworkPort.normalize_raw_info(value)
                     setattr(port, field, value)
 
             self.session.flush()
@@ -420,7 +420,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                         "ip_address": row.get("ip_address"),
                         "speed": row.get("speed"),
                         "description": row.get("description"),
-                        "raw_info": row.get("raw_info") or None,
+                        "raw_info": NetworkPort.normalize_raw_info(row.get("raw_info")),
                         "last_collected_at": now,
                         "updated_at": now,
                     }
@@ -449,7 +449,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                         ip_address=row.get("ip_address"),
                         customer_id=row.get("customer_id"),
                         description=row.get("description"),
-                        raw_info=row.get("raw_info") or None,
+                        raw_info=NetworkPort.normalize_raw_info(row.get("raw_info")),
                         data_source=DataSource.AUTO,
                         last_collected_at=now,
                     )

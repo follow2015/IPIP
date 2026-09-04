@@ -7,7 +7,7 @@
 from sqlalchemy import Index
 from sqlalchemy.sql import func
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, TINYINT
 from extensions import db
 
 
@@ -29,8 +29,8 @@ class IPAllocationLog(db.Model):
     ip_address = db.Column(db.String(45), nullable=False, comment="IP地址")
     room_id = db.Column(db.Integer, db.ForeignKey("rooms.id"), nullable=False, comment="机房ID")
     action = db.Column(db.Enum('allocate', 'release', 'change_status'), nullable=False, comment="操作类型")
-    old_status = db.Column(db.SmallInteger, comment="原状态")
-    new_status = db.Column(db.SmallInteger, comment="新状态")
+    old_status = db.Column(TINYINT(), comment="原状态")
+    new_status = db.Column(TINYINT(), comment="新状态")
     operator_id = db.Column(db.BigInteger, db.ForeignKey("users.id"), nullable=False, comment="操作人 FK→users")
     detail = db.Column(db.JSON, comment="附加信息")
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.now(), comment="创建时间")

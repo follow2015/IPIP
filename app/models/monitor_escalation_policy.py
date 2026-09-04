@@ -10,7 +10,7 @@
 """
 from sqlalchemy import Index, text
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, BIGINT_UNSIGNED
 from extensions import db
 
 
@@ -18,6 +18,8 @@ class MonitorEscalationPolicy(BaseModel):
     """监控告警升级策略"""
 
     __tablename__ = "monitor_escalation_policy"
+
+    id = db.Column(BIGINT_UNSIGNED(), primary_key=True, autoincrement=True, comment="主键ID")
     __table_args__ = (
         Index("ix_mep_enabled", "enabled"),
         Index("ix_mep_alert_type", "alert_type"),

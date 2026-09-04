@@ -10,7 +10,7 @@ from sqlalchemy import ForeignKey, Index
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, TINYINT
 from extensions import db
 
 
@@ -31,7 +31,7 @@ class DeviceHardware(BaseModel):
     )
 
     cpu = db.Column(db.String(100), comment="CPU型号")
-    cpu_way = db.Column(db.SmallInteger, comment="CPU路数")
+    cpu_way = db.Column(TINYINT(), comment="CPU路数")
     cpu_cores = db.Column(db.SmallInteger, comment="单颗CPU核心数")
     memory = db.Column(db.String(100), comment="内存配置描述")
     memory_size_gb = db.Column(db.Integer, comment="内存总容量(GB)")

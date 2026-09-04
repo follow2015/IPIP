@@ -12,7 +12,7 @@
 """
 from sqlalchemy import Index, UniqueConstraint
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, BIGINT_UNSIGNED
 from extensions import db
 
 
@@ -20,6 +20,8 @@ class DeviceMetricAlertState(BaseModel):
     """设备指标告警状态（按 device_id + metric_key + index 维度）"""
 
     __tablename__ = "device_metric_alert_state"
+
+    id = db.Column(BIGINT_UNSIGNED(), primary_key=True, autoincrement=True, comment="主键ID")
     __table_args__ = (
         UniqueConstraint(
             "device_id", "metric_key", "index_key",

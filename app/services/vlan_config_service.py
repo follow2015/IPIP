@@ -36,7 +36,7 @@ class VlanConfigService:
 
 
     def create_vlan(self, switch, vlan_id: int) -> dict:
-        """创建 VLAN（幂等：已存在时跳过创建，但确保 switch_port_status 有对应记录）
+        """创建 VLAN（幂等：已存在时跳过创建，但确保 network_ports 有对应记录）
 
         优先查 vlans 表判断存在性（数据库是权威数据源），
         仅在库中不存在时才SSH到设备执行创建。
@@ -106,7 +106,7 @@ class VlanConfigService:
         2. SSH 删除 VLAN + 清除端口配置
         3. 事务内执行 DB 写入（reset_ports_vlan + 清理关联记录）
 
-        数据库清理：switch_port_status（VLANIF + VLAN记录）、switch_port_status.raw_info（配置缓存）、
+        数据库清理：network_ports（VLANIF + VLAN记录）、network_ports.raw_info（配置缓存）、
         switch_port_ips（FK CASCADE 自动删除）、device_connections（vlan_id引用）、
         network_connections（vlan_id引用）。
         """

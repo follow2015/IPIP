@@ -112,6 +112,7 @@ def create_app(config_name: str = None) -> Flask:
 
     _register_db_cli(app)
     _register_monitor_cli(app)
+    _register_schema_migration_cli(app)
 
     logger.info(f"应用创建成功 (环境: {config_name or 'development'})")
 
@@ -542,3 +543,84 @@ def _register_monitor_cli(app: Flask):
             click.echo(f"ERROR: {e}", err=True)
             raise SystemExit(1)
         click.echo(f"baseline-recompute done: updated_rows={updated}")
+
+
+def _register_schema_migration_cli(app: Flask):
+    """注册 Schema 版本化迁移 CLI 命令。
+
+    - db-upgrade: 按序应用 migrations/versions/ 中未记录的迁移（幂等可重跑）
+    - db-status : 查看已应用 / 待应用版本
+
+    详见 app/services/schema_migration_service.py 模块 docstring。
+    """
+    import os
+
+    import click
+    import pymysql
+
+    from app.services.schema_migration_service import SchemaMigrationRunner
+
+    _VERSIONS_DIR = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "migrations", "versions",
+    )
+
+    def _connect():
+        conn = pymysql.connect(
+            host=app.config.get("MYSQL_HOST", os.getenv("MYSQL_HOST", "localhost")),
+            port=int(app.config.get("MYSQL_PORT", os.getenv("MYSQL_PORT", 3306))),
+            user=app.config.get("MYSQL_USER", os.getenv("MYSQL_USER", "root")),
+            password=app.config.get("MYSQL_PASSWORD", os.getenv("MYSQL_PASSWORD", "")),
+            database=app.config.get("MYSQL_DATABASE", os.getenv("MYSQL_DATABASE", "ip_management")),
+            charset="utf8mb4",
+            autocommit=False,
+        )
+        try:
+            cur = conn.cursor()
+            cur.execute("SET SESSION lock_wait_timeout = 60")
+            cur.close()
+        except Exception:  # noqa: BLE001 - 非MySQL后端（如测试）无此变量，忽略
+            pass
+        return conn
+
+    @app.cli.command("db-status")
+    def db_status_cmd():
+        """查看 schema 迁移状态：已应用版本 / 待应用迁移列表"""
+        conn = _connect()
+        try:
+            runner = SchemaMigrationRunner(conn, _VERSIONS_DIR)
+            applied = sorted(runner.applied_versions())
+            pending = runner.pending()
+        finally:
+            conn.close()
+        click.echo(f"已应用: {', '.join(applied) if applied else '（无）'}")
+        if pending:
+            click.echo("待应用:")
+            for m in pending:
+                click.echo(f"  {m.version}  {m.description}  ({m.path.name})")
+        else:
+            click.echo("待应用: （无，schema 已是最新）")
+
+    @app.cli.command("db-upgrade")
+    @click.option("--dry-run", is_flag=True, help="只打印将应用的迁移，不执行（只读预检）")
+    def db_upgrade_cmd(dry_run):
+        """应用待执行的 schema 迁移（幂等，失败重跑安全；升级前建议先备份）"""
+        conn = _connect()
+        try:
+            runner = SchemaMigrationRunner(conn, _VERSIONS_DIR)
+            if dry_run:
+                pending = runner.pending()
+                if not pending:
+                    click.echo("dry-run: 无待应用迁移")
+                    return
+                click.echo("dry-run: 将按序应用以下迁移（未执行）：")
+                for m in pending:
+                    click.echo(f"  {m.version}  {m.description}  ({m.path.name})")
+                return
+            applied = runner.run()
+        finally:
+            conn.close()
+        if applied:
+            click.echo(f"db-upgrade done: applied={', '.join(applied)}")
+        else:
+            click.echo("db-upgrade done: 无待应用迁移，schema 已是最新")

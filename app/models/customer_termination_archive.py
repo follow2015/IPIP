@@ -8,7 +8,7 @@
 
 详见 docs/CUSTOMER_TERMINATED_PLAN.md §4.4.4。
 """
-from sqlalchemy import Column, Integer, String, JSON, LargeBinary, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, JSON, LargeBinary, ForeignKey, Index, DateTime
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel
@@ -36,6 +36,7 @@ class CustomerTerminationArchive(BaseModel):
     pdf_size = Column(Integer, nullable=True, comment="PDF 字节数，便于列表展示/告警")
     operator_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="终止操作人ID")
     reason = Column(String(255), nullable=True, comment="终止原因（可选，前端弹窗传入）")
+    deleted_at = Column(DateTime, nullable=True, comment="软删除时间")
 
     customer = relationship("Customer", lazy="joined")
     operator = relationship("User", lazy="joined")

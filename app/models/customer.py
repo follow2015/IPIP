@@ -7,7 +7,7 @@ from typing import Any, Dict
 from sqlalchemy import Index
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, MEDIUMTEXT
 from extensions import db
 from app.core.enums import CustomerStatus
 
@@ -34,7 +34,7 @@ class Customer(BaseModel):
     contact_phone = db.Column(db.String(20), nullable=True, comment="联系电话")
     email = db.Column(db.String(100), nullable=True, comment="联系邮箱")
     address = db.Column(db.String(200), nullable=True, comment="客户地址")
-    notes = db.Column(db.Text, nullable=True, comment="备注信息")
+    notes = db.Column(MEDIUMTEXT, nullable=True, comment="备注信息")
     
     deleted_at = db.Column(db.DateTime, nullable=True, comment="软删除时间(NULL=未删除)")
     

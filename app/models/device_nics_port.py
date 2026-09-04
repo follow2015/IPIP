@@ -43,6 +43,7 @@ class DeviceNicsPort(BaseModel):
                       comment='网卡模板ID')
     port_number = db.Column(db.Integer, nullable=False, comment="端口编号")
     port_name = db.Column(db.String(50), comment="端口名称(如eth0, ens192等)")
+    mac_address = db.Column(db.String(17), nullable=True, comment="MAC地址")
     
     port_type = db.Column(db.String(20), nullable=False, comment="端口类型(RJ45/SFP/SFP+/SFP28/QSFP+/QSFP28/QSFP56/QSFP-DD)")
     port_speed = db.Column(db.String(20), nullable=False, comment="端口速率(1G/10G/100G)")

@@ -12,7 +12,7 @@
 """
 from sqlalchemy import BigInteger, DateTime, Index, Integer, String, Text, text
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, LONGTEXT
 from extensions import db
 
 import json
@@ -53,7 +53,7 @@ class MonitorAlertOutbox(BaseModel):
         comment="= notify idempotency_key，去重/幂等",
     )
     payload_json = db.Column(
-        db.Text,
+        LONGTEXT,
         nullable=False,
         comment=(
             "notify 参数字典的 JSON：type/severity/title/content/payload/"

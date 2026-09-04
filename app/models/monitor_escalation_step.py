@@ -9,6 +9,7 @@
 向后兼容：policy 无 step 时回退到 wait_minutes/escalate_severity 单级模式。
 """
 from sqlalchemy import Index, text
+from sqlalchemy.dialects.mysql import BIGINT
 
 from app.models.base import BaseModel
 from extensions import db
@@ -25,7 +26,7 @@ class MonitorEscalationStep(BaseModel):
     )
 
     policy_id = db.Column(
-        db.Integer,
+        BIGINT(unsigned=True),
         db.ForeignKey("monitor_escalation_policy.id", ondelete="CASCADE"),
         nullable=False,
         comment="所属升级策略 ID",

@@ -8,7 +8,7 @@
 from sqlalchemy import ForeignKey, Index
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, TINYINT
 from extensions import db
 
 class DeviceAsset(BaseModel):
@@ -44,7 +44,7 @@ class DeviceAsset(BaseModel):
 
     online_date = db.Column(db.Date, comment="上线投产日期")
     offline_date = db.Column(db.Date, comment="下线/报废日期")
-    lifecycle_years = db.Column(db.SmallInteger, comment="预计使用年限")
+    lifecycle_years = db.Column(TINYINT(), comment="预计使用年限")
 
     device = relationship(
         "Device",
