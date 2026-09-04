@@ -79,7 +79,7 @@ jobs:
           python3 scripts/import_sql.py migrations/versions/0000_baseline.sql
 
       # 全新安装的真实升级路径端到端验证：baseline 导入后按 covers 清单
-      # stamp 版本（与 install.sh 行为一致），再由 MigrationRunner 重放
+      # stamp 版本（与 install.sh 行为一致），再由 SchemaMigrationRunner 重放
       # 清单之外的剩余迁移链，断言 pending=0 收敛。可捕获两类问题：
       # "基线快照与 covers 清单不一致" 和 "迁移不幂等/依赖错误前置状态"。
       - name: covers stamp + 迁移链重放（全新安装升级路径）
@@ -99,7 +99,9 @@ jobs:
               database=os.environ["MYSQL_DATABASE"], charset="utf8mb4",
               autocommit=True)
 
-          runner = sms.MigrationRunner(conn, "migrations/versions")
+          # 类名以主仓 app/services/schema_migration_service.py 为准：
+          # 为 SchemaMigrationRunner（构造签名 (conn, versions_dir)）。
+          runner = sms.SchemaMigrationRunner(conn, "migrations/versions")
           chain = [m.version for m in runner._migrations]
           assert runner.applied_versions() == set(), "预期全新库无任何版本记录"
 
