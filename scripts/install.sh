@@ -197,32 +197,26 @@ c.close()
 print("    数据库 $DB_NAME 就绪")
 PYEOF
 
-  SCHEMA_FILE="$PROJECT_ROOT/database/schema.sql"
+  # 全新安装的权威 DDL 源是迁移基线条目（0000_baseline.sql，生产库真实导出，
+  # 含分区表与 15 个触发器）。database/schema.sql 由 SQLAlchemy 模型生成，
+  # 表达不了触发器/分区，仅作模型漂移参考，不作为安装源。
+  SCHEMA_FILE="$PROJECT_ROOT/migrations/versions/0000_baseline.sql"
+  if [ ! -f "$SCHEMA_FILE" ]; then
+    warn "未找到 $SCHEMA_FILE，回退到 database/schema.sql（缺触发器/分区表）"
+    SCHEMA_FILE="$PROJECT_ROOT/database/schema.sql"
+  fi
   if [ -f "$SCHEMA_FILE" ]; then
-    log "导入 schema.sql..."
+    log "导入 $(basename "$SCHEMA_FILE")..."
     if [ -n "$MYSQL_CLIENT" ]; then
+      # mysql CLI 原生支持 DELIMITER 指令
       "$MYSQL_CLIENT" -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" "$DB_NAME" < "$SCHEMA_FILE"
     else
-      "$VENV_PY" - "$SCHEMA_FILE" << 'PYEOF'
-import sys, os, pymysql
-sql_file = sys.argv[1]
-c = pymysql.connect(host=os.getenv("MYSQL_HOST","localhost"), port=int(os.getenv("MYSQL_PORT","3306")),
-                    user=os.getenv("MYSQL_USER","root"), password=os.getenv("MYSQL_PASSWORD",""),
-                    database=os.getenv("MYSQL_DATABASE","ip_manager"), charset="utf8mb4", autocommit=True)
-with open(sql_file, 'r', encoding='utf-8') as f:
-    sql = f.read()
-cur = c.cursor()
-for stmt in sql.split(';'):
-    s = stmt.strip()
-    if s and not s.startswith('--'):
-        cur.execute(s)
-c.close()
-print("    schema.sql imported via PyMySQL")
-PYEOF
+      # 无 mysql 客户端时走 PyMySQL；触发器体含分号，必须用 DELIMITER 感知的切分器
+      "$VENV_PY" "$PROJECT_ROOT/scripts/import_sql.py" "$SCHEMA_FILE"
     fi
     log "schema 导入完成"
   else
-    warn "schema.sql 不存在，跳过（假设数据库已建表）"
+    warn "未找到任何 schema 文件，跳过（假设数据库已建表）"
   fi
 fi
 

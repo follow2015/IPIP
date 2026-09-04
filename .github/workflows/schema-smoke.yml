@@ -4,12 +4,18 @@ on:
   push:
     branches: [main]
     paths:
+      - 'migrations/versions/**'
       - 'database/schema.sql'
+      - 'scripts/install.sh'
+      - 'scripts/import_sql.py'
       - '.github/workflows/schema-smoke.yml'
   pull_request:
     branches: [main]
     paths:
+      - 'migrations/versions/**'
       - 'database/schema.sql'
+      - 'scripts/install.sh'
+      - 'scripts/import_sql.py'
       - '.github/workflows/schema-smoke.yml'
 
 permissions:
@@ -34,6 +40,14 @@ jobs:
           --health-timeout=5s
           --health-retries=10
 
+    env:
+      # 与 install.sh 的 PyMySQL 回退路径一致，确保 CI 覆盖的就是真实安装路径
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: "3306"
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ""
+      MYSQL_DATABASE: ip_manager
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,30 +57,62 @@ jobs:
           for i in $(seq 1 30); do
             if mysql -h 127.0.0.1 -uroot -e "SELECT 1" >/dev/null 2>&1; then
               echo "MySQL ready"
-              break
+              exit 0
             fi
             echo "等待 MySQL... ($i)"
             sleep 2
           done
+          echo "❌ MySQL 在 60s 内未就绪"
+          exit 1
 
-      - name: 导入 schema.sql
+      - name: 安装 Python 依赖
         run: |
-          mysql -h 127.0.0.1 -uroot ip_manager < database/schema.sql
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymysql
+
+      # 全新安装的权威 DDL 源是迁移基线（含分区表 + 15 个触发器），
+      # database/schema.sql 由模型生成、表达不了触发器，仅作模型漂移参考。
+      - name: 切分预检（dry-run，不连库）
+        run: |
+          python3 scripts/import_sql.py migrations/versions/0000_baseline.sql --dry-run
+
+      - name: 导入基线（PyMySQL 路径，DELIMITER 感知）
+        run: |
+          python3 scripts/import_sql.py migrations/versions/0000_baseline.sql
 
       - name: 验证表数量与关键表存在
         run: |
-          TABLE_COUNT=$(mysql -h 127.0.0.1 -uroot ip_manager -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ip_manager'")
+          q() { mysql -h 127.0.0.1 -uroot ip_manager -N -B -e "$1"; }
+          TABLE_COUNT=$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ip_manager'")
           echo "表数量: $TABLE_COUNT"
-          if [ "$TABLE_COUNT" -lt 60 ]; then
-            echo "❌ 表数量过少（<60），schema 可能不完整"
+          if [ "$TABLE_COUNT" -lt 71 ]; then
+            echo "❌ 表数量不足（期望 71，实得 $TABLE_COUNT）"
             exit 1
           fi
           for t in users devices network_ports vlans ai_conversations ai_diagnosis_sessions; do
-            EXISTS=$(mysql -h 127.0.0.1 -uroot ip_manager -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ip_manager' AND table_name='$t'")
+            EXISTS=$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ip_manager' AND table_name='$t'")
             if [ "$EXISTS" != "1" ]; then
               echo "❌ 缺少表: $t"
               exit 1
             fi
             echo "✅ 表存在: $t"
           done
-          echo "✅ schema 冒烟通过（$TABLE_COUNT 张表全部建表成功）"
+
+      # 触发器只有基线能带过来，模型生成的 schema.sql 一个都没有——
+      # 这几条断言用于防止 DDL 源被误切回模型生成文件。
+      - name: 验证触发器与分区表（基线专属）
+        run: |
+          q() { mysql -h 127.0.0.1 -uroot ip_manager -N -B -e "$1"; }
+          TRG=$(q "SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema='ip_manager'")
+          echo "触发器数量: $TRG"
+          if [ "$TRG" -lt 15 ]; then
+            echo "❌ 触发器数量不足（期望 15，实得 $TRG）：DDL 源可能不是 baseline"
+            exit 1
+          fi
+          PART=$(q "SELECT COUNT(*) FROM information_schema.partitions WHERE table_schema='ip_manager' AND table_name='device_monitor_probe_events' AND partition_name IS NOT NULL")
+          echo "device_monitor_probe_events 分区数: $PART"
+          if [ "$PART" -lt 1 ]; then
+            echo "❌ device_monitor_probe_events 未建分区"
+            exit 1
+          fi
+          echo "✅ schema 冒烟通过（$TABLE_COUNT 表 / $TRG 触发器 / 分区表就位）"
