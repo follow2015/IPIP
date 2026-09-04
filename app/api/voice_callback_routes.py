@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, request, abort, jsonify, current_app
 from sqlalchemy.orm.attributes import flag_modified
 
+from app.services.channels.voice_providers.terminal_status import VOICE_RESULT_EVENTS
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -86,19 +87,74 @@ def _has_any_callback_protection(config: dict) -> bool:
     return any(nets for nets in whitelist.values())
 
 
-def _get_client_ip(req) -> str:
-    """获取真实客户端 IP。
+def warn_if_callback_protection_missing(app) -> None:
+    """n4：启动期检测「语音已启用但回调无任何防线」并告警。
 
-    生产部署经 nginx 反代，request.remote_addr 是代理 IP（127.0.0.1 或内网地址），
-    直接用于白名单会 100% 拒真回调。取 X-Forwarded-For 最左侧（最早跳）IP。
+    默认配置（无 IP 白名单、无 callback_token）下 fail-closed 会 100% 拒真回调：
+    语音终态永不落库 → task 必然超时重试直到预算耗尽（电话照打但状态永不更新）。
+    该状态必须在启动时被运维看到，而不是等第一通电话打完、回调被拒后才从
+    请求日志里排查。应用创建（create_app）时调用本函数。
     """
+    try:
+        with app.app_context():
+            from app.models.voice_setting import VoiceSetting
+
+            config = VoiceSetting.get_raw_batch(VoiceSetting.ALLOWED_KEYS)
+            if (config.get("enabled") or "false").lower() != "true":
+                return  # 语音未启用，不会有回调，无需告警
+            if _has_any_callback_protection(config):
+                return
+        logger.warning(
+            "语音通知已启用，但回调未配置任何防线（IP 白名单 / callback_token）。"
+            "当前 fail-closed 策略将拒绝全部回调：语音终态无法写入、任务将超时重试"
+            "直至预算耗尽。请配置 VOICE_*_IP_WHITELIST 或 callback_token"
+            "（确认风险后可显式将 callback_verify_mode 置 off）。"
+        )
+    except Exception:  # noqa: BLE001 - 启动期检测失败绝不阻断应用创建
+        logger.warning("语音回调防线启动检测失败（跳过）", exc_info=True)
+
+
+def _load_trusted_proxies() -> list:
+    """加载可信代理网段（n7：X-Forwarded-For 信任边界）。
+
+    默认空 = 不信任任何代理，回调 IP 一律取 remote_addr（直连对端）。
+    经 nginx 反代部署时配置 VOICE_TRUSTED_PROXIES（如 127.0.0.1/32 或
+    反代所在内网段），此时才采信代理追加的 XFF。
+    """
+    from flask import current_app
+
+    configured = current_app.config.get("VOICE_TRUSTED_PROXIES")
+    if configured:
+        return [ipaddress.ip_network(n) for n in configured]
+    env_val = os.environ.get("VOICE_TRUSTED_PROXIES", "")
+    return [ipaddress.ip_network(n.strip()) for n in env_val.split(",") if n.strip()]
+
+
+def _get_client_ip(req) -> str:
+    """获取真实客户端 IP（n7：不可盲信 X-Forwarded-For）。
+
+    修复前取 XFF 最左侧（最早跳）——该值由请求方自行携带，可任意伪造，
+    攻击者带 X-Forwarded-For: <白名单IP> 即冒充服务商绕过 IP 白名单。
+
+    信任边界：
+    - 直连对端（remote_addr）落在可信代理网段内 → 取 XFF 最右侧（由可信
+      代理追加，客户端无法伪造；单层代理下即代理看到的直连 IP）；
+    - 否则一律以 remote_addr 为准，XFF 仅作日志参考。
+    """
+    peer = req.remote_addr or ""
+    try:
+        peer_ip = ipaddress.ip_address(peer)
+        trusted = any(peer_ip in net for net in _load_trusted_proxies())
+    except ValueError:
+        trusted = False
+
     xff = req.headers.get("X-Forwarded-For", "")
-    if xff:
-        return xff.split(",")[0].strip()
-    return req.remote_addr or ""
+    if trusted and xff:
+        return xff.split(",")[-1].strip()
+    return peer
 
 
-_TERMINAL_EVENTS = ("acked", "delivered", "answered", "no_answer")
+_TERMINAL_EVENTS = VOICE_RESULT_EVENTS
 
 
 @router.route("/callback", methods=["POST"])

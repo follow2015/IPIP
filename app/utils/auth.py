@@ -205,12 +205,19 @@ class AuthenticationManager:
         auth_type: str = "web",
         openid: str = None,
         expires_delta: timedelta = None,
+        device_id: int = None,
     ) -> str:
         """生成 SSE 一次性票据（短有效期、type=sse_ticket）。
 
         用于替代 SSE URL 中的长期 access token，避免凭据明文出现在代理访问日志 /
         浏览器历史 / Referer。票据不写入撤销缓存与 refresh set，依赖短 TTL +
         网关（realtime_gateway）一次性消费（Redis SETNX 防重放）。
+
+        Args:
+            device_id: s2——可选绑定设备。传入时写入 dev claim，网关
+                /sse/switch/{id} 据此比对设备归属；不传则不绑定设备
+                （仅可用于全局事件流，设备路由会被 403 拒绝）。
+                注意：调用方须先完成设备数据域校验，本方法只做 claim 写入。
         """
         import uuid
 
@@ -233,6 +240,9 @@ class AuthenticationManager:
         else:
             payload["username"] = username
             payload["user_identifier"] = username
+
+        if device_id is not None:
+            payload["dev"] = int(device_id)
 
         token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
         if isinstance(token, bytes):

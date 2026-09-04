@@ -13,7 +13,13 @@
 
 由 outbox_sender 周期调用 run_escalation_scan()。
 """
+import hashlib
+import hmac
 import json
+import os
+import time
+from urllib.parse import urlparse
+
 from app.utils.logging import get_logger
 from datetime import datetime, timedelta, timezone
 from typing import List
@@ -28,6 +34,76 @@ from app.persistence.rbac_repository import RoleRepository
 logger = get_logger(__name__)
 
 _WEBHOOK_TIMEOUT = 5  # 秒
+
+
+def _env_or_config(key: str) -> str:
+    """读取 webhook 安全配置：current_app.config 优先，回退环境变量。
+
+    无应用上下文（如单元测试直调）时跳过 config 读取。
+    """
+    try:
+        from flask import current_app
+
+        v = current_app.config.get(key)
+        if v:
+            return str(v)
+    except RuntimeError:
+        pass
+    return os.getenv(key, "")
+
+
+def validate_escalation_webhook_url(url: str) -> None:
+    """m6：校验升级 webhook URL——scheme 限定 + 可选主机白名单。
+
+    SSRF 收敛：策略虽由具备管理权限者配置，URL 仍须限定 http(s)；
+    配置 MONITOR_ESCALATION_WEBHOOK_ALLOWLIST（逗号分隔主机后缀）后，
+    白名单外主机在策略保存时即被拒绝，而非等到发布时才失败。
+    """
+    from app.exceptions.validation import ValidationError
+
+    if not url:
+        return
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ValidationError("升级 webhook URL 必须是合法的 http(s) 地址")
+    allowlist = [
+        h.strip().lower()
+        for h in _env_or_config("MONITOR_ESCALATION_WEBHOOK_ALLOWLIST").split(",")
+        if h.strip()
+    ]
+    if allowlist:
+        host = parsed.hostname.lower()
+        if not any(host == h or host.endswith("." + h) for h in allowlist):
+            raise ValidationError(
+                f"升级 webhook 主机不在白名单内：{host}"
+                "（MONITOR_ESCALATION_WEBHOOK_ALLOWLIST）"
+            )
+
+
+def _signed_webhook_post(url: str, payload: dict) -> None:
+    """m6：带 HMAC-SHA256 签名的 webhook 投递。
+
+    密钥经 MONITOR_ESCALATION_WEBHOOK_SECRET 配置；未配置时不携带签名头
+    （接收方未部署验签时签名无意义）。接收方按
+    HMAC-SHA256(secret, "{ts}.{raw_body}") 验签，头部为
+    X-Signature: sha256=<hex> 与 X-Signature-Timestamp: <unix 秒>。
+    签名串按 requests json= 的默认 json.dumps 序列化计算，保证与请求体逐字节一致。
+    """
+    secret = _env_or_config("MONITOR_ESCALATION_WEBHOOK_SECRET")
+    headers = None
+    if secret:
+        ts = str(int(time.time()))
+        mac = hmac.new(
+            secret.encode(),
+            f"{ts}.{json.dumps(payload)}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        headers = {
+            "X-Signature-Timestamp": ts,
+            "X-Signature": f"sha256={mac}",
+        }
+    post_json(url, payload, headers=headers, timeout=_WEBHOOK_TIMEOUT,
+              allow_redirects=True)
 
 _policy_repo = MonitorEscalationPolicyRepository()
 _outbox_repo = MonitorAlertOutboxRepository()
@@ -90,8 +166,7 @@ def _publish_escalation(alert: MonitorAlertOutbox,
 
     if escalate_webhook_url:
         try:
-            post_json(escalate_webhook_url, payload, timeout=_WEBHOOK_TIMEOUT,
-                      allow_redirects=True)
+            _signed_webhook_post(escalate_webhook_url, payload)
         except Exception as exc:
             logger.warning("升级 webhook 失败 alert_id=%s url=%s: %s",
                            alert.id, escalate_webhook_url, exc)
@@ -272,6 +347,8 @@ def create_policy(data: dict) -> dict:
     name = data.get("name")
     if not name:
         raise ValidationError("name 必填")
+    if data.get("escalate_webhook_url"):
+        validate_escalation_webhook_url(data["escalate_webhook_url"])
     repo = MonitorEscalationPolicyRepository()
     policy = MonitorEscalationPolicy(
         name=name,
@@ -313,6 +390,8 @@ def update_policy(policy_id: int, data: dict) -> dict:
     ):
         if k in data:
             setattr(policy, k, data[k])
+    if data.get("escalate_webhook_url"):
+        validate_escalation_webhook_url(data["escalate_webhook_url"])
     repo.flush()
 
     if "steps" in data:

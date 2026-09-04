@@ -307,6 +307,9 @@ def register_blueprints(app: Flask):
     app.register_blueprint(voice_settings_bp)
     app.register_blueprint(voice_callback_bp)
 
+    from app.api.voice_callback_routes import warn_if_callback_protection_missing
+    warn_if_callback_protection_missing(app)
+
     from app.api.sse import sse_bp
     app.register_blueprint(sse_bp, url_prefix="/api/sse")
 

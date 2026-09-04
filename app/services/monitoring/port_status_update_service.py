@@ -24,7 +24,7 @@
 from __future__ import annotations
 
 from app.utils.logging import get_logger
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.network_port import NetworkPort
 
@@ -54,7 +54,7 @@ class PortStatusUpdateService:
         Args:
             port: NetworkPort ORM 对象
             link_status: 新的链路状态（up/down/admin_down/...）
-            now: 时间戳，缺省 datetime.now()
+            now: 时间戳，缺省取 UTC naive 当前时间（与监控主链路口径一致）
             emit_alert: 是否在状态变化时产生 port_status_changed 告警
             device_id: 设备 ID（emit_alert=True 时必填）
 
@@ -62,7 +62,7 @@ class PortStatusUpdateService:
             bool: 状态是否发生变化（True=变化，False=未变）
         """
         if now is None:
-            now = datetime.now()
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         old_link_status = port.link_status
         if old_link_status == link_status:
@@ -101,7 +101,7 @@ class PortStatusUpdateService:
             dict: {"updated": int, "unchanged": int, "not_found": list[str]}
         """
         if now is None:
-            now = datetime.now()
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         existing_ports = (
             self._session.query(NetworkPort)

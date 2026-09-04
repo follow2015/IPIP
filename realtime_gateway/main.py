@@ -104,7 +104,10 @@ class SSEAuthMiddleware:
             await response(scope, receive, send)
             return
 
-        scope["state"] = {"user_id": payload["user_id"]}
+        scope["state"] = {
+            "user_id": payload["user_id"],
+            "dev": payload.get("dev"),
+        }
         await self.app(scope, receive, send)
 
 
@@ -172,7 +175,28 @@ async def switch_events(request: Request) -> StreamingResponse:
         )
 
     device_id = request.path_params["device_id"]
-    since_seq = int(request.query_params.get("since_seq", "0"))
+
+    state = request.scope.get("state", {})
+    bound_device = state.get("dev")
+    if bound_device is None or str(bound_device) != str(device_id):
+        _connection_counter.release()
+        logger.warning(
+            "SSE 设备流鉴权失败 user_id=%s bound=%s requested=%s",
+            state.get("user_id"), bound_device, device_id,
+        )
+        return JSONResponse(
+            {"error": "forbidden_device", "device_id": device_id},
+            status_code=403,
+        )
+
+    raw_seq = request.query_params.get("since_seq")
+    if raw_seq is None:
+        since_seq = None
+    else:
+        try:
+            since_seq = int(raw_seq)
+        except (TypeError, ValueError):
+            since_seq = 0
 
     return StreamingResponse(
         _wrap_stream_with_counter(sse.device_event_stream(device_id, since_seq)),
@@ -296,6 +320,7 @@ async def lifespan(app):
 routes = [
     Route("/sse/switch/{device_id:int}", switch_events),
     Route("/sse/global", global_events),
+    Route("/sse/ai-task/{task_id}", ai_task_events),
     Route("/healthz", healthz),
 ]
 

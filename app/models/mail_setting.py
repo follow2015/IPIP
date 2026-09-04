@@ -69,6 +69,22 @@ class MailSetting(BaseModel):
         return cls.DEFAULTS.get(key)
 
     @classmethod
+    def get_raw_batch(cls, keys) -> dict[str, str | None]:
+        """n3：批量读取原始配置（一次 IN 查询替代 N 次单查）。
+
+        get_mail_config_from_db 原逐 key 调 get_raw（每用户约 8 次 SQL）。
+        本方法一次查询取回所有请求键，缺失的 key 回退 DEFAULTS，与 get_raw 语义一致。
+        """
+        valid = [k for k in keys if k in cls.ALLOWED_KEYS]
+        result = {k: cls.DEFAULTS.get(k) for k in keys}
+        if not valid:
+            return result
+        rows = cls.query.filter(cls.key.in_(valid)).all()
+        for row in rows:
+            result[row.key] = row.value
+        return result
+
+    @classmethod
     def set(cls, key: str, value: str) -> None:
         """设置单个配置值（仅允许白名单内的 key）"""
         if key not in cls.ALLOWED_KEYS:

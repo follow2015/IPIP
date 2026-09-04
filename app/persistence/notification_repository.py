@@ -102,20 +102,17 @@ class NotificationReceiptRepository(BaseRepository):
     def mark_read(self, user_id: int) -> int:
         """标记用户所有未读回执为已读
 
-        Args:
-            user_id: 用户 ID
-
         Returns:
             int: 更新行数
         """
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
-        unread = self.session.query(NotificationReceipt).filter_by(
+        return self.session.query(NotificationReceipt).filter_by(
             user_id=user_id, read_at=None,
-        ).all()
-        for r in unread:
-            r.read_at = now
-        return len(unread)
+        ).update(
+            {NotificationReceipt.read_at: now},
+            synchronize_session=False,
+        )
 
     def mark_read_by_ids(self, user_id: int, notification_ids: list) -> int:
         """标记用户指定通知的未读回执为已读

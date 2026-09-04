@@ -129,7 +129,7 @@ def test_voice_call():
     if not admin or not admin.contact_phone:
         return APIResponse.error("当前管理员账号未设置手机号，请先在个人资料中填写")
 
-    config = {k: VoiceSetting.get_raw(k) for k in VoiceSetting.ALLOWED_KEYS}
+    config = VoiceSetting.get_raw_batch(VoiceSetting.ALLOWED_KEYS)
     if (config.get("enabled") or "false").lower() != "true":
         return APIResponse.error("语音通知未启用，请先开启总开关")
 
@@ -190,7 +190,7 @@ def voice_channel_status():
     from app.models.voice_setting import VoiceSetting
     from app.services.channels.voice_providers import get_voice_provider
 
-    config = {k: VoiceSetting.get_raw(k) for k in VoiceSetting.ALLOWED_KEYS}
+    config = VoiceSetting.get_raw_batch(VoiceSetting.ALLOWED_KEYS)
     provider_name = config.get("provider", "aliyun")
 
     enabled = (config.get("enabled") or "false").lower() == "true"

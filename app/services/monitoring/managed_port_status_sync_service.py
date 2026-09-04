@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 from app.utils.logging import get_logger
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.services.monitoring.port_status_update_service import PortStatusUpdateService
 
@@ -57,7 +57,7 @@ class ManagedPortStatusSyncService:
             }
         """
         if now is None:
-            now = datetime.now()
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         if not port_rows:
             return {

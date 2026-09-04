@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 import threading
 import time
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 from flask import current_app
 
@@ -41,7 +41,7 @@ logger = get_logger(__name__)
 
 
 _BATCH_EXECUTORS: set = set()
-_BATCH_EXECUTORS_LOCK = threading.Lock()
+_BATCH_EXECUTORS_LOCK = threading.RLock()
 _atexit_registered = False
 
 
@@ -544,11 +544,12 @@ class MonitorService:
                     }
 
         pool_size = current_app.config.get("MONITOR_BATCH_POOL_SIZE", 10)
-        if not hasattr(self, "_batch_executor") or self._batch_executor is None:
-            self._batch_executor = ThreadPoolExecutor(
-                max_workers=pool_size, thread_name_prefix="monitor-batch"
-            )
-            _register_batch_executor(self._batch_executor)
+        with _BATCH_EXECUTORS_LOCK:
+            if not hasattr(self, "_batch_executor") or self._batch_executor is None:
+                self._batch_executor = ThreadPoolExecutor(
+                    max_workers=pool_size, thread_name_prefix="monitor-batch"
+                )
+                _register_batch_executor(self._batch_executor)
         results = list(self._batch_executor.map(_check_one, targets))
         return {"results": results, "skipped": skipped}
 

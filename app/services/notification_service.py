@@ -222,8 +222,9 @@ class NotificationService:
                 type, target_type, target_id,
             )
 
+        users_by_id = {u.id: u for u in self._user_repo.find_by_ids(user_ids)}
         for uid in user_ids:
-            user = self._user_repo.find_by_id(uid)
+            user = users_by_id.get(uid)
             effective_channels = NotificationService._resolve_channels(
                 user, channels, type, severity
             ) if user else list(channels)
@@ -265,8 +266,10 @@ class NotificationService:
                 "target_user_ids": user_ids if target_type != "broadcast" else None,
                 "ts": int(_time.time() * 1000),
             }, ensure_ascii=False))
-        except Exception:
-            pass  # SSE 推送失败不影响通知创建
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "通知 SSE 推送失败 notification_id=%s: %s", notification.id, exc
+            )
 
         has_personal_external = any(ch not in (ChannelType.INBOX,) for ch in channels)
         _broadcast_names = set(NotificationService._broadcast_channel_registry.keys())
@@ -394,13 +397,13 @@ class NotificationService:
                 ur.user_id
                 for ur in session.query(UserRole).filter_by(role_id=role.id).all()
             ]
-            active = session.query(User).filter(
+            active = session.query(User.id).filter(
                 User.id.in_(user_ids), User.status == UserStatus.ACTIVE
             ).all()
-            return [u.id for u in active]
+            return [row[0] for row in active]
         elif target_type == "broadcast":
-            active = session.query(User).filter_by(status=UserStatus.ACTIVE).all()
-            return [u.id for u in active]
+            active = session.query(User.id).filter_by(status=UserStatus.ACTIVE).all()
+            return [row[0] for row in active]
         else:
             logger.warning("未知 target_type: %s", target_type)
             return []
@@ -493,7 +496,7 @@ class NotificationService:
                 from datetime import timedelta
                 tz = timezone(timedelta(hours=8))
 
-            now = datetime.now(tz).time()
+            now = _local_now_time(tz)
 
             if start <= end:
                 return start <= now <= end
@@ -521,6 +524,16 @@ class NotificationService:
             "acked_at": receipt.acked_at.isoformat() if receipt.acked_at else None,
             "created_at": n.created_at.isoformat() if n.created_at else None,
         }
+
+
+def _local_now_time(tz):
+    """n12：免打扰窗口判定的当前时间源（独立函数，便于测试注入）。
+
+    原实现把 datetime.now(tz) 内联在 _in_quiet_hours 里，测试只能用 freezegun
+    冻结全局时钟（与其它测试的时间假设互相干扰）。收敛到此钩子后，测试
+    monkeypatch 本函数即可精确控制"当前时刻"。
+    """
+    return datetime.now(tz).time()
 
 
 notification_service = NotificationService()

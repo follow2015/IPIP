@@ -22,6 +22,7 @@ seq 归属说明（多副本硬性前提）：
 import asyncio
 import json
 import logging
+import time
 
 import redis.asyncio as aioredis
 
@@ -34,20 +35,37 @@ _subscribers: dict[int, list[asyncio.Queue]] = {}
 
 _global_subscribers: list[tuple[asyncio.Queue, int | None]] = []
 
+_redis_subscribed: set[int] = set()
+_pubsub = None
+
+_DROP_LOG_INTERVAL = 30.0
+_drop_stats: dict[str, int] = {"device": 0, "global": 0}
+_last_drop_log = 0.0
+
 _redis: aioredis.Redis | None = None
 
 
 def subscribe(device_id: int) -> asyncio.Queue:
-    """注册一个设备级订阅者，返回其专属 asyncio.Queue"""
+    """注册一个设备级订阅者，返回其专属 asyncio.Queue
+
+    s13：首个本地订阅者出现时才在 Redis 层订阅 sw:{device_id} 频道
+    （此前 psubscribe("sw:*") 使每个副本无条件接收全部设备事件并逐条
+    JSON 解析，与本地是否存在订阅者无关）。
+    """
     q: asyncio.Queue = asyncio.Queue(maxsize=config.CLIENT_QUEUE_SIZE)
     _subscribers.setdefault(device_id, []).append(q)
     count = len(_subscribers[device_id])
-    logger.debug("SSE 客户端订阅 device=%d，当前订阅数=%d", device_id, count)
+    logger.info("SSE 客户端订阅 device=%d，当前订阅数=%d", device_id, count)
+    if count == 1:
+        _schedule_redis_subscribe(device_id)
     return q
 
 
 def unsubscribe(device_id: int, q: asyncio.Queue) -> None:
-    """注销设备级订阅者"""
+    """注销设备级订阅者
+
+    s13：最后一个本地订阅者离开时，退订 Redis 层的该设备频道。
+    """
     subs = _subscribers.get(device_id, [])
     try:
         subs.remove(q)
@@ -55,7 +73,9 @@ def unsubscribe(device_id: int, q: asyncio.Queue) -> None:
         pass
     if not subs:
         _subscribers.pop(device_id, None)
-    logger.debug("SSE 客户端取消订阅 device=%d", device_id)
+    logger.info("SSE 客户端取消订阅 device=%d", device_id)
+    if device_id not in _subscribers:
+        _schedule_redis_unsubscribe(device_id)
 
 
 def subscribe_global(user_id: int | None = None) -> asyncio.Queue:
@@ -68,7 +88,7 @@ def subscribe_global(user_id: int | None = None) -> asyncio.Queue:
     q: asyncio.Queue = asyncio.Queue(maxsize=config.CLIENT_QUEUE_SIZE)
     _global_subscribers.append((q, user_id))
     count = len(_global_subscribers)
-    logger.debug("SSE 全局客户端订阅 user_id=%s，当前订阅数=%d", user_id, count)
+    logger.info("SSE 全局客户端订阅 user_id=%s，当前订阅数=%d", user_id, count)
     return q
 
 
@@ -78,7 +98,76 @@ def unsubscribe_global(q: asyncio.Queue) -> None:
         if item_q is q:
             _global_subscribers.pop(i)
             break
-    logger.debug("SSE 全局客户端取消订阅，剩余订阅数=%d", len(_global_subscribers))
+    logger.info("SSE 全局客户端取消订阅，剩余订阅数=%d", len(_global_subscribers))
+
+
+
+def _schedule_redis_subscribe(device_id: int) -> None:
+    """记录订阅意图并（在订阅循环就绪时）异步执行 Redis 层订阅。"""
+    if device_id in _redis_subscribed:
+        return
+    _redis_subscribed.add(device_id)
+    _dispatch_redis_op(_ensure_redis_subscribed(device_id))
+
+
+def _schedule_redis_unsubscribe(device_id: int) -> None:
+    """最后一个本地订阅者离开 → 退订 Redis 层频道。
+
+    意图同步清除（无事件循环时也生效）；Redis 层退订异步执行。
+    """
+    if device_id not in _redis_subscribed:
+        return
+    _redis_subscribed.discard(device_id)
+    _dispatch_redis_op(_redis_unsubscribe_now(device_id))
+
+
+def _dispatch_redis_op(coro) -> None:
+    """在运行中的事件循环里排空 coro；无循环（如同步单测）时静默丢弃。"""
+    try:
+        asyncio.get_running_loop().create_task(coro)
+    except RuntimeError:
+        coro.close()  # 重连后 start_subscriber 会按 _redis_subscribed 统一补订
+
+
+async def _ensure_redis_subscribed(device_id: int) -> None:
+    """确保 Redis 层已订阅 sw:{device_id}（幂等，重复订阅为 Redis no-op）。"""
+    if _pubsub is None:
+        return  # 订阅循环未就绪：意图已记录，重连后 start_subscriber 统一补订
+    try:
+        await _pubsub.subscribe(f"sw:{device_id}")
+    except Exception as exc:
+        logger.warning("Redis 层订阅设备频道失败 device=%d: %s", device_id, exc)
+        return
+    _redis_subscribed.add(device_id)
+    logger.info("Redis 层订阅设备频道 device=%d", device_id)
+
+
+async def _redis_unsubscribe_now(device_id: int) -> None:
+    """Redis 层退订 sw:{device_id}（意图已由 _schedule_redis_unsubscribe 清除）。"""
+    if _pubsub is None:
+        return
+    try:
+        await _pubsub.unsubscribe(f"sw:{device_id}")
+        logger.info("Redis 层退订设备频道 device=%d", device_id)
+    except Exception as exc:
+        logger.warning("Redis 层退订设备频道失败 device=%d: %s", device_id, exc)
+
+
+
+def _record_drop(kind: str, detail: str) -> None:
+    """计数并在聚合窗口（30s）到期时输出一条汇总 WARNING。"""
+    global _last_drop_log
+    _drop_stats[kind] = _drop_stats.get(kind, 0) + 1
+    now = time.monotonic()
+    if now - _last_drop_log < _DROP_LOG_INTERVAL:
+        return
+    _last_drop_log = now
+    logger.warning(
+        "SSE 队列满丢弃事件（%ds 聚合）: %s %s",
+        int(_DROP_LOG_INTERVAL), _drop_stats, detail,
+    )
+    for k in _drop_stats:
+        _drop_stats[k] = 0
 
 
 
@@ -171,10 +260,7 @@ def _handle_device_event(device_id: int, raw_data: str) -> None:
         try:
             q.put_nowait(raw_data)
         except asyncio.QueueFull:
-            logger.warning(
-                "SSE 客户端队列已满，丢弃事件 device=%d seq=%s",
-                device_id, event_dict.get("seq"),
-            )
+            _record_drop("device", f"device={device_id} seq={event_dict.get('seq')}")
 
 
 def _handle_global_event(raw_data: str) -> None:
@@ -195,26 +281,32 @@ def _handle_global_event(raw_data: str) -> None:
             try:
                 q.put_nowait(raw_data)
             except asyncio.QueueFull:
-                logger.warning("SSE 全局客户端队列已满，丢弃事件")
+                _record_drop("global", "global")
 
 
 
 async def start_subscriber() -> None:
     """启动 Redis 订阅主循环（在 asyncio 事件循环中运行）。
 
-    使用 psubscribe("sw:*") 模式订阅所有交换机事件，
-    同时 subscribe 全局 channel。
-    断线自动重连（5s 间隔）。多副本部署时每个副本独立运行本循环，
-    Redis Pub/Sub 自然广播到所有副本。
+    s13：按需 subscribe 本地实际有订阅者的 sw:{device_id} 频道（替代
+    psubscribe("sw:*")——后者使每个副本无条件接收全部设备事件并逐条 JSON
+    解析，规模上来后纯属浪费），同时订阅全局 channel。
+    断线自动重连（5s 间隔），重连后按 _redis_subscribed 统一补订。
+    多副本部署时每个副本独立运行本循环，Redis Pub/Sub 自然广播到所有副本。
     """
+    global _pubsub
     while True:
         pubsub = None
         try:
             r = await get_redis()
             pubsub = r.pubsub()
-            await pubsub.psubscribe("sw:*")
             await pubsub.subscribe(config.GLOBAL_CHANNEL)
-            logger.info("网关 Redis 订阅已启动")
+            for device_id in list(_redis_subscribed):
+                await pubsub.subscribe(f"sw:{device_id}")
+            _pubsub = pubsub
+            logger.info(
+                "网关 Redis 订阅已启动（设备频道×%d）", len(_redis_subscribed)
+            )
 
             async for msg in pubsub.listen():
                 if msg["type"] not in ("message", "pmessage"):
@@ -244,6 +336,7 @@ async def start_subscriber() -> None:
             logger.warning("网关 Redis 订阅异常，5s 后重连: %s", exc)
             await asyncio.sleep(5)
         finally:
+            _pubsub = None
             if pubsub is not None:
                 try:
                     await pubsub.aclose()

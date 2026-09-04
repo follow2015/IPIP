@@ -1867,12 +1867,12 @@ def switch_events(device_id):
 
     此端点已废弃（410 Gone）。SSE 服务已从 Flask 移出，
     由独立的 realtime_gateway (uvicorn) 进程提供。
-    新端点：GET /sse/switch/{device_id}?since_seq=0&token=xxx
+    新端点：GET /sse/switch/{device_id}?since_seq=0&ticket=xxx
 
     迁移原因同 global_events。
     """
     return APIResponse.error(
-        f"SSE 服务已迁移至 ASGI 推送网关，请使用 /sse/switch/{device_id}?token=xxx",
+        f"SSE 服务已迁移至 ASGI 推送网关，请使用 /sse/switch/{device_id}?ticket=xxx",
         error_code="GONE",
         status_code=410,
     )
