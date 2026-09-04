@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - 'migrations/versions/**'
-      - 'database/schema.sql'
       - 'scripts/install.sh'
       - 'scripts/import_sql.py'
       - '.github/workflows/schema-smoke.yml'
@@ -13,7 +12,6 @@ on:
     branches: [main]
     paths:
       - 'migrations/versions/**'
-      - 'database/schema.sql'
       - 'scripts/install.sh'
       - 'scripts/import_sql.py'
       - '.github/workflows/schema-smoke.yml'
@@ -71,7 +69,7 @@ jobs:
           python3 -m pip install pymysql
 
       # 全新安装的权威 DDL 源是迁移基线（含分区表 + 15 个触发器），
-      # database/schema.sql 由模型生成、表达不了触发器，仅作模型漂移参考。
+      # 快照覆盖范围由 0000_baseline.covers 清单声明。
       - name: 切分预检（dry-run，不连库）
         run: |
           python3 scripts/import_sql.py migrations/versions/0000_baseline.sql --dry-run
@@ -80,10 +78,11 @@ jobs:
         run: |
           python3 scripts/import_sql.py migrations/versions/0000_baseline.sql
 
-      # 全新安装的真实升级路径端到端验证：baseline 导入后 stamp 版本 0000
-      # （与 install.sh 行为一致），再由 MigrationRunner 重放迁移链，
-      # 断言 pending=0 收敛。可捕获"迁移不幂等/依赖错误前置状态"类问题。
-      - name: stamp 0000 + 迁移链重放（全新安装升级路径）
+      # 全新安装的真实升级路径端到端验证：baseline 导入后按 covers 清单
+      # stamp 版本（与 install.sh 行为一致），再由 MigrationRunner 重放
+      # 清单之外的剩余迁移链，断言 pending=0 收敛。可捕获两类问题：
+      # "基线快照与 covers 清单不一致" 和 "迁移不幂等/依赖错误前置状态"。
+      - name: covers stamp + 迁移链重放（全新安装升级路径）
         run: |
           python3 - <<'PYEOF'
           import importlib.util, os, pymysql
@@ -101,36 +100,46 @@ jobs:
               autocommit=True)
 
           runner = sms.MigrationRunner(conn, "migrations/versions")
+          chain = [m.version for m in runner._migrations]
           assert runner.applied_versions() == set(), "预期全新库无任何版本记录"
 
-          # 复现 install.sh 的 stamp 动作
-          cur = conn.cursor()
-          cur.execute(sms.VERSION_TABLE_DDL)
-          cur.execute(
-              "INSERT INTO schema_migrations (version, description)"
-              " VALUES ('0000', 'baseline')")
-          conn.commit()
-          cur.close()
-
-          plan = [m.version for m in runner.pending()]
-          print("迁移计划:", plan)
-          assert plan == ["0001"], f"迁移计划不符合预期: {plan}"
-
-          applied_now = runner.run()
-          print("本次应用:", applied_now)
-          assert applied_now == plan
-          assert runner.pending() == [], f"仍有未应用迁移: {runner.pending()}"
-
-          # 验证 0001 确实生效（冗余索引已被删除）
+          # 基线重生成有效性：0001 已删除的冗余索引不得再出现在基线里
           cur = conn.cursor()
           cur.execute(
               "SELECT COUNT(*) FROM information_schema.statistics"
               " WHERE table_schema = DATABASE()"
               " AND index_name = 'idx_audit_resource_id'")
           left = cur.fetchone()[0]
+          assert left == 0, "baseline 未重生成：idx_audit_resource_id 仍存在"
           cur.close()
-          assert left == 0, "0001 未生效：idx_audit_resource_id 仍存在"
-          print("✅ baseline → 迁移链重放收敛，pending=0，0001 已生效")
+
+          # 读取 covers 清单（与 install.sh 同一解析逻辑）并 stamp
+          covered = []
+          with open("migrations/versions/0000_baseline.covers", encoding="utf-8") as f:
+              for line in f:
+                  s = line.strip()
+                  if s and not s.startswith("#"):
+                      covered.append(s)
+          assert covered, "covers 清单为空"
+          unknown = [v for v in covered if v not in chain]
+          assert not unknown, f"covers 引用了不存在的迁移: {unknown}"
+
+          cur = conn.cursor()
+          cur.execute(sms.VERSION_TABLE_DDL)
+          for v in covered:
+              cur.execute(
+                  "INSERT INTO schema_migrations (version, description)"
+                  " VALUES (%s, 'baseline')", (v,))
+          conn.commit()
+          cur.close()
+          print("covers stamp:", covered)
+
+          plan = [m.version for m in runner.pending()]
+          print("剩余迁移计划:", plan)
+          applied_now = runner.run()
+          assert applied_now == plan
+          assert runner.pending() == [], f"仍有未应用迁移: {runner.pending()}"
+          print("✅ baseline + covers → 迁移链重放收敛，pending=0")
           PYEOF
 
       - name: 验证表数量与关键表存在
@@ -151,7 +160,7 @@ jobs:
             echo "✅ 表存在: $t"
           done
 
-      # 触发器只有基线能带过来，模型生成的 schema.sql 一个都没有——
+      # 触发器与分区表只有基线能带过来——
       # 这几条断言用于防止 DDL 源被误切回模型生成文件。
       - name: 验证触发器与分区表（基线专属）
         run: |

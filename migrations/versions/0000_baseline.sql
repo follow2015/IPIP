@@ -2,6 +2,8 @@
 -- source: 生产库（主机地址已脱敏，见内部 .env 配置，勿写入本文件）/ip_manager
 -- generated: 2026-09-04T04:21:31Z by scripts/export_schema_dump.py（只读元数据导出）
 -- 用途：仅全新安装导入；存量库升级使用 flask db-upgrade，勿重复导入本文件
+-- updated: 2026-09-04 重生成：应用 0001_drop_redundant_indexes 效果（删除 14 个冗余索引），
+--          快照现对应迁移链头 0001；覆盖范围见 0000_baseline.covers
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -56,7 +58,6 @@ CREATE TABLE `audit_logs` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_audit_user` (`user_id`),
-  KEY `idx_audit_resource_id` (`resource`,`resource_id`),
   KEY `idx_audit_created_action` (`created_at` DESC,`action`),
   KEY `idx_audit_resource_time` (`resource`,`resource_id`,`created_at`),
   KEY `idx_functional_detail_module` ((cast(json_unquote(json_extract(`detail`,_utf8mb4'$.module')) as char(32) charset utf8mb4)))
@@ -124,7 +125,6 @@ CREATE TABLE `customer_termination_archive` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted_at` datetime DEFAULT NULL COMMENT '软删除时间',
   PRIMARY KEY (`id`),
-  KEY `ix_cta_customer_id` (`customer_id`),
   KEY `ix_cta_customer_created` (`customer_id`,`created_at`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='客户终止存档';
 
@@ -320,7 +320,6 @@ CREATE TABLE `device_metric_baseline` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_dmb_device_metric_hour_dow` (`device_id`,`metric_key`,`index_key`,`hour_of_day`,`day_of_week`),
-  KEY `ix_dmb_device_metric` (`device_id`,`metric_key`),
   CONSTRAINT `fk_dmb_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设备指标基线（按小时×星期分桶，滑动28天）';
 
@@ -339,7 +338,6 @@ CREATE TABLE `device_metric_latest` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_dml_device_metric_index` (`device_id`,`metric_key`,`index_key`),
   KEY `ix_dml_metric_key` (`metric_key`),
-  KEY `ix_dml_device_id` (`device_id`),
   CONSTRAINT `device_metric_latest_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=12278384 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设备指标当前值（每次采集 upsert，含正常值）';
 
@@ -355,7 +353,6 @@ CREATE TABLE `device_metric_override` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_dmo_device_metric` (`device_id`,`metric_key`),
-  KEY `ix_dmo_device` (`device_id`),
   CONSTRAINT `fk_dmo_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='设备级阈值覆盖（G4.3）';
 
@@ -650,7 +647,6 @@ CREATE TABLE `ip_addresses` (
   KEY `idx_ip_deleted_room_status` (`room_id`,`status`),
   KEY `idx_ip_int_status` (`ip_int`,`status`),
   KEY `fk_customer` (`customer_id`),
-  KEY `ip_addresses_ibfk_1` (`room_id`),
   KEY `ix_ip_last_active` (`last_active_at`),
   CONSTRAINT `fk_ip_manager_customer_id` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE SET NULL,
   CONSTRAINT `ip_addresses_ibfk_1` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`)
@@ -668,7 +664,6 @@ CREATE TABLE `ip_allocation_logs` (
   `detail` json DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_alloc_ip` (`ip_address`,`room_id`),
   KEY `idx_alloc_created_operator` (`created_at` DESC,`operator_id`),
   KEY `fk_alloc_operator` (`operator_id`),
   KEY `fk_alloc_room` (`room_id`),
@@ -830,7 +825,6 @@ CREATE TABLE `monitor_alert_outbox` (
   KEY `ix_mao_acknowledged_at` (`acknowledged_at`),
   KEY `ix_mao_closed_at` (`closed_at`),
   KEY `idx_mao_incident` (`incident_id`),
-  KEY `ix_mao_incident` (`incident_id`),
   CONSTRAINT `fk_mao_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=1266 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='监控告警发件箱（outbox 模式，解耦状态落库与告警投递）';
 
@@ -846,8 +840,7 @@ CREATE TABLE `monitor_credentials` (
   `payload_hash` varchar(64) DEFAULT NULL COMMENT 'payload 规范 JSON 的 SHA-256 十六进制（用于同明文凭据去重复用；旧行留空）',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_mc_protocol_name` (`protocol`,`name`),
-  UNIQUE KEY `uk_mc_protocol_hash` (`protocol`,`payload_hash`),
-  KEY `ix_mc_protocol` (`protocol`)
+  UNIQUE KEY `uk_mc_protocol_hash` (`protocol`,`payload_hash`)
 ) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设备监控凭据（AES-256-GCM加密）';
 
 DROP TABLE IF EXISTS `monitor_device_type_recommends`;
@@ -907,7 +900,6 @@ CREATE TABLE `monitor_escalation_step` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `ix_mes_policy_step` (`policy_id`,`step_no`),
-  KEY `ix_mes_policy` (`policy_id`),
   KEY `fk_mes_role` (`escalate_to_role_id`),
   CONSTRAINT `fk_mes_policy` FOREIGN KEY (`policy_id`) REFERENCES `monitor_escalation_policy` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_mes_role` FOREIGN KEY (`escalate_to_role_id`) REFERENCES `roles` (`id`) ON DELETE SET NULL
@@ -947,7 +939,6 @@ CREATE TABLE `monitor_metric_template_group_items` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_mmtgi_group_template` (`group_id`,`template_id`),
   KEY `template_id` (`template_id`),
-  KEY `ix_mmtgi_group_id` (`group_id`),
   CONSTRAINT `monitor_metric_template_group_items_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `monitor_metric_template_groups` (`id`) ON DELETE CASCADE,
   CONSTRAINT `monitor_metric_template_group_items_ibfk_2` FOREIGN KEY (`template_id`) REFERENCES `monitor_metric_templates` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='模板组-模板关联（勾选指标入组）';
@@ -1386,7 +1377,6 @@ CREATE TABLE `virtual_room_members` (
   `device_id` bigint NOT NULL COMMENT '交换机设备ID',
   `joined_at` datetime NOT NULL DEFAULT (now()) COMMENT '加入时间',
   PRIMARY KEY (`virtual_room_id`,`device_id`),
-  UNIQUE KEY `uq_vr_member` (`virtual_room_id`,`device_id`),
   KEY `idx_vrm_device` (`device_id`),
   CONSTRAINT `virtual_room_members_ibfk_1` FOREIGN KEY (`virtual_room_id`) REFERENCES `virtual_rooms` (`id`) ON DELETE CASCADE,
   CONSTRAINT `virtual_room_members_ibfk_2` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
@@ -1402,9 +1392,7 @@ CREATE TABLE `virtual_rooms` (
   `last_scan_at` datetime DEFAULT NULL COMMENT '最近扫描完成时间',
   `last_scan_scope` varchar(32) DEFAULT NULL COMMENT '最近扫描 scope 标识',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`),
-  UNIQUE KEY `uq_virtual_room_name` (`name`),
-  KEY `idx_virtual_room_name` (`name`)
+  UNIQUE KEY `uq_virtual_room_name` (`name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='虚拟机房（逻辑扫描单元）';
 
 DROP TABLE IF EXISTS `vlan_port_members`;
