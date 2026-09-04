@@ -455,6 +455,25 @@ CREATE TABLE voice_settings (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `ai_conversations`
+--
+
+DROP TABLE IF EXISTS `ai_conversations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+CREATE TABLE ai_conversations (
+	user_id BIGINT NOT NULL COMMENT '用户ID（FK→users.id，用户删除时级联清理其对话历史）', 
+	scenario VARCHAR(50) NOT NULL COMMENT '场景: chat/alert/nlq/rag/inspection', 
+	`role` VARCHAR(20) NOT NULL COMMENT 'user/assistant', 
+	content TEXT NOT NULL COMMENT '消息内容', 
+	id BIGINT NOT NULL COMMENT '主键ID' AUTO_INCREMENT, 
+	created_at DATETIME NOT NULL COMMENT '创建时间' DEFAULT now(), 
+	updated_at DATETIME NOT NULL COMMENT '更新时间' DEFAULT now(), 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
+)COMMENT='AI 对话历史';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `cabinets`
 --
 
@@ -529,7 +548,7 @@ CREATE TABLE customer_termination_archive (
 	PRIMARY KEY (id), 
 	FOREIGN KEY(customer_id) REFERENCES customers (id), 
 	FOREIGN KEY(operator_id) REFERENCES users (id)
-)CHARSET=utf8mb4 ENGINE=InnoDB;
+)ENGINE=InnoDB CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -783,6 +802,33 @@ CREATE TABLE monitor_escalation_step (
 	FOREIGN KEY(policy_id) REFERENCES monitor_escalation_policy (id) ON DELETE CASCADE, 
 	FOREIGN KEY(escalate_to_role_id) REFERENCES roles (id) ON DELETE SET NULL
 )COMMENT='监控告警升级链步骤（P2-11，多级升级）';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `ai_diagnosis_sessions`
+--
+
+DROP TABLE IF EXISTS `ai_diagnosis_sessions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+CREATE TABLE ai_diagnosis_sessions (
+	device_id BIGINT COMMENT '设备ID（诊断目标设备，设备删除时保留会话供回溯）', 
+	user_id BIGINT NOT NULL COMMENT '用户ID', 
+	skill_name VARCHAR(64) NOT NULL COMMENT 'agentic 技能名（如 network_troubleshoot）', 
+	question TEXT NOT NULL COMMENT '用户原始问题', 
+	rounds_json LONGTEXT COMMENT '每轮工具调用摘要 JSON：[{round, tool, args, result_summary, duration_ms}]', 
+	final_answer_json LONGTEXT COMMENT '结构化诊断结论 JSON：{diagnosis, confidence, evidence, proposed_commands}', 
+	status VARCHAR(20) NOT NULL COMMENT 'running/completed/incomplete/failed', 
+	token_cost INTEGER COMMENT '本次诊断总 token 消耗', 
+	duration_ms INTEGER COMMENT '本次诊断总耗时毫秒', 
+	remedial_executed BOOL NOT NULL COMMENT '是否有 remedial 命令被实际执行', 
+	rollback_failed BOOL NOT NULL COMMENT '回滚是否失败（设备滞留已变更未回滚的中间态标记）', 
+	id BIGINT NOT NULL COMMENT '主键ID' AUTO_INCREMENT, 
+	created_at DATETIME NOT NULL COMMENT '创建时间' DEFAULT now(), 
+	updated_at DATETIME NOT NULL COMMENT '更新时间' DEFAULT now(), 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(device_id) REFERENCES devices (id) ON DELETE SET NULL, 
+	FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
+)COMMENT='AI 诊断会话持久化';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1650,4 +1696,4 @@ CREATE TABLE vlan_port_members (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-02 13:08:00
+-- Dump completed on 2026-09-04 10:41:39
