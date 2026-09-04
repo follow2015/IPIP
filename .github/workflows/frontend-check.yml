@@ -24,9 +24,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 由 package.json 的 packageManager 字段安装 pnpm@10.34.5（与主仓 corepack 强制版本一致）
+      # 显式锁定 pnpm 版本（与主仓 corepack 强制版本一致）：action-setup 默认读取
+      # **仓库根** package.json 的 packageManager，而本仓的字段在 frontend-new/
+      # 下，不显式指定会因找不到该字段而失败。
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
