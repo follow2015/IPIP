@@ -91,6 +91,11 @@ class MetricCollector:
         if not templates:
             return {}
 
+        try:
+            self._template_repo.session.commit()
+        except Exception:  # noqa: BLE001 - 提交失败仅回滚，不阻断采集
+            self._template_repo.session.rollback()
+
         raw = adapter.collect_metrics(device, credential, templates)
         return self._evaluate(raw, templates)
 
