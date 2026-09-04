@@ -1,6 +1,6 @@
 -- ipip schema baseline（版本化迁移链起点，schema 演进见 NNNN_*.py）
--- source: 生产库（主机地址已脱敏，见内部 .env 配置，勿写入本文件）/ip_manager
--- generated: 2026-09-04T04:21:31Z by scripts/export_schema_dump.py（只读元数据导出）
+-- source: 生产库 ip_manager（主机地址已脱敏，见内部 .env 配置，勿写入本文件）
+-- generated: 2026-09-04T12:21:31+0800 by scripts/export_schema_dump.py（只读元数据导出）
 -- 用途：仅全新安装导入；存量库升级使用 flask db-upgrade，勿重复导入本文件
 -- updated: 2026-09-04 重生成：应用 0001_drop_redundant_indexes 效果（删除 14 个冗余索引），
 --          快照现对应迁移链头 0001；覆盖范围见 0000_baseline.covers
