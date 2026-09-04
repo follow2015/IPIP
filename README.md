@@ -1,8 +1,8 @@
 # ipip — IP 管理系统
 
-开源 IP/IPAM 管理系统：机房、机柜、设备、IP 分配、VLAN、交换机、监控告警、客户管理一体化平台。
+开源 IP/IPAM 管理系统：机房、机柜、设备、IP 分配、VLAN、交换机、监控告警、客户管理一体化平台，内置 AI 助手（告警解读 / NL 查询 / RAG 知识库 / Agentic 巡查诊断）。
 
-后端 Flask + SQLAlchemy + MySQL + Redis，前端 React 19 + Ant Design 6 + Vite 8，ASGI SSE 实时推送网关（多副本就绪），Celery 异步任务底座。
+后端 Flask + SQLAlchemy + MySQL + Redis，前端 React 19 + Ant Design 6 + Vite 8，ASGI SSE 实时推送网关（多副本就绪），Celery 异步任务底座（AI 长任务 + 语音通知）。
 
 通知渠道：站内、飞书、企业微信、邮件、**语音（阿里云/腾讯云）**，统一投递 worker 带却制/熔断/失败转移。
 
@@ -17,7 +17,7 @@
 | **语音渠道** | 阿里云/腾讯云语音通知、独立 voice worker、回调鉴权、升级链路 P0 告警叫醒 |
 | **SSE 实时** | 网关 seq/ring 迁 Redis 共享状态，多副本水平扩展 |
 | 客户/审计 | 客户管理、操作审计、RBAC 权限 |
-| AI 助手 | 基础设施配置已就位（env/celery/rbac），业务代码待 AI 开发完成后同步 |
+| **AI 助手** | 告警解读 / NL 查询 / RAG 知识库 / Agentic 巡查诊断；Celery `ai` 队列异步执行，RBAC `ai:use`/`ai:admin` 权限隔离 |
 
 ## 目录结构
 
@@ -226,7 +226,49 @@ pnpm lint         # 代码检查
 
 **实时网关**：Starlette · uvicorn · Redis Pub/Sub · SSE（seq/ring Redis 共享，多副本就绪）
 
-**异步任务**：Celery（broker/result backend 独立 Redis db，队列 `ai`）
+**异步任务**：Celery（broker/result backend 独立 Redis db，队列 `ai,voice`）
+
+**AI 助手**：OpenAI 兼容 LLM · ChromaDB 向量库 · sentence-transformers（bge-small-zh-v1.5）· jieba 中文分词 · Pydantic 技能 schema · tenacity 重试 · prometheus-client 指标
+
+## AI 助手
+
+AI 助手模块提供告警解读、自然语言查询、RAG 知识库检索、Agentic 工具巡查与诊断能力。该模块已纳入部署仓库同步范围（`app/api/ai/`、`app/services/ai/`、`app/models/ai_*.py`、`app/tasks/ai_tasks.py`、`frontend-new/src/pages/AI/`）。
+
+### 数据表
+
+| 表 | 用途 |
+|----|------|
+| `ai_conversations` | 对话历史（user_id + scenario 索引，用户删除级联清理） |
+| `ai_diagnosis_sessions` | Agentic 诊断会话（设备/技能/状态索引，设备删除保留会话供回溯） |
+
+DDL 已包含在 `database/schema.sql`，`install.sh` 初始化时自动建表。
+
+### 权限
+
+| 权限码 | 说明 | 默认角色 |
+|--------|------|----------|
+| `ai:use` | AI 助手使用（告警解读/NL 查询/RAG/巡查） | admin、operator |
+| `ai:admin` | AI 知识库管理（RAG 文档入库） | admin |
+
+由 `seed_rbac.py` 幂等种入。
+
+### 配置
+
+AI 运行依赖以下环境变量（见 `.env.example`）：
+
+| 变量 | 说明 |
+|------|------|
+| `AI_ASYNC_ENABLED` | 是否启用 Celery `ai` 异步队列（`1` 启用，非 `1` 走同步路径） |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` | LLM 接入凭证与端点 |
+| `AI_RAG_*` | RAG 向量库与 embedding 相关配置 |
+
+### 降级与保护
+
+- **LLM 不可用**：AI 接口返回结构化降级响应，不影响主业务。
+- **Celery 未启动**：`AI_ASYNC_ENABLED != 1` 时 AI 任务走同步路径，voice 队列仍由 Flask 同步投递。
+- **RAG 未入库**：检索返回空结果，不阻断 Agentic 流程。
+- **诊断回滚**：`ai_diagnosis_sessions.rollback_failed` 标记设备滞留中间态，供运维介入。
+- **熔断**：LLM/工具调用失败走 `circuit_breaker`，达到阈值后短路返回降级响应。
 
 ## License
 
