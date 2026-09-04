@@ -27,6 +27,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 from starlette.routing import Route
 
+from . import ai_task_stream
 from . import auth
 from . import config
 from . import redis_bus
