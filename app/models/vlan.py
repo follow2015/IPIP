@@ -1,8 +1,9 @@
 """VLAN模型"""
 from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy.dialects.mysql import SMALLINT
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, TINYINT
 from extensions import db
 from app.core.enums import VLANStatus
 
@@ -23,12 +24,12 @@ class VLAN(BaseModel):
         {"comment": "VLAN资源（设备维度）"},
     )
 
-    vlan_id = db.Column(db.SmallInteger, nullable=False, comment="VLAN ID (1-4094)")
+    vlan_id = db.Column(SMALLINT(unsigned=True), nullable=False, comment="VLAN ID (1-4094)")
     name = db.Column(db.String(64), nullable=False, comment="VLAN名称")
-    purpose = db.Column(db.String(200), comment="用途说明")
+    purpose = db.Column(db.String(255), comment="用途说明")
     subnet_id = db.Column(db.BigInteger, db.ForeignKey("ip_networks.id"), comment="关联网段ID FK→ip_networks")
     room_id = db.Column(db.Integer, db.ForeignKey("rooms.id"), comment="所属机房ID")
-    status = db.Column(db.SmallInteger, nullable=False, default=VLANStatus.ACTIVE.value, comment="VLAN状态: 1=活跃 0=停用 (VLANStatus)")
+    status = db.Column(TINYINT(), nullable=False, default=VLANStatus.ACTIVE.value, comment="VLAN状态: 1=活跃 0=停用 (VLANStatus)")
     device_id = db.Column(db.BigInteger, db.ForeignKey("devices.id"), nullable=False, comment="所属交换机设备ID")
 
     room = relationship("Room", foreign_keys=[room_id], lazy="joined")

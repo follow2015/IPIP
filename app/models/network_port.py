@@ -6,10 +6,12 @@ from __future__ import annotations
 定义网络设备端口拓扑关系表（network_ports）。
 统一端口表：同时承载手动维护端口和自动采集端口数据。
 """
+import json
+
 from sqlalchemy import Integer, String, DateTime, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, MEDIUMTEXT
 from extensions import db
 
 
@@ -46,13 +48,13 @@ class NetworkPort(BaseModel):
         default="free", comment="占用状态(free/occupied/disabled/error)",
     )
     vlan = db.Column(String(200), comment="VLAN配置(采集缓存,真值来源为vlan_port_members表)")
-    description = db.Column(db.Text, comment="端口描述")
+    description = db.Column(MEDIUMTEXT, comment="端口描述")
 
     link_status = db.Column(String(50), comment="链路状态(up/down/disabled)")
     mac = db.Column(String(17), comment="MAC地址")
     ip_address = db.Column(String(45), comment="端口主IP(deprecated,权威源为switch_port_ips)")
     customer_id = db.Column(db.BigInteger, ForeignKey("customers.id"), comment="客户ID")
-    raw_info = db.Column(db.Text, comment="原始端口信息(JSON)")
+    raw_info = db.Column(db.JSON, comment="原始端口信息(JSON)")
     data_source = db.Column(
         db.Enum("manual", "auto", "hybrid", name="data_source_enum"),
         default="manual", comment="数据来源(manual/auto/hybrid)",
@@ -82,6 +84,34 @@ class NetworkPort(BaseModel):
     PROTECTED_FIELDS = set()
 
     LOGICAL_PORT_KEYWORDS = {"trunk", "eth-trunk", "port-channel", "vlanif", "loopback", "vlan", "nve", "tunnel"}
+
+    @staticmethod
+    def normalize_raw_info(value):
+        """将任意 raw_info 入参归一为可安全写入 JSON 列的值（dict/list/None）。
+
+        JSON 列不接受空串（MySQL: "Invalid JSON text"），且写入端历史上既有
+        传 dict、也有传 `json.dumps(...)` 字符串的两套写法，这里统一收敛：
+
+        - None / 空串 / 空白串  -> None（NULL）
+        - dict / list           -> 原样
+        - 合法 JSON 字符串      -> 解析后的对象（避免二次编码成 JSON 字符串）
+        - 其他标量（含非 JSON 文本）-> 原样返回，由 JSON 类型编码为 JSON 标量
+        """
+        if value is None:
+            return None
+        if isinstance(value, (dict, list)):
+            return value
+        if isinstance(value, (bytes, bytearray)):
+            value = value.decode("utf-8", errors="replace")
+        if isinstance(value, str):
+            s = value.strip()
+            if not s:
+                return None
+            try:
+                return json.loads(s)
+            except (ValueError, TypeError):
+                return value
+        return value
 
     @staticmethod
     def is_logical_port(port_name: str | None) -> bool:
@@ -164,6 +194,9 @@ class NetworkPort(BaseModel):
                       "raw_info", "data_source", "last_collected_at", "usage_status"):
             if field not in base:
                 base[field] = getattr(self, field, None)
+        raw = base.get("raw_info")
+        if isinstance(raw, (dict, list)):
+            base["raw_info"] = json.dumps(raw, ensure_ascii=False)
         base["status"] = base.get("link_status")
         base["customer_name"] = self.customer.customer_name if self.customer else None
         return base

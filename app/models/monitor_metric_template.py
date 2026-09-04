@@ -17,7 +17,7 @@ metric_type：
 """
 from sqlalchemy import Index
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, BIGINT_UNSIGNED
 from extensions import db
 
 
@@ -25,6 +25,8 @@ class MonitorMetricTemplate(BaseModel):
     """监控指标模板（配置驱动 SNMP/IPMI 指标采集）"""
 
     __tablename__ = "monitor_metric_templates"
+
+    id = db.Column(BIGINT_UNSIGNED(), primary_key=True, autoincrement=True, comment="主键ID")
     __table_args__ = (
         Index("uq_metric_tpl_devtype_metric_vendor", "device_type", "metric_key", "vendor", unique=True),
         {

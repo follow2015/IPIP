@@ -7,7 +7,7 @@ RBAC模型
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, MEDIUMTEXT
 from extensions import db
 
 
@@ -24,7 +24,7 @@ class Role(BaseModel):
 
     name = db.Column(db.String(50), nullable=False, comment="角色名称")
     display_name = db.Column(db.String(100), nullable=False, comment="角色显示名称")
-    description = db.Column(db.Text, nullable=True, comment="角色描述")
+    description = db.Column(MEDIUMTEXT, nullable=True, comment="角色描述")
 
     status = db.Column(db.Integer, default=0, nullable=False, comment="状态")
 
@@ -84,7 +84,7 @@ class Permission(BaseModel):
     code = db.Column(db.String(50), nullable=False, comment="权限编码")
     name = db.Column(db.String(100), nullable=False, comment="权限名称")
     category = db.Column(db.String(50), nullable=True, comment="权限分类")
-    description = db.Column(db.Text, nullable=True, comment="权限描述")
+    description = db.Column(MEDIUMTEXT, nullable=True, comment="权限描述")
 
     roles = relationship(
         "Role", secondary="role_permissions", back_populates="permissions"

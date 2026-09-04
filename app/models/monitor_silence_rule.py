@@ -8,7 +8,7 @@ from datetime import datetime
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Index, Integer, String, text
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, BIGINT_UNSIGNED
 from extensions import db
 
 
@@ -16,6 +16,8 @@ class MonitorSilenceRule(BaseModel):
     """监控告警静默规则"""
 
     __tablename__ = "monitor_silence_rule"
+
+    id = db.Column(BIGINT_UNSIGNED(), primary_key=True, autoincrement=True, comment="主键ID")
     __table_args__ = (
         Index("ix_msr_enabled", "enabled"),
         Index("ix_msr_silence_until", "silence_until"),

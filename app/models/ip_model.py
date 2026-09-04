@@ -8,14 +8,15 @@ IP交换机信息见 switch_credentials.py（IPSwitchInfo→ip_switch_info）。
 """
 
 from sqlalchemy import (
-    Integer, String, SmallInteger, DateTime,
+    BigInteger, Integer, String, SmallInteger, DateTime,
     ForeignKey, UniqueConstraint, Index, func,
 )
 from sqlalchemy.orm import relationship
 import struct
 import socket
 
-from app.models.base import BaseModel
+from sqlalchemy.dialects.mysql import INTEGER
+from app.models.base import BaseModel, TINYINT
 from app.core.enums import IPStatus
 from extensions import db
 
@@ -50,14 +51,14 @@ class IPManager(BaseModel):
     )
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="主键ID")
-    ip_address = db.Column(String(255), nullable=False, comment="IP地址")
-    ip_int = db.Column(db.BigInteger, nullable=True, comment="IP整数表示(INET_ATON),用于范围查询")
+    ip_address = db.Column(String(45), nullable=False, comment="IP地址")
+    ip_int = db.Column(INTEGER(unsigned=True), nullable=True, comment="IP整数表示(INET_ATON),用于范围查询")
     customer_id = db.Column(
-        Integer, ForeignKey("customers.id", ondelete="SET NULL"),
+        BigInteger, ForeignKey("customers.id", ondelete="SET NULL"),
         nullable=True, comment="客户ID",
     )
     status = db.Column(
-        SmallInteger, default=IPStatus.UNUSED, nullable=False, comment="IP状态",
+        TINYINT(), default=IPStatus.UNUSED, nullable=False, comment="IP状态",
     )
     notes = db.Column(String(255), nullable=True, comment="备注")
     room_id = db.Column(
@@ -107,7 +108,7 @@ class IPBanRecord(BaseModel):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="主键ID")
     ip_address = db.Column(String(45), nullable=False, comment="IP地址")
-    ip_int = db.Column(db.BigInteger, nullable=True, comment="IP整数表示(INET_ATON),用于范围查询")
+    ip_int = db.Column(INTEGER(unsigned=True), nullable=True, comment="IP整数表示(INET_ATON),用于范围查询")
     room_id = db.Column(Integer, ForeignKey("rooms.id"), nullable=False, comment="机房ID")
     switch_id = db.Column(
         db.BigInteger, ForeignKey("devices.id"), nullable=False, comment="执行封禁的交换机ID",

@@ -1,9 +1,9 @@
 """设备配置备份与变更模型"""
 from sqlalchemy import Index
-from sqlalchemy.dialects.mysql import MEDIUMTEXT
+from sqlalchemy.dialects.mysql import INTEGER
 from sqlalchemy.sql import func
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, MEDIUMTEXT
 from extensions import db
 
 
@@ -29,7 +29,7 @@ class DeviceConfigBackup(db.Model):
         db.Enum('manual', 'scheduled', 'pre_change'),
         nullable=False, default='manual', comment="备份类型"
     )
-    file_size = db.Column(db.Integer, comment="配置文件大小(字节)")
+    file_size = db.Column(INTEGER(unsigned=True), comment="配置文件大小(字节)")
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.now(), comment="创建时间")
 
     def to_dict(self, exclude=None, include_relations=False):

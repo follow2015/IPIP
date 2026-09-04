@@ -8,9 +8,10 @@ import socket
 
 from app.core.enums import SwitchDeviceTypeCode
 from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy.dialects.mysql import INTEGER
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, TINYINT
 from extensions import db
 
 
@@ -134,7 +135,7 @@ class IPSwitchInfo(BaseModel):
     )
 
     ip_address = db.Column(db.String(45), nullable=False, comment="IP地址")
-    ip_int = db.Column(db.BigInteger, nullable=True, comment="IP整数表示(INET_ATON),用于范围查询")
+    ip_int = db.Column(INTEGER(unsigned=True), nullable=True, comment="IP整数表示(INET_ATON),用于范围查询")
     mac_address = db.Column(db.String(17), comment="MAC地址")
     switch_id = db.Column(db.BigInteger, db.ForeignKey("devices.id"), nullable=False, comment="交换机设备ID")
     port = db.Column(db.String(50), comment="端口名")
@@ -176,9 +177,9 @@ class SwitchPortIP(BaseModel):
     port_id = db.Column(db.BigInteger, db.ForeignKey("network_ports.id"), comment="端口ID")
     port_name = db.Column(db.String(255), nullable=False, comment="端口名")
     ip_address = db.Column(db.String(45), nullable=False, comment="IP地址")
-    ip_int = db.Column(db.BigInteger, nullable=True, comment="IP整数表示(INET_ATON),用于范围查询")
+    ip_int = db.Column(INTEGER(unsigned=True), nullable=True, comment="IP整数表示(INET_ATON),用于范围查询")
     subnet_mask = db.Column(db.String(20), server_default="255.255.255.0", comment="子网掩码(点分十进制)")
-    prefix = db.Column(db.SmallInteger, nullable=True, comment="子网掩码位数(如24,从subnet_mask转换)")
+    prefix = db.Column(TINYINT(unsigned=True), nullable=True, comment="子网掩码位数(如24,从subnet_mask转换)")
     is_primary = db.Column(db.Boolean, server_default="1", comment="是否为主IP")
     vlan = db.Column(db.Integer, comment="VLAN ID(逻辑关联vlans.vlan_id,不加FK因采集数据可能引用不存在的VLAN)")
 

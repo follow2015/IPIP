@@ -10,7 +10,7 @@ metric 取值：
 - ``reachable``：该小时可达占比（0~1），其 avg/min/max 相同
 - ``latency_ms``：该小时 latency_ms 的 avg/min/max（仅可达且有值样本计入）
 """
-from sqlalchemy import func
+from sqlalchemy import Double, func
 
 from extensions import db
 
@@ -45,17 +45,17 @@ class DeviceMonitorTimeseriesHourly(db.Model):
         comment="整点时间，如 2026-07-31 10:00:00",
     )
     avg_value = db.Column(
-        db.Float,
+        Double,
         nullable=False,
         comment="均值",
     )
     min_value = db.Column(
-        db.Float,
+        Double,
         nullable=False,
         comment="最小值",
     )
     max_value = db.Column(
-        db.Float,
+        Double,
         nullable=False,
         comment="最大值",
     )

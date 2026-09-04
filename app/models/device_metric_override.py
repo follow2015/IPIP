@@ -6,7 +6,7 @@
 """
 from sqlalchemy import Index, text
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, BIGINT_UNSIGNED
 from extensions import db
 
 
@@ -14,6 +14,8 @@ class DeviceMetricOverride(BaseModel):
     """设备级阈值覆盖"""
 
     __tablename__ = "device_metric_override"
+
+    id = db.Column(BIGINT_UNSIGNED(), primary_key=True, autoincrement=True, comment="主键ID")
     __table_args__ = (
         Index(
             "uq_dmo_device_metric",

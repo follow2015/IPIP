@@ -2,7 +2,7 @@
 from sqlalchemy import Index
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, TINYINT
 from extensions import db
 from app.core.enums import LAGStatus
 
@@ -24,7 +24,7 @@ class LinkAggregationGroup(BaseModel):
     lag_name = db.Column(db.String(50), nullable=False, comment="聚合组名(Eth-Trunk/X)")
     lag_type = db.Column(db.Enum('lacp', 'static'), nullable=False, default='lacp', comment="聚合类型")
     algorithm = db.Column(db.String(32), comment="负载均衡算法")
-    status = db.Column(db.SmallInteger, nullable=False, default=LAGStatus.ACTIVE.value, comment="LAG状态: 1=活跃 0=停用 (LAGStatus)")
+    status = db.Column(TINYINT(), nullable=False, default=LAGStatus.ACTIVE.value, comment="LAG状态: 1=活跃 0=停用 (LAGStatus)")
     member_count = db.Column(db.SmallInteger, nullable=False, default=0, comment="成员口数量（冗余字段,可从network_ports.lag_group_id统计）")
     purpose = db.Column(db.String(255), nullable=True, comment="用途说明")
 

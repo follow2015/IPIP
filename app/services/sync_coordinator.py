@@ -306,9 +306,9 @@ class SyncCoordinator:
         """获取端口配置（三类处理：普通口 / VLANIF / Eth-Trunk）
 
         流程：
-        1. 查 switch_port_status.raw_info 缓存（非强制刷新时）
+        1. 查 network_ports.raw_info 缓存（非强制刷新时）
         2. 未命中或强制刷新 → SSH 获取
-        3. 写入 switch_port_status.raw_info，解析成员列表，同步 switch_port_status / switch_port_ips
+        3. 写入 network_ports.raw_info，解析成员列表，同步 network_ports / switch_port_ips
 
         Args:
             device_id: 交换机 device_id（devices.id，统一交换机标识）
@@ -364,9 +364,7 @@ class SyncCoordinator:
             self._sync_trunk_members(device_id, port, members)
 
         if port_extra:
-            self.switch_repo.upsert_port_info_cache(device_id, port, {
-                "port_info": json.dumps(port_extra, ensure_ascii=False),
-            })
+            self._update_port_info_cache_if_exists(device_id, port, port_extra)
 
         self._sync_port_vlan_from_config(device_id, port, config_output, adapter)
         self._sync_port_ips_from_config(device_id, port, config_output, adapter)
@@ -463,14 +461,16 @@ class SyncCoordinator:
             NetworkPort.port_name == port,
         ).first()
         if row:
-            existing = {}
-            if row.raw_info:
+            existing = row.raw_info
+            if isinstance(existing, str):
                 try:
-                    existing = json.loads(row.raw_info)
+                    existing = json.loads(existing)
                 except (json.JSONDecodeError, TypeError):
-                    pass
+                    existing = {}
+            if not isinstance(existing, dict):
+                existing = {}
             existing.update(extra)
-            row.raw_info = json.dumps(existing, ensure_ascii=False)
+            row.raw_info = existing
             self.switch_repo.session.flush()
 
     def _sync_vlan_members(self, device_id: int, port: str, members: list) -> None:
@@ -708,7 +708,7 @@ class SyncCoordinator:
     def _sync_port_vlan_from_config(
         self, switch_id: int, port: str, config_text: str, adapter=None,
     ) -> None:
-        """从端口配置文本提取 VLAN ID，同步回 switch_port_status.vlan"""
+        """从端口配置文本提取 VLAN ID，同步回 network_ports.vlan"""
         if not adapter:
             switch = self.switch_repo.find_by_device_id(switch_id)
             if not switch:
@@ -725,7 +725,7 @@ class SyncCoordinator:
     def _sync_port_ips_from_config(
         self, switch_id: int, port: str, config_text: str, adapter,
     ) -> None:
-        """从端口配置文本提取 IP，全量同步到 switch_port_ips，并更新 switch_port_status.ip_address"""
+        """从端口配置文本提取 IP，全量同步到 switch_port_ips，并更新 network_ports.ip_address"""
         try:
             parsed_ips = adapter.parse_existing_ips(config_text or "")
             ip_list = []
@@ -748,7 +748,7 @@ class SyncCoordinator:
     def _sync_port_description_from_config(
         self, switch_id: int, port: str, config_text: str, adapter=None,
     ) -> None:
-        """从端口配置文本提取描述，同步回 switch_port_status.description"""
+        """从端口配置文本提取描述，同步回 network_ports.description"""
         if not adapter:
             switch = self.switch_repo.find_by_device_id(switch_id)
             if not switch:

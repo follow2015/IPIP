@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from sqlalchemy import ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import BaseModel, MEDIUMTEXT
 from extensions import db
 from app.core.enums import CabinetStatus
 
@@ -60,7 +60,7 @@ class Cabinet(BaseModel):
     customer_id = db.Column(
         db.BigInteger, ForeignKey("customers.id"), comment="客户ID"
     )
-    notes = db.Column(db.Text, comment="备注信息")
+    notes = db.Column(MEDIUMTEXT, comment="备注信息")
 
     deleted_at = db.Column(db.DateTime, nullable=True, comment="软删除时间(NULL=未删除)")
 

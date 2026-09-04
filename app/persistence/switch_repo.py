@@ -612,21 +612,32 @@ class SwitchRepository(BaseRepository):
         return info.to_dict() if info else None
 
     @staticmethod
-    def _parse_port_info_text(raw: str) -> str:
+    def _parse_port_info_text(raw) -> str:
         """将 raw_info 字段解析为可读配置文本。
 
-        存储格式为 JSON: {"port_info": "interface ..."}
-        解析失败时返回原始字符串。
+        raw_info 是 MySQL JSON 列，SQLAlchemy 读回后可能是 dict（主流写入路径
+        `upsert_port_config` 存 `{"port_info": ...}`），也可能是 str（历史遗留或
+        直接存文本的端口），两种都需支持。
+
+        - dict 且含 port_info -> 返回该配置文本
+        - 其他 dict/list     -> 重新序列化为缩进 JSON 文本
+        - str                -> 尝试按 {"port_info": ...} 解析，失败则原样返回
         """
-        if not raw:
+        if raw is None or raw == "":
             return raw
+        if isinstance(raw, (dict, list)):
+            if isinstance(raw, dict) and "port_info" in raw:
+                return raw["port_info"]
+            return json.dumps(raw, indent=2, ensure_ascii=False)
         try:
             data = json.loads(raw)
-            if isinstance(data, dict) and "port_info" in data:
-                return data["port_info"]
-            return json.dumps(data, indent=2, ensure_ascii=False)
         except (json.JSONDecodeError, TypeError):
             return raw
+        if isinstance(data, dict) and "port_info" in data:
+            return data["port_info"]
+        if isinstance(data, (dict, list)):
+            return json.dumps(data, indent=2, ensure_ascii=False)
+        return raw
 
     def get_port_config_text(self, switch_id: int, port: str) -> Optional[str]:
         """读取 network_ports.raw_info 字段（端口配置文本）
@@ -667,17 +678,35 @@ class SwitchRepository(BaseRepository):
     def upsert_port_info_cache(
         self, switch_id: int, port: str, data: dict,
     ) -> None:
-        """写入端口缓存（network_ports 表）"""
+        """写入端口缓存（network_ports 表）
+
+        与旧实现的两点差异（P3 专项，docs §1.11 / §四.3）：
+        1. 未知列名不再被 `hasattr` 静默丢弃，改为显式 ValueError——
+           旧行为在「已存在端口」路径静默丢弃、`sync_coordinator` 传入的
+           `port_info` 从未落库；在「新建端口」路径却抛 TypeError，两条路径不一致。
+        2. `raw_info` 走 normalize_raw_info（空串 -> NULL，JSON 列不接受空串）。
+        """
+        known = {c.name for c in NetworkPort.__table__.columns}
+        unknown = [k for k in data if k not in known]
+        if unknown:
+            raise ValueError(
+                f"upsert_port_info_cache 收到 network_ports 不存在的列: {unknown}；"
+                f"可用列: {sorted(known)}"
+            )
+
+        payload = dict(data)
+        if "raw_info" in payload:
+            payload["raw_info"] = NetworkPort.normalize_raw_info(payload["raw_info"])
+
         info = self.session.query(NetworkPort).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
         ).first()
         if info:
-            for key, value in data.items():
-                if hasattr(info, key):
-                    setattr(info, key, value)
+            for key, value in payload.items():
+                setattr(info, key, value)
         else:
-            info = NetworkPort(device_id=switch_id, port_name=port, **data)
+            info = NetworkPort(device_id=switch_id, port_name=port, **payload)
             self.session.add(info)
         self.session.flush()
 
@@ -693,18 +722,16 @@ class SwitchRepository(BaseRepository):
             port: 端口名称
             config_text: 端口配置文本（display current-configuration interface 的输出）
         """
-        port_info_json = json.dumps(
-            {"port_info": config_text}, ensure_ascii=False,
-        )
+        port_info = {"port_info": config_text}
         row = self.session.query(NetworkPort).filter(
             NetworkPort.device_id == switch_id,
             NetworkPort.port_name == port,
         ).first()
         if row:
-            row.raw_info = port_info_json
+            row.raw_info = port_info
         else:
             row = NetworkPort(
-                device_id=switch_id, port_name=port, raw_info=port_info_json,
+                device_id=switch_id, port_name=port, raw_info=port_info,
             )
             self.session.add(row)
         self.session.flush()
