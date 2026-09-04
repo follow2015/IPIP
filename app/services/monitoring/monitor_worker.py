@@ -24,6 +24,7 @@ import os
 import socket
 import threading
 import uuid
+import weakref
 
 import redis
 from concurrent.futures import ThreadPoolExecutor
@@ -180,22 +181,36 @@ class _LockWatchdog:
         return False
 
 
-def _redis_client(app) -> "redis.Redis":
-    """构建 redis 客户端（host/port fallback，签名保留供 fakeredis patch）。
+_redis_client_cache_lock = threading.Lock()
+_redis_client_cache: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
-    注意：不复用 app.utils.redis_client 的共享单例——app.config["REDIS_URL"]
+
+def _redis_client(app) -> "redis.Redis":
+    """返回该 app 的共享 redis 客户端（每 app 一池，弱引用缓存）。
+
+    签名保留供测试 patch（fakeredis 注入替换整个函数，缓存随之绕过）。
+    不复用 app.utils.redis_client 的全局单例——app.config["REDIS_URL"]
     经 from_object(配置类) 拷入的是 @property 描述符对象而非 str（生产路径
     拿不到 URL 字符串），曾尝试的「URL 一致时复用共享池」分支实为死分支，
     已在 code review 中移除。用 REDIS_HOST/PORT/PASSWORD/DB 构造客户端，
     密码不进字符串避免泄漏；连接异常在使用时暴露，由调用方降级
     （锁续期失败、直查 DB 等），语义与收敛前一致。
-    连接复用由 dynamic_config 的 per-app 缓存兜住（worker 每轮多次读配置）。
+    （N-AI-1：缓存原在 dynamic_config 内部，下沉至此使 alert_ingress 等
+    每次调用新建客户端的路径一并收敛。）
     """
-    host = app.config.get("REDIS_HOST", "localhost")
-    port = app.config.get("REDIS_PORT", 6379)
-    password = app.config.get("REDIS_PASSWORD", "") or None
-    db = app.config.get("REDIS_DB", 0)
-    return redis.Redis(host=host, port=port, password=password, db=db, decode_responses=True)
+    with _redis_client_cache_lock:
+        client = _redis_client_cache.get(app)
+        if client is not None:
+            return client
+        host = app.config.get("REDIS_HOST", "localhost")
+        port = app.config.get("REDIS_PORT", 6379)
+        password = app.config.get("REDIS_PASSWORD", "") or None
+        db = app.config.get("REDIS_DB", 0)
+        client = redis.Redis(
+            host=host, port=port, password=password, db=db, decode_responses=True
+        )
+        _redis_client_cache[app] = client
+        return client
 
 
 def _parse_whitelist(app) -> set:

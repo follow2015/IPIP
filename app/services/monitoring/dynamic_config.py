@@ -19,8 +19,6 @@
   本模块不知道驼峰，避免双层映射导致「线上改了但读取端 key 对不上、不生效」。
 """
 import json
-import threading
-import weakref
 from typing import Any, Dict, Optional
 
 from app.exceptions.business import BusinessLogicError
@@ -31,15 +29,6 @@ from app.persistence.monitor_dynamic_config_repository import (
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-_redis_cache_lock = threading.Lock()
-_redis_clients: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
-
-
-def reset_dynamic_config_redis_cache() -> None:
-    """测试/重载专用：清空 Redis 客户端缓存。"""
-    with _redis_cache_lock:
-        _redis_clients.clear()
 
 REDIS_KEY = "monitor:dynamic_config"
 
@@ -216,14 +205,7 @@ class MonitorDynamicConfig:
             target_app = current_app._get_current_object()
         else:
             target_app = app
-        fn_id = id(_redis_client)
-        with _redis_cache_lock:
-            entry = _redis_clients.get(target_app)
-            if entry is not None and entry[0] == fn_id:
-                return entry[1]
-            client = _redis_client(target_app)
-            _redis_clients[target_app] = (fn_id, client)
-            return client
+        return _redis_client(target_app)
 
     @classmethod
     def get(cls, key: str, app=None, session=None) -> Optional[Any]:
