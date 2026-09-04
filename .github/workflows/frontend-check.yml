@@ -1,0 +1,45 @@
+name: Frontend Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend-new/**'
+      - '.github/workflows/frontend-check.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend-new/**'
+      - '.github/workflows/frontend-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-typecheck:
+    name: 前端 lint + 类型检查
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - name: 安装依赖（frozen lockfile）
+        working-directory: frontend-new
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查（tsc --noEmit）
+        working-directory: frontend-new
+        run: pnpm exec tsc --noEmit
+
+      - name: ESLint
+        working-directory: frontend-new
+        run: pnpm run lint

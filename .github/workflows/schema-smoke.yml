@@ -1,0 +1,72 @@
+name: Schema Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'database/schema.sql'
+      - '.github/workflows/schema-smoke.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'database/schema.sql'
+      - '.github/workflows/schema-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  schema-smoke:
+    name: DDL 建表冒烟（MySQL 8.4）
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: ip_manager
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 等待 MySQL 就绪
+        run: |
+          for i in $(seq 1 30); do
+            if mysql -h 127.0.0.1 -uroot -e "SELECT 1" >/dev/null 2>&1; then
+              echo "MySQL ready"
+              break
+            fi
+            echo "等待 MySQL... ($i)"
+            sleep 2
+          done
+
+      - name: 导入 schema.sql
+        run: |
+          mysql -h 127.0.0.1 -uroot ip_manager < database/schema.sql
+
+      - name: 验证表数量与关键表存在
+        run: |
+          TABLE_COUNT=$(mysql -h 127.0.0.1 -uroot ip_manager -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ip_manager'")
+          echo "表数量: $TABLE_COUNT"
+          if [ "$TABLE_COUNT" -lt 60 ]; then
+            echo "❌ 表数量过少（<60），schema 可能不完整"
+            exit 1
+          fi
+          for t in users devices network_ports vlans ai_conversations ai_diagnosis_sessions; do
+            EXISTS=$(mysql -h 127.0.0.1 -uroot ip_manager -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ip_manager' AND table_name='$t'")
+            if [ "$EXISTS" != "1" ]; then
+              echo "❌ 缺少表: $t"
+              exit 1
+            fi
+            echo "✅ 表存在: $t"
+          done
+          echo "✅ schema 冒烟通过（$TABLE_COUNT 张表全部建表成功）"
