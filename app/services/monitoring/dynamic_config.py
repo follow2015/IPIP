@@ -20,6 +20,7 @@
 """
 import json
 import threading
+import weakref
 from typing import Any, Dict, Optional
 
 from app.exceptions.business import BusinessLogicError
@@ -32,7 +33,7 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 _redis_cache_lock = threading.Lock()
-_redis_clients: Dict[int, "tuple[int, object]"] = {}
+_redis_clients: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
 def reset_dynamic_config_redis_cache() -> None:
@@ -211,15 +212,17 @@ class MonitorDynamicConfig:
         from flask import current_app
         from app.services.monitoring.monitor_worker import _redis_client
 
-        target_app = current_app if app is None else app
-        key = id(target_app)
+        if app is None:
+            target_app = current_app._get_current_object()
+        else:
+            target_app = app
         fn_id = id(_redis_client)
         with _redis_cache_lock:
-            entry = _redis_clients.get(key)
+            entry = _redis_clients.get(target_app)
             if entry is not None and entry[0] == fn_id:
                 return entry[1]
             client = _redis_client(target_app)
-            _redis_clients[key] = (fn_id, client)
+            _redis_clients[target_app] = (fn_id, client)
             return client
 
     @classmethod
@@ -296,9 +299,8 @@ class MonitorDynamicConfig:
         redis_vals: Dict[str, Optional[str]] = {}
         if r is not None:
             try:
-                raw_map = r.hgetall(REDIS_KEY)
-                for k in valid_keys:
-                    redis_vals[k] = raw_map.get(k)
+                raw_list = r.hmget(REDIS_KEY, valid_keys)
+                redis_vals = {k: v for k, v in zip(valid_keys, raw_list)}
             except Exception as e:
                 logger.warning("动态配置批量读 Redis HMGET 失败: %s", e)
 

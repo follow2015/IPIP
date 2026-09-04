@@ -77,7 +77,7 @@ async def ai_task_event_stream(task_id: str, user_id: int | None) -> AsyncGenera
         yield _sse_data({"type": "error", "message": "task not found"})
         return
     owner_id = state.get("user_id")
-    if owner_id is None or owner_id != user_id:
+    if owner_id is None or str(owner_id) != str(user_id):
         logger.info("AI 任务进度订阅被拒绝（归属不符） task_id=%s owner=%s user=%s",
                     task_id, owner_id, user_id)
         yield _sse_data({"type": "error", "message": "无权访问该任务"})

@@ -244,18 +244,3 @@ def _probe_result_to_dict(result) -> dict:
     }
 
 
-@transactional
-def _persist_and_alert(device, result, protocol: str, threshold=None,
-                       re_alert_interval_minutes=None, fallback_role=None,
-                       blindspot_role=None):
-    """事务内：落库 + 告警（apply_result 唯一入口），返回统一响应。
-
-    兼容性保留：check_device_now 已拆分为事务外探测 + _persist_check_result
-    事务内落库（P0-6），本函数暂无调用方，保留待 m9 清理时裁决。
-    """
-    monitor_service.apply_result(
-        device, result, protocol,
-        threshold=threshold, re_alert_interval_minutes=re_alert_interval_minutes,
-        fallback_role=fallback_role, blindspot_role=blindspot_role,
-    )
-    return APIResponse.success(data=_probe_result_to_dict(result))

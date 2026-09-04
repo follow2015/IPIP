@@ -165,28 +165,16 @@ class MetricAlertService:
             )
             self._session.execute(stmt)
             self._session.flush()
-        else:
-            state = (
+            return (
                 self._session.query(DeviceMetricAlertState)
                 .filter(
                     DeviceMetricAlertState.device_id == device_id,
                     DeviceMetricAlertState.metric_key == metric_key,
                     DeviceMetricAlertState.index_key == index,
                 )
-                .one_or_none()
+                .one()
             )
-            if state is None:
-                state = DeviceMetricAlertState(
-                    device_id=device_id,
-                    metric_key=metric_key,
-                    index_key=index,
-                    alert_type=alert_type,
-                )
-                self._session.add(state)
-            state.breached = breached
-            state.severity = severity
-            state.last_value = last_value
-            self._session.flush()
+
         state = (
             self._session.query(DeviceMetricAlertState)
             .filter(
@@ -194,8 +182,20 @@ class MetricAlertService:
                 DeviceMetricAlertState.metric_key == metric_key,
                 DeviceMetricAlertState.index_key == index,
             )
-            .one()
+            .one_or_none()
         )
+        if state is None:
+            state = DeviceMetricAlertState(
+                device_id=device_id,
+                metric_key=metric_key,
+                index_key=index,
+                alert_type=alert_type,
+            )
+            self._session.add(state)
+        state.breached = breached
+        state.severity = severity
+        state.last_value = last_value
+        self._session.flush()
         return state
 
     def _enqueue(self, device_id, alert_type, severity, metric_key, index, value, breached):

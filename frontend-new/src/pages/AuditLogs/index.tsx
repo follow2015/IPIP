@@ -9,7 +9,7 @@ const ACTION_OPTIONS = [
   { label: '登录', value: 'login' },
   { label: '登出', value: 'logout' },
   { label: '导入', value: 'import' },
-  { label: '导出', value: 'export' },
+  { label: '导出', value: 'export' }
 ];
 
 const RESOURCE_OPTIONS = [
@@ -22,7 +22,7 @@ const RESOURCE_OPTIONS = [
   { label: '客户', value: 'customer' },
   { label: '用户', value: 'user' },
   { label: 'VLAN', value: 'vlan' },
-  { label: '角色', value: 'role' },
+  { label: '角色', value: 'role' }
 ];
 
 const ACTION_COLOR_MAP: Record<string, string> = {
@@ -32,7 +32,7 @@ const ACTION_COLOR_MAP: Record<string, string> = {
   login: 'cyan',
   logout: 'default',
   import: 'purple',
-  export: 'orange',
+  export: 'orange'
 };
 
 function AuditLogs() {

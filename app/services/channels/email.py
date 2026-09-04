@@ -35,15 +35,19 @@ def get_mail_config_from_db() -> dict:
     """
     from app.models.mail_setting import MailSetting
 
+    raw = MailSetting.get_raw_batch([
+        "mail_server", "mail_port", "mail_use_tls", "mail_use_ssl",
+        "mail_username", "mail_password", "mail_default_sender", "mail_timeout",
+    ])
     return {
-        "server": MailSetting.get_raw("mail_server") or "",
-        "port": int(MailSetting.get_raw("mail_port") or 587),
-        "use_tls": (MailSetting.get_raw("mail_use_tls") or "true").lower() == "true",
-        "use_ssl": (MailSetting.get_raw("mail_use_ssl") or "false").lower() == "true",
-        "username": MailSetting.get_raw("mail_username") or "",
-        "password": MailSetting.get_raw("mail_password") or "",
-        "sender": MailSetting.get_raw("mail_default_sender") or "",
-        "timeout": int(MailSetting.get_raw("mail_timeout") or 10),
+        "server": raw.get("mail_server") or "",
+        "port": int(raw.get("mail_port") or 587),
+        "use_tls": (raw.get("mail_use_tls") or "true").lower() == "true",
+        "use_ssl": (raw.get("mail_use_ssl") or "false").lower() == "true",
+        "username": raw.get("mail_username") or "",
+        "password": raw.get("mail_password") or "",
+        "sender": raw.get("mail_default_sender") or "",
+        "timeout": int(raw.get("mail_timeout") or 10),
     }
 
 

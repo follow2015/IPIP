@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 def get_voice_config_from_db() -> dict:
     """从数据库获取语音配置（不脱敏），供 channel/task 内部使用。"""
     from app.models.voice_setting import VoiceSetting
-    return {k: VoiceSetting.get_raw(k) for k in VoiceSetting.ALLOWED_KEYS}
+    return VoiceSetting.get_raw_batch(VoiceSetting.ALLOWED_KEYS)
 
 
 class VoiceChannel(PersonalChannel):

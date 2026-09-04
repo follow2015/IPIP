@@ -1,5 +1,16 @@
 import { useState, useMemo } from 'react';
-import { Card, Table, Tag, Space, Button, Descriptions, Modal, Alert, Select, DatePicker } from 'antd';
+import {
+  Card,
+  Table,
+  Tag,
+  Space,
+  Button,
+  Descriptions,
+  Modal,
+  Alert,
+  Select,
+  DatePicker
+} from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -23,7 +34,7 @@ export default function AuditLogTable({
   actionPrefix,
   resourceOptions,
   actionOptions,
-  actionColorMap = {},
+  actionColorMap = {}
 }: AuditLogTableProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -38,7 +49,7 @@ export default function AuditLogTable({
       const res = await get<User[]>('/users', { all: 'true' });
       return res.data ?? [];
     },
-    staleTime: 5 * 60 * 1000, // 用户列表 5 分钟缓存
+    staleTime: 5 * 60 * 1000 // 用户列表 5 分钟缓存
   });
   const userNameMap = useMemo(() => {
     const map = new Map<number, string>();
@@ -60,7 +71,7 @@ export default function AuditLogTable({
     ...(dateRange?.[0] ? { start_time: dateRange[0]!.startOf('day').toISOString() } : {}),
     ...(dateRange?.[1] ? { end_time: dateRange[1]!.endOf('day').toISOString() } : {}),
     page,
-    per_page: pageSize,
+    per_page: pageSize
   });
 
   const logs = data?.items ?? [];
@@ -79,42 +90,42 @@ export default function AuditLogTable({
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (t: string) => (t ? new Date(t).toLocaleString('zh-CN') : '-'),
+      render: (t: string) => (t ? new Date(t).toLocaleString('zh-CN') : '-')
     },
     {
       title: '操作人',
       dataIndex: 'user_id',
       key: 'user_id',
       width: 100,
-      render: (v: number | null) => renderUserName(v),
+      render: (v: number | null) => renderUserName(v)
     },
     {
       title: '操作',
       dataIndex: 'action',
       key: 'action',
       width: 180,
-      render: (a: string) => <Tag color={actionColorMap[a] ?? 'blue'}>{a}</Tag>,
+      render: (a: string) => <Tag color={actionColorMap[a] ?? 'blue'}>{a}</Tag>
     },
     {
       title: '资源',
       dataIndex: 'resource',
       key: 'resource',
       width: 120,
-      render: (r: string) => (r ? <Tag>{r}</Tag> : '-'),
+      render: (r: string) => (r ? <Tag>{r}</Tag> : '-')
     },
     {
       title: '资源ID',
       dataIndex: 'resource_id',
       key: 'resource_id',
       width: 80,
-      render: (v: number | null) => v ?? '-',
+      render: (v: number | null) => v ?? '-'
     },
     {
       title: '客户端IP',
       dataIndex: 'ip_address',
       key: 'ip_address',
       width: 130,
-      render: (v: string | null) => v ?? '-',
+      render: (v: string | null) => v ?? '-'
     },
     {
       title: '详情',
@@ -124,8 +135,8 @@ export default function AuditLogTable({
         <Button type="link" onClick={() => setDetailRecord(record)}>
           查看
         </Button>
-      ),
-    },
+      )
+    }
   ];
 
   return (
@@ -204,7 +215,7 @@ export default function AuditLogTable({
           onChange: (p, ps) => {
             setPage(p);
             setPageSize(ps);
-          },
+          }
         }}
       />
 
@@ -225,12 +236,18 @@ export default function AuditLogTable({
                   ? new Date(detailRecord.created_at).toLocaleString('zh-CN')
                   : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="操作人">{renderUserName(detailRecord.user_id)}</Descriptions.Item>
+              <Descriptions.Item label="操作人">
+                {renderUserName(detailRecord.user_id)}
+              </Descriptions.Item>
               <Descriptions.Item label="操作">
-                <Tag color={actionColorMap[detailRecord.action] ?? 'blue'}>{detailRecord.action}</Tag>
+                <Tag color={actionColorMap[detailRecord.action] ?? 'blue'}>
+                  {detailRecord.action}
+                </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="资源">{detailRecord.resource ?? '-'}</Descriptions.Item>
-              <Descriptions.Item label="资源ID">{detailRecord.resource_id ?? '-'}</Descriptions.Item>
+              <Descriptions.Item label="资源ID">
+                {detailRecord.resource_id ?? '-'}
+              </Descriptions.Item>
               <Descriptions.Item label="客户端IP" span={2}>
                 {detailRecord.ip_address ?? '-'}
               </Descriptions.Item>

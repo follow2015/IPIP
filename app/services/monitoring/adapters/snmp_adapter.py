@@ -23,6 +23,20 @@ from app.utils.logging import get_logger
 import threading
 import time
 
+_SNMP_TRACEBACK_COOLDOWN = 300.0
+_SNMP_LOG_THROTTLE: dict = {}
+_SNMP_LOG_LOCK = threading.Lock()
+
+
+def _snmp_log_gate(ip: str, mib: str, symbol: str) -> bool:
+    """返回本次是否应输出完整 traceback（限频：同三元组冷却期内不重复打印栈）。"""
+    key = (ip, mib, symbol)
+    now = time.monotonic()
+    with _SNMP_LOG_LOCK:
+        last = _SNMP_LOG_THROTTLE.get(key)
+        _SNMP_LOG_THROTTLE[key] = now
+        return last is None or (now - last) >= _SNMP_TRACEBACK_COOLDOWN
+
 from app.services.monitoring.adapters.base_adapter import (
     MonitorAdapter,
     MonitorProtocolCode,
@@ -241,7 +255,10 @@ async def _snmp_get_sysuptime_async(
         msg = str(exc).lower()
         if "timeout" in msg:
             return False, None, ProbeErrorCode.TIMEOUT.value
-        logger.warning("SNMP _snmp_get_single 异常 ip=%s", ip, exc_info=True)
+        if _snmp_log_gate(ip, "_single", "_"):
+            logger.warning("SNMP _snmp_get_single 异常 ip=%s", ip, exc_info=True)
+        else:
+            logger.warning("SNMP _snmp_get_single 异常(已限频) ip=%s", ip)
         return False, None, "exception"
 
 
@@ -403,10 +420,16 @@ async def _snmp_walk_table_async(credential: dict, ip: str, mib: str, symbol: st
                 mib, symbol, ip,
             )
             return {}
-        logger.warning("SNMP 指标采集异常 mib=%s symbol=%s ip=%s", mib, symbol, ip, exc_info=True)
+        if _snmp_log_gate(ip, mib, symbol):
+            logger.warning("SNMP 指标采集异常 mib=%s symbol=%s ip=%s", mib, symbol, ip, exc_info=True)
+        else:
+            logger.warning("SNMP 指标采集异常(已限频) mib=%s symbol=%s ip=%s", mib, symbol, ip)
         return {}
     except Exception:  # noqa: BLE001 - 内层吞掉，调用方判定
-        logger.warning("SNMP 指标采集异常 mib=%s symbol=%s ip=%s", mib, symbol, ip, exc_info=True)
+        if _snmp_log_gate(ip, mib, symbol):
+            logger.warning("SNMP 指标采集异常 mib=%s symbol=%s ip=%s", mib, symbol, ip, exc_info=True)
+        else:
+            logger.warning("SNMP 指标采集异常(已限频) mib=%s symbol=%s ip=%s", mib, symbol, ip)
         return {}
 
 

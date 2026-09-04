@@ -520,29 +520,43 @@ def _build_monitor_service():
     )
 
 
+MIN_LOOP_INTERVAL = 5
+
+
 def _resolve_loop_interval(app, loop_name: str, current: int) -> int:
     """热重载读取轮询间隔（每轮调用）。
 
     优先动态配置 MONITOR_INTERVAL_<LOOP>（Redis/DB 双写），否则回退
     app.config，再否则沿用当前值 current。读取出错（Redis 不可达等）时
     降级到 app.config / current，保证 Worker 健壮不崩溃。
+
+    最终结果钳制到 MIN_LOOP_INTERVAL 下限（m1）。
     """
     cfg_key = f"MONITOR_INTERVAL_{loop_name.upper()}"
+    candidates = []
     try:
         with app.app_context():
             from app.services.monitoring.dynamic_config import MonitorDynamicConfig
 
             iv = MonitorDynamicConfig.get(cfg_key)
         if iv is not None:
-            return int(iv)
+            candidates.append(iv)
     except Exception:
         logger.warning(
             "轮询 interval 热重载读取失败（沿用旧值） loop=%s", loop_name, exc_info=True
         )
     try:
-        return int(app.config.get(cfg_key, current))
-    except (TypeError, ValueError):
-        return current
+        candidates.append(app.config.get(cfg_key, current))
+    except Exception:  # noqa: BLE001
+        pass
+
+    for raw in candidates:
+        try:
+            val = int(raw)
+        except (TypeError, ValueError):
+            continue
+        return max(val, MIN_LOOP_INTERVAL)
+    return max(int(current), MIN_LOOP_INTERVAL)
 
 
 def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) -> None:

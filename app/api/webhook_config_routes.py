@@ -15,6 +15,7 @@ from app.openapi.doc import doc
 from app.models.webhook_config import validate_webhook_url
 from app.services.webhook_config_service import webhook_config_service
 from app.utils.auth import login_required
+from app.utils.http_client import post_json
 from app.utils.transactional import transactional
 from app.core.enums import ChannelType
 from app.exceptions.validation import ValidationError
@@ -141,7 +142,7 @@ def test_webhook_config(config_id):
         else:
             payload = {"text": "[测试消息] Webhook 连通性测试 - 来自 IPIP 通知系统"}
 
-        resp = requests.post(config.url, json=payload, timeout=10, allow_redirects=False)
+        resp = post_json(config.url, payload, timeout=10)
         if resp.status_code == 200:
             return APIResponse.success(
                 data={"success": True, "message": "Webhook 连通性测试成功", "response_code": resp.status_code}

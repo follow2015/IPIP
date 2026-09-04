@@ -134,17 +134,19 @@ async def verify_sse_ticket(ticket: str) -> dict | None:
         return None
 
     jti = payload.get("jti")
-    if jti:
-        try:
-            import time
+    if not jti:
+        logger.warning("SSE ticket 缺少 jti，拒绝（一次性消费/防重放保护不可用）")
+        return None
+    try:
+        import time
 
-            r = await redis_bus.get_redis()
-            ttl = max(int(payload.get("exp", 0) - time.time()), 1)
-            if await r.set(f"sse_ticket:{jti}", "1", nx=True, ex=ttl) is None:
-                logger.warning("SSE ticket 已被消费（疑似重放）: jti=%s", jti)
-                return None
-        except Exception as exc:  # noqa: BLE001
-            logger.error("SSE ticket 一次性校验失败（拒绝，fail-closed）: %s", exc)
+        r = await redis_bus.get_redis()
+        ttl = max(int(payload.get("exp", 0) - time.time()), 1)
+        if await r.set(f"sse_ticket:{jti}", "1", nx=True, ex=ttl) is None:
+            logger.warning("SSE ticket 已被消费（疑似重放）: jti=%s", jti)
             return None
+    except Exception as exc:  # noqa: BLE001
+        logger.error("SSE ticket 一次性校验失败（拒绝，fail-closed）: %s", exc)
+        return None
 
     return payload

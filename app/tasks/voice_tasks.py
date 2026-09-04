@@ -15,6 +15,11 @@ from app.services.channels.voice_providers.errors import (
     TransientVoiceError,
     PermanentVoiceError,
 )
+from app.services.channels.voice_providers.terminal_status import (
+    VOICE_RESULT_EVENTS,
+    is_call_concluded,
+    is_failed_status,
+)
 
 logger = get_logger(__name__)
 
@@ -43,6 +48,18 @@ def _get_voice_redis():
 def send_voice_call(self, receipt_id: int) -> dict:
     """发起语音呼叫并等待回调确认窗口。
 
+    n6 容量模型（全局外呼并发的唯一权威说明）：
+    - 全局并发上限 = voice worker 的 celery concurrency（部署默认 4，见
+      deploy/supervisord.conf `-Q voice --concurrency=4`）。
+    - 单 task 在 worker 内阻塞轮询最长 call_timeout（≤30s，本函数 :165 附近），
+      加上 make_call 余量，单 slot 占用上限 = soft_time_limit(45s)。
+    - 扩容外呼吞吐 = 提高 voice worker concurrency；突发告警超出并发时在
+      broker 排队（天然削峰），不会打爆厂商。
+    - 厂商侧额度另由 _check_and_consume_budget 按被叫号码流控（分钟/时/天/夜间
+      四窗口），与并发上限正交。
+    未引入 Redis in-flight 信号量：worker 崩溃会把计数卡在高位（即使有 TTL，
+    也可能造成最长 TTL 窗口内全部外呼被拒），风险大于收益。
+
     流程：
     1. 幂等短路（回调已写终态，含 answered）
     2. 校验被叫号码（无号码为永久错误，不重试）
@@ -69,8 +86,7 @@ def send_voice_call(self, receipt_id: int) -> dict:
 
     status = dict(receipt.channel_status or {})
 
-    if status.get("voice") in ("acked", "answered", "delivered", "no_answer",
-                               "failed:cancelled"):
+    if is_call_concluded(status.get("voice")):
         return {"skipped": f"already_{status['voice']}"}
 
     callee_user = User.query.get(receipt.user_id)
@@ -144,9 +160,9 @@ def send_voice_call(self, receipt_id: int) -> dict:
         db.session.expire(receipt)  # 强制重读
         status_now = dict(receipt.channel_status or {})
         current = status_now.get("voice")
-        if current in ("acked", "answered", "delivered"):
+        if current in VOICE_RESULT_EVENTS:
             return {"result": current, "call_id": call_id}
-        if current == "no_answer" or (current or "").startswith("failed:"):
+        if current == "no_answer" or is_failed_status(current):
             if status_now.get("voice_retryable"):
                 raise TransientVoiceError(f"call ended: {current}")
             logger.info("语音呼叫终态不重试: receipt_id=%s status=%s", receipt_id, current)
@@ -272,9 +288,14 @@ def _check_and_consume_budget(redis_client, phone: str, config: dict) -> bool:
             pipe.incr(key)
             pipe.expire(key, ttl)
         results = pipe.execute()
-        for idx, (_key, budget, _ttl) in enumerate(checks):
-            if results[idx * 2] > budget:
-                return False
+        over = [i for i, (_key, budget, _ttl) in enumerate(checks)
+                if results[i * 2] > budget]
+        if over:
+            rollback = redis_client.pipeline()
+            for i in over:
+                rollback.decr(checks[i][0])
+            rollback.execute()
+            return False
         return True
     except Exception:
         logger.warning("语音预算 Redis 不可用，放行本次呼叫", exc_info=True)

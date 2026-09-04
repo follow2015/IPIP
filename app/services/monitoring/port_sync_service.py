@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 from app.utils.logging import get_logger
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import delete as sa_delete
@@ -113,7 +113,7 @@ class PortSyncService:
             dict: {"matched": int, "added": int, "removed": int}
         """
         session = self.port_repo.session
-        now = datetime.now()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         existing_ports = (
             session.query(NetworkPort)

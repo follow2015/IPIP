@@ -50,6 +50,34 @@ redis.call('EXPIRE', KEYS[1], ARGV[3])
 
 _ring_script = None
 
+_PUBLISH_ATTEMPTS = 3
+_PUBLISH_RETRY_DELAY = 0.05  # 秒
+
+_publish_drop_stats: dict[str, int] = {
+    "device_publish": 0,   # 设备事件最终投递失败（含有界重试耗尽）
+    "global_publish": 0,   # 全局事件投递失败
+    "redis_unavailable": 0,  # Redis 不可用导致的事件丢弃
+}
+_last_unavailable_log = 0.0  # 节流：不可用告警 60s 一次，防故障期刷屏
+
+
+def get_publish_drop_stats() -> dict[str, int]:
+    """返回各类事件投递失败累计计数（供运维端点 / 排障读取）。"""
+    return dict(_publish_drop_stats)
+
+
+def _warn_redis_unavailable() -> None:
+    """Redis 不可用的节流告警（首次及每 60s 提醒一次）。"""
+    global _last_unavailable_log
+    now = time.monotonic()
+    if now - _last_unavailable_log < 60:
+        return
+    _last_unavailable_log = now
+    logger.error(
+        "Redis 不可用，事件发布被丢弃（累计 %d 条；本条每 60s 提醒一次）",
+        _publish_drop_stats["redis_unavailable"],
+    )
+
 
 
 def _get_redis():
@@ -88,6 +116,8 @@ def _publish_device_event(device_id: int, event_dict: dict) -> None:
     """
     r = _get_redis()
     if not r:
+        _publish_drop_stats["redis_unavailable"] += 1
+        _warn_redis_unavailable()
         return
     try:
         seq_key = f"seq:{device_id}"
@@ -100,20 +130,40 @@ def _publish_device_event(device_id: int, event_dict: dict) -> None:
             args=[payload, RING_BUFFER_SIZE - 1, RING_TTL_SECONDS],
         )
 
-        r.publish(f"sw:{device_id}", payload)
+        for attempt in range(1, _PUBLISH_ATTEMPTS + 1):
+            try:
+                r.publish(f"sw:{device_id}", payload)
+                break
+            except Exception as exc:
+                if attempt == _PUBLISH_ATTEMPTS:
+                    _publish_drop_stats["device_publish"] += 1
+                    logger.error(
+                        "Redis 设备事件 publish 失败（已重试 %d 次，放弃；累计丢弃 %d 条；"
+                        "事件已在 ring，重连客户端可重放补收）device=%s seq=%s: %s",
+                        _PUBLISH_ATTEMPTS, _publish_drop_stats["device_publish"],
+                        device_id, event_dict.get("seq"), exc,
+                    )
+                else:
+                    time.sleep(_PUBLISH_RETRY_DELAY)
     except Exception as exc:
-        logger.warning("Redis 设备事件发布失败: %s", exc)
+        _publish_drop_stats["device_publish"] += 1
+        logger.error("Redis 设备事件发布失败（累计丢弃 %d 条）: %s",
+                     _publish_drop_stats["device_publish"], exc)
 
 
 def _redis_publish_global(payload: str) -> None:
     """通过 Redis Pub/Sub 广播全局事件。"""
     r = _get_redis()
     if not r:
+        _publish_drop_stats["redis_unavailable"] += 1
+        _warn_redis_unavailable()
         return
     try:
         r.publish(_GLOBAL_REDIS_CHANNEL, payload)
     except Exception as exc:
-        logger.warning("Redis global publish 失败: %s", exc)
+        _publish_drop_stats["global_publish"] += 1
+        logger.error("Redis global publish 失败（累计丢弃 %d 条）: %s",
+                     _publish_drop_stats["global_publish"], exc)
 
 
 

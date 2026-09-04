@@ -60,7 +60,7 @@ class DeviceEventBus {
       }, 1000);
       return;
     }
-    const ticket = await fetchSSETicket();
+    const ticket = await fetchSSETicket(this.deviceId);
     if (!ticket) {
       this.reconnectTimer = setTimeout(() => {
         void this.connect();
@@ -68,7 +68,12 @@ class DeviceEventBus {
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
       return;
     }
-    const url = `/realtime/sse/switch/${this.deviceId}?since_seq=${this.seq}&ticket=${encodeURIComponent(ticket)}`;
+    const base = `/realtime/sse/switch/${this.deviceId}`;
+    const qs =
+      this.seq > 0
+        ? `since_seq=${this.seq}&ticket=${encodeURIComponent(ticket)}`
+        : `ticket=${encodeURIComponent(ticket)}`;
+    const url = `${base}?${qs}`;
     this.source = new EventSource(url);
 
     this.source.onmessage = (e) => {
@@ -90,7 +95,7 @@ class DeviceEventBus {
   }
 
   private async checkRecoverable(): Promise<void> {
-    const ticket = await fetchSSETicket();
+    const ticket = await fetchSSETicket(this.deviceId);
     if (!ticket) {
       this.reconnectTimer = setTimeout(() => {
         void this.connect();

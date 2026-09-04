@@ -307,7 +307,17 @@ class Config:
 
     @property
     def REDIS_URL(self):
-        """构建Redis连接URL"""
+        """构建Redis连接URL。
+
+        s5：优先级必须与 realtime_gateway/config.py::_build_redis_url 完全一致——
+        1) 环境变量 REDIS_URL（完整 URL，优先）；
+        2) 由 REDIS_HOST / REDIS_PORT / REDIS_PASSWORD / REDIS_DB 组装。
+        否则运维只设 REDIS_URL 时，网关连 A Redis 而 Flask 连 B Redis，
+        事件链路（Flask 发布 → 网关订阅推送）静默断裂且无任何报错。
+        """
+        explicit = os.getenv("REDIS_URL")
+        if explicit:
+            return explicit
         if self.REDIS_PASSWORD:
             return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"

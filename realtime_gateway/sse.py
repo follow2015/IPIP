@@ -21,7 +21,9 @@ from . import redis_bus
 logger = logging.getLogger(__name__)
 
 
-async def device_event_stream(device_id: int, since_seq: int = 0) -> asyncio.AsyncGenerator[str, None]:
+async def device_event_stream(
+    device_id: int, since_seq: int | None = 0
+) -> asyncio.AsyncGenerator[str, None]:
     """SSE 事件流生成器（交换机级别，含断线重放）
 
     连接建立时**先建立订阅**，再推送 since_seq 之后的历史事件（从 Redis 共享
@@ -29,7 +31,9 @@ async def device_event_stream(device_id: int, since_seq: int = 0) -> asyncio.Asy
 
     Args:
         device_id:  交换机 device_id（devices.id）
-        since_seq:  客户端最后收到的序列号（0 表示首次连接）
+        since_seq:  客户端最后收到的序列号。**None 表示首次连接，跳过历史重放**
+                    （s12：此前按 0 重放整个 ring，最多 200 条陈旧事件，页面每次
+                    刷新都白白推一遍）；显式传 0 表示从 ring 头全量补发。
 
     Yields:
         str: SSE 格式的文本帧
@@ -51,11 +55,12 @@ async def device_event_stream(device_id: int, since_seq: int = 0) -> asyncio.Asy
             except (json.JSONDecodeError, AttributeError):
                 pass
 
-        for event_dict in await redis_bus.get_events_since(device_id, since_seq):
-            if event_dict.get("seq") in seen_seq:
-                continue  # 订阅后已推送过，避免重复投递
-            seen_seq.add(event_dict.get("seq"))
-            yield f"data: {json.dumps(event_dict, ensure_ascii=False)}\n\n"
+        if since_seq is not None:
+            for event_dict in await redis_bus.get_events_since(device_id, since_seq):
+                if event_dict.get("seq") in seen_seq:
+                    continue  # 订阅后已推送过，避免重复投递
+                seen_seq.add(event_dict.get("seq"))
+                yield f"data: {json.dumps(event_dict, ensure_ascii=False)}\n\n"
 
         for payload in already:
             yield f"data: {payload}\n\n"
