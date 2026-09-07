@@ -244,7 +244,11 @@ def refresh_token():
     if not data or "refresh_token" not in data:
         return APIResponse.error("缺少refresh_token参数", status_code=400)
 
-    new_token = auth_manager.refresh_token(data["refresh_token"])
+    new_token = auth_manager.refresh_token(
+        data["refresh_token"],
+        device_fingerprint=auth_manager.compute_device_fingerprint(
+            request.headers.get("User-Agent", "")),
+    )
 
     if not new_token:
         return APIResponse.error(

@@ -116,6 +116,7 @@ class AuthenticationManager:
         auth_type: str = "web",
         openid: str = None,
         expires_delta: "timedelta" = None,
+        device_fingerprint: str = None,
     ) -> str:
         """生成JWT令牌
 
@@ -128,6 +129,8 @@ class AuthenticationManager:
             openid: 微信OpenID（微信登录时必需）
             expires_delta: 自定义有效期（秒），None 时按 token_type 取默认值
                           （access=1h / refresh=7d；"记住我"登录传 30d）
+            device_fingerprint: 设备指纹（仅写入 refresh token 的 dfp claim）。
+                              换浏览器/换设备后 UA 变化 → 指纹不匹配 → 刷新被拒
 
         Returns:
             str: JWT令牌
@@ -162,6 +165,9 @@ class AuthenticationManager:
                 raise ValueError("Web登录必须提供username")
             payload["username"] = username
             payload["user_identifier"] = username
+
+        if device_fingerprint and token_type == "refresh":
+            payload["dfp"] = device_fingerprint
 
         token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
         if isinstance(token, bytes):
@@ -304,21 +310,36 @@ class AuthenticationManager:
             )
             return None
 
-    def refresh_token(self, refresh_token: str) -> Optional[Dict[str, str]]:
-        """刷新访问令牌
+    def refresh_token(
+        self, refresh_token: str, device_fingerprint: str = None
+    ) -> Optional[Dict[str, str]]:
+        """刷新访问令牌（含重用检测与设备绑定）
 
         Args:
             refresh_token: 刷新令牌
+            device_fingerprint: 调用方 User-Agent 派生的设备指纹。
+                与签发时绑定的 dfp 不一致则拒绝（换浏览器/换设备须重新登录）
 
         Returns:
             Optional[Dict]: 包含新的访问令牌和刷新令牌，失败返回None
         """
+        if cache_manager.is_token_revoked(refresh_token):
+            self._handle_refresh_token_reuse(refresh_token)
+            return None
+
         payload = self.verify_token(refresh_token)
         if not payload:
             return None
 
         if payload.get("type") != "refresh":
             logger.warning("令牌类型错误，期望refresh令牌")
+            return None
+
+        bound_dfp = payload.get("dfp")
+        if bound_dfp and device_fingerprint is not None and bound_dfp != device_fingerprint:
+            logger.warning(
+                "refresh token 设备指纹不匹配，拒绝刷新（疑似跨设备盗用）: "
+                "user_id=%s", payload.get("user_id"))
             return None
 
         user_id = payload["user_id"]
@@ -357,6 +378,7 @@ class AuthenticationManager:
             )
 
         self.revoke_token(refresh_token)
+        self._mark_refresh_token_rotated(payload)
 
         try:
             from app.services.switch_events import _get_redis
@@ -451,7 +473,8 @@ class AuthenticationManager:
             return False
 
     def authenticate_password(
-        self, username: str, password: str, user_service, remember: bool = False
+        self, username: str, password: str, user_service,
+        remember: bool = False, device_fingerprint: str = None
     ) -> Optional[Dict[str, Any]]:
         """认证用户（用户名密码方式）
 
@@ -462,6 +485,8 @@ class AuthenticationManager:
             remember: 「记住我」勾选——True 时刷新令牌有效期延长至
                       JWT_REFRESH_TOKEN_REMEMBER_EXPIRES（默认 30 天），
                       False 保持默认 7 天
+            device_fingerprint: 调用方设备指纹，绑定到 refresh token
+                      （刷新时校验，换浏览器/换设备须重新登录）
 
         Returns:
             Optional[Dict]: 认证成功返回用户信息和令牌，失败返回None
@@ -502,6 +527,7 @@ class AuthenticationManager:
                         self.refresh_token_expires))
                     if remember else None
                 ),
+                device_fingerprint=device_fingerprint,
             )
 
             logger.info(
@@ -570,6 +596,60 @@ class AuthenticationManager:
             r.delete(key)
         except Exception as e:
             logger.warning("撤销刷新令牌失败: user_id=%d, error=%s", user_id, e)
+
+    @staticmethod
+    def compute_device_fingerprint(user_agent: str) -> str:
+        """由 User-Agent 派生设备指纹（弱绑定）。
+
+        换浏览器/换设备 → UA 变化 → 指纹变化 → refresh 被拒，须重新登录。
+        同一浏览器升级小版本也会强制重登，属接受的权衡（安全优先）。
+        """
+        if not user_agent:
+            return "ua-empty"
+        return hashlib.sha256(user_agent.encode("utf-8")).hexdigest()[:16]
+
+    def _mark_refresh_token_rotated(self, payload: dict) -> None:
+        """轮换后为旧令牌 jti 写标记，TTL = 旧令牌剩余有效期。
+
+        重用检测据此区分「已轮换令牌被重放（疑似盗用，触发全链撤销）」
+        与「登出撤销后的令牌误用（仅拒绝）」。
+        """
+        try:
+            jti = payload.get("jti")
+            if not jti:
+                return
+            exp = payload.get("exp")
+            ttl = int(exp - datetime.now(timezone.utc).timestamp()) if exp else 86400
+            cache_manager.set(f"auth:refresh_rotated:{jti}", "1", ttl=max(ttl, 1))
+        except Exception as e:
+            logger.warning("写 refresh 轮换标记失败: %s", e)
+
+    def _handle_refresh_token_reuse(self, token: str) -> None:
+        """已撤销的 refresh token 再次出现的处理。
+
+        带轮换标记 → 判定凭据泄漏（重放攻击）：撤销该用户全部刷新令牌并告警；
+        无标记 → 登出/过期后的正常无效请求，仅记录不扩大撤销。
+        """
+        try:
+            decoded = jwt.decode(
+                token, self.secret_key,
+                algorithms=[self.algorithm],
+                options={"verify_exp": False},
+            )
+        except jwt.InvalidTokenError:
+            return  # 非本系统签发的令牌，无需处理
+
+        user_id = decoded.get("user_id")
+        jti = decoded.get("jti")
+        rotated = bool(jti) and bool(
+            cache_manager.exists(f"auth:refresh_rotated:{jti}"))
+        if rotated and user_id:
+            logger.warning(
+                "检测到 refresh token 重用（疑似凭据泄漏），"
+                "已撤销该用户全部刷新令牌: user_id=%s, jti=%s", user_id, jti)
+            self._revoke_all_refresh_tokens(user_id)
+        else:
+            logger.info("已撤销的 refresh token 被再次使用: user_id=%s", user_id)
 
     def authenticate(
         self, username: str, password: str, user_service
