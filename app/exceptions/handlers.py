@@ -140,6 +140,23 @@ def register_error_handlers(app: Flask) -> None:
                 status_code=data_error.status_code
             )
     
+    @app.errorhandler(413)
+    def handle_request_entity_too_large(error) -> Tuple[Dict[str, Any], int]:
+        """处理请求体超限（MAX_CONTENT_LENGTH 前置拦截）
+
+        Args:
+            error: werkzeug RequestEntityTooLarge
+
+        Returns:
+            Tuple: (响应数据, 413)
+        """
+        logger.warning("请求体超过上限被拒绝: %s", error)
+        return _api_response().error(
+            message="请求体过大，超过服务器允许的上限（12 MB）",
+            error_code="REQUEST_ENTITY_TOO_LARGE",
+            status_code=413,
+        )
+
     @app.errorhandler(HTTPException)
     def handle_http_exception(error: HTTPException) -> Tuple[Dict[str, Any], int]:
         """处理HTTP异常

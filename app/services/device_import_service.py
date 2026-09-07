@@ -19,6 +19,7 @@ from app.core.enums import (
     SwitchDeviceTypeCode, SSHProtocolCode, DeviceSubtypeCode, SwitchStatus,
 )
 from app.utils import validation_manager
+from app.services import import_export_service
 from app.schemas.device import DeviceCreateSchema
 from app.services.network_device_service import NetworkDeviceService
 from app.models.device import Device
@@ -252,12 +253,7 @@ def build_device_df(file_bytes: bytes, filename: str) -> pd.DataFrame:
     Returns:
         清洗并补全列后的 DataFrame
     """
-    buf = BytesIO(file_bytes)
-    fname = (filename or "").lower()
-    if fname.endswith(".csv"):
-        df = pd.read_csv(buf, encoding="utf-8-sig")
-    else:
-        df = pd.read_excel(buf)
+    df = import_export_service._read_tabular_df(file_bytes, filename)
 
     df = df.where(df.notna(), None)
 

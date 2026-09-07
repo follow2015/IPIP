@@ -14,6 +14,7 @@ from app.models.customer import Customer
 from app.core.enums import CustomerStatus
 from app.persistence.customer_repository import CustomerRepository
 from app.services.switch_events import emit_resource_change_global
+from app.services.import_export_service import escape_export_df
 from app.utils.cache import cache_manager, cached
 from app.exceptions.business import BusinessLogicError
 from app.exceptions.data_access import RecordNotFoundError
@@ -1213,6 +1214,11 @@ class CustomerService:
             columns=["交换机", "端口名", "端口类型", "端口速率", "链路状态", "对端设备"]
         )
 
+        df_overview = escape_export_df(df_overview)
+        df_cabinets = escape_export_df(df_cabinets)
+        df_devices = escape_export_df(df_devices)
+        df_networks = escape_export_df(df_networks)
+        df_ports = escape_export_df(df_ports)
         with pd.ExcelWriter(buf, engine="openpyxl") as writer:
             df_overview.to_excel(writer, index=False, sheet_name="资源概览")
             df_cabinets.to_excel(writer, index=False, sheet_name="机柜明细")

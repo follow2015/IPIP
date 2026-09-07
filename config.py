@@ -155,6 +155,8 @@ class Config:
     CORS_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     CORS_ALLOW_HEADERS = ["Content-Type", "Authorization"]
 
+    MAX_CONTENT_LENGTH = 12 * 1024 * 1024  # 12 MB
+
     TRUSTED_PROXIES = os.getenv("TRUSTED_PROXIES", "").split(",") if os.getenv("TRUSTED_PROXIES") else []
 
     RATELIMIT_ENABLED = True

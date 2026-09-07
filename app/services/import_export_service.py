@@ -20,6 +20,8 @@
 """
 
 import hashlib
+import os
+import zipfile
 import pandas as pd
 from dataclasses import dataclass
 from io import BytesIO
@@ -37,6 +39,11 @@ logger = get_logger(__name__)
 
 
 MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+ALLOWED_IMPORT_EXT = {".csv", ".xlsx"}
+
+_MAX_XLSX_ENTRIES = 5000
+_MAX_XLSX_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
 
 
 class FileTooLargeError(InvalidFormatError):
@@ -181,6 +188,25 @@ class EmptyExportError(InvalidOperationError):
         self.status_code = 404
 
 
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _escape_formula_cell(v):
+    """以公式前缀开头的字符串单元格加单引号前缀（仅处理 str，数值列不受影响）。"""
+    if isinstance(v, str) and v[:1] in _FORMULA_PREFIXES:
+        return "'" + v
+    return v
+
+
+def escape_export_df(df: pd.DataFrame) -> pd.DataFrame:
+    """对 DataFrame 全部字符串单元格做公式注入转义（导出前统一调用）。
+
+    入库数据可能含攻击者可控字符串（如设备名 "=HYPERLINK(...)"），
+    管理员导出打开时会被 Excel 当公式执行。导出侧统一中和。
+    """
+    return df.map(_escape_formula_cell)
+
+
 def export_to_excel(rows: list, sheet_name: str) -> BytesIO:
     """将记录列表统一导出为 Excel 字节流（设备/机柜/客户共用）。
 
@@ -200,13 +226,66 @@ def export_to_excel(rows: list, sheet_name: str) -> BytesIO:
     """
     if not rows:
         raise EmptyExportError()
-    df = pd.DataFrame(rows)
+    df = escape_export_df(pd.DataFrame(rows))
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name=sheet_name)
     output.seek(0)
     return output
 
+
+
+def _validate_import_type(file_bytes: bytes, filename: str) -> str:
+    """导入文件类型校验：扩展名白名单 + 内容 magic bytes 双重检查。
+
+    Args:
+        file_bytes: 上传文件的原始字节
+        filename: 原始文件名
+
+    Returns:
+        归一化后的扩展名（".csv" / ".xlsx"）
+
+    Raises:
+        AppValidationError: 扩展名不在白名单，或内容与声明类型不符
+    """
+    fname = (filename or "").lower()
+    ext = os.path.splitext(fname)[1]
+    if ext not in ALLOWED_IMPORT_EXT:
+        allowed = " / ".join(sorted(ALLOWED_IMPORT_EXT))
+        raise AppValidationError(f"不支持的文件类型 {ext or '(无扩展名)'}，仅支持 {allowed}")
+
+    if ext == ".csv":
+        if b"\x00" in file_bytes[:8192]:
+            raise AppValidationError("文件内容不是合法的 CSV 文本")
+    else:
+        if file_bytes[:2] != b"PK":
+            raise AppValidationError("文件内容不是合法的 xlsx（缺少 ZIP 头）")
+        try:
+            with zipfile.ZipFile(BytesIO(file_bytes)) as zf:
+                names = zf.namelist()
+                if len(names) > _MAX_XLSX_ENTRIES:
+                    raise AppValidationError(
+                        f"xlsx 内部条目过多（{len(names)}），疑似 zip bomb，已拒绝解析")
+                total = sum(info.file_size for info in zf.infolist())
+                if total > _MAX_XLSX_UNCOMPRESSED_BYTES:
+                    raise AppValidationError(
+                        f"xlsx 解压后体积过大（{total} 字节），疑似 zip bomb，已拒绝解析")
+        except zipfile.BadZipFile as e:
+            raise AppValidationError("文件内容不是合法的 xlsx（ZIP 结构损坏）") from e
+    return ext
+
+
+def _read_tabular_df(file_bytes: bytes, filename: str) -> pd.DataFrame:
+    """类型校验后按扩展名解析为 DataFrame（csv / xlsx 双分支唯一收敛点）。
+
+    设备（build_device_df）与客户/机柜（parse_file_to_df）共用，
+    非白名单类型在此统一拒绝，不再落入 read_excel 的无差别解析。
+    """
+    ext = _validate_import_type(file_bytes, filename)
+    buf = BytesIO(file_bytes)
+    if ext == ".csv":
+        return pd.read_csv(buf, encoding="utf-8-sig")
+    return pd.read_excel(buf)
 
 
 def parse_file_to_df(
@@ -226,12 +305,7 @@ def parse_file_to_df(
     Returns:
         清洗并映射后的 DataFrame
     """
-    buf = BytesIO(file_bytes)
-    fname = (filename or "").lower()
-    if fname.endswith(".csv"):
-        df = pd.read_csv(buf, encoding="utf-8-sig")
-    else:
-        df = pd.read_excel(buf)
+    df = _read_tabular_df(file_bytes, filename)
 
     df = df.where(df.notna(), None)
 
