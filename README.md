@@ -53,13 +53,16 @@ ipip/
 │   ├── pnpm-lock.yaml
 │   └── vite.config.js
 ├── database/
-│   ├── schema.sql              # 完整建表 DDL
 │   └── seed/
 │       ├── seed_all.sh         # 统一种子入口
 │       ├── seed_data.sql       # 配置类种子
 │       ├── seed_rbac.py        # RBAC 种子（含 ai:use/ai:admin 权限，幂等）
 │       ├── seed_component_templates.py
 │       └── seed_users.py       # 默认管理员账户
+├── migrations/
+│   └── versions/
+│       ├── 0000_baseline.sql   # 完整建表 DDL（迁移基线快照，含分区表与触发器）
+│       └── 0000_baseline.covers # 基线已覆盖的迁移版本清单
 ├── scripts/
 │   ├── install.sh              # 一键安装（venv + 前端构建 + DB + 种子）
 │   └── start.sh                # 一键启动/停止/状态（4 进程：Flask + gateway + monitor + celery）
@@ -96,7 +99,7 @@ bash scripts/install.sh
 2. 创建 Python venv 并安装 `requirements.txt`
 3. 前端依赖安装 + 构建（`cd frontend-new && pnpm install && pnpm build`）
 4. 从 `.env.example` 创建 `.env`（首次运行，需编辑后重跑）
-5. 创建 MySQL 数据库并导入 `schema.sql`
+5. 创建 MySQL 数据库并导入迁移基线 `0000_baseline.sql`（按 covers 清单登记版本）
 6. 导入种子数据（`seed_all.sh`）
 
 **首次运行后**：编辑 `.env` 填写实际的 `MYSQL_PASSWORD`、`REDIS_PASSWORD`、`SECRET_KEY`、`JWT_SECRET_KEY`，然后再次执行 `bash scripts/install.sh`（已完成的步骤会跳过）。
@@ -241,7 +244,7 @@ AI 助手模块提供告警解读、自然语言查询、RAG 知识库检索、A
 | `ai_conversations` | 对话历史（user_id + scenario 索引，用户删除级联清理） |
 | `ai_diagnosis_sessions` | Agentic 诊断会话（设备/技能/状态索引，设备删除保留会话供回溯） |
 
-DDL 已包含在 `database/schema.sql`，`install.sh` 初始化时自动建表。
+DDL 已迁至 `migrations/versions/0000_baseline.sql`（迁移基线快照），`install.sh` 初始化时自动导入并按 `0000_baseline.covers` 清单登记版本；后续增量通过 `flask db-upgrade` 逐版本升级。
 
 ### 权限
 
