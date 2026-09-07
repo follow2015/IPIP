@@ -2028,7 +2028,7 @@ def batch_update_switches():
             "port": 22,
             "protocol": "ssh",
             "username": "admin",
-            "password": "new_password",
+            "password": "your_new_password",
             "device_type": SwitchDeviceTypeCode.HUAWEI,
             "switch_role": 1,
             "layer": 2,

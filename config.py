@@ -465,6 +465,12 @@ class ProductionConfig(Config):
             raise ValueError("生产环境必须设置SECRET_KEY环境变量")
         if not cls.JWT_SECRET_KEY:
             raise ValueError("生产环境必须设置JWT_SECRET_KEY环境变量")
+        for _key_name in ("SECRET_KEY", "JWT_SECRET_KEY"):
+            _val = getattr(cls, _key_name, "")
+            if _val and str(_val).lower().startswith("change-me"):
+                raise ValueError(
+                    f"生产环境 {_key_name} 仍为 change-me 占位符，拒绝启动（请配置随机密钥）"
+                )
         if not getattr(cls, 'SWITCH_SECRET_KEY', ''):
             raise ValueError(
                 "生产环境必须设置SWITCH_SECRET_KEY环境变量（设备凭据加密密钥）"

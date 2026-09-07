@@ -10,7 +10,7 @@
 #
 # 用法:
 #   bash database/seed/seed_all.sh
-#   SEED_ADMIN_PASSWORD='YourStrongPass!23' bash database/seed/seed_all.sh
+#   SEED_ADMIN_PASSWORD=<你的管理员密码> bash database/seed/seed_all.sh
 #
 # 环境变量:
 #   SEED_ADMIN_PASSWORD  默认管理员密码（缺省随机生成并打印）

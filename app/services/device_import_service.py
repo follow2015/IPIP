@@ -148,7 +148,7 @@ def build_import_template(template_type: str) -> BytesIO:
                 "brand": "华为", "device_model": "CE6800", "serial_number": "SN210004",
                 "hostname": "sw-core-01", "management_ip": "192.168.1.254", "mac_address": "",
                 "cabinet_id": 1, "u_position": 20, "height_u": 1, "status": 2, "notes": "核心交换机", "os_version": "VRP V8.8",
-                "is_managed": True, "ssh_ip": "10.0.0.254", "ssh_port": 22, "ssh_username": "admin", "ssh_password": "admin123",
+                "is_managed": True, "ssh_ip": "10.0.0.254", "ssh_port": 22, "ssh_username": "admin", "ssh_password": "",
                 "ssh_device_type": SwitchDeviceTypeCode.HUAWEI, "ssh_protocol": "ssh",
                 "switch_role": 0, "port_num": 48,
                 "customer_id": "", "responsible_person": "", "power": 350, "asset_number": "",
