@@ -265,9 +265,16 @@ def refresh_token():
 @login_required
 @api_exception_handler
 def logout():
-    """用户登出 — 撤销当前访问令牌"""
+    """用户登出 — /auth/logout 的兼容别名端点
+
+    单一撤销语义源在 AuthManager.logout（app/utils/auth.py）：撤销当前 access
+    token 并撤销该用户全部 refresh token。本端点此前曾直接调用细粒度的
+    revoke_token（只撤 access、不撤 refresh 链），与 /auth/logout 语义漂移；
+    现委托同一语义源，两者完全等价。前端统一使用 /auth/logout。
+    """
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    auth_manager.revoke_token(token)
+    if not auth_manager.logout(token):
+        return APIResponse.error("登出失败", status_code=400)
     return APIResponse.success(message="登出成功")
 
 
