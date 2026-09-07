@@ -255,12 +255,26 @@ DDL 已迁至 `migrations/versions/0000_baseline.sql`（迁移基线快照），
 
 ### 配置
 
-AI 运行依赖以下环境变量（见 `.env.example`）：
+AI 的 LLM 接入（服务商 / 密钥 / 模型 / 超时）配置来源**二选一**，由 `.env` 中 `AI_*` 键是否非空决定（`.env.example` 默认全部为空 / 注释，即走界面自助）：
+
+| 模式 | 配置方式 | 优先级 | 重启后 | 适用 |
+|------|----------|--------|--------|------|
+| ① 部署级固化 | `.env` 中 `AI_PROVIDER` / `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL` 填非空值 | env 最高，界面对应字段显示「由部署环境变量锁定，不可改」 | 始终为 env 值，稳定 | 厂商统一下发、客户不可改 |
+| ② 界面自助 | 上述 4 键保持为空、数值键整行注释 | 无 env 覆盖时以 Redis 快照为准 | 从 Redis `ai:config` 自动恢复，**UI 修改不会被还原** | 客户在「系统设置 → AI 配置」页自行配置 |
+
+> **两种模式不可混用**：任一键非空即进入模式①，界面其余被 env 覆盖字段的修改会被拒绝（`locked`）。切勿照抄占位默认值（`openai` / `gpt-4o-mini`）部署——这些字段会被永久锁死，客户改为 deepseek 等不生效，且重启还原为 env 值。
+> **Redis 是界面配置的唯一持久层**：界面填写内容存于 Redis `key=ai:config`（api_key 以 `SWITCH_SECRET_KEY` 加密）。该 key 丢失 / 被 flush 会使界面配置失效并回落默认，部署后请勿清理该库。
+> **数值键不要留空**：`AI_TIMEOUT` 等只能整行注释（如 `#AI_TIMEOUT=30`），留空会让启动时 `int()`/`float()` 解析崩溃。
+
+主要变量（完整见 `.env.example`）：
 
 | 变量 | 说明 |
 |------|------|
+| `AI_PROVIDER` | LLM 服务商标识（`openai` / `anthropic` / `custom`） |
+| `AI_API_KEY` | LLM 接入密钥（留空则改在界面填写，加密存 Redis） |
+| `AI_BASE_URL` / `AI_MODEL` | LLM 端点与模型名 |
+| `AI_TIMEOUT` / `AI_STREAM_TIMEOUT` / `AI_MAX_TOKENS` / `AI_TEMPERATURE` | 调用超时 / 流式超时 / 最大 token / 采样温度（默认 30s / 120s / 2048 / 0.3） |
 | `AI_ASYNC_ENABLED` | 是否启用 Celery `ai` 异步队列（`1` 启用，非 `1` 走同步路径） |
-| `OPENAI_API_KEY` / `OPENAI_BASE_URL` | LLM 接入凭证与端点 |
 | `AI_RAG_*` | RAG 向量库与 embedding 相关配置 |
 
 ### 降级与保护
