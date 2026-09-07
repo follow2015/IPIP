@@ -277,11 +277,27 @@ export async function resetRagStore(): Promise<void> {
   await post<{ ok: boolean }>('/ai/rag/reset', { confirm: true });
 }
 
-export async function ragQa(question: string): Promise<string> {
-  const res = await post<{ answer: string }>(
-    '/ai/rag/qa',
-    { question },
-    { timeout: AI_TIMEOUT_MS }
-  );
-  return res.data.answer;
+export interface RagReference {
+  doc_id?: string | null;
+  text?: string;
+  score?: number | null;
+}
+
+export interface RagQaResult {
+  answer: string;
+  degraded: boolean;
+  references: RagReference[];
+}
+
+export async function ragQa(question: string): Promise<RagQaResult> {
+  const res = await post<{
+    answer?: string;
+    degraded?: boolean;
+    references?: RagReference[];
+  }>('/ai/rag/qa', { question }, { timeout: AI_TIMEOUT_MS });
+  return {
+    answer: res.data.answer ?? '',
+    degraded: res.data.degraded ?? false,
+    references: res.data.references ?? []
+  };
 }

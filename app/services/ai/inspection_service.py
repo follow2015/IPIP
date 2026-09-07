@@ -11,6 +11,7 @@ from app.services.ai.llm_factory import create_llm_client
 from app.services.ai.llm_base import LLMClient
 from app.services.ai.prompt_guard import strip_sensitive_fields
 from app.services.ai._runtime import observe_call, CallTimer
+from app.services.ai.ai_errors import AINotConfiguredError
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -43,7 +44,7 @@ class InspectionService:
         if not isinstance(device_id, int) or device_id <= 0:
             return ["（device_id 无效，请传入正整数）"]
         if not self.client.is_configured():
-            return ["（AI 未配置，使用默认清单）检查电源/端口/温度"]
+            raise AINotConfiguredError(operation="inspection_checklist")
         device = self._get_device_service().get_device_by_id(device_id) or {}
         monitor = self._get_monitor_service().get_device_status(device_id) or {}
         safe_device = strip_sensitive_fields(device)
@@ -73,7 +74,7 @@ class InspectionService:
 
     def summarize(self, findings: List[str], user_id: int = 0) -> str:
         if not self.client.is_configured():
-            return "（AI 未配置）"
+            raise AINotConfiguredError(operation="inspection_summarize")
         status = "ok"
         summary = ""
         with CallTimer() as t:

@@ -3,7 +3,7 @@
 import hashlib
 import os
 import threading
-from typing import List
+from typing import List, Optional
 
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -11,6 +11,7 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 try:
     import posthog as _posthog
     _posthog.disabled = True
+    _posthog.capture = lambda *args, **kwargs: None  # type: ignore[assignment]
 except ImportError:  # pragma: no cover
     pass
 
@@ -44,6 +45,99 @@ def _distance_to_score(distance, rank: int) -> float:
     if d < 0:
         return 1.0
     return 1.0 / (1.0 + d)
+
+
+_CHUNK_CHARS = int(os.getenv("RAG_CHUNK_CHARS", "800"))
+_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "80"))
+
+_POOL = int(os.getenv("RAG_CANDIDATE_POOL", "20"))
+_RRF_K = 60
+
+
+def _split_blocks(text: str) -> list:
+    """把单个文档切成检索块。
+
+    策略：字符窗口 + 优先在换行符处断块（段落边界更自然），
+    相邻块保留 overlap 字符重叠，缓解跨块语义割裂。
+
+    Args:
+        text: 原始文档全文。
+
+    Returns:
+        文本块列表；短文本（≤ 单块上限）原样返回单块。
+    """
+    text = (text or "").strip()
+    if not text:
+        return []
+    if len(text) <= _CHUNK_CHARS:
+        return [text]
+    blocks: list = []
+    start = 0
+    while start < len(text):
+        end = min(start + _CHUNK_CHARS, len(text))
+        if end < len(text):
+            cut = text.rfind("\n", start, end)
+            if cut != -1 and cut > start + _CHUNK_CHARS // 2:
+                end = cut
+        block = text[start:end].strip()
+        if block:
+            blocks.append(block)
+        if end >= len(text):
+            break
+        start = max(end - _CHUNK_OVERLAP, start + 1)  # 保证推进，防死循环
+    return blocks
+
+
+def _chunk_doc_id(domain: str, source: str, block: str) -> str:
+    """块级 doc_id：与切分顺序无关（内容稳定则幂等）。
+
+    前缀 c- 与旧版"整文 md5"id 区分，避免新旧粒度在同一 collection 混存冲突。
+    同一块内容重复出现（文件间重复段落）自然去重合并。
+    """
+    return "c-" + hashlib.md5(f"{domain}\x00{source}\x00{block}".encode()).hexdigest()[:16]
+
+
+def _rrf_fuse(vec_chunks: list, kw_chunks: list) -> list:
+    """RRF（Reciprocal Rank Fusion）融合两路召回，按融合分降序返回。
+
+    对每个 doc 累加其在各路的名次贡献 1/(K+rank+1)（rank 从 0 起），
+    只命中一路时仅计一路贡献。输出 score 重派生为 1/(1+排名) 以保持
+    0-1 量纲（confidence.rag_relevance 依赖 Top-1 score，不能给原始 RRF 小值）。
+
+    Args:
+        vec_chunks: 向量路召回（按相似度降序）。
+        kw_chunks: 关键词路召回（按 bm25 名次升序）。
+
+    Returns:
+        融合排序后的 chunk 列表，各带 vector_rank/keyword_rank/score/score_source。
+    """
+    merged: dict = {}
+    for rank0, c in enumerate(vec_chunks):
+        e = merged.setdefault(c["doc_id"], {"chunk": c, "vec_rank": None, "kw_rank": None})
+        e["vec_rank"] = rank0
+    for rank0, c in enumerate(kw_chunks):
+        e = merged.setdefault(c["doc_id"], {"chunk": c, "vec_rank": None, "kw_rank": None})
+        e["kw_rank"] = rank0
+
+    scored = []
+    for did, e in merged.items():
+        s = 0.0
+        if e["vec_rank"] is not None:
+            s += 1.0 / (_RRF_K + e["vec_rank"] + 1)
+        if e["kw_rank"] is not None:
+            s += 1.0 / (_RRF_K + e["kw_rank"] + 1)
+        chunk = dict(e["chunk"])
+        chunk["vector_rank"] = e["vec_rank"]
+        chunk["keyword_rank"] = e["kw_rank"]
+        scored.append((s, chunk))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    out = []
+    for i, (_rrf, chunk) in enumerate(scored):
+        chunk = dict(chunk)
+        chunk["score"] = 1.0 / (1.0 + i)
+        chunk["score_source"] = "rrf_rank"
+        out.append(chunk)
+    return out
 
 
 def get_rag_store(persist_dir: str = "instance/chroma", collection: str = "ipip_kb",
@@ -110,24 +204,36 @@ class RAGStore:
         except Exception as e:
             logger.warning("FTS5 关键词索引初始化失败，降级为纯向量检索: %s", e)
 
+        self._meta_ready: Optional[bool] = None
+
     def ingest(self, texts: List[str], domain: str = "code_wiki",
                source: str = "docs") -> None:
+        """入库文档（自动分块，块为检索单元）。
+
+        每个文本切成长度受限的块；向量库与 FTS5 都以块粒度写入，metadata
+        携带 domain/source 供检索按域过滤。块级 doc_id 与顺序无关，内容
+        稳定则重复 ingest 幂等（upsert）。
+        """
         if not self.available:
             return
-        seen: set[str] = set()
-        unique_texts: List[str] = []
-        unique_ids: List[str] = []
+        blocks: List[str] = []
+        ids: List[str] = []
+        metas: List[dict] = []
         for t in texts:
-            doc_id = f"doc-{hashlib.md5(t.encode()).hexdigest()[:16]}"
-            if doc_id in seen:
-                continue
-            seen.add(doc_id)
-            unique_ids.append(doc_id)
-            unique_texts.append(t)
-        self.col.upsert(ids=unique_ids, documents=unique_texts)
+            for block in _split_blocks(t):
+                blocks.append(block)
+                ids.append(_chunk_doc_id(domain, source, block))
+                metas.append({"domain": domain, "source": source})
+        if not ids:
+            return
+        self.col.upsert(ids=ids, documents=blocks, metadatas=metas)
         if self.kw_index is not None:
-            for doc_id, text in zip(unique_ids, unique_texts):
-                self.kw_index.upsert(doc_id, domain, text, source)
+            for doc_id, block in zip(ids, blocks):
+                try:
+                    self.kw_index.upsert(doc_id, domain, block, source)
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("rag.kw_upsert_failed doc=%s %s", doc_id, e)
+        self._meta_ready = True
 
     def search(self, query: str, top_k: int = 3) -> List[str]:
         """向量检索（保持向后兼容）。混合检索用 hybrid_search。"""
@@ -145,13 +251,35 @@ class RAGStore:
 
     def hybrid_search(self, query: str, domain: str = "code_wiki",
                       top_k: int = 5) -> list[dict]:
-        """混合检索：向量 + 关键词两路并行召回，返回候选集（RRF 融合留到 Task 7.3）。
+        """混合检索：向量 + 关键词两路召回 → RRF 融合 → 可选本地 rerank 精排。
 
-        当前实现：两路独立召回，合并去重，不融合排序。
-        Task 7.3 接入 RRF 后此方法返回融合排序结果。"""
+        检索单元为块。返回结果按相关度降序（供 confidence 取 Top-1 score）。
+        score 统一归一在 (0,1]：
+        - 未启用 rerank：RRF 名次派生 1/(1+rank)；
+        - 启用 rerank：cross-encoder logit 的 sigmoid。
+        """
         if not self.available:
             return []
-        vec_res = self.col.query(query_texts=[query], n_results=top_k)
+        pool_k = max(top_k, _POOL)
+
+        where = None
+        meta_ready = self._get_meta_ready()
+        if meta_ready:
+            where = {"domain": domain}
+        elif self.col.count() > 0:
+            logger.warning(
+                "rag.collection 缺少 domain metadata（旧库格式），向量路无法按域过滤。"
+                "建议 reset() 重建后重新 ingest。"
+            )
+
+        query_kwargs = {"query_texts": [query], "n_results": pool_k}
+        if where is not None:
+            query_kwargs["where"] = where
+        try:
+            vec_res = self.col.query(**query_kwargs)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("rag.vec_query_failed where=%s err=%s，降级为不过滤", where, e)
+            vec_res = self.col.query(query_texts=[query], n_results=pool_k)
         vec_docs = vec_res.get("documents", [[]])[0]
         vec_ids = vec_res.get("ids", [[]])[0]
         vec_dists = (vec_res.get("distances") or [[]])[0]
@@ -164,13 +292,35 @@ class RAGStore:
              "score_source": "vector_distance"}
             for i, doc in enumerate(vec_docs)
         ]
-        kw_chunks = self.keyword_search(query, domain, top_k)
-        by_id = {}
-        for c in vec_chunks + kw_chunks:
-            prev = by_id.get(c["doc_id"])
-            if prev is None or (c.get("score") or 0) > (prev.get("score") or 0):
-                by_id[c["doc_id"]] = c
-        return sorted(by_id.values(), key=lambda c: c.get("score") or 0, reverse=True)
+        kw_chunks = self.keyword_search(query, domain, pool_k)
+        fused = _rrf_fuse(vec_chunks, kw_chunks)
+        if not fused:
+            return []
+        try:
+            from app.services.ai.rag import reranker
+            if reranker.is_enabled():
+                reranked = reranker.rerank(query, fused, top_k)
+                return reranked if reranked is not None else fused[:top_k]
+        except Exception as e:  # noqa: BLE001
+            logger.warning("rag.rerank_unavailable %s", e)
+        return fused[:top_k]
+
+    def _get_meta_ready(self) -> bool:
+        """查询集合是否含 domain metadata（惰性探测并缓存）。
+
+        探测用 col.get(limit=1)：空集合或全无 metadata 时返回 False；
+        ingest 写入后置 True；reset 重建后置 None 待下次探测。
+        """
+        if self._meta_ready is None:
+            try:
+                res = self.col.get(limit=1)
+                metas = res.get("metadatas") or []
+                self._meta_ready = bool(
+                    metas and isinstance(metas[0], dict) and "domain" in metas[0])
+            except Exception as e:  # noqa: BLE001
+                logger.warning("rag.meta_probe_failed %s", e)
+                self._meta_ready = False
+        return self._meta_ready
 
 
     def ingest_from_docs(self, docs_dir: str, domain: str = "code_wiki") -> int:
@@ -254,4 +404,5 @@ class RAGStore:
                 )
             except Exception as e:  # noqa: BLE001
                 logger.warning("rag.reset.recreate_collection_failed %s", e)
+            self._meta_ready = None
             _store_cache.clear()

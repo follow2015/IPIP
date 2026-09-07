@@ -920,8 +920,12 @@ def rag_qa():
         return APIResponse.error("问题过长，请控制在 2000 字以内")
     user_id = get_current_user_id() or 0
     service = RAGService()
-    answer = service.ask(question, user_id=user_id)
-    return APIResponse.success(data={"answer": answer})
+    result = service.ask(question, user_id=user_id)
+    return APIResponse.success(data={
+        "answer": result.get("answer", ""),
+        "degraded": bool(result.get("degraded")),
+        "references": result.get("references", []),
+    })
 
 
 @bp.get("/health")

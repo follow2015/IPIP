@@ -8,7 +8,7 @@ from typing import Optional
 from openai import OpenAI, APIConnectionError, APIStatusError, APITimeoutError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-from app.exceptions.system import ExternalServiceError
+from app.services.ai.ai_errors import AINotConfiguredError, AIServiceError
 from app.services.ai.circuit_breaker import get_circuit_breaker, AICircuitOpenError
 from app.services.ai.llm_base import LLMClient
 from app.services.ai.llm_factory import register_provider
@@ -60,30 +60,47 @@ class OpenAIProvider(LLMClient):
 
     def chat(self, system_prompt: str, user_prompt: str) -> str:
         if not self.is_configured():
-            raise ExternalServiceError(service_name="ai", operation="chat",
-                                       message="AI 未配置：缺少 AI_API_KEY")
+            raise AINotConfiguredError(operation="chat")
         try:
             resp = self._call_with_circuit(system_prompt, user_prompt)
             if not resp.choices:
                 return ""
             content = resp.choices[0].message.content
             usage = getattr(resp, "usage", None)
+            reasoning = getattr(resp.choices[0].message, "reasoning_content", None)
+            finish_reason = getattr(resp.choices[0], "finish_reason", None)
             logger.info(
-                "ai.chat.complete model=%s base_url=%s tokens=%s",
+                "ai.chat.complete model=%s base_url=%s tokens=%s prompt=%s "
+                "completion=%s finish=%s content_len=%s reasoning_len=%s",
                 self.model, self.base_url,
                 getattr(usage, "total_tokens", None) if usage else None,
+                getattr(usage, "prompt_tokens", None) if usage else None,
+                getattr(usage, "completion_tokens", None) if usage else None,
+                finish_reason, len(content or ""), len(reasoning or ""),
             )
-            return content or ""
+            if not content:
+                logger.warning(
+                    "ai.chat.empty_content model=%s finish=%s completion=%s "
+                    "reasoning_len=%s（输出配额可能被思维链占满，建议调大 AI_MAX_TOKENS）",
+                    self.model, finish_reason,
+                    getattr(usage, "completion_tokens", None) if usage else None,
+                    len(reasoning or ""),
+                )
+                raise AIServiceError(operation="chat")
+            return content
         except (APIConnectionError, APITimeoutError) as e:
-            raise ExternalServiceError(service_name="ai", operation="chat",
-                                       message=f"AI 连接失败：{e}")
+            logger.error("ai.chat.connection_failed type=%s err=%s",
+                         type(e).__name__, e)
+            raise AIServiceError(operation="chat")
         except APIStatusError as e:
-            raise ExternalServiceError(service_name="ai", operation="chat",
-                                       status_code=e.status_code,
-                                       message=f"AI 返回错误：{e}")
+            logger.error("ai.chat.status_error status=%s err=%s", e.status_code, e)
+            raise AIServiceError(operation="chat")
+        except AIServiceError:
+            raise
         except Exception as e:  # noqa: BLE001
-            raise ExternalServiceError(service_name="ai", operation="chat",
-                                       message=f"AI 调用异常：{e}")
+            logger.error("ai.chat.unexpected type=%s err=%s",
+                         type(e).__name__, e, exc_info=True)
+            raise AIServiceError(operation="chat")
 
     @_RETRY_DECORATOR
     def _call_sdk(self, system_prompt: str, user_prompt: str):
@@ -106,8 +123,7 @@ class OpenAIProvider(LLMClient):
 
     def chat_stream(self, system_prompt: str, user_prompt: str):
         if not self.is_configured():
-            raise ExternalServiceError(service_name="ai", operation="chat_stream",
-                                       message="AI 未配置：缺少 AI_API_KEY")
+            raise AINotConfiguredError(operation="chat_stream")
         breaker = get_circuit_breaker(_provider_name())
         if not breaker.allow_request():
             raise AICircuitOpenError(_provider_name())
@@ -138,13 +154,11 @@ class OpenAIProvider(LLMClient):
             raise
         except (APIConnectionError, APITimeoutError, APIStatusError) as e:
             breaker.record_failure()
-            if isinstance(e, (APIConnectionError, APITimeoutError)):
-                raise ExternalServiceError(service_name="ai", operation="chat_stream",
-                                           message=f"AI 连接失败：{e}")
-            raise ExternalServiceError(service_name="ai", operation="chat_stream",
-                                       status_code=getattr(e, "status_code", None),
-                                       message=f"AI 返回错误：{e}")
+            logger.error("ai.chat_stream.upstream_failed type=%s err=%s",
+                         type(e).__name__, e)
+            raise AIServiceError(operation="chat_stream")
         except Exception as e:  # noqa: BLE001
             breaker.record_failure()
-            raise ExternalServiceError(service_name="ai", operation="chat_stream",
-                                       message=f"AI 流式调用异常：{e}")
+            logger.error("ai.chat_stream.unexpected type=%s err=%s",
+                         type(e).__name__, e, exc_info=True)
+            raise AIServiceError(operation="chat_stream")

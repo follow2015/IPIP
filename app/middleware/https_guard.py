@@ -42,6 +42,13 @@ def register_https_guard(app) -> None:
     """注册 HTTPS 强制与 HSTS 中间件（ENFORCE_HTTPS=true 时生效）。"""
     from app.api.base import APIResponse
 
+    if app.config.get("ENFORCE_HTTPS") and not (app.config.get("TRUSTED_PROXIES") or []):
+        logger.warning(
+            "ENFORCE_HTTPS=true 但 TRUSTED_PROXIES 未配置：反代终止 TLS 的部署"
+            "（X-Forwarded-Proto=https）将被全部拒绝。直连 HTTPS（request.is_secure）"
+            "不受影响。若经反代，请配置 TRUSTED_PROXIES=反代IP。",
+        )
+
     @app.before_request
     def _enforce_https():
         if not app.config.get("ENFORCE_HTTPS"):

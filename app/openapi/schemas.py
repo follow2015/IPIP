@@ -1966,9 +1966,22 @@ class AIRagQaRequestSchema(Schema):
     question = fields.Str(required=True, validate=validate.Length(min=1, max=2000))
 
 
+class AIRagReferenceSchema(Schema):
+    """本地检索模式下的命中片段"""
+    doc_id = fields.Str(allow_none=True)
+    text = fields.Str()
+    score = fields.Float(allow_none=True)
+
+
 class AIRagQaResponseSchema(Schema):
-    """POST /ai/rag/qa 响应 data"""
+    """POST /ai/rag/qa 响应 data
+
+    degraded=True：LLM 未配置或服务不可用，已降级为本地检索模式，
+    answer 为知识库命中的原文片段（无 LLM 参与生成）。
+    """
     answer = fields.Str()
+    degraded = fields.Bool()
+    references = fields.List(fields.Nested(AIRagReferenceSchema))
 
 
 class AIRagResetRequestSchema(Schema):

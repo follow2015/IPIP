@@ -20247,8 +20247,15 @@ export interface components {
         AIRagQaRequest: {
             question: string;
         };
+        AIRagReference: {
+            doc_id?: string | null;
+            text?: string;
+            score?: number | null;
+        };
         AIRagQaResponse: {
             answer?: string;
+            degraded?: boolean;
+            references?: components["schemas"]["AIRagReference"][];
         };
         AIRagResetRequest: {
             confirm: boolean;

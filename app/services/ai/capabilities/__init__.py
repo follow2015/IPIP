@@ -7,6 +7,11 @@
 """
 from . import builtin  # noqa: F401  (side-effect: 注册内置能力)
 from . import diagnostic  # noqa: F401  (side-effect: 注册诊断类能力 device.live_inspection/ssh.diagnostic_show)
+from . import entity_capabilities  # noqa: F401  (side-effect: 注册 customer.search / devices.locate)
+from . import topology_capabilities  # noqa: F401  (side-effect: 注册 topology.* 遍历能力)
 from .registry import get_capability, register_capability
 
-__all__ = ["builtin", "diagnostic", "get_capability", "register_capability"]
+__all__ = [
+    "builtin", "diagnostic", "entity_capabilities", "topology_capabilities",
+    "get_capability", "register_capability",
+]

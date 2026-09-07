@@ -33,6 +33,11 @@ DAILY_DOWNSAMPLE_CUTOFF_DAYS = 30
 
 _PARTITION_NAME_RE = re.compile(r"^p\d{8}$")
 
+_ALLOWED_PARTITION_TABLES = frozenset({
+    "device_monitor_probe_events",
+    "device_metric_timeseries",
+})
+
 
 def _row_to_dict(r: DeviceMonitorProbeEvents) -> Dict[str, Any]:
     return {
@@ -237,8 +242,17 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
             return False
         return bind is not None and bind.dialect.name == "mysql"
 
+    @staticmethod
+    def _assert_partition_table(table: str) -> None:
+        """校验分区 DDL 的表名属于白名单（DDL 无法参数化，防注入 fail-fast）。"""
+        if table not in _ALLOWED_PARTITION_TABLES:
+            raise ValueError(
+                f"非法分区表名 {table!r}，仅允许 {sorted(_ALLOWED_PARTITION_TABLES)}"
+            )
+
     def _list_partitions(self, table: str) -> List[Tuple[str, Optional[date]]]:
         """返回 [(partition_name, upper_bound_date), ...]；upper_bound_date 为 None 表示兜底分区。"""
+        self._assert_partition_table(table)
         rows = self.session.execute(
             text(
                 "SELECT PARTITION_NAME, PARTITION_DESCRIPTION "
@@ -336,6 +350,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
     def _drop_expired_partitions(self, table: str, retention_days: int) -> List[str]:
         if not self._is_mysql():
             return []
+        self._assert_partition_table(table)
         cutoff = date.today() - timedelta(days=retention_days)
         dropped: List[str] = []
         for name, ub in self._list_partitions(table):
@@ -384,6 +399,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         """
         if not self._is_mysql():
             return []
+        self._assert_partition_table(table)
         parts = self._list_partitions(table)
         existing = {n for n, _ in parts}
         has_future = "p_future" in existing

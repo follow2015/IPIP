@@ -293,11 +293,11 @@ def list_ips():
 @transactional
 def update_ip_customer(ip_address):
     """更新IP客户关联"""
-    from app.services.ip_crud_service import IPRudService
+    from app.services.ip_crud_service import IPCrudService
     data = request.get_json()
     customer_id = data.get("customer_id")
     room_id = data.get("room_id")
-    service = IPRudService(IPManagerRepository())
+    service = IPCrudService(IPManagerRepository())
     count = service.update_ip_customer(ip_address, customer_id, room_id)
     if count:
         return APIResponse.success(data={"updated": count})
@@ -309,9 +309,9 @@ def update_ip_customer(ip_address):
 @login_required
 def get_ip_notes(ip_address):
     """获取IP备注"""
-    from app.services.ip_crud_service import IPRudService
+    from app.services.ip_crud_service import IPCrudService
     room_id = request.args.get("room_id", type=int)
-    service = IPRudService(IPManagerRepository())
+    service = IPCrudService(IPManagerRepository())
     notes = service.get_ip_notes(ip_address, room_id)
     return APIResponse.success(data=notes)
 
@@ -323,11 +323,11 @@ def get_ip_notes(ip_address):
 @transactional
 def update_ip_notes(ip_address):
     """更新IP备注"""
-    from app.services.ip_crud_service import IPRudService
+    from app.services.ip_crud_service import IPCrudService
     data = request.get_json()
     notes = data.get("notes", "")
     room_id = data.get("room_id")
-    service = IPRudService(IPManagerRepository())
+    service = IPCrudService(IPManagerRepository())
     count = service.update_ip_notes(ip_address, notes, room_id)
     if count:
         return APIResponse.success(data={"updated": count})
@@ -366,8 +366,8 @@ def batch_update_ip_customer():
             return APIResponse.error(str(e), ErrorCode.BUSINESS_ERROR, getattr(e, "status_code", 400))
         raise
 
-    from app.services.ip_crud_service import IPRudService
-    service = IPRudService(IPManagerRepository())
+    from app.services.ip_crud_service import IPCrudService
+    service = IPCrudService(IPManagerRepository())
     count = service.batch_update_customer(ip_list, customer_id, room_id)
     return APIResponse.success(data={"updated": count})
 
@@ -418,8 +418,8 @@ def get_ip_detail(ip_address):
 @permission_required("ip:scan")
 def ping_ip(ip_address):
     """Ping检测"""
-    from app.services.ip_crud_service import IPRudService
-    service = IPRudService(IPManagerRepository())
+    from app.services.ip_crud_service import IPCrudService
+    service = IPCrudService(IPManagerRepository())
     result = service.ping_ip(ip_address)
     return APIResponse.success(data={"ip": ip_address, "reachable": result})
 
@@ -430,10 +430,10 @@ def ping_ip(ip_address):
 @permission_required("ip:scan")
 def scan_ports(ip_address):
     """端口扫描"""
-    from app.services.ip_crud_service import IPRudService
+    from app.services.ip_crud_service import IPCrudService
     data = request.get_json(silent=True) or {}
     ports = data.get("ports")
-    service = IPRudService(IPManagerRepository())
+    service = IPCrudService(IPManagerRepository())
     result = service.scan_ports(ip_address, ports)
     return APIResponse.success(data=result)
 

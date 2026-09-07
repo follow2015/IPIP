@@ -14,6 +14,7 @@ from app.services.ai.skills.permission import check_skill_permission, SkillPermi
 from app.services.ai.skills.loader import default_skill_dirs, default_agentic_dirs
 from app.services.ai.capabilities.registry import get_capability
 from app.services.ai.llm_factory import create_llm_client
+from app.services.ai.ai_errors import AINotConfiguredError
 
 def _skill_dirs() -> List[str]:
     """a5：技能目录**调用时**读取，而非模块 import 时固化成常量。
@@ -52,7 +53,7 @@ class NLQueryRouter:
     def ask(self, question: str, user_id: int, user_permissions: set) -> str:
         self.last_session_id = None
         if not self.client.is_configured():
-            return "（AI 未配置）"
+            raise AINotConfiguredError(operation="nl_query")
 
         tier1_catalog = self._load_catalog(_skill_dirs())
         agentic_catalog = self._load_agentic_catalog(_agentic_dirs())

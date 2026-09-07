@@ -7,6 +7,7 @@ from app.services.ai.llm_base import LLMClient
 from app.services.ai.prompt_guard import strip_sensitive_fields
 from app.services.ai.prompts.alert_interpret_prompt import SYSTEM, build_user_prompt
 from app.services.ai._runtime import make_cache, observe_call, CallTimer
+from app.services.ai.ai_errors import AINotConfiguredError
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -30,7 +31,7 @@ class AlertInterpreter:
         if cached:
             return cached
         if not self.client.is_configured():
-            return "（AI 未配置，无法解读）"
+            raise AINotConfiguredError(operation="alert_interpret")
         user_prompt = build_user_prompt(safe_alert)
         status = "ok"
         text = ""
