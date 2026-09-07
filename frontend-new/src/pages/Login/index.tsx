@@ -5,7 +5,7 @@
  * - 已登录自动跳转
  */
 import React from 'react';
-import { Form, Input, Button, Card, Typography } from 'antd';
+import { Form, Input, Button, Card, Typography, Checkbox } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
@@ -23,7 +23,8 @@ function Login() {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
+      const from =
+        (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, location.state]);
@@ -33,7 +34,8 @@ function Login() {
     try {
       await login(values);
       message.success('登录成功');
-      const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
+      const from =
+        (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
       navigate(from, { replace: true });
     } catch (err) {
       message.error(err instanceof Error ? err.message : '登录失败，请检查用户名和密码');
@@ -49,7 +51,7 @@ function Login() {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}
     >
       <Card style={{ width: 400, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
@@ -59,22 +61,19 @@ function Login() {
           </Title>
           <p style={{ color: '#999', marginTop: 8 }}>请输入账号和密码登录</p>
         </div>
-        <Form<LoginRequest>
-          onFinish={handleLogin}
-          autoComplete="off"
-          size="large"
-        >
-          <Form.Item
-            name="username"
-            rules={[{ required: true, message: '请输入用户名' }]}
-          >
+        <Form<LoginRequest> onFinish={handleLogin} autoComplete="off" size="large">
+          <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
             <Input prefix={<UserOutlined />} placeholder="用户名" autoComplete="username" />
           </Form.Item>
-          <Form.Item
-            name="password"
-            rules={[{ required: true, message: '请输入密码' }]}
-          >
-            <Input.Password prefix={<LockOutlined />} placeholder="密码" autoComplete="current-password" />
+          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="密码"
+              autoComplete="current-password"
+            />
+          </Form.Item>
+          <Form.Item name="remember" valuePropName="checked" initialValue={false}>
+            <Checkbox>记住我（30 天内免重新登录）</Checkbox>
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading} block>

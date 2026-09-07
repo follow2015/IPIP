@@ -38,7 +38,10 @@ class SecurityService:
         """
         if not password:
             return False, "密码不能为空"
-        
+
+        if len(password.encode("utf-8")) > 72:
+            return False, "密码过长：最多 72 字节（中文约 24 个字），请缩短后重试"
+
         strength_info = password_manager.check_strength(password)
         
         if strength_info['level'] == 'weak':

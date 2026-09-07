@@ -115,6 +115,7 @@ class AuthenticationManager:
         token_type: str = "access",
         auth_type: str = "web",
         openid: str = None,
+        expires_delta: "timedelta" = None,
     ) -> str:
         """生成JWT令牌
 
@@ -125,16 +126,19 @@ class AuthenticationManager:
             token_type: 令牌类型（access或refresh）
             auth_type: 认证类型（web或wx）
             openid: 微信OpenID（微信登录时必需）
+            expires_delta: 自定义有效期（秒），None 时按 token_type 取默认值
+                          （access=1h / refresh=7d；"记住我"登录传 30d）
 
         Returns:
             str: JWT令牌
         """
         import uuid
 
-        if token_type == "refresh":
-            expires_delta = timedelta(seconds=self.refresh_token_expires)
-        else:
-            expires_delta = timedelta(seconds=self.access_token_expires)
+        if expires_delta is None:
+            if token_type == "refresh":
+                expires_delta = timedelta(seconds=self.refresh_token_expires)
+            else:
+                expires_delta = timedelta(seconds=self.access_token_expires)
 
         expires_at = datetime.now(timezone.utc) + expires_delta
 
@@ -447,7 +451,7 @@ class AuthenticationManager:
             return False
 
     def authenticate_password(
-        self, username: str, password: str, user_service
+        self, username: str, password: str, user_service, remember: bool = False
     ) -> Optional[Dict[str, Any]]:
         """认证用户（用户名密码方式）
 
@@ -455,6 +459,9 @@ class AuthenticationManager:
             username: 用户名
             password: 密码
             user_service: 用户服务实例
+            remember: 「记住我」勾选——True 时刷新令牌有效期延长至
+                      JWT_REFRESH_TOKEN_REMEMBER_EXPIRES（默认 30 天），
+                      False 保持默认 7 天
 
         Returns:
             Optional[Dict]: 认证成功返回用户信息和令牌，失败返回None
@@ -489,6 +496,12 @@ class AuthenticationManager:
                 roles=user_roles,
                 token_type="refresh",
                 auth_type="web",
+                expires_delta=(
+                    timedelta(seconds=getattr(
+                        config, "JWT_REFRESH_TOKEN_REMEMBER_EXPIRES",
+                        self.refresh_token_expires))
+                    if remember else None
+                ),
             )
 
             logger.info(

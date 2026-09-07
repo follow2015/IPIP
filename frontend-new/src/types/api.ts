@@ -39,10 +39,11 @@ export interface PaginationParams {
 export interface LoginRequest {
   username: string;
   password: string;
+  remember?: boolean;
 }
 
 export interface LoginResponse {
-  token: string;                    // 后端返回 "token" 而非 "access_token"
+  token: string; // 后端返回 "token" 而非 "access_token"
   refresh_token: string;
   user: {
     id: number;
@@ -50,11 +51,11 @@ export interface LoginResponse {
     email: string | null;
     name?: string;
     real_name?: string;
-    roles: string[];                // 角色名称列表，如 ["admin", "operator"]
+    roles: string[]; // 角色名称列表，如 ["admin", "operator"]
     is_active: boolean;
     status: number;
   };
-  permissions: string[];            // 权限编码列表，如 ["device:view", "device:create"]
+  permissions: string[]; // 权限编码列表，如 ["device:view", "device:create"]
   expires_in: number;
 }
 
@@ -62,14 +63,12 @@ export interface LoginResponse {
  * 后端分页响应 → 前端扁平结构适配函数
  * 在 api-client 响应拦截器或各 service 中调用
  */
-export function adaptPaginatedResponse<T>(
-  backend: BackendPaginatedData<T>,
-): PaginatedData<T> {
+export function adaptPaginatedResponse<T>(backend: BackendPaginatedData<T>): PaginatedData<T> {
   return {
     items: backend.data,
     total: backend.pagination.total,
     page: backend.pagination.page,
     per_page: backend.pagination.per_page,
-    total_pages: backend.pagination.total_pages,
+    total_pages: backend.pagination.total_pages
   };
 }

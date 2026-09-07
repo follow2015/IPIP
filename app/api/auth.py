@@ -247,7 +247,8 @@ def login():
     try:
 
         user_service = UserService(UserRepository(), UserLogRepository())
-        auth_result = auth_manager.authenticate_password(username, password, user_service)
+        auth_result = auth_manager.authenticate_password(
+            username, password, user_service, remember=bool(remember))
 
         if not auth_result:
             if r:

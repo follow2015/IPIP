@@ -146,6 +146,7 @@ class Config:
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
     JWT_ACCESS_TOKEN_EXPIRES = 3600  # 1小时
     JWT_REFRESH_TOKEN_EXPIRES = 604800  # 7天
+    JWT_REFRESH_TOKEN_REMEMBER_EXPIRES = 2592000  # 30天（登录勾选"记住我"时刷新令牌有效期）
     JWT_ALGORITHM = "HS256"
 
     BCRYPT_LOG_ROUNDS = 12
@@ -158,6 +159,8 @@ class Config:
     MAX_CONTENT_LENGTH = 12 * 1024 * 1024  # 12 MB
 
     TRUSTED_PROXIES = os.getenv("TRUSTED_PROXIES", "").split(",") if os.getenv("TRUSTED_PROXIES") else []
+
+    ENFORCE_HTTPS = os.getenv("ENFORCE_HTTPS", "").lower() in ("1", "true", "yes")
 
     RATELIMIT_ENABLED = True
     RATELIMIT_STORAGE_URL = None  # 使用Redis
