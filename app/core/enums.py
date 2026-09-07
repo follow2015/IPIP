@@ -26,6 +26,19 @@ class IPStatus(IntEnum):
     PENDING_UNBAN = 5 # 解封中(SSH执行前/中，等待交换机确认)
 
 
+class IPAuditAction(str, Enum):
+    """IP 审计动作枚举
+
+    合并查询 ip_allocation_logs（归属变更）与 ip_ban_records（封禁/解封）后的统一动作：
+    - ALLOCATE / RELEASE 来自 ip_allocation_logs.action
+    - BAN / UNBAN 来自 ip_ban_records.action
+    """
+    ALLOCATE = "allocate"   # 分配（IP 指定给客户）
+    RELEASE = "release"     # 回收（取消 IP 的客户归属）
+    BAN = "ban"             # 封禁
+    UNBAN = "unban"         # 解封
+
+
 class UserStatus(IntEnum):
     """用户状态枚举"""
     ACTIVE = 0     # 活跃
@@ -346,6 +359,12 @@ STATUS_DISPLAY = {
         ProbeErrorCode.ZABBIX_EMPTY_HOST_LIST: ("Zabbix主机列表为空", "orange"),
         ProbeErrorCode.HOST_NOT_IN_ZABBIX: ("主机不在Zabbix中", "orange"),
     },
+    IPAuditAction: {
+        IPAuditAction.ALLOCATE: ("分配", "green"),
+        IPAuditAction.RELEASE: ("回收", "orange"),
+        IPAuditAction.BAN: ("封禁", "red"),
+        IPAuditAction.UNBAN: ("解封", "blue"),
+    },
 }
 
 
@@ -362,6 +381,7 @@ GENERATED_ENUMS = [
     (LAGStatus, "LAGStatusCode", "LAG_STATUS_MAP", None, "number"),
     (NotificationTypeCode, "NotificationTypeCode", None, "NOTIFICATION_TYPE_OPTIONS", "NotificationTypeCode"),
     (ProbeErrorCode, "ProbeErrorCode", "PROBE_ERROR_MAP", None, "ProbeErrorCode"),
+    (IPAuditAction, "IPAuditAction", "IP_AUDIT_ACTION_MAP", "IP_AUDIT_ACTION_OPTIONS", "IPAuditAction"),
 ]
 
 

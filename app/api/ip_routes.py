@@ -366,8 +366,9 @@ def batch_update_ip_customer():
             return APIResponse.error(str(e), ErrorCode.BUSINESS_ERROR, getattr(e, "status_code", 400))
         raise
 
-    repo = IPManagerRepository()
-    count = repo.batch_update_customer_by_ips(customer_id, ip_list, room_id)
+    from app.services.ip_crud_service import IPRudService
+    service = IPRudService(IPManagerRepository())
+    count = service.batch_update_customer(ip_list, customer_id, room_id)
     return APIResponse.success(data={"updated": count})
 
 

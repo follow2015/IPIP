@@ -260,6 +260,27 @@ export const PROBE_ERROR_MAP: Record<ProbeErrorCode, { label: string; color: str
   [ProbeErrorCode.HOST_NOT_IN_ZABBIX]: { label: '主机不在Zabbix中', color: 'orange' }
 };
 
+export enum IPAuditAction {
+  ALLOCATE = 'allocate',
+  RELEASE = 'release',
+  BAN = 'ban',
+  UNBAN = 'unban'
+}
+
+export const IP_AUDIT_ACTION_MAP: Record<IPAuditAction, { label: string; color: string }> = {
+  [IPAuditAction.ALLOCATE]: { label: '分配', color: 'green' },
+  [IPAuditAction.RELEASE]: { label: '回收', color: 'orange' },
+  [IPAuditAction.BAN]: { label: '封禁', color: 'red' },
+  [IPAuditAction.UNBAN]: { label: '解封', color: 'blue' }
+};
+
+export const IP_AUDIT_ACTION_OPTIONS = [
+  { label: '分配', value: 'allocate' },
+  { label: '回收', value: 'release' },
+  { label: '封禁', value: 'ban' },
+  { label: '解封', value: 'unban' }
+];
+
 export const NOTIFICATION_TYPE_GROUP_OPTIONS = [
   {
     label: '监控告警',

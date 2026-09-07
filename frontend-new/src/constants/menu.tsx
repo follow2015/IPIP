@@ -124,6 +124,13 @@ export const MENU_CONFIGS: MenuConfig[] = [
         permission: 'ip:view'
       },
       {
+        key: 'ip-audit',
+        label: 'IP分配审计',
+        icon: <FileSearchOutlined />,
+        path: '/ip/audit',
+        permission: 'ip:view'
+      },
+      {
         key: 'switches',
         label: '网络设备管理',
         icon: <SwapOutlined />,

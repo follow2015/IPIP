@@ -20,6 +20,7 @@ const CabinetDetail = React.lazy(() => import('@/pages/Cabinets/CabinetDetail'))
 const Devices = React.lazy(() => import('@/pages/Devices'));
 const DeviceDetail = React.lazy(() => import('@/pages/Devices/DeviceDetail'));
 const IP = React.lazy(() => import('@/pages/IP'));
+const IPAudit = React.lazy(() => import('@/pages/IP/IPAudit'));
 const Switches = React.lazy(() => import('@/pages/Switches'));
 const SwitchDetail = React.lazy(() => import('@/pages/Switches/SwitchDetail'));
 const Network = React.lazy(() => import('@/pages/Network'));
@@ -111,6 +112,7 @@ export const routes: RouteObject[] = [
         )
       },
       { path: 'ip', element: withSuspense(IP) },
+      { path: 'ip/audit', element: withSuspense(IPAudit) },
       { path: 'switches', element: withSuspense(Switches) },
       { path: 'switches/:id', element: withSuspense(SwitchDetail) },
       { path: 'network', element: withSuspense(Network) },

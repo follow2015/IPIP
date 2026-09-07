@@ -46,6 +46,10 @@ class NetworkService:
             net_record = self.network_repo.find_by_id(network_id)
             if net_record and net_record.network and net_record.room_id is not None:
                 try:
+                    before = self.ip_repo.find_customer_ids_in_cidr(
+                        net_record.room_id, net_record.network,
+                        only_unassigned=not force,
+                    )
                     if force:
                         self.ip_repo.bulk_update_customer_all(
                             net_record.room_id, net_record.network, customer_id,
@@ -54,6 +58,7 @@ class NetworkService:
                         self.ip_repo.bulk_update_customer_where_null(
                             net_record.room_id, net_record.network, customer_id,
                         )
+                    self._audit_network_change(net_record, customer_id, before)
                 except Exception as e:
                     logger.warning(
                         "级联同步网段 IP 客户归属失败（网段记录已更新）: network_id=%s, error=%s",
@@ -61,6 +66,57 @@ class NetworkService:
                     )
             emit_resource_change_global("network", "update", ids=[network_id])
         return result
+
+    def _audit_network_change(self, net_record, customer_id: Optional[int],
+                              before: dict) -> None:
+        """网段级归属变更留痕（提交后执行，best-effort）
+
+        - force=False（只填空）：before 只含未分配 IP，被跳过的不留痕
+        - force=True（全部覆盖）：已分配 IP 的 detail 记原归属快照
+
+        只记录人工操作：无请求上下文（定时任务/系统调用）时直接跳过，
+        这是「系统驱动动作不记录」的结构性保证（同 IPCrudService）。
+        """
+        from app.utils.auth import get_current_user_id
+        from app.utils.transactional import on_commit
+        from app.persistence.ip_audit_repository import IPAuditRepository
+        from app.services.ip_audit_service import IPAuditService
+
+        try:
+            operator_id = get_current_user_id()
+        except Exception:  # noqa: BLE001 - 无 app context 时访问 flask.g 会抛异常
+            operator_id = None
+        if operator_id is None:
+            return
+
+        changed = {ip: prev for ip, prev in before.items() if prev != customer_id}
+        if not changed:
+            return
+
+        action = "allocate" if customer_id is not None else "release"
+        names = IPAuditService.load_customer_names({customer_id, *changed.values()})
+
+        entries = []
+        for ip, prev_id in changed.items():
+            detail = {
+                "customer_id": customer_id,
+                "customer_name": names.get(customer_id),
+            }
+            if prev_id is not None:
+                detail["prev_customer_id"] = prev_id
+                detail["prev_customer_name"] = names.get(prev_id)
+            entries.append({
+                "ip_address": ip,
+                "room_id": net_record.room_id,
+                "action": action,
+                "detail": detail,
+            })
+
+        on_commit(
+            lambda: IPAuditService(IPAuditRepository()).record_allocation_batch(
+                entries, operator_id=operator_id,
+            )
+        )
 
     def get_ip_networks_paginated(self, **filters) -> dict:
         """分页获取IP网段"""

@@ -74,6 +74,11 @@ export const queryKeys = {
     detail: (addr: string) => ['ip_addresses', addr] as const
   },
 
+  ipAudit: {
+    all: ['ipAudit'] as const,
+    list: (p?: unknown) => ['ipAudit', 'list', p] as const
+  },
+
   networks: {
     all: ['networks'] as const,
     list: (p?: unknown) => ['networks', 'list', p] as const,

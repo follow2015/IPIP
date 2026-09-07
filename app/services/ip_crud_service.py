@@ -2,7 +2,7 @@
 """IP CRUD 服务"""
 import asyncio
 from app.utils.logging import get_logger
-from typing import Optional
+from typing import List, Optional
 
 from app.core.enums import IPStatus
 from config import Config
@@ -20,15 +20,101 @@ class IPCrudService:
         self.repo = repo
 
     def update_ip_customer(self, ip_address: str, customer_id: int, room_id: Optional[int] = None) -> int:
-        """更新IP客户关联"""
+        """更新IP客户关联，并留痕到 IP 审计日志"""
         if customer_id is not None:
             from app.services.customer_service import CustomerService
             from app.persistence.customer_repository import CustomerRepository
             CustomerService(CustomerRepository()).assert_allocatable(customer_id)
+
+        before = [
+            (r.ip_address, r.room_id, r.customer_id)
+            for r in self.repo.get_by_ips([ip_address], room_id)
+        ]
         result = self.repo.update_customer_by_ip(ip_address, customer_id, room_id)
         if result:
             emit_resource_change_global("ip", "update", ids=[ip_address])
+            self._audit_customer_change(before, customer_id)
         return result
+
+    def batch_update_customer(self, ip_list: List[str], customer_id: Optional[int],
+                              room_id: Optional[int] = None) -> int:
+        """批量更新IP客户关联，并留痕到 IP 审计日志
+
+        收敛原先 API 层直调 Repository 的写法：审计挂钩只应存在于 Service 层，
+        否则留痕逻辑散落在 API 层，后续新增入口极易漏挂。
+        """
+        if customer_id is not None:
+            from app.services.customer_service import CustomerService
+            from app.persistence.customer_repository import CustomerRepository
+            CustomerService(CustomerRepository()).assert_allocatable(customer_id)
+
+        before = [
+            (r.ip_address, r.room_id, r.customer_id)
+            for r in self.repo.get_by_ips(ip_list, room_id)
+        ]
+        count = self.repo.batch_update_customer_by_ips(customer_id, ip_list, room_id)
+        if count:
+            self._audit_customer_change(before, customer_id)
+        return count
+
+    def _audit_customer_change(
+        self, before: List[tuple], customer_id: Optional[int],
+    ) -> None:
+        """IP 归属变更留痕（提交后执行，best-effort）
+
+        Args:
+            before: UPDATE 前的归属快照 [(ip_address, room_id, prev_customer_id), ...]，
+                调用方必须在 UPDATE 前提取（原因见 update_ip_customer 注释）
+            customer_id: 新归属（None 表示 release）
+
+        只记录真正发生变更的行（重复保存同值不留痕，与批量/网段路径口径一致）；
+        只记录人工操作：无请求上下文时（定时任务/系统扫描）取不到操作人，直接
+        跳过。这是「系统驱动动作不记录」的结构性保证——将来任何系统调用复用
+        本 Service，都不会把系统动作静默记成人工分配。
+        """
+        from app.utils.auth import get_current_user_id
+        from app.utils.transactional import on_commit
+        from app.persistence.ip_audit_repository import IPAuditRepository
+        from app.services.ip_audit_service import IPAuditService
+
+        try:
+            operator_id = get_current_user_id()
+        except Exception:  # noqa: BLE001 - 无 app context 时访问 flask.g 会抛异常
+            operator_id = None
+        if operator_id is None:
+            logger.debug("无操作人上下文，跳过IP归属审计留痕: %d 条", len(before))
+            return
+
+        changed = [(ip, rid, prev) for ip, rid, prev in before if prev != customer_id]
+        if not changed:
+            return
+
+        action = "allocate" if customer_id is not None else "release"
+        names = IPAuditService.load_customer_names(
+            {customer_id, *(prev for _, _, prev in changed)}
+        )
+
+        entries = []
+        for ip, rid, prev_id in changed:
+            detail = {
+                "customer_id": customer_id,
+                "customer_name": names.get(customer_id),
+            }
+            if prev_id is not None:
+                detail["prev_customer_id"] = prev_id
+                detail["prev_customer_name"] = names.get(prev_id)
+            entries.append({
+                "ip_address": ip,
+                "room_id": rid,
+                "action": action,
+                "detail": detail,
+            })
+
+        on_commit(
+            lambda: IPAuditService(IPAuditRepository()).record_allocation_batch(
+                entries, operator_id=operator_id,
+            )
+        )
 
     def get_ip_notes(self, ip_address: str, room_id: Optional[int] = None) -> list:
         """获取IP备注"""
