@@ -78,7 +78,7 @@ def build_import_template(template_type: str) -> BytesIO:
         example_rows = [
             {
                 "device_name": "SRV-001", "device_subtype": "standalone",
-                "brand": "华为", "device_model": "RH2288H V5", "serial_number": "SN210001",
+                "brand": "2011", "device_model": "RH2288H V5", "serial_number": "SN210001",
                 "hostname": "srv-001", "management_ip": "192.168.1.10", "mac_address": "", "ip_address": "",
                 "cabinet_id": 1, "u_position": 1, "height_u": 2, "status": 1, "notes": "业务服务器",
                 "cpu_template_id": 1, "memory_template_id": 2, "memory_dimm_count": 8,
@@ -96,7 +96,7 @@ def build_import_template(template_type: str) -> BytesIO:
             },
             {
                 "device_name": "CHS-001", "device_subtype": "chassis",
-                "brand": "华为", "device_model": "E9000", "serial_number": "SN210002",
+                "brand": "2011", "device_model": "E9000", "serial_number": "SN210002",
                 "hostname": "", "management_ip": "10.0.0.2", "mac_address": "", "ip_address": "",
                 "cabinet_id": 1, "u_position": 10, "height_u": 8, "status": 2, "notes": "刀片机箱",
                 "cpu_template_id": "", "memory_template_id": "", "memory_dimm_count": "",
@@ -114,7 +114,7 @@ def build_import_template(template_type: str) -> BytesIO:
             },
             {
                 "device_name": "CHS-001-Node1", "device_subtype": "node",
-                "brand": "华为", "device_model": "CH121 V5", "serial_number": "SN210003",
+                "brand": "2011", "device_model": "CH121 V5", "serial_number": "SN210003",
                 "hostname": "", "management_ip": "", "mac_address": "", "ip_address": "",
                 "cabinet_id": "", "u_position": 0, "height_u": 0, "status": 2, "notes": "机箱子节点",
                 "cpu_template_id": 3, "memory_template_id": 4, "memory_dimm_count": 4,
@@ -146,7 +146,7 @@ def build_import_template(template_type: str) -> BytesIO:
         example_rows = [
             {
                 "device_name": "SW-001", "device_subtype": "switch",
-                "brand": "华为", "device_model": "CE6800", "serial_number": "SN210004",
+                "brand": "2011", "device_model": "CE6800", "serial_number": "SN210004",
                 "hostname": "sw-core-01", "management_ip": "192.168.1.254", "mac_address": "",
                 "cabinet_id": 1, "u_position": 20, "height_u": 1, "status": 2, "notes": "核心交换机", "os_version": "VRP V8.8",
                 "is_managed": True, "ssh_ip": "10.0.0.254", "ssh_port": 22, "ssh_username": "admin", "ssh_password": "",
@@ -156,7 +156,7 @@ def build_import_template(template_type: str) -> BytesIO:
             },
             {
                 "device_name": "SW-002", "device_subtype": "switch",
-                "brand": "TP-LINK", "device_model": "TL-SG3428", "serial_number": "SN210005",
+                "brand": "14988", "device_model": "TL-SG3428", "serial_number": "SN210005",
                 "hostname": "", "management_ip": "", "mac_address": "",
                 "cabinet_id": 1, "u_position": 21, "height_u": 1, "status": 2, "notes": "接入交换机", "os_version": "",
                 "is_managed": "", "ssh_ip": "", "ssh_port": "", "ssh_username": "", "ssh_password": "",
@@ -166,7 +166,7 @@ def build_import_template(template_type: str) -> BytesIO:
             },
             {
                 "device_name": "FW-001", "device_subtype": "firewall",
-                "brand": "山石", "device_model": "SG6000", "serial_number": "SN210006",
+                "brand": "25506", "device_model": "SecPath F100", "serial_number": "SN210006",
                 "hostname": "", "management_ip": "192.168.1.1", "mac_address": "",
                 "cabinet_id": 1, "u_position": 22, "height_u": 1, "status": 2, "notes": "边界防火墙", "os_version": "",
                 "is_managed": True, "ssh_ip": "10.0.0.1", "ssh_port": 22, "ssh_username": "admin", "ssh_password": "",
@@ -192,7 +192,7 @@ def build_import_template(template_type: str) -> BytesIO:
             },
             {
                 "device_name": "UPS-001", "device_subtype": "ups",
-                "brand": "APC", "device_model": "Smart-UPS 3000", "serial_number": "SN210008",
+                "brand": "", "device_model": "Smart-UPS 3000", "serial_number": "SN210008",
                 "cabinet_id": 1, "u_position": 0, "height_u": 2, "status": 2, "notes": "不间断电源",
                 "customer_id": "", "responsible_person": "", "power": 3000, "asset_number": "",
             },
@@ -207,12 +207,16 @@ def build_import_template(template_type: str) -> BytesIO:
     brand_instructions = pd.DataFrame({
         "字段": ["品牌 (brand)"],
         "填写说明": [
-            "请填写厂商的 enterprise 号（纯数字），与「监控 → OID 规则 → 厂商品牌」Tab 中的「enterprise_no」列一致。\n"
-            "常见品牌参考：\n"
-            "  服务器：2011=华为 / 674=Dell / 11=HP / 10876=Supermicro / 23=Lenovo\n"
-            "  网络设备：9=思科 / 2011=华为 / 25506=H3C / 2636=Juniper / 3375=F5\n"
-            "  存储：674=Dell EMC / 789=NetApp / 1991=Hitachi\n"
-            "提示：可在「监控 → OID 规则 → 厂商品牌」Tab 查看完整列表及 enterprise_no。"
+            "brand 请填厂商的 enterprise 号（纯数字），必须与「资产管理 → 厂商品牌」页面中的「enterprise 号」列一致，"
+            "且该品牌行的「设备类型」需与本行设备的类型（服务器/网络/存储/其他）匹配。\n"
+            "品牌可以留空（视为未指定厂商，不做校验）。\n"
+            "常见品牌参考（括号内为适用的设备类型）：\n"
+            "  服务器：2011=Huawei / 674=Dell EMC / 232=HP / 10876=Supermicro / 19046=Lenovo / 437=IBM / 161=Fujitsu / 5855=Inspur\n"
+            "  网络设备：9=Cisco / 2011=Huawei / 25506=H3C / 119=Juniper / 2636=F5 / 14988=TP-Link / 1872=Ruijie / 4881=MikroTik\n"
+            "  存储：674=Dell EMC / 2469=NetApp / 789=Hitachi / 1602=Pure Storage / 19046=Lenovo\n"
+            "  其他（虚拟化/系统）：8072=VMware / 311=Microsoft / 42=Oracle\n"
+            "提示：① 填写数字即可（如 2011），系统会按文本处理；② 完整列表及自建/启用入口见"
+            "「资产管理 → 厂商品牌」页面；③ 填写不在库中的值会在导入时报「厂商标识不在厂商品牌库中」。",
         ],
     })
 
