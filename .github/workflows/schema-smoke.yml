@@ -123,7 +123,8 @@ jobs:
                   if s and not s.startswith("#"):
                       covered.append(s)
           assert covered, "covers 清单为空"
-          unknown = [v for v in covered if v not in chain]
+          # 0000 是基线标识（baseline 本身），不在迁移链 chain 中，属合法条目
+          unknown = [v for v in covered if v != "0000" and v not in chain]
           assert not unknown, f"covers 引用了不存在的迁移: {unknown}"
 
           cur = conn.cursor()
