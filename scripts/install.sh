@@ -6,7 +6,7 @@
 #   1. 检查系统依赖（Python 3.14+, Node 20+, pnpm 10+, MySQL 8.4+, Redis）
 #   2. 创建 Python venv 并安装 requirements.txt
 #   3. 前端依赖安装 + 构建（pnpm install && pnpm build → frontend-new/dist/）
-#   4. 初始化 .env（若不存在则从 .env.example 拷贝）
+#   4. 初始化 .env（若不存在则从 .env.example 拷贝，并自动生成 SECRET_KEY/JWT_SECRET_KEY 随机密钥）
 #   5. 创建数据库并导入 schema + 种子
 #
 # 用法:
@@ -162,8 +162,34 @@ if [ ! -f "$PROJECT_ROOT/.env" ]; then
   warn ".env 已从 .env.example 创建。请编辑 $PROJECT_ROOT/.env 填写实际数据库/Redis 密码后重新运行本脚本。"
   warn "（若已配置好 .env，可忽略此提示，脚本将继续执行）"
 else
-  log ".env 已存在，跳过"
+  log ".env 已存在，跳过创建"
 fi
+
+# 安全密钥自动注入：SECRET_KEY / JWT_SECRET_KEY 凡缺失（空值）或仍为 change-me
+# 占位符，一律生成 64 位随机 hex 覆盖，杜绝弱默认密钥上线（生产配置对占位符
+# 会拒绝启动，此处提前自动修复，避免部署者漏填）。
+"$VENV_PY" - <<PYEOF
+import re, secrets
+from pathlib import Path
+
+p = Path("$PROJECT_ROOT/.env")
+lines = p.read_text().splitlines()
+generated = []
+targets = {"SECRET_KEY", "JWT_SECRET_KEY"}
+for i, line in enumerate(lines):
+    m = re.match(r"^([A-Z_]+)=(.*)$", line)
+    if not m or m.group(1) not in targets:
+        continue
+    val = m.group(2).strip()
+    if val == "" or val.lower().startswith("change-me"):
+        lines[i] = f"{m.group(1)}={secrets.token_hex(32)}"
+        generated.append(m.group(1))
+if generated:
+    p.write_text("\n".join(lines) + "\n")
+    print("    已自动生成随机密钥: " + ", ".join(generated))
+else:
+    print("    SECRET_KEY / JWT_SECRET_KEY 已配置，跳过")
+PYEOF
 set -a; . "$PROJECT_ROOT/.env"; set +a
 
 # ── 5. 数据库初始化 ────────────────────────────────────────
