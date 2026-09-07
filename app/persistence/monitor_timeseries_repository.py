@@ -231,7 +231,10 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         }
 
     def _is_mysql(self) -> bool:
-        bind = self.session.bind
+        try:
+            bind = self.session.get_bind()
+        except Exception:  # noqa: BLE001 - 无法解析绑定时按非 MySQL 降级
+            return False
         return bind is not None and bind.dialect.name == "mysql"
 
     def _list_partitions(self, table: str) -> List[Tuple[str, Optional[date]]]:
