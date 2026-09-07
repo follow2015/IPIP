@@ -261,13 +261,14 @@ def register_blueprints(app: Flask):
     app.register_blueprint(audit_bp, url_prefix="/api/audit")
     app.register_blueprint(vlan_bp, url_prefix="/api/vlans")
 
-    from app.api.ip_allocation_log import ip_alloc_log_bp
     from app.api.link_aggregation import lag_bp, lag_global_bp
     from app.api.device_config import device_config_bp
-    app.register_blueprint(ip_alloc_log_bp, url_prefix="/api/ip")
     app.register_blueprint(lag_bp, url_prefix="/api/switch")
     app.register_blueprint(lag_global_bp, url_prefix="/api/link-aggregation")
     app.register_blueprint(device_config_bp, url_prefix="/api/devices")
+
+    from app.api.ip_audit import ip_audit_bp
+    app.register_blueprint(ip_audit_bp, url_prefix="/api/ip-audit")
 
     from app.api.device_port_routes import router as device_port_router
     app.register_blueprint(device_port_router)
@@ -413,7 +414,7 @@ def _register_monitor_cli(app: Flask):
     """注册监控时序归档 / 分区管理相关的 Flask CLI 命令。
 
     - monitor-archive          : 降采样 + 事件分区清理 + 预聚合表清理（cron 03:00）
-    - monitor-manage-partitions: 预创建未来事件分区（cron 02:00，在归档前执行）
+    - monitor-manage-partitions: 预创建未来事件/指标分区（cron 02:00，在归档前执行）
 
     分区 / 降采样 DDL 仅 MySQL 生效；非 MySQL（本地 SQLite 等）下命令为空跑（no-op）。
     """
@@ -433,6 +434,7 @@ def _register_monitor_cli(app: Flask):
             repo.downsample_to_hourly()
             repo.downsample_to_daily()
             dropped = repo.drop_expired_event_partitions()
+            metric_dropped = repo.drop_expired_metric_partitions()
             deleted = repo.cleanup_hourly()
             daily_deleted = repo.cleanup_daily()
         except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
@@ -441,19 +443,23 @@ def _register_monitor_cli(app: Flask):
         click.echo(
             f"monitor-archive done: "
             f"downsample_ok=1 dropped_partitions={dropped} "
+            f"metric_dropped_partitions={metric_dropped} "
             f"hourly_deleted={deleted} daily_deleted={daily_deleted}"
         )
 
     @app.cli.command("monitor-manage-partitions")
     def monitor_manage_partitions_cmd():
-        """预创建未来事件分区（建议 cron 02:00，在归档前执行）"""
+        """预创建未来事件/指标分区（建议 cron 02:00，在归档前执行）"""
         repo = MonitorTimeseriesRepository(db.session)
         try:
             added = repo.add_future_event_partitions()
+            metric_added = repo.add_future_metric_partitions()
         except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
             click.echo(f"ERROR: {e}", err=True)
             raise SystemExit(1)
-        click.echo(f"monitor-manage-partitions done: added={added}")
+        click.echo(
+            f"monitor-manage-partitions done: added={added} metric_added={metric_added}"
+        )
 
     @app.cli.command("monitor-outbox-cleanup")
     @click.option(

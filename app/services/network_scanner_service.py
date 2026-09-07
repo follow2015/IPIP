@@ -31,6 +31,8 @@ from app.services.scan_degrader import NoAuthL3Degrader, NoAuthL2Degrader
 from app.utils.port_name_utils import normalize_port
 from app.utils.network_utils import normalize_mac_address
 from app.utils.transactional import transaction_checkpoint
+from sqlalchemy.exc import SQLAlchemyError
+from redis.exceptions import RedisError
 
 logger = get_logger(__name__)
 
@@ -424,8 +426,10 @@ class ScanOrchestrator:
                     for row in port_ip_rows:
                         sr.port_ip_set(scope, row[0], row[1], row[2], row[3] or 24)
                     logger.info("[Phase0c] 端口IP索引已加载到Redis: %d 条", len(port_ip_rows))
-            except Exception as e:
-                logger.warning("[Phase0c] 端口IP索引加载失败（不影响后续流程）: %s", e)
+            except (SQLAlchemyError, RedisError) as e:
+                logger.warning("[Phase0c] 端口IP索引加载失败(存储层降级): %s", e)
+            except Exception:
+                logger.exception("[Phase0c] 端口IP索引加载失败: 非预期异常，端口IP索引将缺失")
 
             progress.current_phase = "phase0d_sync_members"
             _emit_progress()

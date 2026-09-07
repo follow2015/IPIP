@@ -10,7 +10,7 @@ import ipaddress
 from app.utils.logging import get_logger
 from typing import List, Optional
 
-from sqlalchemy import update, delete, or_, func
+from sqlalchemy import update, delete, or_, func, text, bindparam
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, contains_eager
 
@@ -1237,7 +1237,6 @@ class SwitchRepository(BaseRepository):
         """
         if not device_ids:
             return []
-        from sqlalchemy import text, bindparam
         rows = self.session.execute(
             text(
                 "SELECT device_id, port_name, ip_address, prefix "

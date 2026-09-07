@@ -3,6 +3,10 @@
 
 从 app/api/device.py 拆分而来，供 API 层和 Service 层共同引用，
 消除 service → api 的反向依赖。
+
+约定：
+- 新 Schema 一律定义在本包，不要在 app/api/ 下就地定义。
+- 只在本文件内使用一次的 Schema 可继续留在 app/api/ 下，无需迁移。
 """
 
 from marshmallow import Schema, fields, validate, EXCLUDE
@@ -115,3 +119,31 @@ class DeviceCreateSchema(Schema):
     )
     switch_role = fields.Int(load_default=None, allow_none=True)
     port_num = fields.Int(load_default=None, allow_none=True)
+
+
+_IMPORT_ONLY_FIELDS = (
+    "ssh_ip",
+    "ssh_port",
+    "ssh_username",
+    "ssh_password",
+    "ssh_protocol",
+    "ssh_device_type",
+    "is_managed",
+    "parent_device_name",
+    "switch_role",
+    "port_num",
+)
+
+
+class DeviceCreateApiSchema(DeviceCreateSchema):
+    """HTTP 接口专用创建设备 Schema
+
+    等于 DeviceCreateSchema 剔除 _IMPORT_ONLY_FIELDS 后的子集，
+    字段集与原 app/api/device.py 中的本地定义严格一致（行为等价替换）。
+
+    批量导入请使用完整的 DeviceCreateSchema。
+    """
+
+    class Meta(DeviceCreateSchema.Meta):
+        unknown = EXCLUDE
+        exclude = _IMPORT_ONLY_FIELDS

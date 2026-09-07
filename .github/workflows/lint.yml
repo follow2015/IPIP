@@ -1,0 +1,75 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/lint.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/lint.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  pyflakes:
+    name: 静态检查（pyflakes）
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 安装 pyflakes
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pyflakes
+
+      # pyflakes 是纯静态分析，不需要安装项目运行时依赖，因此很快。
+      #
+      # 分级策略：
+      #   - undefined name     —— 阻断。这类是运行时 NameError，
+      #     历史上已出现过两起：函数内 import 的作用域遗漏
+      #     （switch_repo.get_port_ips_by_device_id 用了未导入的 text，
+      #      被外层 except Exception 吞掉后静默导致端口 IP 索引缺失）。
+      #   - 未使用导入/变量     —— 不阻断，仅统计。存量较多，
+      #     一次性清零会淹没真正的错误，留给后续渐进清理。
+      - name: 运行 pyflakes
+        id: pyflakes
+        run: |
+          set +e
+          python3 -m pyflakes app/ > pyflakes-report.txt 2>&1
+          set -e
+
+          TOTAL=$(grep -c . pyflakes-report.txt || true)
+          HARD=$(grep -c "undefined name" pyflakes-report.txt || true)
+          echo "total=${TOTAL}" >> "$GITHUB_OUTPUT"
+          echo "hard=${HARD}" >> "$GITHUB_OUTPUT"
+
+          echo "=== 全部问题（${TOTAL} 条）==="
+          cat pyflakes-report.txt
+          echo
+          echo "=== 阻断级：undefined name（${HARD} 条）==="
+          grep "undefined name" pyflakes-report.txt || echo "无"
+
+      - name: 汇总
+        run: |
+          echo "pyflakes: ${{ steps.pyflakes.outputs.total }} 条问题，" \
+               "其中 undefined name ${{ steps.pyflakes.outputs.hard }} 条"
+          if [ "${{ steps.pyflakes.outputs.hard }}" != "0" ]; then
+            echo "❌ 存在未定义名称引用（NameError 风险），请修复后重新提交"
+            exit 1
+          fi
+          echo "✅ 无 NameError 风险"
+
+      - name: 上传报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyflakes-report
+          path: pyflakes-report.txt
+          if-no-files-found: ignore

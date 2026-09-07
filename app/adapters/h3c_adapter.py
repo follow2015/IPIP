@@ -10,8 +10,8 @@ from typing import List, Optional
 import re
 
 from app.adapters.base_adapter import (
-    BaseDeviceAdapter, BanCommands, ArpBanCommands, ParsedRoute, ParsedArpEntry, ParsedPort,
-    ParsedDeviceInfo,
+    BaseDeviceAdapter, BanCommands, ArpBanCommands, ParsedRoute, ParsedArpEntry, ParsedMacEntry,
+    ParsedPort, ParsedDeviceInfo,
 )
 
 logger = get_logger(__name__)
@@ -326,7 +326,6 @@ class H3CAdapter(BaseDeviceAdapter):
 
         使用 TextFSM 模板解析 display mac-address 输出。
         """
-        from app.adapters.base_adapter import ParsedMacEntry
         template_path = os.path.join(TEMPLATE_DIR, "h3c_display_mac-address.textfsm")
         return self._parse_with_textfsm(raw_output, template_path, self._map_mac_row)
 
@@ -336,7 +335,6 @@ class H3CAdapter(BaseDeviceAdapter):
 
         TextFSM模板列名: MAC_ADDRESS, VLAN, PORT, TYPE
         """
-        from app.adapters.base_adapter import ParsedMacEntry
         h = header
         return ParsedMacEntry(
             mac_address=H3CAdapter._get_col(h, row, "MAC_ADDRESS"),

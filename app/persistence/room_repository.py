@@ -128,6 +128,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         """
         try:
             from app.models.cabinet import Cabinet  # 避免循环导入
+            from app.models.device import Device  # 避免循环导入
             from app.models.switch_credentials import SwitchCredentials  # 避免循环导入
 
             total_rooms: int = self.count({"status": RoomStatus.NORMAL})

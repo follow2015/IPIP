@@ -27,6 +27,7 @@ HOURLY_RETENTION_DAYS = 90
 DAILY_RETENTION_DAYS = 730
 PARTITION_FUTURE_DAYS = 5
 PARTITION_HISTORY_BUFFER_DAYS = 30
+METRIC_RETENTION_DAYS = 90
 DOWNSAMPLE_CUTOFF_DAYS = 7
 DAILY_DOWNSAMPLE_CUTOFF_DAYS = 30
 
@@ -233,13 +234,13 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         bind = self.session.bind
         return bind is not None and bind.dialect.name == "mysql"
 
-    def _list_event_partitions(self) -> List[Tuple[str, Optional[date]]]:
+    def _list_partitions(self, table: str) -> List[Tuple[str, Optional[date]]]:
         """返回 [(partition_name, upper_bound_date), ...]；upper_bound_date 为 None 表示兜底分区。"""
         rows = self.session.execute(
             text(
                 "SELECT PARTITION_NAME, PARTITION_DESCRIPTION "
                 "FROM information_schema.PARTITIONS "
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'device_monitor_probe_events' "
+                f"WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{table}' "
                 "AND PARTITION_NAME IS NOT NULL"
             )
         ).fetchall()
@@ -317,11 +318,24 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         self, retention_days: int = EVENT_RETENTION_DAYS
     ) -> List[str]:
         """DROP 超过 retention_days 天的事件分区（瞬间完成，无逐行删除开销）。仅 MySQL。"""
+        return self._drop_expired_partitions(
+            "device_monitor_probe_events", retention_days
+        )
+
+    def drop_expired_metric_partitions(
+        self, retention_days: int = METRIC_RETENTION_DAYS
+    ) -> List[str]:
+        """DROP 超过 retention_days 天的指标值时序分区。仅 MySQL。"""
+        return self._drop_expired_partitions(
+            "device_metric_timeseries", retention_days
+        )
+
+    def _drop_expired_partitions(self, table: str, retention_days: int) -> List[str]:
         if not self._is_mysql():
             return []
         cutoff = date.today() - timedelta(days=retention_days)
         dropped: List[str] = []
-        for name, ub in self._list_event_partitions():
+        for name, ub in self._list_partitions(table):
             if name in ("p_before", "p_future") or ub is None:
                 continue
             if ub < cutoff:
@@ -329,42 +343,88 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
                     logger.warning("跳过非法分区名（防注入）: %s", name)
                     continue
                 self.session.execute(
-                    text(f"ALTER TABLE device_monitor_probe_events DROP PARTITION {name}")
+                    text(f"ALTER TABLE {table} DROP PARTITION {name}")
                 )
                 dropped.append(name)
         if dropped:
             self.session.commit()
-        logger.info("dropped event partitions: %s", dropped)
+        logger.info("dropped partitions of %s: %s", table, dropped)
         return dropped
 
     def add_future_event_partitions(
         self, future_days: int = PARTITION_FUTURE_DAYS
     ) -> List[str]:
         """预创建未来 future_days 天的事件分区（幂等）。仅 MySQL。"""
+        return self._add_future_partitions(
+            "device_monitor_probe_events", future_days
+        )
+
+    def add_future_metric_partitions(
+        self, future_days: int = PARTITION_FUTURE_DAYS
+    ) -> List[str]:
+        """预创建未来 future_days 天的指标值时序分区（幂等）。仅 MySQL。"""
+        return self._add_future_partitions(
+            "device_metric_timeseries", future_days
+        )
+
+    def _add_future_partitions(self, table: str, future_days: int) -> List[str]:
+        """预建未来分区；p_future（MAXVALUE）存在时必须走 REORGANIZE。
+
+        生产教训（2026-09-07 核实）：旧实现用 ADD PARTITION，而初始 DDL 带
+        p_future MAXVALUE 兜底分区——MySQL 不允许在 MAXVALUE 分区之后 ADD
+        PARTITION，预建自初始分区耗尽日起持续失败，增量数据全部堆入
+        p_future（probe_events 实测 12.6 万行）。REORGANIZE 则顺带把
+        p_future 存量按新分区边界正确重新落位。
+
+        候选分区从「最后一个日分区的上界日」补建到 today+future_days：
+        既覆盖日常滚动（昨日边界=today），也能把长期缺口一次性补齐。
+        """
         if not self._is_mysql():
             return []
-        existing = {n for n, _ in self._list_event_partitions()}
-        added: List[str] = []
+        parts = self._list_partitions(table)
+        existing = {n for n, _ in parts}
+        has_future = "p_future" in existing
+        daily_ubs = [ub for _, ub in parts if ub is not None]
+        start_day = max(daily_ubs) if daily_ubs else date.today()
+
+        wanted = []
         today = date.today()
-        for offset in range(1, future_days + 1):
-            d = today + timedelta(days=offset)
+        d = start_day
+        end = today + timedelta(days=future_days)
+        while d <= end:
             pname = f"p{d.strftime('%Y%m%d')}"
-            if pname in existing:
-                continue
+            if pname not in existing:
+                wanted.append((pname, d))
+            d += timedelta(days=1)
+        if not wanted:
+            return []
+
+        new_defs = []
+        for pname, d in wanted:
             if not _PARTITION_NAME_RE.match(pname):
                 logger.warning("跳过非法分区名（防注入）: %s", pname)
                 continue
             next_d = (d + timedelta(days=1)).isoformat()
+            new_defs.append(f"PARTITION {pname} VALUES LESS THAN (TO_DAYS('{next_d}'))")
+        if not new_defs:
+            return []
+
+        if has_future:
+            defs = ",\n    ".join(new_defs + ["PARTITION p_future VALUES LESS THAN MAXVALUE"])
             self.session.execute(
                 text(
-                    f"ALTER TABLE device_monitor_probe_events ADD PARTITION ("
-                    f"PARTITION {pname} VALUES LESS THAN (TO_DAYS('{next_d}')))"
+                    f"ALTER TABLE {table} REORGANIZE PARTITION p_future INTO (\n"
+                    f"    {defs}\n)"
                 )
             )
-            added.append(pname)
-        if added:
-            self.session.commit()
-        logger.info("added event partitions: %s", added)
+        else:
+            defs = ",\n    ".join(new_defs)
+            self.session.execute(
+                text(f"ALTER TABLE {table} ADD PARTITION (\n    {defs}\n)")
+            )
+        self.session.commit()
+        added = [p for p, _ in wanted]
+        logger.info("added partitions of %s: %s", table, added)
         return added
 
     def cleanup_hourly(self, retention_days: int = HOURLY_RETENTION_DAYS) -> int:

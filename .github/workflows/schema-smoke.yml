@@ -162,9 +162,10 @@ jobs:
             echo "✅ 表存在: $t"
           done
 
-      # 触发器与分区表只有基线能带过来——
-      # 这几条断言用于防止 DDL 源被误切回模型生成文件。
-      - name: 验证触发器与分区表（基线专属）
+      # probe_events 分区来自基线快照；metric_timeseries 分区来自 0002 迁移重放
+      # （基线里该表未分区，重放 0002 后才落位）——两条断言分别防 DDL 源误切
+      # 与迁移链漏放。
+      - name: 验证触发器与分区表（基线专属 + 迁移重放）
         run: |
           q() { mysql -h 127.0.0.1 -uroot ip_manager -N -B -e "$1"; }
           TRG=$(q "SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema='ip_manager'")
@@ -177,6 +178,18 @@ jobs:
           echo "device_monitor_probe_events 分区数: $PART"
           if [ "$PART" -lt 1 ]; then
             echo "❌ device_monitor_probe_events 未建分区"
+            exit 1
+          fi
+          MTPART=$(q "SELECT COUNT(*) FROM information_schema.partitions WHERE table_schema='ip_manager' AND table_name='device_metric_timeseries' AND partition_name IS NOT NULL")
+          echo "device_metric_timeseries 分区数: $MTPART"
+          if [ "$MTPART" -lt 2 ]; then
+            echo "❌ device_metric_timeseries 分区化缺失（0002 迁移未生效？）"
+            exit 1
+          fi
+          MTPK=$(q "SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index) FROM information_schema.statistics WHERE table_schema='ip_manager' AND table_name='device_metric_timeseries' AND index_name='PRIMARY'")
+          echo "device_metric_timeseries 主键: $MTPK"
+          if [ "$MTPK" != "id,collected_at" ]; then
+            echo "❌ device_metric_timeseries 主键不符合 (id, collected_at)"
             exit 1
           fi
           echo "✅ schema 冒烟通过（$TABLE_COUNT 表 / $TRG 触发器 / 分区表就位）"

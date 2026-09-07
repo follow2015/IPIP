@@ -16,7 +16,7 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 
 from app.persistence.base import BaseRepository
 from app.models.ip_model import IPManager
-from app.models.switch_route import IPNetwork
+from app.models.switch_route import IPNetwork, SwitchRoute
 from app.models.switch_credentials import SwitchCredentials, IPSwitchInfo
 from app.models.customer import Customer
 from app.models.room import Room
@@ -64,6 +64,65 @@ class IPManagerRepository(BaseRepository):
             IPManager.room_id == room_id,
         ).all()
         return {r.ip_address: r for r in rows}
+
+    def get_by_ips(
+        self, ip_list: List[str], room_id: Optional[int] = None,
+    ) -> List[IPManager]:
+        """根据 IP 列表批量查询记录行（机房可选，不传则跨机房）
+
+        供批量归属变更审计留痕使用：需要先读出变更前状态，才能只给
+        「真正发生变化」的 IP 留痕，避免记录无变化的假日志。
+
+        注意返回**行列表**而非 ip→记录 映射：room_id 未限定时，同一私网 IP
+        可能存在于多个机房（同 IP 不同 room_id 是不同实例），按 ip 做 dict
+        键会静默折叠多行，导致审计漏记/机房归属张冠李戴。
+
+        Args:
+            ip_list: IP地址列表
+            room_id: 机房ID，不传则不按机房过滤
+
+        Returns:
+            List[IPManager]: 匹配的记录行（每行含各自的 ip_address/room_id）
+        """
+        if not ip_list:
+            return []
+        filters = [IPManager.ip_address.in_(ip_list)]
+        if room_id is not None:
+            filters.append(IPManager.room_id == room_id)
+        return self.session.query(IPManager).filter(*filters).all()
+
+    def find_customer_ids_in_cidr(
+        self, room_id: int, network_cidr: str, only_unassigned: bool = False,
+    ) -> Dict[str, Optional[int]]:
+        """查询网段内各 IP 的当前客户归属（值快照）
+
+        供网段级归属变更审计留痕使用：必须在 UPDATE **之前**调用并把结果
+        保存为普通值字典——Core update() 经 session 执行时
+        synchronize_session='auto' 会把已加载 ORM 对象同步成新值，
+        UPDATE 后再读会拿到新归属。
+
+        Args:
+            room_id: 机房ID（私网时用于过滤，公网时忽略）
+            network_cidr: 网段CIDR
+            only_unassigned: True 时只查 customer_id IS NULL 的 IP
+                （对应网段分配 force=False 的「只填空」语义）
+
+        Returns:
+            Dict[str, Optional[int]]: IP地址 → 当前客户ID（未分配为 None）
+        """
+        net = ipaddress.ip_network(network_cidr, strict=False)
+        from app.models.ip_model import ip_to_int
+        start_int = ip_to_int(str(net.network_address))
+        end_int = ip_to_int(str(net.broadcast_address))
+        filters = [IPManager.ip_int.between(start_int, end_int)]
+        if net.is_private:
+            filters.append(IPManager.room_id == room_id)
+        if only_unassigned:
+            filters.append(IPManager.customer_id.is_(None))
+        rows = self.session.query(
+            IPManager.ip_address, IPManager.customer_id,
+        ).filter(*filters).all()
+        return {r.ip_address: r.customer_id for r in rows}
 
     def upsert_protect_customer(
         self,
@@ -1355,7 +1414,6 @@ class IPNetworkRepository(BaseRepository):
         Returns:
             Optional[SwitchRoute]: 黑洞路由记录
         """
-        from app.models.switch_route import SwitchRoute
         return self.session.query(SwitchRoute).filter(
             SwitchRoute.destination == f"{ip_address}/32",
             SwitchRoute.switch_id == switch_id,
@@ -1374,7 +1432,6 @@ class IPNetworkRepository(BaseRepository):
         Returns:
             int: 删除行数
         """
-        from app.models.switch_route import SwitchRoute
         stmt = delete(SwitchRoute).where(
             SwitchRoute.destination == f"{ip_address}/32",
             SwitchRoute.switch_id == switch_id,
@@ -1429,7 +1486,6 @@ class IPNetworkRepository(BaseRepository):
 
         route_type 已迁移至 switch_routes 表，从 switch_routes 查询。
         """
-        from app.models.switch_route import SwitchRoute
         return self.session.query(SwitchRoute).filter(
             SwitchRoute.switch_id == switch_id,
             SwitchRoute.route_type == route_type,
@@ -1532,7 +1588,6 @@ class IPNetworkRepository(BaseRepository):
 
     def find_network_ids_by_route_type(self, route_type: int) -> list[int]:
         """按 route_type 查询所有匹配的 network_id 列表。"""
-        from app.models.switch_route import SwitchRoute
         rows = self.session.query(SwitchRoute.network_id).filter(
             SwitchRoute.route_type == route_type,
         ).all()
@@ -1540,7 +1595,6 @@ class IPNetworkRepository(BaseRepository):
 
     def find_switch_routes_by_network_ids(self, network_ids: list[int]) -> dict:
         """按 network_id 列表批量查询 SwitchRoute，返回 {network_id: SwitchRoute} 映射。"""
-        from app.models.switch_route import SwitchRoute
         if not network_ids:
             return {}
         rows = self.session.query(SwitchRoute).filter(
@@ -1550,7 +1604,6 @@ class IPNetworkRepository(BaseRepository):
 
     def find_switch_route(self, switch_id: int, destination: str, room_id: int) -> Optional["SwitchRoute"]:
         """按 switch_id + destination + room_id 精确匹配查单条路由。"""
-        from app.models.switch_route import SwitchRoute
         return self.session.query(SwitchRoute).filter(
             SwitchRoute.switch_id == switch_id,
             SwitchRoute.destination == destination,
@@ -1561,7 +1614,6 @@ class IPNetworkRepository(BaseRepository):
         self, switch_ids: set[int], destinations: set[str],
     ) -> list["SwitchRoute"]:
         """按 switch_id + destination 批量查询路由条目。"""
-        from app.models.switch_route import SwitchRoute
         if not switch_ids or not destinations:
             return []
         return self.session.query(SwitchRoute).filter(
