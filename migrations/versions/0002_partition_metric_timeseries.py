@@ -6,12 +6,14 @@
 但建表早于该迁移，CREATE TABLE IF NOT EXISTS 成为空操作，表停留在
 PK(id) 无分区状态（模型 docstring 声明的"按日分区"从未真正落地）。
 
-本迁移做两件事（合并为一条 ALTER，单次 COPY 重建，需 ~2x 表大小临时磁盘）：
+本迁移做两件事（两条 ALTER，各一次 COPY 重建；MySQL 规定 PARTITION BY
+必须单独成句、不能与其他 alter option 合并，故无法一条完成）：
   1. 主键 (id) → (id, collected_at)：MySQL 分区键必须包含在主键内；
   2. PARTITION BY RANGE (TO_DAYS(collected_at)) 按日分区 + p_future 兜底。
 分区范围覆盖 [min(最早数据日, today-30), today+5]，保证存量数据全部落位。
 
-幂等性：已分区（且 PK 已含 collected_at）则整体跳过，重跑安全。
+幂等性：已分区（且 PK 已含 collected_at）则整体跳过；若在第 1 步后中断，
+重跑时 PK 已复合，直接走第 2 步补分区，重跑安全。
 前置纪律：执行前必须停止监控进程（COPY 重建期间禁止写入；生产执行当天
 业务已暂停）。重建耗时与磁盘请参照评审文档 P1 节。
 
@@ -102,23 +104,22 @@ def apply(conn) -> None:
 
     cur = conn.cursor()
     try:
-        if {"id", "collected_at"} <= pk:
-            cur.execute(
-                f"ALTER TABLE `{TABLE}` PARTITION BY RANGE (TO_DAYS(collected_at)) (\n"
-                f"    {clause}\n)"
-            )
-            logger.info("%s 补建分区完成（PK 已复合，范围 %s ~ %s + p_future）", TABLE, start, end)
-        else:
+        if not {"id", "collected_at"} <= pk:
             cur.execute(
                 f"ALTER TABLE `{TABLE}` "
-                f"DROP PRIMARY KEY, ADD PRIMARY KEY (id, collected_at), "
-                f"PARTITION BY RANGE (TO_DAYS(collected_at)) (\n"
-                f"    {clause}\n)"
+                f"DROP PRIMARY KEY, ADD PRIMARY KEY (id, collected_at)"
             )
-            logger.info(
-                "%s 分区化完成：PK(id)→(id, collected_at)，分区范围 %s ~ %s + p_future",
-                TABLE, start, end,
-            )
+            logger.info("%s 主键已改为 (id, collected_at)", TABLE)
+
+        cur.execute(
+            f"ALTER TABLE `{TABLE}` "
+            f"PARTITION BY RANGE (TO_DAYS(collected_at)) (\n"
+            f"    {clause}\n)"
+        )
+        logger.info(
+            "%s 分区化完成：分区范围 %s ~ %s + p_future，共 %d 个日分区",
+            TABLE, start, end, (end - start).days + 2,
+        )
     finally:
         cur.close()
     conn.commit()
