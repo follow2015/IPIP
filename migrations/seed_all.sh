@@ -3,14 +3,15 @@
 # seed_all.sh - 一键执行全部数据库种子
 # ------------------------------------------------------------
 # 顺序（有依赖关系，不可乱序）：
-#   1. seed_data.sql              配置类种子（权限/角色/指标模板/OID规则/VLAN等，幂等）
+#   1. seed_data.sql              配置类种子（权限/角色/指标模板/OID规则/VLAN等，幂等，
+#                                 初次安装的固定定义数据，平时不随版本调整）
 #   2. seed_rbac.py               RBAC 角色/权限（与 seed_data.sql 中 roles/permissions 互补，幂等）
 #   3. seed_component_templates.py 配件模板（CPU/内存/硬盘/网卡/GPU，幂等）
 #   4. seed_users.py              默认管理员账户 + 角色绑定
 #
 # 用法:
-#   bash database/seed/seed_all.sh
-#   SEED_ADMIN_PASSWORD=<你的管理员密码> bash database/seed/seed_all.sh
+#   bash migrations/seed_all.sh
+#   SEED_ADMIN_PASSWORD=<你的管理员密码> bash migrations/seed_all.sh
 #
 # 环境变量:
 #   SEED_ADMIN_PASSWORD  默认管理员密码（缺省随机生成并打印）
@@ -20,8 +21,9 @@
 # ============================================================
 set -euo pipefail
 
+# 项目根目录（脚本位于 migrations/ 下）
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 # 加载 .env（若存在）
@@ -31,7 +33,7 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
   set +a
 fi
 
-# 选择 Python 解释器
+# 选择可用的 Python 解释器：优先项目 .venv，否则回退 python3
 if [ -x "$PROJECT_ROOT/.venv/bin/python" ]; then
   PY="$PROJECT_ROOT/.venv/bin/python"
 elif command -v python3 >/dev/null 2>&1; then

@@ -55,16 +55,19 @@ BCRYPT_ROUNDS = int(os.getenv("SEED_ADMIN_BCRYPT_ROUNDS", "12"))
 
 
 def _hash_password(password: str) -> str:
+    """使用 bcrypt 生成密码哈希，与 BCryptPasswordManager.hash_password 行为一致。"""
     salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 def _generate_password(length: int = 16) -> str:
+    """生成强随机密码（含大小写字母、数字、符号）。"""
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 def _ensure_tables(cur):
+    """检查必需的表是否存在"""
     required = ("users", "roles", "user_roles")
     for table in required:
         cur.execute(
@@ -78,6 +81,7 @@ def _ensure_tables(cur):
 
 
 def seed():
+    """创建默认管理员账户并绑定角色"""
     admin_username = os.getenv("SEED_ADMIN_USERNAME", "admin")
     admin_password = os.getenv("SEED_ADMIN_PASSWORD")
     admin_name = os.getenv("SEED_ADMIN_NAME", "系统管理员")

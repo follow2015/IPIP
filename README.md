@@ -52,17 +52,15 @@ ipip/
 │   ├── package.json
 │   ├── pnpm-lock.yaml
 │   └── vite.config.js
-├── database/
-│   └── seed/
-│       ├── seed_all.sh         # 统一种子入口
-│       ├── seed_data.sql       # 配置类种子
-│       ├── seed_rbac.py        # RBAC 种子（含 ai:use/ai:admin 权限，幂等）
-│       ├── seed_component_templates.py
-│       └── seed_users.py       # 默认管理员账户
 ├── migrations/
-│   └── versions/
-│       ├── 0000_baseline.sql   # 完整建表 DDL（迁移基线快照，含分区表与触发器）
-│       └── 0000_baseline.covers # 基线已覆盖的迁移版本清单
+│   ├── versions/
+│   │   ├── 0000_baseline.sql   # 完整建表 DDL（迁移基线快照，含分区表与触发器）
+│   │   └── 0000_baseline.covers # 基线已覆盖的迁移版本清单
+│   ├── seed_all.sh             # 统一种子入口（install.sh 调用）
+│   ├── seed_data.sql           # 配置类种子（初次安装固定定义数据）
+│   ├── seed_rbac.py            # RBAC 种子（含 ai:use/ai:admin 权限，幂等）
+│   ├── seed_component_templates.py
+│   └── seed_users.py           # 默认管理员账户
 ├── scripts/
 │   ├── install.sh              # 一键安装（venv + 前端构建 + DB + 种子）
 │   └── start.sh                # 一键启动/停止/状态（4 进程：Flask + gateway + monitor + celery）
@@ -174,7 +172,7 @@ bash scripts/start.sh restart   # 重启全部
 
 ## 种子数据
 
-`database/seed/seed_data.sql` + `seed_rbac.py` 包含系统运行所需的配置类种子：
+`migrations/seed_data.sql` + `seed_all.sh`（串联 seed_data.sql / seed_rbac.py / seed_component_templates.py / seed_users.py）包含系统运行所需的配置类种子：
 
 | 表 | 内容 |
 |----|------|

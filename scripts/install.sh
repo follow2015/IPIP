@@ -278,7 +278,7 @@ if [ "$SKIP_SEED" -eq 1 ]; then
   log "=== [6/6] 跳过种子导入 (--skip-seed) ==="
 else
   log "=== [6/6] 导入种子数据 ==="
-  bash "$PROJECT_ROOT/database/seed/seed_all.sh"
+  bash "$PROJECT_ROOT/migrations/seed_all.sh"
 fi
 
 log "============================================================"

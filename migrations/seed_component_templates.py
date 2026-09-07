@@ -216,12 +216,18 @@ SEED_DATA = {
 
 
 def _dedupe_key(category: str, model: str, spec: dict) -> tuple:
+    """计算去重 / 查重维度键。
+
+    - disk 类额外按容量（spec.capacity_gb）区分，以支持同型号多容量共存；
+    - 其余类仅按 (category, model) 区分。
+    """
     if category == "disk":
         return (category, model, spec.get("capacity_gb"))
     return (category, model)
 
 
 def seed():
+    """执行种子数据导入（幂等）"""
     conn = pymysql.connect(**DB_CONFIG)
     try:
         with conn.cursor() as cur:
@@ -238,7 +244,7 @@ def seed():
                 "WHERE customer_id IS NULL"
             )
             global_rows = cur.fetchall()
-            seen_keys = {}
+            seen_keys = {}          # key -> 保留的 min id
             to_delete_ids = []
             for row in global_rows:
                 try:

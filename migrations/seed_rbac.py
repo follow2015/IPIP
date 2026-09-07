@@ -39,6 +39,7 @@ DB_CONFIG = {
 }
 
 
+
 PERMISSIONS = {
     "room:view": ("查看机房", "room", "查看机房信息"),
     "room:create": ("创建机房", "room", "创建新机房"),
@@ -103,9 +104,10 @@ PERMISSIONS = {
     "rbac:delete": ("删除角色", "rbac", "删除角色"),
     "audit:view": ("查看审计日志", "audit", "查看审计日志记录"),
     "import:view": ("查看导入导出", "import", "查看导入导出记录"),
-    # AI 能力
     "ai:use": ("AI 助手使用", "ai", "使用告警解读/NL 查询/RAG/巡查"),
     "ai:admin": ("AI 知识库管理", "ai", "RAG 文档入库"),
+    "ai:execute": ("AI 自动化操作确认", "ai", "确认执行技能中的写操作类能力"),
+    "ai:agentic": ("AI 开放式排查", "ai", "使用多轮自主决策的 agentic 技能"),
 }
 
 ROLES = {
@@ -134,7 +136,7 @@ ROLE_PERMISSIONS = {
         "rbac:view", "rbac:create", "rbac:update", "rbac:delete",
         "audit:view",
         "import:view",
-        "ai:use", "ai:admin",
+        "ai:use", "ai:admin", "ai:execute", "ai:agentic",
     ],
     "operator": [
         "room:view", "room:create", "room:update",
@@ -161,6 +163,7 @@ ROLE_PERMISSIONS = {
 
 
 def _ensure_tables(cur):
+    """检查必需的表是否存在"""
     required = ("permissions", "roles", "role_permissions")
     for table in required:
         cur.execute(
@@ -174,6 +177,7 @@ def _ensure_tables(cur):
 
 
 def seed_permissions(cur):
+    """导入权限数据，返回 {code: id} 映射"""
     perm_ids = {}
     inserted = updated = 0
 
@@ -204,6 +208,7 @@ def seed_permissions(cur):
 
 
 def seed_roles(cur):
+    """导入角色数据，返回 {name: id} 映射"""
     role_ids = {}
     inserted = updated = 0
 
@@ -234,6 +239,7 @@ def seed_roles(cur):
 
 
 def seed_role_permissions(cur, role_ids, perm_ids):
+    """重建角色权限关联，确保与代码定义完全一致"""
     system_role_ids = tuple(role_ids.values())
     cur.execute(
         "DELETE FROM role_permissions WHERE role_id IN %s",
@@ -262,6 +268,7 @@ def seed_role_permissions(cur, role_ids, perm_ids):
 
 
 def seed():
+    """执行种子数据导入"""
     conn = pymysql.connect(**DB_CONFIG)
     try:
         with conn.cursor() as cur:
