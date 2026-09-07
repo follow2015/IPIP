@@ -374,7 +374,8 @@ class AuthenticationManager:
             )
             new_refresh_token = self.generate_token(
                 user_id, username=username, roles=roles,
-                token_type="refresh", auth_type="web"
+                token_type="refresh", auth_type="web",
+                device_fingerprint=bound_dfp,
             )
 
         self.revoke_token(refresh_token)
