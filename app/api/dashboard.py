@@ -272,23 +272,6 @@ def get_system_status():
         return APIResponse.success(data=data)
 
 
-@dashboard_bp.route("/alerts", methods=["GET"])
-@doc(summary="获取系统警告列表", tags=["仪表盘"], responses={200: "ApiResponse", 401: "ApiError"})
-@login_required
-def get_alerts():
-    """获取系统警告列表
-
-    Returns:
-        JSON响应，包含警告列表
-    """
-    data = {
-        "alerts": [],
-        "total": 0
-    }
-
-    return APIResponse.success(data=data)
-
-
 @dashboard_bp.route("", methods=["GET"])
 @dashboard_bp.route("/", methods=["GET"])
 @doc(summary="获取仪表盘统计数据（兼容旧接口）", tags=["仪表盘"], responses={200: "DashboardStatsResponse", 401: "ApiError"})
