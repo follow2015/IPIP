@@ -514,7 +514,6 @@ def load_topology_index(visible_ids: Optional[Set[int]] = None) -> TopologyIndex
         TopologyIndex：已按可见域裁剪的图索引。
     """
     from app.models.device import Device
-    from app.models.device_switch_ext import DeviceSwitchExt
     from app.models.device_connection import DeviceConnection
     from app.models.network_connection import NetworkConnection
     from sqlalchemy.orm import joinedload

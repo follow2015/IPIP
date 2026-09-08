@@ -58,6 +58,36 @@ def _resolve_user_id() -> Optional[int]:
     return _current_user_var.get()
 
 
+def resolve_visible_scope() -> "tuple[bool, Optional[set], str]":
+    """取当前用户可见设备集（拓扑/实体检索类能力的统一入口）。
+
+    与 `check_device_access` 的区别：那个校验「单个设备」，这个取「整个可见集」
+    用于裁剪图索引（`load_topology_index(visible)`）——跨设备域的信息（客户接入、
+    影响面）靠裁剪后的索引天然不泄露不可见设备的存在性。
+
+    Returns:
+        (ok, visible, reason)：ok=False 时 reason 是可直接回给 LLM 的拒绝原因；
+        visible=None 表示无限制（超管 / data_scope=all），否则为受限设备 id 集合。
+
+    故障语义：**fail-closed**。`get_visible_device_ids` 内部要查用户角色（依赖
+    DB），DB 抖动若按 fail-open 放行，受限用户会瞬间获得全量设备与拓扑可见性
+    ——属静默提权，且只读能力足以问出任意客户的设备清单和拓扑结构。故一律拒绝，
+    并记 error 级日志保证该事件可观测（此前是 warning + 放行，无人察觉）。
+    """
+    user_id = _resolve_user_id()
+    if not user_id:
+        return False, None, "无法识别当前用户"
+    try:
+        from app.services.monitoring.data_scope_service import get_visible_device_ids
+        return True, get_visible_device_ids(user_id), ""
+    except Exception:  # noqa: BLE001
+        logger.error(
+            "ai.capability.scope_lookup_failed user=%s（fail-closed：拒绝本次查询）",
+            user_id, exc_info=True,
+        )
+        return False, None, "设备权限服务暂不可用，已拒绝该查询"
+
+
 def check_device_access(device_id: int, *, fail_closed: bool = False) -> "tuple[bool, str]":
     """校验当前用户是否有权访问指定设备（语义与 C2 helper 对齐）。
 

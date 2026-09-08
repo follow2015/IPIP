@@ -19,7 +19,7 @@ import math
 import os
 import threading
 import time
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from app.utils.logging import get_logger
 

@@ -12,7 +12,6 @@ from typing import Any, Dict, Optional
 
 from app.services.ai.capabilities.registry import register_capability
 from app.services.ai.entity_lookup import (
-    list_customer_devices,
     resolve_customer,
     resolve_device,
 )
@@ -21,24 +20,16 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-def _visible_scope() -> "tuple[bool, Optional[set]]":
-    """取当前用户可见设备集。
+def _visible_scope() -> "tuple[bool, Optional[set], str]":
+    """取当前用户可见设备集（与 topology_capabilities 同口径）。
 
     Returns:
-        (has_identity, visible)：身份缺失 → (False, None)（能力拒绝）；
+        (ok, visible, reason)：ok=False 时 reason 为拒绝原因（身份缺失或
+        数据域服务故障——后者 fail-closed，见 device_scope.resolve_visible_scope）；
         visible=None 表示无限制（超管/全量），否则为受限设备 id 集合。
-        数据域服务故障按只读 fail-open 放行（None）。
     """
-    from app.services.ai.capabilities.device_scope import _resolve_user_id
-    uid = _resolve_user_id()
-    if not uid:
-        return False, None
-    try:
-        from app.services.monitoring.data_scope_service import get_visible_device_ids
-        return True, get_visible_device_ids(uid)
-    except Exception:  # noqa: BLE001
-        logger.warning("ai.capability.scope_lookup_failed", exc_info=True)
-        return True, None  # 只读查询故障放行
+    from app.services.ai.capabilities.device_scope import resolve_visible_scope
+    return resolve_visible_scope()
 
 
 def _resolve_err(res: Dict[str, Any]) -> Dict[str, Any]:
@@ -65,9 +56,9 @@ def customer_search(args: Dict[str, Any]) -> dict:
         return _resolve_err(res)
 
     customer = res["customer"]
-    has_identity, visible = _visible_scope()
-    if not has_identity:
-        return {"supported": False, "hint": "无法识别当前用户"}
+    ok, visible, reason = _visible_scope()
+    if not ok:
+        return {"supported": False, "hint": reason}
 
     from app.models.device import Device
     from app.services.ai.entity_lookup import _MAX_CUSTOMER_DEVICES
@@ -110,9 +101,9 @@ def devices_locate(args: Dict[str, Any]) -> dict:
         return _resolve_err(res)
 
     device = res["device"]
-    has_identity, visible = _visible_scope()
-    if not has_identity:
-        return {"supported": False, "hint": "无法识别当前用户"}
+    ok, visible, reason = _visible_scope()
+    if not ok:
+        return {"supported": False, "hint": reason}
     if visible is not None and device["id"] not in visible:
         return {"supported": False, "hint": f"无权访问设备 {device['id']}（数据域隔离）"}
     return device

@@ -6,9 +6,12 @@
   解析歧义返回候选列表（supported=False + candidates）供 LLM 追问。
 - 每次调用先取当前用户可见设备集并整体裁剪图索引：跨设备域的信息
   （客户接入、影响面）天然不会泄露不可见设备的存在性。
-- 全部能力只读，不声明 requires_permission；数据域服务故障按 fail-open。
+- 全部能力只读，不声明 requires_permission；数据域服务故障按 **fail-closed**
+  拒绝（放行=受限用户静默获得全量可见性，详见 device_scope.resolve_visible_scope）。
 """
-from typing import Any, Dict, Optional
+import threading
+import time
+from typing import Any, Dict, Optional, Set
 
 from app.services.ai.capabilities.registry import register_capability
 from app.services.ai.entity_lookup import resolve_customer, resolve_device
@@ -16,25 +19,62 @@ from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+_TOPO_INDEX_TTL_SECONDS = 60.0
+_TOPO_INDEX_MAX_ENTRIES = 32
+_index_cache: Dict[str, Any] = {}
+_index_cache_lock = threading.Lock()
 
-def _visible_scope() -> "tuple[bool, Optional[set]]":
+
+def _index_cache_key(visible: Optional[Set[int]]) -> str:
+    """缓存键 = 可见域内容。同可见域 → 同索引，可安全共享。
+
+    注意键不含 user_id：索引已按可见域裁剪，可见集相同即内容相同，
+    跨用户共享不会泄露域外设备（泄露面由 visible 决定，不由缓存决定）。
+    """
+    if not visible:
+        return "all"
+    return "v:%d:%d" % (len(visible), hash(frozenset(visible)))
+
+
+def _load_index_cached(visible: Optional[Set[int]]):
+    """带 TTL 的拓扑索引读取（未命中或过期才真正建图）。
+
+    索引对象会被多线程共享，其内部 `_parent_cache`/`_forest_parent` 是幂等
+    的惰性记忆化（重复计算只浪费一点 CPU，结果一致），故共享安全。
+    """
+    key = _index_cache_key(visible)
+    now = time.monotonic()
+    with _index_cache_lock:
+        hit = _index_cache.get(key)
+        if hit is not None and now - hit[0] < _TOPO_INDEX_TTL_SECONDS:
+            return hit[1]
+
+    from app.services.topology_query_service import load_topology_index
+    idx = load_topology_index(visible_ids=visible)
+
+    with _index_cache_lock:
+        if len(_index_cache) >= _TOPO_INDEX_MAX_ENTRIES:
+            _index_cache.clear()
+        _index_cache[key] = (now, idx)
+    return idx
+
+
+def clear_topology_index_cache() -> None:
+    """清空拓扑索引缓存（拓扑变更后手动失效 / 测试用）。"""
+    with _index_cache_lock:
+        _index_cache.clear()
+
+
+def _visible_scope() -> "tuple[bool, Optional[set], str]":
     """取当前用户可见设备集（与 entity_capabilities 同口径）。
 
     Returns:
-        (has_identity, visible)：身份缺失 → (False, None)；
+        (ok, visible, reason)：ok=False 时 reason 为拒绝原因（身份缺失或
+        数据域服务故障——后者 fail-closed，见 device_scope.resolve_visible_scope）；
         visible=None 表示无限制（超管/全量），否则为受限设备 id 集合。
-        数据域服务故障按只读 fail-open 放行（None）。
     """
-    from app.services.ai.capabilities.device_scope import _resolve_user_id
-    uid = _resolve_user_id()
-    if not uid:
-        return False, None
-    try:
-        from app.services.monitoring.data_scope_service import get_visible_device_ids
-        return True, get_visible_device_ids(uid)
-    except Exception:  # noqa: BLE001
-        logger.warning("ai.capability.scope_lookup_failed", exc_info=True)
-        return True, None
+    from app.services.ai.capabilities.device_scope import resolve_visible_scope
+    return resolve_visible_scope()
 
 
 def _deny(hint: str) -> Dict[str, Any]:
@@ -80,15 +120,14 @@ def topology_uplink_path(args: Dict[str, Any]) -> dict:
         return res
     device: Dict[str, Any] = res
 
-    has_identity, visible = _visible_scope()
-    if not has_identity:
-        return _deny("无法识别当前用户")
+    ok, visible, reason = _visible_scope()
+    if not ok:
+        return _deny(reason)
     denied = _root_access(device["id"], visible)
     if denied:
         return denied
 
-    from app.services.topology_query_service import load_topology_index
-    idx = load_topology_index(visible)
+    idx = _load_index_cached(visible)
     path = idx.uplink_path(device["id"])
     return {"device": device, **path}
 
@@ -110,16 +149,15 @@ def topology_path_between(args: Dict[str, Any]) -> dict:
     dev_a: Dict[str, Any] = res_a
     dev_b: Dict[str, Any] = res_b
 
-    has_identity, visible = _visible_scope()
-    if not has_identity:
-        return _deny("无法识别当前用户")
+    ok, visible, reason = _visible_scope()
+    if not ok:
+        return _deny(reason)
     for d in (dev_a, dev_b):
         denied = _root_access(d["id"], visible)
         if denied:
             return denied
 
-    from app.services.topology_query_service import load_topology_index
-    idx = load_topology_index(visible)
+    idx = _load_index_cached(visible)
     path = idx.path_between(dev_a["id"], dev_b["id"])
     return {"device_a": dev_a, "device_b": dev_b, **path}
 
@@ -135,14 +173,13 @@ def topology_customer_connectivity(args: Dict[str, Any]) -> dict:
         return res
     customer: Dict[str, Any] = res
 
-    has_identity, visible = _visible_scope()
-    if not has_identity:
-        return _deny("无法识别当前用户")
+    ok, visible, reason = _visible_scope()
+    if not ok:
+        return _deny(reason)
     if visible is not None and not visible:
         return _deny("当前数据域无可访问设备")
 
-    from app.services.topology_query_service import load_topology_index
-    idx = load_topology_index(visible)
+    idx = _load_index_cached(visible)
     conn = idx.customer_connectivity(customer["id"])
     return {"customer": customer, **conn}
 
@@ -165,15 +202,14 @@ def topology_impact_analysis(args: Dict[str, Any]) -> dict:
             "影响面分析仅面向网络设备（交换机/路由器/防火墙）"
         )
 
-    has_identity, visible = _visible_scope()
-    if not has_identity:
-        return _deny("无法识别当前用户")
+    ok, visible, reason = _visible_scope()
+    if not ok:
+        return _deny(reason)
     denied = _root_access(device["id"], visible)
     if denied:
         return denied
 
-    from app.services.topology_query_service import load_topology_index
-    idx = load_topology_index(visible)
+    idx = _load_index_cached(visible)
     impact = idx.downstream(device["id"])
     if not impact.get("supported_root"):
         return _deny(impact.get("reason", "该设备不支持作为影响面根"))
