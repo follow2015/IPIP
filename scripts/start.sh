@@ -176,11 +176,13 @@ start_celery() {
     return 0
   fi
   log "启动 celery worker (queue ai,voice, concurrency ${CELERY_CONCURRENCY:-4})..."
+  # --chdir 是 celery 的**全局**选项，必须写在 `worker` 之前，否则报
+  # "No such option '--chdir'" 导致 worker 起不来。本脚本开头已 cd 到
+  # PROJECT_ROOT，故省略该选项。
   nohup "$CELERY_BIN" -A app.celery_app.celery worker \
     -Q ai,voice \
     --concurrency="${CELERY_CONCURRENCY:-4}" \
     --loglevel="${CELERY_LOGLEVEL:-info}" \
-    --chdir "$PROJECT_ROOT" \
     > "$LOG_CELERY" 2>&1 &
   echo $! > "$PID_CELERY"
   sleep 2
