@@ -9,6 +9,7 @@ import ipaddress
 from app.utils.logging import get_logger
 from datetime import datetime
 from typing import Dict, List, Optional
+from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy import update, delete, text, func, bindparam
 from sqlalchemy.orm import joinedload
@@ -163,7 +164,7 @@ class IPManagerRepository(BaseRepository):
             room_id: 机房ID
             status: 新状态
         """
-        now = datetime.now()
+        now = now_utc_naive()
         stmt = (
             update(IPManager)
             .where(IPManager.ip_address == ip, IPManager.room_id == room_id)
@@ -300,7 +301,7 @@ class IPManagerRepository(BaseRepository):
         if room_id is not None:
             filters.append(IPManager.room_id == room_id)
         stmt = update(IPManager).where(*filters).values(
-            status=status, updated_at=datetime.now(),
+            status=status, updated_at=now_utc_naive(),
         )
         result = self.session.execute(stmt)
         self.session.flush()

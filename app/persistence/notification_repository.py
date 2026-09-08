@@ -6,6 +6,7 @@
 """
 from app.utils.logging import get_logger
 from typing import List, Optional, Tuple
+from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy import not_, exists
 
@@ -106,7 +107,7 @@ class NotificationReceiptRepository(BaseRepository):
             int: 更新行数
         """
         from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
+        now = now_utc_naive()
         return self.session.query(NotificationReceipt).filter_by(
             user_id=user_id, read_at=None,
         ).update(
@@ -125,7 +126,7 @@ class NotificationReceiptRepository(BaseRepository):
             int: 更新行数
         """
         from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
+        now = now_utc_naive()
         return self.session.query(NotificationReceipt).filter_by(
             user_id=user_id, read_at=None,
         ).filter(

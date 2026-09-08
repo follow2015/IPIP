@@ -9,6 +9,7 @@ import re
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy import case, distinct, func, or_
 from sqlalchemy.exc import SQLAlchemyError
@@ -845,14 +846,14 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     ) -> str:
         for _ in range(max_retries):
             if format_type == "timestamp":
-                ts = datetime.now().strftime("%Y%m%d%H%M%S")
+                ts = now_utc_naive().strftime("%Y%m%d%H%M%S")
                 sn = f"{prefix}{ts}{''.join(str(random.randint(0,9)) for _ in range(4))}"
             elif format_type == "uuid":
                 sn = f"{prefix}{str(uuid.uuid4()).upper()}" if prefix else str(uuid.uuid4()).upper()
             elif format_type == "random":
                 sn = f"{prefix}{''.join(str(random.randint(0,9)) for _ in range(length))}"
             elif format_type == "custom":
-                date = datetime.now().strftime("%Y%m%d")
+                date = now_utc_naive().strftime("%Y%m%d")
                 sn = f"{prefix}{date}{''.join(str(random.randint(0,9)) for _ in range(6))}"
             else:
                 raise ValueError(f"不支持的 format_type: {format_type}")

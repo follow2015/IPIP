@@ -18,6 +18,7 @@ daemon 线程内启动一个 ``MonitorOutboxSender.run_loop``：周期性读取
 import json
 import threading
 from datetime import datetime, timezone
+from app.utils.time_utils import now_utc_naive
 
 from app.models.monitor_alert_outbox import MonitorAlertOutbox
 from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
@@ -180,7 +181,7 @@ class MonitorOutboxSender:
                                 row.id, row.device_id, e,
                             )
                         continue
-                    repo.mark_sent(row.id, datetime.now(timezone.utc))
+                    repo.mark_sent(row.id, now_utc_naive())
                     sent += 1
                     try:
                         from app.services.ai.alert_ai_push import push_alert_with_ai

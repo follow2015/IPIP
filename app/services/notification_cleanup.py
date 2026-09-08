@@ -12,6 +12,7 @@ from app.utils.logging import get_logger
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from app.utils.time_utils import now_utc_naive
 
 logger = get_logger(__name__)
 
@@ -27,7 +28,7 @@ def cleanup_notifications():
     try:
         notif_repo = NotificationRepository()
         receipt_repo = NotificationReceiptRepository()
-        cutoff = datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
+        cutoff = now_utc_naive() - timedelta(days=RETENTION_DAYS)
 
         deleted_receipts = receipt_repo.delete_read_acked_before(cutoff)
 

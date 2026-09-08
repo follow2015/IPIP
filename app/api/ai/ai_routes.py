@@ -689,7 +689,7 @@ def rag_ingest():
     返回 task_id，客户端可通过 /rag/ingest/progress/<task_id> 订阅进度。
     """
     body = request.get_json(silent=True) or {}
-    docs_dir = body.get("docs_dir", "docs")
+    docs_dir = (body.get("docs_dir") or ".").strip() or "."
     try:
         safe_dir = _validate_docs_dir(docs_dir)
     except ValueError as e:
@@ -816,12 +816,14 @@ def task_progress(task_id):
 @permission_required("ai:use")
 @api_exception_handler
 def rag_status():
-    """知识库状态：文档总数 + 是否可用。"""
+    """知识库状态：文档总数 + 是否可用 + 文档根目录（AI_DOCS_ROOT 真实路径）。"""
+    from app.services.ai.docs_dir_validation import resolve_docs_root
     from app.services.ai.rag_store import get_rag_store
     store = get_rag_store()
     return APIResponse.success(data={
         "available": store.available,
         "doc_count": store.count(),
+        "docs_root": resolve_docs_root(),
     })
 
 

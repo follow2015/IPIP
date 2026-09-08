@@ -9,6 +9,7 @@
 import ipaddress
 import os
 from datetime import datetime, timezone
+from app.utils.time_utils import now_utc_naive
 
 from flask import Blueprint, request, abort, jsonify, current_app
 from sqlalchemy.orm.attributes import flag_modified
@@ -248,7 +249,7 @@ def voice_callback():
         is_ack = event == "acked" or bool(parsed.get("key_press"))
         if is_ack:
             status["voice"] = "acked"
-            receipt.acked_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            receipt.acked_at = now_utc_naive()
         else:
             status["voice"] = event
         status["voice_retryable"] = bool(parsed.get("retryable"))

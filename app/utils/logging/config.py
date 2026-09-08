@@ -9,8 +9,9 @@ import logging
 import os
 import sys
 import traceback
-from datetime import datetime
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+
+from app.utils.time_utils import from_ts
 from typing import Any, Dict, Optional, Union
 
 from config import get_config
@@ -43,7 +44,7 @@ class JSONFormatter(logging.Formatter):
             str: JSON格式的日志字符串
         """
         log_data = {
-            "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+            "timestamp": from_ts(record.created).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "module": record.module,

@@ -10,9 +10,9 @@ from app.utils.auth import login_required
 from app.utils.rate_limiting.decorators import rate_limit_api
 from app.api.base import APIResponse
 from app.utils.logging import get_logger
+from app.utils.time_utils import now_iso
 import json
 import os
-from datetime import datetime
 
 errors_bp = Blueprint('errors', __name__)
 logger = get_logger(__name__)
@@ -44,7 +44,7 @@ def report_error():
             
         log_file = os.path.join(log_dir, 'frontend_errors.log')
         
-        timestamp = datetime.now().isoformat()
+        timestamp = now_iso()
         log_entry = {
             'timestamp': timestamp,
             'remote_addr': request.remote_addr,

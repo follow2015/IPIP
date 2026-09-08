@@ -20236,6 +20236,7 @@ export interface components {
         AIRagStatusResponse: {
             available?: boolean;
             doc_count?: number;
+            docs_root?: string;
         };
         AIRagDoc: {
             doc_id?: string;

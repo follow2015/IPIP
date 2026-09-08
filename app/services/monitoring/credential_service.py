@@ -10,6 +10,7 @@
 import hashlib
 import json
 from typing import List, Optional
+from app.utils.time_utils import now_utc_naive
 
 from app.exceptions.business import BusinessLogicError
 from app.utils.logging import get_logger
@@ -254,7 +255,7 @@ class MonitorCredentialService:
         linked_ids = self._repo.linked_device_ids(cred.id)
         self._status_repo.mark_stale_batch(linked_ids)
         from datetime import datetime, timezone
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = now_utc_naive()
         for did in linked_ids:
             if not self._status_repo.find_by_device(did):
                 self._status_repo.upsert(
@@ -330,7 +331,7 @@ class MonitorCredentialService:
             self._repo.link(credential_id, did)
         self._status_repo.mark_stale_batch(list(device_ids))
         from datetime import datetime, timezone
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = now_utc_naive()
         for did in device_ids:
             if not self._status_repo.find_by_device(did):
                 self._status_repo.upsert(

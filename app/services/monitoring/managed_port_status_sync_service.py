@@ -14,6 +14,7 @@
 - SSH 扫描负责端口增删和拓扑信息，本服务负责状态高频更新
 """
 from __future__ import annotations
+from app.utils.time_utils import now_utc_naive
 
 from app.utils.logging import get_logger
 from datetime import datetime, timezone
@@ -57,7 +58,7 @@ class ManagedPortStatusSyncService:
             }
         """
         if now is None:
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            now = now_utc_naive()
 
         if not port_rows:
             return {

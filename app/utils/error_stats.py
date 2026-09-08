@@ -7,10 +7,10 @@
 from app.utils.logging import get_logger
 import time
 from collections import defaultdict
-from datetime import datetime
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
+from app.utils.time_utils import from_ts, now_iso
 from config import get_config
 
 config = get_config()
@@ -126,8 +126,8 @@ class ErrorStats:
                     if errors:
                         stats_by_type[error_type] = {
                             "count": len(errors),
-                            "first_seen": datetime.fromtimestamp(errors[0][0]).isoformat(),
-                            "last_seen": datetime.fromtimestamp(errors[-1][0]).isoformat(),
+                            "first_seen": from_ts(errors[0][0]).isoformat(),
+                            "last_seen": from_ts(errors[-1][0]).isoformat(),
                             "recent_messages": [msg for _, msg, _ in errors[-5:]],  # 最近5条消息
                         }
 
@@ -139,7 +139,7 @@ class ErrorStats:
                     "total_errors": total_errors,
                     "error_types_count": len(self._errors),
                     "stats_by_type": stats_by_type,
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": now_iso(),
                 }
 
         except Exception as e:
@@ -175,8 +175,8 @@ class ErrorStats:
                             {
                                 "error_type": error_type,
                                 "count": len(errors),
-                                "first_seen": datetime.fromtimestamp(errors[0][0]).isoformat(),
-                                "last_seen": datetime.fromtimestamp(errors[-1][0]).isoformat(),
+                                "first_seen": from_ts(errors[0][0]).isoformat(),
+                                "last_seen": from_ts(errors[-1][0]).isoformat(),
                                 "last_message": errors[-1][1],
                             }
                         )

@@ -10,6 +10,7 @@ from app.api.base import APIResponse
 from app.openapi.doc import doc, public
 from app.utils import error_statistics, health_checker
 from app.utils.auth import login_required
+from app.utils.time_utils import now_iso_utc
 
 health_bp = Blueprint("health", __name__)
 
@@ -25,12 +26,10 @@ def health_root():
     Returns:
         JSON响应,包含基本健康状态
     """
-    from datetime import datetime
-    
     return APIResponse.success(
         data={
             'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': now_iso_utc(),
             'service': 'IPIP Management System'
         },
         message='系统运行正常'

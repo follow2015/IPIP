@@ -8,9 +8,22 @@ import { PROBE_ERROR_MAP, ProbeErrorCode } from '@/types/enums';
 
 dayjs.extend(utc);
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 export function ensureUtc(iso: string): string {
-  if (iso.endsWith('Z') || iso.endsWith('+00:00')) return iso;
+  if (iso.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(iso)) return iso;
+  if (DATE_ONLY_RE.test(iso)) return iso;
   return iso + 'Z';
+}
+
+export function parseServerTime(iso: string | null | undefined) {
+  if (!iso) return null;
+  return dayjs(ensureUtc(iso));
+}
+
+export function toServerUtc(d: Date | string | number | null | undefined): string | null {
+  if (d === null || d === undefined || d === '') return null;
+  return dayjs(d).utc().format('YYYY-MM-DDTHH:mm:ss');
 }
 
 export function formatDateTime(date: string | null | undefined): string {
@@ -60,7 +73,7 @@ export function translateProbeError(error: string | null): string {
  */
 export function relativeTime(iso: string | null): string {
   if (!iso) return '-';
-  const utcIso = iso.endsWith('Z') || iso.endsWith('+00:00') ? iso : iso + 'Z';
+  const utcIso = ensureUtc(iso);
   const diff = Date.now() - new Date(utcIso).getTime();
   if (diff < 0) return '刚刚';
   if (diff < 60_000) return '刚刚';

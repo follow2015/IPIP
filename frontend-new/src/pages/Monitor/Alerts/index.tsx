@@ -659,14 +659,10 @@ export default function MonitorAlerts() {
                 </Typography.Text>
               </Descriptions.Item>
               <Descriptions.Item label="创建时间">
-                {detailQuery.data.created_at
-                  ? dayjs(detailQuery.data.created_at).format('YYYY-MM-DD HH:mm:ss')
-                  : '-'}
+                {detailQuery.data.created_at ? formatDateTime(detailQuery.data.created_at) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="发送时间">
-                {detailQuery.data.sent_at
-                  ? dayjs(detailQuery.data.sent_at).format('YYYY-MM-DD HH:mm:ss')
-                  : '-'}
+                {detailQuery.data.sent_at ? formatDateTime(detailQuery.data.sent_at) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="尝试次数">{detailQuery.data.attempts}</Descriptions.Item>
               <Descriptions.Item label="最后错误">
@@ -689,7 +685,7 @@ export default function MonitorAlerts() {
               </Descriptions.Item>
               <Descriptions.Item label="确认时间">
                 {detailQuery.data.acknowledged_at
-                  ? dayjs(detailQuery.data.acknowledged_at).format('YYYY-MM-DD HH:mm:ss')
+                  ? formatDateTime(detailQuery.data.acknowledged_at)
                   : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="确认备注">

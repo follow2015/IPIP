@@ -7,6 +7,7 @@
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
+from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy import case, func, update as sa_update
 
@@ -69,7 +70,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
             .filter(
                 MonitorAlertOutbox.status == "pending",
                 (MonitorAlertOutbox.next_retry_at.is_(None))
-                | (MonitorAlertOutbox.next_retry_at <= datetime.now(timezone.utc).replace(tzinfo=None)),
+                | (MonitorAlertOutbox.next_retry_at <= now_utc_naive()),
             )
             .order_by(MonitorAlertOutbox.id.asc())
             .limit(limit)
@@ -111,7 +112,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
             row.next_retry_at = None  # 已 failed，不再重试
         else:
             row.next_retry_at = (
-                datetime.now(timezone.utc).replace(tzinfo=None)
+                now_utc_naive()
                 + timedelta(seconds=_backoff_seconds(row.attempts))
             )
         self.session.flush()
@@ -351,7 +352,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         返回更新后的行；行不存在返回 None。
         """
         from datetime import datetime, timezone
-        ts = now if now is not None else datetime.now(timezone.utc).replace(tzinfo=None)
+        ts = now if now is not None else now_utc_naive()
         result = self.session.execute(
             sa_update(MonitorAlertOutbox)
             .where(MonitorAlertOutbox.id == row_id)
@@ -381,7 +382,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         from datetime import datetime, timezone
         if not ids:
             return {"acknowledged": 0, "not_found": 0}
-        ts = now if now is not None else datetime.now(timezone.utc).replace(tzinfo=None)
+        ts = now if now is not None else now_utc_naive()
         result = self.session.execute(
             sa_update(MonitorAlertOutbox)
             .where(MonitorAlertOutbox.id.in_(ids))
@@ -421,7 +422,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         返回更新后的行；行不存在返回 None。
         """
         from datetime import datetime, timezone
-        ts = now if now is not None else datetime.now(timezone.utc).replace(tzinfo=None)
+        ts = now if now is not None else now_utc_naive()
         result = self.session.execute(
             sa_update(MonitorAlertOutbox)
             .where(MonitorAlertOutbox.id == row_id)
@@ -437,7 +438,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         from datetime import datetime, timezone
         if not ids:
             return {"closed": 0, "not_found": 0}
-        ts = now if now is not None else datetime.now(timezone.utc).replace(tzinfo=None)
+        ts = now if now is not None else now_utc_naive()
         result = self.session.execute(
             sa_update(MonitorAlertOutbox)
             .where(MonitorAlertOutbox.id.in_(ids))
@@ -475,7 +476,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         failed——即每轮复位只有**一次**投递机会、无退避重试。
         """
         from datetime import datetime, timedelta, timezone
-        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=max_age_hours)
+        cutoff = now_utc_naive() - timedelta(hours=max_age_hours)
         result = self.session.execute(
             sa_update(MonitorAlertOutbox)
             .where(
@@ -505,7 +506,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         """
         from datetime import datetime, timedelta, timezone
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = now_utc_naive()
         sent_cutoff = now - timedelta(days=sent_retention_days)
         failed_cutoff = now - timedelta(days=failed_retention_days)
 

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import threading
 import time
 from typing import Optional, Tuple, Dict
+from app.utils.time_utils import now_utc_naive
 
 from flask import current_app
 
@@ -247,7 +248,7 @@ class MonitorService:
 
     def _now(self) -> datetime:
         """统一时间戳，apply_result 内只算一次，复用到三个时间字段。"""
-        return datetime.now(timezone.utc)
+        return now_utc_naive()
 
     _CFG_KEYS = (
         "MONITOR_CONSECUTIVE_FAILURES_THRESHOLD",
@@ -927,7 +928,7 @@ class MonitorService:
                 device_id=device_id,
                 protocol=protocol,
                 reachable=False,
-                last_checked_at=datetime.now(timezone.utc),
+                last_checked_at=now_utc_naive(),
                 monitor_enabled=enabled,
             )
         return {"device_id": device_id, "monitor_enabled": enabled}
@@ -959,7 +960,7 @@ class MonitorService:
                     device_id=did,
                     protocol=protocol,
                     reachable=False,
-                    last_checked_at=datetime.now(timezone.utc),
+                    last_checked_at=now_utc_naive(),
                     monitor_enabled=enabled,
                 )
             updated += 1
@@ -1532,11 +1533,11 @@ def get_probe_trends(
     - from_ 超过 90 天 → 走 hourly 聚合表
     """
     if to_ is None:
-        to_ = datetime.now(timezone.utc).replace(tzinfo=None)
+        to_ = now_utc_naive()
     if from_ is None:
         from_ = to_ - timedelta(days=7)
 
-    retention_floor = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=90)
+    retention_floor = now_utc_naive() - timedelta(days=90)
     ts_repo = MonitorTimeseriesRepository()
     if from_ >= retention_floor:
         agg = ts_repo.aggregate_events(

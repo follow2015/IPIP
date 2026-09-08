@@ -6,6 +6,7 @@
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
+from app.utils.time_utils import now_utc_naive
 
 from app.models.audit_log import AuditLog
 from app.persistence.base import SQLAlchemyRepository
@@ -58,7 +59,7 @@ class AuditLogRepository(SQLAlchemyRepository):
             ``audit_logs.created_at`` 是 naive DateTime（DB 写 UTC 值无 tz 标记），
             threshold 也用 naive UTC 比较，避免 aware vs naive 比较告警。
         """
-        ts = now if now is not None else datetime.now(timezone.utc)
+        ts = now if now is not None else now_utc_naive()
         if ts.tzinfo is not None:
             ts = ts.astimezone(timezone.utc).replace(tzinfo=None)
         threshold = ts - timedelta(seconds=within_seconds)

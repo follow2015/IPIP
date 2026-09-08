@@ -11,6 +11,7 @@
   建议后续统一迁移至 utf8mb4。
 """
 from datetime import datetime
+from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy import Index, ForeignKey
 
@@ -36,7 +37,7 @@ class UserLog(db.Model):
     login_time = db.Column(
         db.DateTime,
         nullable=False,
-        default=datetime.now,
+        default=now_utc_naive,
         comment="登录时间",
     )
     login_type = db.Column(

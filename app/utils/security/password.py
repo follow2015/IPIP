@@ -10,6 +10,7 @@ import secrets
 import string
 from datetime import datetime, timedelta
 from typing import Any, Dict
+from app.utils.time_utils import now_utc_naive
 
 import bcrypt
 
@@ -330,7 +331,7 @@ class BCryptPasswordManager(PasswordManager):
             return False  # 不限制过期时间
         
         expiry_date = last_changed + timedelta(days=max_age_days)
-        return datetime.now() > expiry_date
+        return now_utc_naive() > expiry_date
 
 
 password_manager = BCryptPasswordManager()

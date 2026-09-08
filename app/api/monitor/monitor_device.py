@@ -2,6 +2,7 @@
 """设备监控状态 / 历史 / 趋势 / 手动探测 / 批量探测。"""
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from app.utils.time_utils import now_utc_naive
 
 from flask import request
 
@@ -120,7 +121,7 @@ def get_probe_history(device_id: int):
         raise ValidationError("limit 必须为正整数")
 
     if to_ is None:
-        to_ = datetime.now(timezone.utc).replace(tzinfo=None)
+        to_ = now_utc_naive()
     if from_ is None:
         from_ = to_ - timedelta(days=7)
 
@@ -156,7 +157,7 @@ def get_probe_trends(device_id: int):
         raise ValidationError("from 不能晚于 to")
 
     if to_ is None:
-        to_ = datetime.now(timezone.utc).replace(tzinfo=None)
+        to_ = now_utc_naive()
     if from_ is None:
         from_ = to_ - timedelta(days=7)
 

@@ -15,6 +15,7 @@ from app.utils import (
     permission_required,
     rate_limit_api,
 )
+from app.utils.time_utils import now_utc_naive
 from app.utils.transactional import transactional
 from app.exceptions.validation import ValidationError as AppValidationError, RequiredFieldError
 from app.services import import_export_service
@@ -141,5 +142,5 @@ def export_customers():
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
-        download_name=f'customers_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx',
+        download_name=f'customers_{now_utc_naive().strftime("%Y%m%d_%H%M%S")}.xlsx',
     )

@@ -1871,7 +1871,8 @@ class AIHealthResponseSchema(Schema):
 
 class AIRagIngestRequestSchema(Schema):
     """POST /ai/rag/ingest 请求体"""
-    docs_dir = fields.Str(metadata={"description": "文档目录（必须在 AI_DOCS_ROOT 之下）"})
+    docs_dir = fields.Str(metadata={
+        "description": "文档子目录（必须在 AI_DOCS_ROOT 之下；'.' 表示根目录本身）"})
 
 
 class AIRagIngestResponseSchema(Schema):
@@ -1948,6 +1949,8 @@ class AIRagStatusResponseSchema(Schema):
     """GET /ai/rag/status 响应 data"""
     available = fields.Bool()
     doc_count = fields.Int()
+    docs_root = fields.Str(metadata={
+        "description": "文档根目录（AI_DOCS_ROOT 真实绝对路径）；docs_dir 相对它解析"})
 
 
 class AIRagDocSchema(Schema):

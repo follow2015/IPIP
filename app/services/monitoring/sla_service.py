@@ -10,6 +10,7 @@
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from app.utils.time_utils import now_utc_naive
 
 from app.utils.logging import get_logger
 
@@ -129,7 +130,7 @@ def compute_achievement(
     if not target:
         raise BusinessLogicError("SLA 目标不存在", status_code=404)
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = now_utc_naive()
     end_dt = end or now
     start_dt = start or (end_dt - timedelta(days=target.window_days))
 

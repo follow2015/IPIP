@@ -208,6 +208,7 @@ def publish_monitor_alert_event(
     为 None 视为全局广播。publish 失败不影响 outbox 落库与后续投递。
     """
     try:
+        from app.utils.time_utils import now_iso_utc
         from app.services.monitoring.data_scope_service import (
             get_users_with_device_access,
         )
@@ -224,7 +225,7 @@ def publish_monitor_alert_event(
             "severity": severity,
             "dedup_key": idempotency_key,
             "outbox_id": outbox_id,
-            "timestamp": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+            "timestamp": now_iso_utc(),
             "target_user_ids": target_user_ids if target_user_ids else None,
             "payload": payload,
         }, ensure_ascii=False))

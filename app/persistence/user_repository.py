@@ -7,6 +7,7 @@
 from app.utils.logging import get_logger
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy import func, or_
 from sqlalchemy.exc import SQLAlchemyError
@@ -253,7 +254,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def find_recent_users(self, days: int = 7, limit: int = 10) -> List[User]:
         """查找最近注册的用户"""
         try:
-            since_date = datetime.now() - timedelta(days=days)
+            since_date = now_utc_naive() - timedelta(days=days)
             return (
                 self.session.query(User)
                 .filter(User.created_at >= since_date)

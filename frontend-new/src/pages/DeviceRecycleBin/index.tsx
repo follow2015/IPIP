@@ -4,7 +4,7 @@ import { Button, Space, Select, Tag, Input, Popconfirm, Typography, Alert, Modal
 import { useBatchSelection } from '@/hooks/useBatchSelection';
 import BatchActionBar from '@/components/BatchActionBar';
 import { DeleteOutlined, UndoOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
+import { formatDateTime } from '@/utils/format';
 import DataTable from '@/components/DataTable';
 import FilterBar from '@/components/FilterBar';
 import {
@@ -107,7 +107,7 @@ function buildColumns(handlers: {
       dataIndex: 'deleted_at',
       key: 'deleted_at',
       width: 180,
-      render: (val: string) => (val ? dayjs(val).format('YYYY-MM-DD HH:mm:ss') : '-')
+      render: (val: string) => formatDateTime(val)
     },
     {
       title: '操作',

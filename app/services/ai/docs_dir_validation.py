@@ -18,6 +18,25 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+def resolve_docs_root() -> str:
+    """返回 AI_DOCS_ROOT 的真实绝对路径（不校验存在性）。
+
+    AI_DOCS_ROOT 常被配成相对路径（.env 的 `AI_DOCS_ROOT=docs`）。相对路径依赖
+    进程 CWD：后端不以项目根启动时（systemd / 其它目录拉起）会解析到错误位置，
+    表现为「目录不存在」或误判越界。故统一按项目根解析，并对外暴露该真实路径
+    （前端据此展示"文档根目录"，避免用户猜路径）。
+    """
+    from config import Config
+
+    raw_root = Config.AI_DOCS_ROOT
+    if not _os.path.isabs(raw_root):
+        import config as _config
+
+        project_root = _os.path.dirname(_os.path.abspath(_config.__file__))
+        raw_root = _os.path.join(project_root, raw_root)
+    return _os.path.realpath(raw_root)
+
+
 def validate_docs_dir(docs_dir: str) -> str:
     """校验 docs_dir 必须位于 AI_DOCS_ROOT 之下，返回真实绝对路径。
 
@@ -35,10 +54,17 @@ def validate_docs_dir(docs_dir: str) -> str:
     if not isinstance(docs_dir, str) or not docs_dir:
         raise ValueError("docs_dir 必须为非空字符串")
 
-    root = _os.path.realpath(Config.AI_DOCS_ROOT)
-    target = _os.path.realpath(_os.path.join(root, docs_dir))
+    root = resolve_docs_root()
+    docs_dir = docs_dir.strip()
+    if _os.path.isabs(docs_dir):
+        target = _os.path.realpath(_os.path.normpath(docs_dir))
+    else:
+        target = _os.path.realpath(_os.path.join(root, docs_dir))
     if target != root and not target.startswith(root + _os.sep):
-        raise ValueError("docs_dir 越界，仅允许在文档根目录之下")
+        raise ValueError(
+            f"docs_dir 越界，仅允许在文档根目录之下：{docs_dir}"
+            "（请填相对路径，'.' 表示根目录本身）"
+        )
     if not _os.path.isdir(target):
-        raise ValueError(f"目录不存在：{docs_dir}")
+        raise ValueError(f"目录不存在：{docs_dir}（相对文档根目录；'.' 表示根目录本身）")
     return target

@@ -25,6 +25,7 @@ import socket
 import threading
 import uuid
 import weakref
+from app.utils.time_utils import now_utc_naive
 
 import redis
 from concurrent.futures import ThreadPoolExecutor
@@ -471,7 +472,7 @@ def _check_monitor_interrupted(app, monitor_service, enabled_ids: list, loop_nam
 
     threshold_secs = app.config.get("MONITOR_INTERRUPTED_THRESHOLD_SECS", 180)
     threshold = timedelta(seconds=threshold_secs)
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = now_utc_naive()
 
     status_repo = DeviceMonitorStatusRepository()
     status_map = status_repo.find_by_device_ids(list(enabled_ids))

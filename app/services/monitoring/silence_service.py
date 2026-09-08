@@ -15,6 +15,7 @@ import json
 from app.utils.logging import get_logger
 from datetime import datetime, timezone
 from typing import List, Optional
+from app.utils.time_utils import now_utc_naive
 
 logger = get_logger(__name__)
 
@@ -74,7 +75,7 @@ def is_silenced(device_id: int, alert_type: str,
     Returns:
         True 表示静默（不入箱），False 表示放行
     """
-    ts = now if now is not None else datetime.now(timezone.utc).replace(tzinfo=None)
+    ts = now if now is not None else now_utc_naive()
     try:
         rules = _get_active_rules(ts)
         for rule in rules:

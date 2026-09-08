@@ -14,8 +14,14 @@ from marshmallow import ValidationError as MarshmallowValidationError
 from app.exceptions.validation import ValidationError
 from app.exceptions.handlers import handle_api_exception
 from app.utils.logging import get_logger
+from app.utils.time_utils import now_iso_utc
 
 logger = get_logger(__name__)
+
+
+def _now_iso() -> str:
+    """UTC ISO8601（带 Z 后缀）。统一实现见 app/utils/time_utils.py。"""
+    return now_iso_utc()
 
 
 class APIResponse:
@@ -27,19 +33,18 @@ class APIResponse:
         "message": "操作成功",
         "data": { ... },          // 成功时可选
         "error_code": "10001",    // 失败时可选
-        "timestamp": "2026-04-10T10:00:00Z"
+        "timestamp": "2026-04-10T10:00:00Z"   // UTC（带 Z 后缀，与数据字段口径一致）
     }
     """
     
     @staticmethod
     def success(data: Any = None, message: str = "操作成功", status_code: int = 200) -> Tuple[Dict, int]:
         """成功响应"""
-        from datetime import datetime, timezone
         
         response = {
             'success': True,
             'message': message,
-            'timestamp': datetime.now(timezone.utc).isoformat()
+            'timestamp': _now_iso()
         }
         
         if data is not None:
@@ -57,12 +62,11 @@ class APIResponse:
             status_code: HTTP状态码
             details: 错误详情（可选）
         """
-        from datetime import datetime, timezone
         
         response = {
             'success': False,
             'message': message,
-            'timestamp': datetime.now(timezone.utc).isoformat()
+            'timestamp': _now_iso()
         }
         
         if error_code:
@@ -90,7 +94,7 @@ class APIResponse:
                     "total_pages": 5
                 }
             },
-            "timestamp": "2026-04-10T10:00:00Z"
+            "timestamp": "2026-04-10T10:00:00Z"   // UTC（带 Z 后缀，与数据字段口径一致）
         }
         
         Args:
@@ -103,7 +107,6 @@ class APIResponse:
         Returns:
             tuple: (响应字典, HTTP状态码)
         """
-        from datetime import datetime, timezone
         
         total_pages = (total + per_page - 1) // per_page if total > 0 else 0
         
@@ -119,7 +122,7 @@ class APIResponse:
                     'total_pages': total_pages
                 }
             },
-            'timestamp': datetime.now(timezone.utc).isoformat()
+            'timestamp': _now_iso()
         }
         
         return jsonify(response), 200

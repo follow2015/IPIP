@@ -19,6 +19,7 @@ import json
 import os
 import time
 from urllib.parse import urlparse
+from app.utils.time_utils import now_utc_naive
 
 from app.utils.logging import get_logger
 from datetime import datetime, timedelta, timezone
@@ -154,7 +155,7 @@ def _publish_escalation(alert: MonitorAlertOutbox,
             "policy_name": policy.name,
             "escalation_count": escalation_count,
             "step_no": (step.step_no if step else None),
-            "escalated_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+            "escalated_at": now_utc_naive().isoformat(),
         }
         emit_global_event_with_targets(
             event_type="monitor_escalation",
@@ -229,7 +230,7 @@ def run_escalation_scan(now: datetime = None) -> int:
     P2-11: 优先走多级 step 链；policy 无 step 时回退单级模式（向后兼容）。
     由 outbox_sender 周期调用（建议每 1 分钟）。
     """
-    ts = now or datetime.now(timezone.utc).replace(tzinfo=None)
+    ts = now or now_utc_naive()
     upgraded = 0
 
     try:

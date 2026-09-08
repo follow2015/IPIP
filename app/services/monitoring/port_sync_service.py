@@ -18,6 +18,7 @@
 - ``data_source`` 演进：manual → auto（替换语义，不保留 hybrid）
 """
 from __future__ import annotations
+from app.utils.time_utils import now_utc_naive
 
 from app.utils.logging import get_logger
 from datetime import datetime, timezone
@@ -113,7 +114,7 @@ class PortSyncService:
             dict: {"matched": int, "added": int, "removed": int}
         """
         session = self.port_repo.session
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = now_utc_naive()
 
         existing_ports = (
             session.query(NetworkPort)

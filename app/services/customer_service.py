@@ -9,6 +9,7 @@ import ipaddress
 from app.utils.logging import get_logger
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
+from app.utils.time_utils import now_utc_naive
 
 from app.models.customer import Customer
 from app.core.enums import CustomerStatus
@@ -361,7 +362,7 @@ class CustomerService:
         story.append(Paragraph(f"客户终止存档 - {customer.customer_name}", styles["CNTitle"]))
         story.append(Spacer(1, 10))
         summary = assets.get("summary", {})
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = now_utc_naive().strftime("%Y-%m-%d %H:%M:%S")
         info_data = [
             ["客户名称", assets.get("customer_name", ""), "终止时间", now_str],
             ["客户状态", "已终止", "生成方式", "系统自动生成"],

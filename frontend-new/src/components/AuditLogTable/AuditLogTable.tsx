@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuditLogs } from '@/services/audit';
 import { get } from '@/services/api-client';
 import type { AuditLog, User } from '@/types/models';
+import { formatDateTime } from '@/utils/format';
 
 const { RangePicker } = DatePicker;
 
@@ -90,7 +91,7 @@ export default function AuditLogTable({
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (t: string) => (t ? new Date(t).toLocaleString('zh-CN') : '-')
+      render: (t: string) => (t ? formatDateTime(t) : '-')
     },
     {
       title: '操作人',
@@ -232,9 +233,7 @@ export default function AuditLogTable({
             <Descriptions column={{ xs: 1, sm: 1, md: 2 }} bordered size="small">
               <Descriptions.Item label="ID">{detailRecord.id}</Descriptions.Item>
               <Descriptions.Item label="时间">
-                {detailRecord.created_at
-                  ? new Date(detailRecord.created_at).toLocaleString('zh-CN')
-                  : '-'}
+                {detailRecord.created_at ? formatDateTime(detailRecord.created_at) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="操作人">
                 {renderUserName(detailRecord.user_id)}

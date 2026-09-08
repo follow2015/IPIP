@@ -7,6 +7,7 @@
 from app.utils.logging import get_logger
 from flask import Blueprint
 from datetime import datetime
+from app.utils.time_utils import now_utc_naive
 
 from app.persistence.factory import create_repository
 from app.persistence.room_repository import RoomRepository
@@ -211,7 +212,7 @@ def get_system_status():
                     "api": "running",
                     "frontend": "running"
                 },
-                "lastUpdated": datetime.now().isoformat(),
+                "lastUpdated": now_utc_naive().isoformat(),
                 "error": "psutil library not installed"
             })
 
@@ -244,7 +245,7 @@ def get_system_status():
                 "api": "running",
                 "frontend": "running"
             },
-            "lastUpdated": datetime.now().isoformat()
+            "lastUpdated": now_utc_naive().isoformat()
         }
 
         return APIResponse.success(data=data)
@@ -264,7 +265,7 @@ def get_system_status():
                 "api": "unknown",
                 "frontend": "unknown"
             },
-            "lastUpdated": datetime.now().isoformat(),
+            "lastUpdated": now_utc_naive().isoformat(),
             "error": str(e)
         }
 

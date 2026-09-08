@@ -8,6 +8,7 @@ from flask import Blueprint, request, g
 import hashlib
 from app.utils.logging import get_logger
 from marshmallow import Schema, fields, validate, EXCLUDE
+from app.utils.time_utils import now_utc_naive
 
 from app.services import CustomerService
 from app.persistence.customer_repository import CustomerRepository
@@ -409,7 +410,7 @@ def export_customer_assets(customer_id):
             output,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             as_attachment=True,
-            download_name=f"{customer_name}_资源统计_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            download_name=f"{customer_name}_资源统计_{now_utc_naive().strftime('%Y%m%d')}.xlsx",
         )
     except Exception as e:
         logger.error("导出客户资源Excel失败: %s", str(e))

@@ -59,6 +59,7 @@ import {
   CabinetStatusCode
 } from '@/types/enums';
 import type { DeviceStatusCode, IPStatusCode } from '@/types/enums';
+import { formatDateTime } from '@/utils/format';
 
 const { useToken } = theme;
 
@@ -278,7 +279,7 @@ function SystemStatusCard() {
             }}
           >
             <ClockCircleOutlined style={{ marginRight: 4 }} />
-            {status?.lastUpdated ? new Date(status.lastUpdated).toLocaleTimeString() : '--'}
+            {status?.lastUpdated ? formatDateTime(status.lastUpdated) : '--'}
           </div>
         </div>
       ) : (
@@ -331,7 +332,7 @@ function ActivityTimeline() {
                     {act.description}
                   </div>
                   <div style={{ fontSize: 11, color: token.colorTextDisabled, marginTop: 2 }}>
-                    {act.user} · {act.timestamp ? new Date(act.timestamp).toLocaleString() : '--'}
+                    {act.user} · {act.timestamp ? formatDateTime(act.timestamp) : '--'}
                   </div>
                 </div>
               )

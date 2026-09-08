@@ -114,6 +114,7 @@ function parseScanProgress(progress: {
 }
 import { exportCSV } from '@/utils/csv';
 import type { IPNetwork } from '@/types/models';
+import { formatDateTime } from '@/utils/format';
 
 const DEFAULT_ROUTE = '0.0.0.0/0';
 
@@ -445,7 +446,7 @@ function Network() {
       title: '更新时间',
       dataIndex: 'updated_at',
       key: 'updated_at',
-      render: (v: string | null) => (v ? new Date(v).toLocaleString('zh-CN') : '-')
+      render: (v: string | null) => (v ? formatDateTime(v) : '-')
     },
     {
       title: '操作',

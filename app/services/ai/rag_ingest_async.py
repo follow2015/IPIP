@@ -170,14 +170,20 @@ def ingest_async(docs_dir: str, user_id: Optional[int] = None) -> str:
                 task_id=task_id,
             )
         except Exception as e:  # noqa: BLE001
-            _save_progress(task_id, "error", 0, 0, "enqueue_failed", user_id)
+            _save_progress(
+                task_id, "error", 0, 0,
+                "入库任务入队失败：Celery broker 不可达"
+                "（检查 CELERY_BROKER_URL 是否指向可达 Redis，且 worker 已启动）",
+                user_id,
+            )
             logger.warning("rag.async.enqueue_failed %s", e)
         return task_id
 
     try:
         _get_executor().submit(_run_ingest_sync, task_id, docs_dir, user_id)
     except RuntimeError as e:
-        _save_progress(task_id, "error", 0, 0, "submit_failed", user_id)
+        _save_progress(task_id, "error", 0, 0, "入库任务提交失败（线程池不可用）",
+                       user_id)
         logger.warning("rag.async.submit_failed %s", e)
     return task_id
 

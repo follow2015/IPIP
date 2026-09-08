@@ -45,7 +45,7 @@ import { useMessage } from '@/hooks/useMessage';
 import { confirm } from '@/utils/confirm';
 import { ConfirmButton } from '@/components/ConfirmButton';
 
-const { Paragraph } = Typography;
+const { Paragraph, Text } = Typography;
 
 export default function RAGPage() {
   const [status, setStatus] = useState<RagStatus | null>(null);
@@ -107,7 +107,12 @@ export default function RAGPage() {
               setIngestProgress(ev.progress ?? 0);
               setIngestTotal(ev.total ?? 0);
             } else if (ev.type === 'done') {
-              message.success(`入库完成，共 ${ev.result ?? ev.progress ?? 0} 篇文档`);
+              const count = Number(ev.result);
+              if (Number.isFinite(count) && ev.result !== null && ev.result !== '') {
+                message.success(`入库完成，共 ${count} 篇文档`);
+              } else {
+                message.error(`入库失败：${String(ev.result ?? '未知错误')}`);
+              }
               setIngesting(false);
               fetchStatus();
               fetchDocs();
@@ -132,20 +137,24 @@ export default function RAGPage() {
   );
 
   const handleIngest = async (docsDir: string) => {
-    if (!docsDir.trim()) {
-      message.warning('请输入文档目录');
+    const dir = (docsDir ?? '').trim() || '.';
+    if (dir.startsWith('/') || /^[A-Za-z]:[\\/]/.test(dir)) {
+      message.warning("请填相对路径（相对 AI_DOCS_ROOT）；'.' 或留空表示根目录本身");
       return;
     }
-    await startIngestTask(docsDir);
+    await startIngestTask(dir);
   };
 
   const handleRebuild = () => {
+    const dir = ingestForm.getFieldValue('docs_dir')?.trim() || '.';
+    if (dir.startsWith('/') || /^[A-Za-z]:[\\/]/.test(dir)) {
+      message.warning("请填相对路径（相对 AI_DOCS_ROOT）；'.' 或留空表示根目录本身");
+      return;
+    }
     confirm({
       title: '确认重建知识库',
       icon: <ExclamationCircleOutlined />,
-      content:
-        '将清空全部文档与索引，并自动重新全量入库，不可恢复。' +
-        `重跑目录：${ingestForm.getFieldValue('docs_dir')?.trim() || 'docs'}`,
+      content: '将清空全部文档与索引，并自动重新全量入库，不可恢复。' + `重跑目录：${dir}`,
       okType: 'danger',
       okText: '清空并重建',
       onOk: async () => {
@@ -154,7 +163,6 @@ export default function RAGPage() {
         setIngestTotal(0);
         try {
           await resetRagStore();
-          const dir = ingestForm.getFieldValue('docs_dir')?.trim() || 'docs';
           message.success('知识库已清空，正在重新入库');
           await startIngestTask(dir);
         } catch (err) {
@@ -248,7 +256,9 @@ export default function RAGPage() {
                   {qaResult.references.length > 0 && (
                     <>
                       <Divider />
-                      <Paragraph type="secondary">命中片段（{qaResult.references.length}）：</Paragraph>
+                      <Paragraph type="secondary">
+                        命中片段（{qaResult.references.length}）：
+                      </Paragraph>
                       <List
                         size="small"
                         dataSource={qaResult.references}
@@ -302,7 +312,11 @@ export default function RAGPage() {
                     <Statistic
                       title="知识库状态"
                       valueRender={() =>
-                        status?.available ? <Tag color="green">可用</Tag> : <Tag color="red">不可用</Tag>
+                        status?.available ? (
+                          <Tag color="green">可用</Tag>
+                        ) : (
+                          <Tag color="red">不可用</Tag>
+                        )
                       }
                     />
                   </Col>
@@ -312,15 +326,25 @@ export default function RAGPage() {
                 </Row>
 
                 <Divider />
-                <Form form={ingestForm} layout="inline" onFinish={(vals) => handleIngest(vals.docs_dir)}>
-                  <Form.Item
-                    name="docs_dir"
-                    rules={[{ required: true, message: '请输入文档目录' }]}
-                    style={{ flex: 1 }}
-                  >
+                {/* 显式展示文档根目录：docs_dir 是相对它的子目录。此前默认值填
+                    "docs" 被拼成 <root>/docs/docs，反复报「目录不存在」。 */}
+                <Paragraph type="secondary" style={{ marginBottom: 12 }}>
+                  文档根目录：<Text code>{status?.docs_root || '加载中…'}</Text>
+                  。下方填<Text strong>相对</Text>路径：
+                  <Text code>.</Text> 或留空 = 根目录本身；填
+                  <Text code>monitoring</Text> ={' '}
+                  <Text code>{`${status?.docs_root || '<根目录>'}/monitoring`}</Text>
+                  。根目录由 .env 的 <Text code>AI_DOCS_ROOT</Text> 决定，改动需重启后端。
+                </Paragraph>
+                <Form
+                  form={ingestForm}
+                  layout="inline"
+                  onFinish={(vals) => handleIngest(vals.docs_dir)}
+                >
+                  <Form.Item name="docs_dir" initialValue="." style={{ flex: 1 }}>
                     <Input
                       prefix={<InboxOutlined />}
-                      placeholder="文档目录（如 docs，相对于 AI_DOCS_ROOT）"
+                      placeholder="子目录（相对 AI_DOCS_ROOT；'.' 或留空表示根目录）"
                       disabled={ingesting}
                     />
                   </Form.Item>

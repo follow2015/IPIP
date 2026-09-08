@@ -213,16 +213,23 @@ class RAGStore:
         每个文本切成长度受限的块；向量库与 FTS5 都以块粒度写入，metadata
         携带 domain/source 供检索按域过滤。块级 doc_id 与顺序无关，内容
         稳定则重复 ingest 幂等（upsert）。
+
+        同批重复块会被丢弃（见下方 D1 说明），因此幂等性不受影响。
         """
         if not self.available:
             return
         blocks: List[str] = []
         ids: List[str] = []
         metas: List[dict] = []
+        seen_ids: set = set()
         for t in texts:
             for block in _split_blocks(t):
+                doc_id = _chunk_doc_id(domain, source, block)
+                if doc_id in seen_ids:
+                    continue
+                seen_ids.add(doc_id)
                 blocks.append(block)
-                ids.append(_chunk_doc_id(domain, source, block))
+                ids.append(doc_id)
                 metas.append({"domain": domain, "source": source})
         if not ids:
             return

@@ -7,6 +7,7 @@
 from app.utils.logging import get_logger
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -76,7 +77,7 @@ class UserLogRepository:
                 user_id=user_id,
                 login_ip=login_ip,
                 login_type=_normalize_login_type(login_type),
-                login_time=datetime.now(),
+                login_time=now_utc_naive(),
                 user_agent=user_agent,
             )
             with db.session.begin_nested():
@@ -126,7 +127,7 @@ class UserLogRepository:
     def get_login_count(self, user_id: int, days: int = 30) -> int:
         """统计用户在最近 N 天内的登录次数。"""
         try:
-            since = datetime.now() - timedelta(days=days)
+            since = now_utc_naive() - timedelta(days=days)
             return (
                 db.session.query(UserLog)
                 .filter(UserLog.user_id == user_id, UserLog.login_time >= since)
@@ -139,7 +140,7 @@ class UserLogRepository:
     def get_recent_logs(self, days: int = 7, limit: int = 100) -> List[UserLog]:
         """获取全局最近 N 天的登录日志（安全审计用）。"""
         try:
-            since = datetime.now() - timedelta(days=days)
+            since = now_utc_naive() - timedelta(days=days)
             return (
                 db.session.query(UserLog)
                 .filter(UserLog.login_time >= since)

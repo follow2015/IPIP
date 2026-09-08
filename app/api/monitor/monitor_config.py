@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """监控运行配置 + 指标模板 + 指标告警 + Zabbix 流量。"""
 from datetime import datetime, timedelta, timezone
+from app.utils.time_utils import now_utc_naive, now_utc
 
 from flask import request
 from marshmallow import ValidationError as MarshmallowValidationError
@@ -235,7 +236,7 @@ def get_device_traffic(device_id: int):
     port = request.args.get("port", type=str)
     if not port:
         raise ValidationError("port 参数必填")
-    now = int(datetime.now(timezone.utc).timestamp())
+    now = int(now_utc().timestamp())
     try:
         time_from = int(request.args.get("from", now - 3600))
         time_till = int(request.args.get("till", now))
@@ -413,7 +414,7 @@ def get_device_metric_history(device_id: int, metric_key: str):
         raise ValidationError("limit 必须为正整数")
 
     if to_ is None:
-        to_ = datetime.now(timezone.utc).replace(tzinfo=None)
+        to_ = now_utc_naive()
     if from_ is None:
         from_ = to_ - timedelta(days=1)
 

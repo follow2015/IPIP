@@ -5,6 +5,7 @@
 """
 from datetime import datetime, timezone
 from typing import Optional
+from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy import func, or_
 
@@ -34,7 +35,7 @@ class IncidentRepository:
         Args:
             now: 事件首末告警时间（测试注入）；None 取当前 UTC 时间。
         """
-        ts = now if now is not None else datetime.now(timezone.utc)
+        ts = now if now is not None else now_utc_naive()
         inc = MonitorIncident(
             incident_key=incident_key,
             title=title,
@@ -83,7 +84,7 @@ class IncidentRepository:
         if inc is None:
             return
         inc.alert_count = (inc.alert_count or 0) + 1
-        inc.last_alert_at = now if now is not None else datetime.now(timezone.utc)
+        inc.last_alert_at = now if now is not None else now_utc_naive()
         self.session.flush()
         if device_id is not None:
             self.refresh_device_count(incident_id)
@@ -152,7 +153,7 @@ class IncidentRepository:
         if inc is None:
             return
         inc.status = "closed"
-        inc.closed_at = datetime.now(timezone.utc)
+        inc.closed_at = now_utc_naive()
         self.session.flush()
 
     def list_active(self, limit: int = 50, offset: int = 0) -> list:

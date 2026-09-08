@@ -6,6 +6,7 @@
 import time
 from datetime import datetime, timezone
 from typing import List, Optional
+from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.exc import OperationalError
@@ -73,7 +74,7 @@ class DeviceMetricLatestRepository:
         """
         if not collected:
             return 0
-        collected_at = collected_at or datetime.now(timezone.utc)
+        collected_at = collected_at or now_utc_naive()
         rows = []
         for metric_key, table in collected.items():
             for index, info in (table or {}).items():

@@ -22,6 +22,7 @@ from app.utils import (
     permission_required,
     rate_limit_api,
 )
+from app.utils.time_utils import now_utc_naive
 from app.utils.transactional import transactional
 from app.exceptions.validation import ValidationError as AppValidationError, RequiredFieldError
 from app.services import device_import_service
@@ -141,7 +142,7 @@ def export_devices():
             output,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             as_attachment=True,
-            download_name=f"devices_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            download_name=f"devices_{now_utc_naive().strftime('%Y%m%d_%H%M%S')}.xlsx"
         )
     except ImportError as e:
         logger.error("导出依赖缺失: %s", str(e))

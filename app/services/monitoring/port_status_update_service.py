@@ -22,6 +22,7 @@
 - 状态变化检测：对比新旧 link_status，仅变化时告警（避免每轮重复告警）
 """
 from __future__ import annotations
+from app.utils.time_utils import now_utc_naive
 
 from app.utils.logging import get_logger
 from datetime import datetime, timezone
@@ -62,7 +63,7 @@ class PortStatusUpdateService:
             bool: 状态是否发生变化（True=变化，False=未变）
         """
         if now is None:
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            now = now_utc_naive()
 
         old_link_status = port.link_status
         if old_link_status == link_status:
@@ -101,7 +102,7 @@ class PortStatusUpdateService:
             dict: {"updated": int, "unchanged": int, "not_found": list[str]}
         """
         if now is None:
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            now = now_utc_naive()
 
         existing_ports = (
             self._session.query(NetworkPort)

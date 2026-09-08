@@ -9,6 +9,7 @@ from app.utils.logging import get_logger
 import re as _re
 import ipaddress as _ipa
 from typing import Any, Dict, List, Optional, Tuple
+from app.utils.time_utils import now_utc_naive
 
 from app.models.device import Device
 from app.core.enums import DeviceStatus
@@ -686,7 +687,7 @@ class DeviceService:
 
                 self._cleanup_device_dependencies(device_id)
 
-                device.deleted_at = datetime.now(timezone.utc)
+                device.deleted_at = now_utc_naive()
 
                 self._clear_device_location_inline(device)
 
@@ -1356,7 +1357,7 @@ class DeviceService:
         """生成资产编号：ZC-YYYYMMDD-HHmmss-XXXX"""
         from datetime import datetime, timezone
         import random
-        now = datetime.now(timezone.utc)
+        now = now_utc_naive()
         date_part = now.strftime("%Y%m%d")
         time_part = now.strftime("%H%M%S")
         rand_part = str(random.randint(0, 9999)).zfill(4)
@@ -1705,7 +1706,7 @@ class DeviceService:
         """创建设备存储条目，支持从配件模板自动填充字段。"""
         from app.models.device_storage import DeviceStorage
         from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
+        now = now_utc_naive()
         global_slot = 1  # 全局槽位计数器，跨 storage_items 递增
 
         for item in items:
@@ -1758,7 +1759,7 @@ class DeviceService:
         """
         from app.models.device_nics_port import DeviceNicsPort
         from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
+        now = now_utc_naive()
         nic_num = 1
 
         existing_keys = set(

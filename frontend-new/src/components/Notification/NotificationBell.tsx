@@ -28,6 +28,7 @@ import {
 import { useAuthStore } from '@/stores/auth';
 import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
 import { SEVERITY_COLOR_MAP, SEVERITY_LABELS } from '@/types/enums';
+import { formatDate, parseServerTime } from '@/utils/format';
 
 const { Text, Paragraph } = Typography;
 
@@ -91,9 +92,9 @@ function NotificationItemRow({
 
 function formatTime(iso: string | null): string {
   if (!iso) return '';
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
+  const d = parseServerTime(iso);
+  if (!d) return '';
+  const diffMs = Date.now() - d.valueOf();
   const diffMin = Math.floor(diffMs / 60_000);
   if (diffMin < 1) return '刚刚';
   if (diffMin < 60) return `${diffMin}分钟前`;
@@ -101,7 +102,7 @@ function formatTime(iso: string | null): string {
   if (diffHour < 24) return `${diffHour}小时前`;
   const diffDay = Math.floor(diffHour / 24);
   if (diffDay < 30) return `${diffDay}天前`;
-  return d.toLocaleDateString('zh-CN');
+  return formatDate(iso);
 }
 
 function NotificationBell() {
@@ -122,7 +123,10 @@ function NotificationBell() {
     const items = listResult?.items ?? [];
     return [...items].sort((a, b) => {
       if (a.is_read !== b.is_read) return a.is_read ? 1 : -1;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return (
+        (parseServerTime(b.created_at)?.valueOf() ?? 0) -
+        (parseServerTime(a.created_at)?.valueOf() ?? 0)
+      );
     });
   }, [listResult?.items]);
 

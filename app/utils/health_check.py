@@ -7,10 +7,11 @@
 from app.utils.logging import get_logger
 import shutil
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Dict, List
 
 from app.utils.cache import cache_manager
+from app.utils.time_utils import now_iso, now_local, parse_iso
 from extensions import db
 
 logger = get_logger(__name__)
@@ -96,7 +97,7 @@ class HealthChecker:
             Dict: 所有检查结果
         """
         results = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_iso(),
             "checks": {
                 "database": HealthChecker.check_database(),
                 "redis": HealthChecker.check_redis(),
@@ -136,7 +137,7 @@ class ErrorStatistics:
         error_detail = {
             "type": error_type,
             "message": message,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_iso(),
             "context": context or {},
         }
 
@@ -160,13 +161,13 @@ class ErrorStatistics:
         Returns:
             Dict: 统计信息
         """
-        cutoff_time = datetime.now() - timedelta(seconds=time_range)
+        cutoff_time = now_local() - timedelta(seconds=time_range)
 
-        recent_errors = [
-            error
-            for error in self.error_details
-            if datetime.fromisoformat(error["timestamp"]) > cutoff_time
-        ]
+        recent_errors = []
+        for error in self.error_details:
+            ts = parse_iso(error["timestamp"])
+            if ts is not None and ts > cutoff_time:
+                recent_errors.append(error)
 
         type_counts = defaultdict(int)
         for error in recent_errors:

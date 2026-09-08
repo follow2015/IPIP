@@ -6,8 +6,9 @@
 包含端口增量更新（R-01 原子事务）等关键业务逻辑。
 """
 from app.utils.logging import get_logger
-from datetime import datetime
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
+from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy import update, delete
 from sqlalchemy.exc import SQLAlchemyError
@@ -379,7 +380,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                        port_name, link_status, vlan, mac, ip_address, speed,
                        description, port_type 等字段
         """
-        now = datetime.now()
+        now = now_utc_naive()
 
         self.session.execute(
             update(NetworkPort)
@@ -455,7 +456,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                     )
                     self.session.add(new_port)
 
-        grace_cutoff = datetime.now().timestamp() - 600  # 10 分钟宽限期
+        grace_cutoff = now_utc_naive() - timedelta(seconds=600)
         self.session.execute(
             delete(NetworkPort)
             .where(
@@ -466,7 +467,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             .where(
                 ~(
                     NetworkPort.updated_at.isnot(None)
-                    & NetworkPort.updated_at.op('>')(datetime.fromtimestamp(grace_cutoff))
+                    & NetworkPort.updated_at.op('>')(grace_cutoff)
                 )
             )
         )

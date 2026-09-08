@@ -6,7 +6,7 @@
 import { useState, useMemo } from 'react';
 import { Card, Empty, Space, Tooltip, Typography, DatePicker, theme } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
-import { ensureUtc } from '@/utils/format';
+import { parseServerTime } from '@/utils/format';
 import { useMonitorAlerts } from '@/services/monitor';
 
 const { Text } = Typography;
@@ -28,7 +28,8 @@ export default function AlertTrend() {
     const map = new Map<string, number>();
     for (const it of items) {
       if (!it.created_at) continue;
-      const day = dayjs(ensureUtc(it.created_at)).format('YYYY-MM-DD');
+      const day = parseServerTime(it.created_at)?.format('YYYY-MM-DD');
+      if (!day) continue;
       map.set(day, (map.get(day) ?? 0) + 1);
     }
     const days: { day: string; count: number }[] = [];

@@ -10,6 +10,7 @@ P2 修订：外部渠道（email/webhook）改为后台线程异步投递，不�
 """
 from app.utils.logging import get_logger
 from datetime import datetime, timezone
+from app.utils.time_utils import now_utc_naive
 
 from app.core.enums import ChannelType, PERSONAL_CHANNELS, SeverityLevel
 from app.models.notification import Notification, NotificationReceipt
@@ -333,7 +334,7 @@ class NotificationService:
         receipt = self._receipt_repo.find_by_user_and_notification(user_id, notification_id)
         if not receipt or not receipt.ack_required:
             return False
-        receipt.acked_at = datetime.now(timezone.utc)
+        receipt.acked_at = now_utc_naive()
         self._receipt_repo.session.flush()
         return True
 

@@ -3,6 +3,7 @@ import { EyeOutlined, RedoOutlined, ClearOutlined, DeleteOutlined } from '@ant-d
 import { StatusTag } from '@/components/StatusTag';
 import { LINK_STATUS_MAP } from '@/types/enums';
 import type { SwitchPort, SwitchPortDetail, SwitchPortIP, PortConfigResult } from '@/types/models';
+import { formatDateTime } from '@/utils/format';
 
 interface PortDetailModalProps {
   open: boolean;
@@ -116,9 +117,7 @@ export function PortDetailModal({
               {port.notes ?? portDetail.description ?? '-'}
             </Descriptions.Item>
             <Descriptions.Item label="更新时间" span={2}>
-              {portDetail.updated_at
-                ? new Date(portDetail.updated_at).toLocaleString('zh-CN')
-                : '-'}
+              {portDetail.updated_at ? formatDateTime(portDetail.updated_at) : '-'}
             </Descriptions.Item>
           </Descriptions>
 
@@ -178,7 +177,7 @@ export function PortDetailModal({
               <>
                 {portConfig.updated_at && (
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 4 }}>
-                    更新时间：{new Date(portConfig.updated_at).toLocaleString('zh-CN')}
+                    更新时间：{formatDateTime(portConfig.updated_at)}
                     {portConfig.from_cache && ' (缓存)'}
                   </div>
                 )}
@@ -200,7 +199,7 @@ export function PortDetailModal({
               <span style={{ fontSize: 12, color: '#999' }}>
                 已有缓存配置（
                 {portDetail.port_config_updated_at
-                  ? new Date(portDetail.port_config_updated_at).toLocaleString('zh-CN')
+                  ? formatDateTime(portDetail.port_config_updated_at)
                   : '未知时间'}
                 ）
               </span>

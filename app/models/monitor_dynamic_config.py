@@ -35,6 +35,12 @@ class MonitorDynamicConfig(db.Model):
         server_default="",
         comment="配置说明（前端展示）",
     )
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        server_default=func.now(),
+        comment="创建时间",
+    )
     updated_at = db.Column(
         db.DateTime,
         nullable=False,

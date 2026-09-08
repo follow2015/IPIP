@@ -9,6 +9,7 @@
 异常检测算法（按优先级）：基线偏离（3-sigma，主判据）→ 环比突变（>50%）→ 同比。
 """
 from __future__ import annotations
+from app.utils.time_utils import now_utc_naive
 
 import math
 import re
@@ -61,7 +62,7 @@ class BaselineService:
         Returns:
             更新的基线行数。
         """
-        now = datetime.now(timezone.utc)
+        now = now_utc_naive()
         since = now - timedelta(days=window_days)
 
         rows = (
@@ -171,7 +172,7 @@ class BaselineService:
         Returns:
             {"mean", "stddev", "sample_count", "baseline_status"} 或 None。
         """
-        at = at or datetime.now()
+        at = at or now_utc_naive()
         h = at.hour
         dow = at.weekday()
         row = (

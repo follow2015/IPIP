@@ -11,6 +11,7 @@ import type { IPAuditLog } from '@/services/ip-audit';
 import { useRoomOptions } from '@/services/room';
 import { IP_AUDIT_ACTION_MAP, IP_AUDIT_ACTION_OPTIONS } from '@/types/status-codes.generated';
 import type { User } from '@/types/models';
+import { formatDateTime } from '@/utils/format';
 
 function ActionTag({ action }: { action: string }) {
   const meta = IP_AUDIT_ACTION_MAP[action as keyof typeof IP_AUDIT_ACTION_MAP];
@@ -69,7 +70,7 @@ export default function IPAudit() {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (t: string | null) => (t ? new Date(t).toLocaleString('zh-CN') : '-')
+      render: (t: string | null) => (t ? formatDateTime(t) : '-')
     },
     {
       title: '操作人',
@@ -171,7 +172,7 @@ export default function IPAudit() {
           <Card size="small" type="inner">
             <Descriptions column={2} bordered size="small">
               <Descriptions.Item label="时间" span={2}>
-                {detail.created_at ? new Date(detail.created_at).toLocaleString('zh-CN') : '-'}
+                {detail.created_at ? formatDateTime(detail.created_at) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="操作人">
                 {renderOperator(detail.operator_id)}

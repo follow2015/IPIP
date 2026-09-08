@@ -5,6 +5,7 @@ Repository基础实现
 提供Repository模式的基础实现，统一数据访问方式。
 """
 import inspect
+from app.utils.time_utils import now_utc_naive
 
 from app.utils.logging import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
@@ -450,7 +451,7 @@ class BaseRepository:
                 entities = self._base_query().filter(
                     self.model_class.id.in_(entity_ids)
                 ).all()
-                now = datetime.now(timezone.utc).replace(tzinfo=None)
+                now = now_utc_naive()
                 for entity in entities:
                     entity.deleted_at = now
                 deleted_count = len(entities)

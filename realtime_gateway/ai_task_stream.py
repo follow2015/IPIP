@@ -93,8 +93,16 @@ async def ai_task_event_stream(task_id: str, user_id: int | None) -> AsyncGenera
                 last_sent = frame
                 last_activity = time.monotonic()
                 yield frame
-            if state.get("status") in ("done", "error"):
-                yield _sse_data({"type": "done", "result": state.get("result")})
+            status = state.get("status")
+            if status in ("done", "error"):
+                if status == "error":
+                    yield _sse_data({
+                        "type": "error",
+                        "message": state.get("result") or "任务失败",
+                        "status": status,
+                    })
+                else:
+                    yield _sse_data({"type": "done", "result": state.get("result")})
                 return
         now = time.monotonic()
         if now - start > STREAM_TIMEOUT:
