@@ -477,7 +477,6 @@ class CustomerRepository(SQLAlchemyRepository):
                 .filter(
                     Cabinet.customer_id == customer_id,
                     Cabinet.status != DeviceStatus.SCRAPPED,
-                    Cabinet.deleted_at.is_(None),
                 )
                 .all()
             )
@@ -517,7 +516,6 @@ class CustomerRepository(SQLAlchemyRepository):
                     Device.customer_id == customer_id,
                     Device.status != DeviceStatus.SCRAPPED,
                     Device.deleted_at.is_(None),
-                    Cabinet.deleted_at.is_(None),
                     ~Cabinet.id.in_(full_cabinet_ids) if full_cabinet_ids else True
                 )
                 .group_by(Cabinet.id)

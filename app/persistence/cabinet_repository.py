@@ -276,7 +276,6 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             room_rows = (
                 self.session.query(Room.name, func.count(Cabinet.id).label("cnt"))
                 .join(Cabinet, Room.id == Cabinet.room_id)
-                .filter(Room.deleted_at.is_(None), Cabinet.deleted_at.is_(None))
                 .group_by(Room.id, Room.name)
                 .all()
             )

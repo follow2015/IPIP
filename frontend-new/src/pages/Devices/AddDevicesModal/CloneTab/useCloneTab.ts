@@ -7,10 +7,13 @@
  */
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useEditableRows } from '@/hooks/useEditableRows';
-import { useUPositionAssigner } from '@/hooks/useUPositionAssigner';
 import { useBatchDeviceCreate } from '@/hooks/useBatchDeviceCreate';
 import { useDeviceDetail, useDeviceList } from '@/services/device';
-import { useCabinetOptions, useCabinetAvailableUPositions } from '@/services/cabinet';
+import {
+  useCabinetOptions,
+  useCabinetAvailableUPositions,
+  useBatchAllocateUPositions
+} from '@/services/cabinet';
 import { useMessage } from '@/hooks/useMessage';
 import { useQueryClient } from '@tanstack/react-query';
 import { DeviceSubtype } from '@/types/enums';
@@ -109,7 +112,8 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
   const { data: availableUPositions } = useCabinetAvailableUPositions(effectiveCabinetId);
   const { data: cabinetOptionsData } = useCabinetOptions(undefined, false, [1, 2]);
   const cabinetOptions = cabinetOptionsData ?? [];
-  const { assign: assignU, available: availableUCount } = useUPositionAssigner(availableUPositions);
+  const availableUCount = availableUPositions?.length ?? 0;
+  const assignUMutation = useBatchAllocateUPositions();
 
   const { data: deviceListData, isLoading: isDeviceListLoading } = useDeviceList({
     search: searchText || undefined,
@@ -216,8 +220,35 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
       message.warning('当前机柜无可用 U 位');
       return;
     }
-    const updated = assignU(diffRows);
-    resetRows(updated.map(({ key: _k, ...r }) => r));
+    assignUMutation.mutate(
+      {
+        cabinetId: effectiveCabinetId,
+        devices: diffRows.map((r) => ({
+          key: r.key,
+          height_u: r.height_u ?? 1,
+          u_position: r.u_position
+        }))
+      },
+      {
+        onSuccess: (res) => {
+          if (!res.success) {
+            message.warning(res.message || '机柜空间不足，分配失败');
+            return;
+          }
+          const uByKey = new Map(res.allocations.map((a) => [a.key, a.u_position]));
+          resetRows(
+            diffRows
+              .map((r) => {
+                const u = uByKey.get(r.key);
+                return u != null ? { ...r, u_position: u } : r;
+              })
+              .map(({ key: _k, ...rest }) => rest)
+          );
+          message.success(res.message || '自动分配完成');
+        },
+        onError: () => message.error('U位分配请求失败，请重试')
+      }
+    );
   };
 
   const handleRegenerateNames = () => {

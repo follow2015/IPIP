@@ -15,8 +15,16 @@
 schema_migrations；``flask db-status`` 查看状态；``flask db-upgrade --dry-run``
 只打印计划不落库（对齐「先只读预检再执行」纪律）。
 
+上述流程只能覆盖「已经写了迁移」的变更，挡不住两种漏网：迁移文件压根没写
+（手工改了 baseline 或模型），或写了却没在目标环境执行——两者最终都表现为
+同一类事故：ORM 按模型全列拼 SELECT，库里没这列 → 1054 Unknown column →
+运行时崩。为此提供 ``flask db-check``（见 `collect_missing_columns`），
+直接以 ORM 元数据为准核对真实库，列出缺失的表/列。
+
 纪律：
 - 模型改动与迁移文件同一 commit（防模型↔库漂移）；
+- 是否漂移以 `collect_missing_columns` / flask db-check 的判定为准，
+  不以「模型看着对」或「迁移好像跑过」为准；
 - 数据回填也走迁移链（.py 内批处理），不放 DDL 文件；
 - 已知 MySQL 8.4 硬约束见项目 memory：分区表无 FK(1506)、表 COMMENT 先于
   PARTITION BY(1064)、FK 引用列类型须完全一致(3780)。
@@ -161,3 +169,46 @@ class SchemaMigrationRunner:
         finally:
             cur.close()
         self._conn.commit()
+
+
+def collect_missing_columns(session) -> list[str]:
+    """比对 ORM 元数据与实际库，返回「模型已声明但库中缺失」的表/列清单。
+
+    模型↔库漂移的唯一判定实现，供三种调用方共用（避免多份实现各说各话）：
+    CLI `flask db-check`、应用启动自检、以及 mysql_only 回归测试。
+
+    仅适用于 MySQL：依赖 information_schema.columns。非 MySQL 方言（测试的
+    SQLite）须由调用方跳过。
+
+    Args:
+        session: SQLAlchemy Session，须处于 app context 内（ORM metadata 已注册）。
+
+    Returns:
+        人类可读的漂移描述列表；空列表表示无漂移。
+    """
+    from sqlalchemy import text
+
+    from extensions import db
+
+    rows = session.execute(
+        text(
+            "SELECT table_name, column_name FROM information_schema.columns "
+            "WHERE table_schema = DATABASE()"
+        )
+    ).fetchall()
+    actual: dict[str, set] = {}
+    for table_name, column_name in rows:
+        actual.setdefault(table_name, set()).add(column_name)
+
+    problems: list[str] = []
+    for table in db.metadata.sorted_tables:
+        cols = actual.get(table.name)
+        if cols is None:
+            problems.append(f"缺表：{table.name}（模型已声明，库中不存在）")
+            continue
+        for column in table.columns:
+            if column.name not in cols:
+                problems.append(
+                    f"缺列：{table.name}.{column.name}（模型已声明，库中不存在）"
+                )
+    return problems

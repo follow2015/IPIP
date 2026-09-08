@@ -700,12 +700,12 @@ class IPManagerRepository(BaseRepository):
 
         room_map = {}
         if room_ids:
-            for r in self.session.query(Room).filter(Room.id.in_(room_ids), Room.deleted_at.is_(None)).all():
+            for r in self.session.query(Room).filter(Room.id.in_(room_ids)).all():
                 room_map[r.id] = r.name
 
         customer_map = {}
         if customer_ids:
-            for c in self.session.query(Customer).filter(Customer.id.in_(customer_ids), Customer.deleted_at.is_(None)).all():
+            for c in self.session.query(Customer).filter(Customer.id.in_(customer_ids)).all():
                 customer_map[c.id] = c.customer_name
 
         switch_map = {}

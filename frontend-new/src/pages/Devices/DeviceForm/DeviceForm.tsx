@@ -13,7 +13,8 @@ import { useRoomOptions } from '@/services/room';
 import {
   useCabinetOptions,
   useCabinetAvailableUPositions,
-  useCabinetLayout
+  useCabinetLayout,
+  useAllocateUPosition
 } from '@/services/cabinet';
 import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useUserOptions } from '@/services/user';
@@ -119,6 +120,7 @@ function DeviceForm({
   const { data: cabinetOptions } = useCabinetOptions(selectedRoomId, false, [1, 2]);
 
   const { data: availableUPositions } = useCabinetAvailableUPositions(selectedCabinetId ?? 0);
+  const allocateUMutation = useAllocateUPosition();
 
   const { data: cabinetLayout } = useCabinetLayout(selectedCabinetId ?? 0);
 
@@ -274,46 +276,30 @@ function DeviceForm({
   ]);
 
   const handleAutoAssignUPosition = useCallback(() => {
-    if (!availableUPositions || availableUPositions.length === 0) {
-      message.warning('当前机柜无可用U位');
+    if (!selectedCabinetId) {
+      message.warning('请先选择机柜');
       return;
     }
     const heightU = form.getFieldValue('height_u') ?? 1;
     const gap = form.getFieldValue('device_gap') ?? 0;
-
-    const sorted = [...availableUPositions].sort((a, b) => a - b);
-
-    let candidatePositions = sorted;
-    if (isEdit && editRecord?.u_position) {
-      const myPositions: number[] = [];
-      for (
-        let i = editRecord.u_position;
-        i < editRecord.u_position + (editRecord.height_u || 1);
-        i++
-      ) {
-        myPositions.push(i);
-      }
-      candidatePositions = [...myPositions, ...sorted].sort((a, b) => a - b);
-    }
-
-    const needed = heightU + gap;
-    for (let i = 0; i <= candidatePositions.length - needed; i++) {
-      const start = candidatePositions[i];
-      let continuous = true;
-      for (let j = 1; j < needed; j++) {
-        if (candidatePositions[i + j] !== start + j) {
-          continuous = false;
-          break;
+    allocateUMutation.mutate(
+      {
+        cabinetId: Number(selectedCabinetId),
+        height_u: heightU,
+        device_spacing: gap,
+        exclude_device_id: isEdit ? editRecord?.id : undefined
+      },
+      {
+        onSuccess: (res) => {
+          form.setFieldValue('u_position', res.u_position);
+          message.success(`已分配U${res.u_position}~U${res.u_position + heightU - 1}`);
+        },
+        onError: (err) => {
+          message.warning(err instanceof Error ? err.message : '分配失败：无可用 U 位');
         }
       }
-      if (continuous) {
-        form.setFieldValue('u_position', start);
-        message.success(`已分配U${start}~U${start + heightU - 1}`);
-        return;
-      }
-    }
-    message.warning(`无连续${needed}个U位可用`);
-  }, [availableUPositions, form, message, isEdit, editRecord]);
+    );
+  }, [selectedCabinetId, form, message, isEdit, editRecord, allocateUMutation]);
 
   useEffect(() => {
     if (prevDeviceType.current !== undefined && prevDeviceType.current !== deviceType) {

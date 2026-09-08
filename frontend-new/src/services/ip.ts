@@ -20,6 +20,7 @@ export interface IPQueryParams extends PaginationParams {
 
 interface IPCustomerRequest {
   customer_id: number | null;
+  room_id?: number;
 }
 
 interface BanRequest {
@@ -143,8 +144,15 @@ export function useIPNotes(address: string) {
 export function useUpdateIPNotes() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ address, notes }: { address: string; notes: string }) =>
-      put<IPAddressDetail>(`/ip/${encodeURIComponent(address)}/notes`, { notes }),
+    mutationFn: ({
+      address,
+      notes,
+      room_id
+    }: {
+      address: string;
+      notes: string;
+      room_id?: number;
+    }) => put<IPAddressDetail>(`/ip/${encodeURIComponent(address)}/notes`, { notes, room_id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ip.all });
     }

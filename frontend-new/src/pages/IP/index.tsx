@@ -104,7 +104,7 @@ function IP() {
 
   const batch = useBatchSelection<IPAddress>({
     dataSource: data?.items ?? [],
-    getRowKey: (r) => r.ip_address
+    getRowKey: (r) => `${r.ip_address}|${r.room_id ?? ''}`
   });
 
   useGlobalEventListener(
@@ -208,7 +208,7 @@ function IP() {
       onOk: async () => {
         try {
           await batchBanIP.mutateAsync({
-            ip_list: batch.selectedKeys.map(String)
+            ip_list: batch.selectedKeys.map((k) => String(k).split('|')[0])
           });
           msg.info(`批量封禁已提交，完成后将通过消息通知您`);
           batch.clear();
@@ -231,7 +231,7 @@ function IP() {
       onOk: async () => {
         try {
           await batchUnbanIP.mutateAsync({
-            ip_list: batch.selectedKeys.map(String),
+            ip_list: batch.selectedKeys.map((k) => String(k).split('|')[0]),
             room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined
           });
           msg.info(`批量解封已提交，完成后将通过消息通知您`);
@@ -254,19 +254,36 @@ function IP() {
   };
 
   const handleBatchEditSubmit = async (values: { customer_id?: number | null; notes?: string }) => {
-    const ip_list = batch.selectedKeys.map(String);
-    const room_id = table.filters.room_id ? Number(table.filters.room_id) : undefined;
+    const keys = batch.selectedKeys.map(String);
+    const groups = new Map<number, string[]>();
+    for (const k of keys) {
+      const sep = k.lastIndexOf('|');
+      const ip = k.slice(0, sep);
+      const rid = k.slice(sep + 1);
+      const roomId = rid === '' ? NaN : Number(rid);
+      if (!groups.has(roomId)) groups.set(roomId, []);
+      groups.get(roomId)!.push(ip);
+    }
+    const viewRoomId = table.filters.room_id ? Number(table.filters.room_id) : undefined;
     try {
       if (values.customer_id !== undefined) {
-        await batchUpdateIPCustomer.mutateAsync({
-          ip_list,
-          customer_id: values.customer_id,
-          room_id
-        });
-        msg.success(`已为 ${ip_list.length} 个 IP 分配客户`);
+        for (const [roomId, ips] of groups) {
+          await batchUpdateIPCustomer.mutateAsync({
+            ip_list: ips,
+            customer_id: values.customer_id,
+            room_id: viewRoomId ?? (Number.isNaN(roomId) ? undefined : roomId)
+          });
+        }
+        msg.success(`已为 ${keys.length} 个 IP 分配客户`);
       } else if (values.notes !== undefined) {
-        await batchUpdateIPNotes.mutateAsync({ ip_list, notes: values.notes, room_id });
-        msg.success(`已更新 ${ip_list.length} 个 IP 的备注`);
+        for (const [roomId, ips] of groups) {
+          await batchUpdateIPNotes.mutateAsync({
+            ip_list: ips,
+            notes: values.notes,
+            room_id: viewRoomId ?? (Number.isNaN(roomId) ? undefined : roomId)
+          });
+        }
+        msg.success(`已更新 ${keys.length} 个 IP 的备注`);
       }
       setBatchEditOpen(false);
       batch.clear();
@@ -335,11 +352,15 @@ function IP() {
       if (values.customer_id !== undefined) {
         await updateIPCustomer.mutateAsync({
           address: selectedIP.ip_address,
-          data: { customer_id: values.customer_id }
+          data: { customer_id: values.customer_id, room_id: selectedIP.room_id ?? undefined }
         });
       }
       if (values.notes !== undefined) {
-        await updateIPNotes.mutateAsync({ address: selectedIP.ip_address, notes: values.notes });
+        await updateIPNotes.mutateAsync({
+          address: selectedIP.ip_address,
+          notes: values.notes,
+          room_id: selectedIP.room_id ?? undefined
+        });
       }
       msg.success('更新成功');
       setEditModalOpen(false);
@@ -546,7 +567,7 @@ function IP() {
         columns={columns}
         dataSource={data?.items ?? []}
         loading={isLoading}
-        rowKey="ip_address"
+        rowKey={(r) => `${r.ip_address}|${r.room_id ?? ''}`}
         total={data?.total}
         page={table.page}
         perPage={table.perPage}

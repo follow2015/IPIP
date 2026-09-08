@@ -470,10 +470,10 @@ class CustomerService:
         cabinet_count = resource_counts["cabinet_count"]
         device_count = resource_counts["device_count"]
 
-        if (cabinet_count > 0 or device_count > 0) and not force:
+        if cabinet_count > 0 or device_count > 0:
             raise ValidationError(
                 f"客户还有 {cabinet_count} 个机柜和 {device_count} 个设备，无法删除。"
-                "请先删除所有关联资源或使用强制删除。"
+                "请先释放/删除所有关联资源。"
             )
 
         result = self.customer_repository.delete(customer_id)

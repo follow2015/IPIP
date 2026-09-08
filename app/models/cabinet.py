@@ -62,8 +62,6 @@ class Cabinet(BaseModel):
     )
     notes = db.Column(MEDIUMTEXT, comment="备注信息")
 
-    deleted_at = db.Column(db.DateTime, nullable=True, comment="软删除时间(NULL=未删除)")
-
 
     customer = relationship(
         "Customer",

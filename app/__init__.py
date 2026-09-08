@@ -113,6 +113,7 @@ def create_app(config_name: str = None) -> Flask:
     _register_db_cli(app)
     _register_monitor_cli(app)
     _register_schema_migration_cli(app)
+    _warn_on_schema_drift(app)
 
     logger.info(f"应用创建成功 (环境: {config_name or 'development'})")
 
@@ -562,6 +563,7 @@ def _register_schema_migration_cli(app: Flask):
 
     - db-upgrade: 按序应用 migrations/versions/ 中未记录的迁移（幂等可重跑）
     - db-status : 查看已应用 / 待应用版本
+    - db-check  : 校验 ORM 模型与实际库是否漂移（缺表/缺列），漂移以退出码 1 报警
 
     详见 app/services/schema_migration_service.py 模块 docstring。
     """
@@ -636,3 +638,60 @@ def _register_schema_migration_cli(app: Flask):
             click.echo(f"db-upgrade done: applied={', '.join(applied)}")
         else:
             click.echo("db-upgrade done: 无待应用迁移，schema 已是最新")
+
+    @app.cli.command("db-check")
+    def db_check_cmd():
+        """校验 ORM 模型与实际库是否漂移（缺表/缺列）；发现漂移以退出码 1 报警。
+
+        db-upgrade 只能覆盖「已写了迁移」的变更，写漏或跑漏都需靠本命令兜底。
+
+        用法: flask db-check
+        """
+        import sys
+
+        from app.services.schema_migration_service import collect_missing_columns
+
+        if db.engine.dialect.name != "mysql":
+            click.echo("db-check skipped: 非 MySQL 方言（无 information_schema）")
+            return
+        problems = collect_missing_columns(db.session)
+        if problems:
+            click.echo(f"检测到 {len(problems)} 处 schema 漂移（模型已声明但库中不存在）：")
+            for p in problems:
+                click.echo(f"  {p}")
+            click.echo(
+                "处理：在 migrations/versions/ 补 NNNN_*.py 增量迁移，然后 flask db-upgrade"
+            )
+            sys.exit(1)
+        click.echo("db-check OK：无表/列漂移")
+
+
+def _warn_on_schema_drift(app: Flask) -> None:
+    """启动时比对 ORM 模型与实际库结构，漂移则告警（只读，绝不阻塞启动）。
+
+    防复发机制：历史事故为模型新增 `monitor_dynamic_config.created_at` 而存量库
+    未执行对应增量迁移，ORM 按模型全列拼 SELECT 报 1054，整条监控探测链路 500。
+    `flask db-upgrade` 覆盖不到「迁移没写」或「写了没跑」两种漏网，只能靠本项在
+    启动第一时间暴露，而不是等某个用户请求踩到。
+
+    非 MySQL 方言（如测试的 SQLite）与查询异常一律跳过：自检不得拖垮启动。
+    """
+    with app.app_context():
+        try:
+            if db.engine.dialect.name != "mysql":
+                return
+            from app.services.schema_migration_service import collect_missing_columns
+
+            problems = collect_missing_columns(db.session)
+        except Exception as e:  # noqa: BLE001 - 自检失败不得阻塞启动
+            logger.warning("schema drift check 跳过：%s", e)
+            return
+    if problems:
+        logger.warning(
+            "检测到 %d 处 schema 漂移（模型已声明但库中不存在）：", len(problems)
+        )
+        for p in problems:
+            logger.warning("  %s", p)
+        logger.warning(
+            "处理：在 migrations/versions/ 补 NNNN_*.py 增量迁移后执行 flask db-upgrade"
+        )

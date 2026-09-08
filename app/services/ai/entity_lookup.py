@@ -69,7 +69,7 @@ def resolve_customer(query: Any) -> Dict[str, Any]:
         return {"status": "missing", "customer": None, "candidates": [],
                 "message": "客户参数为空"}
 
-    base = Customer.query.filter(Customer.deleted_at.is_(None))
+    base = Customer.query
 
     if q.isdigit():
         c = base.filter(Customer.id == int(q)).first()

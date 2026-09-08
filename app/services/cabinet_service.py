@@ -31,8 +31,6 @@ _STRATEGY_MAP: Dict[str, UPositionStrategy] = {
     "top_down":       UPositionStrategy.AUTO_TOP_DOWN,
     "auto_best_fit":  UPositionStrategy.AUTO_BEST_FIT,
     "best_fit":       UPositionStrategy.AUTO_BEST_FIT,
-    "auto_first_fit": UPositionStrategy.AUTO_FIRST_FIT,
-    "first_fit":      UPositionStrategy.AUTO_FIRST_FIT,
 }
 
 
@@ -249,6 +247,13 @@ class CabinetService:
         cabinet = self.get_by_id_or_raise(cabinet_id)
         room_id = cabinet.room_id
 
+        recycled = [d for d in cabinet.devices if d.deleted_at is not None]
+        if recycled:
+            raise ValidationError(
+                f"机柜回收站中还有 {len(recycled)} 台设备，无法删除。"
+                "请先恢复这些设备（或彻底删除）后再删除机柜。"
+            )
+
         if not force and cabinet.devices:
             raise ValidationError(
                 f"机柜下还有 {len(cabinet.devices)} 个设备，无法删除。"
@@ -331,22 +336,17 @@ class CabinetService:
         height_u: int,
         exclude_device_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """检查指定 U 位区间是否可用（无冲突）。"""
-        cabinet = self.get_by_id(cabinet_id)
-        if not cabinet:
-            return {"available": False, "message": "机柜不存在"}
+        """检查指定 U 位区间是否可用（无冲突）。
 
-        devices  = [d.to_dict() for d in cabinet.devices]
-        conflict = CabinetUCalculator.check_u_position_conflict(
-            devices=devices,
+        统一委托给 `check_u_position_conflict`（同一判定的唯一实现），
+        仅做布尔语义包装，供需要 available/message 结构的调用方使用。
+        """
+        conflict = self.check_u_position_conflict(
             cabinet_id=cabinet_id,
             u_position=u_position,
             height_u=height_u,
-            total_u=cabinet.total_u,
             exclude_device_id=exclude_device_id,
-            filter_parent_only=True,
         )
-
         if conflict["has_conflict"]:
             return {
                 "available":           False,
@@ -362,7 +362,7 @@ class CabinetService:
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
-        devices = [d.to_dict() for d in cabinet.devices]
+        devices = self._cabinet_device_dicts(cabinet)
         return CabinetUCalculator.get_available_u_positions(
             devices=devices, total_u=cabinet.total_u,
             height_u=height_u, device_spacing=device_spacing,
@@ -379,7 +379,7 @@ class CabinetService:
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
-        devices = [d.to_dict() for d in cabinet.devices]
+        devices = self._cabinet_device_dicts(cabinet)
         return CabinetUCalculator.auto_allocate_u_position(
             devices=devices, total_u=cabinet.total_u,
             height_u=height_u, strategy=_parse_strategy(strategy),
@@ -389,24 +389,61 @@ class CabinetService:
     def batch_allocate_devices(
         self,
         cabinet_id: int,
-        devices_to_allocate: List[Dict],
-        default_strategy: str = "auto_bottom_up",
-        allow_partial: bool = False,
-        device_spacing: int = 2,
+        devices: List[Dict],
+        strategy: str = "auto_bottom_up",
+        device_spacing: int = 0,
     ) -> Optional[Dict[str, Any]]:
-        """批量为多个设备分配 U 位。"""
+        """批量为多行分配 U 位（前端批量添加 / 克隆复制的分配落点）。
+
+        语义：
+        - u_position 已填的行**原样保留**（自动分配不覆盖手填值），并作为
+          已占用参与后续计算——新分配不得与其重叠；
+        - u_position 为空的行按策略分配；
+        - 空间不足时整批失败（不做部分分配），由调用方提示用户。
+
+        Args:
+            cabinet_id: 机柜 ID。
+            devices: 行列表 [{key, height_u, u_position?}, ...]。
+            strategy: 分配策略（bottom_up / top_down / best_fit）。
+            device_spacing: 设备间距（U），默认 0（紧密排列）。
+
+        Returns:
+            {success, allocations, preserved, failed, message}；机柜不存在返回 None。
+        """
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
-        existing = [d.to_dict() for d in cabinet.devices]
-        return CabinetUCalculator.batch_allocate_devices(
-            devices_to_allocate=devices_to_allocate,
+
+        manual  = [d for d in devices if d.get("u_position") is not None]
+        pending = [d for d in devices if d.get("u_position") is None]
+
+        occupied_by_manual = [
+            {"id": d.get("key"), "u_position": d["u_position"],
+             "height_u": d.get("height_u") or 1}
+            for d in manual
+        ]
+        existing = self._cabinet_device_dicts(cabinet) + occupied_by_manual
+
+        calc_result = CabinetUCalculator.batch_allocate_devices(
+            devices_to_allocate=pending,
             existing_devices=existing,
             total_u=cabinet.total_u,
-            default_strategy=_parse_strategy(default_strategy),
-            allow_partial=allow_partial,
+            default_strategy=_parse_strategy(strategy),
             device_spacing=device_spacing,
         )
+
+        return {
+            "success": calc_result["success"],
+            "allocations": [
+                {"key": d.get("key"), "u_position": d["u_position"]}
+                for d in calc_result["allocated"]
+            ],
+            "preserved": [
+                {"key": d.get("key"), "u_position": d["u_position"]} for d in manual
+            ],
+            "failed": calc_result["failed"],
+            "message": calc_result["message"],
+        }
 
 
     def get_utilization(self, cabinet_id: int) -> Optional[Dict[str, Any]]:
@@ -440,7 +477,7 @@ class CabinetService:
         if not cabinet:
             return None
 
-        devices     = [d.to_dict() for d in cabinet.devices]
+        devices     = self._cabinet_device_dicts(cabinet)
         usage       = CabinetUCalculator.calculate_u_usage(devices, cabinet.total_u)
         free_ranges = CabinetUCalculator.get_free_ranges(devices, cabinet.total_u)
 
@@ -553,7 +590,7 @@ class CabinetService:
         if not cabinet:
             return None
 
-        devices  = [d.to_dict() for d in cabinet.devices]
+        devices  = self._cabinet_device_dicts(cabinet)
         total_u  = cabinet.total_u or 42
         usage    = CabinetUCalculator.calculate_total_u_with_spacing(
             devices, total_u, device_spacing=device_spacing
@@ -581,7 +618,7 @@ class CabinetService:
         cabinet = self.get_by_id(cabinet_id)
         if not cabinet:
             return None
-        devices = [d.to_dict() for d in cabinet.devices]
+        devices = self._cabinet_device_dicts(cabinet)
         return CabinetUCalculator.optimize_cabinet_layout(
             devices=devices, total_u=cabinet.total_u, device_spacing=device_spacing
         )
@@ -599,7 +636,7 @@ class CabinetService:
         if not cabinet:
             return None
 
-        devices = [d.to_dict() for d in cabinet.devices]
+        devices = self._cabinet_device_dicts(cabinet)
         result  = CabinetUCalculator.validate_cabinet_capacity(
             devices=devices, total_u=cabinet.total_u,
             device_spacing=device_spacing, max_usage_rate=max_usage_rate,
@@ -641,7 +678,7 @@ class CabinetService:
         if not cabinet:
             return {"can_fit": False, "message": "机柜不存在"}
 
-        devices = [d.to_dict() for d in cabinet.devices]
+        devices = self._cabinet_device_dicts(cabinet)
         check   = CabinetUCalculator.check_capacity_with_spacing(
             devices=devices, total_u=cabinet.total_u,
             new_height=new_height, device_spacing=device_spacing,
@@ -677,35 +714,28 @@ class CabinetService:
                 "message": "机柜不存在",
             }
 
-        devices = [d.to_dict() for d in cabinet.devices]
+        devices = self._cabinet_device_dicts(cabinet)
         return CabinetUCalculator.check_u_position_conflict(
             devices=devices,
-            cabinet_id=cabinet_id,
             u_position=u_position,
             height_u=height_u,
             total_u=cabinet.total_u,
             exclude_device_id=exclude_device_id,
         )
 
-    def allocate_u_position(
-        self,
-        cabinet_id: int,
-        height_u: int,
-        strategy: str = "auto_bottom_up",
-        device_spacing: int = 2,
-    ) -> Optional[int]:
-        """智能分配U位（兼容旧API）。"""
-        return self.auto_allocate_u_position(
-            cabinet_id=cabinet_id,
-            height_u=height_u,
-            strategy=strategy,
-            device_spacing=device_spacing,
-        )
-
     def get_global_statistics(self) -> Dict[str, Any]:
         """获取全局机柜统计汇总。"""
         return self.cabinet_repository.get_cabinet_statistics()
 
+
+    def _cabinet_device_dicts(self, cabinet) -> List[Dict[str, Any]]:
+        """机柜内**有效**设备字典列表——service 层统一的设备口径。
+
+        过滤回收站（软删）设备：它们可能仍挂着 cabinet_id/u_position，
+        不剔除会让分配、可用位统计与机柜概览（模型侧已过滤）口径分裂。
+        子节点过滤由算法层 _iter_effective 统一处理。
+        """
+        return [d.to_dict() for d in cabinet.devices if d.deleted_at is None]
 
     def _normalize_cabinet_payload(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """统一字段命名（兼容旧 API 字段名 → 标准字段名）。

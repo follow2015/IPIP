@@ -9,11 +9,14 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Form } from 'antd';
 
 import { useEditableRows } from '@/hooks/useEditableRows';
-import { useUPositionAssigner } from '@/hooks/useUPositionAssigner';
 import { useBatchDeviceCreate } from '@/hooks/useBatchDeviceCreate';
 import { useDeviceList, type CreateDeviceRequest } from '@/services/device';
 import { useRoomOptions } from '@/services/room';
-import { useCabinetOptions, useCabinetAvailableUPositions } from '@/services/cabinet';
+import {
+  useCabinetOptions,
+  useCabinetAvailableUPositions,
+  useBatchAllocateUPositions
+} from '@/services/cabinet';
 import { useMessage } from '@/hooks/useMessage';
 import { post } from '@/services/api-client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -109,7 +112,8 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     useEditableRows<DeviceBatchRow>();
 
   const { data: availableUPositions } = useCabinetAvailableUPositions(selectedCabinetId ?? 0);
-  const { assign: assignU, available: availableUCount } = useUPositionAssigner(availableUPositions);
+  const availableUCount = availableUPositions?.length ?? 0;
+  const assignUMutation = useBatchAllocateUPositions();
 
   const { data: roomOptions } = useRoomOptions();
   const { data: cabinetOptions } = useCabinetOptions(selectedRoomId, false, [1, 2]);
@@ -289,12 +293,40 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
   };
 
   const handleAutoAssignU = () => {
-    if (!availableUCount) {
-      message.warning('当前机柜无可用 U 位');
+    if (!selectedCabinetId) {
+      message.warning('请先选择机柜');
       return;
     }
-    const updated = assignU(rows, uGap);
-    resetRows(updated.map(({ key: _key, ...r }) => r));
+    assignUMutation.mutate(
+      {
+        cabinetId: selectedCabinetId,
+        devices: rows.map((r) => ({
+          key: r.key,
+          height_u: r.height_u ?? 1,
+          u_position: r.u_position
+        })),
+        gap: uGap
+      },
+      {
+        onSuccess: (res) => {
+          if (!res.success) {
+            message.warning(res.message || '机柜空间不足，分配失败');
+            return;
+          }
+          const uByKey = new Map(res.allocations.map((a) => [a.key, a.u_position]));
+          resetRows(
+            rows
+              .map((r) => {
+                const u = uByKey.get(r.key);
+                return u != null ? { ...r, u_position: u } : r;
+              })
+              .map(({ key: _key, ...rest }) => rest)
+          );
+          message.success(res.message || '自动分配完成');
+        },
+        onError: () => message.error('U位分配请求失败，请重试')
+      }
+    );
   };
 
   const handleRegenerateNames = () => {

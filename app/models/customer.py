@@ -20,7 +20,6 @@ class Customer(BaseModel):
     """
 
     __tablename__ = "customers"
-    __soft_delete__ = True  # 启用软删除，客户注销改为设置 deleted_at
     __table_args__ = (
         {"comment": "客户信息表"},
     )
@@ -35,9 +34,7 @@ class Customer(BaseModel):
     email = db.Column(db.String(100), nullable=True, comment="联系邮箱")
     address = db.Column(db.String(200), nullable=True, comment="客户地址")
     notes = db.Column(MEDIUMTEXT, nullable=True, comment="备注信息")
-    
-    deleted_at = db.Column(db.DateTime, nullable=True, comment="软删除时间(NULL=未删除)")
-    
+
     devices = relationship("Device", back_populates="customer", lazy="select")
 
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> Dict[str, Any]:

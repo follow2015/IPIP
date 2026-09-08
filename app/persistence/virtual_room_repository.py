@@ -69,7 +69,6 @@ class VirtualRoomRepository(SQLAlchemyRepository):
             .join(VirtualRoomMember, VirtualRoomMember.device_id == Device.id)
             .filter(
                 VirtualRoomMember.virtual_room_id == virtual_room_id,
-                Cabinet.deleted_at.is_(None),
             )
             .distinct()
             .all()

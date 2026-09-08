@@ -142,6 +142,65 @@ export function useCabinetAvailableUPositions(id: number) {
   });
 }
 
+
+export interface UAssignRow {
+  key: string;
+  height_u?: number | null;
+  u_position?: number | null;
+}
+
+export interface UAssignResult {
+  success: boolean;
+  allocations: Array<{ key: string; u_position: number }>;
+  preserved: Array<{ key: string; u_position: number }>;
+  failed: Array<Record<string, unknown>>;
+  message: string;
+}
+
+export function useAllocateUPosition() {
+  return useMutation({
+    mutationFn: async (params: {
+      cabinetId: number;
+      height_u: number;
+      device_spacing?: number;
+      allocation_strategy?: string;
+      exclude_device_id?: number;
+    }) => {
+      const res = await post<{ u_position: number }>(
+        `/cabinets/${params.cabinetId}/u-positions/allocate`,
+        {
+          height_u: params.height_u,
+          device_spacing: params.device_spacing ?? 0,
+          allocation_strategy: params.allocation_strategy ?? 'bottom_up',
+          exclude_device_id: params.exclude_device_id
+        }
+      );
+      return res.data;
+    }
+  });
+}
+
+export function useBatchAllocateUPositions() {
+  return useMutation({
+    mutationFn: async (params: {
+      cabinetId: number;
+      devices: UAssignRow[];
+      gap?: number;
+      strategy?: string;
+    }) => {
+      const res = await post<UAssignResult>(
+        `/cabinets/${params.cabinetId}/u-positions/batch-allocate`,
+        {
+          devices: params.devices,
+          gap: params.gap ?? 0,
+          strategy: params.strategy ?? 'auto_bottom_up'
+        }
+      );
+      return res.data;
+    }
+  });
+}
+
 export function useCabinetLayout(id: number) {
   return useQuery({
     queryKey: [...queryKeys.cabinets.all, id, 'layout'],

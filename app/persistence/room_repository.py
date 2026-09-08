@@ -145,7 +145,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
             rooms_with_cabinets: int = (
                 self.session.query(func.count(func.distinct(Cabinet.room_id)))
-                .filter(Cabinet.room_id.isnot(None), Cabinet.status == CabinetStatus.DISABLED, Cabinet.deleted_at.is_(None))
+                .filter(Cabinet.room_id.isnot(None), Cabinet.status == CabinetStatus.DISABLED)
                 .scalar()
                 or 0
             )
@@ -165,7 +165,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
             has_cabinet_sq = (
                 self.session.query(Cabinet.room_id)
-                .filter(Cabinet.room_id.isnot(None), Cabinet.status == CabinetStatus.DISABLED, Cabinet.deleted_at.is_(None))
+                .filter(Cabinet.room_id.isnot(None), Cabinet.status == CabinetStatus.DISABLED)
                 .distinct()
                 .subquery()
             )

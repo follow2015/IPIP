@@ -71,10 +71,16 @@ class UPositionCheckSchema(Schema):
 
 
 class UAssignSchema(Schema):
-    """批量分配U位请求Schema"""
+    """批量分配U位请求Schema
+
+    devices 每项: {key: 行标识, height_u: 占用U数, u_position: 已手填起始位(可空)}
+    u_position 非空的行原样保留并视为占用；空行由后端按 strategy 分配。
+    """
     class Meta:
         unknown = EXCLUDE
     devices = fields.List(fields.Dict(), required=True)
+    gap = fields.Int(allow_none=True)
+    strategy = fields.Str(allow_none=True)
 
 
 class SmartUAssignSchema(Schema):
@@ -544,14 +550,11 @@ def check_u_position(cabinet_id):
     if not cabinet:
         return APIResponse.error(message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404)
 
-    from app.utils.cabinet_utils import CabinetUCalculator
-
-    devices = [d.to_dict() for d in cabinet.devices]
-    result = CabinetUCalculator.check_u_position_conflict(
-        devices=devices,
+    result = cabinet_service.check_u_position_conflict(
+        cabinet_id=cabinet_id,
         u_position=u_position,
         height_u=height_u,
-        exclude_device_id=exclude_device_id
+        exclude_device_id=exclude_device_id,
     )
 
     return APIResponse.success(data=result, message="检查成功")
@@ -569,36 +572,33 @@ def batch_allocate_u_positions(cabinet_id):
         cabinet_id: 机柜ID
 
     Request Body:
-        devices: 设备列表 [{device_id, height_u, preferred_position}, ...]
+        devices: 行列表 [{key, height_u, u_position?}, ...]——
+                 u_position 已填的行原样保留（不覆盖），空行由后端分配
+        gap: 设备间距（U），默认 0（紧密排列）
+        strategy: 分配策略 bottom_up / top_down / best_fit，默认 bottom_up
 
     Returns:
-        JSON响应
+        JSON: {success, allocations, preserved, failed, message}
+              空间不足时 success=false（整批失败，不做部分分配）
     """
     data = request.get_json(silent=True) or {}
     devices_data = data.get("devices", [])
+    gap = data.get("gap", 0)
+    strategy = data.get("strategy", "auto_bottom_up")
 
     if not devices_data:
         return APIResponse.error(message="请提供 devices 参数", error_code="INVALID_PARAMS", status_code=400)
 
-    cabinet = cabinet_service.get_by_id(cabinet_id)
-    if not cabinet:
+    result = cabinet_service.batch_allocate_devices(
+        cabinet_id=cabinet_id,
+        devices=devices_data,
+        strategy=strategy,
+        device_spacing=gap,
+    )
+    if result is None:
         return APIResponse.error(message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404)
 
-    from app.utils.cabinet_utils import CabinetUCalculator
-
-    existing_devices = [d.to_dict() for d in cabinet.devices]
-    device_dicts = [
-        {"device_id": d.get("device_id"), "height_u": d.get("height_u"), "preferred_position": d.get("preferred_position")}
-        for d in devices_data
-    ]
-
-    result = CabinetUCalculator.batch_allocate_devices(
-        devices_to_allocate=device_dicts,
-        existing_devices=existing_devices,
-        total_u=cabinet.total_u
-    )
-
-    return APIResponse.success(data=result, message="批量分配成功")
+    return APIResponse.success(data=result, message=result.get("message", "批量分配完成"))
 
 
 @cabinet_bp.route("/<int:cabinet_id>/u-positions/usage-map", methods=["GET"])
@@ -714,6 +714,7 @@ def allocate_u_position(cabinet_id):
         device_spacing = data.get('device_spacing', 0)
         min_u = data.get('min_u', 1)
         max_u = data.get('max_u')  # 缺省时由机柜 total_u 决定
+        exclude_device_id = data.get('exclude_device_id')  # 编辑模式：排除自身占用
 
         if not height_u:
             return APIResponse.error(
@@ -731,44 +732,31 @@ def allocate_u_position(cabinet_id):
             return APIResponse.error(message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404)
 
         devices = [d.to_dict() for d in cabinet.devices]
+        if exclude_device_id:
+            devices = [d for d in devices if d.get('id') != exclude_device_id]
 
         from app.services.cabinet_service import _parse_strategy
         strategy = _parse_strategy(allocation_strategy)
-
-        if device_spacing > 0:
-            free_ranges = CabinetUCalculator.get_free_ranges(
-                devices, cabinet.total_u,
-                include_spacing=True,
-                device_spacing=device_spacing,
-            )
-        else:
-            free_ranges = CabinetUCalculator.get_free_ranges(
-                devices, cabinet.total_u,
-                include_spacing=False,
-            )
-
-        usable = []
-        for r in free_ranges:
-            start = max(r.start, min_u)
-            end = min(r.end, max_u)
-            if start <= end:
-                usable.append(UPositionRange(start, end))
-
-        suitable = [r for r in usable if r.height >= height_u]
-        if not suitable:
-            return APIResponse.error(
-                message='机柜空间不足，无法分配U位',
-                error_code="ALLOCATION_FAILED",
-                status_code=400
-            )
 
         constraint = DeviceConstraint(
             min_u_position=min_u,
             max_u_position=max_u,
         )
-        result = CabinetUCalculator._select_position_by_strategy(
-            suitable, height_u, strategy, constraint
+        result = CabinetUCalculator.auto_allocate_u_position(
+            devices=devices,
+            total_u=cabinet.total_u,
+            height_u=height_u,
+            strategy=strategy,
+            constraint=constraint,
+            device_spacing=device_spacing,
         )
+
+        if result is None:
+            return APIResponse.error(
+                message='机柜空间不足，无法分配U位',
+                error_code="ALLOCATION_FAILED",
+                status_code=400
+            )
 
         return APIResponse.success(data={'u_position': result}, message="U位分配成功")
 

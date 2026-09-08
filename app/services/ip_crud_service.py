@@ -19,8 +19,35 @@ class IPCrudService:
     def __init__(self, repo: IPManagerRepository):
         self.repo = repo
 
+    def _assert_unambiguous_scope(self, ip_list: List[str], room_id: Optional[int]) -> None:
+        """跨机房歧义守卫：room_id 未限定且目标 IP 存在于多个机房时拒绝执行。
+
+        同一私网 IP 在多个机房各有一条记录（(ip_address, room_id) 唯一约束）。
+        room_id=None 时 UPDATE 会波及全部匹配行——曾导致"释放一个机房的 IP，
+        另一个机房的同名 IP 被连带释放"（2026-09-08 rooms 16/17 事故）。
+        涉及多机房归属变更必须显式指定机房。
+        """
+        if room_id is not None:
+            return
+        rows = self.repo.get_by_ips(ip_list)
+        rooms_by_ip: dict = {}
+        for r in rows:
+            rooms_by_ip.setdefault(r.ip_address, set()).add(r.room_id)
+        ambiguous = {ip: rooms for ip, rooms in rooms_by_ip.items() if len(rooms) > 1}
+        if ambiguous:
+            detail = ", ".join(
+                f"{ip}（机房 {sorted(r for r in rooms if r is not None)}）"
+                for ip, rooms in sorted(ambiguous.items())
+            )
+            from app.exceptions.validation import ValidationError
+            raise ValidationError(
+                f"以下 IP 存在于多个机房，归属变更必须指定机房：{detail}"
+            )
+
     def update_ip_customer(self, ip_address: str, customer_id: int, room_id: Optional[int] = None) -> int:
         """更新IP客户关联，并留痕到 IP 审计日志"""
+        self._assert_unambiguous_scope([ip_address], room_id)
+
         if customer_id is not None:
             from app.services.customer_service import CustomerService
             from app.persistence.customer_repository import CustomerRepository
@@ -47,6 +74,8 @@ class IPCrudService:
             from app.services.customer_service import CustomerService
             from app.persistence.customer_repository import CustomerRepository
             CustomerService(CustomerRepository()).assert_allocatable(customer_id)
+
+        self._assert_unambiguous_scope(ip_list, room_id)
 
         before = [
             (r.ip_address, r.room_id, r.customer_id)

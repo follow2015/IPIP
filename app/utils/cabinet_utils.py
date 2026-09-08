@@ -16,8 +16,7 @@ class UPositionStrategy(Enum):
     MANUAL          = "manual"
     AUTO_BOTTOM_UP  = "auto_bottom_up"   # 从底部（1U）向上分配
     AUTO_TOP_DOWN   = "auto_top_down"    # 从顶部（最大U）向下分配
-    AUTO_BEST_FIT   = "auto_best_fit"    # 最小空隙优先（减少碎片）
-    AUTO_FIRST_FIT  = "auto_first_fit"   # 选第一个合适空隙
+    AUTO_BEST_FIT   = "auto_best_fit"    # 最小空隙优先（减少碎片，布局优化在用）
 
 
 class DeviceType(Enum):
@@ -91,14 +90,34 @@ class CabinetUCalculator:
         return isinstance(u_position, int) and 1 <= u_position <= total_u
 
     @staticmethod
+    def _iter_effective(devices: List[Dict], filter_parent_only: bool = True):
+        """迭代「有效设备」：排除机箱子节点与软删（回收站）设备。
+
+        全模块**唯一**的设备口径——占用统计、冲突检测、分配都必须经由此处。
+        此前各方法各自 `if parent_device_id: continue`，且都漏了软删过滤，
+        于是出现「机柜概览显示有空位、自动分配却说空间不足」这类口径分裂。
+
+        Args:
+            devices: 原始设备字典列表。
+            filter_parent_only: True 时排除机箱子节点（子设备不独立占 U 位）。
+
+        Yields:
+            有效设备字典。
+        """
+        for device in devices:
+            if filter_parent_only and device.get("parent_device_id"):
+                continue
+            if device.get("deleted_at") is not None:
+                continue
+            yield device
+
+    @staticmethod
     def calculate_used_u_positions(
         devices: List[Dict], total_u: int, filter_parent_only: bool = True
     ) -> Set[int]:
         """计算已占用的U位集合。"""
         used: Set[int] = set()
-        for device in devices:
-            if filter_parent_only and device.get("parent_device_id"):
-                continue
+        for device in CabinetUCalculator._iter_effective(devices, filter_parent_only):
             start_u  = CabinetUCalculator.parse_u_position(device.get("u_position"))
             height_u = int(device.get("height_u", device.get("u_height", 1)))
             if start_u is None or not CabinetUCalculator.is_valid_u_position(start_u, total_u):
@@ -125,7 +144,6 @@ class CabinetUCalculator:
     @staticmethod
     def check_u_position_conflict(
         devices: List[Dict],
-        cabinet_id: int,
         u_position: int,
         height_u: int,
         total_u: int,
@@ -146,11 +164,9 @@ class CabinetUCalculator:
         conflict_devices: List[Dict] = []
         conflict_ranges:  List[str]  = []
 
-        for device in devices:
+        for device in CabinetUCalculator._iter_effective(devices, filter_parent_only):
             device_id = device.get("id")
             if exclude_device_id and device_id == exclude_device_id:
-                continue
-            if filter_parent_only and device.get("parent_device_id"):
                 continue
 
             start_u = CabinetUCalculator.parse_u_position(device.get("u_position"))
@@ -186,9 +202,7 @@ class CabinetUCalculator:
     ) -> List[UPositionRange]:
         """获取已占用U位区间列表（已排序）。"""
         ranges: List[UPositionRange] = []
-        for device in devices:
-            if filter_parent_only and device.get("parent_device_id"):
-                continue
+        for device in CabinetUCalculator._iter_effective(devices, filter_parent_only):
             start_u = CabinetUCalculator.parse_u_position(device.get("u_position"))
             if start_u is None:
                 continue
@@ -226,9 +240,7 @@ class CabinetUCalculator:
 
         if include_spacing:
             expanded: List[UPositionRange] = []
-            for device in devices:
-                if filter_parent_only and device.get("parent_device_id"):
-                    continue
+            for device in CabinetUCalculator._iter_effective(devices, filter_parent_only):
                 start_u = CabinetUCalculator.parse_u_position(device.get("u_position"))
                 if start_u is None:
                     continue
@@ -236,9 +248,11 @@ class CabinetUCalculator:
                     continue
                 h = int(device.get("height_u", device.get("u_height", 1)))
                 end_u = min(start_u + h - 1, total_u)
+                lo, hi = start_u, end_u
                 if h >= min_height_for_spacing and device_spacing > 0:
-                    end_u = min(end_u + device_spacing, total_u)
-                expanded.append(UPositionRange(start_u, end_u))
+                    lo = max(1, start_u - device_spacing)
+                    hi = min(end_u + device_spacing, total_u)
+                expanded.append(UPositionRange(lo, hi))
             occupied = expanded
 
         merged     = CabinetUCalculator._merge_ranges(occupied)
@@ -254,6 +268,62 @@ class CabinetUCalculator:
 
 
     @staticmethod
+    def get_candidate_positions(
+        devices: List[Dict],
+        total_u: int,
+        height_u: int,
+        device_spacing: int = 2,
+        filter_parent_only: bool = True,
+        min_height_for_spacing: int = 2,
+    ) -> List[int]:
+        """枚举全部合法起始 U 位（已通过重叠与**双向**间距校验）。
+
+        这是「自动分配」与「可用位置列表」的共同基础：先枚举合法位置，再按策略
+        挑选。原实现是「先算空闲区间、再由区间端点推导位置」，间距只在区间层面
+        生效，于是 AUTO_TOP_DOWN 会把设备贴到相邻设备身上（间距静默失效）。
+
+        间距语义：新设备与任一已有设备之间，只要**其中一方**高度达到
+        min_height_for_spacing，两者间就必须留出 >= device_spacing 的空隙。
+
+        Args:
+            devices: 机柜内已有设备字典列表。
+            total_u: 机柜总 U 数。
+            height_u: 待放置设备高度（U）。
+            device_spacing: 要求的设备间距（U），0 表示不要求间距。
+            filter_parent_only: True 时忽略机箱子节点。
+            min_height_for_spacing: 触发间距要求的最小设备高度。
+
+        Returns:
+            升序的合法起始 U 位列表；无可用位置返回空列表。
+        """
+        h = int(height_u)
+        if h < 1 or total_u < 1 or h > total_u:
+            return []
+
+        occupied: List[Tuple[int, int, int]] = []   # (start, end, height)
+        for device in CabinetUCalculator._iter_effective(devices, filter_parent_only):
+            start_u = CabinetUCalculator.parse_u_position(device.get("u_position"))
+            if start_u is None or not CabinetUCalculator.is_valid_u_position(start_u, total_u):
+                continue
+            d_h = int(device.get("height_u", device.get("u_height", 1)))
+            occupied.append((start_u, min(start_u + d_h - 1, total_u), d_h))
+
+        new_needs_spacing = h >= min_height_for_spacing
+        candidates: List[int] = []
+        for s in range(1, total_u - h + 2):
+            end = s + h - 1
+            for (ds, de, dh) in occupied:
+                if s <= de and ds <= end:                      # 区间重叠
+                    break
+                if device_spacing > 0 and (new_needs_spacing or dh >= min_height_for_spacing):
+                    gap = (s - de - 1) if s > de else (ds - end - 1)
+                    if gap < device_spacing:                   # 间距不足
+                        break
+            else:
+                candidates.append(s)
+        return candidates
+
+    @staticmethod
     def get_available_u_positions(
         devices: List[Dict],
         total_u: int,
@@ -262,7 +332,14 @@ class CabinetUCalculator:
         filter_parent_only: bool = True,
         min_height_for_spacing: int = 2,
     ) -> Dict:
-        """获取可放置指定高度设备的起始U位列表及使用映射。"""
+        """获取可放置指定高度设备的起始U位列表及使用映射。
+
+        available_positions 直接取自 `get_candidate_positions`，与自动分配同源，
+        保证「界面看到可选的」与「点自动分配得到的」永远一致。
+
+        usage_map 中的 is_spacing 仅用于界面标注保护区，最终可否放置一律以
+        available_positions 为准（保护区判定无法表达"新设备自身高度"这一变量）。
+        """
         used_positions = CabinetUCalculator.calculate_used_u_positions(
             devices, total_u, filter_parent_only
         )
@@ -272,27 +349,24 @@ class CabinetUCalculator:
             for u in range(1, total_u + 1)
         ]
 
-        for device in devices:
-            if filter_parent_only and device.get("parent_device_id"):
-                continue
+        for device in CabinetUCalculator._iter_effective(devices, filter_parent_only):
             start_u = CabinetUCalculator.parse_u_position(device.get("u_position"))
             if start_u is None:
                 continue
             d_height = int(device.get("height_u", device.get("u_height", 1)))
             end_u    = start_u + d_height - 1
             if d_height >= min_height_for_spacing and device_spacing > 0:
-                for u in range(end_u + 1, min(end_u + device_spacing + 1, total_u + 1)):
-                    usage_map[u - 1]["is_used"]    = True
-                    usage_map[u - 1]["is_spacing"] = True
+                lo = max(1, start_u - device_spacing)
+                hi = min(end_u + device_spacing, total_u)
+                for u in range(lo, hi + 1):
+                    if not usage_map[u - 1]["is_used"]:
+                        usage_map[u - 1]["is_used"]    = True
+                        usage_map[u - 1]["is_spacing"] = True
 
-        available = [
-            s
-            for s in range(1, total_u - int(height_u) + 2)
-            if all(
-                u <= total_u and not usage_map[u - 1]["is_used"]
-                for u in range(s, s + int(height_u))
-            )
-        ]
+        available = CabinetUCalculator.get_candidate_positions(
+            devices, total_u, height_u, device_spacing,
+            filter_parent_only, min_height_for_spacing,
+        )
 
         return {
             "available_positions": available,
@@ -316,9 +390,7 @@ class CabinetUCalculator:
         才计入间距，避免对已隔开的设备重复计算。
         """
         valid_devices: List[Dict] = []
-        for device in devices:
-            if filter_parent_only and device.get("parent_device_id"):
-                continue
+        for device in CabinetUCalculator._iter_effective(devices, filter_parent_only):
             start_u = CabinetUCalculator.parse_u_position(device.get("u_position"))
             if start_u is None:
                 continue
@@ -419,60 +491,59 @@ class CabinetUCalculator:
         device_spacing: int = 2,
         min_height_for_spacing: int = 2,
     ) -> Optional[int]:
-        """自动分配U位，返回推荐起始U位，无可用位置时返回 None。"""
+        """自动分配U位，返回推荐起始U位，无可用位置时返回 None。
+
+        先由 get_candidate_positions 枚举出所有「不与已有设备重叠 且 满足双向
+        间距」的位置，再按策略挑选——因此任何策略都不可能返回违规位置。
+        """
         if constraint is None:
             constraint = DeviceConstraint()
 
-        include_spacing = height_u >= min_height_for_spacing
-        free_ranges = CabinetUCalculator.get_free_ranges(
-            devices, total_u, filter_parent_only,
-            include_spacing, device_spacing, min_height_for_spacing,
+        candidates = CabinetUCalculator.get_candidate_positions(
+            devices, total_u, height_u, device_spacing,
+            filter_parent_only, min_height_for_spacing,
         )
-        suitable = [r for r in free_ranges if r.height >= height_u]
-        if not suitable:
+        if not candidates:
             return None
 
-        suitable = CabinetUCalculator._apply_constraints(suitable, height_u, constraint, total_u)
-        if not suitable:
+        candidates = CabinetUCalculator._apply_constraints(
+            candidates, height_u, constraint, total_u
+        )
+        if not candidates:
             return None
 
-        return CabinetUCalculator._select_position_by_strategy(suitable, height_u, strategy, constraint)
+        return CabinetUCalculator._select_position_by_strategy(
+            candidates, height_u, strategy, devices, filter_parent_only, total_u
+        )
 
     @staticmethod
     def _apply_constraints(
-        ranges: List[UPositionRange],
+        positions: List[int],
         height_u: int,
         constraint: DeviceConstraint,
         total_u: int,
-    ) -> List[UPositionRange]:
-        """根据约束条件过滤可用区间。"""
-        filtered: List[UPositionRange] = []
-        for r in ranges:
-            if constraint.min_u_position and r.start < constraint.min_u_position:
+    ) -> List[int]:
+        """根据约束条件过滤候选起始位。"""
+        filtered: List[int] = []
+        for s in positions:
+            end = s + height_u - 1
+            if constraint.min_u_position and s < constraint.min_u_position:
                 continue
-            if constraint.max_u_position and r.end > constraint.max_u_position:
+            if constraint.max_u_position and end > constraint.max_u_position:
                 continue
-            if constraint.avoid_positions and any(r.contains(p) for p in constraint.avoid_positions):
+            if constraint.avoid_positions and any(s <= p <= end for p in constraint.avoid_positions):
                 continue
-            if constraint.must_align_bottom and (r.start - 1) % height_u != 0:
+            if constraint.must_align_bottom and (s - 1) % height_u != 0:
                 continue
-            if constraint.must_align_top:
-                has_aligned_pos = any(
-                    (total_u - k * height_u - height_u + 1) >= r.start
-                    and (total_u - k * height_u) <= r.end
-                    for k in range(0, (total_u // height_u) + 1)
-                )
-                if not has_aligned_pos:
-                    continue
-            filtered.append(r)
+            if constraint.must_align_top and (total_u - end) % height_u != 0:
+                continue
+            filtered.append(s)
 
         if constraint.preferred_positions:
-            preferred: List[UPositionRange] = []
-            for pos in constraint.preferred_positions:
-                for r in filtered:
-                    if r.contains(pos) and pos + height_u - 1 <= r.end:
-                        preferred.append(r)
-                        break
+            preferred = [
+                s for s in filtered
+                if any(s <= p <= s + height_u - 1 for p in constraint.preferred_positions)
+            ]
             if preferred:
                 return preferred
 
@@ -480,36 +551,44 @@ class CabinetUCalculator:
 
     @staticmethod
     def _select_position_by_strategy(
-        ranges: List[UPositionRange],
+        positions: List[int],
         height_u: int,
         strategy: UPositionStrategy,
-        constraint: DeviceConstraint,
+        devices: List[Dict],
+        filter_parent_only: bool = True,
+        total_u: int = 0,
     ) -> int:
-        """根据策略从候选区间中选择起始 U 位。
+        """根据策略从合法候选位中挑选起始 U 位。
 
-        修复：AUTO_TOP_DOWN 原来返回 ranges[-1].start，
-        这是最后一个空闲区间的起始位置（即区间底部），
-        对于"从顶向下"分配，应该返回区间末端倒推：
-            end - height_u + 1
+        入参是**已通过重叠与间距校验的起始位列表**，策略只负责"挑哪一个"，
+        不再自行推导位置。历史 bug 正是策略层用区间端点推导位置，导致
+        AUTO_TOP_DOWN 把设备贴到相邻设备身上、间距静默失效。
         """
-        if not ranges:
+        if not positions:
             raise ValueError("没有可用的U位区间")
 
-        if strategy == UPositionStrategy.AUTO_BOTTOM_UP:
-            return ranges[0].start
+        if strategy == UPositionStrategy.AUTO_TOP_DOWN:
+            return max(positions)
 
-        elif strategy == UPositionStrategy.AUTO_TOP_DOWN:
-            last = ranges[-1]
-            return last.end - height_u + 1
+        if strategy == UPositionStrategy.AUTO_BEST_FIT:
+            spans: List[Tuple[int, int]] = []
+            for device in CabinetUCalculator._iter_effective(devices, filter_parent_only):
+                start_u = CabinetUCalculator.parse_u_position(device.get("u_position"))
+                if start_u is None:
+                    continue
+                d_h = int(device.get("height_u", device.get("u_height", 1)))
+                spans.append((start_u, start_u + d_h - 1))
 
-        elif strategy == UPositionStrategy.AUTO_BEST_FIT:
-            best = min(ranges, key=lambda r: r.height)
-            return best.start
+            def _slack(s: int) -> int:
+                end = s + height_u - 1
+                left  = min((s - de - 1 for (_ds, de) in spans if de < s), default=s - 1)
+                right = min((ds - end - 1 for (ds, _de) in spans if ds > end),
+                            default=total_u - end)
+                return left + right
 
-        elif strategy == UPositionStrategy.AUTO_FIRST_FIT:
-            return ranges[0].start
+            return min(positions, key=lambda s: (_slack(s), s))
 
-        return ranges[0].start
+        return min(positions)
 
 
     @staticmethod
@@ -575,9 +654,7 @@ class CabinetUCalculator:
         """
         fixed:    List[Dict] = []
         movable:  List[Dict] = []
-        for device in devices:
-            if filter_parent_only and device.get("parent_device_id"):
-                continue
+        for device in CabinetUCalculator._iter_effective(devices, filter_parent_only):
             if CabinetUCalculator.parse_u_position(device.get("u_position")) is not None:
                 fixed.append(device)
             else:
@@ -673,6 +750,9 @@ class CabinetUCalculator:
         for device in devices:
             if filter_parent_only and device.get("parent_device_id"):
                 invalid.append({**device, "invalid_reason": "子设备"})
+                continue
+            if device.get("deleted_at") is not None:
+                invalid.append({**device, "invalid_reason": "回收站设备"})
                 continue
             start_u = CabinetUCalculator.parse_u_position(device.get("u_position"))
             if start_u is None:

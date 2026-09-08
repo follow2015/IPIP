@@ -2078,6 +2078,9 @@ class DeviceService:
             raise ValidationError("子节点设备只能恢复到原机箱，不能指定其他机柜")
 
         if cabinet_id is not None:
+            from app.models.cabinet import Cabinet
+            if session.query(Cabinet.id).filter(Cabinet.id == cabinet_id).first() is None:
+                raise ValidationError(f"机柜不存在 (ID: {cabinet_id})，无法恢复")
             target_cabinet_id = cabinet_id
             if u_position is not None:
                 target_u_position = u_position
@@ -2101,13 +2104,17 @@ class DeviceService:
         if cabinet_id is None and target_cabinet_id and target_u_position:
             from app.models.cabinet import Cabinet
             cabinet = session.query(Cabinet).filter(Cabinet.id == target_cabinet_id).first()
-            if cabinet:
-                conflict_result = cabinet.check_u_position_conflict(
-                    target_u_position, height_u, exclude_device_id=device_id
+            if cabinet is None:
+                raise ValidationError(
+                    f"原机柜已不存在 (ID: {target_cabinet_id})，无法恢复到原位置，"
+                    "请指定其他机柜恢复"
                 )
-                if conflict_result["has_conflict"]:
-                    location_conflict = True
-                    conflict_devices = conflict_result["conflicting_devices"]
+            conflict_result = cabinet.check_u_position_conflict(
+                target_u_position, height_u, exclude_device_id=device_id
+            )
+            if conflict_result["has_conflict"]:
+                location_conflict = True
+                conflict_devices = conflict_result["conflicting_devices"]
 
         if location_conflict:
             return {

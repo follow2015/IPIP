@@ -4,7 +4,6 @@
 """
 from typing import Any, Dict, List, TYPE_CHECKING
 
-from sqlalchemy import Index
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel
@@ -20,13 +19,12 @@ class Room(BaseModel):
 
     管理机房的基本信息，包括名称、位置、联系人等。
     一个机房可以包含多个机柜。
-    启用软删除：删除机房时设置 deleted_at，不物理删除。
+    删除即物理删除（依赖检查由 RoomService.delete 把关）；
+    软删除仅保留给设备（DeviceRecycleBin 回收站）。
     """
 
     __tablename__ = "rooms"
-    __soft_delete__ = True
     __table_args__ = (
-        Index("idx_room_deleted_status", "deleted_at", "status"),
         {"comment": "机房信息表"},
     )
 
@@ -37,8 +35,6 @@ class Room(BaseModel):
     location = db.Column(db.String(255), comment="机房位置")
     contact = db.Column(db.String(255), comment="联系人")
     contact_phone = db.Column(db.String(50), comment="联系电话")
-
-    deleted_at = db.Column(db.DateTime, nullable=True, comment="软删除时间(NULL=未删除)")
 
     cabinets = relationship(
         "Cabinet",
