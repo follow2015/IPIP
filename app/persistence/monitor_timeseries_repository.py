@@ -11,6 +11,7 @@ SQLite（测试）经 create_all 建普通表，相关方法按 dialect 守卫�
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
+from app.utils.time_utils import now_utc_naive, utc_today
 
 from sqlalchemy import distinct, func, text
 
@@ -276,7 +277,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         """将 >cutoff_days 天的事件数据按小时聚合写入预聚合表（幂等 upsert）。仅 MySQL。"""
         if not self._is_mysql():
             return 0
-        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=cutoff_days)
+        cutoff = now_utc_naive() - timedelta(days=cutoff_days)
 
         self.session.execute(
             text(
@@ -351,7 +352,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         if not self._is_mysql():
             return []
         self._assert_partition_table(table)
-        cutoff = date.today() - timedelta(days=retention_days)
+        cutoff = utc_today() - timedelta(days=retention_days)
         dropped: List[str] = []
         for name, ub in self._list_partitions(table):
             if name in ("p_before", "p_future") or ub is None:
@@ -404,10 +405,10 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         existing = {n for n, _ in parts}
         has_future = "p_future" in existing
         daily_ubs = [ub for _, ub in parts if ub is not None]
-        start_day = max(daily_ubs) if daily_ubs else date.today()
+        start_day = max(daily_ubs) if daily_ubs else utc_today()
 
         wanted = []
-        today = date.today()
+        today = utc_today()
         d = start_day
         end = today + timedelta(days=future_days)
         while d <= end:
@@ -448,7 +449,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
 
     def cleanup_hourly(self, retention_days: int = HOURLY_RETENTION_DAYS) -> int:
         """清理预聚合表中 >retention_days 天的数据（跨方言；SQLite 测试亦可安全执行）。"""
-        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=retention_days)
+        cutoff = now_utc_naive() - timedelta(days=retention_days)
         deleted = (
             self.session.query(DeviceMonitorTimeseriesHourly)
             .filter(DeviceMonitorTimeseriesHourly.hour_bucket < cutoff)
@@ -466,7 +467,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         """
         if not self._is_mysql():
             return 0
-        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=cutoff_days)
+        cutoff = now_utc_naive() - timedelta(days=cutoff_days)
 
         self.session.execute(
             text(
@@ -498,7 +499,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
 
     def cleanup_daily(self, retention_days: int = DAILY_RETENTION_DAYS) -> int:
         """清理 daily 表中 >retention_days 天的数据（跨方言）。"""
-        cutoff = date.today() - timedelta(days=retention_days)
+        cutoff = utc_today() - timedelta(days=retention_days)
         deleted = (
             self.session.query(DeviceMonitorTimeseriesDaily)
             .filter(DeviceMonitorTimeseriesDaily.day_bucket < cutoff)

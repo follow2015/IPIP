@@ -860,6 +860,7 @@ CREATE TABLE `monitor_dynamic_config` (
   `config_value` text NOT NULL COMMENT '配置值（字符串化存储，按 value_type 解析）',
   `value_type` varchar(16) NOT NULL DEFAULT 'string' COMMENT 'string/int/float/bool/json',
   `description` varchar(255) DEFAULT '' COMMENT '配置说明（前端展示）',
+  `created_at` datetime NOT NULL DEFAULT (now()) COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT (now()) COMMENT '更新时间',
   `updated_by` varchar(64) DEFAULT '' COMMENT '操作人（审计）',
   PRIMARY KEY (`config_key`)

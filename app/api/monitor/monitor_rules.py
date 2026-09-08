@@ -303,11 +303,11 @@ def delete_sla_target(target_id: int):
 @permission_required("monitor:view")
 def get_sla_achievement(target_id: int):
     from app.services.monitoring.sla_service import compute_achievement
-    from datetime import datetime as _dt
+    from app.utils.time_utils import parse_iso, to_utc_naive
     start = request.args.get("start")
     end = request.args.get("end")
-    start_dt = _dt.fromisoformat(start.replace("Z", "+00:00")) if start else None
-    end_dt = _dt.fromisoformat(end.replace("Z", "+00:00")) if end else None
+    start_dt = to_utc_naive(parse_iso(start)) if start else None
+    end_dt = to_utc_naive(parse_iso(end)) if end else None
     result = compute_achievement(target_id, start=start_dt, end=end_dt)
     return APIResponse.success(data=result)
 
@@ -318,10 +318,10 @@ def get_sla_achievement(target_id: int):
 @permission_required("monitor:view")
 def list_sla_achievements():
     from app.services.monitoring.sla_service import compute_all_achievements
-    from datetime import datetime as _dt
+    from app.utils.time_utils import parse_iso, to_utc_naive
     start = request.args.get("start")
     end = request.args.get("end")
-    start_dt = _dt.fromisoformat(start.replace("Z", "+00:00")) if start else None
-    end_dt = _dt.fromisoformat(end.replace("Z", "+00:00")) if end else None
+    start_dt = to_utc_naive(parse_iso(start)) if start else None
+    end_dt = to_utc_naive(parse_iso(end)) if end else None
     items = compute_all_achievements(start=start_dt, end=end_dt)
     return APIResponse.paginated(data=items, page=1, per_page=len(items) or 1, total=len(items))

@@ -14,7 +14,7 @@ from flask_cors import CORS
 from app.utils.logging.manager import logging_manager
 from app.exceptions import register_error_handlers
 from config import get_config
-from extensions import db
+from extensions import db, check_mysql_session_timezone
 from app.infra import report_netmiko_log_switch
 
 logger = get_logger(__name__)
@@ -126,6 +126,9 @@ def init_extensions(app: Flask):
         app: Flask应用实例
     """
     db.init_app(app)
+
+    with app.app_context():
+        check_mysql_session_timezone()
 
     CORS(
         app,

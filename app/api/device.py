@@ -950,7 +950,8 @@ def get_deleted_devices():
         device_type: 设备类型
         ip_search: IP地址搜索（参数名：search）
     """
-    from datetime import datetime
+    from datetime import timedelta
+    from app.utils.time_utils import local_day_range
 
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
@@ -965,13 +966,13 @@ def get_deleted_devices():
     end_date = None
     if start_date_str:
         try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+            start_date, _ = local_day_range(start_date_str)
         except ValueError:
             return APIResponse.error(message="start_date 格式错误，应为 YYYY-MM-DD", status_code=400)
     if end_date_str:
         try:
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-            end_date = end_date.replace(hour=23, minute=59, second=59)
+            _, end_exclusive = local_day_range(end_date_str)
+            end_date = end_exclusive - timedelta(seconds=1)
         except ValueError:
             return APIResponse.error(message="end_date 格式错误，应为 YYYY-MM-DD", status_code=400)
 

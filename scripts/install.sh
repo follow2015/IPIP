@@ -207,6 +207,7 @@ else
   "$VENV_PY" - << PYEOF || die "MySQL 连接失败，请检查 .env 中 MYSQL_* 配置"
 import pymysql, os
 c = pymysql.connect(host="$DB_HOST", port=int("$DB_PORT"), user="$DB_USER",
+                       init_command="SET time_zone='+00:00'",
                     password=os.getenv("MYSQL_PASSWORD",""), charset="utf8mb4")
 c.close()
 print("    MySQL 连接 OK")
@@ -216,6 +217,7 @@ PYEOF
   "$VENV_PY" - << PYEOF
 import pymysql, os
 c = pymysql.connect(host="$DB_HOST", port=int("$DB_PORT"), user="$DB_USER",
+                       init_command="SET time_zone='+00:00'",
                     password=os.getenv("MYSQL_PASSWORD",""), charset="utf8mb4", autocommit=True)
 cur = c.cursor()
 cur.execute("CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci")
@@ -232,7 +234,9 @@ PYEOF
     log "导入 $(basename "$SCHEMA_FILE")..."
     if [ -n "$MYSQL_CLIENT" ]; then
       # mysql CLI 原生支持 DELIMITER 指令
-      "$MYSQL_CLIENT" -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" "$DB_NAME" < "$SCHEMA_FILE"
+      # --init-command：固定会话时区为 UTC，使导入期间的 NOW()/CURRENT_TIMESTAMP
+      # 与应用运行时的 UTC 口径一致（见 extensions.py 连接事件）
+      "$MYSQL_CLIENT" --init-command="SET time_zone='+00:00'" -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" "$DB_NAME" < "$SCHEMA_FILE"
     else
       # 无 mysql 客户端时走 PyMySQL；触发器体含分号，必须用 DELIMITER 感知的切分器
       "$VENV_PY" "$PROJECT_ROOT/scripts/import_sql.py" "$SCHEMA_FILE"
@@ -253,6 +257,7 @@ PYEOF
 import pymysql, os
 covered = "${COVERED}".split(",")
 c = pymysql.connect(host="$DB_HOST", port=int("$DB_PORT"), user="$DB_USER",
+                       init_command="SET time_zone='+00:00'",
                     database="$DB_NAME", password=os.getenv("MYSQL_PASSWORD",""),
                     charset="utf8mb4", autocommit=True)
 cur = c.cursor()

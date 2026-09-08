@@ -7,6 +7,7 @@
 """
 from datetime import datetime, timezone
 from typing import Any, Dict
+from app.utils.time_utils import now_utc_naive, to_iso_utc
 
 from extensions import db
 from sqlalchemy import Integer, SmallInteger, Text
@@ -79,7 +80,7 @@ class BaseModel(db.Model):
     def soft_delete(self) -> None:
         """执行软删除（设置 deleted_at 为当前时间）"""
         if hasattr(self, 'deleted_at'):
-            self.deleted_at = datetime.now(timezone.utc)
+            self.deleted_at = now_utc_naive()
 
     def restore(self) -> None:
         """恢复软删除"""
@@ -88,12 +89,17 @@ class BaseModel(db.Model):
 
     @staticmethod
     def _serialize_value(value: Any) -> Any:
-        """序列化单个值：datetime → ISO 字符串，其余原样返回。
+        """序列化单个值：datetime → 带 `Z` 的 UTC ISO 字符串，其余原样返回。
 
         子类 to_dict() 中手动构建字段时，可调用此方法避免重复
         isinstance(value, datetime) 判断。
+
+        改用 to_iso_utc（而非裸 isoformat）的原因：库内时间是 naive UTC，
+        裸输出会让消费方按本地时区误读。带 Z 后字符串自描述为 UTC，符合
+        ISO8601 且前端 ensureUtc 对已带 Z 的字符串不重复处理。date-only
+        列（如 warranty_end）不是 datetime 子类，原样返回。
         """
-        return value.isoformat() if isinstance(value, datetime) else value
+        return to_iso_utc(value) if isinstance(value, datetime) else value
 
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> Dict[str, Any]:
         """将模型转换为字典

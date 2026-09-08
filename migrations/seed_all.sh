@@ -63,7 +63,10 @@ if [ "${SKIP_SQL_SEED:-0}" != "1" ]; then
     MYSQL_DATABASE="${MYSQL_DATABASE:-ip_manager}"
     # 密码通过 MYSQL_PWD 环境变量传递，避免命令行暴露
     export MYSQL_PWD="${MYSQL_PASSWORD:-}"
-    "$MYSQL_CLIENT" -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" "$MYSQL_DATABASE" \
+    # --init-command：会话时区固定为 UTC，使种子导入期间的 NOW()/CURRENT_TIMESTAMP
+    # 与应用运行时口径一致（见 extensions.py 连接事件）
+    "$MYSQL_CLIENT" --init-command="SET time_zone='+00:00'" \
+      -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" "$MYSQL_DATABASE" \
       < "$SCRIPT_DIR/seed_data.sql"
     echo "    seed_data.sql imported via $MYSQL_CLIENT"
   else
@@ -76,7 +79,10 @@ port = int(os.getenv('MYSQL_PORT', '3306'))
 user = os.getenv('MYSQL_USER', 'root')
 pwd = os.getenv('MYSQL_PASSWORD', '')
 db = os.getenv('MYSQL_DATABASE', 'ip_manager')
-c = pymysql.connect(host=host, port=port, user=user, password=pwd, database=db, charset='utf8mb4', autocommit=True)
+# init_command：会话时区固定为 UTC（与应用运行时口径一致，见 extensions.py）
+c = pymysql.connect(host=host, port=port, user=user, password=pwd, database=db,
+                    charset='utf8mb4', autocommit=True,
+                    init_command="SET time_zone='+00:00'")
 with open(sql_file, 'r', encoding='utf-8') as f:
     sql = f.read()
 # 按分号拆分语句，跳过注释行和空行
