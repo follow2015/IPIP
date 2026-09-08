@@ -8,6 +8,7 @@
 #   3. 前端依赖安装 + 构建（pnpm install && pnpm build → frontend-new/dist/）
 #   4. 初始化 .env（若不存在则从 .env.example 拷贝，并自动生成 SECRET_KEY/JWT_SECRET_KEY 随机密钥）
 #   5. 创建数据库并导入 schema + 种子
+#   6. 配置监控维护 cron（02:00 预建分区 / 03:00 归档清理）
 #
 # 用法:
 #   bash scripts/install.sh                    # 完整安装
@@ -51,7 +52,7 @@ done
 log "项目根目录: $PROJECT_ROOT"
 
 # ── 1. 系统依赖检查 ────────────────────────────────────────
-log "=== [1/6] 检查系统依赖 ==="
+log "=== [1/7] 检查系统依赖 ==="
 
 # Python
 PY_BIN=""
@@ -115,7 +116,7 @@ else
 fi
 
 # ── 2. Python 虚拟环境 ─────────────────────────────────────
-log "=== [2/6] 创建 Python venv 并安装依赖 ==="
+log "=== [2/7] 创建 Python venv 并安装依赖 ==="
 VENV_DIR="$PROJECT_ROOT/.venv"
 if [ ! -x "$VENV_DIR/bin/python" ]; then
   log "创建 venv: $VENV_DIR"
@@ -131,7 +132,7 @@ log "安装 requirements.txt..."
 log "Python 依赖安装完成"
 
 # ── 3. 前端构建 ────────────────────────────────────────────
-log "=== [3/6] 前端构建 ==="
+log "=== [3/7] 前端构建 ==="
 FRONTEND_DIR="$PROJECT_ROOT/frontend-new"
 if [ "$SKIP_FRONTEND" -eq 1 ]; then
   if [ -d "$FRONTEND_DIR/dist" ] && [ -f "$FRONTEND_DIR/dist/index.html" ]; then
@@ -156,7 +157,7 @@ else
 fi
 
 # ── 4. .env 初始化 ─────────────────────────────────────────
-log "=== [4/6] 初始化 .env ==="
+log "=== [4/7] 初始化 .env ==="
 if [ ! -f "$PROJECT_ROOT/.env" ]; then
   cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
   warn ".env 已从 .env.example 创建。请编辑 $PROJECT_ROOT/.env 填写实际数据库/Redis 密码后重新运行本脚本。"
@@ -194,9 +195,9 @@ set -a; . "$PROJECT_ROOT/.env"; set +a
 
 # ── 5. 数据库初始化 ────────────────────────────────────────
 if [ "$SKIP_DB" -eq 1 ]; then
-  log "=== [5/6] 跳过数据库初始化 (--skip-db) ==="
+  log "=== [5/7] 跳过数据库初始化 (--skip-db) ==="
 else
-  log "=== [5/6] 数据库初始化 ==="
+  log "=== [5/7] 数据库初始化 ==="
   DB_HOST="${MYSQL_HOST:-localhost}"
   DB_PORT="${MYSQL_PORT:-3306}"
   DB_USER="${MYSQL_USER:-root}"
@@ -280,10 +281,38 @@ fi
 
 # ── 6. 种子数据 ────────────────────────────────────────────
 if [ "$SKIP_SEED" -eq 1 ]; then
-  log "=== [6/6] 跳过种子导入 (--skip-seed) ==="
+  log "=== [6/7] 跳过种子导入 (--skip-seed) ==="
 else
-  log "=== [6/6] 导入种子数据 ==="
+  log "=== [6/7] 导入种子数据 ==="
   bash "$PROJECT_ROOT/migrations/seed_all.sh"
+fi
+
+# ── 7. 监控维护 cron ────────────────────────────────────────
+log "=== [7/7] 配置监控维护 cron ==="
+# 为什么必须有（生产教训 2026-09-07）：device_monitor_probe_events 与
+# device_metric_timeseries 两张表按日分区，且都带 p_future(MAXVALUE) 兜底分区。
+# 无人每天预建分区时，新数据全部落进 p_future（实测 30 天积压 12.6 万行），
+# 按天 DROP PARTITION 的清理与分区裁剪随之全部失效 —— 表会无限膨胀。
+# 预建必须走 REORGANIZE（有 MAXVALUE 兜底时 ADD PARTITION 会报 1481），
+# CLI 已实现，但**必须有人调度**才会执行，故此处落地为默认 cron。
+CRON_TAG="ipip-monitor-maintenance"
+mkdir -p "$PROJECT_ROOT/logs" || warn "无法创建 logs 目录（不影响安装主体，但 cron 日志会写失败）"
+if command -v crontab >/dev/null 2>&1; then
+  # 幂等：先剔除旧的同类条目（按行尾标记识别），再整体重建，重跑 install.sh 不会重复叠加
+  EXISTING="$(crontab -l 2>/dev/null | grep -v "$CRON_TAG" || true)"
+  {
+    [ -n "$EXISTING" ] && printf '%s\n' "$EXISTING"
+    printf '# %s（由 scripts/install.sh 写入，重跑本脚本会整体重建，勿手工编辑）\n' "$CRON_TAG"
+    printf '0 2 * * * cd %s && ./.venv/bin/flask --app wsgi:app monitor-manage-partitions >> %s/logs/monitor-partitions.log 2>&1 # %s\n' \
+      "$PROJECT_ROOT" "$PROJECT_ROOT" "$CRON_TAG"
+    printf '0 3 * * * cd %s && ./.venv/bin/flask --app wsgi:app monitor-archive >> %s/logs/monitor-archive.log 2>&1 # %s\n' \
+      "$PROJECT_ROOT" "$PROJECT_ROOT" "$CRON_TAG"
+  } | crontab -
+  log "cron 已写入：02:00 预建分区 / 03:00 归档清理（日志 logs/monitor-*.log）"
+else
+  warn "未找到 crontab，跳过监控维护 cron。请自行添加两条定时任务："
+  warn "  0 2 * * * cd $PROJECT_ROOT && ./.venv/bin/flask --app wsgi:app monitor-manage-partitions"
+  warn "  0 3 * * * cd $PROJECT_ROOT && ./.venv/bin/flask --app wsgi:app monitor-archive"
 fi
 
 log "============================================================"
