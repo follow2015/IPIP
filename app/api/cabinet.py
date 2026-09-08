@@ -723,13 +723,14 @@ def allocate_u_position(cabinet_id):
                 status_code=400
             )
 
-        if max_u is None:
-            max_u = cabinet_service.get_by_id(cabinet_id).total_u
-
-        from app.utils.cabinet_utils import CabinetUCalculator, UPositionRange, DeviceConstraint
         cabinet = cabinet_service.get_by_id(cabinet_id)
         if not cabinet:
             return APIResponse.error(message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404)
+
+        if max_u is None:
+            max_u = cabinet.total_u
+
+        from app.utils.cabinet_utils import CabinetUCalculator, DeviceConstraint
 
         devices = [d.to_dict() for d in cabinet.devices]
         if exclude_device_id:
