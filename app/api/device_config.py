@@ -14,6 +14,7 @@ from app.api.base import APIResponse, api_exception_handler
 from app.services.device_config_service import DeviceConfigService
 from app.persistence.device_config_backup_repository import DeviceConfigBackupRepository, DeviceConfigChangeRepository
 from app.utils import login_required, permission_required, rate_limit_api
+from app.utils.auth import get_current_user_id
 from app.utils.idempotency import redis_lock
 from app.utils.transactional import transactional
 from app.exceptions.validation import ValidationError
@@ -26,12 +27,15 @@ _device_config_service = DeviceConfigService(DeviceConfigBackupRepository(), Dev
 
 
 class ConfigChangeRequestSchema(Schema):
-    """提交配置变更请求Schema"""
+    """提交配置变更请求Schema（字段名对齐 DeviceConfigChange 模型）"""
     class Meta:
         unknown = EXCLUDE
-    change_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    content = fields.Str(allow_none=True)
-    description = fields.Str(validate=validate.Length(max=500), allow_none=True)
+    change_summary = fields.Str(
+        required=True, validate=validate.Length(min=1, max=500),
+        error_messages={"required": "变更摘要不能为空"},
+    )
+    change_detail = fields.Str(allow_none=True)
+    backup_id = fields.Int(allow_none=True)
 
 
 
@@ -47,7 +51,7 @@ def get_device_config(device_id):
     Path Parameters:
         device_id (int): 设备ID
     """
-    config = _device_config_service.get_latest_backup(device_id)
+    config = _device_config_service.get_latest_config(device_id)
     if not config:
         return APIResponse.success(data={})
     return APIResponse.success(data=config.to_dict())
@@ -64,8 +68,8 @@ def get_config_history(device_id):
     Path Parameters:
         device_id (int): 设备ID
     """
-    history = _device_config_service.get_backup_history(device_id)
-    return APIResponse.success(data=[h.to_dict() for h in history])
+    history = _device_config_service.get_config_history(device_id)
+    return APIResponse.success(data=[h.to_dict() for h in history.get("data", [])])
 
 
 @device_config_bp.route("/<int:device_id>/config/backup", methods=["POST"])
@@ -76,12 +80,12 @@ def get_config_history(device_id):
 @redis_lock(prefix="config_backup", key_param="device_id", ttl=300)
 @transactional
 def backup_device_config(device_id):
-    """触发配置备份
+    """触发配置备份（SSH 实时采集 running-config 后落库）
 
     Path Parameters:
         device_id (int): 设备ID
     """
-    result = _device_config_service.create_backup(device_id)
+    result = _device_config_service.capture_backup_from_device(device_id)
     return APIResponse.success(data=result.to_dict(), message="配置备份成功", status_code=201)
 
 
@@ -110,5 +114,50 @@ def submit_config_change(device_id):
         raise ValidationError(f"参数校验失败: {errors}")
 
     validated_data = schema.load(data)
-    change = _device_config_service.submit_change(device_id, validated_data)
+    change = _device_config_service.submit_change(
+        device_id,
+        validated_data.get("change_summary"),
+        requested_by=get_current_user_id(),
+        backup_id=validated_data.get("backup_id"),
+        change_detail=validated_data.get("change_detail"),
+    )
     return APIResponse.success(data=change.to_dict(), message="配置变更请求提交成功", status_code=201)
+
+
+@device_config_bp.route("/<int:device_id>/config/changes", methods=["GET"])
+@doc(summary="获取配置变更审批列表", tags=["设备配置"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "DeviceConfigChangeResponse", 404: "ApiError"})
+@login_required
+@permission_required("device:view")
+@rate_limit_api
+def list_config_changes(device_id):
+    """获取配置变更审批列表
+
+    Path Parameters:
+        device_id (int): 设备ID
+    """
+    changes = _device_config_service.list_changes(device_id)
+    return APIResponse.success(data=[c.to_dict() for c in changes])
+
+
+@device_config_bp.route("/<int:device_id>/config/changes/<int:change_id>/<action>", methods=["POST"])
+@doc(summary="审批配置变更请求", tags=["设备配置"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "change_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "action", "in": "path", "required": True, "schema": {"type": "string", "enum": ["approve", "reject"]}}], responses={200: "DeviceConfigChangeResponse", 400: "ApiError"})
+@login_required
+@permission_required("device:update")
+@api_exception_handler
+@transactional
+def review_config_change(device_id, change_id, action):
+    """审批配置变更请求
+
+    Path Parameters:
+        device_id (int): 设备ID
+        change_id (int): 变更请求ID
+        action (str): approve 或 reject
+    """
+    if action not in ("approve", "reject"):
+        raise ValidationError("操作类型必须为 approve 或 reject")
+
+    change = _device_config_service.review_change(
+        device_id, change_id, action, approved_by=get_current_user_id(),
+    )
+    message = "已批准" if action == "approve" else "已拒绝"
+    return APIResponse.success(data=change.to_dict(), message=message)

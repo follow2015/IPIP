@@ -216,6 +216,43 @@ def start_config_sync() -> None:
             _logger.warning("ai.config.subscriber_start_failed %s", e)
 
 
+def report_ai_config_mode() -> None:
+    """启动自检：把 AI 配置的生效模式打印到启动日志。
+
+    双模式的已知踩坑点此前只在 .env.example 注释里警告过两处：
+    ① 占位默认值会被 env 永久锁死（UI 改不动）；② 数值键留空会让 int() 崩溃。
+    两者过去都只能在运行时暴露——配置来源要靠翻代码、解析错误直接崩在
+    config 导入阶段（日志系统尚未初始化，只有裸 traceback）。
+    这里在启动期一次性说清"哪些字段被锁定、哪些 env 值非法、密钥是否就位"。
+    """
+    from app.utils.logging import get_logger
+    _logger = get_logger(__name__)
+
+    if _ENV_OVERRIDES:
+        _logger.info(
+            "ai.config.mode locked_by_env fields=%s（部署级优先，界面不可修改）",
+            sorted(_ENV_OVERRIDES),
+        )
+    else:
+        _logger.info("ai.config.mode all_editable（无 env 覆盖，全量字段可由界面修改）")
+
+    try:
+        from config import _ENV_FALLBACKS
+        if _ENV_FALLBACKS:
+            _logger.warning(
+                "ai.config.env_invalid keys=%s（已回退默认值，请检查部署环境变量）",
+                list(_ENV_FALLBACKS),
+            )
+    except Exception as e:  # noqa: BLE001
+        _logger.debug("ai.config.env_fallbacks_unavailable %s", e)
+
+    _logger.info(
+        "ai.config.mode api_key=%s model=%s",
+        "已配置" if bool(getattr(Config, "AI_API_KEY", "")) else "未配置",
+        getattr(Config, "AI_MODEL", ""),
+    )
+
+
 def _mask_key(key: str) -> str:
     if not key:
         return ""

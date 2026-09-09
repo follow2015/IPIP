@@ -71,6 +71,12 @@ def create_app(config_name: str = None) -> Flask:
         except Exception as e:  # noqa: BLE001
             logger.warning("ai.config.start_sync_failed %s", e)
 
+        try:
+            from app.services.ai.config_admin_service import report_ai_config_mode
+            report_ai_config_mode()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("ai.config.mode_report_failed %s", e)
+
     if config_name != "testing":
         from app.services.notification_cleanup import start_cleanup_scheduler
         start_cleanup_scheduler(app)
@@ -322,12 +328,14 @@ def register_blueprints(app: Flask):
     from app.api.rbac import register_rbac_routes  # 导入RBAC路由
     from app.api.device_storage import device_storage_bp  # 导入设备存储API
     from app.api.device_nics_port import device_nics_port_bp, _port_bp, _template_bp  # 导入网卡端口API
+    from app.api.deployment_plan import deployment_plan_bp  # 上架方案查询API（只读推荐）
 
     from app.api.ip_routes import router as ip_new_bp
     from app.api.network_routes import router as network_new_bp
     from app.api.switch_routes import router as switch_new_bp
 
     app.register_blueprint(health_bp, url_prefix="/api/health")
+    app.register_blueprint(deployment_plan_bp, url_prefix="/api/deployment")  # 上架方案查询
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(logs_bp, url_prefix="/api/logs")  # 注册日志API
     app.register_blueprint(user_bp, url_prefix="/api/users")

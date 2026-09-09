@@ -10,9 +10,11 @@ from . import diagnostic  # noqa: F401  (side-effect: 注册诊断类能力 devi
 from . import entity_capabilities  # noqa: F401  (side-effect: 注册 customer.search / devices.locate)
 from . import topology_capabilities  # noqa: F401  (side-effect: 注册 topology.* 遍历能力)
 from . import root_cause_capabilities  # noqa: F401  (side-effect: 注册 root_cause.analyze 故障域定位)
+from . import deployment_capabilities  # noqa: F401  (side-effect: 注册 deployment.plan 上架方案推荐)
 from .registry import get_capability, register_capability
 
 __all__ = [
     "builtin", "diagnostic", "entity_capabilities", "topology_capabilities",
-    "root_cause_capabilities", "get_capability", "register_capability",
+    "root_cause_capabilities", "deployment_capabilities",
+    "get_capability", "register_capability",
 ]

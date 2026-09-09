@@ -15,6 +15,41 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+_ENV_FALLBACKS: list[str] = []
+
+
+def _env_num(key: str, default, min_value=None, cast=int):
+    """读取数值型环境变量，空串/非法值回退默认值而不是抛异常。
+
+    `AI_TIMEOUT=`（空值）会让裸 int() 在 config 导入阶段抛 ValueError，
+    进程直接起不来且只有一行 traceback——部署脚本多打一个等号就踩中。
+    这里统一回退到默认值并记账，由启动日志显式告警。
+
+    Args:
+        key: 环境变量名。
+        default: 解析失败时使用的默认值（决定返回类型）。
+        min_value: 最小值，超出范围同样回退（如 timeout <= 0 无意义）。
+        cast: int 或 float。
+
+    Returns:
+        解析后的数值，或 default。
+    """
+    raw = os.getenv(key)
+    if raw is None or str(raw).strip() == "":
+        if raw is not None:
+            _ENV_FALLBACKS.append(f"{key}=(空值)")
+        return default
+    try:
+        value = cast(str(raw).strip())
+    except (TypeError, ValueError):
+        _ENV_FALLBACKS.append(f"{key}={raw}")
+        return default
+    if min_value is not None and value < min_value:
+        _ENV_FALLBACKS.append(f"{key}={raw}")
+        return default
+    return value
+
+
 def _redis_url_for_db(db: int) -> str:
     """构造指向指定 Redis db 的连接 URL（Celery broker / backend 用）。
 
@@ -77,9 +112,9 @@ class Config:
     AI_API_KEY = os.getenv("AI_API_KEY", "")
     AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1")
     AI_MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
-    AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", 30))
-    AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", 1024))
-    AI_TEMPERATURE = float(os.getenv("AI_TEMPERATURE", 0.2))
+    AI_TIMEOUT = _env_num("AI_TIMEOUT", 30, min_value=1)
+    AI_MAX_TOKENS = _env_num("AI_MAX_TOKENS", 1024, min_value=1)
+    AI_TEMPERATURE = _env_num("AI_TEMPERATURE", 0.2, min_value=0, cast=float)
 
     _AI_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "app", "services", "ai", "skills")
@@ -89,7 +124,7 @@ class Config:
     AI_AGENTIC_SKILLS_DIR = os.path.join(_AI_BASE, "agentic")
 
     AI_SKILL_TRIGGER_PREFILTER = os.getenv("AI_SKILL_TRIGGER_PREFILTER", "true").lower() == "true"
-    AI_SKILL_RECALL_TOPK = int(os.getenv("AI_SKILL_RECALL_TOPK", "8"))
+    AI_SKILL_RECALL_TOPK = _env_num("AI_SKILL_RECALL_TOPK", 8, min_value=1)
     AI_SKILL_ROUTING_MODE = os.getenv("AI_SKILL_ROUTING_MODE", "domain").lower()
 
     AI_SKILL_VISIBILITY_FILTER = os.getenv(
@@ -98,11 +133,11 @@ class Config:
     AI_DOCS_ROOT = os.environ.get(
         "AI_DOCS_ROOT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs"))
 
-    AI_STREAM_TIMEOUT = int(os.getenv("AI_STREAM_TIMEOUT", 120))
-    MAX_STREAM_CONNECTIONS = int(os.getenv("MAX_STREAM_CONNECTIONS", 100))
+    AI_STREAM_TIMEOUT = _env_num("AI_STREAM_TIMEOUT", 120, min_value=1)
+    MAX_STREAM_CONNECTIONS = _env_num("MAX_STREAM_CONNECTIONS", 100, min_value=1)
 
-    AI_CIRCUIT_FAILURE_THRESHOLD = int(os.getenv("AI_CIRCUIT_FAILURE_THRESHOLD", 5))
-    AI_CIRCUIT_COOLDOWN_SECONDS = int(os.getenv("AI_CIRCUIT_COOLDOWN_SECONDS", 30))
+    AI_CIRCUIT_FAILURE_THRESHOLD = _env_num("AI_CIRCUIT_FAILURE_THRESHOLD", 5, min_value=1)
+    AI_CIRCUIT_COOLDOWN_SECONDS = _env_num("AI_CIRCUIT_COOLDOWN_SECONDS", 30, min_value=1)
 
     AI_ASYNC_ENABLED = os.getenv("AI_ASYNC_ENABLED", "1") == "1"
 
