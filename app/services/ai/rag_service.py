@@ -6,7 +6,7 @@ from app.services.ai.llm_factory import create_llm_client
 from app.services.ai.llm_base import LLMClient
 from app.services.ai.prompt_guard import sanitize_user_input
 from app.services.ai.rag_store import RAGStore, get_rag_store
-from app.services.ai._runtime import observe_call, CallTimer
+from app.services.ai._runtime import bind_scenario, observe_call, CallTimer
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -65,7 +65,7 @@ class RAGService:
         status = "ok"
         answer = ""
         audit_response: Any = None
-        with CallTimer() as t:
+        with bind_scenario("rag"), CallTimer() as t:
             try:
                 answer = self.client.chat(SYSTEM, user)
                 audit_response = answer
@@ -77,7 +77,7 @@ class RAGService:
             finally:
                 observe_call(scenario="rag", user_id=user_id,
                              request=safe_q, response=audit_response,
-                             status=status, duration_ms=t.duration_ms,
+                             status=status, duration_ms=t.elapsed_ms(),
                              model=getattr(self.client, "model", None),
                              base_url=getattr(self.client, "base_url", None))
         return {"answer": answer, "degraded": False, "references": []}

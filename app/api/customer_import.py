@@ -15,6 +15,7 @@ from app.utils import (
     permission_required,
     rate_limit_api,
 )
+from app.utils.idempotency import idempotent, upload_file_idempotency_key
 from app.utils.time_utils import now_utc_naive
 from app.utils.transactional import transactional
 from app.exceptions.validation import ValidationError as AppValidationError, RequiredFieldError
@@ -64,6 +65,7 @@ def download_import_template():
 @login_required
 @permission_required("customer:create")
 @rate_limit_api
+@idempotent(prefix="import_customers", ttl=3600, key_func=upload_file_idempotency_key)
 @transactional
 def batch_import_customers():
     """批量导入客户"""

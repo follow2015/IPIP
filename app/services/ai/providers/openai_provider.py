@@ -3,6 +3,7 @@
 
 兼容通义/DeepSeek/本地 Ollama 等任意 OpenAI 兼容端点（通过 base_url 切换）。
 """
+import time
 from typing import Optional
 
 from openai import OpenAI, APIConnectionError, APIStatusError, APITimeoutError
@@ -59,14 +60,30 @@ class OpenAIProvider(LLMClient):
         return self._stream_client
 
     def chat(self, system_prompt: str, user_prompt: str) -> str:
+        """非流式调用入口：结果回写 _usage 后统一埋点（成功/失败均记录）。"""
         if not self.is_configured():
             raise AINotConfiguredError(operation="chat")
+        _usage = {"prompt": 0, "completion": 0, "status": "ok"}
+        _t0 = time.monotonic()
+        try:
+            return self._chat_inner(system_prompt, user_prompt, _usage)
+        except Exception:
+            _usage["status"] = "error"
+            raise
+        finally:
+            _record(self.model, _usage, time.monotonic() - _t0)
+
+    def _chat_inner(self, system_prompt: str, user_prompt: str, _usage: dict) -> str:
+        """chat 的原有实现，额外把 usage 的 token 数回写到 _usage。"""
         try:
             resp = self._call_with_circuit(system_prompt, user_prompt)
             if not resp.choices:
                 return ""
             content = resp.choices[0].message.content
             usage = getattr(resp, "usage", None)
+            if usage:
+                _usage["prompt"] = getattr(usage, "prompt_tokens", 0) or 0
+                _usage["completion"] = getattr(usage, "completion_tokens", 0) or 0
             reasoning = getattr(resp.choices[0].message, "reasoning_content", None)
             finish_reason = getattr(resp.choices[0], "finish_reason", None)
             logger.info(
@@ -127,6 +144,8 @@ class OpenAIProvider(LLMClient):
         breaker = get_circuit_breaker(_provider_name())
         if not breaker.allow_request():
             raise AICircuitOpenError(_provider_name())
+        _usage = {"prompt": 0, "completion": 0, "status": "ok"}
+        _t0 = time.monotonic()
         try:
             client = self._get_stream_client()
             stream = client.chat.completions.create(
@@ -149,16 +168,41 @@ class OpenAIProvider(LLMClient):
                 except Exception:  # noqa: BLE001
                     logger.debug("AI 流式连接关闭异常（忽略）")
         except GeneratorExit:
+            _usage["status"] = "aborted"
             breaker.record_success()
             logger.warning("AI 流式输出因客户端断连而中止（已按成功计入熔断）")
             raise
         except (APIConnectionError, APITimeoutError, APIStatusError) as e:
+            _usage["status"] = "error"
             breaker.record_failure()
             logger.error("ai.chat_stream.upstream_failed type=%s err=%s",
                          type(e).__name__, e)
             raise AIServiceError(operation="chat_stream")
         except Exception as e:  # noqa: BLE001
+            _usage["status"] = "error"
             breaker.record_failure()
             logger.error("ai.chat_stream.unexpected type=%s err=%s",
                          type(e).__name__, e, exc_info=True)
             raise AIServiceError(operation="chat_stream")
+        finally:
+            _record(self.model, _usage, time.monotonic() - _t0)
+
+
+def _record(model: str, usage_box: dict, seconds: float) -> None:
+    """把一次 LLM 调用写入跨进程指标（埋点失败不影响主流程）。
+
+    Args:
+        model: 模型名。
+        usage_box: {"prompt": 输入 token, "completion": 输出 token, "status": ok|error}。
+        seconds: 调用耗时（秒）。
+    """
+    try:
+        from app.services.ai import metrics as _metrics
+        from app.services.ai._runtime import current_scenario
+        _metrics.record_llm_call(
+            scenario=current_scenario(), model=model,
+            prompt_tokens=usage_box.get("prompt", 0),
+            completion_tokens=usage_box.get("completion", 0),
+            duration_seconds=seconds, status=usage_box.get("status", "ok"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("ai.metrics.record_failed %s", e)

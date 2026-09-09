@@ -172,23 +172,24 @@ def skills_run(name):
     engine = WorkflowEngine(get_capability=get_capability)
     import time as _time
     from app.services.ai.metrics import record_skill_run
-    from app.services.ai._runtime import observe_call
+    from app.services.ai._runtime import bind_scenario, observe_call
     _t0 = _time.monotonic()
     result = None
     status = "ok"
     try:
-        result = engine.run(skill, args, user_id=user_id)
+        with bind_scenario(f"skill.{name}"):
+            result = engine.run(skill, args, user_id=user_id)
         return APIResponse.success(data={"result": result})
     except Exception:
         status = "error"
         raise
     finally:
-        duration_ms = int((_time.monotonic() - _t0) * 1000)
+        _elapsed = _time.monotonic() - _t0
         record_skill_run(skill_name=name, status=status,
-                         duration_seconds=_time.monotonic() - _t0)
+                         duration_seconds=_elapsed)
         observe_call(scenario=f"skill.{name}", user_id=user_id,
                      request=args, response=result if status == "ok" else None,
-                     status=status, duration_ms=duration_ms)
+                     status=status, duration_ms=int(_elapsed * 1000))
 
 
 @bp.post("/ask")
@@ -210,10 +211,10 @@ def ask():
     user_id = get_current_user_id() or 0
     user_perms = get_user_permissions(user_id)
 
-    from app.services.ai._runtime import observe_call, CallTimer
+    from app.services.ai._runtime import bind_scenario, observe_call, CallTimer
     status = "ok"
     answer = ""
-    with CallTimer() as t:
+    with bind_scenario("nlq"), CallTimer() as t:
         try:
             router = NLQueryRouter()
             answer = router.ask(question, user_id=user_id, user_permissions=user_perms)
@@ -224,7 +225,7 @@ def ask():
             observe_call(scenario="nlq", user_id=user_id,
                          request={"question": question},
                          response={"answer": answer} if status == "ok" else None,
-                         status=status, duration_ms=t.duration_ms)
+                         status=status, duration_ms=t.elapsed_ms())
     session_id = router.last_session_id
     return APIResponse.success(data={
         "answer": answer,
@@ -323,10 +324,12 @@ def run_agentic_skill(name):
     runner = AgenticSkillRunner()
     import time as _time
     from app.services.ai.metrics import record_skill_run
+    from app.services.ai._runtime import bind_scenario
     _t0 = _time.monotonic()
     try:
-        answer = runner.run(spec, instructions, question,
-                            user_id=user_id, user_permissions=user_perms)
+        with bind_scenario(f"agentic.{name}"):
+            answer = runner.run(spec, instructions, question,
+                                user_id=user_id, user_permissions=user_perms)
         record_skill_run(skill_name=f"agentic.{name}", status="ok",
                          duration_seconds=_time.monotonic() - _t0)
         session_id = runner.last_session_id

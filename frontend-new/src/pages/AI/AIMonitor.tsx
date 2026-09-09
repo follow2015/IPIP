@@ -21,6 +21,23 @@ import {
 import { useMessage } from '@/hooks/useMessage';
 import { confirm } from '@/utils/confirm';
 
+const META_KEYS = new Set(['metrics_source', 'pid']);
+
+const METRIC_LABELS: Record<string, string> = {
+  ai_calls_total: 'LLM 调用次数（累计）',
+  ai_errors_total: '调用失败（累计）',
+  ai_prompt_tokens_total: '输入 Token（累计）',
+  ai_completion_tokens_total: '输出 Token（累计）',
+  ai_tokens_total: 'Token 总消耗（累计）',
+  ai_skill_runs_total: '技能执行次数（累计）',
+  ai_calls_today: 'LLM 调用次数（今日）',
+  ai_errors_today: '调用失败（今日）',
+  ai_prompt_tokens_today: '输入 Token（今日）',
+  ai_completion_tokens_today: '输出 Token（今日）',
+  ai_tokens_today: 'Token 总消耗（今日）',
+  ai_skill_runs_today: '技能执行次数（今日）'
+};
+
 export default function AIMonitor() {
   const [circuits, setCircuits] = useState<CircuitStatus[]>([]);
   const [metrics, setMetrics] = useState<AIMetrics | null>(null);
@@ -162,7 +179,7 @@ export default function AIMonitor() {
     }
   ];
 
-  const metricEntries = metrics ? Object.entries(metrics) : [];
+  const metricEntries = metrics ? Object.entries(metrics).filter(([k]) => !META_KEYS.has(k)) : [];
 
   return (
     <Space direction="vertical" size="middle" style={{ display: 'flex' }}>
@@ -207,9 +224,26 @@ export default function AIMonitor() {
           </Space>
         }
         extra={
-          <Button icon={<ReloadOutlined />} onClick={fetchAll} loading={loading}>
-            刷新
-          </Button>
+          <Space>
+            {/* 数据来源提示：local/error 都不可作为全局依据，
+                若不明示会被误读成"全局就是这些数"，且随命中的 worker 漂移。 */}
+            {metrics?.metrics_source === 'error' ? (
+              <Tooltip title="Redis 可达但本次读取失败，以下为本进程兜底数据，不代表全局真实值，请刷新重试">
+                <Tag color="error">读取异常 · pid {metrics?.pid}</Tag>
+              </Tooltip>
+            ) : metrics?.metrics_source === 'local' ? (
+              <Tooltip title="Redis 不可用，当前仅为处理本请求的进程内的兜底数据，会随命中的 worker 变化，不可作为全局依据">
+                <Tag color="warning">本进程兜底 · pid {metrics?.pid}</Tag>
+              </Tooltip>
+            ) : (
+              <Tooltip title="来自 Redis 聚合，覆盖全部 gunicorn worker 与 celery worker；python_gc 等系统指标仍只反映本进程">
+                <Tag color="success">全进程聚合 · pid {metrics?.pid}</Tag>
+              </Tooltip>
+            )}
+            <Button icon={<ReloadOutlined />} onClick={fetchAll} loading={loading}>
+              刷新
+            </Button>
+          </Space>
         }
       >
         {metricEntries.length === 0 ? (
@@ -219,6 +253,8 @@ export default function AIMonitor() {
             {metricEntries.map(([key, val]) => {
               const isNumeric = typeof val === 'number' && Number.isFinite(val);
               const isRawText = key === 'raw' && typeof val === 'string';
+              const isCount = /_(total|today)$/.test(key);
+              const label = METRIC_LABELS[key] ?? key;
               return (
                 <Col key={key} xs={24} sm={12} md={8} lg={isRawText ? 24 : 6}>
                   <Card size="small" type="inner">
@@ -237,11 +273,11 @@ export default function AIMonitor() {
                       <Statistic
                         title={
                           <Tooltip title={key}>
-                            <span style={{ fontSize: 13 }}>{key}</span>
+                            <span style={{ fontSize: 13 }}>{label}</span>
                           </Tooltip>
                         }
                         value={val}
-                        precision={val < 100 ? 2 : 0}
+                        precision={isCount ? 0 : val < 100 ? 2 : 0}
                       />
                     ) : (
                       <>

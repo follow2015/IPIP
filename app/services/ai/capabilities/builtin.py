@@ -158,6 +158,308 @@ def ip_list(args: Dict[str, Any]) -> dict:
 
 
 
+@register_capability("ip.mac_lookup")
+def ip_mac_lookup(args: Dict[str, Any]) -> dict:
+    """按 MAC 地址反查其所在的交换机 / 端口 / 机房。"""
+    mac = args.get("mac")
+    if not mac:
+        raise ValueError("mac 必填")
+    from app.persistence.ip_repositories import IPSwitchInfoRepository
+    rows = IPSwitchInfoRepository().find_by_mac_address(mac)
+    return {
+        "mac": mac,
+        "count": len(rows),
+        "locations": [
+            {
+                "ip_address": r.ip_address,
+                "switch_id": r.switch_id,
+                "port": r.port,
+                "room_id": r.room_id,
+            }
+            for r in rows
+        ],
+    }
+
+
+@register_capability("ip.ping")
+def ip_ping(args: Dict[str, Any]) -> dict:
+    """探测单个 IP 是否在线（ICMP ping，内网限速）。"""
+    ip = args.get("ip")
+    if not ip:
+        raise ValueError("ip 必填")
+    from app.services.ai.service_factory import get_ip_crud_service
+    reachable = get_ip_crud_service().ping_ip(ip)
+    return {"ip": ip, "reachable": bool(reachable)}
+
+
+@register_capability("ip.subnet_utilization")
+def ip_subnet_utilization(args: Dict[str, Any]) -> dict:
+    """统计某网段的 IP 状态分布（活跃 / 离线 / 封禁 / 空闲）。"""
+    cidr = args.get("cidr")
+    if not cidr:
+        raise ValueError("cidr 必填")
+    from app.persistence.ip_repositories import IPManagerRepository
+    stats = IPManagerRepository().get_status_statistics_by_cidr(cidr)
+    return {"cidr": cidr, **stats}
+
+
+@register_capability("ip.history")
+def ip_history(args: Dict[str, Any]) -> dict:
+    """查询某 IP 的归属变更与封禁审计流（合并 allocation / ban 两表）。"""
+    ip = args.get("ip")
+    if not ip:
+        raise ValueError("ip 必填")
+    from app.persistence.ip_audit_repository import IPAuditRepository
+    from app.services.ip_audit_service import IPAuditService
+    return IPAuditService(IPAuditRepository()).query_audit_logs(
+        ip_address=ip,
+        page=_coerce_int(args.get("page"), default=1) or 1,
+        per_page=_coerce_int(args.get("per_page"), default=20) or 20,
+    )
+
+
+@register_capability("ip.allocate_suggest")
+def ip_allocate_suggest(args: Dict[str, Any]) -> dict:
+    """在指定机房推荐空闲 IP（状态为未使用 / 离线）。"""
+    room_id = _coerce_int(args.get("room_id"))
+    if room_id is None:
+        raise ValueError("room_id 必填")
+    limit = _coerce_int(args.get("limit"), default=20) or 20
+    from app.core.enums import IPStatus
+    from app.persistence.ip_repositories import IPManagerRepository
+    ips = IPManagerRepository().find_unused_inactive_ips_by_rooms(
+        [room_id], [int(IPStatus.UNUSED), int(IPStatus.INACTIVE)]
+    )
+    return {
+        "room_id": room_id,
+        "suggested_count": min(limit, len(ips)),
+        "ips": ips[:limit],
+    }
+
+
+@register_capability("ip.reconcile_check")
+def ip_reconcile_check(args: Dict[str, Any]) -> dict:
+    """只读对账：发现台账（ip_addresses）与实际（定位 / 封禁）的不一致。
+
+    区别于 ip_reconcile_service.reconcile 的写动作，本能力仅统计差异，不写库。
+    """
+    room_id = _coerce_int(args.get("room_id"))
+    if room_id is None:
+        raise ValueError("room_id 必填")
+    from sqlalchemy import text
+
+    from app.core.enums import IPStatus
+    from app.persistence.ip_repositories import IPManagerRepository
+
+    repo = IPManagerRepository()
+    active_no_loc = repo.session.execute(text(
+        "SELECT COUNT(*) FROM ip_addresses ia "
+        "LEFT JOIN ip_switch_info si "
+        "  ON si.ip_address = ia.ip_address AND si.room_id = ia.room_id "
+        "WHERE ia.room_id = :rid AND ia.status = :active AND si.id IS NULL"
+    ), {"rid": room_id, "active": int(IPStatus.ACTIVE)}).scalar() or 0
+    banned_no_record = repo.session.execute(text(
+        "SELECT COUNT(*) FROM ip_addresses ia "
+        "LEFT JOIN ip_ban_records br "
+        "  ON br.ip_address = ia.ip_address AND br.room_id = ia.room_id "
+        "WHERE ia.room_id = :rid AND ia.status = :banned AND br.id IS NULL"
+    ), {"rid": room_id, "banned": int(IPStatus.BANNED)}).scalar() or 0
+    return {
+        "room_id": room_id,
+        "active_without_location": int(active_no_loc),
+        "banned_without_record": int(banned_no_record),
+        "consistent": int(active_no_loc) == 0 and int(banned_no_record) == 0,
+    }
+
+
+@register_capability("vlan.by_device")
+def vlan_by_device(args: Dict[str, Any]) -> list:
+    """列出某设备的所有 VLAN（含端口成员预加载）。"""
+    device_id = _coerce_int(args.get("device_id"))
+    if device_id is None:
+        raise ValueError("device_id 必填")
+    from app.persistence.vlan_repository import VLANRepository
+    from app.services.vlan_service import VLANService
+    vlans = VLANService(VLANRepository()).get_by_device(device_id)
+    return [v.to_dict() for v in vlans]
+
+
+@register_capability("vlan.members")
+def vlan_members(args: Dict[str, Any]) -> list:
+    """列出某 VLAN 的成员端口（按 device_id + vlan_id 定位）。"""
+    device_id = _coerce_int(args.get("device_id"))
+    vlan_id = _coerce_int(args.get("vlan_id"))
+    if device_id is None or vlan_id is None:
+        raise ValueError("device_id 与 vlan_id 必填")
+    from app.persistence.vlan_repository import VLANRepository
+    from app.services.vlan_service import VLANService
+    vlan = VLANRepository().find_by_device_and_vlan_id(device_id, vlan_id)
+    if vlan is None:
+        return []
+    return VLANService(VLANRepository()).get_members(vlan.id)
+
+
+
+@register_capability("root_cause.analyze")
+def root_cause_analyze(args: Dict[str, Any]) -> dict:
+    """单设备异常 → 故障域定位（同机柜 / 同机房 / 同上游是否同时异常）。"""
+    device_id = _coerce_int(args.get("device_id"))
+    metric = args.get("metric")
+    if device_id is None:
+        raise ValueError("device_id 必填")
+    if not metric:
+        raise ValueError("metric 必填（异常指标 key，如 cpu_usage）")
+    from app.services.ai.root_cause_analyzer import RootCauseAnalyzer
+    return RootCauseAnalyzer().analyze_fault_domain(device_id, metric)
+
+
+@register_capability("capacity.trend")
+def capacity_trend(args: Dict[str, Any]) -> dict:
+    """查询某设备某指标的历史趋势（均值 / 极值 / 越限点数 + 原始序列）。"""
+    from datetime import timedelta
+
+    from app.utils.time_utils import now_utc_naive
+
+    from app.persistence.device_metric_timeseries_repository import (
+        DeviceMetricTimeseriesRepository,
+    )
+    device_id = _coerce_int(args.get("device_id"))
+    metric_key = args.get("metric_key")
+    if device_id is None:
+        raise ValueError("device_id 必填")
+    if not metric_key:
+        raise ValueError("metric_key 必填")
+    hours = _coerce_int(args.get("hours"), default=24) or 24
+    index_key = args.get("index_key")  # 可选：端口号等实例索引
+    limit = _coerce_int(args.get("limit"), default=500) or 500
+
+    since = now_utc_naive() - timedelta(hours=hours)
+    rows = DeviceMetricTimeseriesRepository().list_by_metric(
+        device_id, metric_key, index_key=index_key, from_=since, limit=limit,
+    )
+    series = [r.to_dict() for r in rows]
+    nums, breached = [], 0
+    for r in rows:
+        if r.breached:
+            breached += 1
+        try:
+            nums.append(float(r.value))
+        except (TypeError, ValueError):
+            pass
+    summary = {
+        "samples": len(rows),
+        "breached_points": breached,
+        "avg": round(sum(nums) / len(nums), 2) if nums else None,
+        "min": min(nums) if nums else None,
+        "max": max(nums) if nums else None,
+        "last_value": series[-1]["value"] if series else None,
+    }
+    return {
+        "device_id": device_id,
+        "metric_key": metric_key,
+        "index_key": index_key,
+        "window": {"hours": hours, "from": since.isoformat(),
+                   "to": now_utc_naive().isoformat()},
+        "summary": summary,
+        "series": series,
+    }
+
+
+@register_capability("diag.timeline")
+def diag_timeline(args: Dict[str, Any]) -> dict:
+    """聚合某设备跨源事件时间线 + Incident 级上下文。
+
+    events（扁平时间线）：监控事件 + 探测可达性告警 + 历史诊断会话。
+    incidents（事件上下文）：每个事件附 reason_code（归并原因）、suppressed
+    （L2 被抑制的连坐下游）、change（L3 故障前配置变更，回查审计表复算）、
+    diagnosis（该事件是否已有进行中/已完成诊断，可直接复用结论）。
+    """
+    from datetime import timedelta
+
+    from app.utils.time_utils import now_utc_naive
+
+    from extensions import db
+    from app.models.device_monitor_probe_events import DeviceMonitorProbeEvents
+    from app.models.monitor_incident import MonitorIncident
+    from app.services.ai.diagnosis_session_service import DiagnosisSessionService
+
+    device_id = _coerce_int(args.get("device_id"))
+    if device_id is None:
+        raise ValueError("device_id 必填")
+    hours = _coerce_int(args.get("hours"), default=24) or 24
+    since = now_utc_naive() - timedelta(hours=hours)
+
+    events: list = []
+
+    incidents = (
+        db.session.query(MonitorIncident)
+        .filter(MonitorIncident.root_device_id == device_id,
+                MonitorIncident.first_alert_at >= since)
+        .order_by(MonitorIncident.first_alert_at.asc())
+        .all()
+    )
+    for inc in incidents:
+        events.append({
+            "ts": inc.first_alert_at.isoformat() if inc.first_alert_at else None,
+            "source": "incident",
+            "kind": inc.severity,
+            "summary": inc.title,
+            "status": inc.status,
+        })
+
+    probes = (
+        db.session.query(DeviceMonitorProbeEvents)
+        .filter(DeviceMonitorProbeEvents.device_id == device_id,
+                DeviceMonitorProbeEvents.probed_at >= since,
+                DeviceMonitorProbeEvents.is_alert.is_(True))
+        .order_by(DeviceMonitorProbeEvents.probed_at.asc())
+        .all()
+    )
+    for p in probes:
+        events.append({
+            "ts": p.probed_at.isoformat() if p.probed_at else None,
+            "source": "probe",
+            "kind": "unreachable" if not p.reachable else "recovered",
+            "summary": "探测" + ("不可达" if not p.reachable else "恢复")
+                       + (f"（{p.error}）" if p.error else ""),
+            "latency_ms": p.latency_ms,
+        })
+
+    for s in DiagnosisSessionService().get_history_by_device(device_id, limit=20):
+        events.append({
+            "ts": s.get("created_at"),
+            "source": "diagnosis",
+            "kind": s.get("status"),
+            "summary": s.get("question"),
+            "skill": s.get("skill_name"),
+        })
+
+    events.sort(key=lambda e: e["ts"] or "")
+
+    from app.services.ai.capabilities.device_scope import resolve_visible_scope
+
+    ok, visible, reason = resolve_visible_scope()
+    if not ok:
+        return {"supported": False, "hint": reason}
+    if visible is not None and device_id not in visible:
+        return {"supported": False, "hint": "无权查看该设备"}
+
+    from app.services.ai.incident_context import collect_incident_contexts
+
+    incidents = collect_incident_contexts(device_id, since, visible=visible)
+
+    return {
+        "device_id": device_id,
+        "window": {"hours": hours, "from": since.isoformat(),
+                   "to": now_utc_naive().isoformat()},
+        "event_count": len(events),
+        "events": events,
+        "incident_count": len(incidents),
+        "incidents": incidents,
+    }
+
+
+
 @register_capability("monitor.overview")
 def monitor_overview(args: Dict[str, Any]) -> dict:
     """监控总览：在线 / 离线 / 中断统计、按协议与设备类型分布、近期告警。"""

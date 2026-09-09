@@ -22,7 +22,7 @@ from urllib.parse import urlparse
 from app.utils.time_utils import now_utc_naive
 
 from app.utils.logging import get_logger
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List
 
 from app.utils.http_client import post_json
@@ -219,6 +219,15 @@ def _apply_escalation_step(alert: MonitorAlertOutbox,
 
     from sqlalchemy.orm.attributes import flag_modified
     flag_modified(alert, "payload")
+
+    if getattr(step, "trigger_ai_diagnosis", False):
+        try:
+            from app.services.ai.incident_diagnosis_trigger import (
+                trigger_incident_diagnosis,
+            )
+            trigger_incident_diagnosis(alert, skill_name=getattr(step, "ai_skill_name", None))
+        except Exception as exc:  # noqa: BLE001 - 二次兜底，防御性
+            logger.error("升级触发诊断异常 alert_id=%s: %s", alert.id, exc)
 
     _publish_escalation(alert, policy, new_count, step=step)
     return True

@@ -159,7 +159,9 @@ def _progress(task_id: str, status: str, progress: int, total: int,
              retry_backoff_max=60, retry_jitter=True, max_retries=3)
 def run_agentic_diagnosis(self, name: str, question: str, user_id: int,
                           user_perms: List[str], instructions: str = "",
-                          max_iterations: Optional[int] = None) -> Dict[str, Any]:
+                          max_iterations: Optional[int] = None,
+                          incident_id: Optional[int] = None,
+                          device_id: Optional[int] = None) -> Dict[str, Any]:
     """执行 agentic 诊断技能（有界 agent loop）。
 
     Args:
@@ -170,6 +172,9 @@ def run_agentic_diagnosis(self, name: str, question: str, user_id: int,
             （方案 Q1），task 内重建为 set 供 runner 使用。
         instructions: 技能指令。缺省则在 task 内加载（worker 侧文件系统可见）。
         max_iterations: 覆盖技能默认轮次上限（可选）。
+        incident_id: 关联监控事件 ID（升级链路自动触发时传入）。写入诊断会话，
+            用于「同一事件只诊断一次」与结论写回事件；手工发起为 None。
+        device_id: 诊断目标设备（自动触发时已知，避免 LLM 首轮才去推断）。
 
     Returns:
         {"answer": str, "session_id": int|None}，同时写入 task_state。
@@ -177,6 +182,7 @@ def run_agentic_diagnosis(self, name: str, question: str, user_id: int,
     task_id = self.request.id
     from app.services.ai.agentic.loader import load_agentic_skill
     from app.services.ai.agentic.runner import AgenticSkillRunner
+    from app.services.ai._runtime import bind_scenario
     from app.services.ai.metrics import record_skill_run
 
     started = time.monotonic()
@@ -191,8 +197,10 @@ def run_agentic_diagnosis(self, name: str, question: str, user_id: int,
     _progress(task_id, "running", 0, spec.max_iterations, None,
               user_id=user_id, session_id=None)
     try:
-        answer = runner.run(spec, instructions, question,
-                            user_id=user_id, user_permissions=perms_set)
+        with bind_scenario(f"agentic.{name}"):
+            answer = runner.run(spec, instructions, question,
+                                user_id=user_id, user_permissions=perms_set,
+                                incident_id=incident_id, device_id=device_id)
         session_id = _session_id_of(runner)
         record_skill_run(skill_name=f"agentic.{name}", status="ok",
                          duration_seconds=time.monotonic() - started)

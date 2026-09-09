@@ -5,16 +5,38 @@ C1 修复：把"组件存在但未接线"的熔断/审计/指标/缓存接到调
 本模块提供 service 层用的薄封装，避免每个 service 重复样板。
 """
 import time
-from typing import Any, Optional
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Iterator, Optional
 
 from app.services.ai.ai_audit_logger import AIAuditLogger
 from app.services.ai.ai_cache import AIResponseCache
-from app.services.ai.metrics import record_call
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 _AUDIT = AIAuditLogger()
+
+_bound_scenario: ContextVar[str] = ContextVar("ai_bound_scenario", default="unknown")
+
+
+@contextmanager
+def bind_scenario(scenario: str) -> Iterator[None]:
+    """在上下文内绑定 AI 场景，供 provider 层埋点读取。
+
+    Args:
+        scenario: 场景名，如 "rag" / "skill.device_inspect" / "agentic.diagnosis"。
+    """
+    token = _bound_scenario.set(scenario or "unknown")
+    try:
+        yield
+    finally:
+        _bound_scenario.reset(token)
+
+
+def current_scenario() -> str:
+    """返回当前上下文绑定的 AI 场景，未绑定时为 "unknown"。"""
+    return _bound_scenario.get()
 
 
 def get_redis_client():
@@ -43,15 +65,12 @@ def make_cache() -> AIResponseCache:
 def observe_call(scenario: str, user_id: int, request: Any, response: Any,
                  status: str, duration_ms: int, tokens: Optional[int] = None,
                  model: Optional[str] = None, base_url: Optional[str] = None) -> None:
-    """统一审计 + 指标埋点（best-effort，不抛异常）。"""
-    try:
-        from config import Config
-        default_model = getattr(Config, "AI_MODEL", "unknown")
-        record_call(scenario=scenario, model=model or default_model, user_id=user_id,
-                    tokens=tokens or 0, duration_seconds=duration_ms / 1000.0,
-                    status=status)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("ai.metrics.record_failed %s", e)
+    """统一审计埋点（best-effort，不抛异常）。
+
+    注意：本函数**不再写 Prometheus/Redis 指标**。token 与耗时的真值只在
+    provider 层（resp.usage）可得，指标已下沉到 openai_provider 的
+    chat/chat_stream 出口，此处再计一次会造成双计。
+    """
     try:
         _AUDIT.log(user_id=user_id, scenario=scenario, request=request,
                    response=response, duration_ms=duration_ms, status=status,
@@ -72,5 +91,15 @@ class CallTimer:
         return self
 
     def __exit__(self, *exc):
-        self.duration_ms = int((time.monotonic() - self.start) * 1000)
+        self.duration_ms = self.elapsed_ms()
         return False
+
+    def elapsed_ms(self) -> int:
+        """返回自进入上下文以来的耗时（毫秒），可随时调用。
+
+        为什么调用方必须用它而不是读 `duration_ms`：`duration_ms` 只在
+        `__exit__` 里赋值，而调用方普遍在 **with 体内的 finally** 中读值——
+        此刻 `__exit__` 尚未执行，读到的是初始值 0。表现为审计日志里
+        `duration_ms` 恒为 0（AI 调用的耗时审计全部失效）。
+        """
+        return int((time.monotonic() - self.start) * 1000)

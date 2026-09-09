@@ -16536,48 +16536,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/dashboard/alerts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiResponse"];
-                    };
-                };
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/dashboard/": {
         parameters: {
             query?: never;
@@ -18521,6 +18479,8 @@ export interface components {
             devices: {
                 [key: string]: unknown;
             }[];
+            gap?: number | null;
+            strategy?: string | null;
         };
         SmartUAssign: {
             height_u: number;
@@ -20229,9 +20189,20 @@ export interface components {
         };
         AIMetricsResponse: {
             raw?: string;
+            metrics_source?: string;
+            pid?: number;
+            ai_calls_total?: number;
             ai_tokens_total?: number;
+            ai_prompt_tokens_total?: number;
+            ai_completion_tokens_total?: number;
             ai_errors_total?: number;
             ai_skill_runs_total?: number;
+            ai_calls_today?: number;
+            ai_tokens_today?: number;
+            ai_prompt_tokens_today?: number;
+            ai_completion_tokens_today?: number;
+            ai_errors_today?: number;
+            ai_skill_runs_today?: number;
         };
         AIRagStatusResponse: {
             available?: boolean;

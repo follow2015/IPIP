@@ -18,6 +18,7 @@ class AIDiagnosisSession(BaseModel):
     __table_args__ = (
         Index("idx_ai_diag_device_user", "device_id", "user_id"),
         Index("idx_ai_diag_skill_status", "skill_name", "status"),
+        Index("idx_ai_diag_incident_status", "incident_id", "status"),
         {"comment": "AI 诊断会话持久化"},
     )
 
@@ -32,6 +33,12 @@ class AIDiagnosisSession(BaseModel):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         comment="用户ID",
+    )
+    incident_id = db.Column(
+        db.BigInteger,
+        ForeignKey("monitor_incident.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="关联监控事件ID（incident 级诊断；事件删除后保留会话供回溯）",
     )
     skill_name = db.Column(
         String(64),

@@ -19,7 +19,7 @@ from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-_EXEMPT_PREFIXES = ("/api/health",)
+_EXEMPT_PREFIXES = ("/api/health", "/metrics")
 
 HSTS_HEADER = "Strict-Transport-Security"
 HSTS_VALUE = "max-age=31536000; includeSubDomains"
@@ -54,7 +54,10 @@ def register_https_guard(app) -> None:
         if not app.config.get("ENFORCE_HTTPS"):
             return None
         if request.path.startswith(_EXEMPT_PREFIXES):
-            return None
+            if request.path == "/metrics" and app.config.get("METRICS_TOKEN"):
+                pass  # 继续走下方 HTTPS 检查
+            else:
+                return None
         if _is_https_request(app):
             return None
         logger.warning("拒绝非 HTTPS 请求: path=%s remote=%s",

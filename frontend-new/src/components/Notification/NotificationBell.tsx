@@ -76,7 +76,7 @@ function NotificationItemRow({
                 symbol: (expandedState) => (expandedState ? '收起' : '展开'),
                 onExpand: (_e, info) => setExpanded(info.expanded)
               }}
-              style={{ marginBottom: 0, fontSize: 12 }}
+              style={{ marginBottom: 0, fontSize: 12, whiteSpace: 'pre-wrap' }}
             >
               {item.content}
             </Paragraph>

@@ -87,6 +87,17 @@ class MonitorIncident(BaseModel):
         nullable=True,
         comment="关闭时间",
     )
+    ai_diagnosis_session_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("ai_diagnosis_sessions.id", ondelete="SET NULL", use_alter=True),
+        nullable=True,
+        comment="最新一次 AI 诊断会话ID（诊断会话删除后置空）",
+    )
+    ai_diagnosis_summary = db.Column(
+        db.Text,
+        nullable=True,
+        comment="最新一次 AI 诊断结论摘要（供告警页直接展示）",
+    )
 
     def to_dict(self, exclude: list = None) -> dict:
         """序列化"""
@@ -103,6 +114,8 @@ class MonitorIncident(BaseModel):
             "first_alert_at": self.first_alert_at.isoformat() if self.first_alert_at else None,
             "last_alert_at": self.last_alert_at.isoformat() if self.last_alert_at else None,
             "closed_at": self.closed_at.isoformat() if self.closed_at else None,
+            "ai_diagnosis_session_id": self.ai_diagnosis_session_id,
+            "ai_diagnosis_summary": self.ai_diagnosis_summary,
         }
         if exclude:
             for k in exclude:

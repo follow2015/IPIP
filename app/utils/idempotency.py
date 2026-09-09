@@ -65,6 +65,35 @@ class IdempotencyError(Exception):
         super().__init__(self.message)
 
 
+def upload_file_idempotency_key(field: str = "file") -> str:
+    """按上传文件内容生成幂等键：同一用户重复提交同一文件只真正执行一次。
+
+    用于批量导入防重（网络抖动重试、用户连点提交）。与依赖客户端传
+    X-Idempotency-Key 的默认行为不同，这里在服务端按内容生成，前端不配合也能
+    生效；内容变了（用户改过 Excel 再传）即为新键，不会被误拦。
+
+    Args:
+        field: 上传表单里的文件字段名。
+
+    Returns:
+        文件内容的 sha256；无文件或读取失败返回空串（装饰器据此不启用幂等）。
+    """
+    f = request.files.get(field)
+    if f is None:
+        return ""
+    try:
+        content = f.read()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"读取上传文件失败，跳过幂等保护: {e}")
+        return ""
+    finally:
+        try:
+            f.seek(0)
+        except Exception:  # noqa: BLE001
+            pass
+    return hashlib.sha256(content).hexdigest() if content else ""
+
+
 def idempotent(prefix: str = "idem", ttl: int = 86400,
                key_func: Optional[Callable] = None):
     """幂等键装饰器
@@ -137,30 +166,28 @@ def idempotent(prefix: str = "idem", ttl: int = 86400,
             result = f(*args, **kwargs)
 
             try:
-                if isinstance(result, tuple) and len(result) == 2:
-                    body, status_code = result
-                    if 200 <= status_code < 300:
-                        body_data = body.get_json() if hasattr(body, "get_json") else {}
-                        cache_value = json.dumps(
-                            {"body": body_data, "status_code": status_code},
-                            ensure_ascii=False,
-                        )
-                        redis_client.setex(redis_key, ttl, cache_value)
-                        logger.debug(f"幂等键已缓存: key={redis_key}, ttl={ttl}")
-                elif isinstance(result, tuple) and len(result) == 3:
-                    body, status_code, headers = result
-                    if 200 <= status_code < 300:
-                        body_data = body.get_json() if hasattr(body, "get_json") else {}
-                        cache_value = json.dumps(
-                            {"body": body_data, "status_code": status_code},
-                            ensure_ascii=False,
-                        )
-                        redis_client.setex(redis_key, ttl, cache_value)
+                body, status_code = None, None
+                if isinstance(result, tuple) and len(result) in (2, 3):
+                    body, status_code = result[0], result[1]
+                elif hasattr(result, "status_code"):
+                    body, status_code = result, getattr(result, "status_code", None)
+
+                if status_code is not None and 200 <= status_code < 300:
+                    body_data = body.get_json() if hasattr(body, "get_json") else {}
+                    cache_value = json.dumps(
+                        {"body": body_data, "status_code": status_code},
+                        ensure_ascii=False,
+                    )
+                    redis_client.set(redis_key, cache_value, ex=ttl)
+                    logger.debug(f"幂等键已缓存: key={redis_key}, ttl={ttl}")
+                else:
+                    redis_client.delete(redis_key)
             except Exception as e:
                 logger.warning(f"缓存幂等响应失败: key={redis_key}, error={e}")
 
             return result
 
+        decorated_function.__idempotent__ = True
         return decorated_function
 
     return decorator

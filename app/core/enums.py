@@ -220,6 +220,7 @@ class NotificationTypeCode(str, Enum):
     PORT_ACTION = "port_action"
     ASYNC_ACTION = "async_action"
     RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
+    ASSET_WARRANTY_ALERT = "asset_warranty_alert"     # 保修/生命周期到期汇总
 
 
 class ProbeErrorCode(str, Enum):
@@ -396,6 +397,7 @@ NOTIFICATION_TYPE_GROUPS = [
                 NotificationTypeCode.VIRTUAL_ROOM_SCAN_COMPLETE, NotificationTypeCode.VIRTUAL_ROOM_SCAN_FAILED]),
     ("端口/异步操作", [NotificationTypeCode.PORT_ACTION, NotificationTypeCode.ASYNC_ACTION]),
     ("运维告警", [NotificationTypeCode.RATE_LIMIT_EXCEEDED]),
+    ("资产提醒", [NotificationTypeCode.ASSET_WARRANTY_ALERT]),
 ]
 
 NOTIFICATION_TYPE_LABELS = {
@@ -413,6 +415,7 @@ NOTIFICATION_TYPE_LABELS = {
     NotificationTypeCode.PORT_ACTION: "端口操作结果",
     NotificationTypeCode.ASYNC_ACTION: "异步操作结果",
     NotificationTypeCode.RATE_LIMIT_EXCEEDED: "频率超限",
+    NotificationTypeCode.ASSET_WARRANTY_ALERT: "资产到期提醒",
 }
 
 

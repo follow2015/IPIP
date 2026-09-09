@@ -10,7 +10,7 @@ from typing import List
 from app.services.ai.llm_factory import create_llm_client
 from app.services.ai.llm_base import LLMClient
 from app.services.ai.prompt_guard import strip_sensitive_fields
-from app.services.ai._runtime import observe_call, CallTimer
+from app.services.ai._runtime import bind_scenario, observe_call, CallTimer
 from app.services.ai.ai_errors import AINotConfiguredError
 from app.utils.logging import get_logger
 
@@ -56,7 +56,7 @@ class InspectionService:
         )
         status = "ok"
         lines: List[str] = []
-        with CallTimer() as t:
+        with bind_scenario("inspection"), CallTimer() as t:
             try:
                 raw = self.client.chat(SYSTEM, user_prompt)
                 lines = [line.strip("0123456789.、 ") for line in raw.splitlines() if line.strip()]
@@ -67,7 +67,7 @@ class InspectionService:
             finally:
                 observe_call(scenario="inspection", user_id=user_id,
                              request={"device_id": device_id}, response=lines,
-                             status=status, duration_ms=t.duration_ms,
+                             status=status, duration_ms=t.elapsed_ms(),
                              model=getattr(self.client, "model", None),
                              base_url=getattr(self.client, "base_url", None))
         return lines
@@ -77,7 +77,7 @@ class InspectionService:
             raise AINotConfiguredError(operation="inspection_summarize")
         status = "ok"
         summary = ""
-        with CallTimer() as t:
+        with bind_scenario("inspection_summarize"), CallTimer() as t:
             try:
                 summary = self.client.chat("你是巡检报告助手，汇总以下发现为一段结论。", "\n".join(findings))
             except Exception as e:  # noqa: BLE001
@@ -87,7 +87,7 @@ class InspectionService:
             finally:
                 observe_call(scenario="inspection_summarize", user_id=user_id,
                              request=findings, response=summary,
-                             status=status, duration_ms=t.duration_ms,
+                             status=status, duration_ms=t.elapsed_ms(),
                              model=getattr(self.client, "model", None),
                              base_url=getattr(self.client, "base_url", None))
         return summary

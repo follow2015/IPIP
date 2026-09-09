@@ -58,6 +58,17 @@ class MonitorEscalationStep(BaseModel):
         nullable=True,
         comment="本步骤触发的 webhook URL（可选）",
     )
+    trigger_ai_diagnosis = db.Column(
+        db.Boolean,
+        nullable=False,
+        server_default=text("0"),
+        comment="本步骤是否触发 AI 深度诊断（incident 级，按事件去重）",
+    )
+    ai_skill_name = db.Column(
+        db.String(64),
+        nullable=True,
+        comment="触发诊断使用的 agentic 技能名（空=用默认 network_troubleshoot）",
+    )
     enabled = db.Column(
         db.Boolean,
         nullable=False,
@@ -74,6 +85,8 @@ class MonitorEscalationStep(BaseModel):
             "escalate_severity": self.escalate_severity,
             "escalate_to_role_id": self.escalate_to_role_id,
             "escalate_webhook_url": self.escalate_webhook_url,
+            "trigger_ai_diagnosis": self.trigger_ai_diagnosis,
+            "ai_skill_name": self.ai_skill_name,
             "enabled": self.enabled,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

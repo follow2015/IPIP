@@ -189,7 +189,8 @@ export enum NotificationTypeCode {
   VIRTUAL_ROOM_SCAN_FAILED = 'virtual_room_scan_failed',
   PORT_ACTION = 'port_action',
   ASYNC_ACTION = 'async_action',
-  RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded'
+  RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
+  ASSET_WARRANTY_ALERT = 'asset_warranty_alert'
 }
 
 export const NOTIFICATION_TYPE_OPTIONS = [
@@ -211,7 +212,8 @@ export const NOTIFICATION_TYPE_OPTIONS = [
   { label: '虚拟机房扫描失败', value: 'virtual_room_scan_failed' },
   { label: '端口操作结果', value: 'port_action' },
   { label: '异步操作结果', value: 'async_action' },
-  { label: '频率超限', value: 'rate_limit_exceeded' }
+  { label: '频率超限', value: 'rate_limit_exceeded' },
+  { label: '资产到期提醒', value: 'asset_warranty_alert' }
 ];
 
 export enum ProbeErrorCode {
@@ -323,5 +325,9 @@ export const NOTIFICATION_TYPE_GROUP_OPTIONS = [
   {
     label: '运维告警',
     options: [{ value: 'rate_limit_exceeded', label: '频率超限' }]
+  },
+  {
+    label: '资产提醒',
+    options: [{ value: 'asset_warranty_alert', label: '资产到期提醒' }]
   }
 ];

@@ -133,7 +133,8 @@ class AgenticSkillRunner:
         self.sessions = sessions or DiagnosisSessionService()
         self.last_session_id: Optional[int] = None
 
-    def _start_session(self, spec, user_id: int, safe_question: str) -> Optional[int]:
+    def _start_session(self, spec, user_id: int, safe_question: str,
+                       incident_id: Optional[int] = None) -> Optional[int]:
         """创建诊断会话（旁路：失败仅记日志，不中断诊断）。
 
         诊断会话属审计/回溯旁路，其失败不应让用户拿不到诊断结论，
@@ -143,6 +144,7 @@ class AgenticSkillRunner:
             return self.sessions.create_session(
                 device_id=None, user_id=user_id,
                 skill_name=spec.name, question=safe_question,
+                incident_id=incident_id,
             )
         except Exception as e:  # noqa: BLE001 - 旁路持久化失败不阻断诊断
             logger.error("agentic.%s create diagnosis session failed: %s",
@@ -172,7 +174,9 @@ class AgenticSkillRunner:
                          spec.name, e, exc_info=True)
 
     def run(self, spec, instructions: str, question: str,
-            user_id: int, user_permissions: set) -> str:
+            user_id: int, user_permissions: set,
+            incident_id: Optional[int] = None,
+            device_id: Optional[int] = None) -> str:
         from app.services.ai.capabilities.registry import is_registered
         tools = []
         for name in spec.allowed_capabilities:
@@ -192,9 +196,15 @@ class AgenticSkillRunner:
                     {"role": "user", "content": safe_question}]
         last_tool_result = ""
 
-        session_id = self._start_session(spec, user_id, safe_question)
+        session_id = self._start_session(spec, user_id, safe_question,
+                                         incident_id=incident_id)
         self.last_session_id = session_id if isinstance(session_id, int) else None
         session_id = self.last_session_id
+        if session_id is not None and device_id is not None:
+            try:
+                self.sessions.set_device_id(session_id, device_id)
+            except Exception as e:  # noqa: BLE001 - 旁路
+                logger.error("agentic.%s set device_id failed: %s", spec.name, e)
         rounds: list = []  # 每轮 {tool, args, result} 原始记录，供 confidence 与会话留存
         run_started = time.monotonic()
 

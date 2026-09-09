@@ -16,6 +16,15 @@ from extensions import db
 
 logger = get_logger(__name__)
 
+MAX_SUMMARY_CHARS = 1000
+
+
+def _truncate_summary(text: str) -> str:
+    text = text.strip()
+    if len(text) <= MAX_SUMMARY_CHARS:
+        return text
+    return text[:MAX_SUMMARY_CHARS] + "…（完整结论见诊断会话）"
+
 
 class DiagnosisSessionService:
     """诊断会话 CRUD。"""
@@ -26,14 +35,21 @@ class DiagnosisSessionService:
         user_id: int,
         skill_name: str,
         question: str,
+        incident_id: Optional[int] = None,
     ) -> int:
-        """创建诊断会话（status=running），返回 session_id。"""
+        """创建诊断会话（status=running），返回 session_id。
+
+        Args:
+            incident_id: 关联的监控事件 ID。升级链路自动触发的诊断必带，
+                用于「同一个事件只诊断一次」与结论写回事件；手工发起为 None。
+        """
         session = AIDiagnosisSession(
             device_id=device_id,
             user_id=user_id,
             skill_name=skill_name,
             question=question,
             status="running",
+            incident_id=incident_id,
         )
         db.session.add(session)
         db.session.flush()
@@ -75,6 +91,59 @@ class DiagnosisSessionService:
         if duration_ms is not None:
             session.duration_ms = duration_ms
         db.session.flush()
+
+        self._write_back_incident(session)
+
+    @staticmethod
+    def _extract_summary(final_answer_json: Optional[str]) -> Optional[str]:
+        """从诊断结论 JSON 中抽取可展示的摘要文本。"""
+        if not final_answer_json:
+            return None
+        try:
+            parsed = json.loads(final_answer_json)
+        except (json.JSONDecodeError, ValueError):
+            return None
+        if isinstance(parsed, dict):
+            text = parsed.get("diagnosis") or parsed.get("summary") or parsed.get("answer")
+            if not text:
+                evidence = parsed.get("evidence")
+                if isinstance(evidence, list) and evidence:
+                    text = str(evidence[0])
+        elif isinstance(parsed, str):
+            text = parsed
+        else:
+            text = None
+        if not text:
+            return None
+        return _truncate_summary(str(text))
+
+    def _write_back_incident(self, session) -> None:
+        """把本次诊断结论写回所属监控事件（AI 诊断 × 告警集成 ⑤）。
+
+        仅当会话带 incident_id 时执行；手工发起的诊断不属任何事件，跳过。
+        """
+        incident_id = getattr(session, "incident_id", None)
+        if not incident_id:
+            return
+        try:
+            from app.models.monitor_incident import MonitorIncident
+
+            summary = self._extract_summary(session.final_answer_json)
+            if summary and session.status != "completed":
+                summary = f"[{session.status}] {summary}"
+            db.session.query(MonitorIncident).filter(
+                MonitorIncident.id == incident_id
+            ).update(
+                {
+                    "ai_diagnosis_session_id": session.id,
+                    "ai_diagnosis_summary": summary,
+                },
+                synchronize_session=False,
+            )
+            db.session.flush()
+        except Exception:  # noqa: BLE001 - 旁路：写回失败不阻断会话结束
+            logger.warning("写回诊断结论失败 incident=%s session=%s",
+                           incident_id, getattr(session, "id", None), exc_info=True)
 
     @staticmethod
     def _sanitize_rounds(rounds: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

@@ -1933,15 +1933,28 @@ class AIMetricsResponseSchema(Schema):
     """GET /ai/metrics 响应 data
 
     M2 修复：对齐 get_metrics() 真实返回结构。
-    两种分支：
-    - Prometheus 可用时：{"raw": str}（exposition 格式文本）
-    - Prometheus 不可用时：{"ai_tokens_total": int, "ai_errors_total": int, "ai_skill_runs_total": int}
-    所有字段可选（partial），适配两种分支。
+    跨进程聚合版（gunicorn -w N + celery worker 各有独立内存态）：
+    - raw: Prometheus exposition 文本（AI 聚合计数 + 本进程系统指标）；
+    - metrics_source: redis 表示全进程聚合，local 表示 Redis 不可用、仅为
+      本进程兜底数据（会随命中的 worker 变化，不可作为全局依据）；
+    - ai_*_total / ai_*_today: 累计与当日窗口的扁平计数。
+    所有字段可选（partial）。
     """
-    raw = fields.String(required=False, metadata={"description": "Prometheus exposition 格式文本（有 prometheus_client 时）"})
-    ai_tokens_total = fields.Integer(required=False, metadata={"description": "AI token 总消耗（无 Prometheus 时扁平计数）"})
+    raw = fields.String(required=False, metadata={"description": "Prometheus exposition 格式文本（AI 聚合计数 + 本进程系统指标）"})
+    metrics_source = fields.String(required=False, metadata={"description": "指标来源：redis=全进程聚合 / local=本进程兜底"})
+    pid = fields.Integer(required=False, metadata={"description": "处理本次请求的进程号（多 worker 排查用）"})
+    ai_calls_total = fields.Integer(required=False, metadata={"description": "AI LLM 调用总次数"})
+    ai_tokens_total = fields.Integer(required=False, metadata={"description": "AI token 总消耗（输入+输出）"})
+    ai_prompt_tokens_total = fields.Integer(required=False, metadata={"description": "AI 输入 token 总消耗"})
+    ai_completion_tokens_total = fields.Integer(required=False, metadata={"description": "AI 输出 token 总消耗"})
     ai_errors_total = fields.Integer(required=False, metadata={"description": "AI 调用错误总数"})
     ai_skill_runs_total = fields.Integer(required=False, metadata={"description": "AI 技能执行总数"})
+    ai_calls_today = fields.Integer(required=False, metadata={"description": "当日 AI LLM 调用次数"})
+    ai_tokens_today = fields.Integer(required=False, metadata={"description": "当日 AI token 消耗（输入+输出）"})
+    ai_prompt_tokens_today = fields.Integer(required=False, metadata={"description": "当日 AI 输入 token"})
+    ai_completion_tokens_today = fields.Integer(required=False, metadata={"description": "当日 AI 输出 token"})
+    ai_errors_today = fields.Integer(required=False, metadata={"description": "当日 AI 调用错误数"})
+    ai_skill_runs_today = fields.Integer(required=False, metadata={"description": "当日 AI 技能执行次数"})
 
 
 

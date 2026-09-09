@@ -4,11 +4,13 @@
 
 提供Flask应用创建和配置功能。
 """
+import hmac
+import ipaddress
 import os
 
 from app.utils.logging import get_logger
 
-from flask import Flask
+from flask import Flask, abort, request
 from flask_cors import CORS
 
 from app.utils.logging.manager import logging_manager
@@ -18,6 +20,16 @@ from extensions import db, check_mysql_session_timezone
 from app.infra import report_netmiko_log_switch
 
 logger = get_logger(__name__)
+
+_METRICS_NOTICE = (
+    "# ipip /metrics\n"
+    "# ai_llm_* / ai_skill_* 为跨进程（Redis）聚合值：每个 gunicorn worker 返回\n"
+    "# 相同的数字，抓取多 worker 时会得到 N 条同值序列。查询请用 max() / avg()\n"
+    "# / topk(1, ...)，切勿用 sum()，否则数值会被放大 N 倍。\n"
+    "# process_* / python_gc_* / python_info 为本进程指标，按 instance 区分，\n"
+    "# 可正常聚合。\n"
+    "# window=\"day\" 的日期边界按服务器本地时区计算。\n"
+)
 
 
 def create_app(config_name: str = None) -> Flask:
@@ -62,6 +74,10 @@ def create_app(config_name: str = None) -> Flask:
     if config_name != "testing":
         from app.services.notification_cleanup import start_cleanup_scheduler
         start_cleanup_scheduler(app)
+
+    if config_name != "testing":
+        from app.services.asset_warranty_alert import start_asset_warranty_alert_scheduler
+        start_asset_warranty_alert_scheduler(app)
 
     if config_name != "testing":
         from app.services.channels.inbox import InboxChannel
@@ -188,6 +204,82 @@ def register_blueprints(app: Flask):
         import os
         return send_from_directory(os.path.join(app.static_folder, 'config'), filename)
     
+    if app.config.get("METRICS_ENABLED", True):
+        def _metrics_allowed_ips():
+            """解析 METRICS_ALLOWED_IPS 为 ip_network 列表（忽略非法条目）。"""
+            nets = []
+            for n in (app.config.get("METRICS_ALLOWED_IPS") or []):
+                try:
+                    nets.append(ipaddress.ip_network(n, strict=False))
+                except ValueError:
+                    logger.warning("METRICS_ALLOWED_IPS 含非法条目，已忽略: %s", n)
+            return nets
+
+        def _metrics_client_ip():
+            """获取真实客户端 IP（n7：不可盲信 X-Forwarded-For）。
+
+            仅在直连对端（remote_addr）落在 TRUSTED_PROXIES 内时，才采信代理
+            追加的 XFF 最右段；否则一律以 remote_addr 为准，防止伪造 XFF 绕过白名单。
+            """
+            peer = request.remote_addr or ""
+            try:
+                peer_ip = ipaddress.ip_address(peer)
+                trusted = any(peer_ip in net for net in _metrics_trusted_nets())
+            except ValueError:
+                trusted = False
+            xff = request.headers.get("X-Forwarded-For", "")
+            if trusted and xff:
+                return xff.split(",")[-1].strip()
+            return peer
+
+        def _metrics_trusted_nets():
+            """解析 TRUSTED_PROXIES 为 ip_network 列表（与 https_guard 同一口径）。"""
+            nets = []
+            for n in (app.config.get("TRUSTED_PROXIES") or []):
+                try:
+                    nets.append(ipaddress.ip_network(n, strict=False))
+                except ValueError:
+                    pass
+            return nets
+
+        @app.route("/metrics")
+        def prometheus_metrics():
+            """Prometheus 抓取端点：AI 跨进程聚合指标 + 本进程系统指标。
+
+            安全（opt-in 加固，默认适合内网直抓；公网务必同时开启下列两项）：
+            - METRICS_TOKEN 为空时免鉴权；设置后必须带 ?token=<值> 或
+              Authorization: Bearer <值> 才放行；
+            - METRICS_ALLOWED_IPS 非空时，仅放行白名单来源 IP（与口令校验叠加）。
+            """
+            allow = _metrics_allowed_ips()
+            if allow:
+                try:
+                    client_ip = ipaddress.ip_address(_metrics_client_ip())
+                except ValueError:
+                    client_ip = None
+                if client_ip is None or not any(client_ip in net for net in allow):
+                    logger.warning("拒绝非白名单 IP 的 /metrics 抓取: %s",
+                                   request.remote_addr)
+                    abort(403)
+
+            expected = app.config.get("METRICS_TOKEN") or ""
+            if expected:
+                auth = request.headers.get("Authorization", "")
+                provided = request.args.get("token") or (
+                    auth[7:] if auth.lower().startswith("bearer ") else "")
+                if not hmac.compare_digest(provided or "", expected):
+                    abort(403)
+
+            from flask import Response
+
+            from app.services.ai.metrics import get_metrics
+
+            snapshot = get_metrics()
+            head = "# pid=%s source=%s\n" % (snapshot.get("pid"),
+                                             snapshot.get("metrics_source"))
+            body = _METRICS_NOTICE + head + (snapshot.get("raw") or "")
+            return Response(body, mimetype="text/plain; version=0.0.4")
+
     @app.route("/<path:filename>")
     def frontend_files(filename):
         """前端静态文件（HTML、JS、CSS等）"""

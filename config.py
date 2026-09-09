@@ -88,6 +88,13 @@ class Config:
         "AI_CUSTOM_SKILLS_DIR", os.path.join(_AI_BASE, "custom"))
     AI_AGENTIC_SKILLS_DIR = os.path.join(_AI_BASE, "agentic")
 
+    AI_SKILL_TRIGGER_PREFILTER = os.getenv("AI_SKILL_TRIGGER_PREFILTER", "true").lower() == "true"
+    AI_SKILL_RECALL_TOPK = int(os.getenv("AI_SKILL_RECALL_TOPK", "8"))
+    AI_SKILL_ROUTING_MODE = os.getenv("AI_SKILL_ROUTING_MODE", "domain").lower()
+
+    AI_SKILL_VISIBILITY_FILTER = os.getenv(
+        "AI_SKILL_VISIBILITY_FILTER", "false").lower() == "true"
+
     AI_DOCS_ROOT = os.environ.get(
         "AI_DOCS_ROOT", os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs"))
 
@@ -234,6 +241,12 @@ class Config:
 
     MONITOR_ENABLED = os.getenv("MONITOR_ENABLED", "true").lower() == "true"
     MONITOR_TIMEOUT_SECONDS = int(os.getenv("MONITOR_TIMEOUT_SECONDS", "5"))
+
+    METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() == "true"
+    METRICS_TOKEN = os.getenv("METRICS_TOKEN", "")
+    METRICS_ALLOWED_IPS = [
+        n.strip() for n in os.getenv("METRICS_ALLOWED_IPS", "").split(",") if n.strip()
+    ]
 
     MONITOR_SUPPRESSION_ENABLED = os.getenv("MONITOR_SUPPRESSION_ENABLED", "true").lower() == "true"
     MONITOR_SUPPRESSION_WINDOW = int(os.getenv("MONITOR_SUPPRESSION_WINDOW", "60"))  # 滑动窗口秒

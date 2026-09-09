@@ -6,7 +6,7 @@ from app.services.ai.llm_factory import create_llm_client
 from app.services.ai.llm_base import LLMClient
 from app.services.ai.prompt_guard import strip_sensitive_fields
 from app.services.ai.prompts.alert_interpret_prompt import SYSTEM, build_user_prompt
-from app.services.ai._runtime import make_cache, observe_call, CallTimer
+from app.services.ai._runtime import bind_scenario, make_cache, observe_call, CallTimer
 from app.services.ai.ai_errors import AINotConfiguredError
 from app.utils.logging import get_logger
 
@@ -36,7 +36,7 @@ class AlertInterpreter:
         status = "ok"
         text = ""
         audit_response: Any = None
-        with CallTimer() as t:
+        with bind_scenario("alert"), CallTimer() as t:
             try:
                 text = self.client.chat(SYSTEM, user_prompt)
                 audit_response = text
@@ -49,7 +49,7 @@ class AlertInterpreter:
             finally:
                 observe_call(scenario="alert", user_id=user_id,
                              request=safe_alert, response=audit_response,
-                             status=status, duration_ms=t.duration_ms,
+                             status=status, duration_ms=t.elapsed_ms(),
                              model=getattr(self.client, "model", None),
                              base_url=getattr(self.client, "base_url", None))
         if cache_key:
