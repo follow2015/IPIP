@@ -3,7 +3,13 @@
 # install.sh - ipip 一键安装脚本
 # ------------------------------------------------------------
 # 功能：
-#   1. 检查系统依赖（Python 3.14+, Node 20+, pnpm 10+, MySQL 8.4+, Redis）
+#   1. 版本基线检查 + 系统依赖
+#      基线取本机 dev 实测版本：Python 3.14.7 / Node v26.7.0 / pnpm 10.34.5 /
+#      MySQL 8.4+ / Redis 8.0+
+#      处理策略：Python、Node、pnpm 低于基线 → 硬失败（已被实测证实会中断
+#      安装或运行）；MySQL、Redis 低于基线 → 告警不阻断（本机不可测得，
+#      且低版本已实测可用）。做严格分级的目的是：把"悄无声息的环境偏差"
+#      变成安装阶段可见的决策点，而不是留到运行时才炸。
 #   2. 创建 Python venv 并安装 requirements.txt
 #   3. 前端依赖安装 + 构建（pnpm install && pnpm build → frontend-new/dist/）
 #   4. 初始化 .env（若不存在则从 .env.example 拷贝，并自动生成 SECRET_KEY/JWT_SECRET_KEY 随机密钥）
@@ -32,6 +38,131 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 err()  { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 die()  { err "$*"; exit 1; }
 
+# ── 安装进度反馈 & pip 源自动选择 ───────────────────────────────
+# 背景：pip install 是全流程最慢的一步，过去用 -q 完全静默，运维无法判断
+# "在装"还是"卡死"。此处提供三件事：
+#   ① 步骤计时——每个长步骤打印起止与耗时；
+#   ② pip 实时输出——去掉 -q 并强制 PYTHONUNBUFFERED，日志重定向时也能 tail -f 看到滚动；
+#   ③ 源自动切换——官方慢到阈值以上即切清华镜像，安装失败再自动重试一次。
+
+# 判据必须是**真实安装速度**，不能是 curl 首页响应时间：实测官方源首页
+# 0.98s 可用，但安装单个依赖包 60s 仍未完成——首页延迟与包下载吞吐完全无关。
+# 故此处"先装一个真实包并计时"，超阈值未完成即判定该源不可用。
+PIP_INSTALL_TIMEOUT="${PIP_INSTALL_TIMEOUT:-120}"   # 探测包安装上限（秒）
+PIP_INDEX_OFFICIAL="https://pypi.org/simple"
+PIP_INDEX_TUNA="https://pypi.tuna.tsinghua.edu.cn/simple"
+PIP_INDEX_ARG=""   # 空=官方源；非空=携带 -i <url>
+# 探测包取项目自身依赖之一（装完计入 pip 缓存，后续安装不浪费下载）
+# 探测包用中等体积的 numpy（约 15-20MB wheel）：uvicorn 这类小包在官方源也能
+# 秒装，无法反映大文件（torch ≈554MB）场景下的真实吞吐。
+PIP_PROBE_PACKAGE="${PIP_PROBE_PACKAGE:-numpy}"
+
+# --no-deps：只取目标包本体，避免依赖树把耗时放大、污染速度判据
+install_probe_pip() {
+  timeout "$PIP_INSTALL_TIMEOUT" "$VENV_PY" -m pip install --no-deps \
+    $PIP_INDEX_ARG "$PIP_PROBE_PACKAGE" -q
+}
+
+select_pip_index() {
+  # 支持强制指定源（跳过探测）：PIP_INDEX_URL=<url> bash scripts/install.sh
+  if [ -n "${PIP_INDEX_URL:-}" ]; then
+    PIP_INDEX_ARG="-i $PIP_INDEX_URL"
+    log "使用 PIP_INDEX_URL 强制指定的 pip 源: $PIP_INDEX_URL"
+    return 0
+  fi
+  local rc
+  log "实测 pip 下载速度：安装 ${PIP_PROBE_PACKAGE}（上限 ${PIP_INSTALL_TIMEOUT}s，超时即换源）..."
+  install_probe_pip
+  rc=$?
+  if [ "$rc" -eq 0 ]; then
+    log "官方源可用（${PIP_PROBE_PACKAGE} 安装完成）"
+    return 0
+  fi
+  if [ "$rc" -eq 124 ]; then
+    warn "官方源下载过慢：${PIP_INSTALL_TIMEOUT}s 未装完 ${PIP_PROBE_PACKAGE} —— 切换清华源"
+  else
+    warn "官方源安装失败（退出码 $rc）—— 尝试清华源"
+  fi
+  PIP_INDEX_ARG="-i $PIP_INDEX_TUNA"
+  if install_probe_pip; then
+    log "清华源可用，后续依赖均走 ${PIP_INDEX_TUNA}"
+  else
+    warn "清华源同样未能完成安装，继续尝试（后续安装可能很慢或失败）"
+  fi
+}
+
+# ── Node 源自动选择（同样以真实下载为判据）─────────────────────
+NPM_REGISTRY_OFFICIAL="https://registry.npmjs.org"
+NPM_REGISTRY_MIRROR="https://registry.npmmirror.com"
+NPM_REGISTRY=""
+NODE_PROBE_TIMEOUT="${NODE_PROBE_TIMEOUT:-120}"
+NODE_PROBE_PACKAGE="debug"   # 极小且无依赖，专门用作网络速度试金石
+
+select_npm_registry() {
+  # 幂等：同一轮安装中只实测一次（第 1 步装 pnpm 与第 3 步构建都会用到）
+  if [ -n "$NPM_REGISTRY" ]; then return 0; fi
+  local probe_dir
+  probe_dir="$(mktemp -d)"
+  log "实测 npm registry 下载速度：安装 ${NODE_PROBE_PACKAGE}（上限 ${NODE_PROBE_TIMEOUT}s）..."
+  if timeout "$NODE_PROBE_TIMEOUT" npm install --prefix "$probe_dir" \
+       --registry "$NPM_REGISTRY_OFFICIAL" --no-audit --no-fund \
+       --loglevel=error "$NODE_PROBE_PACKAGE" >/dev/null 2>&1; then
+    NPM_REGISTRY="$NPM_REGISTRY_OFFICIAL"
+    log "npm 官方 registry 可用"
+  else
+    warn "npm 官方 registry 过慢/超时 —— 切换 ${NPM_REGISTRY_MIRROR}"
+    NPM_REGISTRY="$NPM_REGISTRY_MIRROR"
+  fi
+  rm -rf "$probe_dir"
+}
+
+# pnpm 安装：不要依赖 corepack
+# 理由：corepack 会从 registry 拉 pnpm 版本签名并用内置公钥校验，在部分
+# node/corepack 组合下失败（Node 20.18.1 实测报 "Cannot find matching keyid"）。
+# 更重要的是它会留下**可执行但一跑就崩**的 shim，导致 command -v pnpm 误判为已安装。
+ensure_pnpm() {
+  local want="${1:-${PNPM_VERSION:-10.34.5}}"
+  local have=""
+  # 判据必须是真跑一次 pnpm：corepack 会留下"可执行但一跑就崩"的 shim，
+  # command -v pnpm 会误判为已安装。
+  if command -v pnpm >/dev/null 2>&1; then have="$(pnpm --version 2>/dev/null || true)"; fi
+  if [ -n "$have" ] && ver_ge "$have" "$want"; then
+    log "pnpm: $have ✓ (>= $want)"
+    return 0
+  fi
+  if [ -n "$have" ]; then
+    warn "pnpm 版本过低（$have < $want），将升级到 $want"
+  else
+    warn "pnpm 不可用（缺失，或 corepack shim 签名校验失败），改用 npm 全局安装 pnpm@${want}"
+  fi
+  local PNPM_VERSION="$want"
+  # 清掉 corepack 残留 shim，否则 npm install -g 会因同名文件冲突直接拒绝安装
+  local pnpm_path
+  pnpm_path="$(command -v pnpm 2>/dev/null || true)"
+  if [ -n "$pnpm_path" ] && [ -f "$pnpm_path" ]; then
+    warn "移除冲突/损坏的 corepack shim: $pnpm_path"
+    rm -f "$pnpm_path" "$(dirname "$pnpm_path")/pnpx" 2>/dev/null || true
+  fi
+  select_npm_registry
+  npm install -g "pnpm@${PNPM_VERSION}" --registry "$NPM_REGISTRY" --no-audit --no-fund \
+    || die "pnpm 安装失败，请手动执行: npm i -g pnpm@${PNPM_VERSION}"
+  log "pnpm: $(pnpm --version)"
+}
+
+run_timed() {
+  # 执行一条命令并汇报耗时，避免长步骤看起来像卡死
+  local name="$1"; shift
+  local started=$SECONDS
+  log "▶ $name ..."
+  if "$@"; then
+    log "✔ $name 完成（耗时 $((SECONDS - started))s）"
+    return 0
+  fi
+  local rc=$?
+  err "✘ $name 失败（退出码 $rc，耗时 $((SECONDS - started))s）"
+  return $rc
+}
+
 # 参数解析
 SKIP_FRONTEND=0
 SKIP_DB=0
@@ -51,68 +182,103 @@ done
 
 log "项目根目录: $PROJECT_ROOT"
 
-# ── 1. 系统依赖检查 ────────────────────────────────────────
-log "=== [1/7] 检查系统依赖 ==="
+# ── 1. 系统依赖与版本基线检查 ──────────────────────────────
+log "=== [1/7] 检查系统依赖与版本基线 ==="
 
-# Python
+# ══ 版本基线＝本机 dev 环境实测版本 ═══════════════════════════
+# 低于基线＝未经完整验证的环境。分级处理：
+#   硬失败(DIE)：已被实测证实会导致安装或运行中断的项
+#   告警(WARN) ：本机无法直接测得，或已实测可运行的项（仅提示偏差）
+PYTHON_MIN="3.14"      # 本机 3.14.7
+NODE_MIN="26.7"        # 本机 v26.7.0
+PNPM_MIN="10.34.5"     # frontend-new/package.json 的 packageManager
+MYSQL_MIN="8.4"        # 安装文档标称版本
+REDIS_MIN="8.0"        # 本机 Redis server 8.10.1
+
+# 版本比较：ver_ge <当前> <最低>，满足返回 0
+ver_ge() {
+  awk -v cur="$1" -v min="$2" '
+    BEGIN{ n=split(cur,a,"."); m=split(min,b,".")
+           for(i=1;i<=m;i++){ if(a[i]+0>b[i]+0) exit 0; if(a[i]+0<b[i]+0) exit 1 }
+           exit 0 }'
+}
+
+# Python：必须 >= 3.14，**不允许降级**
+# 理由：realtime_gateway 使用 asyncio.AsyncGenerator，该属性在 Python 3.14 才存在；
+# 旧脚本"找不到 3.14 就降级继续"会把必然崩溃压缩成一行 WARN，部署完成后才发现
+# gateway 起不来，排查成本极高。
 PY_BIN=""
-for c in python3.14 python3; do
+for c in python3.14 python3.13 python3.12 python3; do
   if command -v "$c" >/dev/null 2>&1; then
-    ver=$("$c" -c 'import sys;print("%d.%d"%sys.version_info[:2])' 2>/dev/null || echo "0")
-    if [ "${ver%%.*}" -ge 3 ] && [ "$(echo "$ver" | cut -d. -f2)" -ge 14 ] 2>/dev/null; then
-      PY_BIN="$c"; break
-    fi
+    v="$("$c" -c 'import sys;print("%d.%d"%sys.version_info[:2])' 2>/dev/null || echo 0.0)"
+    if ver_ge "$v" "$PYTHON_MIN"; then PY_BIN="$c"; break; fi
   fi
 done
 if [ -z "$PY_BIN" ]; then
-  if command -v python3 >/dev/null 2>&1; then
-    PY_BIN="python3"
-    warn "未找到 Python 3.14，使用 $(python3 --version)。可能存在兼容性风险。"
-  else
-    die "未找到 Python 3.14+。请先安装：https://www.python.org/downloads/"
-  fi
+  die "未找到 Python >= ${PYTHON_MIN}（当前系统最高 $(python3 --version 2>/dev/null || echo 未知)）。
+  这是硬性要求：realtime_gateway 的 asyncio.AsyncGenerator 在更低版本不存在，启动即崩。
+  安装方式（任选其一）：
+    · uv（推荐）: curl -LsSf https://astral.sh/uv/install.sh | sh && uv python install 3.14
+    · PPA      : sudo add-apt-repository ppa:deadsnakes/ppa && sudo apt-get install -y python3.14 python3.14-venv
+    · 官方源    : https://www.python.org/downloads/"
 fi
-log "Python: $PY_BIN ($($PY_BIN --version))"
+log "Python: $PY_BIN ($("$PY_BIN" --version 2>&1)) ✓ (>= $PYTHON_MIN)"
 
 # Node（前端构建必需）
 if [ "$SKIP_FRONTEND" -eq 0 ]; then
   if ! command -v node >/dev/null 2>&1; then
-    die "未找到 node。前端构建需要 Node.js 20+，请先安装：https://nodejs.org/"
+    die "未找到 node。前端构建需要 Node >= ${NODE_MIN}，请先安装：https://nodejs.org/"
   fi
-  NODE_MAJOR=$(node -e 'console.log(process.versions.node.split(".")[0])')
-  if [ "$NODE_MAJOR" -lt 20 ]; then
-    die "Node.js 版本过低 ($(node --version))，需要 20+。"
+  # 判据取本机 dev 基线，而非"主版本 >= 20"：vite 8 / rolldown 的 engines 为
+  # ^20.19.0 || >=22.12.0，Node 20.18.x 能通过粗放的主版本检查，但 pnpm 会
+  # **静默跳过**不满足 engines 的可选原生依赖(@rolldown/binding-linux-x64-gnu)，
+  # 到构建阶段才报 Cannot find native binding —— 报错点离根因很远，极难排查。
+  cur_node="$(node -v 2>/dev/null | sed 's/^v//')"
+  if ! ver_ge "${cur_node:-0.0}" "$NODE_MIN"; then
+    die "Node 版本过低：当前 v${cur_node}，基线要求 >= ${NODE_MIN}（本机 dev = v26.7.0）。
+  升级方式（任选其一）：
+    · nvm    : nvm install 26 && nvm use 26
+    · 二进制 : https://nodejs.org/dist/latest-v26.x/ 下载 linux-x64 包解压到 /usr/local
+    · NodeSource: https://github.com/nodesource/distributions"
   fi
-  log "Node: $(node --version)"
+  log "Node: $(node --version) ✓ (>= $NODE_MIN)"
 
-  # pnpm
-  if ! command -v pnpm >/dev/null 2>&1; then
-    warn "未找到 pnpm，尝试通过 corepack 启用..."
-    if command -v corepack >/dev/null 2>&1; then
-      corepack enable pnpm 2>/dev/null || corepack prepare pnpm@10.34.5 --activate 2>/dev/null || die "pnpm 启用失败，请手动安装: npm i -g pnpm"
-    else
-      die "未找到 corepack，请手动安装 pnpm: npm i -g pnpm"
-    fi
-  fi
-  log "pnpm: $(pnpm --version)"
+  # pnpm：低于基线版本则自动安装/升级
+  ensure_pnpm "$PNPM_MIN"
 fi
 
-# MySQL 客户端（可选，seed_all.sh 内部会回退到 PyMySQL）
+# MySQL（WARN 级：8.0.x 已实测可完成部署，但不等于 dev 基线，仅记录偏差）
 MYSQL_CLIENT=""
 for c in mysql mysql8; do
   if command -v "$c" >/dev/null 2>&1; then MYSQL_CLIENT="$c"; break; fi
 done
 if [ -n "$MYSQL_CLIENT" ]; then
-  log "MySQL 客户端: $MYSQL_CLIENT"
+  mysql_ver="$("$MYSQL_CLIENT" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
+  if ver_ge "${mysql_ver:-0.0}" "$MYSQL_MIN"; then
+    log "MySQL: ${mysql_ver} ✓ (>= $MYSQL_MIN)"
+  else
+    warn "MySQL ${mysql_ver:-未知} 低于基线 ${MYSQL_MIN}。8.0.x 已实测可跑通部署，但属于「未验证组合」，
+      生产环境建议对齐，避免 payroll/json 相关 SQL 行为差异。"
+  fi
 else
   warn "未找到 mysql 客户端，将使用 PyMySQL 导入 SQL（功能等价）"
 fi
 
-# Redis 客户端（仅检查，非必须）
-if command -v redis-cli >/dev/null 2>&1; then
-  log "redis-cli: $(command -v redis-cli)"
+# Redis（WARN 级：本机 dev 为 8.10.1）
+if command -v redis-server >/dev/null 2>&1; then
+  redis_ver="$(redis-server --version 2>/dev/null | grep -oE 'v=[0-9]+\.[0-9]+(\.[0-9]+)?' | cut -d= -f2)"
+elif command -v redis-cli >/dev/null 2>&1; then
+  redis_ver="$(redis-cli --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
 else
-  warn "未找到 redis-cli（Redis 服务需另行安装并启动）"
+  warn "未找到 redis-server / redis-cli。Redis 为缓存与 Celery broker，必须另行安装并启动。"
+  redis_ver=""
+fi
+if [ -n "${redis_ver:-}" ]; then
+  if ver_ge "$redis_ver" "$REDIS_MIN"; then
+    log "Redis: ${redis_ver} ✓ (>= $REDIS_MIN)"
+  else
+    warn "Redis ${redis_ver} 低于 dev 基线 ${REDIS_MIN}（本机 8.10.1）。基础功能可用，但属「未验证组合」。"
+  fi
 fi
 
 # ── 2. Python 虚拟环境 ─────────────────────────────────────
@@ -125,10 +291,42 @@ else
   log "venv 已存在，跳过创建"
 fi
 VENV_PY="$VENV_DIR/bin/python"
-log "升级 pip..."
-"$VENV_PY" -m pip install --upgrade pip wheel setuptools -q
-log "安装 requirements.txt..."
-"$VENV_PY" -m pip install -r "$PROJECT_ROOT/requirements.txt" -q
+
+# 选择 pip 源（官方慢则自动切清华）
+select_pip_index
+# 日志被重定向到文件时 pip 输出会被缓冲，导致 tail -f 看不到滚动进度；
+# PYTHONUNBUFFERED=1 让其行缓冲实时落盘。
+export PYTHONUNBUFFERED=1
+
+# ⚠️ 为什么用 script 包一层（而不是直接调用 pip）：
+# pip 检测到输出不是终端(TTY)时会**不渲染进度条**。依赖树里的 torch ≈554MB，
+# 下载期间日志一行不动，运维极易误判为"卡死"而反复重启安装——而 pip
+# **不支持断点续传**，每次重来都要从 0 下载这 554MB，于是陷入死循环。
+# script -qec 提供伪终端，让进度实时可见（tail -f 也能看到滚动）。
+pip_tty() {
+  script -qec "$VENV_PY -m pip install $*" /dev/null
+}
+
+# 大包预警：提前给出时间预期，避免"进度条不动 = 卡死"的误判
+if grep -qE "^sentence-transformers" "$PROJECT_ROOT/requirements.txt" 2>/dev/null; then
+  log "ℹ️  依赖树含 sentence-transformers → torch(≈554MB)，镜像源预计 1-4 分钟；"
+  log "    期间进度条不动属正常（大文件正在下载）。若长时间无进展，可用"
+  log "    PIP_INDEX_URL=<更快镜像> bash scripts/install.sh 强制指定源。"
+fi
+
+run_timed "升级 pip" script -qec "$VENV_PY -m pip install --upgrade pip wheel setuptools $PIP_INDEX_ARG --timeout 30 --retries 3" /dev/null
+
+# 大文件易受网络抖动影响，单次连接超时放宽到 60s；失败则自动换清华源重试一次。
+# 若两次都失败，多半是 requirements.txt 内部版本冲突（非网络问题）。
+if run_timed "安装 requirements.txt" pip_tty \
+      "-r $PROJECT_ROOT/requirements.txt $PIP_INDEX_ARG --progress-bar on --timeout 60 --retries 5"; then
+  :
+else
+  warn "依赖安装失败，尝试改用清华源重试一次..."
+  run_timed "安装 requirements.txt（清华源重试）" pip_tty \
+      "-r $PROJECT_ROOT/requirements.txt -i $PIP_INDEX_TUNA --progress-bar on --timeout 60 --retries 5" \
+    || die "依赖安装失败。若上方报错为 ResolutionImpossible/版本冲突，属 requirements.txt 内部矛盾（非网络问题）；若卡在 torch 等大包下载，请用 PIP_INDEX_URL 指定更快镜像后重跑。"
+fi
 log "Python 依赖安装完成"
 
 # ── 3. 前端构建 ────────────────────────────────────────────
@@ -145,8 +343,21 @@ else
     die "frontend-new/package.json 不存在"
   fi
   cd "$FRONTEND_DIR"
+  select_npm_registry
   log "安装前端依赖 (pnpm install)..."
-  pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+  # 实测教训：小包探测能过不代表大依赖树能撑住——官方 registry 在完整安装时
+  # 掉到 24 KiB/s 并丢失 rolldown 原生 binding 包导致构建失败。故首次尝试
+  # 失败后，一律用 npmmirror 重试一次再判定失败。
+  install_frontend_deps() {
+    pnpm install --frozen-lockfile --registry "$NPM_REGISTRY" 2>/dev/null \
+      || pnpm install --registry "$NPM_REGISTRY"
+  }
+  if ! install_frontend_deps; then
+    warn "前端依赖安装失败，改用 ${NPM_REGISTRY_MIRROR} 重试一次..."
+    NPM_REGISTRY="$NPM_REGISTRY_MIRROR"
+    install_frontend_deps \
+      || die "前端依赖安装失败（官方与 npmmirror 均失败），请检查网络后手动执行 pnpm install"
+  fi
   log "构建前端 (pnpm build)..."
   pnpm build
   cd "$PROJECT_ROOT"
