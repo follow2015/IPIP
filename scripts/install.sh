@@ -681,7 +681,24 @@ if generated:
 else:
     print("    SECRET_KEY / JWT_SECRET_KEY / SWITCH_SECRET_KEY 已配置，跳过")
 PYEOF
-set -a; . "$PROJECT_ROOT/.env"; set +a
+# ⚠️ 不能用 `set -a; . .env`：.env 不是 shell 脚本。值里含 $ / 反引号 / 空格时，
+# source 会真的去执行它们 —— 实测踩到：随机生成的 MySQL 密码含 '$'（9ai$aoGx…），
+# source 时被当作变量展开，set -u 下报 "aoGxEm3Y: unbound variable" 直接中断安装。
+# 改用 python-dotenv 解析 + shlex.quote 转义后再 eval（与 scripts/dev-start.sh 同一做法）。
+load_env_file() {
+  local env_path="$1" exports
+  [ -f "$env_path" ] || return 0
+  exports="$("$VENV_PY" -c '
+import shlex, sys
+from dotenv import dotenv_values
+for k, v in dotenv_values(sys.argv[1]).items():
+    if v is not None and k:
+        print("export %s=%s" % (k, shlex.quote(v)))
+' "$env_path" 2>/dev/null)" || exports=""
+  [ -n "$exports" ] && eval "$exports"
+  return 0
+}
+load_env_file "$PROJECT_ROOT/.env"
 
 # ── 5. 数据库初始化 ────────────────────────────────────────
 if [ "$SKIP_DB" -eq 1 ]; then
@@ -770,11 +787,26 @@ PYEOF
 fi
 
 # ── 6. 种子数据 ────────────────────────────────────────────
+ADMIN_PWD=""          # 非空 = 本次新建管理员时生成的随机密码，收尾要显示并留档
 if [ "$SKIP_SEED" -eq 1 ]; then
   log "=== [6/7] 跳过种子导入 (--skip-seed) ==="
 else
   log "=== [6/7] 导入种子数据 ==="
-  bash "$PROJECT_ROOT/migrations/seed_all.sh"
+  # 为什么要 tee：seed_users.py 在创建管理员时会随机生成密码并只输出一次。
+  # 那行输出若不落盘，密码就再也找不回来（实测踩到：只在当时的终端滚过一次）。
+  # 这里同时写临时文件用于捕获，安装收尾再统一显示并写入 .credentials。
+  SEED_LOG="$(mktemp)"
+  bash "$PROJECT_ROOT/migrations/seed_all.sh" 2>&1 | tee "$SEED_LOG"
+  ADMIN_PWD="$(grep -oE "初始密码: .*" "$SEED_LOG" | tail -1 | sed 's/^初始密码: //' || true)"
+  if [ -n "$ADMIN_PWD" ]; then
+    {
+      printf '\n[%s] install.sh 自动创建管理员\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+      printf '  username = %s\n' "${SEED_ADMIN_USERNAME:-admin}"
+      printf '  password = %s\n' "$ADMIN_PWD"
+    } >> "$PROJECT_ROOT/.credentials"
+    chmod 600 "$PROJECT_ROOT/.credentials" 2>/dev/null || true
+  fi
+  rm -f "$SEED_LOG"
 fi
 
 # ── 7. 监控维护 cron ────────────────────────────────────────
@@ -853,6 +885,24 @@ if [ "$WITH_UNITS" -eq 1 ]; then
 else
   log "=== [可选] 跳过 systemd 进程托管（加 --with-units 启用）==="
 fi
+
+# ── 10. 凭据汇总 ───────────────────────────────────────────
+# 部署最怕「装完了却不知道账号密码」：admin 是随机密码，MySQL/Redis 密码散落在
+# .env 里，事后翻文件既慢又容易看错环境（本机 .env 与服务器 .env 长得一样）。
+# 此处统一展示一次，并指向留档文件与重置入口。
+log "=== 凭据汇总（请立即保存）==="
+if [ -n "$ADMIN_PWD" ]; then
+  log "本次新建管理员 '${SEED_ADMIN_USERNAME:-admin}' 的密码: $ADMIN_PWD"
+fi
+if [ -f "$PROJECT_ROOT/scripts/credentials.py" ]; then
+  "$VENV_PY" "$PROJECT_ROOT/scripts/credentials.py" show \
+    || warn "凭据清单展示失败，可稍后手工执行：$VENV_PY scripts/credentials.py show"
+else
+  warn "未找到 scripts/credentials.py，跳过凭据清单展示"
+fi
+log "重置入口: $VENV_PY scripts/credentials.py reset-admin   # 重置管理员密码"
+log "          sudo $VENV_PY scripts/credentials.py reset-mysql  # 重置 MySQL 密码（并同步 .env）"
+log "留档文件: $PROJECT_ROOT/.credentials（权限 600，含历次生成的明文凭据）"
 
 log "============================================================"
 log "安装完成 ✅"
