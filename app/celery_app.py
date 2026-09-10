@@ -28,7 +28,10 @@ task 靠 `@celery.task` 装饰器注册，**不 import 模块就不会注册**�
 Celery 只加载 `-A` 指定的模块，故必须用 `conf.imports` 显式声明，否则报
 `Received unregistered task`。
 """
+import os
+
 from celery import Celery
+from celery.signals import worker_ready
 
 from app.utils.logging import get_logger
 
@@ -114,3 +117,18 @@ def init_celery(app) -> Celery:
     )
     celery.Task = ContextTask
     return celery
+
+
+@worker_ready.connect
+def _start_worker_heartbeat(**_kwargs) -> None:
+    if os.getenv("HEARTBEAT_ENABLED", "true").strip().lower() in ("false", "0", "no"):
+        return
+    try:
+        from app.services.monitoring.heartbeat import (
+            resolve_celery_service_name,
+            start_heartbeat_thread,
+        )
+
+        start_heartbeat_thread(resolve_celery_service_name())
+    except Exception as exc:  # noqa: BLE001  心跳失败绝不能阻断 worker 启动
+        logger.warning("worker 心跳线程启动失败（已忽略）: %s", exc)

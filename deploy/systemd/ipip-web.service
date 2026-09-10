@@ -1,0 +1,83 @@
+; -*- coding: utf-8 -*-
+; IPIP Flask HTTP API（生产 WSGI）
+;
+; 替代 ipip-deploy/scripts/start.sh 的 start_flask：
+;   gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 wsgi:application
+;
+; ⚠️ 部署改动点见 deploy/systemd/README.md（PROJECT_ROOT / User / EnvironmentFile）
+
+[Unit]
+Description=IPIP Flask HTTP API (gunicorn)
+Documentation=file:%E/project_home/deploy/systemd/README.md
+After=network.target mysql.service redis.service
+
+; ── 重启风暴抑制（属于 [Unit] 段！）───────────────────────
+; ⚠️ StartLimitBurst / StartLimitIntervalSec 是 [Unit] 段指令，写在 [Service]
+;    会被 systemd **静默忽略**（systemd-analyze verify 报
+;    "Unknown key name 'StartLimitIntervalSec' in section 'Service'"），
+;    结果是启动即崩时无限重启刷屏，抑制形同虚设。
+; 300s 内崩溃 5 次即进入 failed 停止重试；该状态同时是上层失联告警的检测信号。
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Service]
+Type=simple
+User=ipip
+Group=ipip
+
+EnvironmentFile=/etc/ipip/ipip.env
+; ============================================================
+; ⚠️ WorkingDirectory 必须是项目根目录
+; python-dotenv（config.py 的 load_dotenv()）依赖 cwd 定位 .env，
+; 设置错误会导致 DB/Redis 配置静默回落到默认值。
+; ============================================================
+WorkingDirectory=${PROJECT_ROOT}
+
+; ── 进程心跳身份（P0-T2.2）───────────────────────────────
+; ⚠️ 必须显式声明：create_app() 只认显式身份，不再回落成 "web"。
+;    原因：会调用 create_app() 的进程远不止 web —— CLI、运维脚本、以及
+;    heartbeat_watchdog 自身都会建 app；若默认写成 web，watchdog 每 60s 一次
+;    的运行就会持续给已死的 gunicorn 续命（TTL 90s），第二层「僵死」检测
+;    对 web 永久失效。
+; ⚠️ 只在 web unit 里设，**不要**写进 ipip.env（EnvironmentFile 会覆盖本行，
+;    且所有 unit 共用该文件，会把 monitor/gateway 的身份也串成 web）。
+Environment=HEARTBEAT_SERVICE_NAME=web
+
+ExecStart=${VENV_BIN}/gunicorn \
+  --bind 0.0.0.0:${FLASK_PORT} \
+  --workers ${GUNICORN_WORKERS} \
+  --timeout 120 \
+  --access-logfile - \
+  --error-logfile - \
+  --chdir ${PROJECT_ROOT} \
+  wsgi:application
+
+ExecReload=/bin/kill -HUP $MAINPID
+
+; ── 崩溃恢复 ─────────────────────────────────────────────
+; on-failure：正常退出不重启，仅异常退出才拉起。
+Restart=on-failure
+RestartSec=10
+
+; ── 停止语义 ─────────────────────────────────────────────
+KillSignal=SIGTERM
+; gunicorn master 收到 SIGTERM 会等 worker 处理完当前请求
+TimeoutStopSec=30
+; control-group：连带清理全部 worker 子进程，避免残留孤儿进程
+KillMode=control-group
+
+; ── 安全加固（轻量）──────────────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+
+; ── 资源上限（防止 4 workers OOM 被内核无差别杀且无归因）──
+; 按部署机内存调整，建议预留 50% 给 MySQL/Redis
+MemoryMax=4G
+
+; ── 日志：统一走 journald ────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ipip-web
+
+[Install]
+WantedBy=ipip.target

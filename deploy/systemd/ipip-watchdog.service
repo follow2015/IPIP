@@ -1,0 +1,56 @@
+; -*- coding: utf-8 -*-
+; IPIP 进程自监控判活（oneshot），由 ipip-watchdog.timer 每 60s 触发。
+;
+; 对应 WBS 任务 T2：scripts/heartbeat_watchdog.py
+;
+; ⚠️ 本 unit 必须跑在被监控进程之外（独立进程 + 独立 systemd unit）。
+;    若把判活逻辑塞进 Flask 或 monitor 进程，那两个进程自己一死就没人报警 ——
+;    自监控的第一原则是「监控者不能是被监控者」。
+;
+; 三层信号（任一异常即告警）：
+;   1. systemd ActiveState / NRestarts   → 进程崩溃且拉不起来
+;   2. Redis 心跳 key TTL                 → 进程活着但逻辑卡死
+;   3. HTTP /api/health/check             → 服务在跑但依赖异常
+; 三层全不可用时静默跳过（不产生假警），另发一条「自监控降级」通知。
+
+[Unit]
+Description=IPIP process liveness watchdog (systemd + heartbeat + HTTP)
+Documentation=file:%E/project_home/deploy/systemd/README.md
+; 刻意不写 After=ipip-web.service：watchdog 要能检测「web 根本起不来」，
+; 依赖 web 启动会被它拖住而失效。启动时序由心跳 TTL 吸收。
+
+[Service]
+Type=oneshot
+User=ipip
+Group=ipip
+
+EnvironmentFile=/etc/ipip/ipip.env
+WorkingDirectory=${PROJECT_ROOT}
+
+; 健康检查基址：默认本机 Flask 端口；需走 Nginx/域名时在 ipip.env 里覆盖
+; WATCHDOG_BASE_URL（同键以 EnvironmentFile 为准）。
+Environment=WATCHDOG_BASE_URL=http://127.0.0.1:5000
+
+; ⚠️ 关闭监控采集：本进程每 60s 冷启一次 create_app()，若不关会连带拉起
+; in-Flask 监控 worker（真实探测设备）。判活只需要「能读心跳 + 能发通知」，
+; 不需要承担采集职责 —— 否则自监控进程本身就成了负载来源。
+Environment=MONITOR_ENABLED=false
+
+ExecStart=${VENV_BIN}/python ${PROJECT_ROOT}/scripts/heartbeat_watchdog.py
+
+; ── 超时与退出码 ─────────────────────────────────────────
+; 单轮最坏耗时 ≈ 5 服务 × systemctl(10s) + HTTP(8s) + 通知落库，给 180s 上限，
+; 避免某层卡死吃掉下一次触发（timer 用 OnUnitActiveSec 计算间隔）。
+TimeoutStartSec=180
+Restart=no
+; 退出码 1 = 「检测到服务异常」，是正常语义而非 unit 失败，故放行不标红。
+SuccessExitStatus=0 1
+
+; ── 安全加固（与其它 unit 同级）──────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+
+; ── 日志：统一走 journald ────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ipip-watchdog

@@ -300,6 +300,15 @@ async def lifespan(app):
         )
 
     subscriber_task = asyncio.create_task(redis_bus.start_subscriber())
+
+    if os.getenv("HEARTBEAT_ENABLED", "true").strip().lower() not in ("false", "0", "no"):
+        try:
+            from app.services.monitoring.heartbeat import start_heartbeat_thread
+
+            start_heartbeat_thread(os.getenv("HEARTBEAT_SERVICE_NAME") or "gateway")
+        except Exception as exc:  # pragma: no cover - 心跳失败不得影响网关启动
+            logger.warning("网关心跳线程启动失败（已忽略）: %s", exc)
+
     logger.info(
         "ASGI 推送网关已启动（%s）",
         "降级模式" if degraded else "Redis 已连接",

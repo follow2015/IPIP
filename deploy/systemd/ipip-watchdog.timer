@@ -1,0 +1,28 @@
+; -*- coding: utf-8 -*-
+; IPIP 自监控判活定时器：常驻周期触发 ipip-watchdog.service
+;
+; 用法：
+;   systemctl enable --now ipip-watchdog.timer
+;   systemctl list-timers 'ipip-*'              # 查看下次触发时间
+;   journalctl -u ipip-watchdog.service -n 100  # 看单轮判定结果
+;
+; 为什么用 OnUnitActiveSec 而不是 OnCalendar：
+;   OnCalendar 最小粒度是分钟且需要手写 *:0/1，语义上更适合「每天 3 点」这类
+;   日历事件；本场景是「持续高频轮询」，OnUnitActiveSec 以「上次服务激活」为
+;   基准计算间隔，语义直接，也避免与整分钟边界对齐造成的触发簇拥。
+
+[Unit]
+Description=IPIP watchdog timer (every 60s)
+; 不 Requires= 被监控的服务：监控者若依赖被监控对象，对方失败时监控自身也不会启动
+
+[Timer]
+; 开机 2 分钟后开始首次判定 —— 各服务（gunicorn/celery/monitor）冷启需要时间，
+; 心跳 TTL 90s，过早判定会把「还在启动」误报成「心跳过期」。
+OnBootSec=120
+; 之后按「上次激活 + 60s」轮询。注意：实际周期 = 服务运行时长 + 60s，
+; 故 service 侧用 TimeoutStartSec=180 兜住卡死场景，避免间隔被无限拉长。
+OnUnitActiveSec=60
+Unit=ipip-watchdog.service
+
+[Install]
+WantedBy=timers.target

@@ -220,6 +220,8 @@ class NotificationTypeCode(str, Enum):
     PORT_ACTION = "port_action"
     ASYNC_ACTION = "async_action"
     RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
+    SERVICE_UNHEALTHY = "service_unhealthy"    # 常驻进程失败/僵死/重启
+    SERVICE_RECOVERED = "service_recovered"    # 常驻进程恢复正常
     ASSET_WARRANTY_ALERT = "asset_warranty_alert"     # 保修/生命周期到期汇总
 
 

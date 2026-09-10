@@ -121,8 +121,19 @@ def create_app(config_name: str = None) -> Flask:
             )
 
         if config_name != "testing":
+
             from app.services.scan_scheduler_service import start_scan_scheduler
+
             start_scan_scheduler(app)
+
+        from app.services.monitoring.heartbeat import (
+            in_app_service_name,
+            start_heartbeat_thread,
+        )
+
+        service_name = in_app_service_name(app.config)
+        if service_name:
+            start_heartbeat_thread(service_name)
 
     try:
         from app.celery_app import init_celery

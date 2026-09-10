@@ -1,0 +1,21 @@
+; -*- coding: utf-8 -*-
+; IPIP 聚合单元：统一管理全部服务进程
+;
+; 用法：
+;   systemctl enable ipip.target          # 开机自启（会拉起所有 Wants 的服务）
+;   systemctl start  ipip.target
+;   systemctl stop   ipip.target
+;   systemctl status 'ipip-*'
+;
+; 仅操作单个服务：systemctl restart ipip-monitor.service
+
+[Unit]
+Description=IPIP 网络运维管理平台（全部服务）
+Documentation=https://github.com/ipip
+; 部署说明见仓库 deploy/systemd/README.md（systemd 的 Documentation= 只接受纯 URL，
+; 含中文/括号会被判为 "Invalid URL, ignoring"，故说明文字另起注释行）
+After=network.target mysql.service redis.service
+Wants=ipip-web.service ipip-gateway.service ipip-monitor.service ipip-celery-ai.service ipip-celery-voice.service
+
+[Install]
+WantedBy=multi-user.target

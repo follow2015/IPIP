@@ -1,0 +1,23 @@
+; -*- coding: utf-8 -*-
+; IPIP 备份定时器：每日低峰执行 ipip-backup.service
+;
+; 用法：
+;   systemctl enable --now ipip-backup.timer
+;   systemctl list-timers ipip-*            # 查看下次触发时间
+;   journalctl -u ipip-backup.service -n 100
+
+[Unit]
+Description=Daily IPIP system backup
+Requires=ipip-backup.service
+
+[Timer]
+; 每日 03:10；RandomizedDelaySec 避免与其它定时任务同秒争抢 IO
+OnCalendar=*-*-* 03:10:00
+RandomizedDelaySec=600
+; Persistent=true：错过触发时刻（如机器关机）后，开机立即补跑一次，
+; 避免"长时间没备份却无人察觉"
+Persistent=true
+Unit=ipip-backup.service
+
+[Install]
+WantedBy=timers.target

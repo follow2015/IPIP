@@ -4,7 +4,7 @@
 
 提供系统健康状态检查端点。
 """
-from flask import Blueprint
+from flask import Blueprint, current_app
 
 from app.api.base import APIResponse
 from app.openapi.doc import doc, public
@@ -47,6 +47,13 @@ def health_check():
         JSON响应,包含健康状态信息
     """
     status = health_checker.check_all()
+
+    try:
+        from app.services.monitoring.heartbeat import build_heartbeat_view
+
+        status["services_heartbeat"] = build_heartbeat_view()
+    except Exception:  # noqa: BLE001  心跳视图失败不应让健康检查端点 500
+        current_app.logger.warning("健康检查心跳视图生成失败（已忽略）")
 
     http_status = 200 if status["overall_status"] == "healthy" else 503
 

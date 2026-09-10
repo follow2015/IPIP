@@ -1,0 +1,38 @@
+; -*- coding: utf-8 -*-
+; IPIP 系统级备份（oneshot），由 ipip-backup.timer 每日触发。
+;
+; 对应 WBS 任务 T1：scripts/backup_system.py + scripts/restore_system.py
+; ⚠️ 备份≠可恢复：首次上线后必须完成一次真实恢复演练（T1.8），否则本 unit
+;    只是「定时产生一堆无法确认有效的文件」。
+
+[Unit]
+Description=IPIP system backup (mysql + instance)
+; 本地备份不强依赖 Redis，但仍需 MySQL 在运行
+After=mysql.service
+Wants=ipip-backup.timer
+
+[Service]
+Type=oneshot
+User=ipip
+Group=ipip
+
+EnvironmentFile=/etc/ipip/ipip.env
+WorkingDirectory=${PROJECT_ROOT}
+
+; --prune：备份后按日7/周4/月3清理过期备份（见 scripts/backup_system.py）
+ExecStart=${VENV_BIN}/python ${PROJECT_ROOT}/scripts/backup_system.py \
+  --output-dir ${BACKUP_DIR} \
+  --prune
+
+; ── 超时与重试 ───────────────────────────────────────────
+; 大数据量 dump 可能较久，给足 1 小时；备份失败不重试，交给次日窗口 +
+; 上层告警（T2 判活脚本应监控本 unit 的 LastTrigger 失败）。
+TimeoutStartSec=3600
+Restart=no
+
+PrivateTmp=true
+NoNewPrivileges=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ipip-backup

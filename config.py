@@ -277,6 +277,11 @@ class Config:
     MONITOR_ENABLED = os.getenv("MONITOR_ENABLED", "true").lower() == "true"
     MONITOR_TIMEOUT_SECONDS = int(os.getenv("MONITOR_TIMEOUT_SECONDS", "5"))
 
+    HEARTBEAT_ENABLED = os.getenv("HEARTBEAT_ENABLED", "true").lower() == "true"
+    HEARTBEAT_INTERVAL_SECONDS = int(os.getenv("HEARTBEAT_INTERVAL_SECONDS", "20"))
+    HEARTBEAT_TTL_SECONDS = int(os.getenv("HEARTBEAT_TTL_SECONDS", "90"))
+    HEARTBEAT_SERVICE_NAME = os.getenv("HEARTBEAT_SERVICE_NAME") or None
+
     METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() == "true"
     METRICS_TOKEN = os.getenv("METRICS_TOKEN", "")
     METRICS_ALLOWED_IPS = [
@@ -432,6 +437,8 @@ class TestingConfig(Config):
     REDIS_DB = 1
 
     MONITOR_ENABLED = False
+
+    HEARTBEAT_ENABLED = False
 
     MONITOR_OUTBOX_LOCK_ENABLED = False
 

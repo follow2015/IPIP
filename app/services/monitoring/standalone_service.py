@@ -297,6 +297,13 @@ class StandaloneMonitorService:
 
         start_fd_monitor(stop_event=sender_stop)
 
+        if self.app.config.get("HEARTBEAT_ENABLED", False):
+            from app.services.monitoring.heartbeat import start_heartbeat_thread
+
+            start_heartbeat_thread(
+                self.app.config.get("HEARTBEAT_SERVICE_NAME") or "monitor"
+            )
+
         def request_stop() -> None:
             logger.info("收到退出信号，准备停止监控服务…")
             loop.call_soon_threadsafe(stop_event.set)

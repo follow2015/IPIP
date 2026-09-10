@@ -1,0 +1,49 @@
+; -*- coding: utf-8 -*-
+; IPIP realtime_gateway（SSE 推送网关，uvicorn ASGI）
+;
+; 替代 ipip-deploy/scripts/start.sh 的 start_gateway：
+;   uvicorn realtime_gateway.main:app --host 0.0.0.0 --port 8000
+
+[Unit]
+Description=IPIP realtime_gateway (uvicorn, SSE)
+Documentation=file:%E/project_home/deploy/systemd/README.md
+After=network.target redis.service
+
+; ── 重启风暴抑制（[Unit] 段指令）─────────────────────────
+; ⚠️ StartLimitBurst / StartLimitIntervalSec 属于 [Unit] 段，写在 [Service] 会被
+;    systemd **静默忽略**（verify 报 "Unknown key name ... in section 'Service'"），
+;    导致服务启动即崩时无限重启刷屏，抑制形同虚设。
+; 300s 内崩溃 5 次即进入 failed 停止重试；该状态同时是上层失联告警的检测信号。
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Service]
+Type=simple
+User=ipip
+Group=ipip
+
+EnvironmentFile=/etc/ipip/ipip.env
+WorkingDirectory=${PROJECT_ROOT}
+
+ExecStart=${VENV_BIN}/uvicorn realtime_gateway.main:app \
+  --host 0.0.0.0 \
+  --port ${GATEWAY_PORT} \
+  --app-dir ${PROJECT_ROOT}
+
+Restart=on-failure
+RestartSec=10
+
+KillSignal=SIGTERM
+TimeoutStopSec=20
+KillMode=control-group
+
+NoNewPrivileges=true
+PrivateTmp=true
+MemoryMax=1G
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ipip-gateway
+
+[Install]
+WantedBy=ipip.target
