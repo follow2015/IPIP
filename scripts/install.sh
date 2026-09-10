@@ -45,22 +45,50 @@ die()  { err "$*"; exit 1; }
 #   ② pip 实时输出——去掉 -q 并强制 PYTHONUNBUFFERED，日志重定向时也能 tail -f 看到滚动；
 #   ③ 源自动切换——官方慢到阈值以上即切清华镜像，安装失败再自动重试一次。
 
-# 判据必须是**真实安装速度**，不能是 curl 首页响应时间：实测官方源首页
-# 0.98s 可用，但安装单个依赖包 60s 仍未完成——首页延迟与包下载吞吐完全无关。
-# 故此处"先装一个真实包并计时"，超阈值未完成即判定该源不可用。
-PIP_INSTALL_TIMEOUT="${PIP_INSTALL_TIMEOUT:-120}"   # 探测包安装上限（秒）
+# 判据必须是**真实下载吞吐**，不能是 curl 首页响应时间，也不能是"小包能否装完"：
+#   - 官方源首页 0.98s 可用，但大文件下载可能只有几百 KB/s（首页延迟与吞吐无关）；
+#   - numpy(16MB) 这类小文件官方 CDN 也能 30~60s 装完，"装完=可用"会误判，
+#     导致 torch(≈554MB+依赖链) 全程走官方源——实测仅几百 KB/s，而清华源可到 4MB/s。
+# 故用 pip download --no-cache-dir 实测下载 numpy 的吞吐，低于阈值即切镜像；
+# 两个源都测，取吞吐高者。--no-cache-dir 防止缓存命中造成"秒回=快"的假象。
+PIP_INSTALL_TIMEOUT="${PIP_INSTALL_TIMEOUT:-120}"   # 单源探测上限（秒）
+PIP_MIN_SPEED_KBPS="${PIP_MIN_SPEED_KBPS:-1024}"    # 可接受吞吐下限（KB/s，1024=1MB/s）
 PIP_INDEX_OFFICIAL="https://pypi.org/simple"
 PIP_INDEX_TUNA="https://pypi.tuna.tsinghua.edu.cn/simple"
 PIP_INDEX_ARG=""   # 空=官方源；非空=携带 -i <url>
-# 探测包取项目自身依赖之一（装完计入 pip 缓存，后续安装不浪费下载）
-# 探测包用中等体积的 numpy（约 15-20MB wheel）：uvicorn 这类小包在官方源也能
-# 秒装，无法反映大文件（torch ≈554MB）场景下的真实吞吐。
+# 探测包取项目自身依赖之一，中等体积（numpy 约 16MB wheel）：太小反映不出
+# 大文件（torch ≈554MB）场景的真实吞吐，太大又拖慢探测本身。
 PIP_PROBE_PACKAGE="${PIP_PROBE_PACKAGE:-numpy}"
 
-# --no-deps：只取目标包本体，避免依赖树把耗时放大、污染速度判据
-install_probe_pip() {
-  timeout "$PIP_INSTALL_TIMEOUT" "$VENV_PY" -m pip install --no-deps \
-    $PIP_INDEX_ARG "$PIP_PROBE_PACKAGE" -q
+# 实测某源的下载吞吐（KB/s）。用 pip download 只下载不安装。
+# 0 字节（源不可达/立即失败）时输出空并返回非 0；超时被杀的部分下载
+# 也算有效样本（字节数/总耗时=真实窗口吞吐）。
+#   - 用 bash 后台进程 + watchdog 定时 kill 计时，不依赖 GNU timeout
+#     （macOS 无此命令，且缺它时探测会无限挂起）；
+#   - 耗时用 python time.monotonic() 取浮点秒：date +%s 秒级精度下"1 秒内
+#     完成"会把速率放大上千倍（实测出过 2662MB/s 的荒谬值）。
+probe_speed_kbps() {
+  local index="$1" dir start elapsed bytes
+  dir="$(mktemp -d)"
+  start=$("$VENV_PY" -c 'import time; print(time.monotonic())')
+  "$VENV_PY" -m pip download \
+    --no-cache-dir --no-deps --disable-pip-version-check -q \
+    -d "$dir" -i "$index" "$PIP_PROBE_PACKAGE" >/dev/null 2>&1 &
+  local pid=$!
+  ( sleep "$PIP_INSTALL_TIMEOUT" 2>/dev/null; kill "$pid" 2>/dev/null ) &
+  local watchdog=$!
+  wait "$pid" 2>/dev/null
+  kill "$watchdog" 2>/dev/null
+  wait "$watchdog" 2>/dev/null
+  elapsed=$("$VENV_PY" -c "import time; print(max(0.01, time.monotonic() - $start))")
+  bytes=$(du -sk "$dir" 2>/dev/null | cut -f1)
+  rm -rf "$dir"
+  [ -n "$bytes" ] && [ "$bytes" -gt 0 ] || return 1
+  echo "$bytes" "$elapsed" | awk '{ printf "%d", $1 / $2 }'   # du -sk 已是 KB
+}
+
+human_speed() {  # KB/s → 人类可读
+  awk -v k="$1" 'BEGIN{ if (k>=1024) printf "%.1fMB/s", k/1024; else printf "%dKB/s", k }'
 }
 
 select_pip_index() {
@@ -70,24 +98,27 @@ select_pip_index() {
     log "使用 PIP_INDEX_URL 强制指定的 pip 源: $PIP_INDEX_URL"
     return 0
   fi
-  local rc
-  log "实测 pip 下载速度：安装 ${PIP_PROBE_PACKAGE}（上限 ${PIP_INSTALL_TIMEOUT}s，超时即换源）..."
-  install_probe_pip
-  rc=$?
-  if [ "$rc" -eq 0 ]; then
-    log "官方源可用（${PIP_PROBE_PACKAGE} 安装完成）"
+  local official_kbps tuna_kbps
+  log "实测 pip 下载吞吐（探测包 ${PIP_PROBE_PACKAGE}，上限 ${PIP_INSTALL_TIMEOUT}s/源）..."
+  official_kbps=$(probe_speed_kbps "$PIP_INDEX_OFFICIAL")
+  log "  官方源 pypi.org：$(human_speed "${official_kbps:-0}")"
+  if [ -n "$official_kbps" ] && [ "$official_kbps" -ge "$PIP_MIN_SPEED_KBPS" ]; then
+    log "官方源吞吐达标（≥ $(human_speed "$PIP_MIN_SPEED_KBPS")），沿用官方源"
     return 0
   fi
-  if [ "$rc" -eq 124 ]; then
-    warn "官方源下载过慢：${PIP_INSTALL_TIMEOUT}s 未装完 ${PIP_PROBE_PACKAGE} —— 切换清华源"
-  else
-    warn "官方源安装失败（退出码 $rc）—— 尝试清华源"
+  warn "官方源吞吐不足/不可用，实测清华源..."
+  tuna_kbps=$(probe_speed_kbps "$PIP_INDEX_TUNA")
+  log "  清华源：$(human_speed "${tuna_kbps:-0}")"
+  if [ -z "$tuna_kbps" ]; then
+    warn "两个源均不可用，仍沿用官方源继续（后续安装可能很慢或失败）"
+    return 0
   fi
   PIP_INDEX_ARG="-i $PIP_INDEX_TUNA"
-  if install_probe_pip; then
-    log "清华源可用，后续依赖均走 ${PIP_INDEX_TUNA}"
+  if [ -z "$official_kbps" ] || [ "$tuna_kbps" -ge "$official_kbps" ]; then
+    log "切换清华源（${tuna_kbps}KB/s），后续依赖均走 ${PIP_INDEX_TUNA}"
   else
-    warn "清华源同样未能完成安装，继续尝试（后续安装可能很慢或失败）"
+    warn "清华源反而更慢，沿用官方源（${official_kbps}KB/s）"
+    PIP_INDEX_ARG=""
   fi
 }
 
