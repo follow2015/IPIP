@@ -11,17 +11,42 @@
 #      且低版本已实测可用）。做严格分级的目的是：把"悄无声息的环境偏差"
 #      变成安装阶段可见的决策点，而不是留到运行时才炸。
 #   2. 创建 Python venv 并安装 requirements.txt
+#      · 默认安装 **CPU 版 torch**（约 190MB，无 CUDA 依赖）
+#      · --gpu 安装 CUDA 版（体积约 2.6-3.5GB，耗时长，见下方用法说明）
 #   3. 前端依赖安装 + 构建（pnpm install && pnpm build → frontend-new/dist/）
-#   4. 初始化 .env（若不存在则从 .env.example 拷贝，并自动生成 SECRET_KEY/JWT_SECRET_KEY 随机密钥）
+#   4. 初始化 .env（若不存在则从 .env.example 拷贝，并自动生成
+#      SECRET_KEY / JWT_SECRET_KEY / SWITCH_SECRET_KEY 随机密钥）
 #   5. 创建数据库并导入 schema + 种子
 #   6. 配置监控维护 cron（02:00 预建分区 / 03:00 归档清理）
+#   7. 下载 RAG 本地模型到 **HF 标准缓存**（$HF_HOME/hub/models--BAAI--*/snapshots/main/）
+#      embedding（bge-small-zh-v1.5）≈92MB + reranker（bge-reranker-base）≈1100MB，
+#      默认走 ModelScope 镜像（实测约 5.7MB/s，hf-mirror 仅约 1MB/s）。
+#      写入 HF 缓存而非项目目录，是为了与本地开发环境（~/.cache/huggingface）保持
+#      同一套解析机制 —— 代码与 .env 都不需要改动。
+#      与代码的 HF_HUB_OFFLINE=1 策略配套：模型未预置则 RAG 检索不可用
+#      （reranker 缺失会降级为 RRF 排序，不影响基本检索）。
 #
 # 用法:
-#   bash scripts/install.sh                    # 完整安装
+#   bash scripts/install.sh                    # 完整安装（默认 CPU 版 torch，推荐）
+#   bash scripts/install.sh --gpu              # 安装 CUDA 版 torch（需 NVIDIA GPU；耗时长）
+#   bash scripts/install.sh --gpu-fast         # CUDA 版 + 多镜像分散并行预取大包（更快）
+#   bash scripts/install.sh --cpu              # 显式指定 CPU 版（等同默认）
+#   bash scripts/install.sh --skip-models      # 跳过本地模型下载（不需要 RAG 时用）
 #   bash scripts/install.sh --skip-frontend    # 跳过前端构建（假设 frontend-new/dist 已存在）
 #   bash scripts/install.sh --skip-db          # 跳过数据库初始化
 #   bash scripts/install.sh --skip-seed        # 跳过种子导入
 #   bash scripts/install.sh --help
+#
+# torch 版本选择说明（重要）：
+#   CPU 版：torch ≈190MB，来自 https://download.pytorch.org/whl/cpu
+#           （实测 wheel 下载约 2.8MB/s；注意不要用"首页响应时间"判断该源——
+#            首页慢不代表文件下载慢，这是本项目的实测教训）
+#   GPU 版：torch ≈554MB，另拖入 nvidia-cudnn/cublas/cusparse/nccl/cusparselt、
+#           triton 等 CUDA 依赖，合计 2.6-3.5GB。
+#           ⚠️ 预计耗时 30-60 分钟，网络较慢时**可能超过 1 小时**。
+#           无 NVIDIA GPU 的服务器请一律使用默认 CPU 版，否则纯属浪费带宽与时间。
+#           大包可按包名分散到不同镜像并行下载（--gpu-fast），也可不加该参数
+#           走默认单源安装。
 #
 # 幂等：可重复执行，已存在的步骤会跳过
 # ============================================================
@@ -180,17 +205,56 @@ ensure_pnpm() {
   log "pnpm: $(pnpm --version)"
 }
 
+# C++ 编译工具链：必须在安装 Python 依赖之前就绪
+# 为什么是硬要求：chroma-hnswlib（chromadb 的依赖）在 PyPI 上**只有 sdist**，
+# 必须本地编译。缺 g++ 时 pip 报 "Failed to build chroma-hnswlib"，而 pip 的
+# 安装是**原子性**的——一个包构建失败会导致整个 requirements 都不安装
+# （实测 venv 只剩 8 个基础包，直到第 5 步连不上数据库才暴露，排查成本极高）。
+ensure_build_toolchain() {
+  if command -v g++ >/dev/null 2>&1; then
+    log "C++ 编译器: $(g++ --version | head -1) ✓"
+    return 0
+  fi
+  warn "未找到 g++：chroma-hnswlib 等包只有源码分发，必须本地编译"
+  local apt_cmd="" yum_cmd=""
+  command -v apt-get >/dev/null 2>&1 && apt_cmd="apt-get"
+  command -v dnf >/dev/null 2>&1 && yum_cmd="dnf"
+  command -v yum >/dev/null 2>&1 && yum_cmd="${yum_cmd:-yum}"
+  if [ -n "$apt_cmd" ] && { [ "$(id -u)" -eq 0 ] || command -v sudo >/dev/null 2>&1; }; then
+    [ "$(id -u)" -eq 0 ] || apt_cmd="sudo $apt_cmd"
+    log "安装编译工具链 build-essential + cmake（约 1-2 分钟）..."
+    DEBIAN_FRONTEND=noninteractive $apt_cmd update -qq
+    DEBIAN_FRONTEND=noninteractive $apt_cmd install -y build-essential cmake python3-dev \
+      || die "编译工具链安装失败，请手动执行：apt-get install -y build-essential cmake python3-dev"
+  elif [ -n "$yum_cmd" ]; then
+    log "安装编译工具链 Development Tools + cmake ..."
+    $yum_cmd groupinstall -y "Development Tools" && $yum_cmd install -y cmake python3-devel \
+      || die "编译工具链安装失败，请手动执行：yum groupinstall -y 'Development Tools'"
+  else
+    die "缺少 C++ 编译器且未找到受支持的包管理器。请安装后重跑：
+      · Debian/Ubuntu : apt-get install -y build-essential cmake python3-dev
+      · CentOS/RHEL   : yum groupinstall -y 'Development Tools' && yum install -y cmake python3-devel"
+  fi
+  command -v g++ >/dev/null 2>&1 \
+    || die "g++ 安装后仍不可用，无法编译 chroma-hnswlib，安装中止"
+  log "C++ 编译器已就绪"
+}
+
 run_timed() {
   # 执行一条命令并汇报耗时，避免长步骤看起来像卡死
   local name="$1"; shift
   local started=$SECONDS
   log "▶ $name ..."
-  if "$@"; then
+  # ⚠️ 不能在 if 之后再取 $?：那时拿到的是 if 语句自身的状态（常为 0），会把失败
+  # 伪造成成功，导致后续步骤带着半成品环境继续跑（实测踩到：pip 安装失败却
+  # 一路推进到第 5 步才炸，报错点离根因很远）。
+  local rc=0
+  "$@" || rc=$?
+  if [ "$rc" -eq 0 ]; then
     log "✔ $name 完成（耗时 $((SECONDS - started))s）"
-    return 0
+  else
+    err "✘ $name 失败（退出码 $rc，耗时 $((SECONDS - started))s）"
   fi
-  local rc=$?
-  err "✘ $name 失败（退出码 $rc，耗时 $((SECONDS - started))s）"
   return $rc
 }
 
@@ -198,13 +262,20 @@ run_timed() {
 SKIP_FRONTEND=0
 SKIP_DB=0
 SKIP_SEED=0
+SKIP_MODELS=0
+TORCH_FLAVOR="cpu"      # cpu（默认）| gpu
+CUDA_MULTI_MIRROR=0     # 1=用多镜像分散并行预取 CUDA 大包（--gpu-fast）
 for arg in "$@"; do
   case "$arg" in
     --skip-frontend) SKIP_FRONTEND=1 ;;
     --skip-db)       SKIP_DB=1 ;;
     --skip-seed)     SKIP_SEED=1 ;;
+    --skip-models)   SKIP_MODELS=1 ;;
+    --cpu)           TORCH_FLAVOR="cpu" ;;
+    --gpu)           TORCH_FLAVOR="gpu" ;;
+    --gpu-fast)      TORCH_FLAVOR="gpu"; CUDA_MULTI_MIRROR=1 ;;
     --help|-h)
-      sed -n '2,30p' "$0"
+      sed -n '2,52p' "$0"
       exit 0
       ;;
     *) die "未知参数: $arg（用 --help 查看用法）" ;;
@@ -312,6 +383,9 @@ if [ -n "${redis_ver:-}" ]; then
   fi
 fi
 
+# C++ 编译工具链必须在装 Python 依赖之前就绪（chroma-hnswlib 只有 sdist，需本地编译）
+ensure_build_toolchain
+
 # ── 2. Python 虚拟环境 ─────────────────────────────────────
 log "=== [2/7] 创建 Python venv 并安装依赖 ==="
 VENV_DIR="$PROJECT_ROOT/.venv"
@@ -338,25 +412,154 @@ pip_tty() {
   script -qec "$VENV_PY -m pip install $*" /dev/null
 }
 
-# 大包预警：提前给出时间预期，避免"进度条不动 = 卡死"的误判
-if grep -qE "^sentence-transformers" "$PROJECT_ROOT/requirements.txt" 2>/dev/null; then
-  log "ℹ️  依赖树含 sentence-transformers → torch(≈554MB)，镜像源预计 1-4 分钟；"
-  log "    期间进度条不动属正常（大文件正在下载）。若长时间无进展，可用"
-  log "    PIP_INDEX_URL=<更快镜像> bash scripts/install.sh 强制指定源。"
+# ── CUDA 大包「多镜像分散 + 多连接分段」预取（仅 --gpu-fast）─────
+# 背景：pip 单连接下载 500MB 级大包既慢（实测 200-900KB/s 且逐渐衰减）又
+# **不支持断点续传**；同一文件用 curl 多连接分段实测可达 4.8MB/s。故按包名把
+# 大包分散到不同镜像，包内再分段并行下载，最后本地离线安装。
+# 不加 --gpu-fast 则不做预取，直接走 pip 默认安装（简单但慢，可能超 1 小时）。
+CUDA_MIRROR_POOL=(
+  "https://mirrors.aliyun.com/pypi"
+  "https://mirrors.ustc.edu.cn/pypi"
+  "https://pypi.tuna.tsinghua.edu.cn"
+)
+PIP_WHEEL_CACHE="${PIP_WHEEL_CACHE:-/tmp/ipip-wheels}"
+CUDA_SEGMENTS="${CUDA_SEGMENTS:-8}"
+
+prefetch_one_wheel() {
+  # $1=包名 $2=wheel 文件名 $3=镜像基址
+  local pkg="$1" fn="$2" mirror="$3" out="$PIP_WHEEL_CACHE/$2"
+  local u="" full="" total="" seg n="$CUDA_SEGMENTS" i s e fin
+  [ -f "$out" ] && { log "  已缓存 $pkg"; return 0; }
+  u=$(curl -s -m 20 "$mirror/simple/$pkg/" | grep -oE "href=\"[^\"]*$fn[^\"]*\"" | head -1 | sed 's/href="//;s/"$//')
+  if [ -z "$u" ]; then warn "  $pkg 在 ${mirror#https://} 未找到，跳过"; return 1; fi
+  case "$u" in
+    http*) full="$u" ;;
+    ../*)  full="$mirror/${u#../../}" ;;
+    *)     full="$mirror/$u" ;;
+  esac
+  total=$(curl -sIL -m 20 "$full" | grep -i content-length | tail -1 | tr -dc 0-9)
+  if [ -z "$total" ] || [ "$total" -le 0 ]; then warn "  $pkg 无法获取大小，跳过"; return 1; fi
+  seg=$(( (total + n - 1) / n ))
+  log "  预取 $pkg（$((total/1048576))MB，源 ${mirror#https://}，${n} 连接并行）..."
+  for i in $(seq 0 $((n-1))); do
+    s=$((i*seg)); e=$((s+seg-1))
+    [ "$e" -ge "$total" ] && e=$((total-1))
+    [ "$s" -gt "$e" ] && continue
+    curl -sL --retry 10 --retry-all-errors -r "$s-$e" -o "$out.part$i" "$full" >/dev/null 2>&1 &
+  done
+  wait
+  cat "$out".part* > "$out" 2>/dev/null; rm -f "$out".part*
+  fin=$(stat -c%s "$out" 2>/dev/null || echo 0)
+  if [ "$fin" -eq "$total" ]; then
+    log "  ✔ $pkg 完成"
+  else
+    warn "  ✘ $pkg 大小不符（$fin/$total），丢弃重来"
+    rm -f "$out"; return 1
+  fi
+}
+
+prefetch_cuda_multi_mirror() {
+  local report="$PIP_WHEEL_CACHE/cuda-report.json" list="$PIP_WHEEL_CACHE/jobs.tsv"
+  local ok=0 fail=0 pkg fn mirror w
+  mkdir -p "$PIP_WHEEL_CACHE"
+  log "生成依赖清单（pip --dry-run，只解析不下载）..."
+  "$VENV_PY" -m pip install --dry-run --ignore-installed --report "$report" \
+    -r "$PROJECT_ROOT/requirements.txt" $PIP_INDEX_ARG >/dev/null 2>&1 || return 1
+  "$VENV_PY" - "$report" "$list" "${CUDA_MIRROR_POOL[@]}" <<'PYEOF'
+import json, sys
+report, out, *mirrors = sys.argv[1:]
+d = json.load(open(report))
+rows = []
+for it in d.get("install", []):
+    url = (it.get("download_info") or {}).get("url", "")
+    if not url.endswith(".whl"):
+        continue
+    fn = url.rsplit("/", 1)[-1].split("#")[0]
+    # 只挑 CUDA/triton 这类超大包，其余交给 pip 正常安装
+    if not fn.startswith(("nvidia_", "nvidia-", "triton-")):
+        continue
+    rows.append((fn.split("-")[0].replace("_", "-"), fn))
+with open(out, "w") as f:
+    for i, (pkg, fn) in enumerate(rows):
+        f.write(f"{pkg}\t{fn}\t{mirrors[i % len(mirrors)]}\n")
+print(f"待预取 {len(rows)} 个 CUDA/triton 大包，按包名分散到 {len(mirrors)} 个镜像",
+      file=sys.stderr)
+PYEOF
+  while IFS=$'\t' read -r pkg fn mirror; do
+    [ -z "$pkg" ] && continue
+    if prefetch_one_wheel "$pkg" "$fn" "$mirror"; then ok=$((ok+1)); else fail=$((fail+1)); fi
+  done < "$list"
+  log "预取结束：成功 $ok 个，失败 $fail 个"
+  if [ "$ok" -gt 0 ]; then
+    # 用**文件路径**离线安装，而不是 --find-links：后者只是候选源，pip 仍会优先
+    # 去 index 下载（实测踩过，白等一次全量下载）。--no-deps 让依赖由后续
+    # requirements 安装补齐。
+    local wheels=()
+    for w in "$PIP_WHEEL_CACHE"/*.whl; do [ -e "$w" ] && wheels+=("$w"); done
+    if [ "${#wheels[@]}" -gt 0 ]; then
+      run_timed "离线安装已预取的 CUDA 包" pip_tty "${wheels[*]} --no-deps" \
+        || warn "离线安装部分失败，将由后续 requirements 安装补齐"
+    fi
+  fi
+  [ "$fail" -eq 0 ]
+}
+
+# ── torch 版本选择（CPU 默认 / GPU 需显式 --gpu）──────────────
+if [ "$TORCH_FLAVOR" = "cpu" ]; then
+  # CPU 版仅 torch 本体 ≈190MB，无 CUDA 依赖。
+  # ⚠️ 该源的"首页响应时间"不能当作速度判据：实测首页仅 57KB/s，但 wheel 真实
+  # 下载可达 2.8MB/s。判断源快慢必须测真实文件（本项目反复踩过的坑）。
+  cur_torch="$("$VENV_PY" -c "import importlib.metadata as m; print(m.version('torch'))" 2>/dev/null || true)"
+  need_cpu=1
+  case "$cur_torch" in
+    *+cpu*) log "已安装 CPU 版 torch（$cur_torch），跳过"; need_cpu=0 ;;
+  esac
+  if [ "$need_cpu" -eq 1 ]; then
+    if [ -n "$cur_torch" ]; then
+      warn "当前 torch=$cur_torch 不是 CPU 版（无 +cpu 标记），将替换为 CPU 版"
+      # --force-reinstall 是必需的：已装同版本号但非 +cpu 时，pip 会判定
+      # "Requirement already satisfied" 而**直接跳过**（实测踩到：安装仅耗时 2s、
+      # 版本号与 nvidia 依赖都原封不动）。--no-deps 避免连带重装依赖。
+    fi
+    log "torch 版本：CPU（默认，≈190MB）"
+    run_timed "安装 CPU 版 torch" pip_tty \
+      "torch --index-url https://download.pytorch.org/whl/cpu --extra-index-url $PIP_INDEX_TUNA --force-reinstall --no-deps --progress-bar on --timeout 60 --retries 5" \
+      || die "CPU 版 torch 安装失败。可手动执行：
+      $VENV_PY -m pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cpu"
+    # 从 CUDA 版切换过来时，此前的 nvidia-* 包会残留（对 CPU 版无用，白占数 GB）
+    if "$VENV_PY" -m pip list 2>/dev/null | grep -qi "^nvidia-"; then
+      warn "检测到残留的 CUDA 依赖包（nvidia-*，对 CPU 版 torch 无用），可执行以下命令清理："
+      warn "  $VENV_PY -m pip uninstall -y \$($VENV_PY -m pip list --format=freeze | grep -i '^nvidia-' | cut -d= -f1 | tr '\\n' ' ')"
+    fi
+  fi
+else
+  warn "════════════════════════════════════════════════════════════"
+  warn "已选择 GPU (CUDA) 版本 torch"
+  warn "  · 体积：torch 554MB + nvidia-cudnn/cublas/cusparse/nccl/cusparselt"
+  warn "           + triton 等，合计约 2.6-3.5 GB"
+  warn "  · 耗时：预计 30-60 分钟，网络较慢时【可能超过 1 小时】"
+  warn "  · 前提：服务器需有 NVIDIA GPU；若无 GPU，这些依赖完全用不上，"
+  warn "           强烈建议改用默认 CPU 版（直接 bash scripts/install.sh）"
+  warn "  · 加速：加 --gpu-fast 可把大包分散到多镜像并行下载"
+  warn "════════════════════════════════════════════════════════════"
+  if [ "$CUDA_MULTI_MIRROR" -eq 1 ]; then
+    prefetch_cuda_multi_mirror || warn "分散预取未完全成功，未覆盖部分回退 pip 默认安装"
+  fi
+  log "torch 版本：GPU（CUDA）"
 fi
 
 run_timed "升级 pip" script -qec "$VENV_PY -m pip install --upgrade pip wheel setuptools $PIP_INDEX_ARG --timeout 30 --retries 3" /dev/null
 
-# 大文件易受网络抖动影响，单次连接超时放宽到 60s；失败则自动换清华源重试一次。
+# 大文件易受网络抖动影响，单次连接超时放宽到 60s；失败则自动换备用镜像重试一次。
 # 若两次都失败，多半是 requirements.txt 内部版本冲突（非网络问题）。
 if run_timed "安装 requirements.txt" pip_tty \
       "-r $PROJECT_ROOT/requirements.txt $PIP_INDEX_ARG --progress-bar on --timeout 60 --retries 5"; then
   :
 else
-  warn "依赖安装失败，尝试改用清华源重试一次..."
-  run_timed "安装 requirements.txt（清华源重试）" pip_tty \
+  warn "依赖安装失败，尝试改用备用镜像重试一次..."
+  run_timed "安装 requirements.txt（备用镜像重试）" pip_tty \
       "-r $PROJECT_ROOT/requirements.txt -i $PIP_INDEX_TUNA --progress-bar on --timeout 60 --retries 5" \
-    || die "依赖安装失败。若上方报错为 ResolutionImpossible/版本冲突，属 requirements.txt 内部矛盾（非网络问题）；若卡在 torch 等大包下载，请用 PIP_INDEX_URL 指定更快镜像后重跑。"
+    || die "依赖安装失败。若报错为 ResolutionImpossible/版本冲突，属 requirements.txt 内部矛盾（非网络问题）；若卡在大包下载，可加 --gpu-fast 或设置 PIP_INDEX_URL 指定更快镜像。"
 fi
 log "Python 依赖安装完成"
 
@@ -408,9 +611,11 @@ else
   log ".env 已存在，跳过创建"
 fi
 
-# 安全密钥自动注入：SECRET_KEY / JWT_SECRET_KEY 凡缺失（空值）或仍为 change-me
-# 占位符，一律生成 64 位随机 hex 覆盖，杜绝弱默认密钥上线（生产配置对占位符
-# 会拒绝启动，此处提前自动修复，避免部署者漏填）。
+# 安全密钥自动注入：SECRET_KEY / JWT_SECRET_KEY / SWITCH_SECRET_KEY 凡缺失（含整行
+# 不存在、空值、或仍是 change-me 占位符）一律生成 64 位随机 hex，杜绝弱默认密钥
+# 上线（生产配置对占位符会直接拒绝启动，此处提前修复，避免部署者漏填）。
+# SWITCH_SECRET_KEY 是设备凭据加密密钥，FLASK_ENV=production 时**强制非空**，
+# 缺失会让服务启动即崩（实测：monitor 因此被 systemd 反复拉起后进入 failed）。
 "$VENV_PY" - <<PYEOF
 import re, secrets
 from pathlib import Path
@@ -418,20 +623,29 @@ from pathlib import Path
 p = Path("$PROJECT_ROOT/.env")
 lines = p.read_text().splitlines()
 generated = []
-targets = {"SECRET_KEY", "JWT_SECRET_KEY"}
+targets = {"SECRET_KEY", "JWT_SECRET_KEY", "SWITCH_SECRET_KEY"}
+present = set()
 for i, line in enumerate(lines):
     m = re.match(r"^([A-Z_]+)=(.*)$", line)
     if not m or m.group(1) not in targets:
         continue
+    present.add(m.group(1))
     val = m.group(2).strip()
     if val == "" or val.lower().startswith("change-me"):
         lines[i] = f"{m.group(1)}={secrets.token_hex(32)}"
         generated.append(m.group(1))
+# ⚠️ 必须补齐「整行缺失」的键：.env 通常是从**旧版** .env.example 拷贝而来，
+# 后续在模板里新增的密钥键在其中根本不存在。只遍历已有行的写法会永远补不上它
+# （实测踩到：.env.example 已加 SWITCH_SECRET_KEY，装机后 .env 里始终没有该键，
+#   直到 FLASK_ENV=production 启动时才以崩溃形式暴露）。
+for key in sorted(targets - present):
+    lines.append(f"{key}={secrets.token_hex(32)}")
+    generated.append(key + "(新增)")
 if generated:
     p.write_text("\n".join(lines) + "\n")
     print("    已自动生成随机密钥: " + ", ".join(generated))
 else:
-    print("    SECRET_KEY / JWT_SECRET_KEY 已配置，跳过")
+    print("    SECRET_KEY / JWT_SECRET_KEY / SWITCH_SECRET_KEY 已配置，跳过")
 PYEOF
 set -a; . "$PROJECT_ROOT/.env"; set +a
 
@@ -555,6 +769,25 @@ else
   warn "未找到 crontab，跳过监控维护 cron。请自行添加两条定时任务："
   warn "  0 2 * * * cd $PROJECT_ROOT && ./.venv/bin/flask --app wsgi:app monitor-manage-partitions"
   warn "  0 3 * * * cd $PROJECT_ROOT && ./.venv/bin/flask --app wsgi:app monitor-archive"
+fi
+
+# ── 8. RAG 本地模型 ─────────────────────────────────────────
+# 为什么必须预置：app/services/ai/rag/{embedding,reranker}.py 都强制
+# HF_HUB_OFFLINE=1（避免 transformers 5.x 在无网环境加载时卡死），模型不在本地
+# 就会加载失败——embedding 失败则 RAG 检索整体不可用，reranker 失败则降级为 RRF。
+# 国内机房访问 huggingface.co 基本不可达，脚本默认走 ModelScope（实测约 5.7MB/s）。
+if [ "$SKIP_MODELS" -eq 1 ]; then
+  warn "已跳过本地模型下载（--skip-models）：RAG 向量检索将不可用，"
+  warn "  需要时执行：$VENV_PY scripts/download_models.py"
+else
+  log "=== [8] 下载 RAG 本地模型（embedding≈92MB + reranker≈1100MB）==="
+  # 默认写入 HF 标准缓存（$HF_HOME/hub/models--BAAI--*/snapshots/main/），
+  # 与本地开发环境同一套解析机制 → 代码与 .env 均无需改动。
+  # 下载体积较大但属必需步骤；失败只告警不中止安装，但会把影响范围说清楚。
+  run_timed "下载 RAG 本地模型" "$VENV_PY" "$PROJECT_ROOT/scripts/download_models.py" \
+    || warn "模型下载失败 → RAG 功能不可用。可稍后单独重跑（支持断点续传）：
+      $VENV_PY scripts/download_models.py                    # 全部（写入 HF 缓存）
+      $VENV_PY scripts/download_models.py --only embedding    # 只下必需的 92MB"
 fi
 
 log "============================================================"
