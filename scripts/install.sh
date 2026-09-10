@@ -187,7 +187,7 @@ ensure_pnpm() {
     return 0
   fi
   if [ -n "$have" ]; then
-    warn "pnpm 版本过低（$have < $want），将升级到 $want"
+    warn "pnpm 版本过低（$have < ${want}），将升级到 $want"
   else
     warn "pnpm 不可用（缺失，或 corepack shim 签名校验失败），改用 npm 全局安装 pnpm@${want}"
   fi
@@ -243,7 +243,7 @@ ensure_build_toolchain() {
 run_timed() {
   # 执行一条命令并汇报耗时，避免长步骤看起来像卡死
   local name="$1"; shift
-  local started=$SECONDS
+  local started=${SECONDS}
   log "▶ $name ..."
   # ⚠️ 不能在 if 之后再取 $?：那时拿到的是 if 语句自身的状态（常为 0），会把失败
   # 伪造成成功，导致后续步骤带着半成品环境继续跑（实测踩到：pip 安装失败却
@@ -253,9 +253,9 @@ run_timed() {
   if [ "$rc" -eq 0 ]; then
     log "✔ $name 完成（耗时 $((SECONDS - started))s）"
   else
-    err "✘ $name 失败（退出码 $rc，耗时 $((SECONDS - started))s）"
+    err "✘ $name 失败（退出码 ${rc}，耗时 $((SECONDS - started))s）"
   fi
-  return $rc
+  return ${rc}
 }
 
 # 参数解析
@@ -278,7 +278,7 @@ for arg in "$@"; do
       sed -n '2,52p' "$0"
       exit 0
       ;;
-    *) die "未知参数: $arg（用 --help 查看用法）" ;;
+    *) die "未知参数: ${arg}（用 --help 查看用法）" ;;
   esac
 done
 
@@ -440,7 +440,7 @@ prefetch_one_wheel() {
   total=$(curl -sIL -m 20 "$full" | grep -i content-length | tail -1 | tr -dc 0-9)
   if [ -z "$total" ] || [ "$total" -le 0 ]; then warn "  $pkg 无法获取大小，跳过"; return 1; fi
   seg=$(( (total + n - 1) / n ))
-  log "  预取 $pkg（$((total/1048576))MB，源 ${mirror#https://}，${n} 连接并行）..."
+  log "  预取 ${pkg}（$((total/1048576))MB，源 ${mirror#https://}，${n} 连接并行）..."
   for i in $(seq 0 $((n-1))); do
     s=$((i*seg)); e=$((s+seg-1))
     [ "$e" -ge "$total" ] && e=$((total-1))
@@ -453,7 +453,7 @@ prefetch_one_wheel() {
   if [ "$fin" -eq "$total" ]; then
     log "  ✔ $pkg 完成"
   else
-    warn "  ✘ $pkg 大小不符（$fin/$total），丢弃重来"
+    warn "  ✘ $pkg 大小不符（$fin/${total}），丢弃重来"
     rm -f "$out"; return 1
   fi
 }
@@ -512,7 +512,7 @@ if [ "$TORCH_FLAVOR" = "cpu" ]; then
   cur_torch="$("$VENV_PY" -c "import importlib.metadata as m; print(m.version('torch'))" 2>/dev/null || true)"
   need_cpu=1
   case "$cur_torch" in
-    *+cpu*) log "已安装 CPU 版 torch（$cur_torch），跳过"; need_cpu=0 ;;
+    *+cpu*) log "已安装 CPU 版 torch（${cur_torch}），跳过"; need_cpu=0 ;;
   esac
   if [ "$need_cpu" -eq 1 ]; then
     if [ -n "$cur_torch" ]; then
@@ -670,7 +670,7 @@ c.close()
 print("    MySQL 连接 OK")
 PYEOF
 
-  log "创建数据库 $DB_NAME（若不存在）..."
+  log "创建数据库 ${DB_NAME}（若不存在）..."
   "$VENV_PY" - << PYEOF
 import pymysql, os
 c = pymysql.connect(host="$DB_HOST", port=int("$DB_PORT"), user="$DB_USER",
