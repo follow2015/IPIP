@@ -25,6 +25,8 @@
 #      同一套解析机制 —— 代码与 .env 都不需要改动。
 #      与代码的 HF_HUB_OFFLINE=1 策略配套：模型未预置则 RAG 检索不可用
 #      （reranker 缺失会降级为 RRF 排序，不影响基本检索）。
+#   8. 【可选】systemd 进程托管（--with-units）：调用 deploy/systemd/install-units.sh
+#      渲染并安装 9 个 unit。默认**不做**——接管进程属生产变更且需要 root。
 #
 # 用法:
 #   bash scripts/install.sh                    # 完整安装（默认 CPU 版 torch，推荐）
@@ -35,6 +37,7 @@
 #   bash scripts/install.sh --skip-frontend    # 跳过前端构建（假设 frontend-new/dist 已存在）
 #   bash scripts/install.sh --skip-db          # 跳过数据库初始化
 #   bash scripts/install.sh --skip-seed        # 跳过种子导入
+#   bash scripts/install.sh --with-units       # 额外安装 systemd 进程托管 unit（需 root）
 #   bash scripts/install.sh --help
 #
 # torch 版本选择说明（重要）：
@@ -259,26 +262,57 @@ run_timed() {
 }
 
 # 参数解析
+# 用 while+shift 而非 for：新增的 --units-user/--units-group/--units-script 需要
+# 取值，for 循环无法消费下一个参数（会把值当成未知参数直接 die）。
 SKIP_FRONTEND=0
 SKIP_DB=0
 SKIP_SEED=0
 SKIP_MODELS=0
 TORCH_FLAVOR="cpu"      # cpu（默认）| gpu
 CUDA_MULTI_MIRROR=0     # 1=用多镜像分散并行预取 CUDA 大包（--gpu-fast）
-for arg in "$@"; do
-  case "$arg" in
-    --skip-frontend) SKIP_FRONTEND=1 ;;
-    --skip-db)       SKIP_DB=1 ;;
-    --skip-seed)     SKIP_SEED=1 ;;
-    --skip-models)   SKIP_MODELS=1 ;;
-    --cpu)           TORCH_FLAVOR="cpu" ;;
-    --gpu)           TORCH_FLAVOR="gpu" ;;
-    --gpu-fast)      TORCH_FLAVOR="gpu"; CUDA_MULTI_MIRROR=1 ;;
+WITH_UNITS=0            # 1=安装完成后渲染并安装 systemd unit（T2.1）
+UNITS_USER=""           # 空=由 install-units.sh 决定默认账号（ipip）
+UNITS_GROUP=""
+UNITS_SCRIPT=""         # 空=按仓库布局自动探测
+while [ $# -gt 0 ]; do
+  case "$1" in
+    # flag 形式
+    --skip-frontend) SKIP_FRONTEND=1; shift ;;
+    --skip-db)       SKIP_DB=1; shift ;;
+    --skip-seed)     SKIP_SEED=1; shift ;;
+    --skip-models)   SKIP_MODELS=1; shift ;;
+    --cpu)           TORCH_FLAVOR="cpu"; shift ;;
+    --gpu)           TORCH_FLAVOR="gpu"; shift ;;
+    --gpu-fast)      TORCH_FLAVOR="gpu"; CUDA_MULTI_MIRROR=1; shift ;;
+    --with-units)    WITH_UNITS=1; shift ;;
+    # 取值形式（同时支持 "--k v" 与 "--k=v"）
+    # 缺值时给出与前文一致的 [ERROR] 提示，而不是 bash 默认的 "line N: 2: ..."
+    --units-user)
+      [ $# -ge 2 ] || die "--units-user 需要一个账号名（如 --units-user root）"
+      UNITS_USER="$2"; shift 2 ;;
+    --units-group)
+      [ $# -ge 2 ] || die "--units-group 需要一个组名（如 --units-group root）"
+      UNITS_GROUP="$2"; shift 2 ;;
+    --units-script)
+      [ $# -ge 2 ] || die "--units-script 需要一个路径"
+      UNITS_SCRIPT="$2"; shift 2 ;;
+    --units-user=*)   UNITS_USER="${1#*=}"; shift ;;
+    --units-group=*)  UNITS_GROUP="${1#*=}"; shift ;;
+    --units-script=*) UNITS_SCRIPT="${1#*=}"; shift ;;
     --help|-h)
-      sed -n '2,52p' "$0"
+      sed -n '2,55p' "$0"
+      cat <<'HELP'
+
+systemd 进程托管（可选，需 root）:
+  --with-units            安装完成后渲染并安装 systemd unit
+  --units-user NAME       服务运行账号（默认 ipip；项目在 /root 下应为 root）
+  --units-group NAME      服务运行组（默认同 --units-user）
+  --units-script PATH     指定 install-units.sh 路径
+                          （默认探测 <repo>/deploy/systemd/install-units.sh）
+HELP
       exit 0
       ;;
-    *) die "未知参数: ${arg}（用 --help 查看用法）" ;;
+    *) die "未知参数: $1（用 --help 查看用法）" ;;
   esac
 done
 
@@ -790,7 +824,45 @@ else
       $VENV_PY scripts/download_models.py --only embedding    # 只下必需的 92MB"
 fi
 
+# ── 9. 【可选】systemd 进程托管（T2.1）──────────────────────
+# 与 install-units.sh 的分工：本脚本装「应用」，它装「进程托管」。
+# 刻意默认关闭：接管进程属生产变更且需要 root，不应由安装脚本默默代做。
+UNITS_INSTALLED=0
+if [ "$WITH_UNITS" -eq 1 ]; then
+  log "=== [可选] 安装 systemd 进程托管 unit ==="
+  # 默认按仓库布局探测：deploy/ 与 ipip-deploy/ 是兄弟目录，该相对位置在源码仓
+  # （ipip/ipip-deploy + ipip/deploy）与部署机（/root/ipip-deploy + /root/deploy）
+  # 下都成立，因此无需额外配置。
+  UNITS_SCRIPT="${UNITS_SCRIPT:-$SCRIPT_DIR/../../deploy/systemd/install-units.sh}"
+  if [ ! -f "$UNITS_SCRIPT" ]; then
+    warn "未找到 unit 安装脚本: $UNITS_SCRIPT"
+    warn "  用 --units-script <路径> 指定，或按 deploy/systemd/README.md 手工安装。"
+  else
+    units_args=(--project-root "$PROJECT_ROOT")
+    [ -n "$UNITS_USER" ]  && units_args+=(--user "$UNITS_USER")
+    [ -n "$UNITS_GROUP" ] && units_args+=(--group "$UNITS_GROUP")
+    if bash "$UNITS_SCRIPT" "${units_args[@]}"; then
+      UNITS_INSTALLED=1
+      log "unit 安装完成（脚本不会自动启用服务，请按上面的提示逐个 enable）"
+    else
+      # 应用本体已就绪，托管失败不应把整次安装判为失败
+      warn "systemd unit 安装失败 —— 应用已可用，可稍后手工重试："
+      warn "  sudo bash $UNITS_SCRIPT ${units_args[*]}"
+    fi
+  fi
+else
+  log "=== [可选] 跳过 systemd 进程托管（加 --with-units 启用）==="
+fi
+
 log "============================================================"
 log "安装完成 ✅"
-log "下一步: 编辑 .env 确认配置后，执行 bash scripts/start.sh 启动系统"
+if [ "$UNITS_INSTALLED" -eq 1 ]; then
+  log "下一步:"
+  log "  1) 按 install-units.sh 输出的清单逐个 enable 并验证"
+  log "  2) systemctl enable ipip.target        # 开机自启聚合"
+  log "  3) curl -fsS http://127.0.0.1:${FLASK_PORT:-5000}/api/health/check"
+else
+  log "下一步: 编辑 .env 确认配置后，执行 bash scripts/start.sh 启动系统"
+  log "  需要 systemd 托管进程时：重跑本脚本并加 --with-units"
+fi
 log "============================================================"
