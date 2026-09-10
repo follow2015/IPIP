@@ -30,10 +30,16 @@ class DeploymentPlanRequestSchema(Schema):
                           metadata={"description": "单台U高，默认2"})
     power_per_unit = fields.Int(load_default=750, validate=validate.Range(min=1),
                                 metadata={"description": "单台功率W，默认750（仅参考）"})
-    bandwidth_mbps = fields.Int(required=True, validate=validate.Range(min=1),
-                                metadata={"description": "单台带宽需求Mbps（人工输入）"})
+    bandwidth_mbps = fields.Int(load_default=None, validate=validate.Range(min=1),
+                                metadata={"description": "单台带宽需求Mbps（可选；缺省不给限速建议）"})
     port_speed = fields.Str(required=True,
                             metadata={"description": "服务器端口速率：如 1000M/1G/10G"})
+    ip_scope = fields.Str(load_default=None, validate=validate.OneOf(["public", "private"]),
+                          metadata={"description": "IP 类型过滤：public 仅公网 / private 仅内网（缺省不限，推荐序公网优先）"})
+    ip_examples = fields.Int(load_default=0, validate=validate.Range(min=0, max=50),
+                             metadata={"description": "额外返回的「可分配 IP 样例」数量（0=不返回样例；容量模式默认给 10 个）"})
+    ip_pool_scope = fields.Str(load_default="auto", validate=validate.OneOf(["auto", "room"]),
+                               metadata={"description": "地址池口径：auto 先本机房后二层域跨机房 / room 只用本机房地址"})
 
 
 @deployment_plan_bp.route("/plan", methods=["POST"])
@@ -50,8 +56,11 @@ def create_deployment_plan():
         count (int): 上架台数，可选；缺省=容量模式（返回还能上多少台）
         u_height (int): 单台U高，默认 2
         power_per_unit (int): 单台功率W，默认 750，仅参考不阻断
-        bandwidth_mbps (int): 单台带宽需求Mbps，必填（人工输入）
+        bandwidth_mbps (int): 单台带宽需求Mbps，可选；缺省不给限速建议
         port_speed (str): 服务器端口速率，必填：如 1000M/1G/10G
+        ip_scope (str): IP 类型过滤，可选：public 仅公网 / private 仅内网
+        ip_examples (int): 额外返回的「可分配 IP 样例」数量（0=不要样例）
+        ip_pool_scope (str): 地址池口径，可选：auto 先本机房后跨机房 / room 只用本机房
     """
     payload = request.get_json(silent=True) or {}
     try:
@@ -69,6 +78,9 @@ def create_deployment_plan():
             u_height=params["u_height"],
             power_per_unit=params["power_per_unit"],
             room_id=params["room_id"],
+            ip_scope=params["ip_scope"],
+            ip_examples=params["ip_examples"],
+            ip_pool_scope=params["ip_pool_scope"],
         )
     except DeploymentPlanError as exc:
         return APIResponse.error(message=str(exc), status_code=400)

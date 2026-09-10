@@ -28,6 +28,8 @@ from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+_DEFAULT_IP_SAMPLES = 10
+
 _DEVICE_SPACING = 2
 _MIN_HEIGHT_FOR_SPACING = 2
 
@@ -55,7 +57,7 @@ def normalize_port_speed(raw: Any) -> int:
     mbps = PortMatchingEngine._parse_speed_to_mbps(str(raw))
     if not mbps or mbps <= 0:
         raise DeploymentPlanError(
-            f"端口速率无法识别: {raw!r}（支持 100M/1G/1000M/10G/25G/40G/100G/400G）"
+            f"端口速率无法识别：{raw}（支持 100M/1G/1000M/10G/25G/40G/100G/400G）"
         )
     return mbps
 
@@ -160,15 +162,24 @@ def _room_u_capacity(room_id: int, u_height: int) -> tuple:
 
 
 def _room_power_headroom(cabinets: List, power_per_unit: int) -> tuple:
-    """电力参考容量：总和 + 未录入机柜数。未录入不阻断，只计数。"""
+    """电力参考容量：(可再放台数, 未录入额定功率机柜数, [(机柜号,额定,已用)...])。
+
+    第三项 = 已用功率超过额定值的异常机柜（登记数据自相矛盾），必须暴露给
+    用户——这类数据的电力参考值已不可信，不能静默按 0 抹平。
+    """
     headroom = 0
     unrecorded = 0
+    anomalies = []
     for cab, _, _ in cabinets:
         if not cab.total_power or cab.total_power <= 0:
             unrecorded += 1
             continue
-        headroom += max(0, (cab.total_power - (cab.used_power or 0)) // power_per_unit)
-    return headroom, unrecorded
+        used = cab.used_power or 0
+        if used > cab.total_power:
+            anomalies.append((cab.cabinet_number, cab.total_power, used))
+            continue
+        headroom += max(0, (cab.total_power - used) // power_per_unit)
+    return headroom, unrecorded, anomalies
 
 
 def _collect_room_ports(room_id: int, speed_mbps: int, visible_switch_ids=None) -> Dict[str, Any]:
@@ -262,57 +273,285 @@ def _format_port_breakdown(ports: Dict[str, Any]) -> str:
     return "；".join(parts)
 
 
-def _room_free_ips(room_id: int, needed: int) -> Dict[str, Any]:
-    """按网段挑空闲 IP：状态 UNUSED 优先、INACTIVE 兜底，排除网关/网络号/广播。
+def _switch_distribution(ports: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """可用端口按交换机聚合（"哪些交换机、多少口、接入还是核心、在哪个机柜"）。
+
+    只报总数会让用户无法判断布线可行性（端口可能集中在某台远机柜交换机上），
+    因此 Top 维度必须落到交换机。
+    """
+    from app.models.cabinet import Cabinet
+
+    counter: Dict[int, Dict[str, Any]] = {}
+    for port, sw in list(ports["access"]) + list(ports["core"]):
+        item = counter.get(sw.id)
+        if item is None:
+            meta = ports["switches"].get(sw.id, {})
+            item = {
+                "switch_id": sw.id,
+                "device_name": sw.device_name,
+                "role": "core" if meta.get("is_core") else "access",
+                "cabinet_id": sw.cabinet_id,
+                "cabinet_number": None,
+                "free_ports": 0,
+            }
+            counter[sw.id] = item
+        item["free_ports"] += 1
+
+    cab_ids = {i["cabinet_id"] for i in counter.values() if i["cabinet_id"]}
+    numbers = {}
+    if cab_ids:
+        numbers = {
+            c.id: c.cabinet_number
+            for c in Cabinet.query.filter(Cabinet.id.in_(list(cab_ids))).all()
+        }
+    for item in counter.values():
+        item["cabinet_number"] = numbers.get(item["cabinet_id"])
+
+    return sorted(counter.values(), key=lambda x: (-x["free_ports"], str(x["device_name"])))
+
+
+def _is_public_ipv4(ip_address: Optional[str]) -> bool:
+    """是否为公网 IPv4（RFC1918/CGNAT/环回/链路本地/多播/保留段均算内网）。
+
+    库内无"公网/内网"字段，只能按地址属性判定；判定不了的安全回落为 False。
+    """
+    import ipaddress
+
+    try:
+        addr = ipaddress.ip_address(str(ip_address or "").strip())
+    except ValueError:
+        return False
+    if addr.version != 4:
+        return False
+    return not (
+        addr.is_private or addr.is_loopback or addr.is_link_local
+        or addr.is_multicast or addr.is_reserved or addr.is_unspecified
+    )
+
+
+def _l2_room_ids(room_id: int) -> Dict[str, Any]:
+    """本机房所在的二层可达域（虚拟房网格径）。
+
+    同一虚拟机房（virtual_room_members）的成员交换机在网络上是互联的，
+    因此登记在该虚拟机房覆盖机房名下的网段对本机房同样可用。
+
+    该口径与网络扫描保持一致：``vr:{id}`` 扫描的 IP 作业范围就是
+    ``VirtualRoomService.get_covered_room_ids()``（见 network_scanner_service
+    Phase 6b）；公网地址本身也是跨机房可达的（同文件 6b 段注释）。
 
     Returns:
-        {"ips": [...], "total_free": int, "subnet_count": int, "short": int}
+        {"room_ids": set, "room_names": [...], "virtual_room_names": [...],
+         "scope": "virtual_room" | "room"}
     """
+    from app.models.cabinet import Cabinet
+    from app.models.device import Device
+    from app.models.room import Room
+    from app.models.virtual_room import VirtualRoomMember
+    from app.persistence.virtual_room_repository import VirtualRoomRepository
+
+    fallback = {
+        "room_ids": {room_id}, "room_names": [], "virtual_room_names": [],
+        "scope": "room",
+    }
+    cab_ids = [
+        r[0] for r in db.session.query(Cabinet.id).filter(
+            Cabinet.room_id == room_id
+        ).all()
+    ]
+    if not cab_ids:
+        return fallback
+    switch_ids = [
+        r[0] for r in db.session.query(Device.id).filter(
+            Device.cabinet_id.in_(cab_ids)
+        ).all()
+    ]
+    if not switch_ids:
+        return fallback
+
+    vr_ids = [
+        r[0] for r in db.session.query(VirtualRoomMember.virtual_room_id)
+        .filter(VirtualRoomMember.device_id.in_(switch_ids))
+        .distinct().all()
+    ]
+    if not vr_ids:
+        return fallback  # 本机房交换机未加入任何虚拟机房 → 保守按本机房计
+
+    repo = VirtualRoomRepository(db.session)
+    room_ids = {room_id}
+    vr_names = []
+    for vr_id in sorted(vr_ids):
+        room_ids |= set(repo.get_covered_room_ids(vr_id))
+        vr = repo.find_by_id(vr_id)
+        if vr is not None:
+            vr_names.append(vr.name)
+
+    names = [
+        r[1] for r in db.session.query(Room.id, Room.name)
+        .filter(Room.id.in_(sorted(room_ids)))
+        .order_by(Room.id).all()
+    ]
+    return {
+        "room_ids": room_ids,
+        "room_names": names,
+        "virtual_room_names": vr_names,
+        "scope": "virtual_room" if len(room_ids) > 1 else "room",
+    }
+
+
+def _collect_ip_candidates(room_ids, primary_room_id=None):
+    """收集一组机房内的空闲 IP 候选（跨去重），供多口径统计复用。
+
+    Returns:
+        (candidates, stats)；candidates 每项含 ip/network/room/is_primary/
+        is_public/unused/ip_int，其中 is_primary 表示网段登记在目标物理机房名下。
+    """
+    import bisect
+
     from app.core.enums import IPStatus
     from app.models.ip_model import IPManager, ip_to_int
+    from app.models.room import Room
     from app.models.switch_route import IPNetwork
 
-    subnets = IPNetwork.query.filter_by(room_id=room_id).all()
+    room_ids = sorted(set(int(r) for r in room_ids if r is not None))
+    if not room_ids:
+        return [], {"usable": 0, "registered": 0,
+                    "usable_local": 0, "registered_local": 0}
+
+    subnets = IPNetwork.query.filter(IPNetwork.room_id.in_(room_ids)).all()
     if not subnets:
-        return {"ips": [], "total_free": 0, "subnet_count": 0, "short": needed}
+        return [], {"usable": 0, "registered": 0,
+                    "usable_local": 0, "registered_local": 0}
 
     wanted_status = (int(IPStatus.UNUSED), int(IPStatus.INACTIVE))
     rows = (
         IPManager.query
-        .filter(IPManager.room_id == room_id, IPManager.status.in_(wanted_status))
+        .filter(
+            IPManager.room_id.in_(room_ids),
+            IPManager.status.in_(wanted_status),
+            IPManager.ip_int.isnot(None),
+        )
         .all()
     )
+    room_names = {
+        r.id: r.name for r in Room.query.filter(Room.id.in_(room_ids)).all()
+    }
+    rows.sort(key=lambda r: r.ip_int)
+    ints = [r.ip_int for r in rows]
 
-    picked: List[str] = []
-    total_free = 0
+    seen: Dict[int, Dict[str, Any]] = {}
+    usable = usable_local = registered_local = 0
     for subnet in subnets:
+        is_primary = subnet.room_id == primary_room_id
+        if is_primary:
+            registered_local += 1
         if subnet.network_int is None or not subnet.prefix:
             continue
         prefix = int(subnet.prefix)
-        if prefix < 8 or prefix > 32:
+        if prefix < 8 or prefix > 32:   # 排除 0.0.0.0/0 一类兜底脏数据
             continue
         size = 1 << (32 - prefix)
         lo = subnet.network_int + 1          # 排除网络号
         hi = subnet.network_int + size - 2   # 排除广播地址
-        if lo > hi:
+        if lo > hi:                          # /31、/32 无可分配主机地址
             continue
+        usable += 1
+        if is_primary:
+            usable_local += 1
         gateway_int = ip_to_int(subnet.gateway) if subnet.gateway else None
-        in_range = [
-            r for r in rows
-            if r.ip_int is not None and lo <= r.ip_int <= hi
-            and (gateway_int is None or r.ip_int != gateway_int)
-        ]
-        in_range.sort(key=lambda r: (r.status != int(IPStatus.UNUSED), r.ip_int))
-        total_free += len(in_range)
-        for r in in_range:
-            if len(picked) < needed:
-                picked.append(r.ip_address)
+        left = bisect.bisect_left(ints, lo)
+        right = bisect.bisect_right(ints, hi)
+        for r in rows[left:right]:
+            if gateway_int is not None and r.ip_int == gateway_int:
+                continue
+            cand = {
+                "ip": r.ip_address,
+                "network": subnet.network,
+                "room": room_names.get(subnet.room_id),
+                "is_primary": is_primary,
+                "is_public": _is_public_ipv4(r.ip_address),
+                "unused": r.status == int(IPStatus.UNUSED),
+                "ip_int": r.ip_int,
+            }
+            old = seen.get(r.ip_int)
+            if old is None or (is_primary and not old["is_primary"]):
+                seen[r.ip_int] = cand
+
+    return list(seen.values()), {
+        "usable": usable, "registered": len(subnets),
+        "usable_local": usable_local, "registered_local": registered_local,
+    }
+
+
+def _ip_view(candidates, ip_scope, needed: int, examples: int,
+             usable_subnets: int, registered_subnets: int,
+             required: Optional[int] = None) -> Dict[str, Any]:
+    """把一个候选池折算成某个口径的统计视图（计数 + 推荐序 + 样例）。
+
+    needed 决定候选切片大小（容量模式下按最大可能台数取），
+    required 是实际要落地的台数，决定 short 缺口。
+    """
+    if ip_scope == "public":
+        pool = [c for c in candidates if c["is_public"]]
+    elif ip_scope == "private":
+        pool = [c for c in candidates if not c["is_public"]]
+    else:
+        pool = list(candidates)
+
+    pool.sort(key=lambda c: (not c["is_public"], not c["is_primary"],
+                             not c["unused"], c["ip_int"]))
 
     return {
-        "ips": picked,
-        "total_free": total_free,
-        "subnet_count": len(subnets),
-        "short": max(0, needed - len(picked)),
+        "ips": [c["ip"] for c in pool[:max(needed, 0)]],
+        "total_free": len(candidates),
+        "public_free": sum(1 for c in candidates if c["is_public"]),
+        "private_free": sum(1 for c in candidates if not c["is_public"]),
+        "subnet_count": usable_subnets,
+        "registered_subnet_count": registered_subnets,
+        "short": max(0, (needed if required is None else required)
+                     - min(len(pool), max(needed, 0))),
+        "samples": [
+            {"ip": c["ip"], "network": c["network"], "room": c["room"],
+             "scope": "public" if c["is_public"] else "private"}
+            for c in pool[:max(examples, 0)]
+        ],
+    }
+
+
+def _ip_reference(primary_room_id: int, l2: Dict[str, Any],
+                  ip_scope: Optional[str], needed: int, examples: int,
+                  pool_scope: str = "auto",
+                  required: Optional[int] = None) -> Dict[str, Any]:
+    """双口径 IP 资源：物理机房（本地出口）与虚拟机房二层域（跨域可调）并行。
+
+    生产两种形态并存，不是非此即彼：
+      · room —— 网段按物理机房登记，出口与带宽在本机房，最稳妥；
+      · l2   —— 同一虚拟机房内二层互通，网段可跨物理机房调度，但需要确认出口可达。
+
+    pool_scope:
+      "auto"（默认）—— 两套都算，挑 IP 时先本地后跨域；
+      "room" —— 严格只用本物理机房名下的地址。
+
+    Returns: 顶层为选中口径的统计（向后兼容 ips/total_free/...），
+    另含 local / l2 两份明细与口径标识。
+    """
+    cands, stats = _collect_ip_candidates(l2["room_ids"], primary_room_id)
+    local_cands = [c for c in cands if c["is_primary"]]
+
+    view_local = _ip_view(local_cands, ip_scope, needed, examples,
+                          stats["usable_local"], stats["registered_local"],
+                          required)
+    view_l2 = _ip_view(cands, ip_scope, needed, examples,
+                       stats["usable"], stats["registered"], required)
+
+    pick = view_local if pool_scope == "room" else view_l2
+    return {
+        **pick,
+        "scope": l2["scope"],
+        "pool_scope": pool_scope,
+        "scope_rooms": l2["room_names"],
+        "virtual_rooms": l2["virtual_room_names"],
+        "local": view_local,
+        "l2": view_l2,
     }
 
 
@@ -364,6 +603,192 @@ def _pick_cabinet_window(cabinets: List[tuple], need: int) -> List[tuple]:
     return cabinets[start: start + best[0]]
 
 
+def _ip_reference_lines(ip_ref: Optional[Dict[str, Any]], placeable: int,
+                        room_name: str = "") -> List[str]:
+    """IP 段：物理机房（本地出口）与虚拟机房二层域两套口径并列展示。
+
+    实际网络里两者并存——段既可能按物理机房落地（带宽/出口就在这里），
+    也可能登记在虚拟机房内其他机房名下（二层互通但要看出口方向是否可达），
+    所以不分彼此，用谁的结论由使用者按现场出口情况决定。
+    """
+    lines = ["", "IP 地址资源"]
+    if not ip_ref:
+        return lines
+
+    local = ip_ref.get("local") or {}
+    l2 = ip_ref.get("l2") or {}
+    strict = ip_ref.get("pool_scope") == "room"
+    vr_txt = "、".join(ip_ref.get("virtual_rooms") or [])
+    room_txt = "、".join(ip_ref.get("scope_rooms") or [])
+    has_l2 = ip_ref.get("scope") == "virtual_room"
+
+    def _line(label: str, view: Dict[str, Any]) -> str:
+        return (
+            f"· {label}：登记 {view.get('registered_subnet_count', 0)} 个网段，"
+            f"其中 {view.get('subnet_count', 0)} 个含可分配主机地址；"
+            f"空闲可用 {view.get('total_free', 0)} 个："
+            f"公网 {view.get('public_free', 0)} 个、"
+            f"内网 {view.get('private_free', 0)} 个"
+        )
+
+    if local.get("registered_subnet_count") == 0:
+        lines.append(f"· ⚠ {room_name}名下未登记任何网段，无法推荐 IP，请先维护网段规划")
+    else:
+        lines.append(_line(f"本物理机房（{room_name}）", local))
+    if has_l2:
+        lines.append(_line(f"虚拟机房「{vr_txt}」二层域（{room_txt}）", l2))
+        lines.append(
+            "· 分配口径：" + ("限定只用本物理机房地址" if strict else
+                          "先本物理机房，不足时在同一虚拟机房内跨机房调度")
+        )
+    else:
+        lines.append("· 本机房交换机未加入虚拟机房，无跨机房二层域可参照")
+    lines.append("· 计数已去重，并剔除网关、网络号、广播地址与 /31、/32 主机路由")
+
+    base = local.get("public_free", 0) if strict else l2.get("public_free", 0)
+    if local.get("registered_subnet_count", 0) and base < placeable:
+        gap = placeable - base
+        if has_l2 and not strict and l2.get("public_free", 0) >= placeable:
+            extra = int(l2["public_free"]) - int(local.get("public_free", 0))
+            lines.append(
+                f"· ⚠ 每台 1 个公网 IP 时，本物理机房公网地址差 "
+                f"{placeable - int(local.get('public_free', 0))} 个；"
+                f"二层域内另有 {extra} 个公网空闲可在确认出口可达后跨机房调配"
+            )
+        else:
+            lines.append(
+                f"· ⚠ 若每台配 1 个公网 IP，公网地址还差 {gap} 个，"
+                f"需先申请新的公网地址段"
+            )
+
+    samples = ip_ref.get("samples") or []
+    if samples:
+        lines.append(f"· 优先可分配地址（前 {len(samples)} 个 · 网段 / 地址）")
+        for s in samples:
+            tag = "" if s["scope"] == "public" else "（内网）"
+            where = f"（{s['room']}）" if s.get("room") else ""
+            lines.append(f"  - {s['network']}{where}：{s['ip']}{tag}")
+    lines.append("· 以上为可分配建议，未做任何预留与占用")
+    return lines
+
+
+def _capacity_report(room, ev: Dict[str, Any], u_height: int,
+                     power_per_unit: int, speed_mbps: int) -> str:
+    """容量模式中文报告（给 AI/前端直接展示，避免吐机器字段）。"""
+    per_unit_u = u_height + _DEVICE_SPACING
+    free_u = sum(
+        max(0, (cab.total_u or 0) - sum(d["height_u"] for d in existing))
+        for cab, _, existing in ev["cabinets"]
+    )
+    lines = [
+        f"【上架容量查询】{room.name}",
+        f"结论：还能上架 {ev['placeable']} 台"
+        f"（{u_height}U / {power_per_unit}W / {speed_mbps}Mbps 端口）",
+        "",
+        "依据",
+        f"· U 位：可用 {free_u}U，按每台占 {u_height}U + {_DEVICE_SPACING}U "
+        f"散热间距（即 {per_unit_u}U/台）计算 → {ev['placeable']} 台",
+        f"· 端口：速率 ≥ {speed_mbps}Mbps 的空闲物理端口 {ev['port_total']} 个",
+    ]
+
+    sw_dist = ev.get("switch_distribution") or []
+    if sw_dist:
+        lines.append("· 端口落在以下交换机（接入/核心 · 所在机柜：可用口）")
+        for item in sw_dist:
+            where = f"{item['cabinet_number']} 机柜" if item["cabinet_number"] else "机柜未登记"
+            role = "核心" if item["role"] == "core" else "接入"
+            lines.append(
+                f"  - {item['device_name']}（{role} · {where}）：{item['free_ports']} 个"
+            )
+        if any(i["role"] == "core" for i in sw_dist):
+            lines.append("  - ⚠ 上列含核心交换机端口，正式上架请优先用接入交换机端口")
+
+    lines.append(f"· 瓶颈：{ev['bottleneck']}（端口 {ev['port_total']} vs U 位 {ev['placeable']}）")
+
+    dist = [(cab.cabinet_number, fits) for cab, fits, _ in ev["cabinets"] if fits > 0]
+    if dist:
+        total_fits = sum(f for _, f in dist)
+        lines.append("")
+        lines.append("可上机柜分布（机柜：台数）")
+        lines.append("· " + " | ".join(f"{num}：{fits}" for num, fits in dist))
+        if total_fits > ev["placeable"]:
+            lines.append(
+                f"  - 机柜合计可放 {total_fits} 台，但受{ev['bottleneck']}限制"
+                f"最终只能上 {ev['placeable']} 台"
+            )
+
+    lines.append("")
+    lines.append("电力余量参考")
+    lines.append("· 说明：电力按机柜台账估算，存在加装/临时下电未登记的情况，"
+                 "不纳入上面的容量结论，以现场实测为准")
+    if ev["power_anomalies"]:
+        detail = "；".join(
+            f"{num} 机柜已用 {used}W 超过额定 {total}W"
+            for num, total, used in ev["power_anomalies"]
+        )
+        lines.append(
+            f"· ⚠ 台账异常：{detail}——该部分余量不计入，"
+            f"请先核对并修正机柜额定/已用功率"
+        )
+    lines.append(f"· 按已录额定功率推算还能支撑 {ev['power_headroom']} 台")
+    if ev["power_unrecorded"]:
+        lines.append(
+            f"· 另有 {ev['power_unrecorded']} 个机柜未录入额定功率，未计入电力余量"
+        )
+    if ev["power_headroom"] < ev["placeable"]:
+        lines.append(
+            f"· ⚠ 按电力推算（{ev['power_headroom']} 台）少于空间容量"
+            f"（{ev['placeable']} 台），上架前请先确认新增电路的供电能力"
+        )
+
+    lines += _ip_reference_lines(ev.get("ip_reference"), ev["placeable"], room.name)
+
+    lines.append("")
+    lines.append("备注")
+    lines.append("· 结果依据库内登记数据推算，现场请复核承重/散热/走线")
+    lines.append("· 需要具体到每台机柜、U 位、端口与 IP 的清单，请指定台数后再查")
+    return "\n".join(lines)
+
+
+def _assignment_report(room, assignments: List[Dict[str, Any]],
+                       warnings: List[Dict[str, str]], u_height: int,
+                       speed_mbps: int) -> str:
+    """分配模式中文报告。"""
+    cabinets_used = {a["cabinet_number"] for a in assignments}
+    core_used = [a for a in assignments if a["switch"]["role"] == "core"]
+    lines = [
+        f"【上架方案】{room.name} · {len(assignments)} 台 {u_height}U / "
+        f"{speed_mbps}Mbps 端口",
+        f"涉及机柜：{'、'.join(sorted(cabinets_used))}",
+        "",
+        "逐台方案（序号 | 机柜-U位 | 交换机/端口 | 建议IP | 限速）",
+    ]
+    for a in assignments:
+        sw = a["switch"]
+        limit = a.get("speed_limit_mbps")
+        lines.append(
+            f"· {a['seq']} | {a['cabinet_number']}-U{a['start_u']} "
+            f"| {sw['device_name']} {sw['port_name']}"
+            f"（{'核心' if sw['role'] == 'core' else '接入'}）"
+            f" | {a.get('suggested_ip') or '无空闲 IP'}"
+            f" | {str(limit) + 'Mbps' if limit else '未提供需求'}"
+        )
+    if core_used:
+        names = sorted({a["switch"]["device_name"] for a in core_used})
+        lines.append(
+            f"· ⚠ 其中 {len(core_used)} 台落到核心交换机（{'、'.join(names)}），"
+            f"建议优先接接入交换机"
+        )
+    if warnings:
+        lines.append("")
+        lines.append("提示")
+        for w in warnings:
+            lines.append(f"· {w['message']}")
+    lines.append("")
+    lines.append("本清单为推荐方案，未预留机位、端口与 IP；实施请走 IP 管理与上架审批流程")
+    return "\n".join(lines)
+
+
 def build_plan(
     *,
     count: Optional[int],
@@ -373,6 +798,9 @@ def build_plan(
     power_per_unit: int = 750,
     room_id: Optional[int] = None,
     visible_switch_ids=None,
+    ip_scope: Optional[str] = None,
+    ip_examples: int = 0,
+    ip_pool_scope: str = "auto",
 ) -> Dict[str, Any]:
     """生成上架推荐方案（只读）。
 
@@ -386,13 +814,25 @@ def build_plan(
         power_per_unit: 单台额定功率 W（默认 750，仅参考）
         room_id: 机房 ID（可选；缺省则在全部机房中择优）
         visible_switch_ids: 数据域可见交换机集合（None=不限制）
+        ip_scope: "public" 只要公网 / "private" 只要内网 / None 不限（推荐序仍公网优先）
+        ip_examples: 额外返回多少个"可分配 IP 样例"（容量模式默认给 _DEFAULT_IP_SAMPLES 个）
+        ip_pool_scope: 地址池口径，"auto"（默认，先本物理机房后二层域内跨机房）/
+               "room"（严格只用本物理机房名下的地址）
     """
+    if ip_scope not in (None, "public", "private"):
+        raise DeploymentPlanError("IP 类型 ip_scope 只能是 public / private")
+    pool_scope = (ip_pool_scope or "auto").strip().lower()
+    if pool_scope in ("l2", "virtual_room", "vroom"):
+        pool_scope = "auto"
+    if pool_scope not in ("auto", "room"):
+        raise DeploymentPlanError("地址池口径 ip_pool_scope 只能是 auto / room")
+    examples = int(ip_examples or 0)
     speed_mbps = normalize_port_speed(port_speed_raw)
     if bandwidth_mbps is not None and (not int(bandwidth_mbps) or int(bandwidth_mbps) <= 0):
         raise DeploymentPlanError("单台带宽需求 bandwidth_mbps 须为正整数（不填=不给限速建议）")
     if count is not None and (not int(count) or int(count) < 1):
         raise DeploymentPlanError("台数 count 须 ≥ 1（缺省=查询机房还能上多少台）")
-    bandwidth_mbps = int(bandwidth_mbps)
+    bandwidth_mbps = int(bandwidth_mbps) if bandwidth_mbps is not None else None
     capacity_mode = count is None
     count = int(count) if count is not None else 0
     u_height = max(1, int(u_height or 2))
@@ -418,7 +858,9 @@ def build_plan(
             continue
         ports = _collect_room_ports(room.id, speed_mbps, visible_switch_ids)
         port_total = len(ports["access"]) + len(ports["core"])
-        power_head, power_unrecorded = _room_power_headroom(cabinets, power_per_unit)
+        power_head, power_unrecorded, power_anomalies = _room_power_headroom(
+            cabinets, power_per_unit
+        )
         dims = {"U 位": u_total, "匹配空闲端口": port_total}
         placeable = min(dims.values())
         bottleneck = min(dims, key=dims.get)
@@ -427,6 +869,7 @@ def build_plan(
             "placeable": placeable, "u_total": u_total,
             "port_total": port_total, "power_headroom": power_head,
             "power_unrecorded": power_unrecorded, "bottleneck": bottleneck,
+            "power_anomalies": power_anomalies,
             "dims": dims,
         })
 
@@ -445,12 +888,32 @@ def build_plan(
     for ev in room_evals[1:]:
         warnings.append({
             "code": "room_not_chosen",
-            "message": f"机房 {ev['room'].name} 可放 {ev['placeable']} 台，未选用",
+            "message": (f"另有候选机房 {ev['room'].name}，可容纳 {ev['placeable']} 台"
+                        f"（本次未选用）"),
         })
+
+    examples = max(examples, _DEFAULT_IP_SAMPLES) if capacity_mode else examples
+    chosen["switch_distribution"] = _switch_distribution(chosen["ports"])
+    l2 = _l2_room_ids(room.id)
+    chosen["ip_reference"] = _ip_reference(
+        room.id, l2, ip_scope, max(chosen["placeable"], count),
+        examples, pool_scope=pool_scope,
+        required=chosen["placeable"] if capacity_mode else count,
+    )
 
     placeable = chosen["placeable"]
     diff = max(0, count - placeable) if not capacity_mode else 0
     to_place = min(count, placeable)
+
+    if chosen["power_anomalies"]:
+        detail = "；".join(
+            f"{n}（额定 {t}W < 已用 {u}W）" for n, t, u in chosen["power_anomalies"]
+        )
+        warnings.append({
+            "code": "power_data_inconsistent",
+            "message": (f"机柜电力台账待核对：{detail}，这部分余量未计入本次评估，"
+                        f"请先核对额定功率与已用功率录入"),
+        })
 
     if capacity_mode:
         if placeable <= 0:
@@ -471,6 +934,8 @@ def build_plan(
             "capacity_query": True, "requested": None,
             "placeable": placeable, "diff": 0, "assignments": [],
             "room": {"id": room.id, "name": room.name},
+            "report": _capacity_report(room, chosen, u_height,
+                                       power_per_unit, speed_mbps),
             "summary": {
                 "u_height": u_height,
                 "power_per_unit": power_per_unit,
@@ -480,9 +945,34 @@ def build_plan(
                 "matched_port_total": chosen["port_total"],
                 "bottleneck": chosen["bottleneck"],
                 "power_headroom": chosen["power_headroom"],
+                "switch_count": len(chosen["switch_distribution"]),
+                "free_ip_total": chosen["ip_reference"]["total_free"],
+                "public_ip_total": chosen["ip_reference"]["public_free"],
+                "subnet_count": chosen["ip_reference"]["subnet_count"],
+                "ip_scope": chosen["ip_reference"]["scope"],
+                "ip_scope_rooms": chosen["ip_reference"]["scope_rooms"],
+                "ip_pool_scope": chosen["ip_reference"]["pool_scope"],
+                "local_free_ip_total": (chosen["ip_reference"].get("local") or {})
+                .get("total_free", 0),
+                "local_public_ip_total": (chosen["ip_reference"].get("local") or {})
+                .get("public_free", 0),
             },
+            "power_reference": {
+                "placeable_by_power": chosen["power_headroom"],
+                "unrecorded_cabinets": chosen["power_unrecorded"],
+                "anomalies": [
+                    {"cabinet": n, "total_power": t, "used_power": u}
+                    for n, t, u in chosen["power_anomalies"]
+                ],
+            },
+            "cabinet_distribution": [
+                {"cabinet_number": cab.cabinet_number, "placeable": fits}
+                for cab, fits, _ in chosen["cabinets"] if fits > 0
+            ],
+            "switch_distribution": chosen["switch_distribution"],
+            "ip_reference": chosen["ip_reference"],
             "warnings": warnings,
-            "note": "容量模式：placeable 即该机房还能上的台数；明细分配请指定台数查询",
+            "note": "本次仅评估机房容量，未生成分配明细；指定台数可得逐台机柜/U位/端口/IP 清单",
         }
 
     if chosen["port_total"] == 0:
@@ -516,8 +1006,8 @@ def build_plan(
         warnings.append({
             "code": "power_unrecorded",
             "message": (
-                f"机房 {room.name} 有 {chosen['power_unrecorded']} 个机柜未录入"
-                f" total_power，电力校验跳过（仅提示不阻断）"
+                f"机房 {room.name} 有 {chosen['power_unrecorded']} 个机柜未录入额定功率，"
+                f"其电力余量未计入本次评估"
             ),
         })
 
@@ -527,8 +1017,8 @@ def build_plan(
         warnings.append({
             "code": "core_switch_fallback",
             "message": (
-                f"接入交换机空闲端口不足，有 {core_used} 台需接入核心交换机"
-                f"（违反分层规范时请先扩容接入层）"
+                f"接入交换机空闲端口不足，有 {core_used} 台需上联核心交换机；"
+                f"建议先扩容接入交换机端口再上架"
             ),
         })
 
@@ -572,8 +1062,8 @@ def build_plan(
                 warnings.append({
                     "code": "power_exceeded",
                     "message": (
-                        f"机柜 {cab.cabinet_number} 按方案满载后功率 {used}W，"
-                        f"超出额定 {cab.total_power}W（仅提示，请复核电力分配）"
+                        f"机柜 {cab.cabinet_number} 按本方案满载后达 {used}W，"
+                        f"超出额定 {cab.total_power}W，请复核该机柜供电或调整本批分布"
                     ),
                 })
 
@@ -598,13 +1088,15 @@ def build_plan(
             "speed_limit_mbps": bandwidth_mbps,
         })
 
-    ip_plan = _room_free_ips(room.id, to_place)
-    if ip_plan["short"] > 0:
+    ip_plan = chosen["ip_reference"]  # 已在选机房后统一扫描，避免重复全表查询
+    ip_short = max(0, to_place - len(ip_plan["ips"]))
+    if ip_short > 0:
         warnings.append({
             "code": "ip_short",
             "message": (
-                f"机房 {room.name} 空闲 IP 仅 {ip_plan['total_free']} 个"
-                f"（{ip_plan['subnet_count']} 个网段），差 {ip_plan['short']} 个"
+                f"机房 {room.name} 网络可达范围内空闲 IP 仅 "
+                f"{ip_plan['total_free']} 个"
+                f"（分布于 {ip_plan['subnet_count']} 个网段），还差 {ip_short} 个"
             ),
         })
     for i, a in enumerate(assignments):
@@ -612,9 +1104,14 @@ def build_plan(
 
     used_switch_ids = list({a["switch"]["device_id"] for a in assignments})
     uplinks = _uplink_info(used_switch_ids)
+    if bandwidth_mbps is None:
+        warnings.append({
+            "code": "bandwidth_not_provided",
+            "message": "未提供单机带宽需求，未生成端口限速建议，也未核算出口带宽余量",
+        })
     warnings.append({
         "code": "uplink_capacity_unknown",
-        "message": "上行链路容量未登记（connections.bandwidth 为自由文本），出口余量无法计算，请人工核对",
+        "message": "上行链路带宽未录入或无法识别，出口带宽余量无法核算，请先在连接台账补录上行链路带宽",
     })
 
     return {
@@ -625,6 +1122,8 @@ def build_plan(
         "placeable": placeable,
         "diff": diff,
         "room": {"id": room.id, "name": room.name},
+        "report": _assignment_report(room, assignments, warnings,
+                                     u_height, speed_mbps),
         "summary": {
             "u_height": u_height,
             "power_per_unit": power_per_unit,
@@ -633,10 +1132,17 @@ def build_plan(
             "bottleneck": chosen["bottleneck"],
             "power_headroom": chosen["power_headroom"],
             "free_ip_total": ip_plan["total_free"],
+            "public_ip_total": ip_plan["public_free"],
+            "ip_scope": ip_plan["scope"],
+            "ip_scope_rooms": ip_plan["scope_rooms"],
+            "ip_pool_scope": ip_plan["pool_scope"],
+            "local_free_ip_total": (ip_plan.get("local") or {}).get("total_free", 0),
+            "local_public_ip_total": (ip_plan.get("local") or {}).get("public_free", 0),
             "cabinets_used": sorted({a["cabinet_number"] for a in assignments}),
         },
         "assignments": assignments,
+        "ip_reference": chosen["ip_reference"],
         "uplinks": uplinks,
         "warnings": warnings,
-        "note": "Phase 1 纯推荐，零副作用：实际分配请走 IP 管理流程与上架流程",
+        "note": "本方案为推荐结果，未预留机位、端口与 IP；正式分配请走 IP 管理与上架审批流程",
     }

@@ -43,7 +43,12 @@ celery==5.6.3
 
 # ── 实时网关 (realtime_gateway) 独立 ASGI 进程运行时依赖 ──────────────
 uvicorn==0.49.0
-starlette==1.3.1
+# ⚠️ 不可升级到 starlette 1.x：chromadb==1.0.0 硬锁 fastapi==0.115.9，
+#    而 fastapi 0.115.9 约束 starlette>=0.40.0,<0.46.0。此处曾写 1.3.1，
+#    与两者同时冲突，导致**全新环境 pip 安装必然失败**（本机 venv 因历史
+#    安装顺序侥幸停在 0.45.3，故问题被长期掩盖）。realtime_gateway 自身
+#    的 requirements.txt 只要求 starlette>=0.37.0，0.45.3 功能无损。
+starlette==0.45.3
 
 # ── AI 能力 (Phase 0-4) ──────────────────────────────────────────────
 openai>=1.99,<3  # OpenAI 兼容 LLM 客户端

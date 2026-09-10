@@ -180,6 +180,9 @@ def skills_run(name):
         with bind_scenario(f"skill.{name}"):
             result = engine.run(skill, args, user_id=user_id)
         return APIResponse.success(data={"result": result})
+    except ValueError as e:
+        status = "error"
+        return APIResponse.error(f"参数或查询条件有误：{e}", status_code=400)
     except Exception:
         status = "error"
         raise

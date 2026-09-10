@@ -139,6 +139,9 @@ class NLQueryRouter:
                     skill, args,
                     user_id=user_id, user_permissions=user_permissions,
                 )
+        except ValueError as e:
+            _status = "error"
+            return f"查询条件有误：{e}"
         except Exception:
             _status = "error"
             raise
@@ -147,6 +150,9 @@ class NLQueryRouter:
                              duration_seconds=_time.monotonic() - _t0)
         if result is None:
             return "该查询暂无数据，请换种问法或调整筛选条件。"
+        report = result.get("report") if isinstance(result, dict) else None
+        if isinstance(report, str) and report.strip():
+            return report.strip()
         return result if isinstance(result, str) else _format_result_cn(result)
 
     def _run_agentic(self, skill_name: str, question: str,
