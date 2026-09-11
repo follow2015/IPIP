@@ -112,11 +112,13 @@ bash scripts/install.sh
 
 安装脚本会依次执行：
 1. 检查系统依赖（Python / Node / pnpm / MySQL 客户端 / redis-cli）
-2. 创建 Python venv 并安装 `requirements.txt`
+2. 创建 Python venv 并安装 `requirements.txt`（默认 CPU 版 torch，`--gpu` 装 CUDA 版）
 3. 前端依赖安装 + 构建（`cd frontend-new && pnpm install && pnpm build`）
 4. 从 `.env.example` 创建 `.env`（首次运行，需编辑后重跑）
 5. 创建 MySQL 数据库并导入迁移基线 `0000_baseline.sql`（按 covers 清单登记版本）
 6. 导入种子数据（`seed_all.sh`）
+7. 下载 RAG 本地模型到 HF 缓存（embedding ≈92MB + reranker ≈1100MB，`--skip-models` 跳过）
+8. 【可选】安装 systemd unit（`--with-units`，需 root）
 
 **首次运行后**：编辑 `.env` 填写实际的 `MYSQL_PASSWORD`、`REDIS_PASSWORD`、`SECRET_KEY`、`JWT_SECRET_KEY`，然后再次执行 `bash scripts/install.sh`（已完成的步骤会跳过）。
 
@@ -138,6 +140,14 @@ bash scripts/start.sh restart   # 重启全部
 | `--skip-frontend` | 跳过前端构建（要求 `frontend-new/dist/` 已存在） |
 | `--skip-db` | 跳过数据库 schema 初始化 |
 | `--skip-seed` | 跳过种子数据导入 |
+| `--skip-models` | 跳过本地 AI 模型下载（不需要 RAG 时用） |
+| `--cpu` | 显式指定 CPU 版 torch（默认，约 190MB） |
+| `--gpu` | 安装 CUDA 版 torch（需 NVIDIA GPU，约 2.6-3.5GB，耗时 30-60 分钟） |
+| `--gpu-fast` | CUDA 版 + 多镜像分散并行预取大包（更快） |
+| `--with-units` | 安装完成后渲染并安装 systemd unit（需 root） |
+| `--units-user NAME` | 服务运行账号（默认 ipip；项目在 /root 下应为 root） |
+| `--units-group NAME` | 服务运行组（默认同 `--units-user`） |
+| `--units-script PATH` | 指定 `install-units.sh` 路径 |
 | `--help` | 查看用法 |
 
 ## 启动脚本命令
