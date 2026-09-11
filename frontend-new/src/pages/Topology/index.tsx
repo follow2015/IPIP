@@ -31,7 +31,8 @@ import {
   CloudServerOutlined,
   SwapOutlined,
   ThunderboltOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  NodeIndexOutlined
 } from '@ant-design/icons';
 import { useNetworkTopology, useDeviceTopology, useAutoDetectTopology } from '@/services/topology';
 import { useRoomOptions } from '@/services/room';
@@ -42,6 +43,7 @@ import TopologyGraph from './TopologyGraph';
 import type { TopologyGraphHandle } from './TopologyGraph';
 import TopologyToolbar from './TopologyToolbar';
 import NodeDetailPanel from './NodeDetailPanel';
+import LldpDiscoveryModal from './LldpDiscoveryModal';
 
 
 type ViewMode = 'network' | 'device';
@@ -57,6 +59,7 @@ const TopologyPage: React.FC = () => {
   const [searchValue, setSearchValue] = useState('');
   const deferredSearch = useDeferredValue(searchValue);
   const [autoDetectModalOpen, setAutoDetectModalOpen] = useState(false);
+  const [discoveryModalOpen, setDiscoveryModalOpen] = useState(false);
   const graphRef = useRef<TopologyGraphHandle>(null);
 
   const { data: roomOptions } = useRoomOptions();
@@ -271,6 +274,15 @@ const TopologyPage: React.FC = () => {
                 size="small"
                 type="primary"
                 ghost
+                icon={<NodeIndexOutlined />}
+                onClick={() => setDiscoveryModalOpen(true)}
+              >
+                LLDP 发现
+              </Button>
+              <Button
+                size="small"
+                type="primary"
+                ghost
                 icon={<ThunderboltOutlined />}
                 onClick={handleAutoDetect}
                 loading={autoDetectMutation.isPending}
@@ -356,6 +368,13 @@ const TopologyPage: React.FC = () => {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onLocateNode={(nodeId) => setHighlightNodeId(nodeId)}
+      />
+
+      {/* LLDP/CDP 发现 Modal（建议式，不自动覆盖） */}
+      <LldpDiscoveryModal
+        open={discoveryModalOpen}
+        onClose={() => setDiscoveryModalOpen(false)}
+        roomId={roomId}
       />
 
       {/* 自动推断预览 Modal */}

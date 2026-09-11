@@ -77,6 +77,26 @@ class ParsedPort:
     description: str = ""
 
 
+@dataclass
+class ParsedLldpNeighbor:
+    """解析后的 LLDP 邻居条目（P2-1 拓扑发现）
+
+    Attributes:
+        local_port: 本机端口号（厂商原样写法，如 GE0/0/1 / XGE1/0/49 / Gi0/1）
+        neighbor_sysname: 对端系统名（System name）
+        neighbor_port: 对端端口号（Port id）
+        neighbor_mgmt_ip: 对端管理地址（缺失为 None）
+        chassis_id: 对端 chassis id（缺失为 None）
+        protocol: 发现协议来源（lldp / cdp）
+    """
+    local_port: str
+    neighbor_sysname: str = ""
+    neighbor_port: str = ""
+    neighbor_mgmt_ip: Optional[str] = None
+    chassis_id: Optional[str] = None
+    protocol: str = "lldp"
+
+
 def normalize_port_status(raw_status: str) -> str:
     """将设备原始端口状态规范化为统一值
 
@@ -202,6 +222,71 @@ class BaseDeviceAdapter(ABC):
         if not re.match(r'^[a-zA-Z0-9]', name):
             return ""
         return name
+
+
+    def get_lldp_neighbor_command(self) -> str:
+        """LLDP 邻居表查询命令（默认华为 VRP）"""
+        return "display lldp neighbor"
+
+    def get_cdp_neighbor_command(self) -> Optional[str]:
+        """CDP 邻居表查询命令；不支持 CDP 的厂商返回 None（LLDP 空结果时不做回退）"""
+        return None
+
+    def parse_lldp_neighbors(self, raw_output: str) -> list:
+        """解析 LLDP/CDP 邻居输出 → list[ParsedLldpNeighbor]
+
+        默认实现：华为 VRP 块状输出（每端口一段，含 System name / Port id /
+        Management address 标签行）。H3C/Cisco 子类按自身格式覆盖。
+        """
+        return self._parse_lldp_blocks(
+            raw_output,
+            block_start=re.compile(r"^(\S+)\s+has\s+\d+\s+neighbor", re.M | re.I),
+            fields={
+                "local_port": None,  # 从块起始行捕获组 1 取
+                "chassis_id": re.compile(r"^\s*Chassis id\s*:\s*(\S+)", re.M | re.I),
+                "neighbor_port": re.compile(r"^\s*Port id\s*:\s*(\S+)", re.M | re.I),
+                "neighbor_sysname": re.compile(r"^\s*System name\s*:\s*(\S.*)", re.M | re.I),
+                "neighbor_mgmt_ip": re.compile(
+                    r"^\s*Management address\s*:\s*(\d+(?:\.\d+){3})", re.M | re.I),
+            },
+        )
+
+    @staticmethod
+    def _parse_lldp_blocks(raw_output: str, block_start: "re.Pattern",
+                           fields: dict) -> list:
+        """LLDP 块状输出通用解析器（各厂商共用）
+
+        按 block_start 切分输出为块，每块内用 fields 的标签正则抽字段。
+
+        Args:
+            raw_output: 命令原始输出
+            block_start: 块起始正则（捕获组 1 为本机端口号）
+            fields: 字段名 → 标签正则；值为 None 的字段取块起始行捕获组 1
+
+        Returns:
+            list[ParsedLldpNeighbor]
+        """
+        neighbors = []
+        matches = list(block_start.finditer(raw_output))
+        for i, m in enumerate(matches):
+            start = m.start()
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(raw_output)
+            block = raw_output[start:end]
+            kwargs = {}
+            for name, pattern in fields.items():
+                if pattern is None:
+                    kwargs[name] = m.group(1).strip()
+                else:
+                    fm = pattern.search(block)
+                    kwargs[name] = fm.group(1).strip() if fm else ""
+            neighbors.append(ParsedLldpNeighbor(
+                local_port=kwargs.get("local_port", ""),
+                neighbor_sysname=kwargs.get("neighbor_sysname", ""),
+                neighbor_port=kwargs.get("neighbor_port", ""),
+                neighbor_mgmt_ip=kwargs.get("neighbor_mgmt_ip") or None,
+                chassis_id=kwargs.get("chassis_id") or None,
+            ))
+        return neighbors
 
     def get_port_vlan_command(self) -> str:
         """获取端口VLAN查询命令（可选，默认返回空）"""

@@ -11,7 +11,7 @@ import re
 
 from app.adapters.base_adapter import (
     BaseDeviceAdapter, BanCommands, ArpBanCommands, ParsedRoute, ParsedArpEntry, ParsedMacEntry,
-    ParsedPort, ParsedDeviceInfo,
+    ParsedPort, ParsedDeviceInfo, ParsedLldpNeighbor,
 )
 
 logger = get_logger(__name__)
@@ -29,6 +29,30 @@ _H3C_RE_TRUNK_PERMIT = re.compile(r'^\s*port\s+trunk\s+permit\s+vlan\s+(.+?)\s*$
 
 class H3CAdapter(BaseDeviceAdapter):
     """H3C Comware 平台适配器"""
+
+
+    def get_lldp_neighbor_command(self) -> str:
+        """H3C Comware 的 LLDP 邻居明细命令（块状 verbose 输出）"""
+        return "display lldp neighbor-information verbose"
+
+    def parse_lldp_neighbors(self, raw_output: str) -> list:
+        """解析 H3C verbose 块状输出
+
+        与华为同构（"XGE1/0/49 has 1 neighbor(s)" 块起始），仅标签大小写
+        存在差异（Chassis ID / Port ID），统一用大小写不敏感正则处理。
+        """
+        return self._parse_lldp_blocks(
+            raw_output,
+            block_start=re.compile(r"^(\S+)\s+has\s+\d+\s+neighbor", re.M | re.I),
+            fields={
+                "local_port": None,
+                "chassis_id": re.compile(r"^\s*Chassis ID\s*:\s*(\S+)", re.M | re.I),
+                "neighbor_port": re.compile(r"^\s*Port ID\s*:\s*(\S+)", re.M | re.I),
+                "neighbor_sysname": re.compile(r"^\s*System name\s*:\s*(\S.*)", re.M | re.I),
+                "neighbor_mgmt_ip": re.compile(
+                    r"^\s*Management address\s*:\s*(\d+(?:\.\d+){3})", re.M | re.I),
+            },
+        )
 
     def parse_port_vlans(self, raw_output: str) -> dict:
         """解析H3C display port vlan 输出，返回 {端口名: pvid}"""

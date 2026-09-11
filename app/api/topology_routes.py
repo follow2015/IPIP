@@ -11,7 +11,7 @@ from flask import Blueprint, request
 from app.api.base import APIResponse, ErrorCode, api_exception_handler
 from app.openapi.doc import doc
 from app.services.topology_service import TopologyService
-from app.utils.auth import login_required
+from app.utils import login_required, permission_required, rate_limit_api
 from app.utils.transactional import transactional
 
 logger = get_logger(__name__)
@@ -106,3 +106,68 @@ def auto_detect_topology():
         force=force,
     )
     return APIResponse.success(data=result, message="自动推断完成")
+
+
+
+_discovery_service_lazy = None
+
+
+def _get_discovery_service():
+    global _discovery_service_lazy
+    if _discovery_service_lazy is None:
+        from app.services.topology_discovery_service import TopologyDiscoveryService
+        _discovery_service_lazy = TopologyDiscoveryService()
+    return _discovery_service_lazy
+
+
+@router.route("/discover", methods=["POST"])
+@login_required
+@permission_required("device:update")
+@rate_limit_api
+@api_exception_handler
+@doc(
+    summary="LLDP/CDP 拓扑发现（只读，返回连接建议）",
+    tags=["拓扑"],
+    responses={200: {"description": "建议列表：match_status = existing/matched/partial/unknown_peer/port_occupied"}},
+)
+def discover_topology():
+    """对交换机（单台或 ≤10 台）执行 LLDP/CDP 邻居发现
+
+    请求体：{"device_ids": [..]}（≤10 台）或 {"device_id": n}
+    本接口只读探测，不写任何库表。
+    """
+    data = request.get_json(silent=True) or {}
+    device_ids = data.get("device_ids") or ([data["device_id"]] if data.get("device_id") else [])
+    if not device_ids:
+        return APIResponse.error("缺少必填字段: device_ids", ErrorCode.VALIDATION_ERROR, 400)
+
+    result = _get_discovery_service().discover_batch(device_ids)
+    return APIResponse.success(data=result, message="发现完成")
+
+
+@router.route("/discover/apply", methods=["POST"])
+@login_required
+@permission_required("device:update")
+@rate_limit_api
+@api_exception_handler
+@transactional
+@doc(
+    summary="应用拓扑发现建议（仅 matched 项）",
+    tags=["拓扑"],
+    responses={200: {"description": "创建的 N2N 连接与跳过项"}},
+)
+def apply_discovered_topology():
+    """将勾选的 matched 建议落库为 N2N 连接
+
+    纪律：只建全新连接；端口被占用或非 matched 状态一律跳过并报告，
+    绝不改写/覆盖手工录入的连接关系。
+    """
+    data = request.get_json(silent=True) or {}
+    device_id = data.get("device_id")
+    suggestions = data.get("suggestions") or []
+    if not device_id or not suggestions:
+        return APIResponse.error("缺少必填字段: device_id / suggestions",
+                                 ErrorCode.VALIDATION_ERROR, 400)
+
+    result = _get_discovery_service().apply_suggestions(device_id, suggestions)
+    return APIResponse.success(data=result, message="应用完成")

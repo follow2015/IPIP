@@ -11,7 +11,7 @@ from typing import List, Optional
 
 from app.adapters.base_adapter import (
     BaseDeviceAdapter, BanCommands, ArpBanCommands, ParsedRoute, ParsedArpEntry, ParsedPort,
-    ParsedDeviceInfo, ParsedIP, ParsedMacEntry,
+    ParsedDeviceInfo, ParsedIP, ParsedMacEntry, ParsedLldpNeighbor,
 )
 
 logger = get_logger(__name__)
@@ -33,6 +33,58 @@ class CiscoAdapter(BaseDeviceAdapter):
 
     def get_route_command(self) -> str:
         return "show ip route"
+
+
+    def get_lldp_neighbor_command(self) -> str:
+        return "show lldp neighbors detail"
+
+    def get_cdp_neighbor_command(self) -> Optional[str]:
+        """Cisco 保留 CDP 回退通道：老旧 IOS 未开 LLDP 时用 CDP 兜底"""
+        return "show cdp neighbors detail"
+
+    def parse_lldp_neighbors(self, raw_output: str) -> list:
+        """解析 show lldp neighbors detail
+
+        块起始为 "Local Intf: Gi0/1"，块间以 "---------" 分隔；
+        管理地址在 "Management Addresses:" 下属行 "IP: x.x.x.x"。
+        """
+        return self._parse_lldp_blocks(
+            raw_output,
+            block_start=re.compile(r"^\s*Local (?:Intf|interface)\s*:\s*(\S+)", re.M | re.I),
+            fields={
+                "local_port": None,
+                "chassis_id": re.compile(r"^\s*Chassis id\s*:\s*(\S+)", re.M | re.I),
+                "neighbor_port": re.compile(r"^\s*Port id\s*:\s*(\S+)", re.M | re.I),
+                "neighbor_sysname": re.compile(r"^\s*System name\s*:\s*(\S.*)", re.M | re.I),
+                "neighbor_mgmt_ip": re.compile(
+                    r"^\s*IP\s*:\s*(\d+(?:\.\d+){3})", re.M),
+            },
+        )
+
+    def parse_cdp_neighbors(self, raw_output: str) -> list:
+        """解析 show cdp neighbors detail
+
+        块起始为 "Device ID: xxx"（即对端 sysname），本机端口在
+        "Interface: Gi0/1," 行，对端端口为 "Port ID (outgoing port):"，
+        管理地址在 "Entry address(es):" 下属行 "IP address:"。
+        """
+        neighbors = []
+        for block in re.split(r"(?m)^\s*-{10,}\s*$", raw_output):
+            m_dev = re.search(r"Device ID\s*:\s*(\S+)", block, re.I)
+            if not m_dev:
+                continue
+            m_local = re.search(r"Interface\s*:\s*([^\s,]+)", block, re.I)
+            m_port = re.search(r"Port ID \(outgoing port\)\s*:\s*(\S+)", block, re.I)
+            m_ip = re.search(r"IP(?:v4)? address\s*:\s*(\d+(?:\.\d+){3})", block, re.I)
+            neighbors.append(ParsedLldpNeighbor(
+                local_port=m_local.group(1) if m_local else "",
+                neighbor_sysname=m_dev.group(1),
+                neighbor_port=m_port.group(1) if m_port else "",
+                neighbor_mgmt_ip=m_ip.group(1) if m_ip else None,
+                chassis_id=None,
+                protocol="cdp",
+            ))
+        return neighbors
 
     def get_arp_command(self) -> str:
         return "show ip arp"

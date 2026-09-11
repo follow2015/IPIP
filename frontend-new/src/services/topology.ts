@@ -12,7 +12,7 @@ import type {
   TopologyNode,
   TopologyEdge,
   TopologyStats,
-  TopologyAutoDetectChange,
+  TopologyAutoDetectChange
 } from '@/types/models';
 
 
@@ -69,7 +69,7 @@ export function useNetworkTopology(params?: NetworkTopologyParams) {
     queryKey: queryKeys.topology.network(params),
     queryFn: () => fetchNetworkTopology(params),
     staleTime: 5 * 60 * 1000, // 5 分钟缓存
-    enabled: params !== undefined && Object.values(params).some(v => v !== undefined),
+    enabled: params !== undefined && Object.values(params).some((v) => v !== undefined)
   });
 }
 
@@ -78,7 +78,7 @@ export function useDeviceTopology(params?: DeviceTopologyParams) {
     queryKey: queryKeys.topology.device(params),
     queryFn: () => fetchDeviceTopology(params),
     staleTime: 5 * 60 * 1000,
-    enabled: params !== undefined && Object.values(params).some(v => v !== undefined),
+    enabled: params !== undefined && Object.values(params).some((v) => v !== undefined)
   });
 }
 
@@ -90,6 +90,93 @@ export function useAutoDetectTopology() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.topology.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.switches.all });
-    },
+    }
+  });
+}
+
+
+export type DiscoveryMatchStatus =
+  | 'existing' // 连接已存在
+  | 'matched' // 两端设备+端口全部解析成功，可应用
+  | 'partial' // 设备已匹配但端口缺失/歧义
+  | 'unknown_peer' // 对端设备不在系统内
+  | 'port_occupied'; // 端口已被其它连接占用
+
+export interface TopologyDiscoverySuggestion {
+  local_port_name: string;
+  local_port_id: number | null;
+  local_device_id: number;
+  peer_name: string;
+  peer_mgmt_ip: string | null;
+  peer_port_name: string;
+  peer_port_id: number | null;
+  peer_device_id: number | null;
+  chassis_id: string | null;
+  protocol: string;
+  match_status: DiscoveryMatchStatus;
+  reason: string;
+}
+
+export interface TopologyDiscoverySwitchResult {
+  device_id: number;
+  source: 'lldp' | 'cdp' | null;
+  suggestions: TopologyDiscoverySuggestion[];
+  raw_count?: number;
+  error: string | null;
+}
+
+export interface TopologyDiscoverParams {
+  device_ids: number[];
+}
+
+export interface TopologyDiscoverResult {
+  results: TopologyDiscoverySwitchResult[];
+  total_suggestions: number;
+}
+
+export interface TopologyApplyDiscoverParams {
+  device_id: number;
+  suggestions: TopologyDiscoverySuggestion[];
+}
+
+export interface TopologyApplyDiscoverResult {
+  created_count: number;
+  created_ids: number[];
+  skipped: { item: TopologyDiscoverySuggestion; reason: string }[];
+}
+
+async function triggerDiscover(params: TopologyDiscoverParams): Promise<TopologyDiscoverResult> {
+  const res = await post<TopologyDiscoverResult, TopologyDiscoverParams>(
+    '/topology/discover',
+    params
+  );
+  return res.data;
+}
+
+async function triggerApplyDiscovered(
+  params: TopologyApplyDiscoverParams
+): Promise<TopologyApplyDiscoverResult> {
+  const res = await post<TopologyApplyDiscoverResult, TopologyApplyDiscoverParams>(
+    '/topology/discover/apply',
+    params
+  );
+  return res.data;
+}
+
+export function useDiscoverTopology() {
+  return useMutation({
+    mutationFn: triggerDiscover
+  });
+}
+
+export function useApplyDiscoveredTopology() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: triggerApplyDiscovered,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.topology.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.switches.all });
+    }
   });
 }
