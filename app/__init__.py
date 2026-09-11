@@ -146,6 +146,7 @@ def create_app(config_name: str = None) -> Flask:
     _register_db_cli(app)
     _register_monitor_cli(app)
     _register_schema_migration_cli(app)
+    _register_ldap_cli(app)
     _warn_on_schema_drift(app)
 
     logger.info(f"应用创建成功 (环境: {config_name or 'development'})")
@@ -775,6 +776,37 @@ def _register_schema_migration_cli(app: Flask):
             )
             sys.exit(1)
         click.echo("db-check OK：无表/列漂移")
+
+
+def _register_ldap_cli(app: Flask):
+    """注册 LDAP 企业身份集成自检命令。
+
+    - ldap-check: 校验 LDAP 必填项、映射语法，以及映射表/默认角色指向的每个
+      角色在 roles 表中存在且启用；发现问题以退出码 1 报警。
+      不需要连真实域控，可直接用于上线检查清单（对应手册 §2 检查步骤）。
+
+    为什么角色缺失不是「补数据迁移」：映射表是环境配置、角色是 RBAC 业务数据，
+    每个客户集合不同；迁移只承载产品级种子角色。缺角色属于**部署疏漏**，
+    正确防线是部署期 fail-fast（本命令），而不是把某个环境的角色烧进迁移。
+    """
+    import click
+
+    from app.persistence.rbac_repository import RoleRepository
+    from app.services.ldap_config_check import collect_ldap_check_issues
+
+    @app.cli.command("ldap-check")
+    def ldap_check_cmd():
+        """校验 LDAP 配置与角色目标（LDAP_ENABLED=false 时输出 skipped）"""
+        issues = collect_ldap_check_issues(app.config, RoleRepository())
+        if not issues:
+            if not app.config.get("LDAP_ENABLED"):
+                click.echo("ldap-check skipped: LDAP 未启用（关闭态不做校验）")
+            else:
+                click.echo("ldap-check OK：映射与默认角色全部存在且启用")
+            return
+        for issue in issues:
+            click.echo(f"ERROR: {issue}", err=True)
+        raise SystemExit(1)
 
 
 def _warn_on_schema_drift(app: Flask) -> None:
