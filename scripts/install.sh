@@ -915,12 +915,16 @@ fi
 UNITS_INSTALLED=0
 if [ "$WITH_UNITS" -eq 1 ]; then
   log "=== [可选] 安装 systemd 进程托管 unit ==="
-  # 默认按仓库布局探测：deploy/ 与 ipip-deploy/ 是兄弟目录，该相对位置在源码仓
-  # （ipip/ipip-deploy + ipip/deploy）与部署机（/root/ipip-deploy + /root/deploy）
-  # 下都成立，因此无需额外配置。
+  # 默认按仓库布局探测，两种布局都支持：
+  #   · 源码仓：deploy/ 与 ipip-deploy/ 是兄弟目录 → ../../deploy/systemd/
+  #   · 部署机（整目录拷贝）：deploy/ 在副本内部 → ../deploy/systemd/
+  #   （实测踩到：服务器上副本自包含，只探测兄弟布局会落空并静默跳过装 unit）
   UNITS_SCRIPT="${UNITS_SCRIPT:-$SCRIPT_DIR/../../deploy/systemd/install-units.sh}"
   if [ ! -f "$UNITS_SCRIPT" ]; then
-    warn "未找到 unit 安装脚本: $UNITS_SCRIPT"
+    UNITS_SCRIPT="$SCRIPT_DIR/../deploy/systemd/install-units.sh"
+  fi
+  if [ ! -f "$UNITS_SCRIPT" ]; then
+    warn "未找到 unit 安装脚本（已探测兄弟目录与副本内布局）"
     warn "  用 --units-script <路径> 指定，或按 deploy/systemd/README.md 手工安装。"
   else
     units_args=(--project-root "$PROJECT_ROOT")
