@@ -30,9 +30,16 @@ def _index_cache_key(visible: Optional[Set[int]]) -> str:
 
     注意键不含 user_id：索引已按可见域裁剪，可见集相同即内容相同，
     跨用户共享不会泄露域外设备（泄露面由 visible 决定，不由缓存决定）。
+
+    必须区分两种"空"：visible=None 表示超管/全量（不裁剪），
+    visible=set() 表示受限且当前无任何可见设备——两者语义相反，
+    共用键会让空集用户命中全量索引。把这条防线放在缓存键本身，
+    新增 capability 即使漏了入口校验也不会静默获得全量可见性。
     """
-    if not visible:
+    if visible is None:
         return "all"
+    if not visible:
+        return "empty"
     return "v:%d:%d" % (len(visible), hash(frozenset(visible)))
 
 

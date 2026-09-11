@@ -3,7 +3,6 @@
 
 主键为 config_key（复用现有大写 MONITOR_* 名），不复用 BaseModel 的 id 自增主键。
 """
-from datetime import datetime
 
 from sqlalchemy.sql import func
 

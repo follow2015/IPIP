@@ -175,7 +175,7 @@ export function useUpdateNotificationPreferences() {
 }
 
 
-export type BroadcastChannel = 'wechat_work' | 'feishu' | 'custom';
+export type BroadcastChannel = 'wechat_work' | 'feishu' | 'dingtalk' | 'custom';
 
 export interface WebhookConfig {
   id: number;

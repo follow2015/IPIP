@@ -254,7 +254,6 @@ class MonitorCredentialService:
             self._repo.link(cred.id, device_id)
         linked_ids = self._repo.linked_device_ids(cred.id)
         self._status_repo.mark_stale_batch(linked_ids)
-        from datetime import datetime, timezone
         now = now_utc_naive()
         for did in linked_ids:
             if not self._status_repo.find_by_device(did):
@@ -330,7 +329,6 @@ class MonitorCredentialService:
                 self._cleanup_other_protocols(did, cred.protocol)
             self._repo.link(credential_id, did)
         self._status_repo.mark_stale_batch(list(device_ids))
-        from datetime import datetime, timezone
         now = now_utc_naive()
         for did in device_ids:
             if not self._status_repo.find_by_device(did):

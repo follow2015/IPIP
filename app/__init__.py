@@ -90,6 +90,7 @@ def create_app(config_name: str = None) -> Flask:
         from app.services.channels.email import EmailChannel
         from app.services.channels.wechat_work import WeChatWorkWebhookChannel
         from app.services.channels.feishu import FeishuWebhookChannel
+        from app.services.channels.dingtalk import DingTalkWebhookChannel
         from app.services.notification_service import NotificationService
         from app.services.notification_delivery_worker import start_delivery_worker
         from app.services.ops_alert_bridge import register_ops_alert_callbacks
@@ -100,6 +101,7 @@ def create_app(config_name: str = None) -> Flask:
         NotificationService.register_personal_channel(VoiceChannel())
         NotificationService.register_broadcast_channel(WeChatWorkWebhookChannel())
         NotificationService.register_broadcast_channel(FeishuWebhookChannel())
+        NotificationService.register_broadcast_channel(DingTalkWebhookChannel())
 
         start_delivery_worker(app)
         register_ops_alert_callbacks()

@@ -134,14 +134,14 @@ class Config:
     APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Asia/Shanghai")
 
     FLASK_HOST = os.getenv("FLASK_HOST", "0.0.0.0")
-    FLASK_PORT = int(os.getenv("FLASK_PORT", 5000))
+    FLASK_PORT = _env_num("FLASK_PORT", 5000)
     DEBUG = False
     TESTING = False
 
     NETMIKO_SESSION_LOG = False
 
     MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
-    MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
+    MYSQL_PORT = _env_num("MYSQL_PORT", 3306)
     MYSQL_USER = os.getenv("MYSQL_USER", "root")
     MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
     MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "ip_management")
@@ -191,8 +191,7 @@ class Config:
     CELERY_TASK_DEFAULT_QUEUE = "ai"
     CELERY_TASK_TIME_LIMIT = 1800  # 硬上限 30min，杀失控 agentic 循环
     CELERY_TASK_SOFT_TIME_LIMIT = 1500
-    CELERY_WORKER_MAX_TASKS_PER_CHILD = int(
-        os.getenv("CELERY_WORKER_MAX_TASKS_PER_CHILD", 100))
+    CELERY_WORKER_MAX_TASKS_PER_CHILD = _env_num("CELERY_WORKER_MAX_TASKS_PER_CHILD", 100)
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -205,8 +204,8 @@ class Config:
     }
 
     REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-    REDIS_DB = int(os.getenv("REDIS_DB", 0))
+    REDIS_PORT = _env_num("REDIS_PORT", 6379)
+    REDIS_DB = _env_num("REDIS_DB", 0)
     REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
 
     LDAP_ENABLED = os.getenv("LDAP_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
@@ -263,17 +262,17 @@ class Config:
     RATELIMIT_DEFAULT = "1000 per minute"  # 增加默认限制
     RATELIMIT_LOGIN = "10 per minute"      # 增加登录限制
     RATELIMIT_API = "500 per minute"       # 大幅增加API限制
-    RATE_LIMIT_MAX_ATTEMPTS = int(os.getenv("RATE_LIMIT_MAX_ATTEMPTS", 5))
-    RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", 300))  # 5分钟
+    RATE_LIMIT_MAX_ATTEMPTS = _env_num("RATE_LIMIT_MAX_ATTEMPTS", 5)
+    RATE_LIMIT_WINDOW_SECONDS = _env_num("RATE_LIMIT_WINDOW_SECONDS", 300)  # 5分钟
 
     DEFAULT_PAGE_SIZE = 20
     MAX_PAGE_SIZE = 100
 
     SCAN_TIME = os.getenv("SCAN_TIME", "02:00")
     SCAN_ON_STARTUP = os.getenv("SCAN_ON_STARTUP", "false").lower() == "true"
-    MAX_SCAN_TIME = int(os.getenv("MAX_SCAN_TIME", 3600))
-    SCAN_INTERVAL = int(os.getenv("SCAN_INTERVAL", 86400))  # 24小时
-    THREAD_POOL_SIZE = int(os.getenv("THREAD_POOL_SIZE", 50))
+    MAX_SCAN_TIME = _env_num("MAX_SCAN_TIME", 3600)
+    SCAN_INTERVAL = _env_num("SCAN_INTERVAL", 86400)  # 24小时
+    THREAD_POOL_SIZE = _env_num("THREAD_POOL_SIZE", 50)
 
     COMMON_PORTS = [
         22,     # SSH
@@ -287,13 +286,13 @@ class Config:
         3306,   # MySQL
     ]
 
-    MAX_RETRY_COUNT = int(os.getenv("MAX_RETRY_COUNT", 3))
-    RETRY_DELAY = int(os.getenv("RETRY_DELAY", 5))
+    MAX_RETRY_COUNT = _env_num("MAX_RETRY_COUNT", 3)
+    RETRY_DELAY = _env_num("RETRY_DELAY", 5)
 
     WX_APPID = os.getenv("WX_APPID", "")
     WX_SECRET = os.getenv("WX_SECRET", "")
     WX_TOKEN = os.getenv("WX_TOKEN", "")
-    QR_CODE_EXPIRE_MINUTES = int(os.getenv("QR_CODE_EXPIRE_MINUTES", 5))  # 二维码过期时间（分钟）
+    QR_CODE_EXPIRE_MINUTES = _env_num("QR_CODE_EXPIRE_MINUTES", 5)  # 二维码过期时间（分钟）
 
     SSH_CERTIFICATE = os.getenv("ssh_Certificate", "")
     SSH_PASSPHRASE = os.getenv("ssh_passphrase", "")
@@ -301,8 +300,8 @@ class Config:
     ALLOWED_DOMAINS = os.getenv("ALLOWED_DOMAINS", "localhost,127.0.0.1").split(",")
 
     SENTRY_DSN = os.getenv("SENTRY_DSN", "")
-    SENTRY_TRACES_SAMPLE_RATE = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
-    SENTRY_PROFILES_SAMPLE_RATE = float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.1"))
+    SENTRY_TRACES_SAMPLE_RATE = _env_num("SENTRY_TRACES_SAMPLE_RATE", 0.1, cast=float)
+    SENTRY_PROFILES_SAMPLE_RATE = _env_num("SENTRY_PROFILES_SAMPLE_RATE", 0.1, cast=float)
 
     ERROR_STATS_ENABLED = True
     ERROR_STATS_WINDOW = 3600  # 统计窗口：1小时
@@ -311,29 +310,29 @@ class Config:
 
 
     SWITCH_SECRET_KEY = os.environ.get('SWITCH_SECRET_KEY', '')  # AES-256-GCM密钥(R-07)
-    CONFIG_BACKUP_INTERVAL = int(os.environ.get('CONFIG_BACKUP_INTERVAL', '86400'))  # 配置备份间隔(秒)
-    CONFIG_BACKUP_MAX_COUNT = int(os.environ.get('CONFIG_BACKUP_MAX_COUNT', '30'))  # 每设备最大备份数
-    AUDIT_LOG_RETENTION_DAYS = int(os.environ.get('AUDIT_LOG_RETENTION_DAYS', '90'))  # 审计日志保留天数
-    IP_ALLOCATION_LOG_RETENTION_DAYS = int(os.environ.get('IP_ALLOCATION_LOG_RETENTION_DAYS', '365'))  # IP分配日志保留天数
+    CONFIG_BACKUP_INTERVAL = _env_num("CONFIG_BACKUP_INTERVAL", 86400)  # 配置备份间隔(秒)
+    CONFIG_BACKUP_MAX_COUNT = _env_num("CONFIG_BACKUP_MAX_COUNT", 30)  # 每设备最大备份数
+    AUDIT_LOG_RETENTION_DAYS = _env_num("AUDIT_LOG_RETENTION_DAYS", 90)  # 审计日志保留天数
+    IP_ALLOCATION_LOG_RETENTION_DAYS = _env_num("IP_ALLOCATION_LOG_RETENTION_DAYS", 365)  # IP分配日志保留天数
     VLAN_ID_RANGE = (1, 4094)  # VLAN ID允许范围
 
     MONITOR_FALLBACK_ROLE = os.getenv("MONITOR_FALLBACK_ROLE", "admin")
-    MONITOR_CONSECUTIVE_FAILURES_THRESHOLD = int(os.getenv("MONITOR_CONSECUTIVE_FAILURES_THRESHOLD", "2"))
+    MONITOR_CONSECUTIVE_FAILURES_THRESHOLD = _env_num("MONITOR_CONSECUTIVE_FAILURES_THRESHOLD", 2)
 
-    MONITOR_INTERVAL_SNMP = int(os.getenv("MONITOR_INTERVAL_SNMP", "60"))
-    MONITOR_INTERVAL_BMC = int(os.getenv("MONITOR_INTERVAL_BMC", "60"))
-    MONITOR_THREAD_POOL_SIZE = int(os.getenv("MONITOR_THREAD_POOL_SIZE", "20"))
+    MONITOR_INTERVAL_SNMP = _env_num("MONITOR_INTERVAL_SNMP", 60)
+    MONITOR_INTERVAL_BMC = _env_num("MONITOR_INTERVAL_BMC", 60)
+    MONITOR_THREAD_POOL_SIZE = _env_num("MONITOR_THREAD_POOL_SIZE", 20)
     MONITOR_DEVICE_IDS_WHITELIST = os.getenv("MONITOR_DEVICE_IDS_WHITELIST", "")
 
-    MONITOR_INTERVAL_ZABBIX = int(os.getenv("MONITOR_INTERVAL_ZABBIX", "60"))
-    MONITOR_ZABBIX_CACHE_TTL = int(os.getenv("MONITOR_ZABBIX_CACHE_TTL", "30"))
+    MONITOR_INTERVAL_ZABBIX = _env_num("MONITOR_INTERVAL_ZABBIX", 60)
+    MONITOR_ZABBIX_CACHE_TTL = _env_num("MONITOR_ZABBIX_CACHE_TTL", 30)
 
     MONITOR_ENABLED = os.getenv("MONITOR_ENABLED", "true").lower() == "true"
-    MONITOR_TIMEOUT_SECONDS = int(os.getenv("MONITOR_TIMEOUT_SECONDS", "5"))
+    MONITOR_TIMEOUT_SECONDS = _env_num("MONITOR_TIMEOUT_SECONDS", 5)
 
     HEARTBEAT_ENABLED = os.getenv("HEARTBEAT_ENABLED", "true").lower() == "true"
-    HEARTBEAT_INTERVAL_SECONDS = int(os.getenv("HEARTBEAT_INTERVAL_SECONDS", "20"))
-    HEARTBEAT_TTL_SECONDS = int(os.getenv("HEARTBEAT_TTL_SECONDS", "90"))
+    HEARTBEAT_INTERVAL_SECONDS = _env_num("HEARTBEAT_INTERVAL_SECONDS", 20)
+    HEARTBEAT_TTL_SECONDS = _env_num("HEARTBEAT_TTL_SECONDS", 90)
     HEARTBEAT_SERVICE_NAME = os.getenv("HEARTBEAT_SERVICE_NAME") or None
 
     METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() == "true"
@@ -343,13 +342,13 @@ class Config:
     ]
 
     MONITOR_SUPPRESSION_ENABLED = os.getenv("MONITOR_SUPPRESSION_ENABLED", "true").lower() == "true"
-    MONITOR_SUPPRESSION_WINDOW = int(os.getenv("MONITOR_SUPPRESSION_WINDOW", "60"))  # 滑动窗口秒
-    MONITOR_SUPPRESSION_MAX = int(os.getenv("MONITOR_SUPPRESSION_MAX", "5"))  # 窗口内最大告警数
-    MONITOR_SUPPRESSION_THROTTLE = int(os.getenv("MONITOR_SUPPRESSION_THROTTLE", "300"))  # 抑制后降频通知间隔秒
+    MONITOR_SUPPRESSION_WINDOW = _env_num("MONITOR_SUPPRESSION_WINDOW", 60)  # 滑动窗口秒
+    MONITOR_SUPPRESSION_MAX = _env_num("MONITOR_SUPPRESSION_MAX", 5)  # 窗口内最大告警数
+    MONITOR_SUPPRESSION_THROTTLE = _env_num("MONITOR_SUPPRESSION_THROTTLE", 300)  # 抑制后降频通知间隔秒
 
     MONITOR_INCIDENT_ENABLED = os.getenv("MONITOR_INCIDENT_ENABLED", "true").lower() == "true"
-    MONITOR_INCIDENT_WINDOW = int(os.getenv("MONITOR_INCIDENT_WINDOW", "300"))  # L1 归并时间窗秒
-    MONITOR_INCIDENT_CHANGE_WINDOW = int(os.getenv("MONITOR_INCIDENT_CHANGE_WINDOW", "300"))  # L3 变更回溯窗秒
+    MONITOR_INCIDENT_WINDOW = _env_num("MONITOR_INCIDENT_WINDOW", 300)  # L1 归并时间窗秒
+    MONITOR_INCIDENT_CHANGE_WINDOW = _env_num("MONITOR_INCIDENT_CHANGE_WINDOW", 300)  # L3 变更回溯窗秒
 
     MONITOR_WORKER_IN_PROCESS = os.getenv("MONITOR_WORKER_IN_PROCESS", "true").lower() == "true"
 
@@ -552,8 +551,8 @@ class ProductionConfig(Config):
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",")
 
     SENTRY_DSN = os.getenv("SENTRY_DSN")
-    SENTRY_TRACES_SAMPLE_RATE = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.2"))
-    SENTRY_PROFILES_SAMPLE_RATE = float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.2"))
+    SENTRY_TRACES_SAMPLE_RATE = _env_num("SENTRY_TRACES_SAMPLE_RATE", 0.2, cast=float)
+    SENTRY_PROFILES_SAMPLE_RATE = _env_num("SENTRY_PROFILES_SAMPLE_RATE", 0.2, cast=float)
 
     @classmethod
     def init_app(cls, app):

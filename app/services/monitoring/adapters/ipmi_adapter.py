@@ -18,7 +18,6 @@
 
 from app.utils.logging import get_logger
 import threading
-import time
 
 from app.services.monitoring.adapters.base_adapter import (
     MonitorAdapter,

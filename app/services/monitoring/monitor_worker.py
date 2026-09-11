@@ -467,7 +467,7 @@ def _check_monitor_interrupted(app, monitor_service, enabled_ids: list, loop_nam
 
     阈值 = 3 × interval（默认 60s → 180s），可通过 MONITOR_INTERRUPTED_THRESHOLD_SECS 配置。
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import timedelta
     from app.persistence.device_monitor_status_repository import DeviceMonitorStatusRepository
 
     threshold_secs = app.config.get("MONITOR_INTERRUPTED_THRESHOLD_SECS", 180)

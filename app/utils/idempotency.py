@@ -163,7 +163,11 @@ def idempotent(prefix: str = "idem", ttl: int = 86400,
                 else:
                     redis_client.delete(redis_key)
 
-            result = f(*args, **kwargs)
+            try:
+                result = f(*args, **kwargs)
+            except Exception:
+                redis_client.delete(redis_key)
+                raise
 
             try:
                 body, status_code = None, None

@@ -14,10 +14,10 @@ exposition 中用 ``window="total"|"day"`` 标签区分，指标名不重复。
 import os
 import threading
 from collections import OrderedDict
-from datetime import date
 from typing import Dict, List, Optional, Tuple
 
 from app.utils.logging import get_logger
+from app.utils.time_utils import utc_today
 
 logger = get_logger(__name__)
 
@@ -64,12 +64,13 @@ def _redis():
 
 
 def _day_stamp() -> str:
-    """当日窗口的日期戳（**服务器本地时区** YYYYMMDD）。
+    """当日窗口的日期戳（**UTC 日历日** YYYYMMDD）。
 
-    注意：容器时区与运维所在时区不一致时，"今日"的边界会随之偏移（UTC 容器
-    相比 CST 差 8 小时），跨窗口对账须以服务器时区为准。
+    统一用 ``utc_today()``：时序数据按 UTC 存储，若取服务器本地日，容器 TZ 不同
+    时"今日"边界会随之偏移（UTC 容器相比 CST 差 8 小时），多 worker 之间也会
+    落到不同的 day key。UTC 日界与库内时间口径一致，且完全不受进程 TZ 影响。
     """
-    return date.today().strftime("%Y%m%d")
+    return utc_today().strftime("%Y%m%d")
 
 
 def _key(name: str, window: str) -> str:

@@ -7,7 +7,7 @@ GET /api/monitor/incidents/<id>   事件详情（含关联告警 + 被抑制下�
 from flask import request
 
 from app.api.base import APIResponse
-from app.api.monitor import logger, monitor_bp
+from app.api.monitor import monitor_bp
 from app.exceptions.business import BusinessLogicError
 from app.openapi.doc import doc
 from app.persistence.monitor_incident_repository import IncidentRepository

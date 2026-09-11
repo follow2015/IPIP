@@ -7,7 +7,7 @@
 自动推断的依赖关系（DeviceServerExt.parent_device_id）不在此表，
 由 alert_dependency_service 直接查拓扑；此表仅存手动配置的覆盖/补充规则。
 """
-from sqlalchemy import BigInteger, Boolean, Index, String, text
+from sqlalchemy import Index, text
 
 from app.models.base import BaseModel
 from extensions import db

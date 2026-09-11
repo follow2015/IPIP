@@ -86,12 +86,18 @@ class ChannelType(str, Enum):
     VOICE = "voice"             # 语音通知（个人渠道，默认关闭，需显式开启）
     WECHAT_WORK = "wechat_work"  # 企业微信（广播渠道，群机器人）
     FEISHU = "feishu"           # 飞书（广播渠道，群机器人）
+    DINGTALK = "dingtalk"       # 钉钉（广播渠道，自定义机器人加签）
     CUSTOM = "custom"           # 自定义 Webhook（广播渠道）
 
 
 PERSONAL_CHANNELS = (ChannelType.INBOX, ChannelType.EMAIL)
 
-BROADCAST_CHANNELS = (ChannelType.WECHAT_WORK, ChannelType.FEISHU, ChannelType.CUSTOM)
+BROADCAST_CHANNELS = (
+    ChannelType.WECHAT_WORK,
+    ChannelType.FEISHU,
+    ChannelType.DINGTALK,
+    ChannelType.CUSTOM,
+)
 
 
 class DataSource:

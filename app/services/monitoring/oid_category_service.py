@@ -12,7 +12,6 @@
 """
 import json
 from app.utils.logging import get_logger
-from typing import Any
 
 logger = get_logger(__name__)
 
@@ -486,7 +485,6 @@ def batch_import_templates(items: list) -> dict:
     - metric_type / unit / display_name / severity_default：按 category 默认推断
     - vendor：从前端透传（设备厂商，用于模板匹配过滤）
     """
-    from app.models.monitor_metric_template import MonitorMetricTemplate
     from app.persistence.monitor_metric_template_repository import MonitorMetricTemplateRepository
     from app.persistence.monitor_vendor_brand_repository import MonitorVendorBrandRepository
     from app.exceptions.validation import ValidationError

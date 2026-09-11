@@ -525,11 +525,37 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
+_FALLBACK_CONFIG = "development"
+
+
+def resolve_config_name() -> str:
+    """解析 create_app 用的配置名。
+
+    解析顺序（务必与其它 unit 走同一条路径，否则 watchdog 与 web/monitor 会落到
+    不同的 config 上）：
+    1. `FLASK_CONFIG` —— 仅作**显式覆盖**保留（存量部署可能靠它指定环境）；
+    2. `FLASK_ENV` —— 全仓统一的部署环境变量，`config.get_config()` 也读它；
+    3. 兜底 `_FALLBACK_CONFIG`（见其定义处的分歧说明）。
+
+    ⚠️ 不要硬编码 production：`ProductionConfig.validate()` 强制要求 SWITCH_SECRET_KEY
+    / CORS_ORIGINS 等非空，硬编码会把「.env 为 development」的机器单独送进生产校验
+    → 启动即抛异常、被 systemd 反复拉起（`ipip-monitor.service` 注释记录过同样的坑，
+    这里是它在 watchdog 自己身上重演）。
+
+    兜底之所以刻意选 development 而非 production：watchdog 是「最后的告警人」，它启动
+    即崩等于自监控静默死亡。DevelopmentConfig 在缺 SECRET_KEY 时会自动生成开发密钥并
+    通过基础校验，能保证这类机器上判活仍然跑得起来；且只会影响 watchdog 这一次性进程
+    自身的配置（它不服务 HTTP，unit 里 MONITOR_ENABLED=false 也不写心跳），不波及
+    web/monitor 进程。
+    """
+    return os.getenv("FLASK_CONFIG") or os.getenv("FLASK_ENV") or _FALLBACK_CONFIG
+
+
 def main(argv=None) -> int:
     args = parse_args(argv)
     from app import create_app
 
-    app = create_app(os.getenv("FLASK_CONFIG", "production"))
+    app = create_app(resolve_config_name())
     with app.app_context():
         report = run(args)
 

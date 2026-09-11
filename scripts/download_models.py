@@ -15,7 +15,8 @@
     2. 回退 ModelScope（默认，实测约 5.7MB/s）/ hf-mirror（约 1MB/s），按 HF 缓存
        布局写入 snapshots/main —— 实测 hf_hub_download 与 snapshot_download 均能
        正常命中，因此加载侧无需任何代码改动。
-    两条路径均做 size + sha256 校验（ModelScope 的文件列表 API 提供 sha256）。
+    两条路径均做 size + sha256 校验：ModelScope 列表 API 直接提供 Sha256；HF 列表
+    接口**必须带 `?blobs=true`** 才能拿到 size 与 `lfs.sha256`（见 list_hf_files）。
 
 背景与必要性：
 - app/services/ai/rag/embedding.py 与 reranker.py 都设置了 HF_HUB_OFFLINE=1 /
@@ -40,6 +41,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+import requests
+
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT = ROOT / "instance" / "models"
 
@@ -60,6 +63,8 @@ MODELS = {
 
 HF_ENDPOINT = os.getenv("HF_ENDPOINT", "https://hf-mirror.com")
 MODELSCOPE_ENDPOINT = os.getenv("MODELSCOPE_ENDPOINT", "https://www.modelscope.cn")
+
+_HF_LARGE_FILE_BYTES = 1024 * 1024
 
 
 def log(msg: str) -> None:
@@ -104,12 +109,52 @@ def list_modelscope_files(repo: str) -> list:
 
 
 def list_hf_files(repo: str) -> list:
-    """列出 hf-mirror 仓库下的文件（HF API 直接返回扁平清单）。"""
-    data = _get_json(f"{HF_ENDPOINT}/api/models/{repo}")
-    return [
-        {"path": f["rfilename"], "size": int(f.get("size") or 0)}
-        for f in data.get("siblings", [])
-    ]
+    """列出 HF 仓库下的文件（含 size 与 lfs sha256）。
+
+    ⚠️ 必须带 ?blobs=true：不带时 siblings 只返回 rfilename，size/sha256 全为空，
+    下游 `not size` / `not sha256` 两道校验会被短路 —— 截断的响应或错误页会被当成
+    成功落盘，而重跑时又因校验"通过"而跳过，损坏就此永久化。
+
+    单个文件的 size/sha256 缺失时**显式告警**（绝不静默跳过）；但若**整体**拿不到
+    任何 size（镜像不认 ?blobs=true），则直接 `raise ValueError` —— 因为 `size=0` /
+    `sha256=""` 在下游被解释为"无需校验"，继续下去等于零校验落盘 + 重跑跳过，
+    仍会"损坏永久化"。抛出后由 fetch_model 捕获并路由到能校验的下一个源。
+
+    Args:
+        repo: 形如 BAAI/bge-reranker-base。
+
+    Returns:
+        [{"path": 相对路径, "size": 字节数, "sha256": 小写十六进制或 ""}, ...]
+
+    Raises:
+        ValueError: siblings 非空但没有任何文件返回可用 size（无法做完整性校验）。
+    """
+    url = (f"{HF_ENDPOINT}/api/models/{repo}?"
+           + urllib.parse.urlencode({"blobs": "true"}))
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+    siblings = resp.json().get("siblings", [])
+    out = []
+    has_usable_size = False
+    for item in siblings:
+        path = item.get("rfilename") or ""
+        if not path:
+            continue
+        size = int(item.get("size") or 0)
+        sha256 = (item.get("lfs") or {}).get("sha256") or ""
+        if size:
+            has_usable_size = True
+            if not sha256 and size >= _HF_LARGE_FILE_BYTES:
+                log(f"  ⚠️ {path} 未返回 sha256，只能做大小校验（无法发现同尺寸内容损坏）")
+        else:
+            log(f"  ⚠️ {path} 未返回 size，无法做大小校验（接口可能不支持 ?blobs=true）")
+        out.append({"path": path, "size": size, "sha256": sha256.lower()})
+    if siblings and not has_usable_size:
+        raise ValueError(
+            f"HF 接口未返回任何文件的 size（仓库 {repo}）：可能该镜像不支持 ?blobs=true，"
+            "无法做完整性校验，拒绝在无校验状态下落盘"
+        )
+    return out
 
 
 def filter_weight_files(files: list) -> list:
@@ -316,7 +361,7 @@ def fetch_model(key: str, spec: dict, dest_dir: Path, mirror: str) -> bool:
             files = filter_weight_files(list_hf_files(repo))
             for f in files:
                 url = f"{HF_ENDPOINT}/{repo}/resolve/main/{f['path']}"
-                download_file(url, dest_dir / f["path"], f["size"])
+                download_file(url, dest_dir / f["path"], f["size"], f.get("sha256", ""))
     except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError) as e:
         log(f"  ❌ {key} 下载失败（mirror={mirror}）: {e}")
         return False

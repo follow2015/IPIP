@@ -18,7 +18,6 @@
 - `probe()` 保持同步接口不变，兼容 MonitorService 线程池模型。
 """
 from app.utils.logging import get_logger
-import time
 
 from app.core.enums import IPStatus, ProbeErrorCode
 from app.services.ip_status_service import detect_ip_status

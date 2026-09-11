@@ -11,7 +11,7 @@
 
 故独立建表存放，只用于统计，不参与投递、不出现在告警列表。
 """
-from sqlalchemy import BigInteger, DateTime, Index, String, text
+from sqlalchemy import Index, text
 
 from app.models.base import BaseModel
 from extensions import db

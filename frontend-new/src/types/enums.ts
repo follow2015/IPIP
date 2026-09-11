@@ -244,6 +244,7 @@ export const CHANNEL_LABELS: Record<string, string> = {
   email: '邮件',
   wechat_work: '企业微信',
   feishu: '飞书',
+  dingtalk: '钉钉',
   custom: '自定义'
 };
 
@@ -252,11 +253,13 @@ export const CHANNEL_COLORS: Record<string, string> = {
   email: 'cyan',
   wechat_work: 'green',
   feishu: 'blue',
+  dingtalk: 'geekblue',
   custom: 'default'
 };
 
 export const BROADCAST_CHANNEL_OPTIONS = [
   { label: '企业微信', value: 'wechat_work' },
   { label: '飞书', value: 'feishu' },
+  { label: '钉钉', value: 'dingtalk' },
   { label: '自定义', value: 'custom' }
 ];

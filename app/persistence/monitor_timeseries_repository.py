@@ -9,7 +9,7 @@ SQLite（测试）经 create_all 建普通表，相关方法按 dialect 守卫�
 不涉及分区/归档逻辑。
 """
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from app.utils.time_utils import now_utc_naive, utc_today
 

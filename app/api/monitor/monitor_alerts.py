@@ -3,7 +3,7 @@
 from flask import current_app, request
 from marshmallow import ValidationError as MarshmallowValidationError
 
-from app.api.base import APIResponse, ErrorCode
+from app.api.base import APIResponse
 from app.api.monitor import (
     _alert_list_schema,
     _audit_monitor_enabled,

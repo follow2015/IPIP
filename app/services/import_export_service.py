@@ -128,6 +128,8 @@ def run_batch_import(
         if existing == "pending":
             raise IdempotencyConflictError("该文件正在导入中，请稍后再试", in_progress=True)
         idem_acquired = redis_client.set(idem_key, "pending", nx=True, ex=300)
+        if not idem_acquired:
+            raise IdempotencyConflictError("该文件正在导入中，请稍后再试", in_progress=True)
 
     try:
         df = parse_fn(file_bytes, filename)

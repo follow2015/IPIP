@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """监控运行配置 + 指标模板 + 指标告警 + Zabbix 流量。"""
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from app.utils.time_utils import now_utc_naive, now_utc
 
 from flask import request

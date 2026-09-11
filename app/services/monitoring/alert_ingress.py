@@ -17,7 +17,6 @@
 """
 import json
 from app.utils.logging import get_logger
-import time as _time
 from typing import Optional, Tuple
 
 logger = get_logger(__name__)

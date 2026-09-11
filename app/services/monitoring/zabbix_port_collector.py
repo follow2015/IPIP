@@ -23,7 +23,6 @@ from __future__ import annotations
 
 from app.utils.logging import get_logger
 
-from app.services.monitoring.adapters.zabbix_adapter import ZabbixAdapter
 from app.services.monitoring.zabbix_graph_service import ZabbixGraphService
 from app.utils.port_name_parser import parse_port_name
 

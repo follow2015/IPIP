@@ -8,7 +8,7 @@
   - met_sla = actual_ratio >= target_ratio
   - 无数据时 actual_ratio=None, sample_count=0, met_sla=False
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 from app.utils.time_utils import now_utc_naive
 

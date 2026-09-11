@@ -4,9 +4,8 @@
 在指定时间窗口内对匹配的设备/告警类型静默（不入箱、不推送），
 用于计划内维护、已知问题处理等场景避免告警噪声。
 """
-from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Index, Integer, String, text
+from sqlalchemy import Index, text
 
 from app.models.base import BaseModel, BIGINT_UNSIGNED
 from extensions import db

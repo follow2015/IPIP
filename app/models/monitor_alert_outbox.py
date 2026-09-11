@@ -10,7 +10,7 @@
 - 发件轮询器提供「至少一次投递」：崩溃重放时 notify 的 ``idempotency_key``
   幂等去重，不会产生重复通知。
 """
-from sqlalchemy import BigInteger, DateTime, Index, Integer, String, Text, text
+from sqlalchemy import Index, text
 
 from app.models.base import BaseModel, LONGTEXT
 from extensions import db

@@ -4,8 +4,7 @@
 定义设备/设备组的可用率 SLA 目标，基于 device_monitor_timeseries_hourly
 的 reachable 聚合计算实际达成度。
 """
-from sqlalchemy import BigInteger, Index, String, Text, text
-from sqlalchemy.sql import func
+from sqlalchemy import Index, text
 
 from app.models.base import BaseModel
 from extensions import db

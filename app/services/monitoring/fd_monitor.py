@@ -15,7 +15,6 @@ daemon 线程，周期读取 Linux 的 ``/proc/self/fd`` 目录计数，超过�
 from app.utils.logging import get_logger
 import os
 import threading
-import time
 
 logger = get_logger(__name__)
 

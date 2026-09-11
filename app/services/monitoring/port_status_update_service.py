@@ -25,7 +25,7 @@ from __future__ import annotations
 from app.utils.time_utils import now_utc_naive
 
 from app.utils.logging import get_logger
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.models.network_port import NetworkPort
 

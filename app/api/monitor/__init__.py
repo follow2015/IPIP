@@ -14,19 +14,10 @@
 - 凭据明文绝不回显到响应；加密由 MonitorCredentialService 内部完成。
 - GET /status 对未配置凭据的设备返回 200 + monitored=False，而非 404。
 """
-import json
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
 
-from concurrent.futures import ThreadPoolExecutor
-from flask import Blueprint, current_app, request, g
-from marshmallow import ValidationError as MarshmallowValidationError
-from sqlalchemy.orm import sessionmaker
+from flask import Blueprint, request
 
-from app.api.base import APIResponse, ErrorCode, RequestValidator, api_exception_handler
 from app.core.enums import MonitorProtocolCode
-from app.models.monitor_alert_outbox import MonitorAlertOutbox
-from app.openapi.doc import doc
 from app.persistence.device_metric_alert_state_repository import DeviceMetricAlertStateRepository
 from app.persistence.device_metric_override_repository import DeviceMetricOverrideRepository
 from app.persistence.device_monitor_status_repository import DeviceMonitorStatusRepository
@@ -39,21 +30,11 @@ from app.persistence.monitor_metric_template_repository import MonitorMetricTemp
 from app.persistence.monitor_oid_category_rule_repository import MonitorOidCategoryRuleRepository
 from app.persistence.monitor_silence_rule_repository import MonitorSilenceRuleRepository
 from app.persistence.monitor_timeseries_repository import MonitorTimeseriesRepository
-from app.schemas.monitor import (
-    MonitorBatchMonitorEnabledSchema,
-    MonitorCheckBatchSchema,
-    MonitorConfigUpdateSchema,
-    MonitorCredentialPayloadUpdateSchema,
-    MonitorCredentialUpsertSchema,
-    MonitorAlertListQuerySchema,
-    MonitorDeviceMonitorEnabledSchema,
-)
+from app.schemas.monitor import MonitorBatchMonitorEnabledSchema, MonitorConfigUpdateSchema, MonitorCredentialPayloadUpdateSchema, MonitorCredentialUpsertSchema, MonitorAlertListQuerySchema, MonitorDeviceMonitorEnabledSchema
 from app.services.audit_service import AuditService
 from app.services.monitoring.credential_service import MonitorCredentialService
-from app.services.monitoring.dynamic_config import CAMEL_TO_KEY, MonitorDynamicConfig, all_entries
 from app.services.monitoring.monitor_service import MonitorService
 from app.services.monitoring.protocol_registry import build_adapter
-from app.utils import login_required, permission_required
 from app.utils.auth import get_current_user_id
 from app.utils.logging import get_logger
 from app.utils.transactional import transactional
@@ -145,7 +126,7 @@ def _audit_config_change(updates: dict, updated: list) -> None:
 from app.api.monitor import monitor_device  # noqa: E402,F401
 from app.api.monitor import monitor_credentials  # noqa: E402,F401
 from app.api.monitor import monitor_alerts  # noqa: E402,F401
+from app.api.monitor import incident_routes  # noqa: E402,F401
 from app.api.monitor import monitor_config  # noqa: E402,F401
 from app.api.monitor import monitor_rules  # noqa: E402,F401
 from app.api.monitor import monitor_oid  # noqa: E402,F401
-from app.api.monitor import incident_routes  # noqa: E402,F401

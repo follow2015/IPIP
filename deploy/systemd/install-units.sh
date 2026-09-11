@@ -187,7 +187,12 @@ prune_unit_backups() {
       done
 }
 
-ALL_UNITS="$SERVICES $TIMERS $TARGET"
+# ipip-backup.service 此前未纳入渲染/安装循环（SERVICES 只列了常驻服务），
+# 导致它的 ${PROJECT_ROOT}/${BACKUP_DIR} 占位符从不替换、单元实际缺失而 timer
+# 指向的 Unit 不存在。此处并入渲染与安装（含 check_no_placeholder 校验），但
+# 不加入 SERVICES，故 --enable 不会直接 enable --now 它——备份只应由 timer 调度，
+# 保持既有语义（避免开机自启抢在 timer 之前重复跑）。
+ALL_UNITS="$SERVICES $TIMERS $TARGET ipip-backup.service"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 

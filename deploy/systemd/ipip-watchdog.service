@@ -18,6 +18,8 @@ Description=IPIP process liveness watchdog (systemd + heartbeat + HTTP)
 Documentation=https://github.com/follow2015/IPIP/blob/main/deploy/systemd/README.md
 ; 刻意不写 After=ipip-web.service：watchdog 要能检测「web 根本起不来」，
 ; 依赖 web 启动会被它拖住而失效。启动时序由心跳 TTL 吸收。
+; PartOf：让 ipip.target 的 stop/restart 传播到本服务（Wants= 不传播停止）。
+PartOf=ipip.target
 
 [Service]
 Type=oneshot
@@ -49,6 +51,16 @@ SuccessExitStatus=0 1
 ; ── 安全加固（与其它 unit 同级）──────────────────────────
 NoNewPrivileges=true
 PrivateTmp=true
+
+; ── 安全加固（2026-09-11 评审遗留项整改：systemd 命名空间隔离）──
+; 判活进程以读 Redis/HTTP 为主，写盘极少（仅日志）；基准路径 instance/
+; 与 logs/ 一并放行以兼容可能的落盘。
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=${PROJECT_ROOT}/instance ${PROJECT_ROOT}/logs
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
 
 ; ── 日志：统一走 journald ────────────────────────────────
 StandardOutput=journal

@@ -12,8 +12,6 @@ from typing import List
 
 from app.exceptions.business import BusinessLogicError
 from app.exceptions.validation import ValidationError
-from app.models.monitor_metric_template import MonitorMetricTemplate
-from app.models.monitor_metric_template_group import MonitorMetricTemplateGroup
 from app.persistence.monitor_metric_template_group_repository import (
     MonitorMetricTemplateGroupRepository,
 )

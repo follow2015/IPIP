@@ -5,15 +5,7 @@ monitor_credentials 退化为「共享凭据」实体：只存协议 + 密文 + 
 不含 device_id；设备关联经 device_monitor_credentials 多对多表。
 encrypted_payload 永不通过 to_dict() 回显，比照 SwitchCredentials.password。
 """
-from sqlalchemy import (
-    BigInteger,
-    Boolean,
-    ForeignKey,
-    Index,
-    String,
-    Text,
-    UniqueConstraint,
-)
+from sqlalchemy import BigInteger, ForeignKey, Index, UniqueConstraint
 
 from app.models.base import BaseModel
 from extensions import db

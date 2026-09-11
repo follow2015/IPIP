@@ -54,6 +54,16 @@ KillMode=control-group
 
 NoNewPrivileges=true
 PrivateTmp=true
+
+; ── 安全加固（2026-09-11 评审遗留项整改：systemd 命名空间隔离）──
+; 采集进程经 netmiko 写 logs/netmiko_*.log，并落轮转日志；instance/ 一并
+; 放行以兼容可能的落盘（如 RAG/锁文件）。
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=${PROJECT_ROOT}/instance ${PROJECT_ROOT}/logs
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
 MemoryMax=2G
 
 StandardOutput=journal

@@ -24,7 +24,6 @@
 from __future__ import annotations
 
 from app.utils.logging import get_logger
-from typing import Optional
 
 from app.services.monitoring.adapters.base_adapter import (
     monitor_timeout_seconds,

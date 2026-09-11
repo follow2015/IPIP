@@ -9,11 +9,11 @@
 - 基于连续失败阈值做抖动抑制 + 去重告警（episode 递增使幂等键不撞）；
 - 解析告警目标（责任人 user / 兜底角色 role）并投递通知。
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from dataclasses import dataclass
 import threading
 import time
-from typing import Optional, Tuple, Dict
+from typing import Optional, Dict
 from app.utils.time_utils import now_utc_naive
 
 from flask import current_app

@@ -26,7 +26,6 @@ from app.services.monitoring.adapters.snmp_adapter import SNMPAdapter
 from app.services.monitoring.adapters.ipmi_adapter import IPMIAdapter
 from app.services.monitoring.adapters.zabbix_adapter import ZabbixAdapter
 from app.services.monitoring.adapters.ping_adapter import PingAdapter
-from app.services.monitoring.snmp_versions import SNMP_REQUIRED_BY_VERSION  # noqa: F401 — re-export
 
 
 @dataclass(frozen=True)

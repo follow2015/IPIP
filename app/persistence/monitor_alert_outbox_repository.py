@@ -5,7 +5,7 @@
 提交决策权交给调用方（apply_result 的 @transactional / 独立 Session，或发件器的会话）。
 """
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from app.utils.time_utils import now_utc_naive
 
@@ -351,7 +351,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         幂等：已确认的告警再次确认将更新 note 与 acknowledged_at（不阻断重复确认）。
         返回更新后的行；行不存在返回 None。
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
         ts = now if now is not None else now_utc_naive()
         result = self.session.execute(
             sa_update(MonitorAlertOutbox)
@@ -379,7 +379,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         幂等：已确认的行再次确认将刷新 acknowledged_at 与 ack_note。
         返回 {"acknowledged": N, "not_found": M}。
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
         if not ids:
             return {"acknowledged": 0, "not_found": 0}
         ts = now if now is not None else now_utc_naive()
@@ -421,7 +421,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         幂等：已关闭的告警再次关闭将更新 reason 与 closed_at。
         返回更新后的行；行不存在返回 None。
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
         ts = now if now is not None else now_utc_naive()
         result = self.session.execute(
             sa_update(MonitorAlertOutbox)
@@ -435,7 +435,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
 
     def batch_close(self, ids: List[int], user: str, reason: Optional[str] = None, now=None) -> dict:
         """P2-16: 批量手动关闭告警。"""
-        from datetime import datetime, timezone
+        from datetime import datetime
         if not ids:
             return {"closed": 0, "not_found": 0}
         ts = now if now is not None else now_utc_naive()
@@ -475,7 +475,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         注意：复活行的 attempts 已 >= max_attempts，mark_failed 会立即重新置
         failed——即每轮复位只有**一次**投递机会、无退避重试。
         """
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
         cutoff = now_utc_naive() - timedelta(hours=max_age_hours)
         result = self.session.execute(
             sa_update(MonitorAlertOutbox)
@@ -504,7 +504,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
 
         返回 {"sent_deleted": N, "failed_deleted": M}。
         """
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         now = now_utc_naive()
         sent_cutoff = now - timedelta(days=sent_retention_days)

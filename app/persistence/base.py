@@ -764,7 +764,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return query.filter_by(id=entity_id).first()
         except Exception as e:
             logger.error(f"优化查询失败: {e}")
-            raise QueryExecutionError(f"按ID查找失败", original_error=e)
+            raise QueryExecutionError("按ID查找失败", original_error=e)
     
     @monitor_query_performance
     def find_all_optimized(self, filters: Optional[Dict[str, Any]] = None,
@@ -797,7 +797,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return query.all()
         except Exception as e:
             logger.error(f"优化查询失败: {e}")
-            raise QueryExecutionError(f"查找所有记录失败", original_error=e)
+            raise QueryExecutionError("查找所有记录失败", original_error=e)
     
     @monitor_query_performance
     def paginate_optimized(self, page: int = 1, page_size: int = 20,
@@ -850,7 +850,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             }
         except Exception as e:
             logger.error(f"分页查询失败: {e}")
-            raise QueryExecutionError(f"分页查询失败", original_error=e)
+            raise QueryExecutionError("分页查询失败", original_error=e)
     
     @monitor_query_performance
     def exists_optimized(self, filters: Dict[str, Any]) -> bool:
@@ -871,7 +871,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return self.session.query(query.exists()).scalar()
         except Exception as e:
             logger.error(f"存在性检查失败: {e}")
-            raise QueryExecutionError(f"存在性检查失败", original_error=e)
+            raise QueryExecutionError("存在性检查失败", original_error=e)
     
     @monitor_query_performance
     def batch_load_by_ids(self, entity_ids: List[int],
@@ -904,7 +904,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return {entity.id: entity for entity in entities}
         except Exception as e:
             logger.error(f"批量加载失败: {e}")
-            raise QueryExecutionError(f"批量加载失败", original_error=e)
+            raise QueryExecutionError("批量加载失败", original_error=e)
     
     def batch_create(self, data_list: List[Dict[str, Any]]) -> List[Any]:
         """批量创建实体
@@ -929,7 +929,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return entities
         except Exception as e:
             logger.error(f"批量创建失败: {e}")
-            raise QueryExecutionError(f"批量创建失败", original_error=e)
+            raise QueryExecutionError("批量创建失败", original_error=e)
     
     def batch_update(self, updates: List[Tuple[int, Dict[str, Any]]]) -> int:
         """批量更新实体（先批量 IN 预加载，再 setattr，消除 N+1 写）
@@ -969,7 +969,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return updated_count
         except Exception as e:
             logger.error(f"批量更新失败: {e}")
-            raise QueryExecutionError(f"批量更新失败", original_error=e)
+            raise QueryExecutionError("批量更新失败", original_error=e)
     
     def _apply_eager_loading(self, query: Query, relationships: List[str]) -> Query:
         """应用预加载策略

@@ -23,6 +23,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from extensions import db
+from sqlalchemy.orm import joinedload
 
 from app.utils.logging import get_logger
 
@@ -192,21 +193,6 @@ def _collect_room_ports(room_id: int, speed_mbps: int, visible_switch_ids=None) 
     """
     from app.models.device import Device
     from app.models.network_port import NetworkPort
-
-    rows = (
-        NetworkPort.query
-        .join(Device, NetworkPort.device_id == Device.id)
-        .filter(
-            Device.device_type == "network",
-            Device.device_subtype == "switch",
-            Device.deleted_at.is_(None),
-            NetworkPort.usage_status == "free",
-            NetworkPort.lag_group_id.is_(None),
-            Device.cabinet_id.isnot(None),
-        )
-        .all()
-    )
-
     from app.core.enums import CabinetStatus
     from app.models.cabinet import Cabinet
 
@@ -217,6 +203,22 @@ def _collect_room_ports(room_id: int, speed_mbps: int, visible_switch_ids=None) 
             Cabinet.status.in_([int(CabinetStatus.AVAILABLE), int(CabinetStatus.IN_USE)]),
         ).all()
     }
+    cab_ids = list(cabinet_room.keys())
+
+    rows = (
+        NetworkPort.query
+        .join(Device, NetworkPort.device_id == Device.id)
+        .filter(
+            Device.device_type == "network",
+            Device.device_subtype == "switch",
+            Device.deleted_at.is_(None),
+            Device.cabinet_id.in_(cab_ids),          # 机房过滤下推：只取本机房机柜上的端口
+            NetworkPort.usage_status == "free",
+            NetworkPort.lag_group_id.is_(None),
+        )
+        .options(joinedload(NetworkPort.device))      # 消除循环里逐端口懒加载 device 的 N+1
+        .all()
+    )
 
     access: list = []
     core: list = []

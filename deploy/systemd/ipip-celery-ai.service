@@ -51,6 +51,16 @@ KillMode=control-group
 
 NoNewPrivileges=true
 PrivateTmp=true
+
+; ── 安全加固（2026-09-11 评审遗留项整改：systemd 命名空间隔离）──
+; instance/ 含 RAG chroma/FTS 与定时任务锁文件；logs/ 含轮转日志与
+; netmiko 设备 I/O 日志，均需在 ProtectSystem=strict 下保持可写。
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=${PROJECT_ROOT}/instance ${PROJECT_ROOT}/logs
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
 MemoryMax=4G
 
 StandardOutput=journal

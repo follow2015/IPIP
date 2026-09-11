@@ -9,7 +9,7 @@
 一条告警属于至多一个事件（outbox.incident_id）；被依赖抑制而未入箱的告警
 记在 monitor_suppressed_alert_log，聚合后回填 incident_id 以统计影响面。
 """
-from sqlalchemy import BigInteger, DateTime, Index, Integer, String, text
+from sqlalchemy import Index, text
 
 from app.models.base import BaseModel
 from extensions import db

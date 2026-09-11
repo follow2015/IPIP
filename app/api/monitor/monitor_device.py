@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """设备监控状态 / 历史 / 趋势 / 手动探测 / 批量探测。"""
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 from app.utils.time_utils import now_utc_naive
 
@@ -8,23 +8,10 @@ from flask import request
 
 from extensions import db
 
-from app.api.base import APIResponse, ErrorCode
+from app.api.base import APIResponse
 from app.exceptions.business import BusinessLogicError
 from app.exceptions.validation import ValidationError
-from app.api.monitor import (
-    _ALLOWED_PROTOCOLS,
-    _credential_upsert_schema,
-    _audit_credential_change,
-    credential_repo,
-    credential_service,
-    device_repo,
-    logger,
-    monitor_bp,
-    monitor_service,
-    monitor_ts_repo,
-    status_repo,
-    _metric_alert_state_repo,
-)
+from app.api.monitor import _ALLOWED_PROTOCOLS, _credential_upsert_schema, _audit_credential_change, credential_service, device_repo, monitor_bp, monitor_service, monitor_ts_repo
 from app.openapi.doc import doc
 from app.schemas.monitor import MonitorCheckBatchSchema
 from app.services.monitoring.monitor_service import get_probe_trends as _probe_trends

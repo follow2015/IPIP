@@ -76,6 +76,17 @@ KillMode=control-group
 NoNewPrivileges=true
 PrivateTmp=true
 
+; ── 安全加固（2026-09-11 评审遗留项整改：systemd 命名空间隔离）──
+; ProtectSystem=strict 使全盘只读，仅 ReadWritePaths 列出的路径可写。
+; instance/ 与 logs/ 是应用实际写盘目录（sqlite/上传、RAG chroma/FTS、
+; 轮转日志、netmiko 设备 I/O 日志、前端错误日志等）。
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=${PROJECT_ROOT}/instance ${PROJECT_ROOT}/logs
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
 ; ── 资源上限（防止 4 workers OOM 被内核无差别杀且无归因）──
 ; 按部署机内存调整，建议预留 50% 给 MySQL/Redis
 MemoryMax=4G

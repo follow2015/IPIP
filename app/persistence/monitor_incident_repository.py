@@ -3,11 +3,10 @@
 
 项目 C5 约束：DB 访问必须走 Repository 层，禁止在 Service 内裸写 query。
 """
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 from app.utils.time_utils import now_utc_naive
 
-from sqlalchemy import func, or_
 
 from app.models.monitor_alert_outbox import MonitorAlertOutbox
 from app.models.monitor_incident import MonitorIncident

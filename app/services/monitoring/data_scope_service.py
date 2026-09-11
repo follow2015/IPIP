@@ -14,7 +14,6 @@ scope_mode 策略：
 缓存：用户→可见设备集 + 设备→可见用户集，TTL 5 分钟。
 注意：本服务只读 DB，不修改任何状态。
 """
-import json
 from app.utils.logging import get_logger
 import threading
 import time

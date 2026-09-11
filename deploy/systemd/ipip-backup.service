@@ -9,6 +9,11 @@
 Description=IPIP system backup (mysql + instance)
 ; 本地备份不强依赖 Redis，但仍需 MySQL 在运行
 After=mysql.service
+; PartOf：让 ipip.target 的 stop 传播到本服务（备份由 timer 触发，此处仅保证
+; 聚合停止时能一并停掉；backup.service 不进 ipip.target 的 Wants，避免开机自启
+; 抢在 timer 之前重复跑）。
+
+PartOf=ipip.target
 
 [Service]
 Type=oneshot
@@ -32,6 +37,18 @@ Restart=no
 
 PrivateTmp=true
 NoNewPrivileges=true
+
+; ── 安全加固（2026-09-11 评审遗留项整改：systemd 命名空间隔离）──
+; ProtectSystem=strict 使全盘只读；备份产物写到 ${BACKUP_DIR}（默认
+; /var/backups/ipip），临时凭据文件走 /tmp（由 PrivateTmp 提供的私有 tmpfs），
+; 故 ReadWritePaths 需放行 BACKUP_DIR 与 logs/（备份自身日志）。instance/ 仅被
+; 读取打包（dataface 数据面），一并列出无害。
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=${PROJECT_ROOT}/instance ${PROJECT_ROOT}/logs ${BACKUP_DIR}
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
 
 StandardOutput=journal
 StandardError=journal
