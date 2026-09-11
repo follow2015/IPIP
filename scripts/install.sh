@@ -334,14 +334,15 @@ if [ "$SOURCE_ROOT" != "$PROJECT_ROOT" ]; then
     rsync -a --delete \
       --exclude ".venv/" --exclude ".git/" --exclude ".env" \
       --exclude "instance/" --exclude "logs/" --exclude "__pycache__/" \
-      --exclude "node_modules/" \
+      --exclude "node_modules/" --exclude ".credentials" \
       "$SOURCE_ROOT/" "$PROJECT_ROOT/" \
       || die "代码同步到 $PROJECT_ROOT 失败（rsync）"
   else
     tar -C "$SOURCE_ROOT" \
       --exclude="./.venv" --exclude="./.git" --exclude="./.env" \
       --exclude="./instance" --exclude="./logs" --exclude="__pycache__" \
-      --exclude="./node_modules" -cf - . | tar -C "$PROJECT_ROOT" -xf - \
+      --exclude="./node_modules" --exclude="./.credentials" -cf - . \
+      | tar -C "$PROJECT_ROOT" -xf - \
       || die "代码同步到 $PROJECT_ROOT 失败（tar 回退路径）"
   fi
 else
