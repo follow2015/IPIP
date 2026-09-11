@@ -31,13 +31,26 @@ logger = get_logger(__name__)
 _DEFAULT_PREFIX = "ipip:heartbeat:"
 
 
+def environment() -> str:
+    """当前环境隔离段（development / testing / production 或自定义前缀）。
+
+    单独暴露给 watchdog 等消费方复用同一套隔离语义。此前 watchdog 用
+    `namespace().split(":")[-2]` 反推环境段，遇到自定义 `HEARTBEAT_KEY_PREFIX`
+    （切分后段数 <4）会静默落到 "production" —— 开发环境的告警冷却因此与生产
+    共用，排查时表现为"冷却时间早过了却没发通知"。
+    """
+    custom = _conf("HEARTBEAT_KEY_PREFIX", None)
+    if custom:
+        return str(custom).rstrip(":")
+    return str(_conf("ENV", "production")).strip().lower() or "production"
+
+
 def namespace() -> str:
     """当前心跳命名空间（含结尾冒号）。"""
     custom = _conf("HEARTBEAT_KEY_PREFIX", None)
     if custom:
-        return custom if str(custom).endswith(":") else f"{custom}:"
-    env = str(_conf("ENV", "production")).strip().lower() or "production"
-    return f"ipip:heartbeat:{env}:"
+        return f"{environment()}:"
+    return f"ipip:heartbeat:{environment()}:"
 
 SERVICES = ("web", "monitor", "gateway", "celery-ai", "celery-voice")
 
@@ -216,7 +229,7 @@ def build_heartbeat_view(services=SERVICES, client=None, now: float = None) -> d
             "heartbeat_at": _iso(state["heartbeat_ts"]),
         }
     return {
-        "redis_available": all(s["checked"] for s in statuses.values()),
+        "redis_available": bool(statuses) and all(s["checked"] for s in statuses.values()),
         "stale_after_seconds": stale_after,
         "services": services_view,
     }
@@ -261,7 +274,11 @@ def resolve_celery_service_name(argv=None) -> str:
     """Celery worker 的服务名：与 deploy/systemd 的 ipip-celery-{ai,voice} 对齐。
 
     优先 `IPIP_SERVICE_NAME`；未设置时从命令行队列推导
-    （`-Q ai` → `celery-ai`，`-Q ai,voice` → 取第一个），兜底 `celery`。
+    （`-Q ai` → `celery-ai`，`-Q ai,voice` → 取第一个）。
+
+    推导不出来时返回 None（调用方据此不起心跳），**不回落到 "celery"**：
+    SERVICES 里没有这个名字，写进去就是一个**没人判定的 key** —— 表面上
+    "worker 有心跳"，实际上它失联永远不会被发现，比没有心跳更糟（虚假安全感）。
     """
     env_name = os.getenv("IPIP_SERVICE_NAME")
     if env_name:
@@ -276,4 +293,8 @@ def resolve_celery_service_name(argv=None) -> str:
             queue = arg.split("=", 1)[1].split(",")[0].strip()
             if queue:
                 return f"celery-{queue}"
-    return "celery"
+    logger.error(
+        "无法推导 celery 服务名（命令行无 -Q/--queues，且未设 IPIP_SERVICE_NAME）；"
+        "本次不写心跳，请检查 ipip-celery-*.service 的启动参数"
+    )
+    return None

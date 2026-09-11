@@ -15,7 +15,7 @@
 
 [Unit]
 Description=IPIP process liveness watchdog (systemd + heartbeat + HTTP)
-Documentation=file:%E/project_home/deploy/systemd/README.md
+Documentation=https://github.com/follow2015/IPIP/blob/main/deploy/systemd/README.md
 ; 刻意不写 After=ipip-web.service：watchdog 要能检测「web 根本起不来」，
 ; 依赖 web 启动会被它拖住而失效。启动时序由心跳 TTL 吸收。
 

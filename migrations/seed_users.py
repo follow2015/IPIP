@@ -17,7 +17,8 @@
 
 环境变量（可选）:
     SEED_ADMIN_USERNAME  默认管理员用户名        (默认 admin)
-    SEED_ADMIN_PASSWORD  明文密码；不设置则随机生成并打印到控制台
+    SEED_ADMIN_PASSWORD  明文密码；不设置则随机生成 16 位并输出到 stderr
+                         （即调用方的输出流）——务必重定向保存，否则无法找回
     SEED_ADMIN_NAME      真实姓名                (默认 系统管理员)
     SEED_ADMIN_EMAIL     邮箱                    (默认 空)
     SEED_ADMIN_ROLE      绑定角色名              (默认 admin)
@@ -117,8 +118,9 @@ def seed():
                 if not admin_password:
                     admin_password = _generate_password()
                     print("=" * 64)
-                    print(f"  未设置 SEED_ADMIN_PASSWORD，已为 '{admin_username}' 随机生成密码。")
-                    print("  密码已写入日志文件，不会在此显示；建议首次登录后立即修改。")
+                    print(f"  未设置 SEED_ADMIN_PASSWORD，已为 '{admin_username}' 随机生成密码：")
+                    print(f"      {admin_password}")
+                    print("  ⚠️ 该密码不会再次显示，请立即保存；建议首次登录后修改。")
                     print("=" * 64)
                     logger.warning(f"管理员 '{admin_username}' 初始密码: {admin_password}")
                 cur.execute(

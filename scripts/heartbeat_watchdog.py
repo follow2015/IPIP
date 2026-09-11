@@ -50,13 +50,12 @@ def state_key(service: str) -> str:
     """告警状态键。环境隔离方式与心跳一致 —— 否则开发环境的状态会挡住
     生产环境的告警（或反之），排查时会看到"明明冷却已过却没发通知"。
 
-    ipip:heartbeat:<env>: → 取 env 段 → ipip:watchdog:<env>:<service>
+    环境段直接问 `heartbeat.environment()`，**不要**切分 `namespace()` 反推：
+    自定义 HEARTBEAT_KEY_PREFIX 时切分出的段数不足，反推会静默落到 production。
     """
     from app.services.monitoring import heartbeat
 
-    parts = heartbeat.namespace().split(":")
-    env = parts[-2] if len(parts) >= 4 else "production"
-    return f"ipip:watchdog:{env}:{service}"
+    return f"ipip:watchdog:{heartbeat.environment()}:{service}"
 
 
 def unit_name(service: str) -> str:
@@ -64,7 +63,7 @@ def unit_name(service: str) -> str:
 
 
 def check_systemd(service: str, timeout: int = 10) -> dict:
-    """查 systemd：返回 Available/ActiveState/SubState/NRestarts。
+    """查 systemd：返回 available/active/sub/nrestarts。
 
     ⚠️ 不要用 `--value` 按行号取值：`systemctl show` 的输出顺序**不保证**与
     --property 的书写顺序一致（实测 NRestarts 会排在 ActiveState 之前），
@@ -72,13 +71,19 @@ def check_systemd(service: str, timeout: int = 10) -> dict:
     于是**所有健康服务都被判为异常**（实测：5 个 active/running 的服务被判 5 个异常，
     这类假警比不告警更糟：它会训练运维忽略告警）。
     改为解析自描述的 KEY=VALUE 输出，与顺序无关。
+
+    ⚠️ `available` 必须由 LoadState 决定，不能看 returncode：
+    `systemctl show <不存在的 unit>` **返回码是 0**，输出 LoadState=not-found
+    + ActiveState=inactive。只看 returncode 会把"服务未部署"当成"状态异常"，
+    部分部署的机器（例如不跑 celery-voice）会每 60s 报一次假警。
     """
     result = {"available": False, "active": None, "sub": None, "nrestarts": 0}
     try:
         proc = subprocess.run(
             [
                 "systemctl", "show", unit_name(service),
-                "--property=ActiveState", "--property=SubState", "--property=NRestarts",
+                "--property=LoadState", "--property=ActiveState",
+                "--property=SubState", "--property=NRestarts",
             ],
             capture_output=True, text=True, timeout=timeout,
         )
@@ -96,6 +101,16 @@ def check_systemd(service: str, timeout: int = 10) -> dict:
         if "=" in line:
             key, _, val = line.partition("=")
             props[key.strip()] = val.strip()
+
+    load_state = props.get("LoadState")
+    if load_state in ("not-found", "masked"):
+        result["undeployed"] = True
+        logger.debug("unit 未部署 service=%s load_state=%s", service, load_state)
+        return result
+    if load_state in ("bad-setting", "error"):
+        logger.debug("unit 配置异常（无法判定）service=%s load_state=%s",
+                     service, load_state)
+        return result
 
     active = props.get("ActiveState")
     if not active:
@@ -133,6 +148,77 @@ def check_http(base_url: str, timeout: int = 8) -> dict:
     return result
 
 
+BACKUP_UNIT = "ipip-backup.service"
+DEFAULT_BACKUP_MAX_AGE_HOURS = 26
+
+
+def check_backup(timeout: int = 10, max_age_hours: int = None) -> dict:
+    """备份 timer 的健康。oneshot 跑完即退，**不能**用 ActiveState 判活。
+
+    只看两个信号：
+    - `Result`：上次执行结果（success / exit-code / timeout / signal ...）；
+    - `InactiveEnterTimestamp`（配 `--timestamp=unix` 取数值）：上次结束时刻。
+
+    第 2 条针对的是"长期没有备份"这一失效模式：timer 被停、机器长期关机、
+    Persistent 没生效时，备份会静静地不再发生 —— 此前完全无人知晓，
+    而备份失效只在需要恢复的那天才暴露。
+
+    LoadState=not-found 时返回 available=False（未部署 → 不判定、不告警）。
+    """
+    result = {"available": False, "result": None, "last_run": None,
+              "age_hours": None, "problems": []}
+    try:
+        proc = subprocess.run(
+            [
+                "systemctl", "show", BACKUP_UNIT,
+                "--timestamp=unix",
+                "--property=LoadState", "--property=Result",
+                "--property=InactiveEnterTimestamp",
+            ],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError) as exc:
+        logger.debug("systemctl 不可用（backup）: %s", exc)
+        return result
+
+    if proc.returncode != 0:
+        return result
+
+    props = {}
+    for line in proc.stdout.splitlines():
+        if "=" in line:
+            key, _, val = line.partition("=")
+            props[key.strip()] = val.strip()
+
+    load_state = props.get("LoadState")
+    if not load_state or load_state in ("not-found", "masked", "bad-setting", "error"):
+        logger.debug("备份 unit 不可判定 load_state=%s", load_state)
+        return result
+
+    result["available"] = True
+    result["result"] = props.get("Result")
+    try:
+        ended_at = int(props.get("InactiveEnterTimestamp") or 0) or None
+    except ValueError:
+        ended_at = None
+    if ended_at:
+        result["age_hours"] = round(max(0.0, _now() - ended_at) / 3600, 1)
+        result["last_run"] = datetime.fromtimestamp(
+            ended_at, tz=timezone.utc).isoformat()
+
+    if result["result"] not in (None, "success"):
+        result["problems"].append(f"上次备份执行失败（Result={result['result']}）")
+
+    limit = (max_age_hours if max_age_hours is not None
+             else int(os.getenv("BACKUP_MAX_AGE_HOURS", DEFAULT_BACKUP_MAX_AGE_HOURS)))
+    if result["age_hours"] is not None and result["age_hours"] > limit:
+        result["problems"].append(
+            f"距上次备份结束已 {result['age_hours']} 小时（阈值 {limit}h），"
+            f"timer 可能未触发或已被停用"
+        )
+    return result
+
+
 def diagnose(service: str, sd: dict, hb: dict, stale_after: int, http: dict = None,
              restart_baseline: int = None):
     """合成单服务结论。返回 (problems: list[str], usable: bool)。
@@ -153,6 +239,9 @@ def diagnose(service: str, sd: dict, hb: dict, stale_after: int, http: dict = No
     """
     problems = []
     usable = False
+
+    if sd.get("undeployed"):
+        return [], False
 
     if sd.get("available"):
         usable = True
@@ -227,7 +316,8 @@ def run(args) -> dict:
     from app.services.monitoring import heartbeat
     from app.services.monitoring.heartbeat import SERVICES
 
-    services = tuple(args.services.split(",")) if args.services else SERVICES
+    services = (tuple(s.strip() for s in args.services.split(",") if s.strip())
+                if args.services else SERVICES)
     now = _now()
     redis_client = heartbeat.get_redis_client()
 
@@ -240,6 +330,7 @@ def run(args) -> dict:
         "redis_available": redis_client is not None,
         "services": {},
         "http": {"skipped": args.no_http},
+        "backup": None,
         "alerts": [],
         "recovered": [],
     }
@@ -271,9 +362,10 @@ def run(args) -> dict:
                                  "reason": reason, "problems": problems})
         if args.dry_run:
             continue
-        if _notify_down(service, problems, unit_name(service), now):
+        cycle = int(state.get("cycle") or 0)
+        if _notify_down(service, problems, unit_name(service), now, cycle=cycle):
             state.update({"down": True, "reason": reason, "since": now,
-                          "notified_at": now,
+                          "notified_at": now, "cycle": cycle,
                           "last_nrestarts": sd.get("nrestarts") or 0})
             save_state(redis_client, service, state)
         else:
@@ -292,8 +384,29 @@ def run(args) -> dict:
             _notify_recovered(service, unit_name(service), now)
             save_state(redis_client, service, {
                 "down": False, "recovered_at": now,
+                "cycle": int(state.get("cycle") or 0) + 1,
                 "last_nrestarts": state.get("last_nrestarts"),
             })
+
+    if not args.no_systemd:
+        backup = check_backup(timeout=args.systemd_timeout)
+        report["backup"] = backup
+        if backup["available"] and backup["problems"]:
+            report["alerts"].append({
+                "service": "backup", "unit": BACKUP_UNIT,
+                "reason": backup["problems"][0], "problems": backup["problems"],
+            })
+            if not args.dry_run:
+                state = load_state(redis_client, "backup")
+                if should_notify(state, now, args.cooldown):
+                    cycle = int(state.get("cycle") or 0)
+                    if _notify_down("backup", backup["problems"], BACKUP_UNIT, now,
+                                    cycle=cycle):
+                        state.update({"down": True,
+                                      "reason": backup["problems"][0],
+                                      "since": now, "notified_at": now,
+                                      "cycle": cycle})
+                        save_state(redis_client, "backup", state)
 
     if redis_client is None and not args.dry_run:
         _notify_watchdog_blind()
@@ -308,12 +421,18 @@ def _now() -> float:
     return time.time()
 
 
-def _notify_down(service: str, problems: list, unit: str, now: float) -> bool:
+def _notify_down(service: str, problems: list, unit: str, now: float,
+                 cycle: int = 0) -> bool:
     """发出「服务异常」告警。返回是否投递成功。
 
     必须用 notify_strict 而非 notify：notify 把「投递失败」与「幂等去重」都返回
     None（见 notification_service.notify 的告警说明），调用方无法区分，会把失败
     当成功 → 告警静默丢失。这里必须拿到真实结果才能决定要不要落冷却状态。
+
+    ⚠️ 幂等键要带故障周期 cycle：只按「服务 + 小时」兜底去重的话，同一小时内的
+    第二次故障（故障 → 恢复 → 再故障）会撞上第一次的键，被 notification_service
+    当成重复投递 → 真实告警被静默吞掉，而报告里仍显示"已告警"并落冷却。
+    cycle 由恢复分支自增（见 run 的恢复判定）。
     """
     from app.core.enums import ChannelType, NotificationTypeCode, SeverityLevel
     from app.services.notification_service import notification_service
@@ -330,7 +449,7 @@ def _notify_down(service: str, problems: list, unit: str, now: float) -> bool:
             target_type="role",
             target_id="admin",
             channels=(ChannelType.INBOX, ChannelType.EMAIL, ChannelType.WECHAT_WORK),
-            idempotency_key=f"watchdog_down_{service}_{hour}",
+            idempotency_key=f"watchdog_down_{service}_{hour}_{cycle}",
             ack_required=True,
         )
         return True

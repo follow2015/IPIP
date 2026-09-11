@@ -8,7 +8,7 @@
 
 [Unit]
 Description=IPIP Flask HTTP API (gunicorn)
-Documentation=file:%E/project_home/deploy/systemd/README.md
+Documentation=https://github.com/follow2015/IPIP/blob/main/deploy/systemd/README.md
 After=network.target mysql.service redis.service
 
 ; ── 重启风暴抑制（属于 [Unit] 段！）───────────────────────

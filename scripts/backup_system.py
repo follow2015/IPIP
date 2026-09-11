@@ -76,7 +76,11 @@ def _write_defaults_file(cfg: dict) -> str:
     fd, path = tempfile.mkstemp(prefix="ipip-backup-", suffix=".cnf")
     os.close(fd)
     os.chmod(path, 0o600)
-    esc_pwd = cfg["password"].replace("\\", "\\\\").replace('"', '\\"')
+    pwd = cfg["password"]
+    if "\n" in pwd or "\r" in pwd:
+        os.unlink(path)
+        sys.exit("❌ 数据库密码含换行符，无法安全写入临时凭据文件，请检查 .env")
+    esc_pwd = pwd.replace("\\", "\\\\").replace('"', '\\"')
     with open(path, "w", encoding="utf-8") as f:
         f.write("[client]\n")
         f.write(f"host={cfg['host']}\n")
@@ -144,14 +148,21 @@ def dump_mysql(cfg: dict, target: Path, dry_run: bool = False) -> None:
             cfg["database"],
         ]
         if dry_run:
-            print(f"[dry-run] {' '.join(cmd)} > {target}")
+            print(f"[dry-run] {' '.join(cmd)} | gzip > {target}")
             return
         print(f"导出 MySQL 库 {cfg['database']} ...")
-        proc = subprocess.run(cmd, capture_output=True)
-        if proc.returncode != 0:
-            sys.exit(f"❌ mysqldump 失败: {proc.stderr.decode('utf-8', 'replace')}")
         with gzip.open(target, "wb") as gz:
-            gz.write(proc.stdout)
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                shutil.copyfileobj(proc.stdout, gz, length=1024 * 1024)
+            finally:
+                proc.stdout.close()
+            stderr_out = proc.stderr.read()
+            proc.stderr.close()
+            proc.wait()
+        if proc.returncode != 0:
+            target.unlink(missing_ok=True)
+            sys.exit(f"❌ mysqldump 失败: {stderr_out.decode('utf-8', 'replace')}")
     finally:
         os.unlink(defaults)
 
@@ -230,10 +241,16 @@ def prune(output_dir: Path, dry_run: bool = False) -> None:
         output_dir: 备份根目录。
         dry_run: True 时只打印将被删除的目录。
     """
-    backups = sorted(
-        (d for d in output_dir.iterdir() if d.is_dir() and d.name.startswith("ipip-backup-")),
-        key=lambda d: d.name,
-    )
+    candidates = [
+        d for d in output_dir.iterdir()
+        if d.is_dir() and d.name.startswith("ipip-backup-")
+    ]
+    backups = sorted((d for d in candidates if (d / "manifest.json").is_file()),
+                     key=lambda d: d.name)
+    skipped = sorted(d.name for d in candidates if not (d / "manifest.json").is_file())
+    if skipped:
+        print(f"⚠️  跳过 {len(skipped)} 个目录（无 manifest.json，非本工具产物，不删）: "
+              f"{'、'.join(skipped)}")
     if not backups:
         return
 

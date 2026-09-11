@@ -6,7 +6,7 @@
 
 [Unit]
 Description=IPIP realtime_gateway (uvicorn, SSE)
-Documentation=file:%E/project_home/deploy/systemd/README.md
+Documentation=https://github.com/follow2015/IPIP/blob/main/deploy/systemd/README.md
 After=network.target redis.service
 
 ; ── 重启风暴抑制（[Unit] 段指令）─────────────────────────

@@ -47,7 +47,7 @@ def load_and_verify_manifest(backup_dir: Path) -> dict:
         dict: manifest 内容。
 
     Raises:
-        SystemExit: manifest 缺失、产物缺失或 sha256 不匹配。
+        SystemExit: manifest 缺失、清单为空、产物缺失或 sha256 不匹配。
     """
     manifest_path = backup_dir / "manifest.json"
     if not manifest_path.exists():
@@ -56,31 +56,59 @@ def load_and_verify_manifest(backup_dir: Path) -> dict:
     with open(manifest_path, encoding="utf-8") as f:
         manifest = json.load(f)
 
-    for name, meta in manifest.get("files", {}).items():
+    files = manifest.get("files") or {}
+    if not files:
+        sys.exit(f"❌ {manifest_path} 未登记任何产物，无法确认备份完整性")
+
+    for name, meta in files.items():
+        expected = (meta or {}).get("sha256")
+        if not expected:
+            sys.exit(f"❌ {name} 在 manifest 中缺少 sha256，无法校验")
         path = backup_dir / name
         if not path.exists():
             sys.exit(f"❌ 备份缺失产物: {name}")
         actual = _sha256(path)
-        if actual != meta["sha256"]:
-            sys.exit(f"❌ 校验失败 {name}: 期望 {meta['sha256']} 实际 {actual}")
+        if actual != expected:
+            sys.exit(f"❌ 校验失败 {name}: 期望 {expected} 实际 {actual}")
         print(f"✔ 校验通过 {name} ({path.stat().st_size} bytes)")
     return manifest
 
 
-def confirm(database: str, backup_dir: Path) -> None:
-    """打印破坏性操作提示并要求交互确认。
+def needs_confirm(*, skip_mysql: bool, skip_dataface: bool,
+                  assume_yes: bool, dry_run: bool) -> bool:
+    """本次运行是否需要交互确认。
+
+    ⚠️ 判据是「本次会不会改动现场」，而不是「会不会还原数据库」：`--skip-mysql`
+    只是跳过数据库，数据面（instance/：向量库、缓存 db）仍会被原地覆盖，
+    因此不能拿它当免确认开关。
+    """
+    return not (dry_run or assume_yes or (skip_mysql and skip_dataface))
+
+
+def confirm(database: str, backup_dir: Path, mysql: bool = True,
+            dataface: bool = True) -> None:
+    """按实际影响面打印破坏性操作提示，并要求交互确认。
+
+    ⚠️ 确认必须与「本次是否真的会改动现场」对齐：此前用 `--skip-mysql` 顺带跳过
+    了确认，但数据面还原依然会原地覆盖 instance/（Chroma 向量库、FTS5 sqlite、
+    pickle）—— 等于留了一条「不加确认就能破坏数据」的命令行。
 
     Args:
         database: 将被覆盖的目标库名。
         backup_dir: 备份来源。
+        mysql: 本次是否会还原数据库。
+        dataface: 本次是否会还原数据面。
 
     Raises:
         SystemExit: 用户未输入 yes。
     """
     print("=" * 60)
-    print("⚠️  即将执行恢复操作，这会覆盖目标库的现有数据")
+    print("⚠️  即将执行恢复操作，这会覆盖现场数据")
     print(f"    来源备份: {backup_dir}")
-    print(f"    目标库  : {database}")
+    if mysql:
+        print(f"    影响数据库: {database}（同名表将被 DROP 后重建）")
+    if dataface:
+        print(f"    影响数据面: {INSTANCE_DIR}（向量库/缓存 db 原地覆盖）")
     print("=" * 60)
     if input("请输入 yes 继续（其它任意输入取消）: ").strip().lower() != "yes":
         sys.exit("已取消")
@@ -107,7 +135,11 @@ def restore_mysql(backup_dir: Path, cfg: dict, database: str, dry_run: bool) -> 
     fd, defaults = tempfile.mkstemp(prefix="ipip-restore-", suffix=".cnf")
     os.close(fd)
     os.chmod(defaults, 0o600)
-    esc_pwd = cfg["password"].replace("\\", "\\\\").replace('"', '\\"')
+    pwd = cfg["password"]
+    if "\n" in pwd or "\r" in pwd:
+        os.unlink(defaults)
+        sys.exit("❌ 数据库密码含换行符，无法安全写入临时凭据文件，请检查 .env")
+    esc_pwd = pwd.replace("\\", "\\\\").replace('"', '\\"')
     with open(defaults, "w", encoding="utf-8") as f:
         f.write("[client]\n")
         f.write(f"host={cfg['host']}\n")
@@ -122,15 +154,24 @@ def restore_mysql(backup_dir: Path, cfg: dict, database: str, dry_run: bool) -> 
 
     try:
         print(f"还原 MySQL 到库 {database} ...")
-        proc = subprocess.Popen(
-            [mysql_bin, f"--defaults-extra-file={defaults}", database],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        )
-        with gzip.open(sql_gz, "rb") as gz:
-            shutil.copyfileobj(gz, proc.stdin)
-        proc.stdin.close()
-        stderr_out = proc.stderr.read()
-        proc.wait()
+        with tempfile.TemporaryFile() as err_file:
+            proc = subprocess.Popen(
+                [mysql_bin, f"--defaults-extra-file={defaults}", database],
+                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=err_file,
+            )
+            try:
+                with gzip.open(sql_gz, "rb") as gz:
+                    shutil.copyfileobj(gz, proc.stdin, length=1024 * 1024)
+            except BrokenPipeError:
+                pass
+            finally:
+                try:
+                    proc.stdin.close()
+                except BrokenPipeError:
+                    pass
+            proc.wait()
+            err_file.seek(0)
+            stderr_out = err_file.read()
         if proc.returncode != 0:
             sys.exit(f"❌ 数据库还原失败: {stderr_out.decode('utf-8', 'replace')}\n"
                      f"   现场已保留，请勿重复执行以免半途状态")
@@ -216,8 +257,10 @@ def main() -> None:
     }
     database = args.database or os.getenv("MYSQL_DATABASE", "ip_management")
 
-    if not args.dry_run and not args.yes and not args.skip_mysql:
-        confirm(database, backup_dir)
+    if needs_confirm(skip_mysql=args.skip_mysql, skip_dataface=args.skip_dataface,
+                     assume_yes=args.yes, dry_run=args.dry_run):
+        confirm(database, backup_dir, mysql=not args.skip_mysql,
+                dataface=not args.skip_dataface)
 
     if not args.skip_mysql:
         restore_mysql(backup_dir, cfg, database, args.dry_run)

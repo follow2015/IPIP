@@ -68,7 +68,15 @@ def create_deployment_plan():
     except ValidationError as exc:
         return APIResponse.error(message=f"参数校验失败: {exc.messages}", status_code=400)
 
+    from app.services.ai.capabilities.device_scope import resolve_visible_scope
     from app.services.deployment_plan_service import build_plan
+
+    scope_ok, visible_switch_ids, scope_reason = resolve_visible_scope()
+    if not scope_ok:
+        return APIResponse.error(
+            message=f"数据域解析失败，已拒绝本次查询: {scope_reason}",
+            status_code=503,
+        )
 
     try:
         plan = build_plan(
@@ -78,6 +86,7 @@ def create_deployment_plan():
             u_height=params["u_height"],
             power_per_unit=params["power_per_unit"],
             room_id=params["room_id"],
+            visible_switch_ids=visible_switch_ids,
             ip_scope=params["ip_scope"],
             ip_examples=params["ip_examples"],
             ip_pool_scope=params["ip_pool_scope"],

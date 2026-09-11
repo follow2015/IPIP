@@ -46,7 +46,10 @@ uvicorn==0.49.0
 # 生产 WSGI 服务器：deploy/systemd/ipip-web.service 直接调用 gunicorn
 # （start.sh 虽有"gunicorn 缺失回退 run.py"的降级逻辑，但 systemd unit 没有回退，
 #   故必须作为显式依赖，否则新环境部署后 web 服务起不来）
-gunicorn>=23,<27
+# 精确 pin：与同文件其它运行时依赖（uvicorn/celery/starlette）保持同一风格。
+# 原先写 >=23,<27 —— 24~26 并不存在，上界形同虚设，且非精确 pin 会让不同时间
+# 的全新安装拿到不同 gunicorn，安装结果无法复现。
+gunicorn==23.0.0
 # ⚠️ 不可升级到 starlette 1.x：chromadb==1.0.0 硬锁 fastapi==0.115.9，
 #    而 fastapi 0.115.9 约束 starlette>=0.40.0,<0.46.0。此处曾写 1.3.1，
 #    与两者同时冲突，导致**全新环境 pip 安装必然失败**（本机 venv 因历史

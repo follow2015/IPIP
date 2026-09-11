@@ -207,10 +207,15 @@ def _collect_room_ports(room_id: int, speed_mbps: int, visible_switch_ids=None) 
         .all()
     )
 
+    from app.core.enums import CabinetStatus
     from app.models.cabinet import Cabinet
+
     cabinet_room = {
         c.id: c.room_id
-        for c in Cabinet.query.filter_by(room_id=room_id).all()
+        for c in Cabinet.query.filter(
+            Cabinet.room_id == room_id,
+            Cabinet.status.in_([int(CabinetStatus.AVAILABLE), int(CabinetStatus.IN_USE)]),
+        ).all()
     }
 
     access: list = []
@@ -311,9 +316,17 @@ def _switch_distribution(ports: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _is_public_ipv4(ip_address: Optional[str]) -> bool:
-    """是否为公网 IPv4（RFC1918/CGNAT/环回/链路本地/多播/保留段均算内网）。
+    """是否为公网 IPv4（内网/环回/链路本地/多播/保留段一律不算）。
 
     库内无"公网/内网"字段，只能按地址属性判定；判定不了的安全回落为 False。
+
+    用 `is_global` 而不是逐个排除 `is_private`：`ipaddress` 的 `is_private`
+    **不覆盖 CGNAT 100.64.0.0/10**（运营商级 NAT），会把 100.64.x.x 当成公网，
+    虚增"可用公网地址"—— 与本函数自称的"CGNAT 算内网"正好相反。
+    实测 `is_global` 与需求吻合：`100.64.0.1`=False、常规公网地址=True。
+
+    但 `is_global` 对 **IPv4 多播（D 类，224/4）** 仍为 True（CPython 的私有网段
+    表不含多播段），故仍需显式排除 —— "可用公网地址"里出现多播地址毫无意义。
     """
     import ipaddress
 
@@ -323,13 +336,10 @@ def _is_public_ipv4(ip_address: Optional[str]) -> bool:
         return False
     if addr.version != 4:
         return False
-    return not (
-        addr.is_private or addr.is_loopback or addr.is_link_local
-        or addr.is_multicast or addr.is_reserved or addr.is_unspecified
-    )
+    return bool(addr.is_global) and not addr.is_multicast
 
 
-def _l2_room_ids(room_id: int) -> Dict[str, Any]:
+def _l2_room_ids(room_id: int, visible_switch_ids=None) -> Dict[str, Any]:
     """本机房所在的二层可达域（虚拟房网格径）。
 
     同一虚拟机房（virtual_room_members）的成员交换机在网络上是互联的，
@@ -338,6 +348,11 @@ def _l2_room_ids(room_id: int) -> Dict[str, Any]:
     该口径与网络扫描保持一致：``vr:{id}`` 扫描的 IP 作业范围就是
     ``VirtualRoomService.get_covered_room_ids()``（见 network_scanner_service
     Phase 6b）；公网地址本身也是跨机房可达的（同文件 6b 段注释）。
+
+    Args:
+        visible_switch_ids: 数据域可见交换机集合。受限时**只有可见交换机**参与
+            二层域推导，且覆盖机房中会剔除"没有任何可见交换机"的机房 ——
+            否则受限用户凭一台可见交换机就能拿到域外机房的名称。
 
     Returns:
         {"room_ids": set, "room_names": [...], "virtual_room_names": [...],
@@ -362,9 +377,15 @@ def _l2_room_ids(room_id: int) -> Dict[str, Any]:
         return fallback
     switch_ids = [
         r[0] for r in db.session.query(Device.id).filter(
-            Device.cabinet_id.in_(cab_ids)
+            Device.cabinet_id.in_(cab_ids),
+            Device.device_type == "network",
+            Device.device_subtype == "switch",
+            Device.deleted_at.is_(None),
         ).all()
     ]
+    if visible_switch_ids is not None:
+        visible = set(visible_switch_ids)
+        switch_ids = [sid for sid in switch_ids if sid in visible]
     if not switch_ids:
         return fallback
 
@@ -385,6 +406,18 @@ def _l2_room_ids(room_id: int) -> Dict[str, Any]:
         if vr is not None:
             vr_names.append(vr.name)
 
+    if visible_switch_ids is not None:
+        visible_rooms = {
+            row[0] for row in (
+                db.session.query(Cabinet.room_id)
+                .join(Device, Device.cabinet_id == Cabinet.id)
+                .filter(Device.id.in_(sorted(set(visible_switch_ids))))
+                .distinct().all()
+            )
+            if row[0] is not None
+        }
+        room_ids &= visible_rooms
+
     names = [
         r[1] for r in db.session.query(Room.id, Room.name)
         .filter(Room.id.in_(sorted(room_ids)))
@@ -398,8 +431,16 @@ def _l2_room_ids(room_id: int) -> Dict[str, Any]:
     }
 
 
-def _collect_ip_candidates(room_ids, primary_room_id=None):
+def _collect_ip_candidates(room_ids, primary_room_id=None, visible_switch_ids=None):
     """收集一组机房内的空闲 IP 候选（跨去重），供多口径统计复用。
+
+    Args:
+        room_ids: 参与统计的机房集合。
+        primary_room_id: 目标物理机房（用于 is_primary 标记）。
+        visible_switch_ids: 数据域可见交换机集合。None=不限制；受限集（含空集）时
+            **只认绑定了可见交换机的网段**（fail-closed）。IP 是比端口更敏感的资源：
+            端口维度已按可见交换机裁剪，IP 维度若不做同样裁剪，受限用户只需能看到
+            一台交换机，就能问出整个二层域（含域外机房）的空闲地址、网段与机房名。
 
     Returns:
         (candidates, stats)；candidates 每项含 ip/network/room/is_primary/
@@ -418,6 +459,9 @@ def _collect_ip_candidates(room_ids, primary_room_id=None):
                     "usable_local": 0, "registered_local": 0}
 
     subnets = IPNetwork.query.filter(IPNetwork.room_id.in_(room_ids)).all()
+    if visible_switch_ids is not None:
+        visible = set(visible_switch_ids)
+        subnets = [s for s in subnets if s.switch_id in visible]
     if not subnets:
         return [], {"usable": 0, "registered": 0,
                     "usable_local": 0, "registered_local": 0}
@@ -489,6 +533,14 @@ def _ip_view(candidates, ip_scope, needed: int, examples: int,
 
     needed 决定候选切片大小（容量模式下按最大可能台数取），
     required 是实际要落地的台数，决定 short 缺口。
+
+    ⚠️ 两个字段族的口径**刻意不同**，不要再"统一"它们：
+      · ``total_free`` / ``public_free`` / ``private_free`` / ``subnet_count``
+        描述**整个候选池**，三数满足 ``total_free == public_free + private_free``，
+        报告（``_ip_reference_lines``）正是这样并列展示的；
+      · ``ips`` / ``samples`` / ``short`` 描述**按 ip_scope 收窄后的选择**。
+    若把 ``total_free`` 也按 ip_scope 过滤，报告会打印「空闲可用 0 个：公网 0 个、
+    内网 4 个」这类自相矛盾的句子 —— 正是本次修掉的 M2 的同源形态。
     """
     if ip_scope == "public":
         pool = [c for c in candidates if c["is_public"]]
@@ -520,7 +572,8 @@ def _ip_view(candidates, ip_scope, needed: int, examples: int,
 def _ip_reference(primary_room_id: int, l2: Dict[str, Any],
                   ip_scope: Optional[str], needed: int, examples: int,
                   pool_scope: str = "auto",
-                  required: Optional[int] = None) -> Dict[str, Any]:
+                  required: Optional[int] = None,
+                  visible_switch_ids=None) -> Dict[str, Any]:
     """双口径 IP 资源：物理机房（本地出口）与虚拟机房二层域（跨域可调）并行。
 
     生产两种形态并存，不是非此即彼：
@@ -531,10 +584,13 @@ def _ip_reference(primary_room_id: int, l2: Dict[str, Any],
       "auto"（默认）—— 两套都算，挑 IP 时先本地后跨域；
       "room" —— 严格只用本物理机房名下的地址。
 
+    visible_switch_ids 透传给候选收集，用于数据域裁剪（None=不限制）。
+
     Returns: 顶层为选中口径的统计（向后兼容 ips/total_free/...），
     另含 local / l2 两份明细与口径标识。
     """
-    cands, stats = _collect_ip_candidates(l2["room_ids"], primary_room_id)
+    cands, stats = _collect_ip_candidates(l2["room_ids"], primary_room_id,
+                                          visible_switch_ids=visible_switch_ids)
     local_cands = [c for c in cands if c["is_primary"]]
 
     view_local = _ip_view(local_cands, ip_scope, needed, examples,
@@ -645,20 +701,24 @@ def _ip_reference_lines(ip_ref: Optional[Dict[str, Any]], placeable: int,
         lines.append("· 本机房交换机未加入虚拟机房，无跨机房二层域可参照")
     lines.append("· 计数已去重，并剔除网关、网络号、广播地址与 /31、/32 主机路由")
 
-    base = local.get("public_free", 0) if strict else l2.get("public_free", 0)
-    if local.get("registered_subnet_count", 0) and base < placeable:
-        gap = placeable - base
-        if has_l2 and not strict and l2.get("public_free", 0) >= placeable:
-            extra = int(l2["public_free"]) - int(local.get("public_free", 0))
+    local_public = int(local.get("public_free") or 0)
+    l2_public = int(l2.get("public_free") or 0)
+    if local.get("registered_subnet_count", 0) and local_public < placeable:
+        gap = placeable - local_public
+        if has_l2 and not strict and l2_public >= placeable:
             lines.append(
-                f"· ⚠ 每台 1 个公网 IP 时，本物理机房公网地址差 "
-                f"{placeable - int(local.get('public_free', 0))} 个；"
-                f"二层域内另有 {extra} 个公网空闲可在确认出口可达后跨机房调配"
+                f"· ⚠ 每台 1 个公网 IP 时，本物理机房公网地址差 {gap} 个；"
+                f"二层域内另有 {l2_public - local_public} 个公网空闲，"
+                f"可在确认出口可达后跨机房调配"
             )
         else:
+            hint = ""
+            if has_l2 and not strict and l2_public > local_public:
+                hint = (f"（二层域内另有 {l2_public - local_public} 个公网空闲，"
+                        f"但仍不足 {placeable} 台所需）")
             lines.append(
                 f"· ⚠ 若每台配 1 个公网 IP，公网地址还差 {gap} 个，"
-                f"需先申请新的公网地址段"
+                f"需先申请新的公网地址段{hint}"
             )
 
     samples = ip_ref.get("samples") or []
@@ -680,15 +740,23 @@ def _capacity_report(room, ev: Dict[str, Any], u_height: int,
         max(0, (cab.total_u or 0) - sum(d["height_u"] for d in existing))
         for cab, _, existing in ev["cabinets"]
     )
+    u_total = int(ev.get("u_total") or 0)
+    port_total = int(ev.get("port_total") or 0)
+    spacing_note = (
+        f"{u_height}U + {_DEVICE_SPACING}U 散热间距（即 {per_unit_u}U/台）"
+        if u_height >= _MIN_HEIGHT_FOR_SPACING
+        else f"{u_height}U（不足 {_MIN_HEIGHT_FOR_SPACING}U 的设备不预留散热间距）"
+    )
     lines = [
         f"【上架容量查询】{room.name}",
         f"结论：还能上架 {ev['placeable']} 台"
         f"（{u_height}U / {power_per_unit}W / {speed_mbps}Mbps 端口）",
         "",
         "依据",
-        f"· U 位：可用 {free_u}U，按每台占 {u_height}U + {_DEVICE_SPACING}U "
-        f"散热间距（即 {per_unit_u}U/台）计算 → {ev['placeable']} 台",
-        f"· 端口：速率 ≥ {speed_mbps}Mbps 的空闲物理端口 {ev['port_total']} 个",
+        f"· U 位：可用 {free_u}U，按每台 {spacing_note}逐柜排布"
+        f"（计机柜内碎片）→ 最多 {u_total} 台",
+        f"· 端口：速率 ≥ {speed_mbps}Mbps 的空闲物理端口 {port_total} 个"
+        f" → 最多 {port_total} 台",
     ]
 
     sw_dist = ev.get("switch_distribution") or []
@@ -703,7 +771,10 @@ def _capacity_report(room, ev: Dict[str, Any], u_height: int,
         if any(i["role"] == "core" for i in sw_dist):
             lines.append("  - ⚠ 上列含核心交换机端口，正式上架请优先用接入交换机端口")
 
-    lines.append(f"· 瓶颈：{ev['bottleneck']}（端口 {ev['port_total']} vs U 位 {ev['placeable']}）")
+    lines.append(
+        f"· 结论取两者较小值：{ev['placeable']} 台"
+        f"（端口 {port_total} 台 vs U 位 {u_total} 台，瓶颈：{ev['bottleneck']}）"
+    )
 
     dist = [(cab.cabinet_number, fits) for cab, fits, _ in ev["cabinets"] if fits > 0]
     if dist:
@@ -894,11 +965,12 @@ def build_plan(
 
     examples = max(examples, _DEFAULT_IP_SAMPLES) if capacity_mode else examples
     chosen["switch_distribution"] = _switch_distribution(chosen["ports"])
-    l2 = _l2_room_ids(room.id)
+    l2 = _l2_room_ids(room.id, visible_switch_ids=visible_switch_ids)
     chosen["ip_reference"] = _ip_reference(
         room.id, l2, ip_scope, max(chosen["placeable"], count),
         examples, pool_scope=pool_scope,
         required=chosen["placeable"] if capacity_mode else count,
+        visible_switch_ids=visible_switch_ids,
     )
 
     placeable = chosen["placeable"]

@@ -9,7 +9,6 @@
 Description=IPIP system backup (mysql + instance)
 ; 本地备份不强依赖 Redis，但仍需 MySQL 在运行
 After=mysql.service
-Wants=ipip-backup.timer
 
 [Service]
 Type=oneshot
@@ -26,7 +25,8 @@ ExecStart=${VENV_BIN}/python ${PROJECT_ROOT}/scripts/backup_system.py \
 
 ; ── 超时与重试 ───────────────────────────────────────────
 ; 大数据量 dump 可能较久，给足 1 小时；备份失败不重试，交给次日窗口 +
-; 上层告警（T2 判活脚本应监控本 unit 的 LastTrigger 失败）。
+; 上层告警。watchdog（scripts/heartbeat_watchdog.py）会检查本 unit 的 Result
+; 与上次结束时刻 —— 备份失败或长时间未跑都会告警，不会静默失效。
 TimeoutStartSec=3600
 Restart=no
 

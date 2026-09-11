@@ -8,7 +8,6 @@
 
 [Unit]
 Description=Daily IPIP system backup
-Requires=ipip-backup.service
 
 [Timer]
 ; 每日 03:10；RandomizedDelaySec 避免与其它定时任务同秒争抢 IO

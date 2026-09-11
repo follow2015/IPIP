@@ -14,8 +14,8 @@
 #   SEED_ADMIN_PASSWORD=<你的管理员密码> bash migrations/seed_all.sh
 #
 # 环境变量:
-#   SEED_ADMIN_PASSWORD  默认管理员密码（缺省随机生成并打印）
-#   SEED_ADMIN_USERNAME  默认管理员用户名（缺省 root）
+#   SEED_ADMIN_PASSWORD  默认管理员密码（缺省随机生成并显示，只显示一次）
+#   SEED_ADMIN_USERNAME  默认管理员用户名（缺省 admin，见 seed_users.py）
 #   SEED_ADMIN_ROLE      默认管理员角色（缺省 admin）
 #   SKIP_SQL_SEED=1      跳过 seed_data.sql（仅运行 Python 种子）
 # ============================================================
@@ -26,11 +26,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
-# 加载 .env（若存在）
-if [ -f "$PROJECT_ROOT/.env" ]; then
-  set -a
-  . "$PROJECT_ROOT/.env"
-  set +a
+# 加载 .env（若存在）。
+# ⚠️ 不能用 `set -a; . .env`：.env 不是 shell 脚本，值里含 $ / 反引号 / 空格时会被
+# 真的执行。实测踩到：随机生成的 MySQL 密码含 '$'，source 时报
+# "unbound variable" 并中断安装。改用 python-dotenv + shlex.quote 后再 eval。
+_env_py="$PROJECT_ROOT/.venv/bin/python"
+[ -x "$_env_py" ] || _env_py="$(command -v python3 || true)"
+if [ -f "$PROJECT_ROOT/.env" ] && [ -n "$_env_py" ]; then
+  _env_exports="$("$_env_py" -c '
+import shlex, sys
+from dotenv import dotenv_values
+for k, v in dotenv_values(sys.argv[1]).items():
+    if v is not None and k:
+        print("export %s=%s" % (k, shlex.quote(v)))
+' "$PROJECT_ROOT/.env" 2>/dev/null)" || _env_exports=""
+  [ -n "$_env_exports" ] && eval "$_env_exports"
 fi
 
 # 选择可用的 Python 解释器：优先项目 .venv，否则回退 python3

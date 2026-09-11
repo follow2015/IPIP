@@ -46,22 +46,77 @@ sudo chown -R ipip:ipip /opt/ipip/instance /opt/ipip/logs
 sudo chmod 640 /opt/ipip/.env
 ```
 
-### 4. 安装环境变量文件
+### 4. 环境变量文件 `/etc/ipip/ipip.env`
+
+第 5 步的安装脚本在**该文件不存在时**会依据 `--project-root` / `--venv-bin` 等参数
+自动生成它（权限 640）；**已存在则保留不覆盖**——其中可能含运维自定义值（如
+`WATCHDOG_BASE_URL`）。
+
+需要手工定制时：
 
 ```bash
 sudo mkdir -p /etc/ipip
 sudo cp deploy/systemd/ipip.env.example /etc/ipip/ipip.env
 sudo vim /etc/ipip/ipip.env      # 必改：PROJECT_ROOT / VENV_BIN
 sudo chmod 640 /etc/ipip/ipip.env
-sudo chown root:ipip /etc/ipip/ipip.env
 ```
 
-### 5. 安装 unit
+> 该文件只放「部署形态」变量。业务配置由 `config.py` 的 `load_dotenv()` 从
+> `${PROJECT_ROOT}/.env` 读取，**不要**把业务 `.env` 拷过来——systemd 的
+> EnvironmentFile 语法更严格（不支持 `export` 前缀等），直接套用会让 unit 启动失败。
+
+### 5. 安装 unit（用脚本，不要手工 cp）
+
+unit 模板里带 `${PROJECT_ROOT}` / `${VENV_BIN}` 等占位符，而 systemd 的 `User=` /
+`Group=` **不支持**环境变量展开，必须在安装期替换成真实值。手工 `cp` 会把占位符原样
+装进去，表现为 unit 启动即失败、且报错信息不指向根因。用安装脚本固化这一步：
 
 ```bash
-sudo cp deploy/systemd/*.service deploy/systemd/*.timer deploy/systemd/ipip.target /etc/systemd/system/
-sudo systemctl daemon-reload
+# 通用（项目在 /opt/ipip，使用专用账号 ipip）
+sudo bash deploy/systemd/install-units.sh --project-root /opt/ipip
+
+# 项目装在 /root 下的场景
+sudo bash deploy/systemd/install-units.sh \
+  --project-root /root/ipip-deploy --user root --group root
+
+# 只渲染打印、不落盘（上线前确认替换结果）
+bash deploy/systemd/install-units.sh \
+  --project-root /root/ipip-deploy --user root --group root --dry-run
 ```
+
+脚本依次完成：渲染全部 unit（含 `User` / `Group`）→ **校验无残留占位符** →
+备份既有 unit 到 `/root/ipip-units.bak.<时间戳>`（只保留最近 3 份）→ 安装到
+`/etc/systemd/system/` →（首次）生成 `/etc/ipip/ipip.env` → `systemd-analyze verify`
++ `daemon-reload`。
+
+**它刻意不做**：自动 `enable` / `start`。接管进程属于生产变更，应先按第 6 步逐个启用
+并验证；确认无误后再用 `--enable` 一次性启用。
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `--project-root` | 脚本上两级目录 | 项目根，须与 `WorkingDirectory` 一致 |
+| `--venv-bin` | `$PROJECT_ROOT/.venv/bin` | 虚拟环境 bin 目录 |
+| `--user` / `--group` | `ipip` / 同 `--user` | 服务运行身份。**项目在 `/root` 下必须用 `root`** |
+| `--flask-port` / `--gateway-port` | 5000 / 8000 | 监听端口 |
+| `--workers` | 4 | gunicorn worker 数 |
+| `--celery-ai-concurrency` / `--celery-voice-concurrency` | 2 / 4 | celery 并发 |
+| `--backup-dir` | `/var/backups/ipip` | 备份产物目录 |
+| `--dry-run` | — | 只渲染并打印关键行 |
+| `--enable` | — | 安装后 `enable --now` 全部 service 与 timer |
+| `--skip-env-file` | — | 不生成 `/etc/ipip/ipip.env` |
+| `--keep-backups N` | 3 | 旧 unit 备份保留份数（`0` = 不清理，全部保留） |
+
+> ⚠️ 以 `root` 运行服务属于权限放宽。能用 `/opt/ipip` + 专用账号 `ipip` 时应优先该方案；
+> 脚本检测到「项目位于 `/root` 下但账号不是 root」会主动告警。
+
+**也可以让应用安装脚本一并完成本节**（把「装应用」与「装托管」合并成一条命令）：
+
+```bash
+sudo bash ipip-deploy/scripts/install.sh \
+  --with-units --units-user root --units-group root
+```
+
+它会在安装收尾调用本节的 `install-units.sh`；托管失败只告警、不把整次安装判为失败。
 
 ### 6. 逐个启用并验证（不要一次全开）
 

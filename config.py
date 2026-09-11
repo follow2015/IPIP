@@ -356,9 +356,16 @@ class Config:
         - charset=utf8mb4: 使用完整 Unicode 字符集
         - collation=utf8mb4_0900_ai_ci: MySQL 8.x 默认排序规则，性能优于 utf8mb4_general_ci
         - mysql_native_password: 兼容旧认证，避免 caching_sha2_password 的 SSL 握手开销
+
+        ⚠️ user/password 必须做 URL 编码：MySQL 密码允许包含 @ : / 等字符，直接拼接
+        会让 SQLAlchemy 把其中的 @ 当作 user@host 分隔符。实测踩到：随机生成的密码
+        以 @ 结尾（...Tb@），URI 被解析成 host='@localhost'，服务启动即报
+        "Can't connect to MySQL server on '@localhost' ([Errno -2] Name or service not known)"。
         """
+        from urllib.parse import quote_plus
+
         return (
-            f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
+            f"mysql+pymysql://{quote_plus(self.MYSQL_USER)}:{quote_plus(self.MYSQL_PASSWORD)}"
             f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}"
             f"?charset=utf8mb4&collation=utf8mb4_0900_ai_ci"
         )
