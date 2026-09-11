@@ -4,7 +4,7 @@
 
 后端 Flask + SQLAlchemy + MySQL + Redis，前端 React 19 + Ant Design 6 + Vite 8，ASGI SSE 实时推送网关（多副本就绪），Celery 异步任务底座（AI 长任务 + 语音通知）。
 
-通知渠道：站内、飞书、企业微信、邮件、**语音（阿里云/腾讯云）**，统一投递 worker 带却制/熔断/失败转移。
+通知渠道：站内、飞书、企业微信、**钉钉（自定义机器人加签）**、邮件、**语音（阿里云/腾讯云）**，统一投递 worker 带却制/熔断/失败转移。
 
 ## 功能概览
 
@@ -13,7 +13,7 @@
 | IP/IPAM | 机房/机柜/设备/IP 分配/VLAN/交换机管理 |
 | 监控告警 | SNMP 指标采集、阈值告警、依赖抑制、告警留痕 |
 | **事件中心** | 告警聚合（L1 规则归并 / L2 拓扑抑制 / L3 变更关联）、事件影响面、回溯窗口 |
-| **通知投递** | 多渠道（站内/飞书/企微/邮件/语音）、投递 worker、却制/熔断/失败转移、用户偏好 |
+| **通知投递** | 多渠道（站内/飞书/企微/钉钉/邮件/语音）、投递 worker、却制/熔断/失败转移、用户偏好 |
 | **语音渠道** | 阿里云/腾讯云语音通知、独立 voice worker、回调鉴权、升级链路 P0 告警叫醒 |
 | **SSE 实时** | 网关 seq/ring 迁 Redis 共享状态，多副本水平扩展 |
 | 客户/审计 | 客户管理、操作审计、RBAC 权限 |
@@ -63,7 +63,25 @@ ipip/
 │   └── seed_users.py           # 默认管理员账户
 ├── scripts/
 │   ├── install.sh              # 一键安装（venv + 前端构建 + DB + 种子）
-│   └── start.sh                # 一键启动/停止/状态（4 进程：Flask + gateway + monitor + celery）
+│   ├── start.sh                # 一键启动/停止/状态（4 进程：Flask + gateway + monitor + celery）
+│   ├── backup_system.py        # T1 备份（MySQL dump + Redis RDB + GPG 加密密钥导出）
+│   ├── restore_system.py       # T1 恢复（恢复前自动安全快照，可回退）
+│   ├── heartbeat_watchdog.py   # T2 自监控 watchdog（心跳超时告警）
+│   ├── download_models.py      # 离线 AI 模型预置（sentence-transformers 等）
+│   ├── backfill_utc_timestamps.py  # 存量时间戳 UTC 回填
+│   └── import_sql.py           # SQL 导入工具（DELIMITER 触发器切分）
+├── deploy/
+│   └── systemd/                # systemd unit（ADR-003 拍板，替代 start.sh 托管）
+│       ├── ipip.target         # 统一目标（stop ipip.target 一键停全部）
+│       ├── ipip-web.service    # Flask HTTP API
+│       ├── ipip-gateway.service # SSE 实时网关
+│       ├── ipip-monitor.service # 监控服务
+│       ├── ipip-celery-ai.service # Celery AI 异步队列
+│       ├── ipip-celery-voice.service # Celery 语音队列
+│       ├── ipip-backup.service / .timer # 定时备份
+│       ├── ipip-watchdog.service / .timer # 心跳 watchdog
+│       ├── install-units.sh    # unit 安装脚本
+│       └── ipip.env.example    # systemd 环境段模板
 └── logs/                       # 运行时日志（gitignore）
 ```
 
@@ -147,6 +165,27 @@ bash scripts/start.sh restart   # 重启全部
 
 > Celery worker 受 `AI_ASYNC_ENABLED` 控制：设为 `1` 启动，非 `1` 跳过（AI 任务走同步路径）。若 `.venv/bin/celery` 不存在也会自动跳过。
 
+### 3a. systemd 托管（生产推荐）
+
+`start.sh` 适合开发/临时运行；生产环境推荐用 systemd 托管（ADR-003），支持开机自启、命名空间隔离（`ProtectSystem=strict`）、统一启停：
+
+```bash
+bash deploy/systemd/install-units.sh   # 安装全部 unit + ipip.target
+systemctl start ipip.target            # 启动全部
+systemctl stop ipip.target             # 停止全部（PartOf 级联）
+systemctl status ipip-web              # 查看单个服务
+```
+
+| unit | 进程 | 说明 |
+|------|------|------|
+| `ipip-web` | Flask HTTP API | gunicorn WSGI，端口 5000 |
+| `ipip-gateway` | SSE 实时网关 | uvicorn ASGI，端口 8000 |
+| `ipip-monitor` | 监控服务 | SNMP 采集 + 告警 + 事件聚合 |
+| `ipip-celery-ai` | Celery AI 队列 | 异步 AI 任务（`ai` 队列） |
+| `ipip-celery-voice` | Celery 语音队列 | 语音通知投递（`voice` 队列） |
+| `ipip-backup` + `.timer` | 定时备份 | MySQL dump + Redis RDB + GPG 密钥导出 |
+| `ipip-watchdog` + `.timer` | 心跳 watchdog | T2 自监控，心跳超时告警 |
+
 ## 环境变量
 
 参见 `.env.example`。关键项：
@@ -218,6 +257,10 @@ pnpm lint         # 代码检查
 | Celery 未启动 | 确认 `AI_ASYNC_ENABLED=1` 且 `.venv/bin/celery` 存在，查 `logs/celery.log` |
 | 语音通知不送达 | 查 `logs/flask.log` 中 voice worker，确认 `voice_setting` 表已配置密钥/模板 |
 | 事件中心无数据 | 确认 `incident_aggregator` 在跑，查 `monitor_incident` 表 |
+| 钉钉通知不送达 | 查 `logs/flask.log`，确认钉钉机器人 webhook + 加签密钥已配置 |
+| systemd unit 启动失败 | `journalctl -u ipip-web -e`，确认 `ipip.env` 环境段路径正确 |
+| 备份失败 | 查 `ipip-backup.service` 日志，确认 MySQL/Redis 连通、GPG 密钥可用 |
+| 恢复后 AI 配置丢失 | 确认备份含 Redis RDB（`--skip-redis` 会跳过），恢复时回灌 Redis |
 
 ## 技术栈
 
@@ -228,6 +271,8 @@ pnpm lint         # 代码检查
 **实时网关**：Starlette · uvicorn · Redis Pub/Sub · SSE（seq/ring Redis 共享，多副本就绪）
 
 **异步任务**：Celery（broker/result backend 独立 Redis db，队列 `ai,voice`）
+
+**备份/恢复**：MySQL mysqldump + Redis RDB + GPG 加密密钥导出（`--include-secrets`），恢复前自动安全快照可回退
 
 **AI 助手**：OpenAI 兼容 LLM · ChromaDB 向量库 · sentence-transformers（bge-small-zh-v1.5）· jieba 中文分词 · Pydantic 技能 schema · tenacity 重试 · prometheus-client 指标
 
