@@ -123,6 +123,24 @@ if [ -z "$PROJECT_ROOT" ]; then
   log "未指定 --project-root，按脚本位置推导: $PROJECT_ROOT"
 fi
 PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)" || die "项目根目录不存在: $PROJECT_ROOT"
+
+# ── 部署位置守卫：/root 下与 ProtectHome=true 互斥 ─────────────
+# 单元模板启用 ProtectHome=true——该档位使 /root、/home、/run/user 对服务
+# 进程**完全不可见**。项目放在 /root 下时，WorkingDirectory 与 venv 解释器
+# 都访问不到，unit 装上后服务必然反复启动失败（systemd 203/EXEC）。
+# 与其装出一个注定起不来的部署，不如在安装阶段直接拒绝并给出修复路径：
+#   · 部署到 /opt/ipip（ipip-deploy/scripts/install.sh 的固定安装目标），或
+#   · 自行把单元模板 ProtectHome=true 改为 read-only（保留加固，/root 只读可访问）
+case "$PROJECT_ROOT" in
+  /root|/root/*)
+    die "拒绝安装：项目根目录位于 /root 下（$PROJECT_ROOT）。
+  单元启用 ProtectHome=true 后，/root 对服务进程完全不可见，
+  WorkingDirectory 与 venv 解释器都无法访问，服务启动必然失败。
+  修复方式二选一：
+    1) 部署到 /opt/ipip（scripts/install.sh 的固定安装目标，推荐）
+    2) 将单元模板 ProtectHome=true 改为 read-only"
+    ;;
+esac
 [ -n "$VENV_BIN" ] || VENV_BIN="$PROJECT_ROOT/.venv/bin"
 
 [ -x "$VENV_BIN/python" ] || die "venv 解释器不可用: $VENV_BIN/python

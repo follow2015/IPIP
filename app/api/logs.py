@@ -8,7 +8,7 @@ from app.utils.logging import get_logger
 from flask import Blueprint, request
 from app.api.base import APIResponse, api_exception_handler
 from app.utils import rate_limit_api
-from app.openapi.doc import doc, public
+from app.openapi.doc import doc
 from app.utils.auth import login_required
 
 logger = get_logger(__name__)
@@ -118,7 +118,8 @@ def log_info():
         return APIResponse.error(message="记录日志失败", status_code=500)
 
 @logs_bp.route("/", methods=["GET"])
-@public(summary="获取最近日志", tags=["用户"], responses={200: "ApiResponse"})
+@doc(summary="获取最近日志", tags=["用户"], responses={200: "ApiResponse", 401: "ApiError"})
+@login_required
 @rate_limit_api
 @api_exception_handler
 def get_logs():
@@ -147,7 +148,8 @@ def get_logs():
 
 
 @logs_bp.route("/stats", methods=["GET"])
-@public(summary="获取日志统计", tags=["用户"], responses={200: "ApiResponse"})
+@doc(summary="获取日志统计", tags=["用户"], responses={200: "ApiResponse", 401: "ApiError"})
+@login_required
 @rate_limit_api
 @api_exception_handler
 def get_log_stats():

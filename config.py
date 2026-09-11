@@ -354,6 +354,14 @@ class Config:
 
     MONITOR_OUTBOX_LOCK_ENABLED = os.getenv("MONITOR_OUTBOX_LOCK_ENABLED", "true").lower() == "true"
 
+    TRAPD_ENABLED = os.getenv("TRAPD_ENABLED", "false").lower() == "true"
+    TRAPD_LISTEN_ADDRESS = os.getenv("TRAPD_LISTEN_ADDRESS", "0.0.0.0")
+    TRAPD_LISTEN_PORT = _env_num("TRAPD_LISTEN_PORT", 10162, min_value=1)
+    TRAPD_COMMUNITIES = os.getenv("TRAPD_COMMUNITIES", "public")
+    TRAPD_RATE_LIMIT_PER_MINUTE = _env_num("TRAPD_RATE_LIMIT_PER_MINUTE", 120, min_value=1)
+    TRAPD_QUEUE_SIZE = _env_num("TRAPD_QUEUE_SIZE", 1000, min_value=1)
+    TRAP_CUSTOM_RULES = os.getenv("TRAP_CUSTOM_RULES", "")
+
 
     @classmethod
     def init_app(cls, app):
@@ -506,6 +514,8 @@ class TestingConfig(Config):
 
     MONITOR_SUPPRESSION_ENABLED = False
 
+    TRAPD_ENABLED = False
+
     WTF_CSRF_ENABLED = False
 
     RATELIMIT_ENABLED = False
@@ -615,6 +625,30 @@ config = {
 }
 
 
+def _assert_deploy_location():
+    """部署位置守卫：拒绝在 /root 下启动。
+
+    为什么：deploy/systemd 的单元模板启用 ProtectHome=true——该档位使 /root、
+    /home、/run/user 对服务进程**完全不可见**（进程看到的 /root 是空目录）。
+    项目一旦放在 /root 下，WorkingDirectory 与 .venv 解释器都访问不到，
+    服务启动必然失败（systemd 表现为 203/EXEC 反复重启）。
+
+    本检查覆盖**绕过安装脚本手工部署**的场景：脚本安装的目标固定为 /opt/ipip
+    （不受 ProtectHome 影响），而手工把代码放 /root 再启动的，在这里得到明确
+    的拒绝与修复提示，而不是一行难懂的 systemd 启动错误。
+    """
+    root = os.path.dirname(os.path.abspath(__file__))
+    if root == "/root" or root.startswith("/root/"):
+        raise RuntimeError(
+            "拒绝启动：项目部署在 /root 下（%s）。\n"
+            "  systemd 加固单元启用 ProtectHome=true 时 /root 对服务进程完全不可见，\n"
+            "  继续启动必然失败。修复方式二选一：\n"
+            "    1) 部署到 /opt/ipip（scripts/install.sh 的固定安装目标，推荐）\n"
+            "    2) 将单元模板的 ProtectHome=true 改为 read-only（保留加固，"
+            "/root 变为只读可访问）" % root
+        )
+
+
 def get_config(config_name=None):
     """获取配置对象
 
@@ -628,6 +662,8 @@ def get_config(config_name=None):
     Raises:
         ValueError: 当配置名称无效时
     """
+    _assert_deploy_location()
+
     if config_name is None:
         config_name = os.getenv("FLASK_ENV", "production")
 

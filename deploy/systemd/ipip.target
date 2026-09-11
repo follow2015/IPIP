@@ -15,7 +15,7 @@ Documentation=https://github.com/follow2015/IPIP
 ; 部署说明见仓库 deploy/systemd/README.md（systemd 的 Documentation= 只接受纯 URL，
 ; 含中文/括号会被判为 "Invalid URL, ignoring"，故说明文字另起注释行）
 After=network.target mysql.service redis.service
-Wants=ipip-web.service ipip-gateway.service ipip-monitor.service ipip-celery-ai.service ipip-celery-voice.service
+Wants=ipip-web.service ipip-gateway.service ipip-monitor.service ipip-celery-ai.service ipip-celery-voice.service ipip-trapd.service
 
 [Install]
 WantedBy=multi-user.target

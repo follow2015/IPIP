@@ -1,0 +1,60 @@
+; -*- coding: utf-8 -*-
+; IPIP SNMP Trap 接收服务（P1-1，独立进程）
+;
+;   python run_trapd_service.py
+;
+; 说明：
+; - 回滚 = systemctl disable --now ipip-trapd.service，不影响轮询采集
+;   （trap 接收与 monitor 探测完全正交）。
+; - 端口：TRAPD_LISTEN_PORT 默认 10162（特权端口 162 需 root/CAP_NET_ADMIN）。
+;   交换机侧用 snmp-server host <ip> <community> <port> 指定目标端口。
+; - MONITOR_WORKER_IN_PROCESS 由 create_headless_monitor_app 强制关闭，
+;   本进程不做轮询探测，只收 trap。
+
+[Unit]
+Description=IPIP SNMP trap receiver
+After=network.target mysql.service redis.service
+; PartOf：让 ipip.target 的 stop/restart 传播到本服务。
+PartOf=ipip.target
+
+; 重启风暴抑制（[Unit] 段指令，写在 [Service] 会被 systemd 静默忽略）
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Service]
+Type=simple
+User=ipip
+Group=ipip
+
+EnvironmentFile=/etc/ipip/ipip.env
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=${PROJECT_ROOT}
+
+ExecStart=${VENV_BIN}/python ${PROJECT_ROOT}/run_trapd_service.py
+
+Restart=on-failure
+RestartSec=10
+
+KillSignal=SIGTERM
+TimeoutStopSec=30
+KillMode=control-group
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+; trapd 不写文件（日志走 journal），但保留与 monitor 相同的落盘放行口径，
+; 避免 create_app 内任何惰性落盘路径被 ProtectSystem 卡死。
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=${PROJECT_ROOT}/instance ${PROJECT_ROOT}/logs
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+MemoryMax=512M
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ipip-trapd
+
+[Install]
+WantedBy=ipip.target
