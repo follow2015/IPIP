@@ -15,6 +15,9 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* 全局类型：TS 6 不再自动纳入 @types/*，需显式声明（测试用到 process.env.TZ） */
+    "types": ["node"],
+
     /* 严格模式 */
     "strict": true,
     "noImplicitAny": true,

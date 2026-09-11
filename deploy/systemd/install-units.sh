@@ -210,7 +210,12 @@ prune_unit_backups() {
 # 指向的 Unit 不存在。此处并入渲染与安装（含 check_no_placeholder 校验），但
 # 不加入 SERVICES，故 --enable 不会直接 enable --now 它——备份只应由 timer 调度，
 # 保持既有语义（避免开机自启抢在 timer 之前重复跑）。
-ALL_UNITS="$SERVICES $TIMERS $TARGET ipip-backup.service"
+#
+# ipip-trapd.service（P1-1 SNMP Trap 接收）同理必须纳入 ALL_UNITS：它带
+# ${PROJECT_ROOT}/${VENV_BIN} 占位符，漏渲染则单元永不安装/启用，交付物形同不存在。
+# 同样**不**进 SERVICES——trap 接收需要 TRAPD_ENABLED/community 等站点配置就绪后
+# 才应启用（且默认端口 162 为特权端口），由运维显式 enable。
+ALL_UNITS="$SERVICES $TIMERS $TARGET ipip-backup.service ipip-trapd.service"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -321,4 +326,9 @@ cat <<'NEXT'
     sudo systemctl enable ipip.target
     sudo systemctl enable --now ipip-backup.timer ipip-watchdog.timer
   或直接：sudo bash install-units.sh --project-root <路径> --enable
+
+可选能力（默认不启用，配置就绪后再开）：
+    # SNMP Trap 接收：先在 ipip.env 设 TRAPD_ENABLED=true 与 TRAPD_COMMUNITIES，
+    # 再启用（单元已随本脚本安装，但不在 --enable 清单内）
+    sudo systemctl enable --now ipip-trapd.service
 NEXT

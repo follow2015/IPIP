@@ -9,8 +9,11 @@
 - **签名拼在 URL 上，不放消息体**：``&timestamp=<毫秒>&sign=<urlencode(签名)>``；
   放进 body 钉钉会直接忽略，表现为"签名错误"且难以排查。
 - 时间戳是**毫秒**（飞书是秒）。
-- 签名算法与飞书一致：``HMAC-SHA256(key=f"{timestamp}\\n{secret}")`` 后 Base64。
+- 签名算法与飞书**不同**（照抄飞书必错）：钉钉为
+  ``HMAC-SHA256(key=secret, msg=f"{timestamp}\\n{secret}")`` 后 Base64；
+  飞书才是 ``HMAC-SHA256(key=f"{timestamp}\\n{secret}", msg="")``。
 """
+import base64
 import hashlib
 import hmac
 import time
@@ -103,12 +106,24 @@ def _matches(cfg: WebhookConfig, notification: Notification) -> bool:
 
 
 def _gen_sign(secret: str, timestamp: str) -> str:
-    """生成钉钉加签签名（与飞书算法相同：key=timestamp\\nsecret 的 HMAC-SHA256）"""
+    """生成钉钉加签签名。
+
+    钉钉官方算法（**与飞书不同，沿用飞书写法会永远校验失败**）::
+
+        string_to_sign = f"{timestamp}\\n{secret}"
+        hmac_code = hmac.new(secret.encode("utf-8"),
+                             string_to_sign.encode("utf-8"),
+                             digestmod=hashlib.sha256).digest()
+        sign = base64.b64encode(hmac_code)
+
+    关键点：**key 是 secret，message 是 ``timestamp\\nsecret``**。
+    """
     string_to_sign = f"{timestamp}\n{secret}"
     hmac_code = hmac.new(
-        string_to_sign.encode("utf-8"), digestmod=hashlib.sha256
+        secret.encode("utf-8"),
+        string_to_sign.encode("utf-8"),
+        digestmod=hashlib.sha256,
     ).digest()
-    import base64
     return base64.b64encode(hmac_code).decode("utf-8")
 
 

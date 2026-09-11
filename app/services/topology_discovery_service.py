@@ -129,7 +129,7 @@ class TopologyDiscoveryService:
         if not neighbors and source == "lldp":
             cdp_cmd = adapter.get_cdp_neighbor_command()
             if cdp_cmd:
-                raw2, _, err2 = self._run_show(cred, cdp_cmd)
+                raw2, err2 = self._run_show(cred, cdp_cmd)
                 if not err2:
                     cdp_rows = adapter.parse_cdp_neighbors(raw2)
                     if cdp_rows:
@@ -264,7 +264,9 @@ class TopologyDiscoveryService:
         if local_port_id is None or peer_port_id is None:
             missing = "本机" if local_port_id is None else "对端"
             item["match_status"] = STATUS_PARTIAL
-            item["reason"] = f"{missing}端口未录入（{neighbor.local_port if local_port_id is None else neighbor.neighbor_port}）"
+            peer_port = (neighbor.local_port if local_port_id is None
+                         else neighbor.neighbor_port)
+            item["reason"] = f"{missing}端口未录入（{peer_port}）"
             return item
 
         existing = self._find_connection(local_port_id, peer_port_id)

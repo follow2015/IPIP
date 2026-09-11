@@ -43,7 +43,7 @@ DEFAULT_TRAP_RULES: list[dict[str, Any]] = [
     },
     {
         "name": "authentication_failure",
-        "match_oid": f"{_TRAP_PREFIX}.6",
+        "match_oid": f"{_TRAP_PREFIX}.5",
         "severity": "warning",
         "title": "SNMP 认证失败",
         "content": "设备收到携带错误 community 的请求，疑似扫描/误配置",
@@ -67,7 +67,7 @@ DEFAULT_TRAP_RULES: list[dict[str, Any]] = [
     },
     {
         "name": "egp_neighbor_loss",
-        "match_oid": f"{_TRAP_PREFIX}.5",
+        "match_oid": f"{_TRAP_PREFIX}.6",
         "severity": "warning",
         "title": "EGP 邻居丢失",
         "content": "设备上报 EGP 邻居丢失",

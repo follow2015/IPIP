@@ -87,10 +87,10 @@ def decode_trap_message(data: bytes) -> dict | None:
         enterprise = str(pdu.getComponentByName("enterprise")).strip(".")
         generic = int(pdu.getComponentByName("generic-trap"))
         specific = int(pdu.getComponentByName("specific-trap"))
-        if generic == 6:  # enterpriseSpecific → enterprise.specific
-            trap_oid = f"{enterprise}.{specific}"
-        else:             # generic → RFC 2576 翻译到 v2 snmpTraps 地址族
-            trap_oid = f"{_V1_GENERIC_TRAP_BASE}.{generic}"
+        if generic == 6:  # enterpriseSpecific → RFC 2576: enterprise.0.specific
+            trap_oid = f"{enterprise}.0.{specific}"
+        else:             # generic → RFC 2576 翻译到 snmpTraps 地址族（下标 = generic+1）
+            trap_oid = f"{_V1_GENERIC_TRAP_BASE}.{generic + 1}"
         varbinds = []
         for name, value in _v1.apiTrapPDU.get_varbinds(pdu):
             pretty = getattr(value, "prettyPrint", None)
