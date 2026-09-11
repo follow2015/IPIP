@@ -38,11 +38,21 @@ def environment() -> str:
     `namespace().split(":")[-2]` 反推环境段，遇到自定义 `HEARTBEAT_KEY_PREFIX`
     （切分后段数 <4）会静默落到 "production" —— 开发环境的告警冷却因此与生产
     共用，排查时表现为"冷却时间早过了却没发通知"。
+
+    ⚠️ 刻意**不读** Flask 的 `config["ENV"]`（也不经 `_conf`）：该键由
+    `FLASK_ENV` 派生，语义是"调试模式"而非部署环境名。线上实测（2026-09-11）：
+    `.env` 里 `FLASK_ENV=development` 时，**请求上下文内**读到 development，
+    而心跳**写入方**是无 app 上下文的守护线程（回落 `os.getenv("ENV")`）→ 同一
+    进程写出 `production` 段、读回 `development` 段，健康端点的
+    `services_heartbeat` 因此把**全部**服务误判为 `alive=false`（判定型信号
+    永久失真）。故环境段只认显式声明，且**在有无 app 上下文下取值恒定一致**：
+    `HEARTBEAT_ENV` → `ENV` 环境变量 → "production"。
     """
     custom = _conf("HEARTBEAT_KEY_PREFIX", None)
     if custom:
         return str(custom).rstrip(":")
-    return str(_conf("ENV", "production")).strip().lower() or "production"
+    explicit = os.getenv("HEARTBEAT_ENV") or os.getenv("ENV")
+    return (explicit or "production").strip().lower() or "production"
 
 
 def namespace() -> str:
