@@ -3,6 +3,8 @@
 # install.sh - ipip 一键安装脚本
 # ------------------------------------------------------------
 # 功能：
+#   0. 固定安装目标：无论从哪个目录执行本脚本，应用一律同步并安装到
+#      /opt/ipip（/root、/home 下与 ProtectHome=true 加固互斥，禁止部署）
 #   1. 版本基线检查 + 系统依赖
 #      基线取本机 dev 实测版本：Python 3.14.7 / Node v26.7.0 / pnpm 10.34.5 /
 #      MySQL 8.4+ / Redis 8.0+
@@ -56,8 +58,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$PROJECT_ROOT"
+SOURCE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# 安装目标固定为 /opt/ipip：deploy/systemd 单元模板启用 ProtectHome=true，
+# 该档位使 /root、/home、/run/user 对服务进程**完全不可见**——项目放这两处
+# 服务必然起不来（systemd 203/EXEC 反复重启）。因此无论本脚本从哪个目录执行，
+# 应用一律先同步到 /opt/ipip 再做后续安装（.env/instance/logs 重装时保留）。
+PROJECT_ROOT="/opt/ipip"
 
 # 颜色输出
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -315,6 +321,31 @@ HELP
     *) die "未知参数: $1（用 --help 查看用法）" ;;
   esac
 done
+
+# ── 0. 代码副本同步到固定安装目录 ──────────────────────────────
+# 重装/升级时 .env、instance/（运行时数据）、logs/ 不被覆盖；.venv 由第 2 步
+# 在安装目录内新建。--delete 让安装目录与代码副本严格一致（陈旧文件不留存）。
+if [ "$SOURCE_ROOT" != "$PROJECT_ROOT" ]; then
+  log "同步代码副本: $SOURCE_ROOT → $PROJECT_ROOT"
+  mkdir -p "$PROJECT_ROOT"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete \
+      --exclude ".venv/" --exclude ".git/" --exclude ".env" \
+      --exclude "instance/" --exclude "logs/" --exclude "__pycache__/" \
+      --exclude "node_modules/" \
+      "$SOURCE_ROOT/" "$PROJECT_ROOT/" \
+      || die "代码同步到 $PROJECT_ROOT 失败（rsync）"
+  else
+    tar -C "$SOURCE_ROOT" \
+      --exclude="./.venv" --exclude="./.git" --exclude="./.env" \
+      --exclude="./instance" --exclude="./logs" --exclude="__pycache__" \
+      --exclude="./node_modules" -cf - . | tar -C "$PROJECT_ROOT" -xf - \
+      || die "代码同步到 $PROJECT_ROOT 失败（tar 回退路径）"
+  fi
+else
+  log "副本已位于安装目录 $PROJECT_ROOT，跳过同步"
+fi
+cd "$PROJECT_ROOT"
 
 log "项目根目录: $PROJECT_ROOT"
 
@@ -847,6 +878,12 @@ if [ "$SKIP_MODELS" -eq 1 ]; then
   warn "  需要时执行：$VENV_PY scripts/download_models.py"
 else
   log "=== [8] 下载 RAG 本地模型（embedding≈92MB + reranker≈1100MB）==="
+  # 模型缓存位置：默认 $PROJECT_ROOT/instance/huggingface（随应用数据目录走，
+  # 该目录在单元 ReadWritePaths 白名单内，读写皆通）。⚠️ 不能落在 ~/.cache：
+  # ProtectHome=true 下 /root、/home 对服务进程不可见，服务运行期读不到模型，
+  # RAG 会静默失效。已显式导出 HF_HOME 的调用方不受影响。
+  export HF_HOME="${HF_HOME:-$PROJECT_ROOT/instance/huggingface}"
+  log "HF 模型缓存: $HF_HOME"
   # 默认写入 HF 标准缓存（$HF_HOME/hub/models--BAAI--*/snapshots/main/），
   # 与本地开发环境同一套解析机制 → 代码与 .env 均无需改动。
   # 下载体积较大但属必需步骤；失败只告警不中止安装，但会把影响范围说清楚。
