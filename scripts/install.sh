@@ -88,7 +88,9 @@ die()  { err "$*"; exit 1; }
 PIP_INSTALL_TIMEOUT="${PIP_INSTALL_TIMEOUT:-120}"   # 单源探测上限（秒）
 PIP_MIN_SPEED_KBPS="${PIP_MIN_SPEED_KBPS:-1024}"    # 可接受吞吐下限（KB/s，1024=1MB/s）
 PIP_INDEX_OFFICIAL="https://pypi.org/simple"
-PIP_INDEX_TUNA="https://pypi.tuna.tsinghua.edu.cn/simple"
+# 兜底源用中科大 USTC：清华/阿里镜像对长时间大文件下载限速（实测教训），
+# USTC 无此策略。不再把清华作为 pip 兜底。
+PIP_INDEX_FALLBACK="https://mirrors.ustc.edu.cn/pypi/web/simple"
 PIP_INDEX_ARG=""   # 空=官方源；非空=携带 -i <url>
 # 探测包取项目自身依赖之一，中等体积（numpy 约 16MB wheel）：太小反映不出
 # 大文件（torch ≈554MB）场景的真实吞吐，太大又拖慢探测本身。
@@ -140,18 +142,18 @@ select_pip_index() {
     log "官方源吞吐达标（≥ $(human_speed "$PIP_MIN_SPEED_KBPS")），沿用官方源"
     return 0
   fi
-  warn "官方源吞吐不足/不可用，实测清华源..."
-  tuna_kbps=$(probe_speed_kbps "$PIP_INDEX_TUNA")
-  log "  清华源：$(human_speed "${tuna_kbps:-0}")"
-  if [ -z "$tuna_kbps" ]; then
+  warn "官方源吞吐不足/不可用，实测中科大源..."
+  fallback_kbps=$(probe_speed_kbps "$PIP_INDEX_FALLBACK")
+  log "  中科大源：$(human_speed "${fallback_kbps:-0}")"
+  if [ -z "$fallback_kbps" ]; then
     warn "两个源均不可用，仍沿用官方源继续（后续安装可能很慢或失败）"
     return 0
   fi
-  PIP_INDEX_ARG="-i $PIP_INDEX_TUNA"
-  if [ -z "$official_kbps" ] || [ "$tuna_kbps" -ge "$official_kbps" ]; then
-    log "切换清华源（${tuna_kbps}KB/s），后续依赖均走 ${PIP_INDEX_TUNA}"
+  PIP_INDEX_ARG="-i $PIP_INDEX_FALLBACK"
+  if [ -z "$official_kbps" ] || [ "$fallback_kbps" -ge "$official_kbps" ]; then
+    log "切换中科大源（${fallback_kbps}KB/s），后续依赖均走 ${PIP_INDEX_FALLBACK}"
   else
-    warn "清华源反而更慢，沿用官方源（${official_kbps}KB/s）"
+    warn "中科大源反而更慢，沿用官方源（${official_kbps}KB/s）"
     PIP_INDEX_ARG=""
   fi
 }
@@ -483,9 +485,9 @@ pip_tty() {
 # 大包分散到不同镜像，包内再分段并行下载，最后本地离线安装。
 # 不加 --gpu-fast 则不做预取，直接走 pip 默认安装（简单但慢，可能超 1 小时）。
 CUDA_MIRROR_POOL=(
-  "https://mirrors.aliyun.com/pypi"
-  "https://mirrors.ustc.edu.cn/pypi"
-  "https://pypi.tuna.tsinghua.edu.cn"
+  "https://mirrors.ustc.edu.cn/pypi/web"
+  "https://pypi.org"
+  "https://mirrors.cloud.tencent.com/pypi"
 )
 PIP_WHEEL_CACHE="${PIP_WHEEL_CACHE:-/tmp/ipip-wheels}"
 CUDA_SEGMENTS="${CUDA_SEGMENTS:-8}"
@@ -588,7 +590,7 @@ if [ "$TORCH_FLAVOR" = "cpu" ]; then
     fi
     log "torch 版本：CPU（默认，≈190MB）"
     run_timed "安装 CPU 版 torch" pip_tty \
-      "torch --index-url https://download.pytorch.org/whl/cpu --extra-index-url $PIP_INDEX_TUNA --force-reinstall --no-deps --progress-bar on --timeout 60 --retries 5" \
+      "torch --index-url https://download.pytorch.org/whl/cpu --extra-index-url $PIP_INDEX_FALLBACK --force-reinstall --no-deps --progress-bar on --timeout 60 --retries 5" \
       || die "CPU 版 torch 安装失败。可手动执行：
       $VENV_PY -m pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cpu"
     # 从 CUDA 版切换过来时，此前的 nvidia-* 包会残留（对 CPU 版无用，白占数 GB）
@@ -621,9 +623,9 @@ if run_timed "安装 requirements.txt" pip_tty \
       "-r $PROJECT_ROOT/requirements.txt $PIP_INDEX_ARG --progress-bar on --timeout 60 --retries 5"; then
   :
 else
-  warn "依赖安装失败，尝试改用备用镜像重试一次..."
-  run_timed "安装 requirements.txt（备用镜像重试）" pip_tty \
-      "-r $PROJECT_ROOT/requirements.txt -i $PIP_INDEX_TUNA --progress-bar on --timeout 60 --retries 5" \
+  warn "依赖安装失败，尝试改用中科大镜像重试一次..."
+  run_timed "安装 requirements.txt（中科大镜像重试）" pip_tty \
+      "-r $PROJECT_ROOT/requirements.txt -i $PIP_INDEX_FALLBACK --progress-bar on --timeout 60 --retries 5" \
     || die "依赖安装失败。若报错为 ResolutionImpossible/版本冲突，属 requirements.txt 内部矛盾（非网络问题）；若卡在大包下载，可加 --gpu-fast 或设置 PIP_INDEX_URL 指定更快镜像。"
 fi
 log "Python 依赖安装完成"
