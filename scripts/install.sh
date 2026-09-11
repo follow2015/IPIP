@@ -875,17 +875,31 @@ fi
 # HF_HUB_OFFLINE=1（避免 transformers 5.x 在无网环境加载时卡死），模型不在本地
 # 就会加载失败——embedding 失败则 RAG 检索整体不可用，reranker 失败则降级为 RRF。
 # 国内机房访问 huggingface.co 基本不可达，脚本默认走 ModelScope（实测约 5.7MB/s）。
+# 模型缓存位置（对 --skip-models 同样生效：运行期读取的就是这个目录）：
+export HF_HOME="${HF_HOME:-$PROJECT_ROOT/instance/huggingface}"
+log "HF 模型缓存: $HF_HOME"
+# ⚠️ 同步运行时环境文件：服务进程的 HF_HOME 来自 /etc/ipip/ipip.env
+# （EnvironmentFile）。该文件由 install-units.sh 首次渲染、之后「已存在不覆盖」，
+# 换目录重装时必残留旧路径 → 服务读不到模型、RAG 静默失效（实测踩到：
+# /root 迁往 /opt 后仍指旧路径）。这里只校正这一行，不碰运维其它自定义值。
+ENV_FILE="${ENV_FILE:-/etc/ipip/ipip.env}"
+if [ -f "$ENV_FILE" ]; then
+  if grep -q "^HF_HOME=" "$ENV_FILE"; then
+    OLD_HF="$(grep "^HF_HOME=" "$ENV_FILE" | head -1 | cut -d= -f2-)"
+    if [ "$OLD_HF" != "$HF_HOME" ]; then
+      sed -i "s|^HF_HOME=.*|HF_HOME=$HF_HOME|" "$ENV_FILE" \
+        && log "已校正 $ENV_FILE 的 HF_HOME: $OLD_HF → $HF_HOME"
+    fi
+  else
+    echo "HF_HOME=$HF_HOME" >> "$ENV_FILE" \
+      && log "已追加 $ENV_FILE 的 HF_HOME=$HF_HOME"
+  fi
+fi
 if [ "$SKIP_MODELS" -eq 1 ]; then
   warn "已跳过本地模型下载（--skip-models）：RAG 向量检索将不可用，"
   warn "  需要时执行：$VENV_PY scripts/download_models.py"
 else
   log "=== [8] 下载 RAG 本地模型（embedding≈92MB + reranker≈1100MB）==="
-  # 模型缓存位置：默认 $PROJECT_ROOT/instance/huggingface（随应用数据目录走，
-  # 该目录在单元 ReadWritePaths 白名单内，读写皆通）。⚠️ 不能落在 ~/.cache：
-  # ProtectHome=true 下 /root、/home 对服务进程不可见，服务运行期读不到模型，
-  # RAG 会静默失效。已显式导出 HF_HOME 的调用方不受影响。
-  export HF_HOME="${HF_HOME:-$PROJECT_ROOT/instance/huggingface}"
-  log "HF 模型缓存: $HF_HOME"
   # 默认写入 HF 标准缓存（$HF_HOME/hub/models--BAAI--*/snapshots/main/），
   # 与本地开发环境同一套解析机制 → 代码与 .env 均无需改动。
   # 下载体积较大但属必需步骤；失败只告警不中止安装，但会把影响范围说清楚。
