@@ -14,6 +14,8 @@
 [Unit]
 Description=IPIP device monitor collector
 After=network.target mysql.service redis.service
+; PartOf：让 ipip.target 的 stop/restart 传播到本服务（Wants= 不传播停止）。
+PartOf=ipip.target
 
 ; ── 重启风暴抑制（[Unit] 段指令）─────────────────────────
 ; ⚠️ StartLimitBurst / StartLimitIntervalSec 属于 [Unit] 段，写在 [Service] 会被

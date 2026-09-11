@@ -10,6 +10,12 @@
 Description=IPIP Flask HTTP API (gunicorn)
 Documentation=https://github.com/follow2015/IPIP/blob/main/deploy/systemd/README.md
 After=network.target mysql.service redis.service
+; PartOf：让 ipip.target 的 stop/restart **传播**到本服务。
+; ⚠️ 只有 Wants= 是不够的 —— Wants 只管"拉起"，不传播停止，于是
+;    README 里的 `systemctl stop ipip.target` 会"返回成功但服务仍在跑"
+;    （2026-09-11 在测试机实测：stop 后 ipip-web 仍是原 PID），
+;    维护窗口里以为停了、实际还在写库，是最危险的静默失效。
+PartOf=ipip.target
 
 ; ── 重启风暴抑制（属于 [Unit] 段！）───────────────────────
 ; ⚠️ StartLimitBurst / StartLimitIntervalSec 是 [Unit] 段指令，写在 [Service]
