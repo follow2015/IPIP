@@ -73,6 +73,44 @@ def _redis_url_for_db(db: int) -> str:
     return f"redis://{host}:{port}/{db}"
 
 
+def _assert_ldap_config(config_cls) -> None:
+    """LDAP 显式开启但缺关键配置时 fail-fast（T3）。
+
+    仅在**显式开启**（LDAP_ENABLED=true）却缺 LDAP_SERVER / LDAP_BASE_DN 时报错。
+    否则会退化成「所有人都登不上」的静默故障，而且要等到第一个用户尝试登录才暴露。
+    关闭状态（默认）不做任何校验 —— 存量部署升级后行为完全不变。
+
+    同时校验 T3.5 的 ``LDAP_GROUP_ROLE_MAP`` 可解析：一份写错的映射表若拖到登录时
+    才报错，表现是「部分账号登不上」，且错误只留在日志里 —— 属于必须在启动期挡住的
+    配置错误。
+
+    抽成纯函数（不碰 app、不建目录），便于单测直接覆盖三种组合，无需构造假 app。
+
+    Raises:
+        RuntimeError: 开启但配置不全，或映射表无法解析。
+    """
+    if not getattr(config_cls, "LDAP_ENABLED", False):
+        return
+
+    if not (getattr(config_cls, "LDAP_SERVER", "") and getattr(config_cls, "LDAP_BASE_DN", "")):
+        raise RuntimeError(
+            "LDAP_ENABLED=true 但 LDAP_SERVER / LDAP_BASE_DN 未配置；请补全后重启"
+            "（如需临时停用外部认证，设 LDAP_ENABLED=false）"
+        )
+
+    raw_map = getattr(config_cls, "LDAP_GROUP_ROLE_MAP", "") or ""
+    if raw_map:
+        from app.services.ldap_role_mapper import (
+            GroupRoleMapError,
+            parse_group_role_map,
+        )
+
+        try:
+            parse_group_role_map(raw_map)
+        except GroupRoleMapError as exc:
+            raise RuntimeError(f"LDAP_GROUP_ROLE_MAP 无法解析：{exc}") from exc
+
+
 def _generate_dev_key(key_name: str) -> str:
     """为开发环境生成随机密钥并打印警告"""
     key = secrets.token_urlsafe(32)
@@ -170,6 +208,22 @@ class Config:
     REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
     REDIS_DB = int(os.getenv("REDIS_DB", 0))
     REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
+
+    LDAP_ENABLED = os.getenv("LDAP_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+    LDAP_SERVER = os.getenv("LDAP_SERVER", "")      # 如 ldaps://dc.corp.local:636
+    LDAP_BASE_DN = os.getenv("LDAP_BASE_DN", "")    # 如 DC=corp,DC=local
+    LDAP_BIND_DN = os.getenv("LDAP_BIND_DN", "")    # 服务账号（检索用户/组用），可留空
+    LDAP_BIND_PASSWORD = os.getenv("LDAP_BIND_PASSWORD", "")
+    LDAP_USER_FILTER = os.getenv("LDAP_USER_FILTER", "(sAMAccountName={username})")
+    LDAP_TIMEOUT = _env_num("LDAP_TIMEOUT", 5, min_value=1)  # 连接/检索/Bind 超时（秒）
+
+    LDAP_GROUP_ROLE_MAP = os.getenv("LDAP_GROUP_ROLE_MAP", "")
+    LDAP_DEFAULT_ROLE = os.getenv("LDAP_DEFAULT_ROLE", "")
+    LDAP_AUTO_PROVISION = os.getenv("LDAP_AUTO_PROVISION", "false").strip().lower() in (
+        "1", "true", "yes", "on")
+    LDAP_SYNC_ROLES_ON_LOGIN = os.getenv("LDAP_SYNC_ROLES_ON_LOGIN", "true").strip().lower() in (
+        "1", "true", "yes", "on")
+    LDAP_BYPASS_USERS = os.getenv("LDAP_BYPASS_USERS", "")
 
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     LOG_DIR = os.getenv("LOG_DIR", "logs")
@@ -447,6 +501,8 @@ class TestingConfig(Config):
 
     HEARTBEAT_ENABLED = False
 
+    LDAP_ENABLED = False
+
     MONITOR_OUTBOX_LOCK_ENABLED = False
 
     MONITOR_SUPPRESSION_ENABLED = False
@@ -503,6 +559,8 @@ class ProductionConfig(Config):
     def init_app(cls, app):
         """初始化生产环境应用配置"""
         Config.init_app(app)
+
+        _assert_ldap_config(cls)
 
         import logging
         from logging.handlers import RotatingFileHandler

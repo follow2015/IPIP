@@ -26,6 +26,7 @@ class User(BaseModel):
         Index("idx_user_openid", "openid"),
         Index("idx_user_status", "status"),
         Index("idx_user_created_at", "created_at"),
+        Index("idx_user_external_dn", "external_dn"),
         {"comment": "用户信息表"},
     )
 
@@ -36,6 +37,14 @@ class User(BaseModel):
     name = db.Column(db.String(255), nullable=False, comment="真实姓名")  # 改为必填
     department = db.Column(db.String(100), nullable=True, comment="所属部门")  # 新增
     contact_phone = db.Column(db.String(20), nullable=True, comment="联系电话")  # 新增
+
+    auth_source = db.Column(
+        db.String(16), nullable=False, server_default="local",
+        comment="认证来源：local/ldap",
+    )
+    external_dn = db.Column(
+        db.String(255), nullable=True, comment="外部身份唯一标识（LDAP DN）",
+    )
 
     roles = relationship(
         "Role", secondary="user_roles", back_populates="users"

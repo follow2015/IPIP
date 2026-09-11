@@ -83,6 +83,8 @@ class AuthenticationManager:
         self.access_token_expires = config.JWT_ACCESS_TOKEN_EXPIRES
         self.refresh_token_expires = config.JWT_REFRESH_TOKEN_EXPIRES
         self.password_manager = password_manager
+        self._ldap_service_cache = None
+        self._ldap_identity_cache = None
 
     def hash_password(self, password: str) -> str:
         """加密密码
@@ -125,7 +127,7 @@ class AuthenticationManager:
             username: 用户名（微信登录时可为None）
             roles: 用户角色列表
             token_type: 令牌类型（access或refresh）
-            auth_type: 认证类型（web或wx）
+            auth_type: 认证类型（web=本地密码 / wx=微信 / ldap=企业目录透传）
             openid: 微信OpenID（微信登录时必需）
             expires_delta: 自定义有效期（秒），None 时按 token_type 取默认值
                           （access=1h / refresh=7d；"记住我"登录传 30d）
@@ -370,11 +372,11 @@ class AuthenticationManager:
 
             new_access_token = self.generate_token(
                 user_id, username=username, roles=roles,
-                token_type="access", auth_type="web"
+                token_type="access", auth_type=auth_type
             )
             new_refresh_token = self.generate_token(
                 user_id, username=username, roles=roles,
-                token_type="refresh", auth_type="web",
+                token_type="refresh", auth_type=auth_type,
                 device_fingerprint=bound_dfp,
             )
 
@@ -507,44 +509,300 @@ class AuthenticationManager:
                 logger.warning("用户已禁用: %s", username)
                 return None
 
-            user_roles = [role.name for role in user.roles]
-
-            access_token = self.generate_token(
-                user.id,
-                username=user.username,
-                roles=user_roles,
-                token_type="access",
-                auth_type="web",
-            )
-            refresh_token = self.generate_token(
-                user.id,
-                username=user.username,
-                roles=user_roles,
-                token_type="refresh",
-                auth_type="web",
-                expires_delta=(
-                    timedelta(seconds=getattr(
-                        config, "JWT_REFRESH_TOKEN_REMEMBER_EXPIRES",
-                        self.refresh_token_expires))
-                    if remember else None
-                ),
+            logger.info("用户认证成功: %s", username)
+            return self._issue_login(
+                user, auth_type="web", remember=remember,
                 device_fingerprint=device_fingerprint,
             )
-
-            logger.info(
-                f"用户认证成功: {username}"
-            )
-
-            return {
-                "user": user.to_dict(),
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "expires_in": self.access_token_expires,
-                "auth_type": "web",
-            }
         except Exception as e:
             logger.error("用户认证失败: %s", e, exc_info=True)
             return None
+
+    def _issue_login(
+        self, user, *, auth_type: str = "web",
+        remember: bool = False, device_fingerprint: str = None,
+    ) -> Dict[str, Any]:
+        """为用户签发登录令牌并组装登录响应 —— 本系统唯一的令牌签发出口。
+
+        本地密码（web）与 LDAP（ldap）两条认证路径共用此出口，保证 refresh 有效期、
+        设备指纹绑定、响应结构三者在两条路径上完全一致（避免「LDAP 登录少了设备绑定」
+        这类只在一条路径上出现的缺口）。
+        """
+        user_roles = [role.name for role in user.roles]
+
+        access_token = self.generate_token(
+            user.id,
+            username=user.username,
+            roles=user_roles,
+            token_type="access",
+            auth_type=auth_type,
+        )
+        refresh_token = self.generate_token(
+            user.id,
+            username=user.username,
+            roles=user_roles,
+            token_type="refresh",
+            auth_type=auth_type,
+            expires_delta=(
+                timedelta(seconds=getattr(
+                    config, "JWT_REFRESH_TOKEN_REMEMBER_EXPIRES",
+                    self.refresh_token_expires))
+                if remember else None
+            ),
+            device_fingerprint=device_fingerprint,
+        )
+
+        return {
+            "user": user.to_dict(),
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_in": self.access_token_expires,
+            "auth_type": auth_type,
+        }
+
+    AUTH_ROUTE_LOCAL = "local"
+    AUTH_ROUTE_LDAP = "ldap"
+
+    def get_ldap_service(self):
+        """惰性构造并缓存 LDAP 认证服务。
+
+        未启用 LDAP 的部署不会 import ldap3（惰性 import 在服务内部），因此不增加
+        存量部署的启动负担；实例无共享可变状态，可跨线程复用。
+        """
+        svc = getattr(self, "_ldap_service_cache", None)
+        if svc is None:
+            from app.services.ldap_auth_service import LdapAuthService
+
+            svc = LdapAuthService.from_config(config)
+            self._ldap_service_cache = svc
+        return svc
+
+    def get_ldap_identity_service(self):
+        """惰性构造并缓存目录身份落库服务（T3.5）。"""
+        svc = getattr(self, "_ldap_identity_cache", None)
+        if svc is None:
+            from app.services.ldap_identity_service import LdapIdentityService
+
+            svc = LdapIdentityService()
+            self._ldap_identity_cache = svc
+        return svc
+
+    def ldap_bypass_users(self) -> frozenset:
+        """应急本地通道白名单（``LDAP_BYPASS_USERS``，逗号分隔，大小写不敏感）。"""
+        raw = getattr(config, "LDAP_BYPASS_USERS", "") or ""
+        return frozenset(
+            part.strip().lower() for part in str(raw).split(",") if part.strip()
+        )
+
+    def is_ldap_bypass_user(self, username) -> bool:
+        """该用户名是否在应急本地通道白名单内。"""
+        name = str(username or "").strip().lower()
+        return bool(name) and name in self.ldap_bypass_users()
+
+    def resolve_auth_route(self, user, ldap_service=None, username=None) -> str:
+        """决定一次登录走本地密码还是 LDAP —— 认证路由的唯一决策点。
+
+        规则（顺序即优先级）：
+        0. 用户名在 ``LDAP_BYPASS_USERS`` 应急白名单内 → 恒走本地密码（T3.6）。
+           这一条必须排在最前：域控整体不可用时，白名单账号是唯一能进系统的口子。
+        1. 账号显式 ``auth_source='ldap'`` → 恒走 LDAP。**即便 LDAP 未启用或域控
+           不可达也绝不回落本地密码**：回落等于把「关掉域控即可用本地口令登录」变成
+           一条降级通路（WBS 关键约束 1：不可降级）。
+        2. 账号 ``auth_source='local'``（含存量行与全部本地账号）→ 本地密码。
+        3. 本地查无此账号 → LDAP 已启用则交给目录判定（目录会给出 user_not_found）；
+           否则回到本地路径（执行 dummy hash，保持「用户不存在」的响应时序）。
+        """
+        name = username if username is not None else getattr(user, "username", None)
+        if self.is_ldap_bypass_user(name):
+            return self.AUTH_ROUTE_LOCAL
+        source = getattr(user, "auth_source", None) or "local"
+        if source == "ldap":
+            return self.AUTH_ROUTE_LDAP
+        if user is not None:
+            return self.AUTH_ROUTE_LOCAL
+        svc = ldap_service if ldap_service is not None else self.get_ldap_service()
+        return self.AUTH_ROUTE_LDAP if getattr(svc, "enabled", False) else self.AUTH_ROUTE_LOCAL
+
+    def authenticate_user(
+        self, username: str, password: str, user_service,
+        remember: bool = False, device_fingerprint: str = None,
+    ) -> Optional[Dict[str, Any]]:
+        """统一登录入口（T3.4）：按账号 ``auth_source`` 路由到本地密码或 LDAP。
+
+        对外语义与 ``authenticate_password`` 完全一致（成功返回同结构 dict，失败
+        ``None``），上层路由无须感知两条认证路径的差异。故障域差异只体现在日志里。
+        """
+        try:
+            user = user_service.get_by_username(username)
+        except Exception as e:
+            logger.error("登录前查询用户失败: %s", e, exc_info=True)
+            return None
+
+        bypass = self.is_ldap_bypass_user(username)
+        route = self.resolve_auth_route(user, username=username)
+
+        if route == self.AUTH_ROUTE_LDAP:
+            result, reason = self._authenticate_ldap(
+                username, password, user,
+                remember=remember, device_fingerprint=device_fingerprint,
+            )
+        else:
+            result = self.authenticate_password(
+                username, password, user_service,
+                remember=remember, device_fingerprint=device_fingerprint,
+            )
+            reason = "ok" if result is not None else "local_credentials_rejected"
+
+        self._audit_login(
+            username, user,
+            auth_type=("ldap" if route == self.AUTH_ROUTE_LDAP else "web"),
+            success=result is not None, reason=reason, bypass=bypass,
+        )
+        return result
+
+    def _audit_login(
+        self, username: str, user, *, auth_type: str, success: bool,
+        reason: str = "", bypass: bool = False,
+    ) -> None:
+        """登录审计（T3.7）—— 本系统唯一的登录留痕入口。
+
+        设计要点：
+        - **只在企业身份集成启用时记录**：LDAP 关闭的存量部署登录行为完全不变
+          （不新增写入、不改变性能特征）；开启后 LDAP 与本地两条路径都记，便于
+          回答「这次登录到底走了哪条路」。
+        - 一次登录**只产生一条记录**：应急通道用独立 action 覆盖，不再重复记一条
+          auth.login（否则事后统计登录次数会翻倍）。
+        - 失败原因只写 `detail.reason`（如 invalid_credentials/unreachable），
+          终端用户看到的仍是统一话术（防账号枚举）。
+        - 审计写失败**绝不影响登录结论**，但会留显眼错误日志，避免"以为有留痕其实没有"。
+        """
+        try:
+            if not getattr(self.get_ldap_service(), "enabled", False):
+                return
+
+            from app.services.audit_service import AuditService
+
+            ip_address = None
+            try:
+                from flask import has_request_context, request
+
+                if has_request_context():
+                    ip_address = request.remote_addr
+            except Exception:  # noqa: BLE001 - 无请求上下文时正常记 None
+                ip_address = None
+
+            if bypass:
+                action = "auth.ldap_bypass"
+            else:
+                action = "auth.login" if success else "auth.login.failed"
+
+            user_id = getattr(user, "id", None)
+            detail = {
+                "username": username,
+                "auth_type": auth_type,
+                "result": "success" if success else "failure",
+                "reason": reason or ("ok" if success else "unknown"),
+                "bypass": bool(bypass),
+            }
+            if bypass:
+                detail["note"] = "账号在 LDAP_BYPASS_USERS 白名单内，走本地口令认证"
+
+            AuditService().log(
+                user_id=user_id,
+                action=action,
+                resource="user",
+                resource_id=user_id,
+                detail=detail,
+                ip_address=ip_address,
+            )
+            log = logger.warning if bypass else logger.info
+            log(
+                "登录审计[%s]: username=%s auth_type=%s reason=%s ip=%s",
+                action, username, auth_type, detail["reason"], ip_address,
+            )
+        except Exception as exc:  # noqa: BLE001 - 审计失败不影响登录结论
+            logger.error(
+                "登录审计写入失败: username=%s action=%s error=%s",
+                username, "auth.ldap_bypass" if bypass else "auth.login", exc,
+                exc_info=True,
+            )
+
+    def _authenticate_ldap(
+        self, username: str, password: str, user,
+        remember: bool = False, device_fingerprint: str = None,
+    ) -> tuple:
+        """LDAP 透传 Bind 认证，成功后按本地账号签发会话（T3.4 + T3.5）。
+
+        Returns:
+            tuple: ``(登录响应 dict | None, 失败原因码)``。原因码供审计记录
+            （T3.7），取值即 T3.3 的 status 常量，或身份落库阶段的
+            no_role_mapped / not_provisioned / local_disabled / identity_error。
+
+        两条铁律：
+        - **不回落**：除 ``ok`` 以外的任何结果（凭据错/不可达/账号禁用/配置不全）
+          一律返回 ``None``，绝不改判本地密码。
+        - **失败原因只进日志与审计**：对终端用户沿用统一的「用户名或密码错误」话术，
+          避免「用户不存在 / 密码错」的差异被用来做账号枚举（统一话术在 API 层）。
+
+        组→角色（T3.5）：仅当配置了 ``LDAP_GROUP_ROLE_MAP`` 时角色才由目录托管；
+        未配置则角色仍由管理员在本地维护，登录不改动既有角色。
+        """
+        from app.services.ldap_identity_service import LdapIdentityError
+        from app.services.ldap_auth_service import STATUS_OK
+
+        result = self.get_ldap_service().authenticate(username, password)
+        if result.status != STATUS_OK:
+            logger.warning(
+                "LDAP 认证失败: username=%s status=%s detail=%s",
+                username, result.status, result.message,
+            )
+            return None, result.status
+
+        try:
+            identity = self.get_ldap_identity_service()
+            roles: list[str] = []
+            if identity.role_management_enabled():
+                roles = identity.resolve_roles(result.groups)
+                if not roles:
+                    logger.warning(
+                        "LDAP 账号未映射到任何角色，拒绝登录: username=%s groups=%s",
+                        username, list(result.groups),
+                    )
+                    return None, "no_role_mapped"
+
+            if user is None:
+                if not identity.auto_provision_enabled():
+                    logger.warning(
+                        "LDAP 认证通过但本地无对应账号，自动建号未启用: username=%s dn=%s",
+                        username, result.dn,
+                    )
+                    return None, "not_provisioned"
+                user = identity.provision_user(
+                    username=username, dn=result.dn or "",
+                    display_name=result.display_name or "",
+                    email=result.email or "", role_names=roles,
+                )
+            else:
+                if not user.is_active:
+                    logger.warning("LDAP 用户已在本地禁用: %s", username)
+                    return None, "local_disabled"
+                if roles and identity.sync_roles_on_login():
+                    identity.sync_user_roles(user, roles)
+        except LdapIdentityError as exc:
+            logger.error("LDAP 身份落库失败，拒绝登录: username=%s error=%s", username, exc)
+            return None, "identity_error"
+        except Exception as exc:  # noqa: BLE001 - 配置/DB 异常一律 fail-close
+            logger.error(
+                "LDAP 身份落库异常，拒绝登录: username=%s error=%s",
+                username, exc, exc_info=True,
+            )
+            return None, "identity_exception"
+
+        logger.info("LDAP 认证成功: username=%s dn=%s", username, result.dn)
+        return self._issue_login(
+            user, auth_type="ldap", remember=remember,
+            device_fingerprint=device_fingerprint,
+        ), STATUS_OK
 
     def logout(self, token: str) -> bool:
         """用户登出 — 撤销当前令牌及该用户的所有刷新令牌
@@ -655,7 +913,7 @@ class AuthenticationManager:
     def authenticate(
         self, username: str, password: str, user_service
     ) -> Optional[Dict[str, Any]]:
-        """认证用户（用户名密码方式）— 委托给 authenticate_password
+        """认证用户（用户名密码方式）— 委托给统一入口 authenticate_user
 
         Args:
             username: 用户名
@@ -665,7 +923,7 @@ class AuthenticationManager:
         Returns:
             Optional[Dict]: 认证成功返回用户信息和令牌，失败返回None
         """
-        return self.authenticate_password(username, password, user_service)
+        return self.authenticate_user(username, password, user_service)
 
     def authenticate_wechat(
         self, openid: str, user_service

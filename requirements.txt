@@ -22,6 +22,9 @@ bcrypt==5.0.0
 click==8.4.1
 cryptography==48.0.0
 flask-cors==6.0.2
+# 企业身份集成（T3）：纯 Python 实现，免装系统 libldap/openldap-dev，生产机无需
+# apt 即可用；仅做只读 Bind 校验（透传用户密码），不做密码同步。精确 pin 同其它依赖。
+ldap3==2.9.1
 marshmallow==4.3.0
 netmiko==4.7.0
 openpyxl==3.1.5

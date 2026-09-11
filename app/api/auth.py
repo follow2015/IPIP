@@ -247,7 +247,7 @@ def login():
     try:
 
         user_service = UserService(UserRepository(), UserLogRepository())
-        auth_result = auth_manager.authenticate_password(
+        auth_result = auth_manager.authenticate_user(
             username, password, user_service, remember=bool(remember),
             device_fingerprint=auth_manager.compute_device_fingerprint(
                 request.headers.get("User-Agent", "")))

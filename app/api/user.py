@@ -131,7 +131,7 @@ def login():
 
     logger.info(f"登录尝试: username={username}, ip={client_ip}")
 
-    auth_result = auth_manager.authenticate(username, password, user_service)
+    auth_result = auth_manager.authenticate_user(username, password, user_service)
 
     if not auth_result:
         logger.warning(
