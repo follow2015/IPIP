@@ -151,7 +151,7 @@ def create_app(config_name: str = None) -> Flask:
     _register_ldap_cli(app)
     _warn_on_schema_drift(app)
 
-    logger.info(f"应用创建成功 (环境: {config_name or 'development'})")
+    logger.info(f"应用创建成功 (环境: {config.__name__})")
 
     return app
 
