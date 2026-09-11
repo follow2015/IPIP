@@ -3,24 +3,14 @@
 凭据表只保留认证信息，拓扑字段迁移至 devices 表，
 采集缓存字段迁移至 SwitchStatusCache 表。
 """
-import struct
-import socket
-
 from app.core.enums import SwitchDeviceTypeCode
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy.dialects.mysql import INTEGER
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel, TINYINT
+from app.utils.ip_codec import ip_to_int as _ip_to_int  # P1-3 收敛：瘦封装，语义不变
 from extensions import db
-
-
-def _ip_to_int(ip_address: str) -> int:
-    """将 IPv4 地址转换为整数（等价于 MySQL INET_ATON）"""
-    try:
-        return struct.unpack("!I", socket.inet_aton(ip_address))[0]
-    except (OSError, struct.error):
-        return None
 
 
 def _mask_to_prefix(subnet_mask: str) -> int:

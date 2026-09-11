@@ -9,8 +9,8 @@ Phase 4 NexthopResolver：nexthop 关联推断补充 switch_id/port
 import ipaddress
 from app.utils.logging import get_logger
 import re
-import struct
-import socket as _socket
+
+from app.utils.ip_codec import ip_to_int
 
 from sqlalchemy import text
 
@@ -21,13 +21,10 @@ logger = get_logger(__name__)
 
 
 def _ip_to_int(ip: str | None) -> int | None:
-    """将点分十进制 IP 转为无符号整数，失败返回 None。"""
+    """将点分十进制 IP 转为无符号整数，失败返回 None。（P1-3 收敛：委托唯一实现）"""
     if not ip:
         return None
-    try:
-        return struct.unpack("!I", _socket.inet_aton(ip))[0]
-    except (OSError, struct.error):
-        return None
+    return ip_to_int(ip)
 
 _PORT_LOOPBACK_RE = re.compile(r'^loopback|^lo\d', re.IGNORECASE)
 _PORT_VLANIF_RE   = re.compile(r'^vlan',            re.IGNORECASE)

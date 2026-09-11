@@ -60,11 +60,13 @@ def analyze(args: Dict[str, Any]) -> Dict[str, Any]:
 
     device_id = _coerce_device_id(args.get("device_id"))
     if device_id is None:
-        return {"supported": False, "hint": "device_id 必填且为整数"}
+        raise ValueError("device_id 必填且为整数")
 
-    metric = args.get("metric") or _DEFAULT_METRIC
+    metric = args.get("metric")
+    if metric is None:
+        metric = _DEFAULT_METRIC
     if not isinstance(metric, str) or not metric.strip():
-        return {"supported": False, "hint": "metric 必须是非空字符串"}
+        raise ValueError("metric 必须是非空字符串")
     metric = metric.strip()
 
     ok, visible, reason = resolve_visible_scope()

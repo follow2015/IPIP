@@ -3,14 +3,12 @@
 ip_networks 只管理网段（CIDR+gateway+归属），
 路由条目统一归 switch_routes。
 """
-import struct
-import socket
-
 from sqlalchemy import Index
 from sqlalchemy.dialects.mysql import INTEGER
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel, TINYINT
+from app.utils.ip_codec import ip_to_int  # P1-3 收敛：全仓唯一实现
 from extensions import db
 
 
@@ -25,10 +23,10 @@ def _cidr_to_ints(cidr: str):
     """
     try:
         ip_part, prefix_part = cidr.rsplit("/", 1)
-        network_int = struct.unpack("!I", socket.inet_aton(ip_part))[0]
+        network_int = ip_to_int(ip_part)  # 无效 IP 返回 None（不再抛 struct.error）
         prefix = int(prefix_part)
         return network_int, prefix
-    except (OSError, ValueError, struct.error):
+    except ValueError:
         return None, None
 
 
@@ -111,10 +109,9 @@ class SwitchRoute(BaseModel):
             if "destination_prefix" not in kwargs and pf is not None:
                 kwargs["destination_prefix"] = pf
         if "nexthop" in kwargs and "nexthop_int" not in kwargs:
-            try:
-                kwargs["nexthop_int"] = struct.unpack("!I", socket.inet_aton(kwargs["nexthop"]))[0]
-            except (OSError, struct.error):
-                pass
+            nexthop_int = ip_to_int(kwargs["nexthop"])  # 无效值返回 None，静默跳过（语义同旧实现）
+            if nexthop_int is not None:
+                kwargs["nexthop_int"] = nexthop_int
         super().__init__(**kwargs)
 
     def to_dict(self, exclude=None, include_relations=False):

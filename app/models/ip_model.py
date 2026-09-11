@@ -12,28 +12,12 @@ from sqlalchemy import (
     ForeignKey, UniqueConstraint, Index, func,
 )
 from sqlalchemy.orm import relationship
-import struct
-import socket
 
 from sqlalchemy.dialects.mysql import INTEGER
 from app.models.base import BaseModel, TINYINT
 from app.core.enums import IPStatus
+from app.utils.ip_codec import ip_to_int  # noqa: F401 —— P1-3 收敛：全仓唯一实现，此处再导出保持旧导入路径
 from extensions import db
-
-
-def ip_to_int(ip_address: str) -> int:
-    """将 IPv4 地址转换为整数（等价于 MySQL INET_ATON）
-
-    Args:
-        ip_address: IPv4 地址字符串
-
-    Returns:
-        int: 整数表示，无效 IP 返回 None
-    """
-    try:
-        return struct.unpack("!I", socket.inet_aton(ip_address))[0]
-    except (OSError, struct.error):
-        return None
 
 class IPManager(BaseModel):
     """IP地址管理主表 — ip_manager
