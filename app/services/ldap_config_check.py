@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from app.services.ldap_auth_service import resolve_tls_policy, transport_is_plaintext
 from app.services.ldap_role_mapper import GroupRoleMapError, parse_group_role_map
 
 
@@ -41,6 +42,20 @@ def collect_ldap_check_issues(
     if not (server and base_dn):
         issues.append(
             "LDAP_ENABLED=true 但 LDAP_SERVER / LDAP_BASE_DN 未配置"
+        )
+
+    policy_error = resolve_tls_policy(
+        server,
+        bool(config.get("LDAP_STARTTLS", False)),
+        config.get("LDAP_CA_FILE") or "",
+        bool(config.get("LDAP_ALLOW_INSECURE_TRANSPORT", False)),
+    )
+    if policy_error:
+        issues.append(f"传输安全策略不满足：{policy_error}")
+    elif transport_is_plaintext(server, bool(config.get("LDAP_STARTTLS", False))):
+        issues.append(
+            "传输未加密（LDAP_ALLOW_INSECURE_TRANSPORT=true 仅限联调；"
+            "生产请改用 ldaps:// 或 StartTLS）"
         )
 
     raw_map = config.get("LDAP_GROUP_ROLE_MAP") or ""

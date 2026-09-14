@@ -19,6 +19,7 @@ docstring 已记录过一轮）。Trap 接收只需要「收 UDP + BER 解码 + 
 端口说明：UDP/162 为特权端口；无特权环境默认 10162（TRAPD_LISTEN_PORT），
 在交换机侧指定 trap 目标端口或在主机上做端口重定向。
 """
+import ipaddress
 import os
 import queue
 import socket
@@ -42,6 +43,34 @@ _PDU_TAG_V1_TRAP = 4      # RFC 1157 Trap-PDU [4] IMPLICIT PDU
 
 _SNMP_TRAP_OID = "1.3.6.1.6.3.1.1.6.1"      # SNMPv2-MIB::snmpTrapOID.0
 _V1_GENERIC_TRAP_BASE = "1.3.6.1.6.3.1.1.5"  # RFC 2576 翻译后的 generic trap 地址族
+
+_WEAK_COMMUNITIES = frozenset({"public", "private"})
+_WILDCARD_ADDRESSES = frozenset({"0.0.0.0", "::", ""})
+
+
+def _split_list(raw) -> list[str]:
+    """逗号分隔配置项 → 去空去空白的列表。"""
+    return [item.strip() for item in str(raw or "").split(",") if item.strip()]
+
+
+def parse_source_allowlist(raw) -> tuple | None:
+    """解析 ``TRAPD_SOURCE_ALLOWLIST`` → 网络对象元组；空配置返回 None（不过滤）。
+
+    写错必须 fail-fast：静默失效会让运维误以为「已在防伪造」。
+    """
+    entries = _split_list(raw)
+    if not entries:
+        return None
+    networks = []
+    for entry in entries:
+        try:
+            networks.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError as exc:
+            raise SystemExit(
+                f"TRAPD_SOURCE_ALLOWLIST 写法非法: {entry!r}（应为 IP 或 CIDR，"
+                f"如 10.0.0.0/8,192.168.1.5）：{exc}"
+            ) from exc
+    return tuple(networks)
 
 
 def decode_trap_message(data: bytes) -> dict | None:
@@ -115,14 +144,45 @@ class TrapdService:
             )
         self.listen_address = cfg.get("TRAPD_LISTEN_ADDRESS", "0.0.0.0")
         self.listen_port = int(cfg.get("TRAPD_LISTEN_PORT", 10162))
-        self.communities = [
-            c.strip() for c in str(cfg.get("TRAPD_COMMUNITIES", "public")).split(",") if c.strip()
-        ]
+        self.communities = _split_list(cfg.get("TRAPD_COMMUNITIES", ""))
+        self._validate_communities(bool(cfg.get("TRAPD_ALLOW_WEAK_COMMUNITY", False)))
+        self.source_allowlist = parse_source_allowlist(cfg.get("TRAPD_SOURCE_ALLOWLIST", ""))
         self._queue: "queue.Queue[dict]" = queue.Queue(maxsize=int(cfg.get("TRAPD_QUEUE_SIZE", 1000)))
         self._decode = decode_fn or decode_trap_message
         self._ingest = ingest_service or self._build_ingest(cfg)
         self._dropped_count = 0
+        self._decode_error_count = 0
+        self._rejected_source_count = 0
         self._sock: socket.socket | None = None
+
+    def _validate_communities(self, allow_weak: bool) -> None:
+        """community 是 SNMPv1/v2c 的**唯一**凭据，配置不当等于不设防 → fail-fast。
+
+        原实现的默认值 ``public`` 是知名公开凭据，配合默认监听 ``0.0.0.0`` 与
+        缺失的源校验，使「伪造设备 IP + 发 linkDown」即可投毒告警箱。
+        """
+        if not self.communities:
+            raise SystemExit(
+                "TRAPD_COMMUNITIES 未配置：SNMPv1/v2c 的 community 是唯一凭据，"
+                "留空等于不设防。请显式配置（如 TRAPD_COMMUNITIES=<强口令>）。"
+            )
+        weak = sorted({c for c in self.communities if c.lower() in _WEAK_COMMUNITIES})
+        if weak and not allow_weak:
+            raise SystemExit(
+                f"TRAPD_COMMUNITIES 含知名默认值 {weak}：这是公开凭据，任何能到达本端口"
+                f"的主体都可伪造 trap。请改用强随机口令；确需在隔离环境保留，"
+                f"请显式设 TRAPD_ALLOW_WEAK_COMMUNITY=true。"
+            )
+
+    def _source_allowed(self, source_ip: str) -> bool:
+        """源 IP 是否在白名单内（未配置白名单时恒 True）。"""
+        if self.source_allowlist is None:
+            return True
+        try:
+            addr = ipaddress.ip_address(source_ip)
+        except ValueError:
+            return False
+        return any(addr in net for net in self.source_allowlist)
 
     @staticmethod
     def _build_ingest(cfg):
@@ -146,20 +206,45 @@ class TrapdService:
 
 
     def _recv_loop(self):
-        """收包线程：阻塞 recvfrom，解码入队。单条失败只丢该条。"""
+        """收包线程：阻塞 recvfrom，解码入队。**任何单条失败都只丢该条，绝不终止循环。**"""
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1 << 20)
         self._sock.bind((self.listen_address, self.listen_port))
         logger.info(
-            "[trapd] SNMP Trap UDP 监听已启动: %s:%s communities=%s",
-            self.listen_address, self.listen_port, self.communities,
+            "[trapd] SNMP Trap UDP 监听已启动: %s:%s communities=%s source_allowlist=%s",
+            self.listen_address, self.listen_port, len(self.communities),
+            "已启用" if self.source_allowlist else "未启用",
         )
+        if self.listen_address in _WILDCARD_ADDRESSES and self.source_allowlist is None:
+            logger.warning(
+                "[trapd] 监听 %s 且未配置 TRAPD_SOURCE_ALLOWLIST：UDP 源 IP 可被伪造，"
+                "而设备关联按源 IP 反查，存在伪造 trap 投毒告警的风险。"
+                "建议用 TRAPD_SOURCE_ALLOWLIST 限定为管理网段（如 10.0.0.0/8）。",
+                self.listen_address,
+            )
         while True:
             try:
                 data, addr = self._sock.recvfrom(65535)
             except OSError:
                 break  # socket 关闭（进程退出）
-            decoded = self._decode(data)
+            if not self._source_allowed(addr[0]):
+                self._rejected_source_count += 1
+                if self._rejected_source_count % 100 == 1:
+                    logger.warning(
+                        "[trapd] 源 IP 不在白名单内，丢弃（from=%s，累计 %s 条）",
+                        addr[0], self._rejected_source_count,
+                    )
+                continue
+            try:
+                decoded = self._decode(data)
+            except Exception:
+                self._decode_error_count += 1
+                if self._decode_error_count % 100 == 1:
+                    logger.exception(
+                        "[trapd] 报文解码异常，丢弃该条（from=%s size=%s，累计 %s 条）",
+                        addr[0], len(data), self._decode_error_count,
+                    )
+                continue
             if decoded is None:
                 logger.warning(
                     "[trapd] 无法解码的报文（非 SNMP trap？）: from=%s size=%s",

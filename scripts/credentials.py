@@ -19,7 +19,8 @@
     直接更换会让既有密文永久不可解，必须走「先解密再加密」的迁移。
 
 用法：
-    python scripts/credentials.py show
+    python scripts/credentials.py show                # 密钥默认脱敏（只显示长度）
+    python scripts/credentials.py show --reveal       # 明文核验（输出会留痕，慎用）
     python scripts/credentials.py reset-admin [--username admin] [--password P]
     python scripts/credentials.py reset-mysql [--db-user ipip] [--password P]
     python scripts/credentials.py reset-secret-keys --yes
@@ -51,6 +52,22 @@ CREDENTIAL_KEYS = [
 ]
 
 NEVER_RESET = {"SWITCH_SECRET_KEY"}
+
+SECRET_KEYS = frozenset({
+    "MYSQL_PASSWORD", "REDIS_PASSWORD",
+    "SECRET_KEY", "JWT_SECRET_KEY", "SWITCH_SECRET_KEY",
+    "AI_API_KEY", "WX_SECRET", "WX_TOKEN", "XCC_SECRET",
+})
+
+
+def mask_secret(value: str) -> str:
+    """脱敏显示：只暴露长度，不暴露任何字符。
+
+    刻意**不**提供「前 4 位 / 截断哈希」式指纹：本输出会进入终端回滚缓冲、录屏、
+    跳板机审计与 CI 日志，弱口令下截断哈希可离线爆破，前缀则直接泄露口令内容。
+    确需核验具体值时必须显式加 ``--reveal``（并打印醒目告警）。
+    """
+    return f"***（已设置，长度 {len(value)}）"
 
 
 def info(msg): print(msg)
@@ -149,12 +166,17 @@ def connect_socket_root() -> pymysql.connections.Connection:
     )
 
 
-def cmd_show(_args) -> int:
+def cmd_show(args) -> int:
     env = read_env()
     if not env:
         die(f"未找到 {ENV_PATH}，无法读取凭据")
+    reveal = bool(getattr(args, "reveal", False))
     print("=" * 68)
     print(f"凭据清单（读取自 {ENV_PATH}）")
+    if reveal:
+        warn("已按 --reveal 明文输出凭据：请确认当前终端回滚缓冲、录屏与 CI 日志不会留存")
+    else:
+        print("  密钥类默认脱敏（只显示长度）；确需核验具体值请显式加 --reveal")
     print("=" * 68)
     for group, keys in CREDENTIAL_KEYS:
         print(f"\n[{group}]")
@@ -164,6 +186,8 @@ def cmd_show(_args) -> int:
                 print(f"  {key:20s} （未设置）")
             elif val == "":
                 print(f"  {key:20s} （空）")
+            elif key in SECRET_KEYS and not reveal:
+                print(f"  {key:20s} {mask_secret(val)}")
             else:
                 print(f"  {key:20s} {val}")
     print("\n[管理员账户]")
@@ -304,7 +328,11 @@ def main(argv=None) -> int:
                "  sudo python scripts/credentials.py reset-mysql\n"
                "  python scripts/credentials.py reset-secret-keys --yes\n")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("show", help="列出 .env 中的凭据与管理员账户状态")
+    p_show = sub.add_parser("show", help="列出 .env 中的凭据与管理员账户状态（密钥默认脱敏）")
+    p_show.add_argument(
+        "--reveal", action="store_true",
+        help="明文显示密钥（默认脱敏）。输出会进入终端回滚缓冲/录屏/CI 日志，仅在确需核验时使用",
+    )
 
     p_admin = sub.add_parser("reset-admin", help="重置管理员密码（默认随机 16 位）")
     p_admin.add_argument("--username", help="管理员用户名（默认取 .env 的 SEED_ADMIN_USERNAME 或 admin）")

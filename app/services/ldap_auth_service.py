@@ -24,7 +24,9 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
+import ssl
 from dataclasses import dataclass
 from typing import Any
 
@@ -59,6 +61,53 @@ _INVALID_CREDENTIALS_EXC_NAMES = frozenset({"LDAPInvalidCredentialsResult"})
 _DEFAULT_ATTRS = ("displayName", "cn", "mail", "memberOf", "sAMAccountName", "uid")
 
 _FILTER_SPECIALS = frozenset({"\\", "*", "(", ")", "\x00"})
+
+
+def resolve_tls_policy(server: str, starttls: bool = False, ca_file: str = "",
+                       allow_insecure: bool = False) -> str | None:
+    """校验 LDAP 传输安全策略。返回**人类可读的错误描述**，``None`` = 通过。
+
+    策略：**不允许明文传输凭据**。二选一：
+      - ``ldaps://``（全程 TLS）
+      - ``ldap://`` + ``LDAP_STARTTLS=true``（连接后立即协商升级）
+
+    ``ldap://`` 且未开 StartTLS 时明确拒绝：那会把域控服务账号 Bind 口令与每个
+    用户的登录口令**明文**暴露在内网上，ARP/DNS 劫持即可截获。
+    同时校验 ``LDAP_CA_FILE`` 指向的文件真实存在 —— 路径写错若拖到登录时才由
+    ldap3 抛错，表现是「所有人都登不上」，且日志里只有一行 SSL 配置异常。
+
+    ``allow_insecure=True``（``LDAP_ALLOW_INSECURE_TRANSPORT``）**仅供联调**：给
+    只有明文监听、尚未配 TLS 的试验目录用。此时不报错，但服务启动与每次认证都会
+    记 WARNING，避免它被当成"生产可用配置"。
+
+    抽成纯函数：``config._assert_ldap_config``（启动期 fail-fast）与
+    ``ldap_config_check``（``flask ldap-check`` 上线自检）共用同一套判据，
+    避免两处口径漂移。
+    """
+    url = (server or "").strip().lower()
+    if not url:
+        return "LDAP_SERVER 未配置"
+    if url.startswith("ldaps://"):
+        pass
+    elif url.startswith("ldap://"):
+        if not starttls and not allow_insecure:
+            return (
+                "LDAP_SERVER 为 ldap://（明文）且未启用 StartTLS：域控服务账号口令与"
+                "用户登录口令将明文经过内网。请改用 ldaps://，或设 LDAP_STARTTLS=true"
+                "（仅联调可用 LDAP_ALLOW_INSECURE_TRANSPORT=true，不建议）。"
+            )
+    else:
+        return f"LDAP_SERVER 协议无法识别（应为 ldaps:// 或 ldap://）：{server}"
+
+    if ca_file and not os.path.isfile(ca_file):
+        return f"LDAP_CA_FILE 指向的文件不存在：{ca_file}"
+    return None
+
+
+def transport_is_plaintext(server: str, starttls: bool = False) -> bool:
+    """最终生效的传输是否会明文发送凭据（供启动/认证期告警）。"""
+    url = (server or "").strip().lower()
+    return url.startswith("ldap://") and not starttls
 
 
 def escape_filter_chars(value: str) -> str:
@@ -101,6 +150,14 @@ class _ServiceBindFailed(Exception):
     """服务账号 Bind 失败 —— 是配置问题，绝不可当成「用户密码错」。"""
 
 
+class _TlsFailed(Exception):
+    """TLS 协商或证书校验失败。
+
+    刻意与 ``_Unreachable`` 区分：这属于**配置 / 信任链**问题（域控未开 StartTLS、
+    CA 不匹配、证书过期），不是网络可达性问题。混为一谈会把运维引去查网络与端口。
+    """
+
+
 class LdapAuthService:
     """LDAP 认证服务（无状态；可安全跨线程复用实例）。"""
 
@@ -116,6 +173,9 @@ class LdapAuthService:
         enabled: bool = True,
         ldap_module: Any = None,
         user_attributes: tuple[str, ...] = _DEFAULT_ATTRS,
+        starttls: bool = False,
+        ca_file: str = "",
+        allow_insecure_transport: bool = False,
     ) -> None:
         self.server_url = (server or "").strip()
         self.base_dn = (base_dn or "").strip()
@@ -126,6 +186,13 @@ class LdapAuthService:
         self.enabled = bool(enabled)
         self._ldap = ldap_module
         self._attrs = tuple(user_attributes)
+        self.starttls = bool(starttls)
+        self.ca_file = (ca_file or "").strip()
+        self.allow_insecure_transport = bool(allow_insecure_transport)
+
+    @property
+    def _use_ssl(self) -> bool:
+        return self.server_url.lower().startswith("ldaps://")
 
     @classmethod
     def from_config(cls, config: Any) -> "LdapAuthService":
@@ -145,6 +212,9 @@ class LdapAuthService:
             user_filter=g("LDAP_USER_FILTER", "(sAMAccountName={username})"),
             timeout=g("LDAP_TIMEOUT", 5),
             enabled=bool(g("LDAP_ENABLED", False)),
+            starttls=bool(g("LDAP_STARTTLS", False)),
+            ca_file=g("LDAP_CA_FILE", ""),
+            allow_insecure_transport=bool(g("LDAP_ALLOW_INSECURE_TRANSPORT", False)),
         )
 
     def _ldap3(self) -> Any:
@@ -169,6 +239,17 @@ class LdapAuthService:
         if not username or not password:
             return LdapAuthResult(STATUS_INVALID_CREDENTIALS, "用户名或密码为空")
 
+        policy_error = resolve_tls_policy(
+            self.server_url, self.starttls, self.ca_file, self.allow_insecure_transport)
+        if policy_error:
+            logger.error("[ldap] 传输安全策略不满足，拒绝认证：%s", policy_error)
+            return LdapAuthResult(
+                STATUS_MISCONFIGURED, f"LDAP 传输安全策略不满足：{policy_error}")
+        if transport_is_plaintext(self.server_url, self.starttls):
+            logger.warning(
+                "[ldap] 正在以**明文**传输域控凭据（%s）：LDAP_ALLOW_INSECURE_TRANSPORT "
+                "仅限联调，生产必须改用 ldaps:// 或 StartTLS", self.server_url)
+
         ldap3 = self._ldap3()
         server = self._make_server(ldap3)
 
@@ -176,6 +257,8 @@ class LdapAuthService:
             found = self._search_user(ldap3, server, username)
         except _Unreachable as exc:
             return LdapAuthResult(STATUS_UNREACHABLE, f"域控不可达：{exc}")
+        except _TlsFailed as exc:
+            return LdapAuthResult(STATUS_MISCONFIGURED, f"TLS 协商/证书校验失败：{exc}")
         except _ServiceBindFailed as exc:
             return LdapAuthResult(STATUS_MISCONFIGURED, f"服务账号 Bind 失败：{exc}")
 
@@ -192,7 +275,7 @@ class LdapAuthService:
 
     def _make_server(self, ldap3: Any):
         url = self.server_url
-        use_ssl = url.lower().startswith("ldaps://")
+        use_ssl = self._use_ssl
         host = url.split("://", 1)[1] if "://" in url else url
         host = host.rstrip("/")
         if ":" in host and not host.startswith("["):
@@ -206,7 +289,44 @@ class LdapAuthService:
         return ldap3.Server(
             hostname, port=port, use_ssl=use_ssl,
             connect_timeout=self.timeout, get_info=getattr(ldap3, "NONE", None),
+            tls=self._make_tls(ldap3),
         )
+
+    def _make_tls(self, ldap3: Any):
+        """构造显式证书校验的 Tls 配置（``ca_file`` 留空则用系统信任库）。
+
+        **必须显式传 validate**：ldap3 的 ``Tls`` 默认 ``ssl.CERT_NONE`` —— 不传
+        等于连证书链都不验，``ldaps://`` 也挡不住中间人。
+
+        残余风险（ldap3 2.9.1 的库内限制，已实测确认）：``Tls.wrap_socket`` 内部
+        **无条件**执行 ``ssl_context.check_hostname = False``，且 ``Server`` 只接受
+        ``Tls`` 对象、无法注入自带 SSLContext，故**主机名校验无法开启**。这意味着
+        当信任锚是系统公共 CA 库时，持有任意受信 CA 签发证书者仍可 MITM。
+        → 因此在企业场景**强烈建议**用 ``LDAP_CA_FILE`` 指向自家 CA 证书，把信任锚
+        收窄到企业 CA；此时仅靠证书链校验已足够（攻击者需先拿到自家 CA 签发的证书）。
+        """
+        tls_cls = getattr(ldap3, "Tls", None)
+        if tls_cls is None:
+            return None
+        kwargs: dict[str, Any] = {"validate": ssl.CERT_REQUIRED}
+        if self.ca_file:
+            kwargs["ca_certs_file"] = self.ca_file
+        return tls_cls(**kwargs)
+
+    def _start_tls_if_needed(self, conn: Any) -> None:
+        """StartTLS：必须在 ``bind()`` **之前**调用。
+
+        放在 bind 之后等于口令已明文发出、再升级也白做。``ldaps://`` 下不调用
+        （连接本身就是 TLS，再协商 StartTLS 会被域控拒绝）。
+        """
+        if not (self.starttls and not self._use_ssl):
+            return
+        try:
+            started = conn.start_tls()
+        except Exception as exc:  # noqa: BLE001 - 统一归为配置/信任链问题
+            raise _TlsFailed(str(exc) or type(exc).__name__) from exc
+        if started is False:
+            raise _TlsFailed(_describe(conn))
 
     def _connect_service(self, ldap3: Any, server: Any):
         """以服务账号（或匿名）连接，用于检索。失败抛 _Unreachable/_ServiceBindFailed。"""
@@ -220,13 +340,14 @@ class LdapAuthService:
                 authentication=auth_simple if self.bind_dn else auth_anon,
                 receive_timeout=self.timeout,
             )
+            self._start_tls_if_needed(conn)
             if not conn.bind():
                 detail = _describe(conn)
                 if _result_is_invalid_credentials(conn):
                     raise _ServiceBindFailed(detail)
                 raise _Unreachable(detail)
             return conn
-        except (_Unreachable, _ServiceBindFailed):
+        except (_Unreachable, _ServiceBindFailed, _TlsFailed):
             raise
         except Exception as exc:  # noqa: BLE001 - 统一归类，避免异常类型外泄
             if _is_network_exc(exc):
@@ -275,7 +396,10 @@ class LdapAuthService:
                 authentication=getattr(ldap3, "AUTH_SIMPLE", "SIMPLE"),
                 receive_timeout=self.timeout,
             )
+            self._start_tls_if_needed(conn)
             ok = conn.bind()
+        except _TlsFailed as exc:
+            return LdapAuthResult(STATUS_MISCONFIGURED, f"TLS 协商/证书校验失败：{exc}")
         except Exception as exc:  # noqa: BLE001
             if _is_network_exc(exc):
                 return LdapAuthResult(STATUS_UNREACHABLE, f"域控不可达：{exc}")

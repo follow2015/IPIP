@@ -98,6 +98,17 @@ def _assert_ldap_config(config_cls) -> None:
             "（如需临时停用外部认证，设 LDAP_ENABLED=false）"
         )
 
+    from app.services.ldap_auth_service import resolve_tls_policy
+
+    policy_error = resolve_tls_policy(
+        getattr(config_cls, "LDAP_SERVER", "") or "",
+        bool(getattr(config_cls, "LDAP_STARTTLS", False)),
+        getattr(config_cls, "LDAP_CA_FILE", "") or "",
+        bool(getattr(config_cls, "LDAP_ALLOW_INSECURE_TRANSPORT", False)),
+    )
+    if policy_error:
+        raise RuntimeError(f"LDAP 传输安全策略不满足：{policy_error}")
+
     raw_map = getattr(config_cls, "LDAP_GROUP_ROLE_MAP", "") or ""
     if raw_map:
         from app.services.ldap_role_mapper import (
@@ -210,6 +221,13 @@ class Config:
 
     LDAP_ENABLED = os.getenv("LDAP_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
     LDAP_SERVER = os.getenv("LDAP_SERVER", "")      # 如 ldaps://dc.corp.local:636
+    LDAP_STARTTLS = os.getenv("LDAP_STARTTLS", "false").strip().lower() in (
+        "1", "true", "yes", "on"
+    )
+    LDAP_CA_FILE = os.getenv("LDAP_CA_FILE", "")
+    LDAP_ALLOW_INSECURE_TRANSPORT = os.getenv(
+        "LDAP_ALLOW_INSECURE_TRANSPORT", "false"
+    ).strip().lower() in ("1", "true", "yes", "on")
     LDAP_BASE_DN = os.getenv("LDAP_BASE_DN", "")    # 如 DC=corp,DC=local
     LDAP_BIND_DN = os.getenv("LDAP_BIND_DN", "")    # 服务账号（检索用户/组用），可留空
     LDAP_BIND_PASSWORD = os.getenv("LDAP_BIND_PASSWORD", "")
@@ -357,7 +375,11 @@ class Config:
     TRAPD_ENABLED = os.getenv("TRAPD_ENABLED", "false").lower() == "true"
     TRAPD_LISTEN_ADDRESS = os.getenv("TRAPD_LISTEN_ADDRESS", "0.0.0.0")
     TRAPD_LISTEN_PORT = _env_num("TRAPD_LISTEN_PORT", 10162, min_value=1)
-    TRAPD_COMMUNITIES = os.getenv("TRAPD_COMMUNITIES", "public")
+    TRAPD_COMMUNITIES = os.getenv("TRAPD_COMMUNITIES", "")
+    TRAPD_SOURCE_ALLOWLIST = os.getenv("TRAPD_SOURCE_ALLOWLIST", "")
+    TRAPD_ALLOW_WEAK_COMMUNITY = (
+        os.getenv("TRAPD_ALLOW_WEAK_COMMUNITY", "false").lower() == "true"
+    )
     TRAPD_RATE_LIMIT_PER_MINUTE = _env_num("TRAPD_RATE_LIMIT_PER_MINUTE", 120, min_value=1)
     TRAPD_QUEUE_SIZE = _env_num("TRAPD_QUEUE_SIZE", 1000, min_value=1)
     TRAP_CUSTOM_RULES = os.getenv("TRAP_CUSTOM_RULES", "")
