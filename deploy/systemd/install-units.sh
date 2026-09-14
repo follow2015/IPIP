@@ -185,6 +185,16 @@ check_no_placeholder() {
   [ -z "$left" ] || die "渲染后仍存在未替换占位符: ${left}（模板 $f 有新增变量？请在 render_unit 中补充）"
 }
 
+# 强随机口令（GPG_PASSPHRASE 用）。base64 字符集不含空白与 #，可直接进
+# systemd EnvironmentFile；只用 openssl，避免依赖 python 解释器就绪。
+gen_gpg_passphrase() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -base64 48 | tr -d '\n'
+  else
+    head -c 48 /dev/urandom | base64 | tr -d '\n'
+  fi
+}
+
 # 只保留最近 N 份 unit 备份。
 # 目录名固定为 ipip-units.bak.YYYYmmdd-HHMMSS，字典序即时序，故 sort 后取最早的
 # 若干份删除即可（不用 ls -t：其排序在同秒写入或跨平台时不稳定）。glob 只匹配本
@@ -269,6 +279,13 @@ log "已安装 $(echo $ALL_UNITS | wc -w | tr -d ' ') 个 unit 到 $SYSTEMD_DIR"
 if [ "$SKIP_ENV_FILE" = 0 ]; then
   if [ -e "$ENV_FILE" ]; then
     log "$ENV_FILE 已存在，保留不覆盖（内含运维自定义值时请勿盲目重生成）"
+    # 升级既有部署：本文件不会被重写，而备份单元已带 --include-secrets ——
+    # 缺口令会让**每日备份整次失败**，必须显式提示，不能让它到凌晨才发现。
+    if ! grep -qE '^GPG_PASSPHRASE=.+' "$ENV_FILE"; then
+      warn "$ENV_FILE 缺少 GPG_PASSPHRASE，而 ipip-backup.service 以 --include-secrets 运行"
+      warn "  → 每日备份会整次失败。请补写 GPG_PASSPHRASE=<强随机口令> 并 chmod 600"
+      warn "  生成示例：openssl rand -base64 48 | tr -d '\\n'"
+    fi
   else
     mkdir -p "$(dirname "$ENV_FILE")"
     sed \
@@ -281,8 +298,24 @@ if [ "$SKIP_ENV_FILE" = 0 ]; then
       -e "s|^CELERY_VOICE_CONCURRENCY=.*|CELERY_VOICE_CONCURRENCY=$CELERY_VOICE_CONCURRENCY|" \
       -e "s|^BACKUP_DIR=.*|BACKUP_DIR=$BACKUP_DIR|" \
       "$SCRIPT_DIR/ipip.env.example" > "$ENV_FILE"
-    chmod 640 "$ENV_FILE"
-    log "已生成 ${ENV_FILE}（权限 640）"
+    # 备份单元以 --include-secrets 运行，空口令会让每次备份整次失败。新装即生成
+    # 一份强随机口令，避免「装完备份就红」的默认坏状态。
+    # ⚠️ 此处刻意**不用 `sed -i`**：BSD sed（macOS 上做本地演练时）要求 -i 带后缀
+    #    参数，会把脚本串当成后缀吃掉并直接报错退出（实测 `-I or -i may not be
+    #    used with stdin`），本脚本全仓也只此一处用 -i。改写临时文件再 mv 两边都成立。
+    gp="$(gen_gpg_passphrase)"
+    tmp_env="${ENV_FILE}.tmp.$$"
+    ( umask 077; sed "s|^GPG_PASSPHRASE=.*|GPG_PASSPHRASE=${gp}|" "$ENV_FILE" > "$tmp_env" )
+    grep -q '^GPG_PASSPHRASE=' "$tmp_env" \
+      || printf 'GPG_PASSPHRASE=%s\n' "$gp" >> "$tmp_env"
+    chmod 600 "$tmp_env"
+    mv "$tmp_env" "$ENV_FILE"
+    log "已生成 ${ENV_FILE}（权限 600，含密钥故不放 group）"
+    printf '\n'
+    warn "已生成随机 GPG_PASSPHRASE 写入 ${ENV_FILE}，请**立即抄录并离线保存**："
+    printf '        GPG_PASSPHRASE=%s\n' "$gp"
+    warn "  它不随备份产物分发；丢失则所有 secrets.env.gpg 永久不可解（等于没备份）。"
+    printf '\n'
   fi
 fi
 

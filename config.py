@@ -140,7 +140,7 @@ class Config:
     """
 
     SECRET_KEY = os.getenv("SECRET_KEY")
-    VERSION = "1.0.0"
+    VERSION = "1.1.0"
 
     APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Asia/Shanghai")
 

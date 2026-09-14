@@ -23,9 +23,27 @@ Group=ipip
 EnvironmentFile=/etc/ipip/ipip.env
 WorkingDirectory=${PROJECT_ROOT}
 
+; ── 密钥导出（--include-secrets）─────────────────────────────
+; GNUPGHOME：export_secrets 走 gpg 对称加密，而本单元 ProtectHome=true 会把
+;   $HOME 换成空目录。更关键的是 —— gpg **不会自己创建 GNUPGHOME**：目录不存在
+;   时直接报 `keyblock resource '.../pubring.kbx': No such file or directory`，
+;   连带整次备份失败（真机实测）。故用 RuntimeDirectory 让 systemd 预先建好
+;   一个 0700 目录；它位于 /run，在 ProtectSystem=strict 下仍可写，且随单元
+;   结束自动清理 —— 顺带避免 gpg-agent socket 残留导致的挂起（见
+;   backup_system.py 的 GPG_TIMEOUT_S 注释）。
+RuntimeDirectory=ipip-backup-gnupg
+RuntimeDirectoryMode=0700
+Environment=GNUPGHOME=/run/ipip-backup-gnupg
+
+; --include-secrets：把 .env 中的密钥（SWITCH_SECRET_KEY 等）GPG 对称加密导出为
+;   <备份目录>/secrets.env.gpg，使整机损毁后 switch_credentials 密文仍可解。
+;   口令取自 /etc/ipip/ipip.env 的 GPG_PASSPHRASE，**不随产物分发**，须离线另存。
+;   ⚠️ 口令缺失/为空时整次备份失败（有意为之：不给"以为备了"的假象），故本单元
+;   依赖该变量存在 —— 升级既有部署请先补写，见 docs/运维手册-备份与恢复.md。
 ; --prune：备份后按日7/周4/月3清理过期备份（见 scripts/backup_system.py）
 ExecStart=${VENV_BIN}/python ${PROJECT_ROOT}/scripts/backup_system.py \
   --output-dir ${BACKUP_DIR} \
+  --include-secrets \
   --prune
 
 ; ── 超时与重试 ───────────────────────────────────────────
