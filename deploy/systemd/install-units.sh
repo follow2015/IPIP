@@ -133,7 +133,7 @@ PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)" || die "项目根目录不存在: $P
 #   · 自行把单元模板 ProtectHome=true 改为 read-only（保留加固，/root 只读可访问）
 case "$PROJECT_ROOT" in
   /root|/root/*)
-    die "拒绝安装：项目根目录位于 /root 下（$PROJECT_ROOT）。
+    die "拒绝安装：项目根目录位于 /root 下（${PROJECT_ROOT}）。
   单元启用 ProtectHome=true 后，/root 对服务进程完全不可见，
   WorkingDirectory 与 venv 解释器都无法访问，服务启动必然失败。
   修复方式二选一：

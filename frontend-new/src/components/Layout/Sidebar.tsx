@@ -1,18 +1,8 @@
-/**
- * Sidebar 侧边栏
- *
- * 重构改动：
- * 1. filteredMenus 用 useMemo 包裹——原代码每次渲染都重新 filter，
- *    配合 usePermission 修复后 hasPermission 引用稳定，整体只在权限变化时重算
- * 2. menuItems 用 useMemo 包裹——每次展开/折叠侧边栏只重算 label 显隐，
- *    不做整个 filter + map 双重计算
- * 3. selectedKey 逻辑提取为独立变量，更易读
- * 4. menuConfigs 移到模块级别（已存在），避免重复定义
- */
 import React, { useMemo } from 'react';
-import { Menu, theme } from 'antd';
+import { Menu, theme, Tooltip } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePermission } from '@/hooks/usePermission';
+import { useAppVersion } from '@/hooks/useAppVersion';
 import { useUIStore } from '@/stores/ui';
 import { MENU_CONFIGS, FLATTENED_MENUS, findMenuByPath } from '@/constants/menu';
 
@@ -28,6 +18,7 @@ function Sidebar({ collapsed }: SidebarProps) {
   const { hasPermission } = usePermission();
   const { token } = theme.useToken(); // 已 useCallback 包裹，引用稳定
   const addTab = useUIStore((s) => s.addTab);
+  const version = useAppVersion();
 
   const filteredMenus = useMemo(
     () => MENU_CONFIGS.filter((item) => !item.permission || hasPermission(item.permission)),
@@ -111,6 +102,30 @@ function Sidebar({ collapsed }: SidebarProps) {
         onClick={handleMenuClick}
         style={{ border: 'none', flex: 1, overflowY: 'auto' }}
       />
+
+      {/* 版本号：常驻可见，便于报障时快速核对线上版本；折叠态只留版本号 */}
+      {version && (
+        <Tooltip title={`后端版本 v${version}`} placement="right">
+          <div
+            data-testid="sidebar-version"
+            style={{
+              flexShrink: 0,
+              padding: '8px 12px 10px',
+              borderTop: `1px solid ${token.colorBorderSecondary}`,
+              textAlign: 'center',
+              fontSize: 12,
+              lineHeight: '18px',
+              color: token.colorTextTertiary,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              cursor: 'default'
+            }}
+          >
+            {collapsed ? `v${version}` : `版本 v${version}`}
+          </div>
+        </Tooltip>
+      )}
     </div>
   );
 }

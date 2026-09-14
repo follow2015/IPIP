@@ -5,7 +5,7 @@ export enum IPStatusCode {
   BANNED = 2,
   UNUSED = 3,
   PENDING_BAN = 4,
-  PENDING_UNBAN = 5
+  PENDING_UNBAN = 5,
 }
 
 export const IP_STATUS_MAP: Record<IPStatusCode, { label: string; color: string }> = {
@@ -14,13 +14,12 @@ export const IP_STATUS_MAP: Record<IPStatusCode, { label: string; color: string 
   [IPStatusCode.BANNED]: { label: '封禁', color: 'red' },
   [IPStatusCode.UNUSED]: { label: '未使用', color: 'blue' },
   [IPStatusCode.PENDING_BAN]: { label: '封禁中', color: 'orange' },
-  [IPStatusCode.PENDING_UNBAN]: { label: '解封中', color: 'orange' }
+  [IPStatusCode.PENDING_UNBAN]: { label: '解封中', color: 'orange' },
 };
 
-export const IP_STATUS_OPTIONS = Object.entries(IP_STATUS_MAP).map(([value, { label }]) => ({
-  value: Number(value),
-  label
-}));
+export const IP_STATUS_OPTIONS = Object.entries(IP_STATUS_MAP).map(
+  ([value, { label }]) => ({ value: Number(value), label }),
+);
 
 export enum RouteNotesCode {
   DEFAULT = 0,
@@ -29,7 +28,7 @@ export enum RouteNotesCode {
   NETWORK = 3,
   BLACKHOLE = 4,
   GATEWAY = 5,
-  NEXTHOP = 6
+  NEXTHOP = 6,
 }
 
 export const ROUTE_NOTES_MAP: Record<number, { label: string; color: string }> = {
@@ -39,17 +38,17 @@ export const ROUTE_NOTES_MAP: Record<number, { label: string; color: string }> =
   [RouteNotesCode.NETWORK]: { label: '网络路由', color: 'cyan' },
   [RouteNotesCode.BLACKHOLE]: { label: '黑洞路由', color: 'red' },
   [RouteNotesCode.GATEWAY]: { label: '网关地址', color: 'purple' },
-  [RouteNotesCode.NEXTHOP]: { label: '下一跳地址', color: 'orange' }
+  [RouteNotesCode.NEXTHOP]: { label: '下一跳地址', color: 'orange' },
 };
 
 export enum SwitchRoleCode {
   CORE = 0,
-  ACCESS = 1
+  ACCESS = 1,
 }
 
 export const SWITCH_ROLE_MAP: Record<SwitchRoleCode, { label: string; color: string }> = {
   [SwitchRoleCode.CORE]: { label: '核心交换机', color: 'blue' },
-  [SwitchRoleCode.ACCESS]: { label: '接入交换机', color: 'green' }
+  [SwitchRoleCode.ACCESS]: { label: '接入交换机', color: 'green' },
 };
 
 export enum DeviceStatusCode {
@@ -60,7 +59,7 @@ export enum DeviceStatusCode {
   MAINTENANCE = 4,
   RESERVED = 5,
   PENDING_ONLINE = 6,
-  TESTING = 7
+  TESTING = 7,
 }
 
 export const DEVICE_STATUS_MAP: Record<DeviceStatusCode, { label: string; color: string }> = {
@@ -71,52 +70,51 @@ export const DEVICE_STATUS_MAP: Record<DeviceStatusCode, { label: string; color:
   [DeviceStatusCode.MAINTENANCE]: { label: '维护中', color: 'orange' },
   [DeviceStatusCode.RESERVED]: { label: '预留', color: 'purple' },
   [DeviceStatusCode.PENDING_ONLINE]: { label: '待上线', color: 'cyan' },
-  [DeviceStatusCode.TESTING]: { label: '测试中', color: 'geekblue' }
+  [DeviceStatusCode.TESTING]: { label: '测试中', color: 'geekblue' },
 };
 
 export const DEVICE_STATUS_OPTIONS = Object.entries(DEVICE_STATUS_MAP).map(
-  ([value, { label }]) => ({ value: Number(value), label })
+  ([value, { label }]) => ({ value: Number(value), label }),
 );
 
 export enum CustomerStatusCode {
   ACTIVE = 0,
   DISABLED = 1,
   PENDING = 2,
-  TERMINATED = 3
+  TERMINATED = 3,
 }
 
 export const CUSTOMER_STATUS_MAP: Record<CustomerStatusCode, { label: string; color: string }> = {
   [CustomerStatusCode.ACTIVE]: { label: '活跃', color: 'green' },
   [CustomerStatusCode.DISABLED]: { label: '停用', color: 'red' },
   [CustomerStatusCode.PENDING]: { label: '待审核', color: 'orange' },
-  [CustomerStatusCode.TERMINATED]: { label: '终止', color: 'default' }
+  [CustomerStatusCode.TERMINATED]: { label: '终止', color: 'default' },
 };
 
 export const CUSTOMER_STATUS_OPTIONS = Object.entries(CUSTOMER_STATUS_MAP).map(
-  ([value, { label }]) => ({ value: Number(value), label })
+  ([value, { label }]) => ({ value: Number(value), label }),
 );
 
 export enum RoomStatusCode {
   NORMAL = 0,
-  DISABLED = 1
+  DISABLED = 1,
 }
 
 export const ROOM_STATUS_MAP: Record<RoomStatusCode, { label: string; color: string }> = {
   [RoomStatusCode.NORMAL]: { label: '正常', color: 'green' },
-  [RoomStatusCode.DISABLED]: { label: '停用', color: 'red' }
+  [RoomStatusCode.DISABLED]: { label: '停用', color: 'red' },
 };
 
-export const ROOM_STATUS_OPTIONS = Object.entries(ROOM_STATUS_MAP).map(([value, { label }]) => ({
-  value: Number(value),
-  label
-}));
+export const ROOM_STATUS_OPTIONS = Object.entries(ROOM_STATUS_MAP).map(
+  ([value, { label }]) => ({ value: Number(value), label }),
+);
 
 export enum CabinetStatusCode {
   DISABLED = 0,
   AVAILABLE = 1,
   IN_USE = 2,
   MAINTENANCE = 3,
-  RESERVED = 4
+  RESERVED = 4,
 }
 
 export const CABINET_STATUS_MAP: Record<CabinetStatusCode, { label: string; color: string }> = {
@@ -124,50 +122,49 @@ export const CABINET_STATUS_MAP: Record<CabinetStatusCode, { label: string; colo
   [CabinetStatusCode.AVAILABLE]: { label: '可用', color: 'green' },
   [CabinetStatusCode.IN_USE]: { label: '使用中', color: 'blue' },
   [CabinetStatusCode.MAINTENANCE]: { label: '维护中', color: 'orange' },
-  [CabinetStatusCode.RESERVED]: { label: '已预留', color: 'purple' }
+  [CabinetStatusCode.RESERVED]: { label: '已预留', color: 'purple' },
 };
 
 export const CABINET_STATUS_OPTIONS = Object.entries(CABINET_STATUS_MAP).map(
-  ([value, { label }]) => ({ value: Number(value), label })
+  ([value, { label }]) => ({ value: Number(value), label }),
 );
 
 export enum VLANStatusCode {
   INACTIVE = 0,
   ACTIVE = 1,
-  RESERVED = 2
+  RESERVED = 2,
 }
 
 export const VLAN_STATUS_MAP: Record<number, { label: string; color: string }> = {
   [VLANStatusCode.INACTIVE]: { label: '禁用', color: 'red' },
   [VLANStatusCode.ACTIVE]: { label: '正常', color: 'green' },
-  [VLANStatusCode.RESERVED]: { label: '预留', color: 'orange' }
+  [VLANStatusCode.RESERVED]: { label: '预留', color: 'orange' },
 };
 
 export enum UserStatusCode {
   ACTIVE = 0,
-  INACTIVE = 1
+  INACTIVE = 1,
 }
 
 export const USER_STATUS_MAP: Record<UserStatusCode, { label: string; color: string }> = {
   [UserStatusCode.ACTIVE]: { label: '活跃', color: 'green' },
-  [UserStatusCode.INACTIVE]: { label: '禁用', color: 'red' }
+  [UserStatusCode.INACTIVE]: { label: '禁用', color: 'red' },
 };
 
-export const USER_STATUS_OPTIONS = Object.entries(USER_STATUS_MAP).map(([value, { label }]) => ({
-  value: Number(value),
-  label
-}));
+export const USER_STATUS_OPTIONS = Object.entries(USER_STATUS_MAP).map(
+  ([value, { label }]) => ({ value: Number(value), label }),
+);
 
 export enum LAGStatusCode {
   INACTIVE = 0,
   ACTIVE = 1,
-  DEGRADED = 2
+  DEGRADED = 2,
 }
 
 export const LAG_STATUS_MAP: Record<number, { label: string; color: string }> = {
   [LAGStatusCode.INACTIVE]: { label: '禁用', color: 'red' },
   [LAGStatusCode.ACTIVE]: { label: '正常', color: 'green' },
-  [LAGStatusCode.DEGRADED]: { label: '降级', color: 'orange' }
+  [LAGStatusCode.DEGRADED]: { label: '降级', color: 'orange' },
 };
 
 export enum NotificationTypeCode {
@@ -190,7 +187,9 @@ export enum NotificationTypeCode {
   PORT_ACTION = 'port_action',
   ASYNC_ACTION = 'async_action',
   RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
-  ASSET_WARRANTY_ALERT = 'asset_warranty_alert'
+  SERVICE_UNHEALTHY = 'service_unhealthy',
+  SERVICE_RECOVERED = 'service_recovered',
+  ASSET_WARRANTY_ALERT = 'asset_warranty_alert',
 }
 
 export const NOTIFICATION_TYPE_OPTIONS = [
@@ -213,7 +212,9 @@ export const NOTIFICATION_TYPE_OPTIONS = [
   { label: '端口操作结果', value: 'port_action' },
   { label: '异步操作结果', value: 'async_action' },
   { label: '频率超限', value: 'rate_limit_exceeded' },
-  { label: '资产到期提醒', value: 'asset_warranty_alert' }
+  { label: 'SERVICE_UNHEALTHY', value: 'service_unhealthy' },
+  { label: 'SERVICE_RECOVERED', value: 'service_recovered' },
+  { label: 'ASSET_WARRANTY_ALERT', value: 'asset_warranty_alert' },
 ];
 
 export enum ProbeErrorCode {
@@ -236,7 +237,7 @@ export enum ProbeErrorCode {
   NO_API_URL = 'no_api_url',
   ZABBIX_API_ERROR = 'zabbix_api_error',
   ZABBIX_EMPTY_HOST_LIST = 'zabbix_empty_host_list',
-  HOST_NOT_IN_ZABBIX = 'host_not_in_zabbix'
+  HOST_NOT_IN_ZABBIX = 'host_not_in_zabbix',
 }
 
 export const PROBE_ERROR_MAP: Record<ProbeErrorCode, { label: string; color: string }> = {
@@ -259,28 +260,28 @@ export const PROBE_ERROR_MAP: Record<ProbeErrorCode, { label: string; color: str
   [ProbeErrorCode.NO_API_URL]: { label: '无API地址', color: 'default' },
   [ProbeErrorCode.ZABBIX_API_ERROR]: { label: 'Zabbix API错误', color: 'red' },
   [ProbeErrorCode.ZABBIX_EMPTY_HOST_LIST]: { label: 'Zabbix主机列表为空', color: 'orange' },
-  [ProbeErrorCode.HOST_NOT_IN_ZABBIX]: { label: '主机不在Zabbix中', color: 'orange' }
+  [ProbeErrorCode.HOST_NOT_IN_ZABBIX]: { label: '主机不在Zabbix中', color: 'orange' },
 };
 
 export enum IPAuditAction {
   ALLOCATE = 'allocate',
   RELEASE = 'release',
   BAN = 'ban',
-  UNBAN = 'unban'
+  UNBAN = 'unban',
 }
 
 export const IP_AUDIT_ACTION_MAP: Record<IPAuditAction, { label: string; color: string }> = {
   [IPAuditAction.ALLOCATE]: { label: '分配', color: 'green' },
   [IPAuditAction.RELEASE]: { label: '回收', color: 'orange' },
   [IPAuditAction.BAN]: { label: '封禁', color: 'red' },
-  [IPAuditAction.UNBAN]: { label: '解封', color: 'blue' }
+  [IPAuditAction.UNBAN]: { label: '解封', color: 'blue' },
 };
 
 export const IP_AUDIT_ACTION_OPTIONS = [
   { label: '分配', value: 'allocate' },
   { label: '回收', value: 'release' },
   { label: '封禁', value: 'ban' },
-  { label: '解封', value: 'unban' }
+  { label: '解封', value: 'unban' },
 ];
 
 export const NOTIFICATION_TYPE_GROUP_OPTIONS = [
@@ -293,16 +294,16 @@ export const NOTIFICATION_TYPE_GROUP_OPTIONS = [
       { value: 'disk_failure_alert', label: 'disk_failure_alert' },
       { value: 'port_status_changed', label: 'port_status_changed' },
       { value: 'monitor_interrupted', label: 'monitor_interrupted' },
-      { value: 'raid_failure_alert', label: 'raid_failure_alert' }
-    ]
+      { value: 'raid_failure_alert', label: 'raid_failure_alert' },
+    ],
   },
   {
     label: '操作结果',
     options: [
       { value: 'batch_create_devices', label: '批量创建设备' },
       { value: 'batch_ban_ip', label: '批量封禁IP' },
-      { value: 'batch_unban_ip', label: '批量解封IP' }
-    ]
+      { value: 'batch_unban_ip', label: '批量解封IP' },
+    ],
   },
   {
     label: '扫描完成',
@@ -312,22 +313,27 @@ export const NOTIFICATION_TYPE_GROUP_OPTIONS = [
       { value: 'room_scan_complete', label: '机房扫描完成' },
       { value: 'room_scan_failed', label: '机房扫描失败' },
       { value: 'virtual_room_scan_complete', label: '虚拟机房扫描完成' },
-      { value: 'virtual_room_scan_failed', label: '虚拟机房扫描失败' }
-    ]
+      { value: 'virtual_room_scan_failed', label: '虚拟机房扫描失败' },
+    ],
   },
   {
     label: '端口/异步操作',
     options: [
       { value: 'port_action', label: '端口操作结果' },
-      { value: 'async_action', label: '异步操作结果' }
-    ]
+      { value: 'async_action', label: '异步操作结果' },
+    ],
   },
   {
     label: '运维告警',
-    options: [{ value: 'rate_limit_exceeded', label: '频率超限' }]
+    options: [
+      { value: 'rate_limit_exceeded', label: '频率超限' },
+    ],
   },
   {
     label: '资产提醒',
-    options: [{ value: 'asset_warranty_alert', label: '资产到期提醒' }]
-  }
+    options: [
+      { value: 'asset_warranty_alert', label: '资产到期提醒' },
+    ],
+  },
 ];
+

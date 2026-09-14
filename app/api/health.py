@@ -30,7 +30,8 @@ def health_root():
         data={
             'status': 'healthy',
             'timestamp': now_iso_utc(),
-            'service': 'IPIP Management System'
+            'service': 'IPIP Management System',
+            'version': current_app.config.get('VERSION'),
         },
         message='系统运行正常'
     )
