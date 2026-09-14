@@ -29,7 +29,7 @@ export function IPDetailModal({
       {loading ? (
         <Spin />
       ) : detail ? (
-        <Descriptions bordered size="small" column={2}>
+        <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
           <Descriptions.Item label="IP地址">{detail.ip_address}</Descriptions.Item>
           <Descriptions.Item label="状态">
             {(() => {

@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState } from 'react';
 import { Button, Switch, Space, Drawer, Tag, Checkbox, Typography, Input, Modal } from 'antd';
 import {
@@ -29,6 +29,7 @@ import { useMessage } from '@/hooks/useMessage';
 import { formatDateTime } from '@/utils/format';
 
 function Users() {
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const [roleDrawerOpen, setRoleDrawerOpen] = useState(false);
   const [roleUser, setRoleUser] = useState<User | null>(null);

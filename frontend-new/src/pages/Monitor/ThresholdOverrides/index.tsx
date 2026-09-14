@@ -245,7 +245,7 @@ export default function ThresholdOverridesPage() {
       >
         <Form form={form} layout="vertical" preserve={false}>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="device_id"
                 label="设备 ID"
@@ -254,7 +254,7 @@ export default function ThresholdOverridesPage() {
                 <InputNumber style={{ width: '100%' }} min={1} disabled={!!editing} />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="metric_key"
                 label="指标标识"
@@ -275,12 +275,12 @@ export default function ThresholdOverridesPage() {
           {/* 结构化阈值：按 metric_type 动态渲染（复用 MetricTemplateModal 模式） */}
           {(currentMetricType === 'gauge' || currentMetricType === 'counter') && (
             <Row gutter={16}>
-              <Col span={12}>
+              <Col xs={24} md={12}>
                 <Form.Item label="告警阈值 (warn)" name="warn" tooltip="达到该值触发告警">
                   <InputNumber style={{ width: '100%' }} placeholder="如 60" />
                 </Form.Item>
               </Col>
-              <Col span={12}>
+              <Col xs={24} md={12}>
                 <Form.Item label="严重阈值 (crit)" name="crit" tooltip="达到该值触发严重告警">
                   <InputNumber style={{ width: '100%' }} placeholder="如 70" />
                 </Form.Item>

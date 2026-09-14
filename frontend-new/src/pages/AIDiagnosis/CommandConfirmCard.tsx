@@ -10,7 +10,7 @@ import {
 } from '@/services/diagnosis';
 import { subscribeTaskProgress } from '@/services/ai';
 import { useMessage } from '@/hooks/useMessage';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 
 const { Text, Paragraph } = Typography;
 
@@ -34,6 +34,7 @@ export default function CommandConfirmCard({
   sessionId,
   onExecuted
 }: CommandConfirmCardProps) {
+  const confirm = useConfirm();
   const message = useMessage();
   const [loading, setLoading] = useState<number | null>(null);
   const [executed, setExecuted] = useState<Record<number, boolean>>({});

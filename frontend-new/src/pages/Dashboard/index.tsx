@@ -60,6 +60,7 @@ import {
 } from '@/types/enums';
 import type { DeviceStatusCode, IPStatusCode } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const { useToken } = theme;
 
@@ -416,6 +417,7 @@ function UtilizationGauges() {
 
 
 function Dashboard() {
+  const { isMobile } = useResponsive();
   const { data: stats } = useDashboardSuspenseStats();
   const { token } = useToken();
 
@@ -569,17 +571,17 @@ function Dashboard() {
       <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
         <Col xs={24} lg={8}>
           <Card size="small" title="设备状态分布" style={{ height: '100%' }}>
-            <RingChart data={deviceChartData} title="设备" height={280} />
+            <RingChart data={deviceChartData} title="设备" height={isMobile ? 220 : 280} />
           </Card>
         </Col>
         <Col xs={24} lg={8}>
           <Card size="small" title="机柜状态分布" style={{ height: '100%' }}>
-            <RingChart data={cabinetChartData} title="机柜" height={280} />
+            <RingChart data={cabinetChartData} title="机柜" height={isMobile ? 220 : 280} />
           </Card>
         </Col>
         <Col xs={24} lg={8}>
           <Card size="small" title="IP 状态分布" style={{ height: '100%' }}>
-            <RingChart data={ipChartData} title="IP" height={280} />
+            <RingChart data={ipChartData} title="IP" height={isMobile ? 220 : 280} />
           </Card>
         </Col>
       </Row>

@@ -8,11 +8,12 @@ import { MENU_CONFIGS, FLATTENED_MENUS, findMenuByPath } from '@/constants/menu'
 
 interface SidebarProps {
   collapsed: boolean;
+  onNavigate?: () => void;
 }
 
 const KEY_TO_PATH = new Map(FLATTENED_MENUS.map((m) => [m.key, m.path]));
 
-function Sidebar({ collapsed }: SidebarProps) {
+function Sidebar({ collapsed, onNavigate }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { hasPermission } = usePermission();
@@ -73,6 +74,7 @@ function Sidebar({ collapsed }: SidebarProps) {
         });
       }
       navigate(path);
+      onNavigate?.();
     }
   };
 

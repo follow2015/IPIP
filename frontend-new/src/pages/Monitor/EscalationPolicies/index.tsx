@@ -40,14 +40,9 @@ import {
   type MonitorEscalationStepInput
 } from '@/services/monitor';
 import { formatDateTime } from '@/utils/format';
+import { SEVERITY_OPTIONS } from '@/types/enums';
 
 const { Text } = Typography;
-
-const SEVERITY_OPTIONS = [
-  { label: 'info', value: 'info' },
-  { label: 'warning', value: 'warning' },
-  { label: 'critical', value: 'critical' }
-];
 
 const ALERT_TYPE_OPTIONS = [
   { label: 'device_unreachable', value: 'device_unreachable' },

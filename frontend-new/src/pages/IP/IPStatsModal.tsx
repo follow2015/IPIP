@@ -28,7 +28,8 @@ export function IPStatsModal({ open, onClose, stats, scopeLabel }: IPStatsModalP
       {stats ? (
         <>
           <Row gutter={[16, 16]}>
-            <Col span={24}>
+            {/* 总计卡始终占满一行，与同 Row 内的 xs/md 写法保持一致 */}
+            <Col xs={24}>
               <Card size="small">
                 <Statistic title="总计" value={stats.total ?? 0} />
               </Card>
@@ -45,7 +46,7 @@ export function IPStatsModal({ open, onClose, stats, scopeLabel }: IPStatsModalP
               const total = stats.total ?? 0;
               const percent = total > 0 ? Math.round((count / total) * 100) : 0;
               return (
-                <Col span={6} key={key}>
+                <Col xs={12} md={6} key={key}>
                   <Card size="small">
                     <Statistic
                       title={label}

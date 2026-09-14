@@ -1,6 +1,7 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState, useMemo } from 'react';
-import { Table, Button, Space, Form, Input, Select, Tag, Modal } from 'antd';
+import { Button, Space, Form, Input, Select, Tag, Modal } from 'antd';
+import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined } from '@ant-design/icons';
 import {
   useLinkAggregationGroups,
@@ -28,6 +29,7 @@ interface LagTabProps {
 }
 
 function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
+  const confirm = useConfirm();
   const { data: lagGroups, isLoading } = useLinkAggregationGroups(deviceId);
   const createLag = useCreateLinkAggregationGroup();
   const deleteLag = useDeleteLinkAggregationGroup();
@@ -244,12 +246,15 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
         )}
       </div>
 
-      <Table
+      <DataTable
         columns={columns}
         dataSource={lagGroups ?? []}
         rowKey="id"
         loading={isLoading}
         size="small"
+        showCard={false}
+        searchable={false}
+        pagination={DENSE_PAGINATION}
       />
 
       {/* 创建链路聚合组弹窗 */}

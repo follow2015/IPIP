@@ -302,7 +302,7 @@ function AssetNumberSection({
   if (mode === 'auto-only') {
     return (
       <Row gutter={16} align="middle">
-        <Col span={16}>
+        <Col xs={24} md={16}>
           <Form.Item
             label="自动生成资产编号"
             tooltip="开启后，每个设备将获得不同的唯一编号（ZC-YYYYMMDD-HHmmss-XXXX）"
@@ -315,7 +315,7 @@ function AssetNumberSection({
             />
           </Form.Item>
         </Col>
-        <Col span={8} style={{ paddingTop: 4 }}>
+        <Col xs={24} md={8} style={{ paddingTop: 4 }}>
           {autoGenerate && (
             <span style={{ color: '#8c8c8c', fontSize: 12 }}>
               将为每台设备自动生成唯一编号（ZC-YYYYMMDD-HHmmss-XXXX）
@@ -329,7 +329,7 @@ function AssetNumberSection({
   if (mode === 'manual-with-switch') {
     return (
       <Row gutter={16} align="middle">
-        <Col span={16}>
+        <Col xs={24} md={16}>
           <Form.Item
             name={name('asset_number')}
             label="资产编号"
@@ -351,7 +351,7 @@ function AssetNumberSection({
             />
           </Form.Item>
         </Col>
-        <Col span={8} style={{ paddingTop: 30 }}>
+        <Col xs={24} md={8} style={{ paddingTop: 30 }}>
           {autoGenerate && (
             <span style={{ color: '#8c8c8c', fontSize: 12 }}>
               将自动生成唯一编号（ZC-YYYYMMDD-HHmmss-XXXX）
@@ -364,7 +364,7 @@ function AssetNumberSection({
 
   return (
     <Row gutter={16}>
-      <Col span={16}>
+      <Col xs={24} md={16}>
         <Form.Item name={name('asset_number')} label="资产编号">
           <Input
             placeholder="资产编号（可自动生成）"
@@ -409,36 +409,36 @@ export default function AssetInfoFields({
       {/* 采购信息 */}
       <Divider plain>采购信息</Divider>
       <Row gutter={16}>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Form.Item name={name('supplier')} label="供应商">
             <Input placeholder="供应商名称" />
           </Form.Item>
         </Col>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Form.Item name={name('supplier_contact')} label="供应商联系人">
             <Input placeholder="联系人" />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Form.Item name={name('contract_number')} label="合同编号">
             <Input placeholder="采购合同编号" />
           </Form.Item>
         </Col>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Form.Item name={name('invoice_number')} label="发票号码">
             <Input placeholder="发票号码" />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name={name('purchase_date')} label="采购日期">
             <DatePicker style={{ width: '100%' }} placeholder="采购日期" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name={name('purchase_price')} label="采购价格(元)">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="价格" precision={2} />
           </Form.Item>
@@ -448,17 +448,17 @@ export default function AssetInfoFields({
       {/* 保修信息 */}
       <Divider plain>保修信息</Divider>
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name={name('warranty_type')} label="保修类型">
             <Input placeholder="如：原厂保修" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name={name('warranty_start')} label="保修开始">
             <DatePicker style={{ width: '100%' }} placeholder="开始日期" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item
             name={name('warranty_end')}
             label="保修到期"
@@ -472,7 +472,7 @@ export default function AssetInfoFields({
       {/* 生命周期 */}
       <Divider plain>生命周期</Divider>
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item
             name={name('online_date')}
             label="上线日期"
@@ -486,7 +486,7 @@ export default function AssetInfoFields({
             <OnlineDateControl form={form} prefix={prefix} />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item
             name={name('offline_date')}
             label="下线日期"
@@ -495,7 +495,7 @@ export default function AssetInfoFields({
             <LifecycleOfflineControl form={form} prefix={prefix} />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item
             name={name('lifecycle_years')}
             label="预计使用年限"

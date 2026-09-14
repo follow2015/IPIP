@@ -18,7 +18,7 @@ import {
   useSetDevicePortSyncEnabled
 } from '@/services/network-port';
 import { useMessage } from '@/hooks/useMessage';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { buildManualColumns } from './columns';
 import { PortTable } from './PortTable';
 import { PortStats } from './PortStats';
@@ -57,6 +57,7 @@ export function PortManualCrud({
   renderBatchActions,
   hasSnmpCredential = false
 }: PortManualCrudProps) {
+  const confirm = useConfirm();
   const message = useMessage();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -114,7 +115,7 @@ export function PortManualCrud({
         }
       });
     },
-    [deletePort, message]
+    [confirm, deletePort, message]
   );
 
   const handleToggleUsageStatus = useCallback(
@@ -130,7 +131,7 @@ export function PortManualCrud({
         }
       });
     },
-    [updateUsageStatus, message]
+    [confirm, updateUsageStatus, message]
   );
 
   const handleBatchLocalUpdate = useCallback(

@@ -148,7 +148,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                     }}
                   >
                     <Row gutter={8}>
-                      <Col span={8}>
+                      <Col xs={24} md={8}>
                         <Form.Item
                           {...restField}
                           name={[name, 'template']}
@@ -163,7 +163,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                           />
                         </Form.Item>
                       </Col>
-                      <Col span={4}>
+                      <Col xs={12} md={4}>
                         <Form.Item
                           {...restField}
                           name={[name, 'slot']}
@@ -174,7 +174,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                           <InputNumber min={0} max={99} style={{ width: '100%' }} size="small" />
                         </Form.Item>
                       </Col>
-                      <Col span={4}>
+                      <Col xs={12} md={4}>
                         <Form.Item
                           {...restField}
                           name={[name, 'card']}
@@ -185,7 +185,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                           <InputNumber min={0} max={99} style={{ width: '100%' }} size="small" />
                         </Form.Item>
                       </Col>
-                      <Col span={3}>
+                      <Col xs={12} md={3}>
                         <Form.Item
                           {...restField}
                           name={[name, 'start_port']}
@@ -196,7 +196,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                           <InputNumber min={0} max={9999} style={{ width: '100%' }} size="small" />
                         </Form.Item>
                       </Col>
-                      <Col span={3}>
+                      <Col xs={12} md={3}>
                         <Form.Item
                           {...restField}
                           name={[name, 'end_port']}
@@ -207,7 +207,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                           <InputNumber min={0} max={9999} style={{ width: '100%' }} size="small" />
                         </Form.Item>
                       </Col>
-                      <Col span={2} style={{ textAlign: 'right', paddingTop: 24 }}>
+                      <Col xs={4} md={2} style={{ textAlign: 'right', paddingTop: 24 }}>
                         {fields.length > 1 && (
                           <Button
                             type="text"

@@ -14,24 +14,13 @@ from flask import Blueprint, request, g
 
 from app.api.base import APIResponse
 from app.openapi.doc import doc
+from app.utils.admin_guard import require_admin
 from app.utils.auth import login_required
 from app.utils.transactional import transactional
 
 logger = get_logger(__name__)
 
 router = Blueprint("mail_settings", __name__, url_prefix="/api/settings/mail")
-
-
-def _require_admin():
-    """检查当前用户是否为管理员"""
-    from app.services.user_service import UserService
-    from app.persistence.user_repository import UserRepository
-    from app.persistence.user_log_repository import UserLogRepository
-    user_service = UserService(UserRepository(), UserLogRepository())
-    user = user_service.get_by_id(g.current_user["user_id"])
-    if not user or not user.is_admin():
-        return False
-    return True
 
 
 def _get_db_config() -> dict:
@@ -77,7 +66,7 @@ def _get_smtp_params(data: dict | None = None) -> dict:
 @login_required
 def get_mail_config():
     """获取当前邮件服务器配置（管理员），密码脱敏。"""
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     return APIResponse.success(data=_get_db_config())
@@ -89,7 +78,7 @@ def get_mail_config():
 @transactional
 def update_mail_config():
     """更新邮件服务器配置（管理员），写入数据库。"""
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     data = request.get_json()
@@ -141,7 +130,7 @@ def update_mail_config():
 @transactional
 def delete_mail_config():
     """删除邮件服务器配置（管理员），清空数据库中的所有配置项。"""
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     try:
@@ -165,7 +154,7 @@ def test_mail_config():
     - recipient: 收件人邮箱地址（必填）
     - 其余字段用于测试未保存的配置（可选）
     """
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     data = request.get_json(silent=True) or {}

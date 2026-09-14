@@ -25,17 +25,17 @@ const ChassisConfigPanel: React.FC<ChassisConfigPanelProps> = ({ form }) => {
       styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
     >
       <Row gutter={16}>
-        <Col span={6}>
+        <Col xs={12} md={6}>
           <Form.Item name="node_rows" label="节点行数" initialValue={2}>
             <InputNumber min={1} max={16} style={{ width: '100%' }} />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col xs={12} md={6}>
           <Form.Item name="node_cols" label="节点列数" initialValue={2}>
             <InputNumber min={1} max={16} style={{ width: '100%' }} />
           </Form.Item>
         </Col>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Form.Item name="node_naming_pattern" label="命名规则">
             <Input placeholder="{NAME}-Node{POS}" />
           </Form.Item>

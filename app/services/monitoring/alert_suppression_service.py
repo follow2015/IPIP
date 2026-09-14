@@ -21,6 +21,7 @@ Feature Flag：MONITOR_SUPPRESSION_ENABLED=false 时全部放行（瞬时回退�
 """
 import json
 from app.utils.logging import get_logger
+from app.utils.redis_client import get_redis_client
 import time
 from typing import Optional, TypedDict
 
@@ -36,12 +37,6 @@ class SuppressionDecision(TypedDict):
     suppressed_count: int
     """下次允许放行的时间戳（被抑制时返回）"""
     next_allowed_at: Optional[float]
-
-
-def _get_redis():
-    """复用 switch_events 的 Redis 客户端（懒加载单例）"""
-    from app.services.switch_events import _get_redis as _get
-    return _get()
 
 
 def _load_config():
@@ -89,7 +84,7 @@ def should_emit(dedup_key: str, now: Optional[float] = None) -> SuppressionDecis
             suppressed=False, aggregated=False, suppressed_count=0, next_allowed_at=None
         )
 
-    r = _get_redis()
+    r = get_redis_client()
     if r is None:
         return SuppressionDecision(
             suppressed=False, aggregated=False, suppressed_count=0, next_allowed_at=None

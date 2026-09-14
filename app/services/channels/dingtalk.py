@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-钉钉自定义机器人 Webhook 渠道
+"""钉钉自定义机器人 Webhook 渠道。
 
 通过群机器人 Webhook URL 发送 Markdown 格式消息，一条通知全局最多发一次，
 与命中多少用户无关。
@@ -17,58 +16,28 @@ import base64
 import hashlib
 import hmac
 import time
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import quote, urlparse
 
-from app.utils.logging import get_logger
-
-from app.utils.http_client import post_json
-
 from app.core.enums import ChannelType
-from app.services.channels.base import BroadcastChannel, ensure_webhook_success
 from app.models.notification import Notification
 from app.models.webhook_config import WebhookConfig
-
-logger = get_logger(__name__)
-
-DINGTALK_API_TIMEOUT = 10  # 钉钉 API 请求超时时间（秒）
-
-SEVERITY_EMOJI = {
-    "info": "📋",
-    "warning": "⚠️",
-    "critical": "🔴",
-}
+from app.services.channels.base_webhook_channel import SEVERITY_EMOJI, BaseWebhookChannel
 
 
-class DingTalkWebhookChannel(BroadcastChannel):
-    """钉钉自定义机器人 Webhook 渠道"""
+class DingTalkWebhookChannel(BaseWebhookChannel):
+    """钉钉自定义机器人 Webhook 渠道。"""
 
-    def get_channel_name(self) -> str:
-        return ChannelType.DINGTALK
+    channel_type = ChannelType.DINGTALK
+    display_name = "钉钉"
 
-    def send(self, notification: Notification) -> bool:
-        """发送通知到所有匹配的钉钉群机器人
+    def _build_payload(
+        self, notification: Notification
+    ) -> Tuple[Dict[str, Any], Optional[Dict[str, str]]]:
+        """构造钉钉 Markdown 消息体。
 
-        查询所有启用的 dingtalk 类型 WebhookConfig，
-        逐条匹配 applicable_types/applicable_severities，匹配的都发，互不影响。
+        钉钉 markdown 子集：支持标题/引用/加粗，**不支持 `<font>` 着色**。
         """
-        configs = WebhookConfig.query.filter_by(channel=ChannelType.DINGTALK, enabled=True).all()
-        if not configs:
-            return False
-
-        any_success = False
-        for cfg in configs:
-            if not _matches(cfg, notification):
-                continue
-            try:
-                self._post_to_webhook(cfg, notification)
-                any_success = True
-            except Exception:
-                logger.exception("钉钉 Webhook 投递失败 config_id=%s name=%s", cfg.id, cfg.name)
-
-        return any_success
-
-    def _post_to_webhook(self, cfg: WebhookConfig, notification: Notification) -> None:
-        """发送 Markdown 消息到钉钉自定义机器人"""
         emoji = SEVERITY_EMOJI.get(notification.severity, "")
         content = (
             f"### {emoji} {notification.title}\n\n"
@@ -79,30 +48,17 @@ class DingTalkWebhookChannel(BroadcastChannel):
             f"> {notification.created_at.isoformat() if notification.created_at else ''}"
         )
 
-        payload = {
+        return {
             "msgtype": "markdown",
             "markdown": {"title": notification.title, "text": content},
-        }
+        }, None
 
-        url = cfg.url
-        if cfg.secret:
-            timestamp = str(int(time.time() * 1000))  # 钉钉要求毫秒
-            sign = _gen_sign(cfg.secret, timestamp)
-            url = _append_sign(url, timestamp, sign)
-
-        resp = post_json(url, payload, timeout=DINGTALK_API_TIMEOUT)
-        resp.raise_for_status()
-        ensure_webhook_success(resp, "钉钉")
-        logger.info("钉钉 Webhook 投递成功 config_id=%s", cfg.id)
-
-
-def _matches(cfg: WebhookConfig, notification: Notification) -> bool:
-    """检查 WebhookConfig 是否匹配当前通知"""
-    if cfg.applicable_types and notification.type not in cfg.applicable_types:
-        return False
-    if cfg.applicable_severities and notification.severity not in cfg.applicable_severities:
-        return False
-    return True
+    def _apply_sign(self, cfg: WebhookConfig, payload: Dict[str, Any]) -> str:
+        """钉钉加签：**拼在 URL query 上，消息体不变**。"""
+        if not cfg.secret:
+            return cfg.url
+        timestamp = str(int(time.time() * 1000))  # 钉钉要求毫秒
+        return _append_sign(cfg.url, timestamp, _gen_sign(cfg.secret, timestamp))
 
 
 def _gen_sign(secret: str, timestamp: str) -> str:

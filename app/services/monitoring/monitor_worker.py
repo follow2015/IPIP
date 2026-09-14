@@ -20,12 +20,10 @@
   正常一轮结束显式释放，进程崩溃时依赖 TTL 过期兜底。
 - 优雅退出：threading.Event 作 stop 信号；create_app 里注册 atexit 置位并 join 全部线程。
 """
-import os
-import socket
 import threading
-import uuid
 import weakref
 from app.utils.time_utils import now_utc_naive
+from app.utils.concurrency.redis_lock import owner_token, release_owner_lock
 
 import redis
 from concurrent.futures import ThreadPoolExecutor
@@ -43,13 +41,6 @@ logger = get_logger(__name__)
 
 
 
-_RELEASE_LOCK_LUA = """
-if redis.call('get', KEYS[1]) == ARGV[1] then
-    return redis.call('del', KEYS[1])
-else
-    return 0
-end
-"""
 
 _RENEW_LOCK_LUA = """
 if redis.call('get', KEYS[1]) == ARGV[1] then
@@ -58,31 +49,6 @@ else
     return 0
 end
 """
-
-_LOCK_OWNER_TOKEN: str | None = None
-_LOCK_OWNER_PID: int | None = None
-_LOCK_OWNER_MUTEX = threading.Lock()
-
-
-def lock_owner_token() -> str:
-    """返回本进程唯一的锁 owner token（`<host>:<pid>:<uuid4>`）。
-
-    host / pid 前缀仅为排障可读性（``redis-cli get monitor:lock:snmp`` 能直接
-    看出锁的归属进程）；唯一性由 uuid4 保证。
-    """
-    global _LOCK_OWNER_TOKEN, _LOCK_OWNER_PID
-    pid = os.getpid()
-    if _LOCK_OWNER_TOKEN is None or _LOCK_OWNER_PID != pid:
-        with _LOCK_OWNER_MUTEX:
-            if _LOCK_OWNER_TOKEN is None or _LOCK_OWNER_PID != pid:
-                try:
-                    host = socket.gethostname()
-                except Exception:
-                    host = "unknown"
-                _LOCK_OWNER_TOKEN = f"{host}:{pid}:{uuid.uuid4().hex}"
-                _LOCK_OWNER_PID = pid
-    return _LOCK_OWNER_TOKEN
-
 
 def _lock_ttl(interval: int) -> int:
     """轮询锁 TTL：进程崩溃时的兜底过期时间。
@@ -97,31 +63,20 @@ def _acquire_lock(r, loop_name: str, interval: int) -> bool:
     """尝试用 SET NX EX 抢占轮询锁。
 
     成功（key 不存在，写入本进程 owner token，TTL=安全上限）返回 True；
-    失败（锁已被其他进程持有）返回 False。锁在每轮成功结束后由 _release_lock 显式释放，
-    TTL 仅作为进程崩溃时的兜底（防止锁永不过期导致监控停摆）。
+    失败（锁已被其他进程持有）返回 False。锁在每轮成功结束后由 release_owner_lock
+    显式释放，TTL 仅作为进程崩溃时的兜底（防止锁永不过期导致监控停摆）。
     """
     return bool(
-        r.set(f"monitor:lock:{loop_name}", lock_owner_token(),
+        r.set(f"monitor:lock:{loop_name}", owner_token(),
               nx=True, ex=_lock_ttl(interval))
     )
-
-
-def _release_lock(r, loop_name: str) -> None:
-    """显式释放轮询锁（仅当仍由本进程持有时），避免 TTL 等待期内的空窗。
-
-    使用 Lua 脚本做原子 compare-and-delete，消除 GET 与 DELETE 之间的
-    TOCTOU 竞态：若锁恰好在此窗口内 TTL 过期、另一进程抢到新锁，
-    原实现会误删别人的锁导致双跑。Lua 脚本保证 compare+delete 在 Redis
-    单线程内原子执行。比对的 owner 是进程唯一 token（见 lock_owner_token）。
-    """
-    r.eval(_RELEASE_LOCK_LUA, 1, f"monitor:lock:{loop_name}", lock_owner_token())
 
 
 def _renew_lock(r, loop_name: str, interval: int) -> bool:
     """续期轮询锁；仍持有返回 True，已易主 / 已过期返回 False。"""
     res = r.eval(
         _RENEW_LOCK_LUA, 1, f"monitor:lock:{loop_name}",
-        lock_owner_token(), str(_lock_ttl(interval)),
+        owner_token(), str(_lock_ttl(interval)),
     )
     return bool(res)
 
@@ -607,7 +562,7 @@ def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) 
                     logger.error("监控轮询一轮异常（已吞掉，继续循环） loop=%s", loop_name, exc_info=True)
                 finally:
                     try:
-                        _release_lock(r, loop_name)
+                        release_owner_lock(r, f"monitor:lock:{loop_name}")
                     except Exception:
                         logger.warning("监控轮询锁释放失败 loop=%s", loop_name, exc_info=True)
             from app.services.monitoring.adapters.base_adapter import get_orphan_count

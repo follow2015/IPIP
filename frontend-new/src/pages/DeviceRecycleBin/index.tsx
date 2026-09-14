@@ -1,6 +1,6 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm, type ConfirmFn } from '@/utils/confirm';
 import { useState, useCallback, useMemo } from 'react';
-import { Button, Space, Select, Tag, Input, Popconfirm, Typography, Alert, Modal } from 'antd';
+import { Button, Space, Select, Tag, Input, Typography, Alert, Modal } from 'antd';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
 import BatchActionBar from '@/components/BatchActionBar';
 import { DeleteOutlined, UndoOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
@@ -55,9 +55,11 @@ const deviceTypeOptions = Object.entries(DEVICE_TYPE_MAP).map(([value, { label }
 
 
 function buildColumns(handlers: {
+  confirm: ConfirmFn;
   onRestore: (r: Device) => void;
   onPermanentDelete: (r: Device) => void;
 }): any[] {
+  const { confirm } = handlers;
   return [
     {
       title: '设备名称',
@@ -118,18 +120,23 @@ function buildColumns(handlers: {
           <Button type="link" icon={<UndoOutlined />} onClick={() => handlers.onRestore(record)}>
             恢复
           </Button>
-          <Popconfirm
-            title="永久删除"
-            description="此操作不可恢复，确定要永久删除该设备吗？"
-            onConfirm={() => handlers.onPermanentDelete(record)}
-            okText="确定"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
+          <Button
+            type="link"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() =>
+              confirm({
+                title: '永久删除',
+                content: '此操作不可恢复，确定要永久删除该设备吗？',
+                okText: '确定',
+                cancelText: '取消',
+                okButtonProps: { danger: true },
+                onOk: () => handlers.onPermanentDelete(record)
+              })
+            }
           >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              永久删除
-            </Button>
-          </Popconfirm>
+            永久删除
+          </Button>
         </Space>
       )
     }
@@ -142,6 +149,7 @@ const RECYCLE_BIN_FILTER_RESETS = {
 };
 
 export default function DeviceRecycleBin() {
+  const confirm = useConfirm();
   const table = useTable({ filterResets: RECYCLE_BIN_FILTER_RESETS });
   const msg = useMessage();
 
@@ -306,11 +314,16 @@ export default function DeviceRecycleBin() {
         });
       }
     });
-  }, [batch, batchPermanentDeleteMutation, msg]);
+  }, [confirm, batch, batchPermanentDeleteMutation, msg]);
 
   const columns = useMemo(
-    () => buildColumns({ onRestore: handleRestore, onPermanentDelete: handlePermanentDelete }),
-    [handleRestore, handlePermanentDelete]
+    () =>
+      buildColumns({
+        confirm,
+        onRestore: handleRestore,
+        onPermanentDelete: handlePermanentDelete
+      }),
+    [confirm, handleRestore, handlePermanentDelete]
   );
 
   const toolbar = (

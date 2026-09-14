@@ -4,8 +4,8 @@
  * - AppLayout 作为 UI 状态的唯一订阅者，通过 Props 传递给子组件
  * - 子组件成为纯展示组件，易于测试和 Storybook 文档化
  */
-import React, { useEffect } from 'react';
-import { Layout, theme } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Layout, theme, Drawer } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -13,6 +13,7 @@ import TabBar from './TabBar';
 import { useUIStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
 import { useGlobalEvents } from '@/hooks/useGlobalEvents';
+import { useResponsive } from '@/hooks/useResponsive';
 import { findMenuByPath } from '@/constants/menu';
 
 const { Sider, Content } = Layout;
@@ -22,25 +23,38 @@ function AppLayout() {
   const location = useLocation();
   const { token } = theme.useToken();
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
-  const toggleSidebar    = useUIStore((s) => s.toggleSidebar);
-  const themeMode        = useUIStore((s) => s.theme);
-  const toggleTheme      = useUIStore((s) => s.toggleTheme);
-  const openTabs         = useUIStore((s) => s.openTabs);
-  const activeTabKey     = useUIStore((s) => s.activeTabKey);
-  const addTab           = useUIStore((s) => s.addTab);
-  const removeTab        = useUIStore((s) => s.removeTab);
-  const setActiveTab     = useUIStore((s) => s.setActiveTab);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const themeMode = useUIStore((s) => s.theme);
+  const toggleTheme = useUIStore((s) => s.toggleTheme);
+  const openTabs = useUIStore((s) => s.openTabs);
+  const activeTabKey = useUIStore((s) => s.activeTabKey);
+  const addTab = useUIStore((s) => s.addTab);
+  const removeTab = useUIStore((s) => s.removeTab);
+  const setActiveTab = useUIStore((s) => s.setActiveTab);
 
-  const user             = useAuthStore((s) => s.user);
-  const logout           = useAuthStore((s) => s.logout);
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   useGlobalEvents({ enabled: isAuthenticated });
 
+  const { isMobile } = useResponsive();
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isMobile) setDrawerOpen(false);
+  }, [isMobile]);
+
   useEffect(() => {
     const menu = findMenuByPath(location.pathname);
     if (menu) {
-      addTab({ key: menu.key, title: menu.label, path: menu.path, closable: menu.key !== 'dashboard' });
+      addTab({
+        key: menu.key,
+        title: menu.label,
+        path: menu.path,
+        closable: menu.key !== 'dashboard'
+      });
     }
   }, [location.pathname, addTab]);
 
@@ -51,40 +65,69 @@ function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider
-        trigger={null}
-        collapsible
-        collapsed={sidebarCollapsed}
-        width={220}
-        theme="light"
+      {isMobile ? (
+        <Drawer
+          placement="left"
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          width={220}
+          styles={{ body: { padding: 0 } }}
+        >
+          <Sidebar collapsed={false} onNavigate={() => setDrawerOpen(false)} />
+        </Drawer>
+      ) : (
+        <Sider
+          trigger={null}
+          collapsible
+          collapsed={sidebarCollapsed}
+          width={220}
+          theme="light"
+          style={{
+            overflow: 'auto',
+            height: '100vh',
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            borderRight: `1px solid ${token.colorBorderSecondary}`
+          }}
+        >
+          <Sidebar collapsed={sidebarCollapsed} />
+        </Sider>
+      )}
+      <Layout
         style={{
-          overflow: 'auto',
-          height: '100vh',
-          position: 'fixed',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          borderRight: `1px solid ${token.colorBorderSecondary}`,
+          marginLeft: isMobile ? 0 : sidebarCollapsed ? 80 : 220,
+          transition: 'margin-left 0.2s'
         }}
       >
-        <Sidebar collapsed={sidebarCollapsed} />
-      </Sider>
-      <Layout style={{ marginLeft: sidebarCollapsed ? 80 : 220, transition: 'margin-left 0.2s' }}>
         <Header
-          sidebarCollapsed={sidebarCollapsed}
-          onToggleSidebar={toggleSidebar}
+          sidebarCollapsed={isMobile ? false : sidebarCollapsed}
+          onToggleSidebar={isMobile ? () => setDrawerOpen(true) : toggleSidebar}
           theme={themeMode}
           onToggleTheme={toggleTheme}
           user={user}
           onLogout={handleLogout}
+          isMobile={isMobile}
         />
-        <TabBar
-          openTabs={openTabs}
-          activeTabKey={activeTabKey}
-          onRemoveTab={removeTab}
-          onSetActiveTab={setActiveTab}
-        />
-        <Content style={{ margin: 16, padding: 24, background: token.colorBgContainer, borderRadius: 8, minHeight: 280 }}>
+        {/* 移动端隐藏多标签栏：值守场景标签栏价值低且必然横向溢出 */}
+        {!isMobile && (
+          <TabBar
+            openTabs={openTabs}
+            activeTabKey={activeTabKey}
+            onRemoveTab={removeTab}
+            onSetActiveTab={setActiveTab}
+          />
+        )}
+        <Content
+          style={{
+            margin: isMobile ? 8 : 16,
+            padding: isMobile ? 12 : 24,
+            background: token.colorBgContainer,
+            borderRadius: 8,
+            minHeight: 280
+          }}
+        >
           <Outlet />
         </Content>
       </Layout>

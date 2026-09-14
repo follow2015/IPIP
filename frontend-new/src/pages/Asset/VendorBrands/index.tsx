@@ -45,6 +45,7 @@ export default function VendorBrandsPage() {
   const [form] = Form.useForm();
   const table = useTable({ initialPerPage: 50 });
 
+
   const openCreate = () => {
     setEditing(null);
     form.resetFields();
@@ -182,7 +183,7 @@ export default function VendorBrandsPage() {
       >
         <Form form={form} layout="vertical">
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="enterprise_no"
                 label="enterprise 号"
@@ -191,7 +192,7 @@ export default function VendorBrandsPage() {
                 <Input placeholder="674" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="device_type"
                 label="设备类型"
@@ -209,7 +210,7 @@ export default function VendorBrandsPage() {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="brand_name"
                 label="品牌全称"
@@ -218,7 +219,7 @@ export default function VendorBrandsPage() {
                 <Input placeholder="Dell EMC" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="label"
                 label="显示名称"
@@ -229,12 +230,12 @@ export default function VendorBrandsPage() {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="sort_order" label="排序">
                 <InputNumber min={0} max={999} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="enabled" label="启用" valuePropName="checked">
                 <Switch />
               </Form.Item>

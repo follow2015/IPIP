@@ -40,9 +40,9 @@ from app.services.monitoring.monitor_worker import (
     _LockWatchdog,
     _parse_whitelist,
     _redis_client,
-    _release_lock,
     _resolve_loop_interval,
 )
+from app.utils.concurrency.redis_lock import release_owner_lock
 from app.services.monitoring.protocol_registry import (
     build_adapter,
     device_types_for_loop,
@@ -204,10 +204,15 @@ class StandaloneMonitorService:
             return False
 
     def _release_lock(self, loop_name: str) -> None:
+        """释放本实例持有的轮询锁（守卫 use_redis_lock / 连接可用性）。
+
+        实际释放走公共原语 release_owner_lock（T2.6 前为跨模块导入
+        monitor_worker 的同名私有函数）。
+        """
         if not self.use_redis_lock or self._redis is None:
             return
         try:
-            _release_lock(self._redis, loop_name)
+            release_owner_lock(self._redis, f"monitor:lock:{loop_name}")
         except Exception:
             logger.warning("监控 Redis 锁释放失败 loop=%s", loop_name, exc_info=True)
 

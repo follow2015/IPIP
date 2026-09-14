@@ -22,8 +22,7 @@ import {
   Typography,
   Empty,
   Spin,
-  Button,
-  Table
+  Button
 } from 'antd';
 import { Line } from '@ant-design/charts';
 import {
@@ -48,6 +47,7 @@ import {
 } from '@/services/monitor';
 import { formatDateTime, translateProbeError, ensureUtc } from '@/utils/format';
 import { useMessage } from '@/hooks/useMessage';
+import { useResetPageOnDeps } from '@/hooks/useResetPageOnDeps';
 import { useTable } from '@/hooks/useTable';
 import DataTable from '@/components/DataTable';
 import dayjs from 'dayjs';
@@ -118,6 +118,10 @@ export default function MonitorHistory() {
   };
 
   const { data: history, isLoading: historyLoading } = useProbeHistory(deviceId, query);
+  const historyItems = history?.items ?? [];
+
+  const { setPage: setHistoryPage } = table;
+  useResetPageOnDeps(setHistoryPage, [deviceId, range, protocol]);
   const { data: trends, isLoading: trendsLoading } = useProbeTrends(deviceId, query);
 
   const [selectedMetricKey, setSelectedMetricKey] = useState<string | undefined>(undefined);
@@ -275,6 +279,27 @@ export default function MonitorHistory() {
       render: (v: string | null) => translateProbeError(v)
     }
   ];
+
+  const renderProbeCard = (r: ProbeHistoryItem) => (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <Text style={{ fontSize: 12 }}>{formatDateTime(r.probed_at)}</Text>
+        <Space size={4} wrap>
+          <Tag color="blue">{r.protocol}</Tag>
+          {r.reachable ? <Tag color="success">可达</Tag> : <Tag color="error">不可达</Tag>}
+          {r.is_alert && <Tag color="warning">告警</Tag>}
+        </Space>
+      </div>
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        延迟 {r.latency_ms == null ? '—' : `${r.latency_ms} ms`} · 连续失败 {r.consecutive_failures}
+      </Text>
+      {r.error && (
+        <Text type="danger" style={{ fontSize: 12 }}>
+          {translateProbeError(r.error)}
+        </Text>
+      )}
+    </Space>
+  );
 
   return (
     <div style={{ padding: 16 }}>
@@ -440,8 +465,10 @@ export default function MonitorHistory() {
           {/* P1-9: 指标当前值 */}
           {deviceId > 0 && (metricLatestData?.items ?? []).length > 0 && (
             <Card title="指标当前值" size="small" variant="borderless" style={{ marginTop: 16 }}>
-              <Table<DeviceMetricLatestItem>
+              <DataTable<DeviceMetricLatestItem>
                 size="small"
+                searchable={false}
+                showCard={false}
                 rowKey={(r) => `${r.metric_key}:${r.index_key}`}
                 dataSource={metricLatestData?.items ?? []}
                 pagination={false}
@@ -541,12 +568,14 @@ export default function MonitorHistory() {
           <Card title="最近探测明细" size="small" variant="borderless" style={{ marginTop: 16 }}>
             <DataTable<ProbeHistoryItem>
               columns={columns}
-              dataSource={history?.items ?? []}
+              dataSource={historyItems}
               rowKey={(r) => String(r.id)}
-              total={history?.items?.length ?? 0}
+              total={historyItems.length}
               searchable={false}
               showCard={false}
               tableProps={table}
+              mobileCardMode
+              cardRender={renderProbeCard}
             />
           </Card>
         </Spin>

@@ -8,6 +8,7 @@ from flask import Blueprint, request, g
 
 from app.api.base import APIResponse
 from app.openapi.doc import doc
+from app.utils.admin_guard import require_admin
 from app.utils.auth import login_required
 from app.utils.transactional import transactional
 from app.utils.logging import get_logger
@@ -26,23 +27,12 @@ _NUMERIC_RANGES = {
 }
 
 
-def _require_admin():
-    """检查当前用户是否为管理员。"""
-    from app.services.user_service import UserService
-    from app.persistence.user_repository import UserRepository
-    from app.persistence.user_log_repository import UserLogRepository
-
-    user_service = UserService(UserRepository(), UserLogRepository())
-    user = user_service.get_by_id(g.current_user["user_id"])
-    return bool(user and user.is_admin())
-
-
 @router.route("", methods=["GET"])
 @doc(summary="获取语音通知配置", tags=["语音配置"], responses={200: "VoiceConfig"})
 @login_required
 def get_voice_config():
     """获取语音通知配置（管理员），敏感字段脱敏。"""
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     from app.models.voice_setting import VoiceSetting
@@ -56,7 +46,7 @@ def get_voice_config():
 @transactional
 def update_voice_config():
     """更新语音通知配置（管理员）。"""
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     data = request.get_json() or {}
@@ -115,7 +105,7 @@ def test_voice_call():
         200 {task_id, receipt_id}：前端可提示"已发起，请留意手机"。
         呼叫结果经回调写入 receipt，可在通知中心查看。
     """
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     from app.models.user import User
@@ -184,7 +174,7 @@ def test_voice_call():
 @login_required
 def voice_channel_status():
     """返回语音渠道是否就绪及缺失的配置项，便于前端引导配置。"""
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     from app.models.voice_setting import VoiceSetting

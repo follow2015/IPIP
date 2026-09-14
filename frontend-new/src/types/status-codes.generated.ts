@@ -212,9 +212,9 @@ export const NOTIFICATION_TYPE_OPTIONS = [
   { label: '端口操作结果', value: 'port_action' },
   { label: '异步操作结果', value: 'async_action' },
   { label: '频率超限', value: 'rate_limit_exceeded' },
-  { label: 'SERVICE_UNHEALTHY', value: 'service_unhealthy' },
-  { label: 'SERVICE_RECOVERED', value: 'service_recovered' },
-  { label: 'ASSET_WARRANTY_ALERT', value: 'asset_warranty_alert' },
+  { label: '服务异常', value: 'service_unhealthy' },
+  { label: '服务恢复', value: 'service_recovered' },
+  { label: '资产到期提醒', value: 'asset_warranty_alert' },
 ];
 
 export enum ProbeErrorCode {
@@ -284,17 +284,39 @@ export const IP_AUDIT_ACTION_OPTIONS = [
   { label: '解封', value: 'unban' },
 ];
 
+export enum SwitchDeviceType {
+  HUAWEI = 'huawei',
+  H3C = 'h3c',
+  CISCO = 'cisco',
+}
+
+export const SWITCH_DEVICE_TYPE_OPTIONS = [
+  { label: '华为', value: 'huawei' },
+  { label: 'H3C', value: 'h3c' },
+  { label: '思科', value: 'cisco' },
+];
+
+export enum SSHProtocol {
+  SSH = 'ssh',
+  TELNET = 'telnet',
+}
+
+export const SSH_PROTOCOL_OPTIONS = [
+  { label: 'SSH', value: 'ssh' },
+  { label: 'Telnet', value: 'telnet' },
+];
+
 export const NOTIFICATION_TYPE_GROUP_OPTIONS = [
   {
     label: '监控告警',
     options: [
       { value: 'device_unreachable', label: '设备不可达' },
       { value: 'device_recovered', label: '设备恢复' },
-      { value: 'temperature_alert', label: 'temperature_alert' },
-      { value: 'disk_failure_alert', label: 'disk_failure_alert' },
-      { value: 'port_status_changed', label: 'port_status_changed' },
-      { value: 'monitor_interrupted', label: 'monitor_interrupted' },
-      { value: 'raid_failure_alert', label: 'raid_failure_alert' },
+      { value: 'temperature_alert', label: '温度告警' },
+      { value: 'disk_failure_alert', label: '硬盘故障' },
+      { value: 'port_status_changed', label: '端口状态变化' },
+      { value: 'monitor_interrupted', label: '监控中断' },
+      { value: 'raid_failure_alert', label: 'RAID故障' },
     ],
   },
   {
@@ -327,6 +349,8 @@ export const NOTIFICATION_TYPE_GROUP_OPTIONS = [
     label: '运维告警',
     options: [
       { value: 'rate_limit_exceeded', label: '频率超限' },
+      { value: 'service_unhealthy', label: '服务异常' },
+      { value: 'service_recovered', label: '服务恢复' },
     ],
   },
   {

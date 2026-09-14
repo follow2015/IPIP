@@ -24,7 +24,15 @@ const nodeGlobals = {
 
 export default tseslint.config(
   {
-    ignores: ['dist', 'coverage', 'node_modules', 'src/types/api-generated.ts']
+    // 生成物不参与 lint：status-codes.generated.ts 与 api-generated.ts 同源，
+    // 且其生成器 --check 为字节级比较，任何 --fix 改写都会让 check-enums 失败。
+    ignores: [
+      'dist',
+      'coverage',
+      'node_modules',
+      'src/types/api-generated.ts',
+      'src/types/status-codes.generated.ts'
+    ]
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

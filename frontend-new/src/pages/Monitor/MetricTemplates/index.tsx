@@ -29,8 +29,9 @@ import {
   CheckOutlined,
   StopOutlined
 } from '@ant-design/icons';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useMessage } from '@/hooks/useMessage';
+import { useResetPageOnDeps } from '@/hooks/useResetPageOnDeps';
 import { useTable } from '@/hooks/useTable';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
 import DataTable from '@/components/DataTable';
@@ -61,6 +62,7 @@ import MetricTemplateGroupsSection from './MetricTemplateGroupsSection';
 const { Text } = Typography;
 
 export default function MetricTemplatesPage() {
+  const confirm = useConfirm();
   const { data, isLoading } = useMetricTemplates();
   const upsert = useUpsertMetricTemplate();
   const deleteMutation = useDeleteMetricTemplate();
@@ -88,6 +90,8 @@ export default function MetricTemplatesPage() {
   const [filterDeviceType, setFilterDeviceType] = useState<string | undefined>(undefined);
   const [filterSource, setFilterSource] = useState<string | undefined>(undefined);
   const [filterEnabled, setFilterEnabled] = useState<string | undefined>(undefined);
+
+  useResetPageOnDeps(table.setPage, [search, filterDeviceType, filterSource, filterEnabled]);
 
   const allItems: MetricTemplateItem[] = data?.items ?? [];
 
@@ -379,13 +383,13 @@ export default function MetricTemplatesPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Card variant="borderless">
         <Row gutter={16}>
-          <Col span={4}>
+          <Col xs={12} md={4}>
             <Statistic title="模板总数" value={stats.total} />
           </Col>
-          <Col span={4}>
+          <Col xs={12} md={4}>
             <Statistic title="已启用" value={stats.enabled} />
           </Col>
-          <Col span={16}>
+          <Col xs={24} md={16}>
             <Statistic
               title="设备类型分布"
               valueRender={() => (

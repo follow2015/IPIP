@@ -1,16 +1,3 @@
-/**
- * 枚举常量与标签映射（前端枚举分层）
- *
- * 单一真相源原则：
- * 1. 后端派生的状态枚举 / 映射 —— 由 app/core/enums.py 经
- *    scripts/generate_frontend_enums.py 自动生成到 ./status-codes.generated.ts。
- *    本文件通过 `export *` 透传，**请勿在此手改后端枚举**（改 enums.py 后运行 `make sync-enums`）。
- * 2. L2 前端独有（API 约定 / 纯展示）枚举与映射 —— 见下方区块，手工维护：
- *    - 设备主类型 / 子类型（前端分类，与后端 cabinet_utils.DeviceType 不同）
- *    - LinkType / ImportExportType / SSHAction / SWITCH_DEVICE_TYPE_OPTIONS（API 约定）
- *    - 端口占用 PORT_USAGE_STATUS_MAP、链路 LINK_STATUS_MAP、节点 NODE_STATUS_MAP、
- *      连接 CONNECTION_STATUS_MAP、登录 LOGIN_TYPE_MAP、认证 AUTH_METHOD_OPTIONS（纯展示）
- */
 
 export * from './status-codes.generated';
 
@@ -103,11 +90,6 @@ export enum SSHAction {
   DELETE_CONFIG = 'delete_config'
 }
 
-export const SWITCH_DEVICE_TYPE_OPTIONS = [
-  { label: '华为', value: 'huawei' },
-  { label: '思科', value: 'cisco' },
-  { label: 'H3C', value: 'h3c' }
-];
 
 
 /**
@@ -186,11 +168,6 @@ export const AUTH_METHOD_OPTIONS = [
 ];
 
 
-export const SSH_PROTOCOL_OPTIONS = [
-  { label: 'SSH', value: 'ssh' },
-  { label: 'Telnet', value: 'telnet' }
-];
-
 
 export const MONITOR_PROTOCOL_OPTIONS = [
   { value: 'snmp', label: 'SNMP' },
@@ -242,6 +219,7 @@ export const SEVERITY_LABELS: Record<string, string> = {
 export const CHANNEL_LABELS: Record<string, string> = {
   inbox: '站内信',
   email: '邮件',
+  voice: '语音通知',
   wechat_work: '企业微信',
   feishu: '飞书',
   dingtalk: '钉钉',
@@ -251,6 +229,7 @@ export const CHANNEL_LABELS: Record<string, string> = {
 export const CHANNEL_COLORS: Record<string, string> = {
   inbox: 'blue',
   email: 'cyan',
+  voice: 'purple',
   wechat_work: 'green',
   feishu: 'blue',
   dingtalk: 'geekblue',

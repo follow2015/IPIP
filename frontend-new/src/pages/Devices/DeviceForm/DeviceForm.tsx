@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Form, Input, Row, Col, Modal } from 'antd';
 import dayjs from 'dayjs';
@@ -76,6 +76,7 @@ function DeviceForm({
   defaultDeviceType,
   editDeviceId
 }: DeviceFormProps) {
+  const confirm = useConfirm();
   const [form] = Form.useForm();
   const message = useMessage();
   const createDevice = useCreateDevice();
@@ -478,20 +479,23 @@ function DeviceForm({
     [form]
   );
 
-  const handleGenerateNodesChange = useCallback((checked: boolean) => {
-    setGenerateNodes(checked);
-    if (checked) {
-      confirm({
-        title: '生成子节点',
-        content:
-          '勾选后，保存时将自动创建所有子节点（包括已经存在的子节点），并使用下方输入的硬件配置统一设置所有子节点。确定？',
-        okText: '确定',
-        cancelText: '取消',
-        onOk: () => {},
-        onCancel: () => setGenerateNodes(false)
-      });
-    }
-  }, []);
+  const handleGenerateNodesChange = useCallback(
+    (checked: boolean) => {
+      setGenerateNodes(checked);
+      if (checked) {
+        confirm({
+          title: '生成子节点',
+          content:
+            '勾选后，保存时将自动创建所有子节点（包括已经存在的子节点），并使用下方输入的硬件配置统一设置所有子节点。确定？',
+          okText: '确定',
+          cancelText: '取消',
+          onOk: () => {},
+          onCancel: () => setGenerateNodes(false)
+        });
+      }
+    },
+    [confirm]
+  );
 
   const currentDeviceId = editRecord?.id;
 

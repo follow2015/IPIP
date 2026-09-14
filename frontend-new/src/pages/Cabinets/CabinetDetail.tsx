@@ -23,8 +23,7 @@ import type {
 } from '@/components/UPositionSelector/UPositionSelector';
 import { formatDateTime } from '@/utils/format';
 import { useMessage } from '@/hooks/useMessage';
-import { CABINET_STATUS_MAP } from '@/types/enums';
-import { DeviceStatusCode } from '@/types/status-codes.generated';
+import { CABINET_STATUS_MAP, DeviceStatusCode } from '@/types/enums';
 import type { Cabinet, Device } from '@/types/models';
 
 function renderStatus(v: number) {
@@ -165,7 +164,7 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
       </div>
 
       <Card title={`机柜详情 - ${c.cabinet_number}`}>
-        <Descriptions column={2} bordered size="small">
+        <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
           <Descriptions.Item label="机柜编号">{c.cabinet_number}</Descriptions.Item>
           <Descriptions.Item label="状态">{renderStatus(c.status)}</Descriptions.Item>
           <Descriptions.Item label="所属机房">{c.room_name}</Descriptions.Item>

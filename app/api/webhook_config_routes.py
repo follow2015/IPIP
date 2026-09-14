@@ -14,6 +14,7 @@ from app.api.base import APIResponse
 from app.openapi.doc import doc
 from app.models.webhook_config import validate_webhook_url
 from app.services.webhook_config_service import webhook_config_service
+from app.utils.admin_guard import require_admin
 from app.utils.auth import login_required
 from app.utils.http_client import post_json
 from app.utils.transactional import transactional
@@ -25,24 +26,12 @@ logger = get_logger(__name__)
 router = Blueprint("webhook_configs", __name__, url_prefix="/api/webhook-configs")
 
 
-def _require_admin():
-    """检查当前用户是否为管理员"""
-    from app.services.user_service import UserService
-    from app.persistence.user_repository import UserRepository
-    from app.persistence.user_log_repository import UserLogRepository
-    user_service = UserService(UserRepository(), UserLogRepository())
-    user = user_service.get_by_id(g.current_user["user_id"])
-    if not user or not user.is_admin():
-        return False
-    return True
-
-
 @router.route("", methods=["GET"])
 @doc(summary="列出 Webhook 配置", tags=["Webhook配置"], responses={200: "ApiResponse"})
 @login_required
 def list_webhook_configs():
     """列出所有 Webhook 配置（管理员）。"""
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     data = webhook_config_service.list_configs()
@@ -55,7 +44,7 @@ def list_webhook_configs():
 @transactional
 def create_webhook_config():
     """创建 Webhook 配置（管理员）。"""
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     data = request.get_json(silent=True) or {}
@@ -79,7 +68,7 @@ def create_webhook_config():
 @transactional
 def update_webhook_config(config_id):
     """更新 Webhook 配置（管理员）。"""
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     data = request.get_json(silent=True) or {}
@@ -99,7 +88,7 @@ def update_webhook_config(config_id):
 @transactional
 def delete_webhook_config(config_id):
     """删除 Webhook 配置（管理员）。"""
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     result = webhook_config_service.delete_config(config_id)
@@ -116,7 +105,7 @@ def test_webhook_config(config_id):
 
     发送一条测试消息到 Webhook URL，验证配置是否正确。
     """
-    if not _require_admin():
+    if not require_admin():
         return APIResponse.error("权限不足", "FORBIDDEN", 403)
 
     config = webhook_config_service.get_config(config_id)

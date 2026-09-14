@@ -3,8 +3,9 @@
  * - Card(基本信息) + Card(资源统计)
  */
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Button, Descriptions, Spin, Result, message, Table, Tag } from 'antd';
+import { Card, Button, Descriptions, Spin, Result, Table, Tag } from 'antd';
 import { ArrowLeftOutlined, DownloadOutlined } from '@ant-design/icons';
+import { useMessage } from '@/hooks/useMessage';
 import {
   useCustomerSuspenseDetail,
   useCustomerAssets,
@@ -36,6 +37,7 @@ function CustomerDetail() {
 }
 
 function CustomerDetailContent({ customerId }: { customerId: number }) {
+  const message = useMessage();
   const navigate = useNavigate();
   const { data: customer } = useCustomerSuspenseDetail(customerId);
   const { data: assetsData, isLoading: assetsLoading } = useCustomerAssets(customerId);
@@ -68,7 +70,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
 
       {/* 基本信息 Card */}
       <Card title={`客户详情 - ${customer.customer_name}`}>
-        <Descriptions column={2} bordered size="small">
+        <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
           <Descriptions.Item label="客户名称">{customer.customer_name}</Descriptions.Item>
           <Descriptions.Item label="状态">
             <StatusTag status={customer.customer_status} statusMap={CUSTOMER_STATUS_MAP} />
@@ -96,7 +98,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
         {assetsLoading ? (
           <Spin description="加载中..." />
         ) : assetsData ? (
-          <Descriptions column={2} bordered size="small">
+          <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
             <Descriptions.Item label="机房数">{s?.total_rooms ?? 0}</Descriptions.Item>
             <Descriptions.Item label="机柜数">{s?.total_cabinets ?? 0}</Descriptions.Item>
             <Descriptions.Item label="整柜租赁">{s?.full_cabinets ?? 0}</Descriptions.Item>
@@ -173,6 +175,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
                   )
                 }
               ]}
+              scroll={{ x: 'max-content' }}
             />
           ) : (
             <span>暂无终止存档</span>

@@ -50,7 +50,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                   borderBottom: '1px dashed #f0f0f0'
                 }}
               >
-                <Col span={6}>
+                <Col xs={12} md={6}>
                   <Form.Item
                     {...restField}
                     name={[name, 'template']}
@@ -61,7 +61,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                     <Select options={PORT_TYPE_TEMPLATES} placeholder="选择类型" size="small" />
                   </Form.Item>
                 </Col>
-                <Col span={3}>
+                <Col xs={12} md={3}>
                   <Form.Item
                     {...restField}
                     name={[name, 'slot']}
@@ -72,7 +72,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                     <InputNumber min={0} max={99} style={{ width: '100%' }} size="small" />
                   </Form.Item>
                 </Col>
-                <Col span={3}>
+                <Col xs={12} md={3}>
                   <Form.Item
                     {...restField}
                     name={[name, 'card']}
@@ -83,7 +83,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                     <InputNumber min={0} max={99} style={{ width: '100%' }} size="small" />
                   </Form.Item>
                 </Col>
-                <Col span={4}>
+                <Col xs={12} md={4}>
                   <Form.Item
                     {...restField}
                     name={[name, 'start']}
@@ -94,7 +94,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                     <InputNumber min={0} max={9999} style={{ width: '100%' }} size="small" />
                   </Form.Item>
                 </Col>
-                <Col span={4}>
+                <Col xs={12} md={4}>
                   <Form.Item
                     {...restField}
                     name={[name, 'end']}
@@ -105,7 +105,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                     <InputNumber min={0} max={9999} style={{ width: '100%' }} size="small" />
                   </Form.Item>
                 </Col>
-                <Col span={3} style={{ textAlign: 'right', paddingTop: 22 }}>
+                <Col xs={12} md={3} style={{ textAlign: 'right', paddingTop: 22 }}>
                   {fields.length > 1 && (
                     <Button
                       type="text"

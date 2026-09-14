@@ -9,7 +9,7 @@ import { useSyncSwitchPorts } from '@/services/switch';
 import { usePortAction } from '@/hooks/usePortAction';
 import { useDeviceEvents } from '@/hooks/useDeviceEvents';
 import { useMessage } from '@/hooks/useMessage';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { startPolling } from './portSortFilter';
 
 interface UsePortSyncArgs {
@@ -27,6 +27,7 @@ export function usePortSync({
   scheduleClearHighlight,
   hasSsh = true
 }: UsePortSyncArgs) {
+  const confirm = useConfirm();
   const message = useMessage();
   const syncSwitchPorts = useSyncSwitchPorts();
   const cancelPollingRef = useRef<(() => void) | null>(null);

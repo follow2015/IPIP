@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, Table, Tag, Button, Space, Statistic, Row, Col, Empty, Tooltip } from 'antd';
+import { Card, Tag, Button, Space, Statistic, Row, Col, Empty, Tooltip } from 'antd';
+import DataTable from '@/components/DataTable';
 import {
   ReloadOutlined,
   DashboardOutlined,
@@ -19,7 +20,7 @@ import {
   type AIMetrics
 } from '@/services/ai';
 import { useMessage } from '@/hooks/useMessage';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 
 const META_KEYS = new Set(['metrics_source', 'pid']);
 
@@ -39,6 +40,7 @@ const METRIC_LABELS: Record<string, string> = {
 };
 
 export default function AIMonitor() {
+  const confirm = useConfirm();
   const [circuits, setCircuits] = useState<CircuitStatus[]>([]);
   const [metrics, setMetrics] = useState<AIMetrics | null>(null);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
@@ -314,7 +316,7 @@ export default function AIMonitor() {
         {circuits.length === 0 ? (
           <Empty description="暂无熔断器记录（无 AI 调用发生）" />
         ) : (
-          <Table
+          <DataTable
             rowKey="name"
             columns={columns}
             dataSource={circuits}
@@ -322,6 +324,8 @@ export default function AIMonitor() {
             pagination={false}
             size="middle"
             scroll={{ x: 'max-content' }}
+            showCard={false}
+            searchable={false}
           />
         )}
       </Card>

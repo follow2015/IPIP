@@ -303,7 +303,7 @@ function ImportPanel() {
         <Card title="导入结果" styles={{ body: { padding: 16 } }}>
           <Space orientation="vertical" style={{ width: '100%' }} size="middle">
             <Row gutter={16}>
-              <Col span={6}>
+              <Col xs={12} md={6}>
                 <Card size="small" styles={{ body: { textAlign: 'center', padding: '12px 0' } }}>
                   <Title level={3} style={{ color: '#52c41a', margin: 0 }}>
                     {importResult.imported_count}
@@ -311,7 +311,7 @@ function ImportPanel() {
                   <Text type="secondary">成功导入</Text>
                 </Card>
               </Col>
-              <Col span={6}>
+              <Col xs={12} md={6}>
                 <Card size="small" styles={{ body: { textAlign: 'center', padding: '12px 0' } }}>
                   <Title
                     level={3}
@@ -332,6 +332,7 @@ function ImportPanel() {
                 dataSource={importResult.failed_rows.map((r, i) => ({ ...r, key: i }))}
                 size="small"
                 pagination={{ pageSize: 10, size: 'small' }}
+                scroll={{ x: 'max-content' }}
               />
             )}
             <Button onClick={handleReset}>继续导入</Button>

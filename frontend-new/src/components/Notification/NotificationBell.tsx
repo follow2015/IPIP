@@ -5,18 +5,8 @@
  * 未读数通过 TanStack Query 15s 轮询刷新，不使用 SSE 长连接。
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  Badge,
-  Popover,
-  List,
-  Button,
-  Empty,
-  Space,
-  Tag,
-  Typography,
-  theme,
-  Popconfirm
-} from 'antd';
+import { Badge, Popover, List, Button, Empty, Space, Tag, Typography, theme } from 'antd';
+import { useConfirm } from '@/utils/confirm';
 import { BellOutlined, CheckOutlined, DeleteOutlined, ClearOutlined } from '@ant-design/icons';
 import {
   useUnreadCount,
@@ -106,6 +96,7 @@ function formatTime(iso: string | null): string {
 }
 
 function NotificationBell() {
+  const confirm = useConfirm();
   const { token } = theme.useToken();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
@@ -178,23 +169,24 @@ function NotificationBell() {
         </Text>
         <Space size={4}>
           {hasReadItems && (
-            <Popconfirm
-              title="确认清除所有已读消息？"
-              description="未读消息将保留"
-              onConfirm={handleClearRead}
-              okText="清除"
-              cancelText="取消"
-              okButtonProps={{ danger: true, size: 'small' }}
+            <Button
+              type="link"
+              size="small"
+              icon={<ClearOutlined />}
+              style={{ padding: 0, fontSize: 12 }}
+              onClick={() =>
+                confirm({
+                  title: '确认清除所有已读消息？',
+                  content: '未读消息将保留',
+                  okText: '清除',
+                  cancelText: '取消',
+                  okButtonProps: { danger: true, size: 'small' },
+                  onOk: handleClearRead
+                })
+              }
             >
-              <Button
-                type="link"
-                size="small"
-                icon={<ClearOutlined />}
-                style={{ padding: 0, fontSize: 12 }}
-              >
-                清除已读
-              </Button>
-            </Popconfirm>
+              清除已读
+            </Button>
           )}
           {unreadCount > 0 && (
             <Button

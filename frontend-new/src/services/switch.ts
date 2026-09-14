@@ -5,7 +5,7 @@
  * 对齐后端 /api/switch/* 端点
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { get, post, put } from './api-client';
+import { get, getMaybe, post, put } from './api-client';
 import { createCrudHooks } from './crud-factory';
 import { queryKeys } from './query-keys';
 import { useInvalidatingMutation } from '@/hooks/useInvalidatingMutation';
@@ -141,11 +141,11 @@ export function useSyncSwitchInfo() {
 export function useSwitchPortDetail(switchId: number, port: string, enabled: boolean = false) {
   return useQuery({
     queryKey: queryKeys.switches.portDetail(switchId, port),
-    queryFn: async () => {
-      const res = await get<SwitchPortDetail>(
+    queryFn: async (): Promise<SwitchPortDetail | null> => {
+      const res = await getMaybe<SwitchPortDetail>(
         `/switch/${switchId}/ports/${encodeURIComponent(port)}`
       );
-      return res.data;
+      return res.data ?? null;
     },
     enabled: enabled && switchId > 0 && !!port
   });

@@ -5,7 +5,8 @@
  * - 登录记录（限制为当前用户）
  */
 import { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Tabs, Table, Tag, Space } from 'antd';
+import { Card, Form, Input, Button, Tabs, Tag, Space } from 'antd';
+import DataTable from '@/components/DataTable';
 import { UserOutlined, LockOutlined, HistoryOutlined, SaveOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/auth';
 import {
@@ -336,7 +337,7 @@ function ProfilePage() {
             ),
             children: (
               <Card>
-                <Table<LoginLog>
+                <DataTable<LoginLog>
                   columns={logColumns}
                   dataSource={loginLogsData?.items ?? []}
                   loading={logsLoading}
@@ -353,6 +354,9 @@ function ProfilePage() {
                     }
                   }}
                   size="small"
+                  scroll={{ x: 'max-content' }}
+                  showCard={false}
+                  searchable={false}
                 />
               </Card>
             )

@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Select, Button, Table, Tag, Alert, Space, Typography, message } from 'antd';
+import { Modal, Select, Button, Table, Tag, Alert, Space, Typography } from 'antd';
 import { NodeIndexOutlined, CheckOutlined } from '@ant-design/icons';
 import { useDiscoverTopology, useApplyDiscoveredTopology } from '@/services/topology';
+import { useResponsive } from '@/hooks/useResponsive';
+import { useMessage } from '@/hooks/useMessage';
 import { useSwitchOptions } from '@/services/switch';
 import type {
   TopologyDiscoverySuggestion,
@@ -33,6 +35,8 @@ interface LldpDiscoveryModalProps {
 }
 
 const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, roomId }) => {
+  const message = useMessage();
+  const { isMobile } = useResponsive();
   const [selectedSwitchIds, setSelectedSwitchIds] = useState<number[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [results, setResults] = useState<TopologyDiscoverySwitchResult[]>([]);
@@ -175,7 +179,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
       }
       open={open}
       onCancel={onClose}
-      width={860}
+      width={isMobile ? 'calc(100vw - 24px)' : 860}
       footer={[
         <Button key="cancel" onClick={onClose}>
           关闭
@@ -245,6 +249,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
             })
           }}
           locale={{ emptyText: '选择交换机后点击"开始发现"' }}
+          scroll={{ x: 'max-content' }}
         />
       </Space>
     </Modal>

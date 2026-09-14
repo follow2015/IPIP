@@ -5,7 +5,8 @@
  */
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Table, DatePicker, Select, Space, Card, Tag, Button } from 'antd';
+import { DatePicker, Select, Space, Card, Tag, Button } from 'antd';
+import DataTable from '@/components/DataTable';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAllLoginLogs, type LoginLogQueryParams, type LoginLog } from '@/services/user';
@@ -25,7 +26,7 @@ function LoginLogs() {
   const { data: usersData } = useUserList({ per_page: 999 });
   const userOptions = (usersData?.items ?? []).map((u) => ({
     label: `${u.name || u.username}${u.department ? ` (${u.department})` : ''}`,
-    value: u.id,
+    value: u.id
   }));
 
   useEffect(() => {
@@ -40,7 +41,7 @@ function LoginLogs() {
     per_page: pageSize,
     ...(userId ? { user_id: userId } : {}),
     ...(dateRange?.[0] ? { start_time: dateRange[0]!.startOf('day').toISOString() } : {}),
-    ...(dateRange?.[1] ? { end_time: dateRange[1]!.endOf('day').toISOString() } : {}),
+    ...(dateRange?.[1] ? { end_time: dateRange[1]!.endOf('day').toISOString() } : {})
   };
 
   const { data, isLoading, refetch } = useAllLoginLogs(queryParams);
@@ -57,28 +58,28 @@ function LoginLogs() {
       dataIndex: 'login_time',
       key: 'login_time',
       width: 180,
-      render: (v: string) => formatDateTime(v),
+      render: (v: string) => formatDateTime(v)
     },
     {
       title: '用户姓名',
       dataIndex: 'name',
       key: 'name',
       width: 120,
-      render: (v: string | null) => v || '-',
+      render: (v: string | null) => v || '-'
     },
     {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
       width: 120,
-      render: (v: string | null) => v || '-',
+      render: (v: string | null) => v || '-'
     },
     {
       title: 'IP地址',
       dataIndex: 'login_ip',
       key: 'login_ip',
       width: 140,
-      render: (v: string | null) => v || '-',
+      render: (v: string | null) => v || '-'
     },
     {
       title: '登录类型',
@@ -88,15 +89,15 @@ function LoginLogs() {
       render: (v: string) => {
         const m = LOGIN_TYPE_MAP[v];
         return <Tag color={m?.color ?? 'default'}>{(m?.label ?? v) || 'Web'}</Tag>;
-      },
+      }
     },
     {
       title: '设备/浏览器',
       dataIndex: 'user_agent',
       key: 'user_agent',
       render: (v: string | null) => v || '-',
-      ellipsis: true,
-    },
+      ellipsis: true
+    }
   ];
 
   return (
@@ -106,7 +107,10 @@ function LoginLogs() {
         <span style={{ color: '#666' }}>用户：</span>
         <Select
           value={userId}
-          onChange={(v) => { setUserId(v); setPage(1); }}
+          onChange={(v) => {
+            setUserId(v);
+            setPage(1);
+          }}
           placeholder="全部用户"
           allowClear
           style={{ width: 200 }}
@@ -115,10 +119,20 @@ function LoginLogs() {
         <span style={{ color: '#666' }}>时间：</span>
         <RangePicker
           value={dateRange}
-          onChange={(dates) => { setDateRange(dates); setPage(1); }}
+          onChange={(dates) => {
+            setDateRange(dates);
+            setPage(1);
+          }}
           style={{ width: 280 }}
         />
-        <Button icon={<SearchOutlined />} type="primary" onClick={() => { setPage(1); refetch(); }}>
+        <Button
+          icon={<SearchOutlined />}
+          type="primary"
+          onClick={() => {
+            setPage(1);
+            refetch();
+          }}
+        >
           查询
         </Button>
         <Button icon={<ReloadOutlined />} onClick={handleReset}>
@@ -127,7 +141,7 @@ function LoginLogs() {
       </Space>
 
       {/* 日志表格 */}
-      <Table<LoginLog>
+      <DataTable<LoginLog>
         columns={columns}
         dataSource={data?.items ?? []}
         loading={isLoading}
@@ -138,9 +152,15 @@ function LoginLogs() {
           current: page,
           showTotal: (t) => `共 ${t} 条`,
           showSizeChanger: true,
-          onChange: (p, ps) => { setPage(p); setPageSize(ps); },
+          onChange: (p, ps) => {
+            setPage(p);
+            setPageSize(ps);
+          }
         }}
         size="small"
+        scroll={{ x: 'max-content' }}
+        showCard={false}
+        searchable={false}
       />
     </Card>
   );

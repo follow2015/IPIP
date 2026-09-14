@@ -42,12 +42,13 @@ import {
 } from '@/services/ai';
 import { usePermission } from '@/hooks/usePermission';
 import { useMessage } from '@/hooks/useMessage';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { ConfirmButton } from '@/components/ConfirmButton';
 
 const { Paragraph, Text } = Typography;
 
 export default function RAGPage() {
+  const confirm = useConfirm();
   const [status, setStatus] = useState<RagStatus | null>(null);
   const [docs, setDocs] = useState<RagDoc[]>([]);
   const [loading, setLoading] = useState(false);
@@ -308,7 +309,7 @@ export default function RAGPage() {
                 }
               >
                 <Row gutter={16} style={{ marginBottom: 24 }}>
-                  <Col span={6}>
+                  <Col xs={12} md={6}>
                     <Statistic
                       title="知识库状态"
                       valueRender={() =>
@@ -320,7 +321,7 @@ export default function RAGPage() {
                       }
                     />
                   </Col>
-                  <Col span={6}>
+                  <Col xs={12} md={6}>
                     <Statistic title="文档总数" value={status?.doc_count ?? 0} />
                   </Col>
                 </Row>
@@ -447,6 +448,7 @@ export default function RAGPage() {
                       )
                     }
                   ]}
+                  scroll={{ x: 'max-content' }}
                 />
               </Card>
             </Space>

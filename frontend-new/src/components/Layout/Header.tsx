@@ -12,7 +12,7 @@ import {
   LogoutOutlined,
   UserOutlined,
   BulbOutlined,
-  SettingOutlined,
+  SettingOutlined
 } from '@ant-design/icons';
 import type { User } from '@/types/models';
 import NotificationBell from '@/components/Notification/NotificationBell';
@@ -24,36 +24,57 @@ interface HeaderProps {
   onToggleTheme: () => void;
   user: User | null;
   onLogout: () => void;
+  isMobile?: boolean;
 }
 
 const { Header: AntHeader } = Layout;
 
-function Header({ sidebarCollapsed, onToggleSidebar, theme: themeMode, onToggleTheme, user, onLogout }: HeaderProps) {
+function Header({
+  sidebarCollapsed,
+  onToggleSidebar,
+  theme: themeMode,
+  onToggleTheme,
+  user,
+  onLogout,
+  isMobile = false
+}: HeaderProps) {
   const { token } = theme.useToken();
   const navigate = useNavigate();
 
   const userMenuItems = [
+    ...(isMobile
+      ? [
+          {
+            key: 'theme',
+            icon: <BulbOutlined />,
+            label: themeMode === 'light' ? '切换深色模式' : '切换浅色模式',
+            onClick: onToggleTheme
+          },
+          { key: 'divider-theme', type: 'divider' as const }
+        ]
+      : []),
     {
       key: 'profile',
       icon: <SettingOutlined />,
       label: '用户中心',
-      onClick: () => navigate('/profile'),
+      onClick: () => navigate('/profile')
     },
     {
-      type: 'divider' as const,
+      key: 'divider-account',
+      type: 'divider' as const
     },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
       label: '退出登录',
-      onClick: onLogout,
-    },
+      onClick: onLogout
+    }
   ];
 
   return (
     <AntHeader
       style={{
-        padding: '0 24px',
+        padding: isMobile ? '0 12px' : '0 24px',
         background: token.colorBgContainer,
         display: 'flex',
         alignItems: 'center',
@@ -61,7 +82,7 @@ function Header({ sidebarCollapsed, onToggleSidebar, theme: themeMode, onToggleT
         borderBottom: `1px solid ${token.colorBorderSecondary}`,
         position: 'sticky',
         top: 0,
-        zIndex: 1,
+        zIndex: 1
       }}
     >
       <Space>
@@ -71,18 +92,20 @@ function Header({ sidebarCollapsed, onToggleSidebar, theme: themeMode, onToggleT
           onClick={onToggleSidebar}
         />
       </Space>
-      <Space size="middle">
+      <Space size={isMobile ? 'small' : 'middle'}>
         <NotificationBell />
-        <Button
-          type="text"
-          icon={<BulbOutlined />}
-          onClick={onToggleTheme}
-          title={themeMode === 'light' ? '切换深色模式' : '切换浅色模式'}
-        />
+        {!isMobile && (
+          <Button
+            type="text"
+            icon={<BulbOutlined />}
+            onClick={onToggleTheme}
+            title={themeMode === 'light' ? '切换深色模式' : '切换浅色模式'}
+          />
+        )}
         <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-          <Space style={{ cursor: 'pointer' }}>
+          <Space style={{ cursor: 'pointer' }} size={4}>
             <Avatar size="small" icon={<UserOutlined />} />
-            <span>{user?.username ?? '未登录'}</span>
+            {!isMobile && <span>{user?.username ?? '未登录'}</span>}
           </Space>
         </Dropdown>
       </Space>

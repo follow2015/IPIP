@@ -112,10 +112,10 @@ class MonitorOutboxSender:
         if r is None:
             return True
         try:
-            from app.services.monitoring.monitor_worker import lock_owner_token
+            from app.utils.concurrency.redis_lock import owner_token
 
             ok = bool(r.set(
-                f"monitor:lock:{self.LOCK_NAME}", lock_owner_token(),
+                f"monitor:lock:{self.LOCK_NAME}", owner_token(),
                 nx=True, ex=self._lock_ttl(),
             ))
             if not ok:
@@ -130,9 +130,9 @@ class MonitorOutboxSender:
         if self._redis is None:
             return
         try:
-            from app.services.monitoring.monitor_worker import _release_lock
+            from app.utils.concurrency.redis_lock import release_owner_lock
 
-            _release_lock(self._redis, self.LOCK_NAME)
+            release_owner_lock(self._redis, f"monitor:lock:{self.LOCK_NAME}")
         except Exception:
             logger.warning("outbox 互斥锁释放失败（TTL 兜底过期）", exc_info=True)
 

@@ -5,7 +5,9 @@
  * - 仅 server/other 设备
  */
 import { useState } from 'react';
-import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, Popconfirm } from 'antd';
+import { useConfirm } from '@/utils/confirm';
+import { Button, Space, Modal, Form, Input, InputNumber, Select } from 'antd';
+import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import { AppstoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   useDeviceNics,
@@ -55,6 +57,7 @@ const PORT_STATUS_OPTIONS = [
 ];
 
 function NicTab({ deviceId }: NicTabProps) {
+  const confirm = useConfirm();
   const { data: nics, isLoading } = useDeviceNics(deviceId);
   const updateNic = useUpdateNic(deviceId);
   const deleteNic = useDeleteNic(deviceId);
@@ -182,19 +185,27 @@ function NicTab({ deviceId }: NicTabProps) {
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
           />
-          <Popconfirm
-            title="确定删除该端口？"
-            onConfirm={async () => {
-              try {
-                await deleteNic.mutateAsync(record.id);
-                message.success('删除成功');
-              } catch (err) {
-                message.error(err instanceof Error ? err.message : '删除失败');
-              }
-            }}
-          >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() =>
+              confirm({
+                title: '确定删除该端口？',
+                okText: '删除',
+                okButtonProps: { danger: true },
+                onOk: async () => {
+                  try {
+                    await deleteNic.mutateAsync(record.id);
+                    message.success('删除成功');
+                  } catch (err) {
+                    message.error(err instanceof Error ? err.message : '删除失败');
+                  }
+                }
+              })
+            }
+          />
         </Space>
       )
     }
@@ -204,11 +215,20 @@ function NicTab({ deviceId }: NicTabProps) {
     <div>
       {/* 批量操作浮条（勾选后浮出，统一批量删除入口） */}
       <BatchActionBar count={batch.count} unit="个端口" onClear={batch.clear}>
-        <Popconfirm title={`确定删除选中的 ${batch.count} 个端口？`} onConfirm={handleBatchDelete}>
-          <Button danger icon={<DeleteOutlined />}>
-            批量删除
-          </Button>
-        </Popconfirm>
+        <Button
+          danger
+          icon={<DeleteOutlined />}
+          onClick={() =>
+            confirm({
+              title: `确定删除选中的 ${batch.count} 个端口？`,
+              okText: '删除',
+              okButtonProps: { danger: true },
+              onOk: handleBatchDelete
+            })
+          }
+        >
+          批量删除
+        </Button>
       </BatchActionBar>
 
       {/* 操作栏 */}
@@ -226,13 +246,16 @@ function NicTab({ deviceId }: NicTabProps) {
         </Space>
       </div>
 
-      <Table
+      <DataTable
         columns={columns}
         dataSource={nics ?? []}
         rowKey="id"
         loading={isLoading}
         size="small"
         rowSelection={batch.rowSelection}
+        showCard={false}
+        searchable={false}
+        pagination={DENSE_PAGINATION}
       />
 
       {/* ─── 编辑 Modal ─── */}

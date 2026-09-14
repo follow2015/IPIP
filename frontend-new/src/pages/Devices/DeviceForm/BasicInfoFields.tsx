@@ -67,7 +67,7 @@ export default function BasicInfoFields({
     <>
       {/* ── 设备基本信息 ── */}
       <Row gutter={16}>
-        <Col span={16}>
+        <Col xs={24} md={16}>
           <Form.Item
             name="device_name"
             label="设备名称"
@@ -89,7 +89,7 @@ export default function BasicInfoFields({
             />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item
             name="device_type"
             label="设备主类型"
@@ -100,17 +100,17 @@ export default function BasicInfoFields({
         </Col>
       </Row>
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="device_subtype" label="设备子类型">
             <Select placeholder="请选择" options={subtypeOptions} allowClear />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="status" label="状态">
             <Select placeholder="请选择" options={statusOptions} />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="responsible_person" label="负责人">
             <Select
               placeholder="请选择负责人"
@@ -124,7 +124,7 @@ export default function BasicInfoFields({
         </Col>
       </Row>
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="brand" label="品牌">
             <Select
               options={vendorOptions}
@@ -137,19 +137,19 @@ export default function BasicInfoFields({
             />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="device_model" label="型号">
             <Input placeholder="型号" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="power" label="功耗(W)">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="功耗" />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Form.Item
             name="metric_template_group_id"
             label="指标模板组（监控数据展示规则）"
@@ -182,17 +182,17 @@ export default function BasicInfoFields({
             />
           </Form.Item>
         </Col>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Form.Item name="serial_number" label="序列号（抄写设备标签）">
             <Input placeholder="抄写设备上的序列号" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="hostname" label="主机名">
             <Input placeholder="主机名" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="customer_id" label="客户">
             <Select
               placeholder="请选择客户"
@@ -210,7 +210,7 @@ export default function BasicInfoFields({
         <>
           <Divider plain>节点关联</Divider>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="room_id"
                 label="所属机房"
@@ -219,7 +219,7 @@ export default function BasicInfoFields({
                 <Select placeholder="请先选择机房" options={roomOptions} allowClear />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="parent_device_id"
                 label="所属机箱"
@@ -237,7 +237,7 @@ export default function BasicInfoFields({
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item
                 name="node_position"
                 label="节点位置"
@@ -254,7 +254,11 @@ export default function BasicInfoFields({
               </Form.Item>
             </Col>
             {selectedChassisId && availablePositions.length > 0 && (
-              <Col span={16} style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}>
+              <Col
+                xs={24}
+                md={16}
+                style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}
+              >
                 <span style={{ color: '#8c8c8c', fontSize: 12 }}>
                   空余位置：{availablePositions.length} 个（
                   {availablePositions.slice(0, 10).join(', ')}
@@ -263,7 +267,11 @@ export default function BasicInfoFields({
               </Col>
             )}
             {selectedChassisId && availablePositions.length === 0 && (
-              <Col span={16} style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}>
+              <Col
+                xs={24}
+                md={16}
+                style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}
+              >
                 <Alert
                   type="warning"
                   title="该机箱无空余节点位置"

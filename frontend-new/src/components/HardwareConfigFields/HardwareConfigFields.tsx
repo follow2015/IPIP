@@ -85,7 +85,7 @@ export default function HardwareConfigFields({
         <>
           {/* ── CPU 配置 ── */}
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name={prefixedName(prefix, 'cpu_template_id')} label="CPU型号">
                 <Select
                   placeholder="选择CPU模板（可搜索品牌/型号）"
@@ -114,12 +114,12 @@ export default function HardwareConfigFields({
                 />
               </Form.Item>
             </Col>
-            <Col span={4}>
+            <Col xs={12} md={4}>
               <Form.Item name={prefixedName(prefix, 'cpu_way')} label="CPU路数">
                 <InputNumber min={1} max={8} style={{ width: '100%' }} placeholder="路数" />
               </Form.Item>
             </Col>
-            <Col span={4}>
+            <Col xs={12} md={4}>
               <Form.Item name={prefixedName(prefix, 'cpu_cores')} label="单颗核心数">
                 <InputNumber min={1} style={{ width: '100%' }} placeholder="核心数" />
               </Form.Item>
@@ -128,7 +128,7 @@ export default function HardwareConfigFields({
 
           {/* ── 内存配置 ── */}
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name={prefixedName(prefix, 'memory_template_id')} label="内存型号">
                 <Select
                   placeholder="选择内存模板"
@@ -161,7 +161,7 @@ export default function HardwareConfigFields({
                 />
               </Form.Item>
             </Col>
-            <Col span={4}>
+            <Col xs={12} md={4}>
               <Form.Item name={prefixedName(prefix, 'memory_dimm_count')} label="内存条数">
                 <InputNumber
                   min={1}
@@ -182,7 +182,7 @@ export default function HardwareConfigFields({
                 />
               </Form.Item>
             </Col>
-            <Col span={4}>
+            <Col xs={12} md={4}>
               <Form.Item name={prefixedName(prefix, 'memory_size_gb')} label="内存总容量">
                 <InputNumber
                   min={0}
@@ -193,7 +193,7 @@ export default function HardwareConfigFields({
                 />
               </Form.Item>
             </Col>
-            <Col span={4}>
+            <Col xs={12} md={4}>
               <Form.Item name={prefixedName(prefix, 'os_version')} label="操作系统">
                 <Input placeholder="如 CentOS 7.9" />
               </Form.Item>
@@ -202,7 +202,7 @@ export default function HardwareConfigFields({
 
           {/* ── GPU 配置 ── */}
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name={prefixedName(prefix, 'gpu_template_id')} label="显卡型号">
                 <Select
                   placeholder="选择显卡模板（可搜索品牌/型号）"
@@ -229,7 +229,7 @@ export default function HardwareConfigFields({
                 />
               </Form.Item>
             </Col>
-            <Col span={4}>
+            <Col xs={12} md={4}>
               <Form.Item name={prefixedName(prefix, 'gpu_count')} label="显卡数量">
                 <InputNumber
                   min={0}
@@ -240,7 +240,7 @@ export default function HardwareConfigFields({
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name={prefixedName(prefix, 'gpu')} label="显卡描述">
                 <Input placeholder="如 NVIDIA A100 80GB × 8" />
               </Form.Item>
@@ -251,18 +251,18 @@ export default function HardwareConfigFields({
           {showIpmi && (
             <Row gutter={16}>
               {showIpmiAddress && (
-                <Col span={8}>
+                <Col xs={24} md={8}>
                   <Form.Item name={prefixedName(prefix, 'ipmi_address')} label="IPMI地址">
                     <Input placeholder="IPMI管理地址" />
                   </Form.Item>
                 </Col>
               )}
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Form.Item name={prefixedName(prefix, 'ipmi_username')} label="IPMI用户名">
                   <Input placeholder="IPMI登录用户名" />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Form.Item name={prefixedName(prefix, 'ipmi_password')} label="IPMI密码">
                   <Input.Password placeholder="IPMI登录密码" />
                 </Form.Item>

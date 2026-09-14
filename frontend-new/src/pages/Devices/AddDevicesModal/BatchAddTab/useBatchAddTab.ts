@@ -29,7 +29,7 @@ import {
   DeviceStatusCode
 } from '@/types/enums';
 import type { Device, BatchCreateItemResult } from '@/types/models';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { type DeviceBatchRow, genBatchName, extractMaxIndex } from '../shared';
 import { checkUConflict, checkNodePositionConflict } from './conflictCheck';
 import { buildCreateDevices, buildSwitchPorts } from './buildCreateRequests';
@@ -93,6 +93,7 @@ export interface UseBatchAddTabResult {
 }
 
 export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
+  const confirm = useConfirm();
   const [form] = Form.useForm();
   const message = useMessage();
   const batchCreate = useBatchDeviceCreate();

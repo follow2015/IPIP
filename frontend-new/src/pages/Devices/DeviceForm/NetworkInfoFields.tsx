@@ -17,17 +17,17 @@ export default function NetworkInfoFields({ isNetwork }: NetworkInfoFieldsProps)
       {/* ── 网络信息区块 ── */}
       <Divider plain>网络信息</Divider>
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="management_ip" label="管理IP">
             <Input placeholder="管理IP地址" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="mac_address" label="MAC地址">
             <Input placeholder="MAC地址" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item
             name="ip_address"
             label="业务IP"
@@ -58,7 +58,7 @@ export default function NetworkInfoFields({ isNetwork }: NetworkInfoFieldsProps)
       {/* 管理权限开关（仅网络设备显示） */}
       {isNetwork && (
         <Row gutter={16}>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Form.Item name={['switch_config', 'has_ssh']} label="管理权限" valuePropName="checked">
               <Switch checkedChildren="开" unCheckedChildren="关" />
             </Form.Item>

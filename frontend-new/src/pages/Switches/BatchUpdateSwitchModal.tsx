@@ -145,7 +145,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
       <Form form={form} layout="vertical">
         <Row gutter={24}>
           {/* 端口号 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label={
                 <Space>
@@ -170,7 +170,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
           </Col>
 
           {/* 协议 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label={
                 <Space>
@@ -199,7 +199,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
           </Col>
 
           {/* 用户名 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label={
                 <Space>
@@ -224,7 +224,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
           </Col>
 
           {/* 密码 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label={
                 <Space>
@@ -246,7 +246,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
           </Col>
 
           {/* 设备类型 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label={
                 <Space>
@@ -277,7 +277,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
           </Col>
 
           {/* 交换机类型 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label={
                 <Space>
@@ -311,7 +311,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
           </Col>
 
           {/* 网络层级 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label={
                 <Space>
@@ -340,7 +340,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
           </Col>
 
           {/* 认证方法 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label={
                 <Space>

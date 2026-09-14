@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState, useCallback } from 'react';
 
 import { useTable, type UseTableReturn } from './useTable';
@@ -43,6 +43,7 @@ export function useCrudPage<
   T extends { id: number },
   TListParams extends object = PaginationParams
 >(options: UseCrudPageOptions<T, TListParams>): UseCrudPageReturn<T> {
+  const confirm = useConfirm();
   const { useList, useDelete, nameKey, nameLabel, buildListParams } = options;
 
   const table = useTable();
@@ -85,7 +86,7 @@ export function useCrudPage<
         }
       });
     },
-    [deleteMutation, nameKey, nameLabel, message, refetch]
+    [confirm, deleteMutation, nameKey, nameLabel, message, refetch]
   );
 
   const closeForm = useCallback(() => {

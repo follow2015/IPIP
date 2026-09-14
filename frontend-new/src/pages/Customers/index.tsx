@@ -8,7 +8,7 @@
  * 列表页骨架（分页/搜索/表单开关/删除确认）由 useCrudPage 统一提供，
  * 本页面仅保留资源跳转、表单提交等特有逻辑。
  */
-import { Button, Space, Tag, message, Modal, Input } from 'antd';
+import { Button, Space, Tag, Modal, Input } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,

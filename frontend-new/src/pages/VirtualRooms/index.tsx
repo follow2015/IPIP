@@ -5,7 +5,8 @@
  * - 触发扫描 + 扫描进度
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Button, Tag, Space, Tooltip, Progress, Popconfirm } from 'antd';
+import { useConfirm } from '@/utils/confirm';
+import { Button, Tag, Space, Tooltip, Progress } from 'antd';
 import {
   PlusOutlined,
   ThunderboltOutlined,
@@ -31,6 +32,7 @@ import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
 import type { GlobalEvent } from '@/hooks/useGlobalEvents';
 
 function VirtualRooms() {
+  const confirm = useConfirm();
   const [membersOpen, setMembersOpen] = useState(false);
   const [membersRecord, setMembersRecord] = useState<VirtualRoom | null>(null);
   const [scanningId, setScanningId] = useState<number | null>(null);
@@ -190,23 +192,24 @@ function VirtualRooms() {
               onClick={() => handleMembers(record)}
             />
           </Tooltip>
-          <Popconfirm
-            title="确认扫描？"
-            description={`将对虚拟机房「${record.name}」下的所有交换机执行全量扫描`}
-            onConfirm={() => handleScan(record)}
-            okText="开始扫描"
-            cancelText="取消"
-          >
-            <Tooltip title="触发扫描">
-              <Button
-                type="link"
-                size="small"
-                icon={<ThunderboltOutlined />}
-                loading={scanningId === record.id}
-                disabled={scanningId !== null && scanningId !== record.id}
-              />
-            </Tooltip>
-          </Popconfirm>
+          <Tooltip title="触发扫描">
+            <Button
+              type="link"
+              size="small"
+              icon={<ThunderboltOutlined />}
+              loading={scanningId === record.id}
+              disabled={scanningId !== null && scanningId !== record.id}
+              onClick={() =>
+                confirm({
+                  title: '确认扫描？',
+                  content: `将对虚拟机房「${record.name}」下的所有交换机执行全量扫描`,
+                  okText: '开始扫描',
+                  cancelText: '取消',
+                  onOk: () => handleScan(record)
+                })
+              }
+            />
+          </Tooltip>
           <Tooltip title="编辑">
             <Button
               type="link"

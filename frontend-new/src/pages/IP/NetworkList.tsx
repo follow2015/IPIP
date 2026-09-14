@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { Table, Button, Space, Select } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { useNetworkList, useDeleteNetwork, useUpdateNetworkCustomer } from '@/services/network';
@@ -7,6 +7,7 @@ import type { IPNetwork } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
 
 function NetworkList() {
+  const confirm = useConfirm();
   const deleteNetwork = useDeleteNetwork();
   const updateCustomer = useUpdateNetworkCustomer();
   const message = useMessage();
@@ -109,6 +110,7 @@ function NetworkList() {
         current: data?.page ?? 1,
         showTotal: (t) => `共 ${t} 条`
       }}
+      scroll={{ x: 'max-content' }}
     />
   );
 }

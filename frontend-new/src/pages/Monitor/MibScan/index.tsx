@@ -299,13 +299,13 @@ export default function MibScanPage() {
         <>
           <Card variant="borderless">
             <Row gutter={16}>
-              <Col span={6}>
+              <Col xs={12} md={6}>
                 <Statistic title="设备 IP" value={scanResult.device_ip} />
               </Col>
-              <Col span={6}>
+              <Col xs={12} md={6}>
                 <Statistic title="发现 OID 数" value={scanResult.oid_count} />
               </Col>
-              <Col span={12}>
+              <Col xs={24} md={12}>
                 <Statistic
                   title="类型分布"
                   valueRender={() => (

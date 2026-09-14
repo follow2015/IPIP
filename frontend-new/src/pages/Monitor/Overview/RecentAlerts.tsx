@@ -6,7 +6,8 @@
  * - pending/sent 状态显示操作按钮，已确认/已关闭隐藏
  * - 操作后乐观更新，失败回滚
  */
-import { Card, Empty, Table, Tag, Button, Typography, Space, Tooltip, theme } from 'antd';
+import { Card, Empty, Tag, Button, Typography, Space, Tooltip, theme } from 'antd';
+import DataTable from '@/components/DataTable';
 import { Link } from 'react-router-dom';
 import { CheckOutlined, CloseOutlined, RightOutlined } from '@ant-design/icons';
 import {
@@ -78,7 +79,9 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
       }
     >
       {items.length > 0 ? (
-        <Table<MonitorAlertItem>
+        <DataTable<MonitorAlertItem>
+          searchable={false}
+          showCard={false}
           rowKey="id"
           size="small"
           pagination={false}

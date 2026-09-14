@@ -105,7 +105,7 @@ const StepSource: React.FC<StepSourceProps> = ({
         <Descriptions
           bordered
           size="small"
-          column={2}
+          column={{ xs: 1, md: 2 }}
           items={templatePreviewItems}
           style={{ marginBottom: 16 }}
         />

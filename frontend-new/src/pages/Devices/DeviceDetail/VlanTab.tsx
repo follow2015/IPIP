@@ -1,6 +1,7 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState, useMemo } from 'react';
-import { Table, Button, Space, Form, InputNumber, Input, Select, Modal } from 'antd';
+import { Button, Space, Form, InputNumber, Input, Select, Modal } from 'antd';
+import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SyncOutlined } from '@ant-design/icons';
 import {
   useVLANsByDevice,
@@ -26,6 +27,7 @@ interface VlanTabProps {
 }
 
 function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
+  const confirm = useConfirm();
   const { data: vlans, isLoading } = useVLANsByDevice(deviceId);
   const createVLAN = useCreateDeviceVLAN(deviceId);
   const updateVLAN = useUpdateDeviceVLAN(deviceId);
@@ -237,12 +239,15 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         )}
       </div>
 
-      <Table
+      <DataTable
         columns={columns}
         dataSource={vlans ?? []}
         rowKey="id"
         loading={isLoading}
         size="small"
+        showCard={false}
+        searchable={false}
+        pagination={DENSE_PAGINATION}
       />
 
       {/* 新增 VLAN 弹窗 */}

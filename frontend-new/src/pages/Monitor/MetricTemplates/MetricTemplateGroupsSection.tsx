@@ -21,12 +21,12 @@ import {
   Switch,
   Modal,
   Table,
-  Popconfirm,
   Empty,
   InputNumber,
   Divider,
   Typography
 } from 'antd';
+import { useConfirm } from '@/utils/confirm';
 import { PlusOutlined, DeleteOutlined, EditOutlined, FolderOutlined } from '@ant-design/icons';
 import { useMessage } from '@/hooks/useMessage';
 import {
@@ -52,6 +52,7 @@ interface GroupFormValues extends Omit<MetricTemplateGroupUpsert, 'vendor'> {
 }
 
 export default function MetricTemplateGroupsSection() {
+  const confirm = useConfirm();
   const message = useMessage();
   const { data: groups, isLoading } = useMetricTemplateGroups();
   const { data: templates, isLoading: templatesLoading } = useMetricTemplates();
@@ -234,16 +235,21 @@ export default function MetricTemplateGroupsSection() {
             管理模板
           </Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEditGroup(r)} />
-          <Popconfirm
-            title="确认删除该模板组？"
-            description="删除后设备将回到自动匹配模板组。"
-            okText="删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDeleteGroup(r.id)}
-          >
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          <Button
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() =>
+              confirm({
+                title: '确认删除该模板组？',
+                content: '删除后设备将回到自动匹配模板组。',
+                okText: '删除',
+                cancelText: '取消',
+                okButtonProps: { danger: true },
+                onOk: () => handleDeleteGroup(r.id)
+              })
+            }
+          />
         </Space>
       )
     }
@@ -266,6 +272,7 @@ export default function MetricTemplateGroupsSection() {
         pagination={false}
         size="small"
         locale={{ emptyText: <Empty description="暂无指标模板组，点击右上角「新增模板组」创建" /> }}
+        scroll={{ x: 'max-content' }}
       />
 
       {/* 组新增/编辑弹窗 */}
@@ -390,6 +397,7 @@ export default function MetricTemplateGroupsSection() {
               }
             ]}
             locale={{ emptyText: <Empty description="没有符合兼容性校验的模板可供加入" /> }}
+            scroll={{ x: 'max-content' }}
           />
 
           <Divider />
@@ -424,18 +432,24 @@ export default function MetricTemplateGroupsSection() {
                   key: 'action',
                   width: 80,
                   render: (_: unknown, r: MetricTemplateItem) => (
-                    <Popconfirm
-                      title="确认从分组移除该模板？"
-                      okText="移除"
-                      cancelText="取消"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => handleRemoveTemplate(r.id!)}
-                    >
-                      <Button size="small" danger icon={<DeleteOutlined />} />
-                    </Popconfirm>
+                    <Button
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() =>
+                        confirm({
+                          title: '确认从分组移除该模板？',
+                          okText: '移除',
+                          cancelText: '取消',
+                          okButtonProps: { danger: true },
+                          onOk: () => handleRemoveTemplate(r.id!)
+                        })
+                      }
+                    />
                   )
                 }
               ]}
+              scroll={{ x: 'max-content' }}
             />
           ) : (
             <Empty

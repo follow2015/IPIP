@@ -87,6 +87,7 @@ interface ScanStatusResult {
   reason?: string;
 }
 
+export const SCAN_TERMINAL_PHASES = new Set(['完成', 'failed', 'unknown']);
 
 export function useNetworkList(params?: NetworkQueryParams) {
   return useQuery({
@@ -227,7 +228,7 @@ export function useFullScanStatus(roomId: number, enabled: boolean = false) {
     refetchInterval: (query) => {
       const d = query.state.data;
       if (!d) return 3000;
-      if (d.phase === '完成' || d.phase === 'failed' || d.phase === 'unknown') return false;
+      if (SCAN_TERMINAL_PHASES.has(d.phase)) return false;
       if (d.elapsed_seconds && d.elapsed_seconds > 600) return false;
       return 3000;
     },

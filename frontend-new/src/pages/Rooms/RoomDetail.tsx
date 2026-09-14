@@ -72,7 +72,7 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
       </div>
 
       <Card title={`机房详情 - ${room.name}`}>
-        <Descriptions column={2} bordered size="small">
+        <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
           <Descriptions.Item label="机房名称">{room.name}</Descriptions.Item>
           <Descriptions.Item label="状态">{renderStatus(room.status)}</Descriptions.Item>
           <Descriptions.Item label="位置">{room.location || '-'}</Descriptions.Item>
@@ -86,13 +86,13 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
 
       <Card title="统计概览" style={{ marginTop: 16 }}>
         <Row gutter={16}>
-          <Col span={6}>
+          <Col xs={12} md={6}>
             <Statistic title="机柜总数" value={totalCabinets} prefix={<DatabaseOutlined />} />
           </Col>
-          <Col span={6}>
+          <Col xs={12} md={6}>
             <Statistic title="设备总数" value={totalDevices} prefix={<AppstoreOutlined />} />
           </Col>
-          <Col span={6}>
+          <Col xs={12} md={6}>
             <Statistic
               title="平均U位利用率"
               value={avgUUsage}
@@ -101,7 +101,7 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
               styles={{ content: { color: avgUUsage > 80 ? '#cf1322' : '#3f8600' } }}
             />
           </Col>
-          <Col span={6}>
+          <Col xs={12} md={6}>
             <Statistic title="已定位机柜" value={positionedCount} suffix={`/ ${totalCabinets}`} />
           </Col>
         </Row>

@@ -14,7 +14,7 @@ HTTP 上下文进行单元测试。路由路径与 device.py 时期完全一致�
 """
 
 from app.utils.logging import get_logger
-from flask import Blueprint, request, g
+from flask import Blueprint, request
 from app.openapi.doc import doc
 from app.api.base import APIResponse
 from app.utils import (
@@ -25,9 +25,7 @@ from app.utils import (
 from app.utils.idempotency import idempotent, upload_file_idempotency_key
 from app.utils.time_utils import now_utc_naive
 from app.utils.transactional import transactional
-from app.exceptions.validation import ValidationError as AppValidationError, RequiredFieldError
 from app.services import device_import_service
-from app.services import import_export_service
 from app.services.switch_events import emit_resource_change_global
 
 logger = get_logger(__name__)
@@ -78,40 +76,21 @@ def batch_import_devices():
         return APIResponse.error(message="未选择文件", status_code=400)
 
     from app.utils.idempotency import _get_redis_client
+    from app.api.import_pipeline import run_import
 
-    def _do_import(df):
-        return device_import_service.parse_and_import_devices(df)
+    def _notify_frontend(outcome):
+        """导入成功后的 SSE 刷新通知（旁路：仅在有成功导入时发出）。"""
+        if outcome.imported_count > 0:
+            imported_ids = (outcome.raw or {}).get("imported_ids", [])
+            emit_resource_change_global("device", "batch_create", ids=imported_ids)
 
-    try:
-        outcome = import_export_service.run_batch_import(
-            file_bytes=file.read(),
-            filename=file.filename,
-            user_id=str(g.current_user.get("user_id", "anon")),
-            idem_scope="import_devices",
-            parse_fn=device_import_service.build_device_df,
-            import_fn=_do_import,
-            redis_client=_get_redis_client(),
-        )
-    except import_export_service.FileTooLargeError as e:
-        return APIResponse.error(message=e.message, status_code=413)
-    except import_export_service.IdempotencyConflictError as e:
-        return APIResponse.error(e.message, error_code="IDEMPOTENCY_CONFLICT", status_code=409)
-    except RequiredFieldError as e:
-        return APIResponse.error(message=str(e), status_code=400)
-    except AppValidationError as e:
-        return APIResponse.error(message=str(e), status_code=400)
-
-    if outcome.imported_count > 0:
-        imported_ids = (outcome.raw or {}).get("imported_ids", [])
-        emit_resource_change_global("device", "batch_create", ids=imported_ids)
-
-    return APIResponse.success(
-        data={
-            "imported_count": outcome.imported_count,
-            "failed_count": outcome.failed_count,
-            "failed_rows": outcome.failed_rows,
-        },
-        message=outcome.message,
+    return run_import(
+        file=file,
+        idem_scope="import_devices",
+        parse_fn=device_import_service.build_device_df,
+        import_fn=device_import_service.parse_and_import_devices,
+        redis_client=_get_redis_client(),
+        after_success=_notify_frontend,
     )
 
 

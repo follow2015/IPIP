@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState } from 'react';
 import {
   Button,
@@ -128,6 +128,7 @@ export default function BatchPortActions({
   hasSsh = true,
   onBatchLocalUpdate
 }: BatchPortActionsProps) {
+  const confirm = useConfirm();
   const message = useMessage();
   const batchAction = useBatchPortAction();
   const { data: customerOptions } = useAllocatableCustomerOptions();

@@ -54,6 +54,14 @@ def analyze(args: Dict[str, Any]) -> Dict[str, Any]:
             "suppressed_by_scope": int     因数据域被剔除的邻居数（0 表示无裁剪）
         }
         或 {"supported": False, "hint": ...}
+
+    Raises:
+        ValueError: **必填参数校验失败**（device_id 缺失/不可转 int、metric 非
+            非空字符串）——与能力层统一约定一致（builtin / deployment / entity /
+            topology 同口径，见 tests/test_ai_capabilities_p1.py::TestParamValidation）。
+            注意区分两类失败：**参数非法 raise**，**语义失败**（无权限、设备不存在、
+            分析异常）返回 `supported: False`。勿把参数校验改成返回值——
+            b121cd4 曾就此专门对齐过一次。
     """
     from app.services.ai.capabilities.device_scope import resolve_visible_scope
     from app.services.ai.root_cause_analyzer import RootCauseAnalyzer

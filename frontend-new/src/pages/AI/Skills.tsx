@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Card,
-  Table,
   Tag,
   Switch,
   Button,
@@ -10,9 +9,10 @@ import {
   Descriptions,
   Tooltip,
   Typography,
-  Modal,
-  Popconfirm
+  Modal
 } from 'antd';
+import DataTable from '@/components/DataTable';
+import { useConfirm } from '@/utils/confirm';
 import {
   ReloadOutlined,
   EyeOutlined,
@@ -45,6 +45,7 @@ const SOURCE_COLOR: Record<string, string> = { builtin: 'blue', custom: 'green' 
 const SOURCE_LABEL: Record<string, string> = { builtin: '内置', custom: '自定义' };
 
 export default function Skills() {
+  const confirm = useConfirm();
   const [skills, setSkills] = useState<SkillSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -270,18 +271,23 @@ export default function Skills() {
               <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record.name)}>
                 编辑
               </Button>
-              <Popconfirm
-                title="确认删除该技能？"
-                description={`将永久删除 ${record.name}，此操作不可恢复。`}
-                onConfirm={() => handleDelete(record.name)}
-                okText="删除"
-                okButtonProps={{ danger: true }}
-                cancelText="取消"
+              <Button
+                type="link"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() =>
+                  confirm({
+                    title: '确认删除该技能？',
+                    content: `将永久删除 ${record.name}，此操作不可恢复。`,
+                    okText: '删除',
+                    cancelText: '取消',
+                    okButtonProps: { danger: true },
+                    onOk: () => handleDelete(record.name)
+                  })
+                }
               >
-                <Button type="link" danger icon={<DeleteOutlined />}>
-                  删除
-                </Button>
-              </Popconfirm>
+                删除
+              </Button>
             </>
           )}
         </Space>
@@ -318,7 +324,7 @@ export default function Skills() {
     >
       {/* F10 修复：8 列合计约 950px 固定宽，移动端（375px）列被强行压缩、
           内容换行错乱。加横向滚动，配合"描述"列的 ellipsis 生效。 */}
-      <Table
+      <DataTable
         rowKey="name"
         columns={columns}
         dataSource={skills}
@@ -326,6 +332,8 @@ export default function Skills() {
         pagination={false}
         size="middle"
         scroll={{ x: 'max-content' }}
+        showCard={false}
+        searchable={false}
       />
 
       <Drawer

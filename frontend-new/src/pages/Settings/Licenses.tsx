@@ -3,7 +3,8 @@
  * 集中展示项目依赖的第三方库及其开源许可证，履行开源合规与透明义务。
  * 数据基于根目录 requirements.txt 与前端 package.json 的实际声明生成。
  */
-import { Card, Table, Tag, Typography, Space, Button, Tooltip } from 'antd';
+import { Card, Tag, Typography, Space, Button, Tooltip } from 'antd';
+import DataTable from '@/components/DataTable';
 import { GithubOutlined, ExportOutlined } from '@ant-design/icons';
 
 const { Title, Paragraph, Text, Link } = Typography;
@@ -386,22 +387,28 @@ export default function LicensesPage() {
         </Card>
 
         <Card title="第三方依赖（后端 / Python）" size="small">
-          <Table<LicenseInfo>
+          <DataTable<LicenseInfo>
             columns={renderCols(backendDeps)}
             dataSource={backendDeps}
             rowKey="name"
             pagination={false}
             size="middle"
+            scroll={{ x: 'max-content' }}
+            showCard={false}
+            searchable={false}
           />
         </Card>
 
         <Card title="第三方依赖（前端 / Node.js）" size="small">
-          <Table<LicenseInfo>
+          <DataTable<LicenseInfo>
             columns={renderCols(frontendDeps)}
             dataSource={frontendDeps}
             rowKey="name"
             pagination={false}
             size="middle"
+            scroll={{ x: 'max-content' }}
+            showCard={false}
+            searchable={false}
           />
         </Card>
 

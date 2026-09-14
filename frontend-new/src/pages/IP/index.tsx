@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, Space, Tag, Tooltip, Modal } from 'antd';
@@ -48,6 +48,7 @@ import { IPStatsModal } from './IPStatsModal';
 import { IPTableToolbar } from './IPTableToolbar';
 
 function IP() {
+  const confirm = useConfirm();
   const table = useTable();
   const [urlParams] = useSearchParams();
   const [editModalOpen, setEditModalOpen] = useState(false);

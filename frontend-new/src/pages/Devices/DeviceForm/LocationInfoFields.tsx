@@ -52,12 +52,12 @@ export default function LocationInfoFields({
     <>
       <Divider plain>位置信息</Divider>
       <Row gutter={16}>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Form.Item name="room_id" label="所属机房">
             <Select placeholder="请选择机房" options={roomOptions} allowClear />
           </Form.Item>
         </Col>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Form.Item
             name="cabinet_id"
             label="所属机柜"
@@ -68,17 +68,17 @@ export default function LocationInfoFields({
         </Col>
       </Row>
       <Row gutter={16}>
-        <Col span={6}>
+        <Col xs={12} md={6}>
           <Form.Item name="height_u" label="占用U数">
             <InputNumber min={1} max={42} style={{ width: '100%' }} placeholder="占用U数" />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col xs={12} md={6}>
           <Form.Item name="device_gap" label="设备间隔(U)" extra="自动分配U位时生效">
             <InputNumber min={0} max={10} style={{ width: '100%' }} placeholder="间隔" />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col xs={12} md={6}>
           <Form.Item
             name="u_position"
             label="U位"
@@ -104,7 +104,7 @@ export default function LocationInfoFields({
             />
           </Form.Item>
         </Col>
-        <Col span={6} style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}>
+        <Col xs={12} md={6} style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}>
           {availableUPositions && availableUPositions.length > 0 && (
             <span style={{ color: '#8c8c8c', fontSize: 12 }}>
               可用U位：{availableUPositions.length} 个

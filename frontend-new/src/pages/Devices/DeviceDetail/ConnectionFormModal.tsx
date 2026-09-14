@@ -46,12 +46,12 @@ export default function ConnectionFormModal({
     <Modal title="新增连接" open={open} onOk={onOk} onCancel={onCancel} width={700} destroyOnHidden>
       <Form form={form} layout="vertical">
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="link_type" label="连接模式">
               <Select placeholder="请选择" options={linkTypeOptions} disabled />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="connection_type" label="连接类型">
               <Select placeholder="请选择" options={connectionTypeOptions} allowClear />
             </Form.Item>
@@ -61,7 +61,7 @@ export default function ConnectionFormModal({
         {/* ── network_to_network: 本机端口选择 ── */}
         {isNetworkDevice && (
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="switch_port_id"
                 label="本机端口"
@@ -81,7 +81,7 @@ export default function ConnectionFormModal({
 
         {/* ── 机房 + 机柜筛选 ── */}
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="room_id" label="对端设备所在机房">
               <Select
                 placeholder="请选择机房"
@@ -93,7 +93,7 @@ export default function ConnectionFormModal({
               />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="cabinet_id" label="机柜">
               <Select
                 placeholder="请选择机柜"
@@ -112,7 +112,7 @@ export default function ConnectionFormModal({
 
         {/* ── 对端设备选择 + 对端端口选择 ── */}
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="switch_device_id"
               label="对端设备"
@@ -127,7 +127,7 @@ export default function ConnectionFormModal({
               />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name={isNetworkDevice ? 'peer_port_id' : 'switch_port_id'}
               label="对端端口"
@@ -148,7 +148,7 @@ export default function ConnectionFormModal({
         {/* ── device_to_network: 本机网卡端口选择 ── */}
         {!isNetworkDevice && (
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="device_nics_port_id" label="本机网卡端口">
                 <Select
                   placeholder="请选择网卡端口"

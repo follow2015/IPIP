@@ -252,7 +252,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
         {/* 通用字段 */}
         <Divider plain>通用信息</Divider>
         <Row gutter={16}>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Form.Item name="brand" label="品牌">
               <Select
                 options={vendorOptions}
@@ -265,19 +265,19 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
               />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Form.Item name="device_model" label="型号">
               <Input placeholder="型号" />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Form.Item name="power" label="功耗(W)">
               <InputNumber min={0} style={{ width: '100%' }} placeholder="功耗" />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="responsible_person" label="负责人">
               <Select
                 placeholder="请选择负责人"
@@ -288,7 +288,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
               />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="customer_id" label="客户">
               <Select
                 placeholder="请选择客户"
@@ -335,7 +335,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
           <>
             <Divider plain>网络拓扑</Divider>
             <Row gutter={16}>
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Form.Item name={['switch_config', 'switch_role']} label="角色">
                   <Select
                     placeholder="请选择"
@@ -347,7 +347,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Form.Item name={['switch_config', 'layer']} label="网络层">
                   <Select
                     placeholder="请选择"
@@ -359,14 +359,14 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Form.Item name={['switch_config', 'port_num']} label="端口数量">
                   <InputNumber placeholder="端口数" style={{ width: '100%' }} min={0} />
                 </Form.Item>
               </Col>
             </Row>
             <Row gutter={16}>
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Form.Item name={['switch_config', 'uplink_device_id']} label="上行设备">
                   <Select
                     placeholder="选择上行设备"
@@ -377,7 +377,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Form.Item name={['switch_config', 'core_device_id']} label="核心交换机">
                   <Select
                     placeholder="选择核心交换机"
@@ -388,7 +388,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Alert
                   type="info"
                   showIcon
@@ -435,7 +435,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                           borderBottom: '1px dashed #f0f0f0'
                         }}
                       >
-                        <Col span={6}>
+                        <Col xs={12} md={6}>
                           <Form.Item
                             {...restField}
                             name={[name, 'template']}
@@ -450,7 +450,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                             />
                           </Form.Item>
                         </Col>
-                        <Col span={3}>
+                        <Col xs={12} md={3}>
                           <Form.Item
                             {...restField}
                             name={[name, 'slot']}
@@ -461,7 +461,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                             <InputNumber min={0} max={99} style={{ width: '100%' }} size="small" />
                           </Form.Item>
                         </Col>
-                        <Col span={3}>
+                        <Col xs={12} md={3}>
                           <Form.Item
                             {...restField}
                             name={[name, 'card']}
@@ -472,7 +472,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                             <InputNumber min={0} max={99} style={{ width: '100%' }} size="small" />
                           </Form.Item>
                         </Col>
-                        <Col span={4}>
+                        <Col xs={12} md={4}>
                           <Form.Item
                             {...restField}
                             name={[name, 'start']}
@@ -488,7 +488,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                             />
                           </Form.Item>
                         </Col>
-                        <Col span={4}>
+                        <Col xs={12} md={4}>
                           <Form.Item
                             {...restField}
                             name={[name, 'end']}
@@ -504,7 +504,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                             />
                           </Form.Item>
                         </Col>
-                        <Col span={3} style={{ textAlign: 'right', paddingTop: 22 }}>
+                        <Col xs={12} md={3} style={{ textAlign: 'right', paddingTop: 22 }}>
                           {fields.length > 1 && (
                             <Button
                               type="text"

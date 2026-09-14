@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import {
@@ -9,10 +9,10 @@ import {
   Input,
   Form,
   Tooltip,
-  Table,
   Progress,
   Modal,
-  Radio
+  Radio,
+  Typography
 } from 'antd';
 import {
   DeleteOutlined,
@@ -35,7 +35,8 @@ import {
   useScanNetwork,
   useNetworkRoutes,
   useTriggerFullScan,
-  useFullScanStatus
+  useFullScanStatus,
+  SCAN_TERMINAL_PHASES
 } from '@/services/network';
 import { queryKeys } from '@/services/query-keys';
 import { useRoomOptions } from '@/services/room';
@@ -118,11 +119,14 @@ import { formatDateTime } from '@/utils/format';
 
 const DEFAULT_ROUTE = '0.0.0.0/0';
 
+const { Text } = Typography;
+
 function isDefaultRoute(ipNetwork: string): boolean {
   return ipNetwork === DEFAULT_ROUTE;
 }
 
 function Network() {
+  const confirm = useConfirm();
   const table = useTable();
   const msg = useMessage();
   const copyInfo = useCopyInfo();
@@ -451,67 +455,84 @@ function Network() {
     {
       title: '操作',
       key: 'action',
-      render: (_: unknown, r: IPNetwork) => {
-        const scanDisabled = isDefaultRoute(r.ip_network) || isPrivateNetwork(r.ip_network);
-        const scanTooltip = isDefaultRoute(r.ip_network)
-          ? '默认路由网段不可扫描'
-          : isPrivateNetwork(r.ip_network)
-            ? '私网地址跨网不可达，状态由ARP表判断'
-            : '';
-        return (
-          <Space>
-            <Button
-              type="link"
-              size="small"
-              icon={<UserOutlined />}
-              onClick={() => handleAssignOpen(r)}
-            >
-              分配
-            </Button>
-            {scanDisabled ? (
-              <Tooltip title={scanTooltip}>
-                <Button type="link" size="small" icon={<SearchOutlined />} disabled>
-                  扫描
-                </Button>
-              </Tooltip>
-            ) : (
-              <Button
-                type="link"
-                size="small"
-                icon={<SearchOutlined />}
-                onClick={() => handleScanNetwork(r)}
-                loading={scanNetwork.isPending}
-              >
-                扫描
-              </Button>
-            )}
-            <Button
-              type="link"
-              size="small"
-              icon={<CopyOutlined />}
-              onClick={() => handleCopy(r)}
-            />
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(r)}
-            >
-              删除
-            </Button>
-          </Space>
-        );
-      }
+      render: (_: unknown, r: IPNetwork) => renderActions(r)
     }
   ];
 
+  const renderActions = (r: IPNetwork) => {
+    const scanDisabled = isDefaultRoute(r.ip_network) || isPrivateNetwork(r.ip_network);
+    const scanTooltip = isDefaultRoute(r.ip_network)
+      ? '默认路由网段不可扫描'
+      : isPrivateNetwork(r.ip_network)
+        ? '私网地址跨网不可达，状态由ARP表判断'
+        : '';
+    return (
+      <Space size="small" wrap>
+        <Button
+          type="link"
+          size="small"
+          icon={<UserOutlined />}
+          onClick={() => handleAssignOpen(r)}
+        >
+          分配
+        </Button>
+        {scanDisabled ? (
+          <Tooltip title={scanTooltip}>
+            <Button type="link" size="small" icon={<SearchOutlined />} disabled>
+              扫描
+            </Button>
+          </Tooltip>
+        ) : (
+          <Button
+            type="link"
+            size="small"
+            icon={<SearchOutlined />}
+            onClick={() => handleScanNetwork(r)}
+            loading={scanNetwork.isPending}
+          >
+            扫描
+          </Button>
+        )}
+        <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => handleCopy(r)} />
+        <Button
+          type="link"
+          size="small"
+          danger
+          icon={<DeleteOutlined />}
+          onClick={() => handleDelete(r)}
+        >
+          删除
+        </Button>
+      </Space>
+    );
+  };
+
+  const renderNetworkCard = (r: IPNetwork) => (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleViewDetail(r)}>
+          <Text strong>{r.ip_network}</Text>
+        </Button>
+        {r.route_type != null && ROUTE_NOTES_MAP[Number(r.route_type)] ? (
+          <Tag color={ROUTE_NOTES_MAP[Number(r.route_type)].color}>
+            {ROUTE_NOTES_MAP[Number(r.route_type)].label}
+          </Tag>
+        ) : null}
+      </div>
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        {[r.switch_name, r.port && `端口 ${r.port}`].filter(Boolean).join(' · ') || '-'}
+      </Text>
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        {[r.room_name, r.customer_name, r.nexthop && `下一跳 ${r.nexthop}`]
+          .filter(Boolean)
+          .join(' · ') || '-'}
+      </Text>
+      {renderActions(r)}
+    </Space>
+  );
 
   const scanProgressIndicator =
-    scanStatus &&
-    scanStatus.phase !== 'unknown' &&
-    scanStatus.phase !== '完成' &&
-    scanStatus.phase !== 'failed' ? (
+    scanStatus && !SCAN_TERMINAL_PHASES.has(scanStatus.phase) ? (
       <Space
         size={4}
         style={{
@@ -556,6 +577,8 @@ function Network() {
           table.setPage(p);
           if (ps !== table.perPage) table.setPerPage(ps);
         }}
+        mobileCardMode
+        cardRender={renderNetworkCard}
         toolbar={
           <FilterBar
             filters={[
@@ -644,13 +667,15 @@ function Network() {
         width={900}
         destroyOnHidden
       >
-        <Table
+        <DataTable
           columns={routeColumns}
           dataSource={routesData ?? []}
           rowKey="id"
           loading={routesLoading}
           size="small"
           pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+          searchable={false}
+          showCard={false}
         />
       </Modal>
     </>

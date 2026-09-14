@@ -91,7 +91,7 @@ export default function MetricTemplateModal({
         initialValues={{ source: 'snmp', metric_type: 'gauge', poll_interval: 60, enabled: true }}
       >
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label="设备类型"
               name="device_type"
@@ -100,7 +100,7 @@ export default function MetricTemplateModal({
               <Select options={DEVICE_TYPE_OPTIONS} />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label="指标 Key"
               name="metric_key"
@@ -112,7 +112,7 @@ export default function MetricTemplateModal({
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label="显示名称"
               name="display_name"
@@ -121,7 +121,7 @@ export default function MetricTemplateModal({
               <Input placeholder="如 端口状态 / 温度 / 硬盘故障" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label="分类 category"
               name="category"
@@ -132,7 +132,7 @@ export default function MetricTemplateModal({
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               label="厂商 vendor"
               name="vendor"
@@ -143,29 +143,29 @@ export default function MetricTemplateModal({
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Form.Item label="来源" name="source">
               <Select options={SOURCE_OPTIONS} />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Form.Item label="类型" name="metric_type">
               <Select options={METRIC_TYPE_OPTIONS} />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Form.Item label="采集频率(秒)" name="poll_interval">
               <InputNumber min={10} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item label="MIB" name="mib">
               <Input placeholder="如 IF-MIB" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item label="OID 符号" name="oid_symbol" tooltip="MIB 符号名，如 ifOperStatus">
               <Input placeholder="如 ifOperStatus / entPhySensorValue" />
             </Form.Item>
@@ -195,12 +195,12 @@ export default function MetricTemplateModal({
         {/* 结构化阈值：按 metric_type 动态渲染 */}
         {(currentMetricType === 'gauge' || currentMetricType === 'counter') && (
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item label="告警阈值 (warn)" name="warn" tooltip="达到该值触发告警">
                 <InputNumber style={{ width: '100%' }} placeholder="如 60" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item label="严重阈值 (crit)" name="crit" tooltip="达到该值触发严重告警">
                 <InputNumber style={{ width: '100%' }} placeholder="如 70" />
               </Form.Item>
@@ -234,12 +234,12 @@ export default function MetricTemplateModal({
         </Form.Item>
 
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item label="单位" name="unit">
               <Input placeholder="如 Celsius / Mbps" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item label="启用" name="enabled" valuePropName="checked">
               <Switch />
             </Form.Item>
@@ -249,7 +249,7 @@ export default function MetricTemplateModal({
           <Input.TextArea rows={2} placeholder="指标含义、采集对象说明等" />
         </Form.Item>
         <Row gutter={16}>
-          <Col span={16}>
+          <Col xs={24} md={16}>
             <Form.Item
               label="处置预案 URL"
               name="runbook_url"
@@ -258,7 +258,7 @@ export default function MetricTemplateModal({
               <Input placeholder="如 https://wiki.internal/runbook/temp-high" />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Form.Item label="预案标题" name="runbook_title">
               <Input placeholder="如 温度过高处置流程" />
             </Form.Item>

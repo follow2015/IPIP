@@ -36,12 +36,12 @@ export default function ConnectionEditModal({
     <Modal title="编辑连接" open={open} onOk={onOk} onCancel={onCancel} width={600} destroyOnHidden>
       <Form form={form} layout="vertical">
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="connection_type" label="连接类型">
               <Select placeholder="请选择" options={connectionTypeOptions} allowClear />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="status" label="状态">
               <Select
                 placeholder="请选择"
@@ -55,7 +55,7 @@ export default function ConnectionEditModal({
         </Row>
         {isN2N && (
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="vlan_id" label="VLAN">
                 <Select
                   placeholder="选择 VLAN"
@@ -66,7 +66,7 @@ export default function ConnectionEditModal({
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="bandwidth" label="带宽">
                 <Input placeholder="如 10G" />
               </Form.Item>
@@ -75,7 +75,7 @@ export default function ConnectionEditModal({
         )}
         {isN2N && (
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="lag_group_id" label="LAG 组">
                 <Select
                   placeholder="选择 LAG 组"
@@ -86,7 +86,7 @@ export default function ConnectionEditModal({
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="description" label="描述">
                 <Input.TextArea rows={1} />
               </Form.Item>

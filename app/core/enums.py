@@ -262,6 +262,25 @@ class ProbeErrorCode(str, Enum):
 
 
 
+class SwitchDeviceTypeCode(str, Enum):
+    """交换机驱动类型枚举（字符串值，前端对应 SwitchDeviceType / SWITCH_DEVICE_TYPE_OPTIONS）
+
+    用于 SSH 自动化驱动的厂商识别，adapter_factory 依据此枚举路由适配器。
+
+    注意成员顺序即前端下拉顺序（生成器按本顺序产出 OPTIONS）。
+    """
+    HUAWEI = "huawei"
+    H3C = "h3c"
+    CISCO = "cisco"
+
+
+class SSHProtocolCode(str, Enum):
+    """SSH 连接协议枚举（字符串值，前端对应 SSHProtocol / SSH_PROTOCOL_OPTIONS）"""
+    SSH = "ssh"
+    TELNET = "telnet"
+
+
+
 STATUS_DISPLAY = {
     IPStatus: {
         IPStatus.ACTIVE: ("活跃", "green"),
@@ -345,6 +364,9 @@ STATUS_DISPLAY = {
         NotificationTypeCode.PORT_STATUS_CHANGED: ("端口状态变化", "purple"),
         NotificationTypeCode.MONITOR_INTERRUPTED: ("监控中断", "orange"),
         NotificationTypeCode.RAID_FAILURE_ALERT: ("RAID故障", "magenta"),
+        NotificationTypeCode.SERVICE_UNHEALTHY: ("服务异常", "red"),
+        NotificationTypeCode.SERVICE_RECOVERED: ("服务恢复", "green"),
+        NotificationTypeCode.ASSET_WARRANTY_ALERT: ("资产到期提醒", "orange"),
     },
     ProbeErrorCode: {
         ProbeErrorCode.TIMEOUT: ("超时", "orange"),
@@ -374,6 +396,15 @@ STATUS_DISPLAY = {
         IPAuditAction.BAN: ("封禁", "red"),
         IPAuditAction.UNBAN: ("解封", "blue"),
     },
+    SwitchDeviceTypeCode: {
+        SwitchDeviceTypeCode.HUAWEI: ("华为", "blue"),
+        SwitchDeviceTypeCode.H3C: ("H3C", "cyan"),
+        SwitchDeviceTypeCode.CISCO: ("思科", "geekblue"),
+    },
+    SSHProtocolCode: {
+        SSHProtocolCode.SSH: ("SSH", "green"),
+        SSHProtocolCode.TELNET: ("Telnet", "orange"),
+    },
 }
 
 
@@ -391,6 +422,8 @@ GENERATED_ENUMS = [
     (NotificationTypeCode, "NotificationTypeCode", None, "NOTIFICATION_TYPE_OPTIONS", "NotificationTypeCode"),
     (ProbeErrorCode, "ProbeErrorCode", "PROBE_ERROR_MAP", None, "ProbeErrorCode"),
     (IPAuditAction, "IPAuditAction", "IP_AUDIT_ACTION_MAP", "IP_AUDIT_ACTION_OPTIONS", "IPAuditAction"),
+    (SwitchDeviceTypeCode, "SwitchDeviceType", None, "SWITCH_DEVICE_TYPE_OPTIONS", "SwitchDeviceType"),
+    (SSHProtocolCode, "SSHProtocol", None, "SSH_PROTOCOL_OPTIONS", "SSHProtocol"),
 ]
 
 
@@ -404,7 +437,8 @@ NOTIFICATION_TYPE_GROUPS = [
                 NotificationTypeCode.ROOM_SCAN_COMPLETE, NotificationTypeCode.ROOM_SCAN_FAILED,
                 NotificationTypeCode.VIRTUAL_ROOM_SCAN_COMPLETE, NotificationTypeCode.VIRTUAL_ROOM_SCAN_FAILED]),
     ("端口/异步操作", [NotificationTypeCode.PORT_ACTION, NotificationTypeCode.ASYNC_ACTION]),
-    ("运维告警", [NotificationTypeCode.RATE_LIMIT_EXCEEDED]),
+    ("运维告警", [NotificationTypeCode.RATE_LIMIT_EXCEEDED,
+                NotificationTypeCode.SERVICE_UNHEALTHY, NotificationTypeCode.SERVICE_RECOVERED]),
     ("资产提醒", [NotificationTypeCode.ASSET_WARRANTY_ALERT]),
 ]
 
@@ -424,6 +458,13 @@ NOTIFICATION_TYPE_LABELS = {
     NotificationTypeCode.ASYNC_ACTION: "异步操作结果",
     NotificationTypeCode.RATE_LIMIT_EXCEEDED: "频率超限",
     NotificationTypeCode.ASSET_WARRANTY_ALERT: "资产到期提醒",
+    NotificationTypeCode.TEMPERATURE_ALERT: "温度告警",
+    NotificationTypeCode.DISK_FAILURE_ALERT: "硬盘故障",
+    NotificationTypeCode.PORT_STATUS_CHANGED: "端口状态变化",
+    NotificationTypeCode.MONITOR_INTERRUPTED: "监控中断",
+    NotificationTypeCode.RAID_FAILURE_ALERT: "RAID故障",
+    NotificationTypeCode.SERVICE_UNHEALTHY: "服务异常",
+    NotificationTypeCode.SERVICE_RECOVERED: "服务恢复",
 }
 
 
@@ -447,22 +488,6 @@ class DeviceSubtypeCode(str, Enum):
     PDU = "pdu"
     UPS = "ups"
     OTHER = "other"
-
-
-class SwitchDeviceTypeCode(str, Enum):
-    """交换机驱动类型枚举（字符串值，前端对应 SwitchDeviceType / SWITCH_DEVICE_TYPE_OPTIONS）
-
-    用于 SSH 自动化驱动的厂商识别，adapter_factory 依据此枚举路由适配器。
-    """
-    HUAWEI = "huawei"
-    H3C = "h3c"
-    CISCO = "cisco"
-
-
-class SSHProtocolCode(str, Enum):
-    """SSH 连接协议枚举（字符串值，前端对应 SSHProtocol）"""
-    SSH = "ssh"
-    TELNET = "telnet"
 
 
 class MonitorProtocolCode(str, Enum):

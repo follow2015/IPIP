@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 
 import { useState, useCallback } from 'react';
 import dayjs, { Dayjs } from 'dayjs';
@@ -61,6 +61,7 @@ function serializeAssetDate(value: unknown): unknown {
 }
 
 function AssetTab({ device }: AssetTabProps) {
+  const confirm = useConfirm();
   const warrantyStatus = getWarrantyStatus(device);
   const updateDevice = useUpdateDevice();
   const resetAsset = useBatchResetDeviceAsset();
@@ -147,7 +148,7 @@ function AssetTab({ device }: AssetTabProps) {
         }
       }
     });
-  }, [device.id, device.device_name, resetAsset]);
+  }, [confirm, device.id, device.device_name, resetAsset]);
 
   return (
     <>
@@ -161,7 +162,7 @@ function AssetTab({ device }: AssetTabProps) {
         </Button>
       </div>
 
-      <Descriptions column={2} bordered size="small">
+      <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
         {/* 资产编号 */}
         <Descriptions.Item label="资产编号">{device.asset_number ?? '-'}</Descriptions.Item>
         <Descriptions.Item label="保修状态">

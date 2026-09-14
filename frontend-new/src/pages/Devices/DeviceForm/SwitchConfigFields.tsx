@@ -20,29 +20,29 @@ export default function SwitchConfigFields({ isEdit }: SwitchConfigFieldsProps) 
       styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
     >
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name={['switch_config', 'ip']} label="管理IP">
             <Input placeholder="管理IP" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name={['switch_config', 'port']} label="SSH端口" initialValue={22}>
             <InputNumber min={1} max={65535} style={{ width: '100%' }} placeholder="默认22" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name={['switch_config', 'protocol']} label="协议" initialValue="ssh">
             <Select placeholder="请选择" options={SSH_PROTOCOL_OPTIONS} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name={['switch_config', 'username']} label="用户名">
             <Input placeholder="登录用户名" />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item
             name={['switch_config', 'password']}
             label="密码"
@@ -51,7 +51,7 @@ export default function SwitchConfigFields({ isEdit }: SwitchConfigFieldsProps) 
             <Input.Password placeholder={isEdit ? '留空则不修改' : '登录密码'} />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item
             name={['switch_config', 'authentication_method']}
             label="认证方法"
@@ -68,7 +68,7 @@ export default function SwitchConfigFields({ isEdit }: SwitchConfigFieldsProps) 
         </Col>
       </Row>
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name={['switch_config', 'device_type']} label="设备驱动">
             <Select placeholder="请选择" allowClear options={SWITCH_DEVICE_TYPE_OPTIONS} />
           </Form.Item>

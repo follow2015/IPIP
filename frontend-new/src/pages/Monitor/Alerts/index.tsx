@@ -9,7 +9,6 @@ import { useState } from 'react';
 import {
   Card,
   Tag,
-  Table,
   Button,
   Space,
   Select,
@@ -22,7 +21,9 @@ import {
   Descriptions,
   Input
 } from 'antd';
+import type { Breakpoint } from 'antd';
 import DataTable from '@/components/DataTable';
+import { useResponsive } from '@/hooks/useResponsive';
 import BatchActionBar from '@/components/BatchActionBar/BatchActionBar';
 import {
   ReloadOutlined,
@@ -52,8 +53,7 @@ import {
 import { useMessage } from '@/hooks/useMessage';
 import { useTable } from '@/hooks/useTable';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
-import { NotificationTypeCode } from '@/types/status-codes.generated';
-import { SEVERITY_OPTIONS, SEVERITY_COLOR_MAP } from '@/types/enums';
+import { NotificationTypeCode, SEVERITY_OPTIONS, SEVERITY_COLOR_MAP } from '@/types/enums';
 import { translateProbeError, formatDateTime, relativeTime } from '@/utils/format';
 import { ALERT_TYPE_LABEL, ALERT_TYPE_COLOR } from '@/constants/monitor';
 
@@ -116,6 +116,7 @@ export default function MonitorAlerts() {
   const [ackModalOpen, setAckModalOpen] = useState(false);
   const [ackTarget, setAckTarget] = useState<MonitorAlertItem | null>(null);
   const [ackNote, setAckNote] = useState('');
+  const { isMobile } = useResponsive();
 
   const query: MonitorAlertQuery = {
     alert_type: alertType || undefined,
@@ -242,6 +243,7 @@ export default function MonitorAlerts() {
       dataIndex: 'device_type',
       key: 'device_type',
       width: 100,
+      responsive: ['md'] satisfies Breakpoint[], // ≥768
       render: (t: string | null) => (t ? <Tag>{t}</Tag> : '-')
     },
     {
@@ -249,6 +251,7 @@ export default function MonitorAlerts() {
       dataIndex: 'management_ip',
       key: 'management_ip',
       width: 140,
+      responsive: ['md'] satisfies Breakpoint[], // ≥768
       render: (ip: string | null) => ip || '-'
     },
     {
@@ -264,6 +267,7 @@ export default function MonitorAlerts() {
       title: '指标实例',
       key: 'metric_instance',
       width: 140,
+      responsive: ['lg'] satisfies Breakpoint[], // ≥992
       render: (_: unknown, record: MonitorAlertItem) => {
         try {
           const parsed = record.payload_json ? JSON.parse(record.payload_json) : null;
@@ -292,6 +296,7 @@ export default function MonitorAlerts() {
       dataIndex: 'status',
       key: 'status',
       width: 100,
+      responsive: ['sm'] satisfies Breakpoint[], // ≥576
       render: (s: string) => <Tag color={STATUS_COLOR[s] || 'default'}>{s}</Tag>
     },
     {
@@ -300,6 +305,7 @@ export default function MonitorAlerts() {
       key: 'attempts',
       width: 90,
       align: 'center' as const,
+      responsive: ['lg'] satisfies Breakpoint[], // ≥992
       render: (n: number) => (n > 0 ? <Text type="danger">{n}</Text> : '-')
     },
     {
@@ -316,6 +322,7 @@ export default function MonitorAlerts() {
       dataIndex: 'last_error',
       key: 'last_error',
       ellipsis: true,
+      responsive: ['lg'] satisfies Breakpoint[], // ≥992
       render: (e: string | null) =>
         e ? (
           <Text type="danger" ellipsis title={e}>
@@ -330,58 +337,101 @@ export default function MonitorAlerts() {
       key: 'action',
       width: 180,
       fixed: 'right' as const,
-      render: (_: unknown, record: MonitorAlertItem) => (
-        <Space size="small">
-          {/* P1-6: 告警详情 */}
-          <Button size="small" onClick={() => setDetailId(record.id)}>
-            详情
-          </Button>
-          {record.device_id != null && (
-            <Tooltip title="查看历史趋势">
-              <Button
-                size="small"
-                icon={<LineChartOutlined />}
-                onClick={() => navigate(`/monitor/history?deviceId=${record.device_id}`)}
-              />
-            </Tooltip>
-          )}
-          {record.status === 'failed' && (
-            <Button
-              size="small"
-              icon={<RedoOutlined />}
-              loading={retryAlert.isPending && retryAlert.variables === record.id}
-              onClick={() => handleRetry(record)}
-            >
-              重试
-            </Button>
-          )}
-          {/* G9: 人工确认/认领 */}
-          <Button size="small" icon={<CheckOutlined />} onClick={() => openAckModal(record)}>
-            {record.acknowledged_by ? '已确认' : '确认'}
-          </Button>
-          {/* P2-16: 手动关闭 */}
-          {!record.closed_at && (
-            <Button
-              size="small"
-              danger
-              onClick={() => handleClose(record)}
-              loading={closeAlert.isPending && closeAlert.variables?.alertId === record.id}
-            >
-              关闭
-            </Button>
-          )}
-        </Space>
-      )
+      render: (_: unknown, record: MonitorAlertItem) => renderActions(record)
     }
   ];
+
+  const renderActions = (record: MonitorAlertItem) => (
+    <Space size="small" wrap>
+      {/* P1-6: 告警详情 */}
+      <Button size="small" onClick={() => setDetailId(record.id)}>
+        详情
+      </Button>
+      {record.device_id != null && (
+        <Tooltip title="查看历史趋势">
+          <Button
+            size="small"
+            icon={<LineChartOutlined />}
+            onClick={() => navigate(`/monitor/history?deviceId=${record.device_id}`)}
+          />
+        </Tooltip>
+      )}
+      {record.status === 'failed' && (
+        <Button
+          size="small"
+          icon={<RedoOutlined />}
+          loading={retryAlert.isPending && retryAlert.variables === record.id}
+          onClick={() => handleRetry(record)}
+        >
+          重试
+        </Button>
+      )}
+      {/* G9: 人工确认/认领 */}
+      <Button size="small" icon={<CheckOutlined />} onClick={() => openAckModal(record)}>
+        {record.acknowledged_by ? '已确认' : '确认'}
+      </Button>
+      {/* P2-16: 手动关闭 */}
+      {!record.closed_at && (
+        <Button
+          size="small"
+          danger
+          onClick={() => handleClose(record)}
+          loading={closeAlert.isPending && closeAlert.variables?.alertId === record.id}
+        >
+          关闭
+        </Button>
+      )}
+    </Space>
+  );
+
+  const renderAlertCard = (record: MonitorAlertItem) => (
+    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <Space size={4} wrap>
+          <Tag color={SEVERITY_COLOR_MAP[record.severity] || 'default'}>{record.severity}</Tag>
+          <Tag color={ALERT_TYPE_COLOR[record.alert_type] || 'default'}>
+            {ALERT_TYPE_LABEL[record.alert_type] || record.alert_type}
+          </Tag>
+          <Tag color={STATUS_COLOR[record.status] || 'default'}>{record.status}</Tag>
+        </Space>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {formatDateTime(record.created_at)}
+        </Text>
+      </div>
+      <div>
+        {record.device_id == null || !record.device_name ? (
+          <Text type="secondary">已删除设备</Text>
+        ) : (
+          <Link to={`/devices/${record.device_id}`}>{record.device_name}</Link>
+        )}
+        {record.management_ip && (
+          <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
+            {record.management_ip}
+          </Text>
+        )}
+      </div>
+      {record.last_error && (
+        <Text type="danger" style={{ fontSize: 12 }} ellipsis>
+          {translateProbeError(record.last_error)}
+        </Text>
+      )}
+      {renderActions(record)}
+    </Space>
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* 过滤栏 */}
       <Card variant="borderless" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-        <Space wrap size="middle">
+        {/* 移动端：垂直堆叠 + 控件全宽；桌面端保持原横向 wrap 布局 */}
+        <Space
+          direction={isMobile ? 'vertical' : 'horizontal'}
+          wrap={!isMobile}
+          size="middle"
+          style={isMobile ? { width: '100%' } : undefined}
+        >
           <Select
-            style={{ width: 160 }}
+            style={{ width: isMobile ? '100%' : 160 }}
             value={alertType}
             options={ALERT_TYPE_OPTIONS}
             onChange={(v) => {
@@ -391,7 +441,7 @@ export default function MonitorAlerts() {
             placeholder="告警类型"
           />
           <Select
-            style={{ width: 140 }}
+            style={{ width: isMobile ? '100%' : 140 }}
             value={severity}
             options={[{ label: '全部', value: '' }, ...SEVERITY_OPTIONS]}
             onChange={(v) => {
@@ -401,6 +451,7 @@ export default function MonitorAlerts() {
             placeholder="严重级别"
           />
           <Segmented
+            style={{ width: isMobile ? '100%' : undefined }}
             options={STATUS_OPTIONS}
             value={status}
             onChange={(v) => {
@@ -409,6 +460,7 @@ export default function MonitorAlerts() {
             }}
           />
           <RangePicker
+            style={{ width: isMobile ? '100%' : undefined }}
             value={range}
             onChange={(v) => {
               setRange(v as [Dayjs, Dayjs] | null);
@@ -417,6 +469,7 @@ export default function MonitorAlerts() {
             disabledDate={(cur) => cur && cur > dayjs().endOf('day')}
           />
           <Segmented
+            style={{ width: isMobile ? '100%' : undefined }}
             options={[
               { label: '全部可见', value: 'all' },
               { label: '我负责的', value: 'mine' }
@@ -429,6 +482,7 @@ export default function MonitorAlerts() {
           />
           {/* P2-10: 聚合视图切换 */}
           <Segmented
+            style={{ width: isMobile ? '100%' : undefined }}
             options={[
               { label: '列表视图', value: 'list' },
               { label: '聚合视图', value: 'aggregation' }
@@ -443,7 +497,7 @@ export default function MonitorAlerts() {
             value={metricKey}
             onChange={(e) => setMetricKey(e.target.value)}
             onPressEnter={() => table.setPage(1)}
-            style={{ width: 180 }}
+            style={{ width: isMobile ? '100%' : 180 }}
           />
           <Input
             allowClear
@@ -451,20 +505,24 @@ export default function MonitorAlerts() {
             value={indexKey}
             onChange={(e) => setIndexKey(e.target.value)}
             onPressEnter={() => table.setPage(1)}
-            style={{ width: 180 }}
+            style={{ width: isMobile ? '100%' : 180 }}
           />
           <Button
             icon={<ReloadOutlined />}
             onClick={() => table.setPage(table.page)}
             loading={isFetching}
+            block={isMobile}
           >
             刷新
           </Button>
-          <Button onClick={resetFilters}>重置</Button>
+          <Button onClick={resetFilters} block={isMobile}>
+            重置
+          </Button>
           {/* G5: 导出告警 CSV */}
           <Button
             icon={<DownloadOutlined />}
             loading={exportAlerts.isPending}
+            block={isMobile}
             onClick={async () => {
               try {
                 await exportAlerts.mutateAsync(query);
@@ -485,11 +543,13 @@ export default function MonitorAlerts() {
         style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
       >
         {viewMode === 'aggregation' ? (
-          <Table<MonitorAlertAggregationItem>
+          <DataTable<MonitorAlertAggregationItem>
             rowKey={(r) => `${r.alert_type}-${r.severity}-${r.device_id ?? 'null'}`}
             dataSource={aggregations.data ?? []}
             loading={aggregations.isLoading}
             pagination={{ pageSize: 20, showSizeChanger: false }}
+            searchable={false}
+            showCard={false}
             columns={[
               {
                 title: '告警类型',
@@ -521,16 +581,19 @@ export default function MonitorAlerts() {
               {
                 title: '首次',
                 dataIndex: 'first_at',
+                responsive: ['lg'] satisfies Breakpoint[], // ≥992
                 render: (v: string) => (v ? dayjs(v).format('MM-DD HH:mm:ss') : '-')
               },
               {
                 title: '最近',
                 dataIndex: 'last_at',
+                responsive: ['sm'] satisfies Breakpoint[], // ≥576
                 render: (v: string) => (v ? dayjs(v).format('MM-DD HH:mm:ss') : '-')
               },
               {
                 title: '样本告警 ID',
                 dataIndex: 'sample_ids',
+                responsive: ['lg'] satisfies Breakpoint[], // ≥992
                 render: (ids: number[]) => ids.join(', ')
               }
             ]}
@@ -574,6 +637,8 @@ export default function MonitorAlerts() {
               searchable={false}
               showCard={false}
               tableProps={table}
+              mobileCardMode
+              cardRender={renderAlertCard}
             />
           </>
         )}
@@ -591,6 +656,7 @@ export default function MonitorAlerts() {
         confirmLoading={ackAlert.isPending}
         okText="确认"
         cancelText="取消"
+        width={isMobile ? 'calc(100vw - 32px)' : 520}
       >
         {ackTarget && (
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -617,13 +683,13 @@ export default function MonitorAlerts() {
         title="告警详情"
         open={detailId != null}
         onClose={() => setDetailId(null)}
-        width={640}
+        width={isMobile ? '100vw' : 640}
         destroyOnClose
       >
         {detailQuery.isLoading && <Typography.Text type="secondary">加载中…</Typography.Text>}
         {detailQuery.data && (
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            <Descriptions column={2} bordered size="small">
+            <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
               <Descriptions.Item label="告警ID">{detailQuery.data.id}</Descriptions.Item>
               <Descriptions.Item label="类型">
                 <Tag color={ALERT_TYPE_COLOR[detailQuery.data.alert_type] || 'default'}>

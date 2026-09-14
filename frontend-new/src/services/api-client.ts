@@ -13,7 +13,7 @@ import axios, {
   type AxiosResponse,
   type AxiosRequestConfig
 } from 'axios';
-import type { ApiResponse, BackendPaginatedData } from '@/types/api';
+import type { ApiResponse, ApiResponseMaybe, BackendPaginatedData } from '@/types/api';
 import { adaptPaginatedResponse } from '@/types/api';
 
 interface ApiErrorData {
@@ -207,6 +207,15 @@ export async function get<T>(
   config?: AxiosRequestConfig
 ): Promise<ApiResponse<T>> {
   const res = await apiClient.get<ApiResponse<T>>(url, { params, ...config });
+  return res.data;
+}
+
+export async function getMaybe<T>(
+  url: string,
+  params?: Record<string, unknown>,
+  config?: AxiosRequestConfig
+): Promise<ApiResponseMaybe<T>> {
+  const res = await apiClient.get<ApiResponseMaybe<T>>(url, { params, ...config });
   return res.data;
 }
 

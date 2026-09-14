@@ -9,20 +9,12 @@
 """
 import json
 from app.utils.logging import get_logger
+from app.utils.redis_client import get_redis_client
 from typing import Optional
 
 logger = get_logger(__name__)
 
 _CACHE_TTL = 300  # 5 分钟
-
-
-def _get_redis():
-    try:
-        from app.services.switch_events import _get_redis
-        return _get_redis()
-    except Exception:
-        logger.warning("threshold_override Redis 客户端获取失败，降级为无缓存", exc_info=True)
-        return None
 
 
 def _cache_key(device_id: int, metric_key: str) -> str:
@@ -44,7 +36,7 @@ def get_effective_threshold(
     Returns:
         阈值 dict 或 None
     """
-    r = _get_redis()
+    r = get_redis_client()
     ck = _cache_key(device_id, metric_key)
     if r is not None:
         try:
@@ -84,7 +76,7 @@ def get_effective_threshold(
 
 def invalidate_cache(device_id: int, metric_key: Optional[str] = None):
     """失效缓存（覆盖变更时调用）"""
-    r = _get_redis()
+    r = get_redis_client()
     if r is None:
         return
     try:

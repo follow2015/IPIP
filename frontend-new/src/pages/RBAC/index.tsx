@@ -194,6 +194,7 @@ function RBAC() {
                   rowKey="id"
                   loading={rolesLoading}
                   size="small"
+                  scroll={{ x: 'max-content' }}
                 />
               </>
             )
@@ -209,6 +210,7 @@ function RBAC() {
                 loading={permsLoading}
                 size="small"
                 pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 条` }}
+                scroll={{ x: 'max-content' }}
               />
             )
           }

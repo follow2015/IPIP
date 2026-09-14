@@ -29,7 +29,7 @@ export default function ChassisConfigFields({
     <>
       <Divider plain>机箱节点配置</Divider>
       <Row gutter={16}>
-        <Col span={6}>
+        <Col xs={12} md={6}>
           <Form.Item
             name="node_rows"
             label="节点行数"
@@ -48,7 +48,7 @@ export default function ChassisConfigFields({
             />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col xs={12} md={6}>
           <Form.Item
             name="node_cols"
             label="节点列数"
@@ -67,7 +67,7 @@ export default function ChassisConfigFields({
             />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col xs={12} md={6}>
           <Form.Item name="total_nodes" label="总节点数">
             <InputNumber
               min={1}
@@ -78,7 +78,7 @@ export default function ChassisConfigFields({
             />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col xs={12} md={6}>
           <Form.Item name="node_naming_pattern" label="命名规则">
             <Input placeholder="{NAME}-Node{POS}" />
           </Form.Item>

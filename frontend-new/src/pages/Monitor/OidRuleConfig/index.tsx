@@ -11,7 +11,6 @@ import { useState } from 'react';
 import {
   Card,
   Tabs,
-  Table,
   Button,
   Space,
   Modal,
@@ -72,6 +71,7 @@ function CategoryRulesTab() {
   const [form] = Form.useForm();
   const watchDeviceType = Form.useWatch('device_type', form) ?? '';
   const table = useTable({ initialPerPage: 50 });
+
 
   const watchVendorId = Form.useWatch('vendor_id', form) as string | undefined;
   const vendorOptions: { key: string | number; label: string; value: string }[] = (
@@ -256,7 +256,7 @@ function CategoryRulesTab() {
             <Input placeholder="1.3.6.1.4.1.674.10892.5.4.300" />
           </Form.Item>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="category"
                 label="category"
@@ -265,19 +265,19 @@ function CategoryRulesTab() {
                 <Input placeholder="temperature" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item name="label" label="标签">
                 <Input placeholder="温度探头" />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="device_type" label="设备类型">
                 <Select options={DEVICE_TYPE_OPTIONS} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="vendor_id" label="厂商">
                 <Select
                   options={vendorOptions ?? []}
@@ -290,7 +290,7 @@ function CategoryRulesTab() {
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="priority" label="优先级">
                 <InputNumber min={0} max={999} style={{ width: '100%' }} />
               </Form.Item>
@@ -368,13 +368,15 @@ function RecommendConfigTab() {
 
   return (
     <Card title="设备类型推荐配置">
-      <Table
+      <DataTable
         rowKey="device_type"
         columns={columns}
         dataSource={data?.items ?? []}
         loading={isLoading}
         pagination={false}
         size="small"
+        searchable={false}
+        showCard={false}
       />
       <Modal
         title={`编辑推荐配置：${editingType}`}
@@ -394,7 +396,7 @@ function RecommendConfigTab() {
         >
           <Row>
             {allCategories.map((c) => (
-              <Col span={8} key={c}>
+              <Col xs={24} md={8} key={c}>
                 <Checkbox value={c}>{c}</Checkbox>
               </Col>
             ))}

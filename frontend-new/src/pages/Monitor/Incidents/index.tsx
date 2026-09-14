@@ -1,16 +1,6 @@
 import { useState } from 'react';
-import {
-  Card,
-  Table,
-  Tag,
-  Space,
-  Select,
-  Button,
-  Drawer,
-  Descriptions,
-  Typography,
-  Tooltip
-} from 'antd';
+import { Card, Tag, Space, Select, Button, Drawer, Descriptions, Typography, Tooltip } from 'antd';
+import DataTable from '@/components/DataTable';
 import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -20,6 +10,7 @@ import {
   type IncidentListParams
 } from '@/services/monitor';
 import { formatDateTime } from '@/utils/format';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const { Text } = Typography;
 
@@ -55,6 +46,8 @@ export default function MonitorIncidents() {
   const items = (data?.items ?? []) as IncidentItem[];
   const total = data?.total ?? 0;
 
+  const { isMobile } = useResponsive();
+
   const columns: ColumnsType<IncidentItem> = [
     {
       title: '事件标题',
@@ -86,9 +79,11 @@ export default function MonitorIncidents() {
       dataIndex: 'alert_count',
       key: 'alert_count',
       width: 80,
-      align: 'right'
+      align: 'right',
+      responsive: ['sm'] // ≥576
     },
     {
+      responsive: ['md'], // ≥768
       title: '影响设备数',
       dataIndex: 'device_count',
       key: 'device_count',
@@ -101,6 +96,7 @@ export default function MonitorIncidents() {
       )
     },
     {
+      responsive: ['lg'], // ≥992
       title: '归并原因',
       dataIndex: 'reason_code',
       key: 'reason_code',
@@ -115,6 +111,7 @@ export default function MonitorIncidents() {
       render: (t: string | null) => (t ? formatDateTime(t) : '-')
     },
     {
+      responsive: ['md'], // ≥768
       title: '末告时间',
       dataIndex: 'last_alert_at',
       key: 'last_alert_at',
@@ -122,6 +119,30 @@ export default function MonitorIncidents() {
       render: (t: string | null) => (t ? formatDateTime(t) : '-')
     }
   ];
+
+  const renderIncidentCard = (row: IncidentItem) => (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      {/* inline-block + padding 撑出 ≥32px 触摸区域：裸 <a> 行内盒高度不足，窄屏难以点中 */}
+      <a
+        onClick={() => setSelectedId(row.id)}
+        style={{ fontWeight: 500, display: 'inline-block', padding: '6px 0', minHeight: 32 }}
+      >
+        {row.title}
+      </a>
+      <Space size={4} wrap>
+        <Tag color={SEVERITY_COLOR[row.severity] ?? 'default'}>{row.severity}</Tag>
+        <Tag color={STATUS_COLOR[row.status] ?? 'default'}>{row.status}</Tag>
+        {row.reason_code && <Tag>{REASON_LABEL[row.reason_code] ?? row.reason_code}</Tag>}
+      </Space>
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        告警 {row.alert_count} · 影响设备 {row.device_count}
+      </Text>
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        首告 {row.first_alert_at ? formatDateTime(row.first_alert_at) : '-'} · 末告{' '}
+        {row.last_alert_at ? formatDateTime(row.last_alert_at) : '-'}
+      </Text>
+    </Space>
+  );
 
   return (
     <Card
@@ -151,7 +172,9 @@ export default function MonitorIncidents() {
         </Space>
       }
     >
-      <Table<IncidentItem>
+      <DataTable<IncidentItem>
+        searchable={false}
+        showCard={false}
         rowKey="id"
         columns={columns}
         dataSource={items}
@@ -164,18 +187,21 @@ export default function MonitorIncidents() {
           onChange: (page, per_page) => setParams((p) => ({ ...p, page, per_page }))
         }}
         onRow={(row) => ({ onClick: () => setSelectedId(row.id) })}
+        mobileCardMode
+        cardRender={renderIncidentCard}
       />
 
       <Drawer
         title="事件详情"
         open={selectedId != null}
         onClose={() => setSelectedId(null)}
-        width={680}
+        width={isMobile ? '100vw' : 680}
         loading={detailLoading}
       >
         {detail && (
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            <Descriptions column={2} bordered size="small">
+            {/* 统一为响应式列数配置，避免 JS 分支与 antd 断点两套语义并存 */}
+            <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
               <Descriptions.Item label="事件标题" span={2}>
                 {detail.title}
               </Descriptions.Item>
@@ -206,7 +232,9 @@ export default function MonitorIncidents() {
             </Descriptions>
 
             <Card size="small" title={`关联告警（${detail.related_alerts.length}）`}>
-              <Table
+              <DataTable
+                searchable={false}
+                showCard={false}
                 rowKey="id"
                 size="small"
                 pagination={{ pageSize: 5 }}
@@ -225,7 +253,9 @@ export default function MonitorIncidents() {
             </Card>
 
             <Card size="small" title={`被抑制的下游设备（${detail.suppressed_logs.length}）`}>
-              <Table
+              <DataTable
+                searchable={false}
+                showCard={false}
                 rowKey={(r) => `${r.device_id}-${r.created_at}`}
                 size="small"
                 pagination={{ pageSize: 5 }}

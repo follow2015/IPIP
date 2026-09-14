@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button, Space, Tag, Dropdown, Tooltip, Badge, Modal } from 'antd';
 import {
@@ -386,6 +386,7 @@ const DEVICE_FILTER_RESETS = {
 };
 
 function Devices() {
+  const confirm = useConfirm();
   const table = useTable({ filterResets: DEVICE_FILTER_RESETS });
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();

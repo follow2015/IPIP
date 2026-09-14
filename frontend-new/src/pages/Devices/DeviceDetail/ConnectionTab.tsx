@@ -1,7 +1,8 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Table, Button, Form, Tag, Alert } from 'antd';
+import { Button, Form, Tag, Alert } from 'antd';
+import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import ConnectionFormModal from './ConnectionFormModal';
 import ConnectionEditModal from './ConnectionEditModal';
@@ -53,6 +54,7 @@ interface ConnectionTabProps {
 }
 
 function ConnectionTab({ device }: ConnectionTabProps) {
+  const confirm = useConfirm();
   const deviceId = device.id;
   const isNetworkDevice = device.device_type === DeviceType.NETWORK;
   const {
@@ -242,7 +244,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         }
       });
     },
-    [deleteConnection, message]
+    [confirm, deleteConnection, message]
   );
 
   const handleDeletePortLink = useCallback(
@@ -260,7 +262,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         }
       });
     },
-    [disconnectPortLink, message]
+    [confirm, disconnectPortLink, message]
   );
 
   const handleSubmit = async () => {
@@ -501,12 +503,15 @@ function ConnectionTab({ device }: ConnectionTabProps) {
           description="请检查网络后重试，或联系管理员。"
         />
       )}
-      <Table
+      <DataTable
         columns={columns}
         dataSource={connections ?? []}
         rowKey="id"
         loading={isLoadingConnections}
         size="small"
+        showCard={false}
+        searchable={false}
+        pagination={DENSE_PAGINATION}
       />
 
       <ConnectionFormModal

@@ -1,0 +1,78 @@
+/**
+ * 全局响应式样式
+ *
+ * 项目首个 CSS 文件（此前为零 CSS，纯 AntD + 内联 style）。
+ * 定位：只处理「纯 CSS 更好解决」的问题，布局分支逻辑仍走 useResponsive()。
+ *
+ * 注意：AntD v6 使用 CSS-in-JS，组件样式在运行时注入 <style>，
+ * 因此覆盖组件内边距等属性时需要 !important 才能稳定生效。
+ *
+ * 断点阈值必须与 src/hooks/useResponsive.ts 的 RESPONSIVE_BREAKPOINTS 一致
+ * （移动端 = max-width: md - 1 = 767px）。该一致性由 useResponsive.test.tsx 钉住。
+ */
+
+/* ========== 移动端（<768px，与 useResponsive().isMobile 同阈值） ========== */
+
+@media (max-width: 767px) {
+  /* 收紧容器内边距，把宽度还给内容。
+     :not([style]) —— 跳过带内联 style 的元素：调用方显式设置的 padding
+     （如拓扑页 bodyStyle={{ padding: 0 }}）属刻意意图，不应被兜底规则压掉。 */
+  .ant-card-body:not([style]) {
+    padding: 12px !important;
+  }
+  .ant-card-head:not([style]) {
+    padding: 0 12px !important;
+  }
+
+  /* 表格横向滚动兜底（DataTable 已内置 scroll.x，此处防止撑破外层布局） */
+  .ant-table-wrapper {
+    overflow-x: auto;
+  }
+
+  /* 统计数值缩小，避免窄屏撑破卡片 */
+  .ant-statistic-content {
+    font-size: 22px !important;
+  }
+
+  /* 长文本 / 长 IP 不撑破单元格 */
+  .ant-table-cell,
+  .ant-descriptions-item-content {
+    word-break: break-word;
+  }
+
+  /* 描述列表标签不换行，避免窄屏错行 */
+  .ant-descriptions-item-label {
+    white-space: nowrap;
+  }
+}
+
+/* ========== 触摸设备：放大点按目标（对齐 iOS HIG 44px 建议） ========== */
+
+/*
+ * 以下 4 条原本缺 !important：antd CSS-in-JS 的规则在运行时注入 head 末尾，
+ * 同特异性下后注入者胜，组件官方样式会反过来压掉这些兜底，
+ * 导致触摸目标放大的意图整体失效。
+ *
+ * 判定用 pointer: coarse（指针精度）而非按屏宽猜触摸设备：
+ * 窄窗口的桌面浏览器不应被当成触摸设备。
+ */
+@media (pointer: coarse) {
+  .ant-btn-sm {
+    min-height: 32px !important;
+  }
+
+  /* 行高 ≥44px，提升值守时点按准确率 */
+  .ant-table-tbody > tr > td {
+    padding-block: 10px !important;
+  }
+
+  /* 分页器可点区域放大 */
+  .ant-pagination-item {
+    min-width: 36px !important;
+  }
+
+  /* 下拉/选择器选项放大，便于手指点选 */
+  .ant-select-item-option {
+    min-height: 36px !important;
+  }
+}

@@ -26,6 +26,7 @@ import {
   Empty,
   Alert
 } from 'antd';
+import { useResponsive } from '@/hooks/useResponsive';
 import {
   ApartmentOutlined,
   CloudServerOutlined,
@@ -61,6 +62,7 @@ const TopologyPage: React.FC = () => {
   const [autoDetectModalOpen, setAutoDetectModalOpen] = useState(false);
   const [discoveryModalOpen, setDiscoveryModalOpen] = useState(false);
   const graphRef = useRef<TopologyGraphHandle>(null);
+  const { isMobile } = useResponsive();
 
   const { data: roomOptions } = useRoomOptions();
   const { data: virtualRoomsData } = useVirtualRooms({ per_page: 200 });
@@ -181,16 +183,23 @@ const TopologyPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: 16, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{
+        padding: isMobile ? 12 : 16,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
       {/* 顶部控制栏 */}
       <Card
         size="small"
         style={{ marginBottom: 12, borderRadius: 8 }}
-        styles={{ body: { padding: '8px 16px' } }}
+        styles={{ body: { padding: isMobile ? '8px 12px' : '8px 16px' } }}
       >
-        <Row justify="space-between" align="middle">
-          <Col>
-            <Space size="middle">
+        <Row justify="space-between" align="middle" gutter={[8, 8]}>
+          <Col xs={24} md="auto">
+            <Space size="middle" wrap>
               <Radio.Group
                 value={viewMode}
                 onChange={(e) => setViewMode(e.target.value)}
@@ -213,7 +222,7 @@ const TopologyPage: React.FC = () => {
               <Select
                 placeholder="选择机房"
                 allowClear
-                style={{ width: 200 }}
+                style={{ width: isMobile ? '100%' : 200 }}
                 size="small"
                 value={
                   virtualRoomId ? `vr_${virtualRoomId}` : roomId ? `room_${roomId}` : undefined
@@ -256,8 +265,8 @@ const TopologyPage: React.FC = () => {
             </Space>
           </Col>
 
-          <Col>
-            <Space size="middle">
+          <Col xs={24} md="auto">
+            <Space size="middle" wrap>
               {/* 统计 */}
               {statsItems.map((item) => (
                 <Statistic
@@ -314,6 +323,16 @@ const TopologyPage: React.FC = () => {
           onFitView={() => graphRef.current?.fitView()}
           onSearch={handleSearch}
         />
+
+        {isMobile && (
+          <Alert
+            banner
+            type="info"
+            showIcon
+            message="拓扑图支持单指拖动、双指缩放；节点较密集时建议在桌面端查看"
+            style={{ fontSize: 12 }}
+          />
+        )}
 
         <div style={{ flex: 1, position: 'relative' }}>
           {isLoading && (
@@ -382,7 +401,7 @@ const TopologyPage: React.FC = () => {
         title="自动推断结果预览"
         open={autoDetectModalOpen}
         onCancel={() => setAutoDetectModalOpen(false)}
-        width={600}
+        width={isMobile ? 'calc(100vw - 24px)' : 600}
         footer={[
           <Button key="cancel" onClick={() => setAutoDetectModalOpen(false)}>
             取消
@@ -409,6 +428,7 @@ const TopologyPage: React.FC = () => {
           dataSource={autoDetectMutation.data?.changes ?? []}
           rowKey="device_id"
           pagination={false}
+          scroll={{ x: 'max-content' }}
         />
       </Modal>
     </div>

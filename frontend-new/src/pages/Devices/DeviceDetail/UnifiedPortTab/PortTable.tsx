@@ -28,6 +28,7 @@ export const PortTable = memo<PortTableProps>(
       rowClassName={(record) =>
         record.port_name === highlightPort ? 'ant-table-row-selected' : ''
       }
+      scroll={{ x: 'max-content' }}
     />
   )
 );

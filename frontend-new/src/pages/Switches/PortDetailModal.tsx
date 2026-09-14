@@ -10,7 +10,7 @@ interface PortDetailModalProps {
   onClose: () => void;
   portName: string;
   port: SwitchPort;
-  portDetail?: SwitchPortDetail;
+  portDetail?: SwitchPortDetail | null;
   loadingDetail: boolean;
   portConfig: PortConfigResult | null;
   portType: string;
@@ -92,7 +92,7 @@ export function PortDetailModal({
         <Spin />
       ) : portDetail ? (
         <div>
-          <Descriptions bordered size="small" column={2}>
+          <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
             <Descriptions.Item label="端口号">
               <code>{portName}</code>
             </Descriptions.Item>

@@ -6,9 +6,10 @@
  * 流量数值自适应进位：bps → Kbps → Mbps → Gbps。
  */
 import { useMemo, useState } from 'react';
-import { Card, Empty, Segmented, Select, Button, Space, message } from 'antd';
+import { Card, Empty, Segmented, Select, Button, Space } from 'antd';
 import { Line } from '@ant-design/charts';
 import { useDeviceTrafficPorts, useDeviceTraffic } from '@/services/monitor';
+import { useMessage } from '@/hooks/useMessage';
 
 const RANGE_MAP: Record<string, number> = {
   '1小时': 3600,
@@ -31,6 +32,7 @@ function fmt(n: number): string {
 }
 
 export default function TrafficChart({ deviceId }: { deviceId: number }) {
+  const message = useMessage();
   const [rangeKey, setRangeKey] = useState('1小时');
   const [selectedPort, setSelectedPort] = useState<string | undefined>(undefined);
   const [shouldFetch, setShouldFetch] = useState(false);

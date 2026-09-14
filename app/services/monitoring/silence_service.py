@@ -13,6 +13,7 @@
 """
 import json
 from app.utils.logging import get_logger
+from app.utils.redis_client import get_redis_client
 from datetime import datetime
 from typing import List, Optional
 from app.utils.time_utils import now_utc_naive
@@ -21,11 +22,6 @@ logger = get_logger(__name__)
 
 _CACHE_KEY = "monitor:silence:active"
 _CACHE_TTL = 60  # 秒
-
-
-def _get_redis():
-    from app.services.switch_events import _get_redis
-    return _get_redis()
 
 
 def _load_active_rules(now: datetime) -> List[dict]:
@@ -45,7 +41,7 @@ def _load_active_rules(now: datetime) -> List[dict]:
 
 def _get_active_rules(now: datetime) -> List[dict]:
     """获取活跃规则（Redis 缓存 → DB 回源）"""
-    r = _get_redis()
+    r = get_redis_client()
     if r is not None:
         try:
             cached = r.get(_CACHE_KEY)
@@ -94,7 +90,7 @@ def is_silenced(device_id: int, alert_type: str,
 
 def invalidate_cache():
     """失效静默规则缓存（规则变更时调用）"""
-    r = _get_redis()
+    r = get_redis_client()
     if r is not None:
         try:
             r.delete(_CACHE_KEY)

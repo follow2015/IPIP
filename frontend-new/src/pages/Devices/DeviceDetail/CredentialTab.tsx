@@ -25,7 +25,7 @@ import {
   Typography
 } from 'antd';
 import { useMessage } from '@/hooks/useMessage';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import {
   useDeviceMonitorStatus,
   useMonitorCredentials,
@@ -50,6 +50,7 @@ interface CredCandidate {
 }
 
 export default function CredentialTab({ device }: { device: Device }) {
+  const confirm = useConfirm();
   const deviceId = device.id;
   const { data: status } = useDeviceMonitorStatus(deviceId);
   const { data: creds = [] } = useMonitorCredentials();
@@ -479,6 +480,7 @@ function NewCredentialForm({
   onSubmit: (values: Record<string, unknown>) => void;
   configuredProtocols: string[];
 }) {
+  const confirm = useConfirm();
   const [form] = Form.useForm();
 
   const handleFinish = (values: Record<string, unknown>) => {

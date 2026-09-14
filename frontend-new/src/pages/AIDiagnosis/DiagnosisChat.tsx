@@ -33,7 +33,7 @@ import {
 } from '@/services/ai';
 import { usePermission } from '@/hooks/usePermission';
 import { useMessage } from '@/hooks/useMessage';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import DiagnosisResultCard from './DiagnosisResultCard';
 import CommandConfirmCard from './CommandConfirmCard';
 
@@ -50,6 +50,7 @@ interface ChatMessage {
 }
 
 export default function DiagnosisChat() {
+  const confirm = useConfirm();
   const message = useMessage();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -323,7 +324,7 @@ export default function DiagnosisChat() {
         message.error(`验证失败：${e instanceof Error ? e.message : String(e)}`);
       }
     },
-    [deviceId, messages, canAdmin, message]
+    [confirm, deviceId, messages, canAdmin, message]
   );
 
   return (

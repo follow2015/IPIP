@@ -7,13 +7,21 @@
  * - 顶部：触发备份按钮
  */
 import { useState } from 'react';
-import { Tabs, Table, Button, Space, Tag, Modal, Popconfirm } from 'antd';
-import { PlusOutlined, EyeOutlined, SwapOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { useConfirm } from '@/utils/confirm';
+import { Tabs, Button, Space, Tag, Modal } from 'antd';
+import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
+import {
+  PlusOutlined,
+  EyeOutlined,
+  SwapOutlined,
+  CheckOutlined,
+  CloseOutlined
+} from '@ant-design/icons';
 import {
   useDeviceConfigHistory,
   useDeviceConfigChanges,
   useBackupDeviceConfig,
-  useApproveConfigChange,
+  useApproveConfigChange
 } from '@/services/deviceConfig';
 import type { DeviceConfigBackup, DeviceConfigChange } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
@@ -22,7 +30,7 @@ import { formatDateTime } from '@/utils/format';
 const BACKUP_TYPE_MAP: Record<string, { label: string; color: string }> = {
   manual: { label: '手动', color: 'blue' },
   scheduled: { label: '定时', color: 'green' },
-  pre_change: { label: '变更前', color: 'orange' },
+  pre_change: { label: '变更前', color: 'orange' }
 };
 
 const CHANGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -30,7 +38,7 @@ const CHANGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
   pending: { label: '待审批', color: 'orange' },
   approved: { label: '已批准', color: 'green' },
   rejected: { label: '已拒绝', color: 'red' },
-  applied: { label: '已应用', color: 'blue' },
+  applied: { label: '已应用', color: 'blue' }
 };
 
 interface ConfigTabProps {
@@ -38,12 +46,21 @@ interface ConfigTabProps {
 }
 
 function ConfigTab({ deviceId }: ConfigTabProps) {
+  const confirm = useConfirm();
   const message = useMessage();
   const [viewContent, setViewContent] = useState<string | null>(null);
   const [diffContent, setDiffContent] = useState<{ old: string; new: string } | null>(null);
 
-  const { data: backups, isLoading: loadingBackups, refetch: refetchBackups } = useDeviceConfigHistory(deviceId);
-  const { data: changes, isLoading: loadingChanges, refetch: refetchChanges } = useDeviceConfigChanges(deviceId);
+  const {
+    data: backups,
+    isLoading: loadingBackups,
+    refetch: refetchBackups
+  } = useDeviceConfigHistory(deviceId);
+  const {
+    data: changes,
+    isLoading: loadingChanges,
+    refetch: refetchChanges
+  } = useDeviceConfigChanges(deviceId);
   const backupConfig = useBackupDeviceConfig();
   const approveChange = useApproveConfigChange();
 
@@ -86,7 +103,7 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (v: string) => formatDateTime(v),
+      render: (v: string) => formatDateTime(v)
     },
     {
       title: '类型',
@@ -96,22 +113,22 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
       render: (v: string) => {
         const info = BACKUP_TYPE_MAP[v];
         return info ? <Tag color={info.color}>{info.label}</Tag> : <Tag>{v}</Tag>;
-      },
+      }
     },
     {
       title: '文件大小',
       dataIndex: 'file_size',
       key: 'file_size',
       width: 100,
-      render: (v: number | null) => v ? `${(v / 1024).toFixed(1)} KB` : '-',
+      render: (v: number | null) => (v ? `${(v / 1024).toFixed(1)} KB` : '-')
     },
     {
       title: '配置哈希',
       dataIndex: 'config_hash',
       key: 'config_hash',
       width: 120,
-      render: (v: string) => v ? v.slice(0, 12) + '...' : '-',
-      ellipsis: true,
+      render: (v: string) => (v ? v.slice(0, 12) + '...' : '-'),
+      ellipsis: true
     },
     {
       title: '操作',
@@ -119,11 +136,15 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
       width: 140,
       render: (_: unknown, r: DeviceConfigBackup) => (
         <Space>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleView(r)}>查看</Button>
-          <Button type="link" size="small" icon={<SwapOutlined />} onClick={() => handleDiff(r)}>对比</Button>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleView(r)}>
+            查看
+          </Button>
+          <Button type="link" size="small" icon={<SwapOutlined />} onClick={() => handleDiff(r)}>
+            对比
+          </Button>
         </Space>
-      ),
-    },
+      )
+    }
   ];
 
   const changeColumns = [
@@ -132,14 +153,14 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (v: string) => formatDateTime(v),
+      render: (v: string) => formatDateTime(v)
     },
     {
       title: '摘要',
       dataIndex: 'change_summary',
       key: 'change_summary',
       render: (v: string) => v || '-',
-      ellipsis: true,
+      ellipsis: true
     },
     {
       title: '状态',
@@ -149,7 +170,7 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
       render: (v: string) => {
         const info = CHANGE_STATUS_MAP[v];
         return info ? <Tag color={info.color}>{info.label}</Tag> : <Tag>{v}</Tag>;
-      },
+      }
     },
     {
       title: '操作',
@@ -159,12 +180,35 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
         <Space>
           {r.status === 'pending' && (
             <>
-              <Popconfirm title="确定批准此变更？" onConfirm={() => handleApprove(r, 'approve')}>
-                <Button type="link" size="small" icon={<CheckOutlined />} style={{ color: '#52c41a' }}>批准</Button>
-              </Popconfirm>
-              <Popconfirm title="确定拒绝此变更？" onConfirm={() => handleApprove(r, 'reject')}>
-                <Button type="link" size="small" danger icon={<CloseOutlined />}>拒绝</Button>
-              </Popconfirm>
+              <Button
+                type="link"
+                size="small"
+                icon={<CheckOutlined />}
+                style={{ color: '#52c41a' }}
+                onClick={() =>
+                  confirm({
+                    title: '确定批准此变更？',
+                    onOk: () => handleApprove(r, 'approve')
+                  })
+                }
+              >
+                批准
+              </Button>
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<CloseOutlined />}
+                onClick={() =>
+                  confirm({
+                    title: '确定拒绝此变更？',
+                    okButtonProps: { danger: true },
+                    onOk: () => handleApprove(r, 'reject')
+                  })
+                }
+              >
+                拒绝
+              </Button>
             </>
           )}
           {r.status === 'approved' && <Tag color="green">已批准</Tag>}
@@ -172,8 +216,8 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
           {r.status === 'applied' && <Tag color="blue">已应用</Tag>}
           {r.status === 'draft' && <Tag>草稿</Tag>}
         </Space>
-      ),
-    },
+      )
+    }
   ];
 
   const tabItems = [
@@ -183,33 +227,44 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
       children: (
         <div>
           <div style={{ marginBottom: 16 }}>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleBackup} loading={backupConfig.isPending}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleBackup}
+              loading={backupConfig.isPending}
+            >
               触发备份
             </Button>
           </div>
-          <Table<DeviceConfigBackup>
+          <DataTable<DeviceConfigBackup>
             columns={backupColumns}
             dataSource={backups ?? []}
             loading={loadingBackups}
             rowKey="id"
             size="small"
+            showCard={false}
+            searchable={false}
+            pagination={DENSE_PAGINATION}
           />
         </div>
-      ),
+      )
     },
     {
       key: 'changes',
       label: '配置变更审批',
       children: (
-        <Table<DeviceConfigChange>
+        <DataTable<DeviceConfigChange>
           columns={changeColumns}
           dataSource={changes ?? []}
           loading={loadingChanges}
           rowKey="id"
           size="small"
+          showCard={false}
+          searchable={false}
+          pagination={DENSE_PAGINATION}
         />
-      ),
-    },
+      )
+    }
   ];
 
   return (
@@ -224,7 +279,16 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
         footer={null}
         width={720}
       >
-        <pre style={{ maxHeight: 500, overflow: 'auto', fontSize: 12, background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+        <pre
+          style={{
+            maxHeight: 500,
+            overflow: 'auto',
+            fontSize: 12,
+            background: '#f5f5f5',
+            padding: 12,
+            borderRadius: 4
+          }}
+        >
           {viewContent}
         </pre>
       </Modal>
@@ -241,13 +305,31 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
           <div style={{ display: 'flex', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <h4 style={{ marginBottom: 8 }}>旧配置</h4>
-              <pre style={{ maxHeight: 500, overflow: 'auto', fontSize: 12, background: '#fff1f0', padding: 12, borderRadius: 4 }}>
+              <pre
+                style={{
+                  maxHeight: 500,
+                  overflow: 'auto',
+                  fontSize: 12,
+                  background: '#fff1f0',
+                  padding: 12,
+                  borderRadius: 4
+                }}
+              >
                 {diffContent.old}
               </pre>
             </div>
             <div style={{ flex: 1 }}>
               <h4 style={{ marginBottom: 8 }}>新配置</h4>
-              <pre style={{ maxHeight: 500, overflow: 'auto', fontSize: 12, background: '#f6ffed', padding: 12, borderRadius: 4 }}>
+              <pre
+                style={{
+                  maxHeight: 500,
+                  overflow: 'auto',
+                  fontSize: 12,
+                  background: '#f6ffed',
+                  padding: 12,
+                  borderRadius: 4
+                }}
+              >
                 {diffContent.new}
               </pre>
             </div>

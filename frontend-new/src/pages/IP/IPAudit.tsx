@@ -9,7 +9,7 @@ import { get } from '@/services/api-client';
 import { useIPAuditLogs } from '@/services/ip-audit';
 import type { IPAuditLog } from '@/services/ip-audit';
 import { useRoomOptions } from '@/services/room';
-import { IP_AUDIT_ACTION_MAP, IP_AUDIT_ACTION_OPTIONS } from '@/types/status-codes.generated';
+import { IP_AUDIT_ACTION_MAP, IP_AUDIT_ACTION_OPTIONS } from '@/types/enums';
 import type { User } from '@/types/models';
 import { formatDateTime } from '@/utils/format';
 
@@ -170,7 +170,7 @@ export default function IPAudit() {
       >
         {detail && (
           <Card size="small" type="inner">
-            <Descriptions column={2} bordered size="small">
+            <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
               <Descriptions.Item label="时间" span={2}>
                 {detail.created_at ? formatDateTime(detail.created_at) : '-'}
               </Descriptions.Item>

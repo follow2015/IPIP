@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, Spin, Button, Space, Tag, Dropdown, Descriptions, Result } from 'antd';
@@ -57,6 +57,7 @@ function DeviceDetail() {
 }
 
 function DeviceDetailContent({ deviceId }: { deviceId: number }) {
+  const confirm = useConfirm();
   const location = useLocation();
   const navigate = useNavigate();
   const { data: device, refetch } = useDeviceSuspenseDetail(deviceId);
@@ -238,7 +239,7 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
       </div>
 
       {/* 设备概要 */}
-      <Descriptions column={3} size="small" style={{ marginBottom: 16 }}>
+      <Descriptions column={{ xs: 1, md: 3 }} size="small" style={{ marginBottom: 16 }}>
         <Descriptions.Item label="设备名称">
           <strong style={{ fontSize: 16 }}>{device.device_name}</strong>
         </Descriptions.Item>

@@ -25,27 +25,27 @@ const PortGeneratePanel: React.FC<PortGeneratePanelProps> = ({ form, portPreview
       styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
     >
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Form.Item name="port_template" label="端口类型" initialValue="GE">
             <Select options={PORT_TYPE_TEMPLATES} placeholder="选择端口类型" />
           </Form.Item>
         </Col>
-        <Col span={4}>
+        <Col xs={12} md={4}>
           <Form.Item name="port_slot" label="槽位" initialValue={0}>
             <InputNumber min={0} max={99} style={{ width: '100%' }} />
           </Form.Item>
         </Col>
-        <Col span={4}>
+        <Col xs={12} md={4}>
           <Form.Item name="port_card" label="卡号" initialValue={0}>
             <InputNumber min={0} max={99} style={{ width: '100%' }} />
           </Form.Item>
         </Col>
-        <Col span={4}>
+        <Col xs={12} md={4}>
           <Form.Item name="port_start" label="起始端口" initialValue={1}>
             <InputNumber min={1} max={9999} style={{ width: '100%' }} />
           </Form.Item>
         </Col>
-        <Col span={4}>
+        <Col xs={12} md={4}>
           <Form.Item name="port_end" label="结束端口" initialValue={24}>
             <InputNumber min={1} max={9999} style={{ width: '100%' }} />
           </Form.Item>
@@ -53,7 +53,7 @@ const PortGeneratePanel: React.FC<PortGeneratePanelProps> = ({ form, portPreview
       </Row>
       {portTemplate === 'custom' && (
         <Row gutter={16}>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Form.Item
               name="port_custom_prefix"
               label="自定义前缀"

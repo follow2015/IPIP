@@ -5,7 +5,6 @@
  */
 import React, { useCallback, useState } from 'react';
 import {
-  Table,
   Button,
   Space,
   Tag,
@@ -15,10 +14,11 @@ import {
   Select,
   Switch,
   message,
-  Popconfirm,
   Typography,
   Card
 } from 'antd';
+import DataTable from '@/components/DataTable';
+import { useConfirm } from '@/utils/confirm';
 import {
   PlusOutlined,
   EditOutlined,
@@ -47,6 +47,7 @@ import {
 const { Title, Text } = Typography;
 
 const WebhookConfigPage: React.FC = () => {
+  const confirm = useConfirm();
   const { data: configs = [], isLoading } = useWebhookConfigs();
   const createMutation = useCreateWebhookConfig();
   const updateMutation = useUpdateWebhookConfig();
@@ -202,17 +203,23 @@ const WebhookConfigPage: React.FC = () => {
           >
             编辑
           </Button>
-          <Popconfirm
-            title="确认删除此配置？"
-            onConfirm={() => handleDelete(record.id)}
-            okText="删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() =>
+              confirm({
+                title: '确认删除此配置？',
+                okText: '删除',
+                cancelText: '取消',
+                okButtonProps: { danger: true },
+                onOk: () => handleDelete(record.id)
+              })
+            }
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
-          </Popconfirm>
+            删除
+          </Button>
         </Space>
       )
     }
@@ -238,13 +245,16 @@ const WebhookConfigPage: React.FC = () => {
           </Button>
         </div>
 
-        <Table
+        <DataTable
           dataSource={configs}
           columns={columns}
           rowKey="id"
           loading={isLoading}
           pagination={false}
           size="middle"
+          scroll={{ x: 'max-content' }}
+          showCard={false}
+          searchable={false}
         />
       </Card>
 

@@ -7,6 +7,7 @@ import { CloudServerOutlined, SwapOutlined, LinkOutlined } from '@ant-design/ico
 import { useNavigate } from 'react-router-dom';
 import { StatusTag } from '@/components/StatusTag';
 import { SWITCH_ROLE_MAP, NODE_STATUS_MAP } from '@/types/enums';
+import { useResponsive } from '@/hooks/useResponsive';
 import type { TopologyNode, TopologyEdge } from '@/types/models';
 
 interface NodeDetailPanelProps {
@@ -27,6 +28,7 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
   onLocateNode
 }) => {
   const navigate = useNavigate();
+  const { isMobile } = useResponsive();
 
   if (!node) return null;
 
@@ -49,7 +51,7 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
         </Space>
       }
       placement="right"
-      width={360}
+      width={isMobile ? '100vw' : 360}
       open={open}
       onClose={onClose}
       extra={

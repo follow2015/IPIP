@@ -5,7 +5,8 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import { Descriptions, Tag, Space, Typography, Button, Popconfirm } from 'antd';
+import { useConfirm } from '@/utils/confirm';
+import { Descriptions, Tag, Space, Typography, Button } from 'antd';
 import { DeleteOutlined, ClearOutlined } from '@ant-design/icons';
 import type { Device } from '@/types/models';
 import {
@@ -61,6 +62,7 @@ function IPEntryItem({
 }
 
 function BasicTab({ device }: BasicTabProps) {
+  const confirm = useConfirm();
   const statusInfo = DEVICE_STATUS_MAP[device.status as DeviceStatusCode];
   const updateDevice = useUpdateDevice();
   const message = useMessage();
@@ -101,7 +103,7 @@ function BasicTab({ device }: BasicTabProps) {
   }, [device.id, updateDevice, message]);
 
   return (
-    <Descriptions column={2} bordered size="small">
+    <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
       <Descriptions.Item label="设备名称">{device.device_name}</Descriptions.Item>
       <Descriptions.Item label="设备类型">
         {DEVICE_TYPE_MAP[device.device_type as DeviceType]?.label ?? device.device_type}
@@ -133,22 +135,24 @@ function BasicTab({ device }: BasicTabProps) {
                 <IPEntryItem key={i} entry={entry} index={i} onRemove={handleRemoveIP} />
               ))}
             </div>
-            <Popconfirm
-              title="确认清空所有业务IP？"
-              onConfirm={handleClearAll}
-              okText="确认"
-              cancelText="取消"
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<ClearOutlined />}
+              style={{ padding: 0, height: 'auto' }}
+              onClick={() =>
+                confirm({
+                  title: '确认清空所有业务IP？',
+                  okText: '确认',
+                  cancelText: '取消',
+                  okButtonProps: { danger: true },
+                  onOk: handleClearAll
+                })
+              }
             >
-              <Button
-                type="link"
-                size="small"
-                danger
-                icon={<ClearOutlined />}
-                style={{ padding: 0, height: 'auto' }}
-              >
-                清空全部
-              </Button>
-            </Popconfirm>
+              清空全部
+            </Button>
           </Space>
         ) : (
           '-'

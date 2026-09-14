@@ -5,20 +5,9 @@
  * - TemplateFormModal：新增/编辑，含客户归属 Select + 四类 spec 字段
  */
 import { useState, useMemo } from 'react';
-import {
-  Tabs,
-  Table,
-  Modal,
-  Form,
-  Select,
-  Input,
-  InputNumber,
-  Tag,
-  Button,
-  Space,
-  Popconfirm,
-  Switch
-} from 'antd';
+import { Tabs, Modal, Form, Select, Input, InputNumber, Tag, Button, Space, Switch } from 'antd';
+import DataTable from '@/components/DataTable';
+import { useConfirm } from '@/utils/confirm';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -102,6 +91,7 @@ interface TemplateFormValues {
 }
 
 function ComponentTemplateManager() {
+  const confirm = useConfirm();
   const message = useMessage();
   const [form] = Form.useForm<TemplateFormValues>();
 
@@ -241,14 +231,22 @@ function ComponentTemplateManager() {
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(r)}>
             编辑
           </Button>
-          <Popconfirm
-            title={`确定要删除「${r.brand} ${r.model}」吗？`}
-            onConfirm={() => handleDelete(r.id)}
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() =>
+              confirm({
+                title: `确定要删除「${r.brand} ${r.model}」吗？`,
+                okText: '删除',
+                okButtonProps: { danger: true },
+                onOk: () => handleDelete(r.id)
+              })
+            }
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
-          </Popconfirm>
+            删除
+          </Button>
         </Space>
       )
     }
@@ -283,13 +281,16 @@ function ComponentTemplateManager() {
           key: cat.key,
           label: cat.label,
           children: (
-            <Table<ComponentTemplate>
+            <DataTable<ComponentTemplate>
               columns={columns}
               dataSource={templates ?? []}
               loading={isLoading}
               rowKey="id"
               size="middle"
               pagination={{ pageSize: 20, showSizeChanger: true }}
+              scroll={{ x: 'max-content' }}
+              showCard={false}
+              searchable={false}
             />
           )
         }))}

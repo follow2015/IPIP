@@ -17,18 +17,19 @@ function NetworkDetail() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const roomId = searchParams.get('room_id') ? Number(searchParams.get('room_id')) : undefined;
-  const switchId = searchParams.get('switch_id') ? Number(searchParams.get('switch_id')) : undefined;
+  const switchId = searchParams.get('switch_id')
+    ? Number(searchParams.get('switch_id'))
+    : undefined;
 
   const networkName = decodeURIComponent(ipNetwork ?? '');
 
-  const { data: detailData } = useNetworkSuspenseDetail(
-    networkName,
-    { page_size: 999, room_id: roomId, switch_id: switchId },
-  );
+  const { data: detailData } = useNetworkSuspenseDetail(networkName, {
+    page_size: 999,
+    room_id: roomId,
+    switch_id: switchId
+  });
 
-  const { data: usageData } = useNetworkUsage(
-    networkName,
-  );
+  const { data: usageData } = useNetworkUsage(networkName);
 
   const handleViewIPs = () => {
     const params = new URLSearchParams();
@@ -42,36 +43,63 @@ function NetworkDetail() {
 
   const routeColumns = [
     { title: '端口', dataIndex: 'port', key: 'port', render: (v: string | null) => v || '-' },
-    { title: '下一跳', dataIndex: 'nexthop', key: 'nexthop', render: (v: string | null) => v || '-' },
+    {
+      title: '下一跳',
+      dataIndex: 'nexthop',
+      key: 'nexthop',
+      render: (v: string | null) => v || '-'
+    },
     { title: '标志', dataIndex: 'flags', key: 'flags', render: (v: string | null) => v || '-' },
-    { title: '类型', dataIndex: 'route_type', key: 'route_type', render: (v: number | string | null) => {
-      if (v === null || v === undefined) return '-';
-      const num = Number(v);
-      const map = ROUTE_NOTES_MAP[num];
-      return map ? <Tag color={map.color}>{map.label}</Tag> : String(v);
-    }},
+    {
+      title: '类型',
+      dataIndex: 'route_type',
+      key: 'route_type',
+      render: (v: number | string | null) => {
+        if (v === null || v === undefined) return '-';
+        const num = Number(v);
+        const map = ROUTE_NOTES_MAP[num];
+        return map ? <Tag color={map.color}>{map.label}</Tag> : String(v);
+      }
+    }
   ];
 
   return (
     <div>
-      <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/network')} style={{ marginBottom: 16 }}>
+      <Button
+        icon={<ArrowLeftOutlined />}
+        onClick={() => navigate('/network')}
+        style={{ marginBottom: 16 }}
+      >
         返回列表
       </Button>
 
       {/* 基本信息 Card */}
-      <Card title={`网段详情 - ${networkName}`} extra={
-        <Button type="primary" icon={<SearchOutlined />} onClick={handleViewIPs}>
-          查看网段IP
-        </Button>
-      }>
+      <Card
+        title={`网段详情 - ${networkName}`}
+        extra={
+          <Button type="primary" icon={<SearchOutlined />} onClick={handleViewIPs}>
+            查看网段IP
+          </Button>
+        }
+      >
         {detailData.network_info && (
-          <Descriptions size="small" bordered column={3}>
+          <Descriptions size="small" bordered column={{ xs: 1, md: 3 }}>
             <Descriptions.Item label="网段">{detailData.network_info.network}</Descriptions.Item>
-            <Descriptions.Item label="子网掩码">{detailData.network_info.subnet_mask ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="网关">{detailData.network_info.gateway ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="可用IP数">{detailData.network_info.usable_ips ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="IP范围">{detailData.network_info.start_ip} - {detailData.network_info.end_ip}</Descriptions.Item>
-            <Descriptions.Item label="交换机">{detailData.network_info.switch_name ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="子网掩码">
+              {detailData.network_info.subnet_mask ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="网关">
+              {detailData.network_info.gateway ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="可用IP数">
+              {detailData.network_info.usable_ips ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="IP范围">
+              {detailData.network_info.start_ip} - {detailData.network_info.end_ip}
+            </Descriptions.Item>
+            <Descriptions.Item label="交换机">
+              {detailData.network_info.switch_name ?? '-'}
+            </Descriptions.Item>
           </Descriptions>
         )}
       </Card>
@@ -85,7 +113,13 @@ function NetworkDetail() {
                 type="circle"
                 percent={Math.round(usageData.usage_rate * 100)}
                 size={120}
-                strokeColor={usageData.usage_rate > 0.8 ? '#ff4d4f' : usageData.usage_rate > 0.6 ? '#faad14' : '#52c41a'}
+                strokeColor={
+                  usageData.usage_rate > 0.8
+                    ? '#ff4d4f'
+                    : usageData.usage_rate > 0.6
+                      ? '#faad14'
+                      : '#52c41a'
+                }
               />
             </Col>
             <Col span={16}>
@@ -94,10 +128,18 @@ function NetworkDetail() {
                   <Statistic title="总IP数" value={usageData.total_ips} />
                 </Col>
                 <Col span={8}>
-                  <Statistic title="已使用" value={usageData.used_ips} styles={{ content: { color: '#1890ff' } }} />
+                  <Statistic
+                    title="已使用"
+                    value={usageData.used_ips}
+                    styles={{ content: { color: '#1890ff' } }}
+                  />
                 </Col>
                 <Col span={8}>
-                  <Statistic title="可用" value={usageData.available_ips} styles={{ content: { color: '#52c41a' } }} />
+                  <Statistic
+                    title="可用"
+                    value={usageData.available_ips}
+                    styles={{ content: { color: '#52c41a' } }}
+                  />
                 </Col>
               </Row>
             </Col>

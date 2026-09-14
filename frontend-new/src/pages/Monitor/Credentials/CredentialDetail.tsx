@@ -138,11 +138,11 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
           </Col>
         </Row>
         <Row gutter={24} style={{ marginTop: 12 }}>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Text type="secondary">状态</Text>
             <div>{selectedCred.enabled ? <Tag color="green">启用</Tag> : <Tag>已停用</Tag>}</div>
           </Col>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Text type="secondary">关联设备</Text>
             <div>
               <Text strong style={{ fontSize: 18 }}>
@@ -151,7 +151,7 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
               台
             </div>
           </Col>
-          <Col span={8}>
+          <Col xs={24} md={8}>
             <Text type="secondary">凭据 ID</Text>
             <div>
               <Text code>{selectedCred.id}</Text>

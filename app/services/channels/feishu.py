@@ -1,25 +1,22 @@
 # -*- coding: utf-8 -*-
-"""
-飞书群机器人 Webhook 渠道
+"""飞书群机器人 Webhook 渠道。
 
 通过群机器人 Webhook URL 发送 Interactive Card 消息。
 一条通知全局最多发一次，与命中多少用户无关。
+
+加签要点：**飞书的 sign 放在消息体里**（payload 的 `timestamp` / `sign` 字段），
+与钉钉「拼在 URL query」不同；两家算法也不一样（见 `_gen_sign` 与 dingtalk.py）。
 """
+import base64
 import hashlib
 import hmac
-from app.utils.logging import get_logger
 import time
-
-from app.utils.http_client import post_json
+from typing import Any, Dict, Optional, Tuple
 
 from app.core.enums import ChannelType
-from app.services.channels.base import BroadcastChannel, ensure_webhook_success
 from app.models.notification import Notification
 from app.models.webhook_config import WebhookConfig
-
-logger = get_logger(__name__)
-
-FEISHU_API_TIMEOUT = 10  # 飞书 API 请求超时时间（秒）
+from app.services.channels.base_webhook_channel import BaseWebhookChannel
 
 SEVERITY_COLOR = {
     "info": "blue",
@@ -28,36 +25,16 @@ SEVERITY_COLOR = {
 }
 
 
-class FeishuWebhookChannel(BroadcastChannel):
-    """飞书群机器人 Webhook 渠道"""
+class FeishuWebhookChannel(BaseWebhookChannel):
+    """飞书群机器人 Webhook 渠道。"""
 
-    def get_channel_name(self) -> str:
-        return ChannelType.FEISHU
+    channel_type = ChannelType.FEISHU
+    display_name = "飞书"
 
-    def send(self, notification: Notification) -> bool:
-        """发送通知到所有匹配的飞书群机器人
-
-        查询所有启用的 feishu 类型 WebhookConfig，
-        逐条匹配 applicable_types/applicable_severities，匹配的都发，互不影响。
-        """
-        configs = WebhookConfig.query.filter_by(channel=ChannelType.FEISHU, enabled=True).all()
-        if not configs:
-            return False
-
-        any_success = False
-        for cfg in configs:
-            if not _matches(cfg, notification):
-                continue
-            try:
-                self._post_to_webhook(cfg, notification)
-                any_success = True
-            except Exception:
-                logger.exception("飞书 Webhook 投递失败 config_id=%s name=%s", cfg.id, cfg.name)
-
-        return any_success
-
-    def _post_to_webhook(self, cfg: WebhookConfig, notification: Notification) -> None:
-        """发送 Interactive Card 消息到飞书群机器人"""
+    def _build_payload(
+        self, notification: Notification
+    ) -> Tuple[Dict[str, Any], Optional[Dict[str, str]]]:
+        """构造飞书 Interactive Card 消息体。"""
         color = SEVERITY_COLOR.get(notification.severity, "blue")
 
         card = {
@@ -85,36 +62,30 @@ class FeishuWebhookChannel(BroadcastChannel):
                 ],
             },
         }
+        return card, {"Content-Type": "application/json"}
 
-        headers = {"Content-Type": "application/json"}
-        url = cfg.url
-
+    def _apply_sign(self, cfg: WebhookConfig, payload: Dict[str, Any]) -> str:
+        """飞书加签：**写入消息体**，URL 不变。"""
         if cfg.secret:
             timestamp = str(int(time.time()))
-            sign = _gen_sign(cfg.secret, timestamp)
-            card["timestamp"] = timestamp
-            card["sign"] = sign
-
-        resp = post_json(url, card, headers=headers, timeout=FEISHU_API_TIMEOUT)
-        resp.raise_for_status()
-        ensure_webhook_success(resp, "飞书")
-        logger.info("飞书 Webhook 投递成功 config_id=%s", cfg.id)
-
-
-def _matches(cfg: WebhookConfig, notification: Notification) -> bool:
-    """检查 WebhookConfig 是否匹配当前通知"""
-    if cfg.applicable_types and notification.type not in cfg.applicable_types:
-        return False
-    if cfg.applicable_severities and notification.severity not in cfg.applicable_severities:
-        return False
-    return True
+            payload["timestamp"] = timestamp
+            payload["sign"] = _gen_sign(cfg.secret, timestamp)
+        return cfg.url
 
 
 def _gen_sign(secret: str, timestamp: str) -> str:
-    """生成飞书 Webhook 签名"""
+    """生成飞书 Webhook 签名。
+
+    飞书官方算法（**与钉钉不同**）::
+
+        string_to_sign = f"{timestamp}\\n{secret}"
+        hmac_code = HMAC-SHA256(key=string_to_sign, msg=b"")
+        sign = base64.b64encode(hmac_code)
+
+    关键点：**签名字符串整体当 key，message 为空**。
+    """
     string_to_sign = f"{timestamp}\n{secret}"
     hmac_code = hmac.new(
         string_to_sign.encode("utf-8"), digestmod=hashlib.sha256
     ).digest()
-    import base64
     return base64.b64encode(hmac_code).decode("utf-8")

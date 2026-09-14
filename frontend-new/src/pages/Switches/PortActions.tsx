@@ -8,7 +8,7 @@
  *
  * 弹窗 UI 已拆为独立子组件（同目录 *Modal.tsx），本文件不再内联大段 Modal JSX。
  */
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState, useCallback, useRef } from 'react';
 import { Button, Space, Modal, Tooltip } from 'antd';
 import {
@@ -64,6 +64,7 @@ const extractInterfaceId = (name: string): number | null => {
 };
 
 function PortActions({ switchId, port, submitAction, hasSsh = true }: PortActionsProps) {
+  const confirm = useConfirm();
   const updatePortCustomer = useUpdatePortCustomer();
   const fetchPortConfig = useFetchPortConfig();
   const refreshPortConfig = useRefreshPortConfig();

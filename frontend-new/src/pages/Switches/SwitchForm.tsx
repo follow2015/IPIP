@@ -88,7 +88,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
       <Form form={form} layout="vertical">
         <Row gutter={24}>
           {/* 第一行：交换机名称 + 管理IP */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="name"
               label="交换机名称"
@@ -97,7 +97,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
               <Input placeholder="交换机名称" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="ip"
               label="管理IP"
@@ -111,7 +111,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
           </Col>
 
           {/* 第二行：端口号 + 协议 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="port" label="端口号" extra="留空则按协议自动填充：SSH→22，Telnet→23">
               <InputNumber
                 min={1}
@@ -121,7 +121,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
               />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="protocol"
               label="协议"
@@ -132,7 +132,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
           </Col>
 
           {/* 第三行：用户名 + 密码 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="username"
               label="用户名"
@@ -141,14 +141,14 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
               <Input placeholder="登录用户名" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="password" label="密码" extra="留空则不修改密码">
               <Input.Password placeholder="留空则不修改" />
             </Form.Item>
           </Col>
 
           {/* 第四行：设备类型 + 型号 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="device_type"
               label="设备类型"
@@ -157,14 +157,14 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
               <Select placeholder="请选择" options={SWITCH_DEVICE_TYPE_OPTIONS} />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="device_model" label="型号">
               <Input placeholder="型号" />
             </Form.Item>
           </Col>
 
           {/* 第五行：交换机类型 + 网络层级 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="switch_role"
               label="交换机类型"
@@ -179,7 +179,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
               />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="layer"
               label="网络层级"
@@ -191,7 +191,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
           </Col>
 
           {/* 第六行：认证方法 + has_ssh 管理权限开关 */}
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item
               name="authentication_method"
               label="认证方法"
@@ -200,7 +200,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
               <Select placeholder="请选择" options={AUTH_METHOD_OPTIONS} />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="has_ssh" label="管理权限" valuePropName="checked" initialValue={false}>
               <AntSwitch checkedChildren="开" unCheckedChildren="关" />
             </Form.Item>

@@ -15,7 +15,8 @@
  * - useDeviceMetricAlerts（活跃指标告警，grouped=false 时按默认分组展示）
  * - useDeviceTrafficPorts（Zabbix 端口列表 + configured 标记）
  */
-import { Card, Table, Tag, Empty, Spin, Alert, Row, Col, Space, Typography } from 'antd';
+import { Card, Tag, Empty, Spin, Alert, Row, Col, Space, Typography } from 'antd';
+import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import {
   FireOutlined,
   SwapOutlined,
@@ -305,11 +306,13 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                 style={{ background: '#fafafa', borderColor: '#d9d9d9' }}
                 styles={{ body: { padding: 0 } }}
               >
-                <Table<DeviceMetricDashboardItem>
+                <DataTable<DeviceMetricDashboardItem>
                   dataSource={metricStatus}
                   rowKey="metric_key"
                   size="small"
                   pagination={false}
+                  showCard={false}
+                  searchable={false}
                   columns={[
                     {
                       title: '指标',
@@ -350,6 +353,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                       render: (v: string | null) => (v ? formatDateTime(v) : '—')
                     }
                   ]}
+                  scroll={{ x: 'max-content' }}
                 />
               </Card>
             ) : (
@@ -362,11 +366,13 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
               style={{ background: '#fafafa', borderColor: '#d9d9d9' }}
               styles={{ body: { padding: 0 } }}
             >
-              <Table<DeviceMetricDashboardItem>
+              <DataTable<DeviceMetricDashboardItem>
                 dataSource={metricStatus}
                 rowKey="metric_key"
                 size="small"
                 pagination={false}
+                showCard={false}
+                searchable={false}
                 columns={[
                   {
                     title: '指标',
@@ -407,6 +413,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                     render: (v: string | null) => (v ? formatDateTime(v) : '—')
                   }
                 ]}
+                scroll={{ x: 'max-content' }}
               />
             </Card>
           ) : (
@@ -454,11 +461,13 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                             <Tag color="green">正常</Tag>
                           )
                         ) : groupItems.length > 0 ? (
-                          <Table
+                          <DataTable
                             dataSource={groupItems}
                             rowKey="id"
                             size="small"
                             pagination={false}
+                            showCard={false}
+                            searchable={false}
                             columns={[
                               {
                                 title: '实例',
@@ -483,6 +492,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                                 render: (v: string | null) => v ?? '—'
                               }
                             ]}
+                            scroll={{ x: 'max-content' }}
                           />
                         ) : notProbedYet ? (
                           <Tag color="default">等待探测</Tag>
@@ -511,11 +521,15 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
               style={{ background: '#fff7e6', borderColor: '#ffd591' }}
               styles={{ body: { padding: 0 } }}
             >
-              <Table
+              <DataTable
                 dataSource={items}
                 rowKey="id"
                 size="small"
-                pagination={items.length > 10 ? { pageSize: 10, size: 'small' } : false}
+                pagination={
+                  items.length > 10 ? { ...DENSE_PAGINATION, pageSize: 10, size: 'small' } : false
+                }
+                showCard={false}
+                searchable={false}
                 columns={[
                   {
                     title: '指标',
@@ -555,6 +569,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                     render: (v: string | null) => (v ? formatDateTime(v) : '—')
                   }
                 ]}
+                scroll={{ x: 'max-content' }}
               />
             </Card>
           </div>

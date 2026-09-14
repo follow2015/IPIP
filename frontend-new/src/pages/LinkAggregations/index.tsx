@@ -9,7 +9,9 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Tag, Popconfirm, Table, Card } from 'antd';
+import { useConfirm } from '@/utils/confirm';
+import { Button, Tag, Card } from 'antd';
+import DataTable from '@/components/DataTable';
 import { StatusTag } from '@/components/StatusTag';
 import { LAG_STATUS_MAP } from '@/types/enums';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -26,6 +28,7 @@ import { formatDateTime } from '@/utils/format';
 import LAGForm from './LAGForm';
 
 function LinkAggregations() {
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const message = useMessage();
   const table = useTable();
@@ -142,19 +145,27 @@ function LinkAggregations() {
         render: (_: unknown, record: LinkAggregationGroupWithDevice) => {
           if (record.has_ssh) return <span style={{ color: '#999' }}>网管型</span>;
           return (
-            <Popconfirm
-              title={`确定要删除「${record.lag_name}」吗？`}
-              onConfirm={() => handleDelete(record)}
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() =>
+                confirm({
+                  title: `确定要删除「${record.lag_name}」吗？`,
+                  okText: '删除',
+                  okButtonProps: { danger: true },
+                  onOk: () => handleDelete(record)
+                })
+              }
             >
-              <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-                删除
-              </Button>
-            </Popconfirm>
+              删除
+            </Button>
           );
         }
       }
     ],
-    [goToLagTab, handleDelete]
+    [confirm, goToLagTab, handleDelete]
   );
 
   return (
@@ -185,7 +196,7 @@ function LinkAggregations() {
           />
         }
       >
-        <Table
+        <DataTable
           columns={columns}
           dataSource={lagData?.items ?? []}
           rowKey="id"
@@ -202,6 +213,9 @@ function LinkAggregations() {
               table.setPerPage(ps);
             }
           }}
+          scroll={{ x: 'max-content' }}
+          showCard={false}
+          searchable={false}
         />
       </Card>
 

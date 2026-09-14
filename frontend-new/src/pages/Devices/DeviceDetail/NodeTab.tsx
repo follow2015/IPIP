@@ -1,8 +1,7 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect } from 'react';
 import type { DragEvent } from 'react';
 import {
-  Table,
   Button,
   Space,
   Form,
@@ -17,6 +16,7 @@ import {
   Tooltip,
   Modal
 } from 'antd';
+import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import { PlusOutlined, DeleteOutlined, FullscreenOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -47,6 +47,7 @@ interface NodeTabProps {
 }
 
 function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeTabProps) {
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const message = useMessage();
 
@@ -426,12 +427,15 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
         </Tooltip>
       </div>
       {renderNodeGrid()}
-      <Table
+      <DataTable
         columns={columns}
         dataSource={data?.items ?? []}
         rowKey="id"
         loading={isLoading}
         size="small"
+        showCard={false}
+        searchable={false}
+        pagination={DENSE_PAGINATION}
       />
 
       {/* 新增节点弹窗 */}
@@ -463,7 +467,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
             <Input placeholder="如 Chassis-01-Node1" />
           </Form.Item>
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item
                 name="node_position"
                 label="节点位置"
@@ -477,7 +481,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="status" label="状态">
                 <Select
                   placeholder="请选择"
@@ -488,7 +492,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="hostname" label="主机名">
                 <Input placeholder="主机名" />
               </Form.Item>

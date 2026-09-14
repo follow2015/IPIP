@@ -11,6 +11,8 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+export type ApiResponseMaybe<T> = Omit<ApiResponse<T>, 'data'> & { data?: T };
+
 export interface BackendPaginatedData<T> {
   data: T[];
   pagination: {

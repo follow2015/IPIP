@@ -1,7 +1,7 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { Button, Space, Tag, Popover, Segmented, Collapse, Table, Card, Input } from 'antd';
+import { Button, Space, Tag, Popover, Segmented, Collapse, Card, Input, Typography } from 'antd';
 import {
   PlusOutlined,
   CopyOutlined,
@@ -35,7 +35,10 @@ import { useGlobalEventListener, type GlobalEvent } from '@/hooks/useGlobalEvent
 
 const SCAN_TIMEOUT = 5 * 60_000;
 
+const { Text } = Typography;
+
 function Switches() {
+  const confirm = useConfirm();
   const table = useTable();
   const navigate = useNavigate();
 
@@ -281,27 +284,63 @@ function Switches() {
     {
       title: '操作',
       key: 'action',
-      render: (_: unknown, r: Switch) => (
-        <Space>
-          <Button type="link" size="small" onClick={() => handleDetail(r)}>
-            详情
-          </Button>
-          {r.has_ssh && (
-            <Button type="link" size="small" onClick={() => handleEdit(r)}>
-              远程信息管理
-            </Button>
-          )}
-          <Button type="link" size="small" onClick={() => handleFullEdit(r)}>
-            编辑
-          </Button>
-          <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => handleCopy(r)} />
-          <Button type="link" size="small" danger onClick={() => handleDelete(r)}>
-            删除
-          </Button>
-        </Space>
-      )
+      render: (_: unknown, r: Switch) => renderActions(r)
     }
   ];
+
+  const renderActions = (r: Switch) => (
+    <Space size="small" wrap>
+      <Button type="link" size="small" onClick={() => handleDetail(r)}>
+        详情
+      </Button>
+      {r.has_ssh && (
+        <Button type="link" size="small" onClick={() => handleEdit(r)}>
+          远程信息管理
+        </Button>
+      )}
+      <Button type="link" size="small" onClick={() => handleFullEdit(r)}>
+        编辑
+      </Button>
+      <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => handleCopy(r)} />
+      <Button type="link" size="small" danger onClick={() => handleDelete(r)}>
+        删除
+      </Button>
+    </Space>
+  );
+
+  const renderSwitchCard = (r: Switch) => (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleDetail(r)}>
+          <Text strong>{r.name}</Text>
+        </Button>
+        <Space size={4} wrap>
+          <Tag color={SWITCH_ROLE_MAP[r.switch_role as SwitchRoleCode]?.color}>
+            {SWITCH_ROLE_MAP[r.switch_role as SwitchRoleCode]?.label ?? '-'}
+          </Tag>
+          {r.layer != null && (
+            <Tag color={r.layer === 3 ? 'blue' : r.layer === 2 ? 'green' : 'purple'}>
+              L{r.layer}
+            </Tag>
+          )}
+        </Space>
+      </div>
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        {r.ip_address ?? '-'}
+        {r.device_model ? ` · ${r.device_model}` : ''}
+      </Text>
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        {r.room_name ?? '-'}
+        {r.protocol ? ` · ${r.protocol}` : ''}
+      </Text>
+      {r.connected_device_count ? (
+        <Link to={`/switches/${r.device_id}`}>
+          <Tag color="blue">关联设备 {r.connected_device_count}</Tag>
+        </Link>
+      ) : null}
+      {renderActions(r)}
+    </Space>
+  );
 
   const switchList = data?.items ?? [];
 
@@ -398,6 +437,8 @@ function Switches() {
           onRefresh={() => refetch()}
           toolbar={filterAndActions}
           rowSelection={rowSelection}
+          mobileCardMode
+          cardRender={renderSwitchCard}
         />
       ) : (
         /* 分组模式：手动渲染搜索栏+工具栏，表格替换为 Collapse 按 has_ssh 分组 */
@@ -429,14 +470,15 @@ function Switches() {
                 key: 'managed',
                 label: `有管理权限 (${managedSwitches.length})`,
                 children: (
-                  <Table<Switch>
+                  <DataTable<Switch>
                     columns={columns}
                     dataSource={managedSwitches}
                     loading={isLoading}
                     rowKey={(r) => String(r.id)}
                     pagination={false}
-                    scroll={{ x: 'max-content' }}
                     rowSelection={rowSelection}
+                    searchable={false}
+                    showCard={false}
                   />
                 )
               },
@@ -444,14 +486,15 @@ function Switches() {
                 key: 'unmanaged',
                 label: `无管理权限 (${unmanagedSwitches.length})`,
                 children: (
-                  <Table<Switch>
+                  <DataTable<Switch>
                     columns={columns}
                     dataSource={unmanagedSwitches}
                     loading={isLoading}
                     rowKey={(r) => String(r.id)}
                     pagination={false}
-                    scroll={{ x: 'max-content' }}
                     rowSelection={rowSelection}
+                    searchable={false}
+                    showCard={false}
                   />
                 )
               }

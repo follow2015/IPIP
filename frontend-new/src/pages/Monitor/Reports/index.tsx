@@ -357,6 +357,7 @@ export default function MonitorReportsPage() {
               pagination={false}
               size="small"
               locale={{ emptyText: <Empty description="暂无数据" /> }}
+              scroll={{ x: 'max-content' }}
             />
           </Card>
         </Col>
@@ -369,6 +370,7 @@ export default function MonitorReportsPage() {
               pagination={false}
               size="small"
               locale={{ emptyText: <Empty description="暂无数据" /> }}
+              scroll={{ x: 'max-content' }}
             />
           </Card>
         </Col>

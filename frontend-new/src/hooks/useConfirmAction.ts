@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useMessage } from '@/hooks/useMessage';
 
 export interface ConfirmActionOptions {
@@ -15,6 +15,7 @@ export interface ConfirmActionOptions {
 }
 
 export function useConfirmAction() {
+  const confirm = useConfirm();
   const message = useMessage();
   return useCallback(
     (opts: ConfirmActionOptions) => {
@@ -34,6 +35,6 @@ export function useConfirmAction() {
         }
       });
     },
-    [message]
+    [confirm, message]
   );
 }

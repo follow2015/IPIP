@@ -74,6 +74,7 @@ export function MetricAlertPopover({ deviceId, alertCount, maxSeverity }: Metric
           render: (v: string | null) => v ?? '—'
         }
       ]}
+      scroll={{ x: 'max-content' }}
     />
   );
 

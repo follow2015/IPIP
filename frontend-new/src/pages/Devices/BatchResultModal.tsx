@@ -1,6 +1,11 @@
 import React from 'react';
 import { Modal, Table, Space, Button, Alert, Typography } from 'antd';
-import { CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, RedoOutlined } from '@ant-design/icons';
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ExportOutlined,
+  RedoOutlined
+} from '@ant-design/icons';
 import type { BatchCreateResult, BatchCreateItemResult } from '@/types/models';
 
 const { Text } = Typography;
@@ -18,7 +23,7 @@ const BatchResultModal: React.FC<BatchResultModalProps> = ({
   onClose,
   result,
   title = '批量操作结果',
-  onRetry,
+  onRetry
 }) => {
   if (!result) return null;
 
@@ -27,7 +32,11 @@ const BatchResultModal: React.FC<BatchResultModalProps> = ({
 
   const handleExportFailed = () => {
     const headers = ['序号', '设备名称', '失败原因'];
-    const rows = failedItems.map((item) => [item.index + 1, item.device_name, item.error || '未知错误']);
+    const rows = failedItems.map((item) => [
+      item.index + 1,
+      item.device_name,
+      item.error || '未知错误'
+    ]);
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -41,7 +50,12 @@ const BatchResultModal: React.FC<BatchResultModalProps> = ({
   const columns = [
     { title: '序号', dataIndex: 'index', key: 'index', render: (i: number) => i + 1, width: 60 },
     { title: '设备名称', dataIndex: 'device_name', key: 'device_name' },
-    { title: '失败原因', dataIndex: 'error', key: 'error', render: (text: string) => <Text type="danger">{text}</Text> },
+    {
+      title: '失败原因',
+      dataIndex: 'error',
+      key: 'error',
+      render: (text: string) => <Text type="danger">{text}</Text>
+    }
   ];
 
   return (
@@ -52,8 +66,22 @@ const BatchResultModal: React.FC<BatchResultModalProps> = ({
         icon={hasFailures ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
         title={
           <Space size="large">
-            <Text>成功: <Text strong type="success">{result.success_count}</Text> 台</Text>
-            {hasFailures && <Text>失败: <Text strong type="danger">{result.failed_count}</Text> 台</Text>}
+            <Text>
+              成功:{' '}
+              <Text strong type="success">
+                {result.success_count}
+              </Text>{' '}
+              台
+            </Text>
+            {hasFailures && (
+              <Text>
+                失败:{' '}
+                <Text strong type="danger">
+                  {result.failed_count}
+                </Text>{' '}
+                台
+              </Text>
+            )}
           </Space>
         }
         style={{ marginBottom: 16 }}
@@ -67,11 +95,16 @@ const BatchResultModal: React.FC<BatchResultModalProps> = ({
             size="small"
             pagination={false}
             style={{ marginBottom: 16 }}
+            scroll={{ x: 'max-content' }}
           />
           <Space>
-            <Button icon={<ExportOutlined />} onClick={handleExportFailed}>导出失败记录</Button>
+            <Button icon={<ExportOutlined />} onClick={handleExportFailed}>
+              导出失败记录
+            </Button>
             {onRetry && (
-              <Button icon={<RedoOutlined />} onClick={() => onRetry(failedItems)}>重试失败项</Button>
+              <Button icon={<RedoOutlined />} onClick={() => onRetry(failedItems)}>
+                重试失败项
+              </Button>
             )}
           </Space>
         </>

@@ -1,4 +1,4 @@
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, Spin, Button, Space, Tag, Dropdown, Descriptions, Result } from 'antd';
@@ -61,6 +61,7 @@ function SwitchDetail() {
 }
 
 function SwitchDetailContent({ switchId }: { switchId: number }) {
+  const confirm = useConfirm();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -203,7 +204,7 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
         {switchData && (
           <Descriptions
             title="交换机配置"
-            column={2}
+            column={{ xs: 1, md: 2 }}
             bordered
             size="small"
             style={{ marginTop: 16 }}
@@ -369,7 +370,7 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
       </div>
 
       {/* 设备概要 */}
-      <Descriptions column={3} size="small" style={{ marginBottom: 16 }}>
+      <Descriptions column={{ xs: 1, md: 3 }} size="small" style={{ marginBottom: 16 }}>
         <Descriptions.Item label="设备名称">
           <strong style={{ fontSize: 16 }}>{device.device_name}</strong>
         </Descriptions.Item>

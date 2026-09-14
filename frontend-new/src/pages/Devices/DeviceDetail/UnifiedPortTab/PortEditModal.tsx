@@ -63,36 +63,36 @@ export function PortEditModal({ deviceId, port, onClose }: PortEditModalProps) {
     >
       <Form form={editForm} layout="vertical">
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="port_name" label="端口名称">
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="port_type" label="端口类型">
               <Input disabled />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="speed" label="速率">
               <Input placeholder="如 1G、10G" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="usage_status" label="占用状态">
               <Select options={USAGE_STATUS_FORM_OPTIONS} />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="vlan" label="VLAN">
               <Input placeholder="如 100" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="customer_id" label="客户">
               <Select
                 allowClear
@@ -107,12 +107,12 @@ export function PortEditModal({ deviceId, port, onClose }: PortEditModalProps) {
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="mac" label="MAC地址">
               <Input placeholder="如 00:1A:2B:3C:4D:5E" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item name="ip_address" label="IP地址">
               <Input placeholder="如 192.168.1.1" />
             </Form.Item>

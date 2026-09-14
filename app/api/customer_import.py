@@ -7,7 +7,7 @@
 """
 
 from app.utils.logging import get_logger
-from flask import Blueprint, request, g
+from flask import Blueprint, request
 from app.openapi.doc import doc
 from app.api.base import APIResponse
 from app.utils import (
@@ -18,7 +18,6 @@ from app.utils import (
 from app.utils.idempotency import idempotent, upload_file_idempotency_key
 from app.utils.time_utils import now_utc_naive
 from app.utils.transactional import transactional
-from app.exceptions.validation import ValidationError as AppValidationError, RequiredFieldError
 from app.services import import_export_service
 from app.core.enums import CUSTOMER_IMPORT_CN_TO_EN, EN_TO_CN_CUSTOMER_IMPORT
 
@@ -77,42 +76,24 @@ def batch_import_customers():
         return APIResponse.error(message="未选择文件", status_code=400)
 
     from app.utils.idempotency import _get_redis_client
+    from app.api.import_pipeline import run_import
+    from app.services.customer_service import CustomerService
+    from app.persistence.customer_repository import CustomerRepository
 
-    def _do_import(df):
-        from app.services.customer_service import CustomerService
-        from app.persistence.customer_repository import CustomerRepository
-        customer_service = CustomerService(CustomerRepository())
-        return import_export_service.import_rows(
+    customer_service = CustomerService(CustomerRepository())
+    return run_import(
+        file=file,
+        idem_scope="import_customers",
+        parse_fn=lambda b, fn: import_export_service.parse_file_to_df(
+            file_bytes=b, filename=fn, cn_to_en=CUSTOMER_IMPORT_CN_TO_EN
+        ),
+        import_fn=lambda df: import_export_service.import_rows(
             df=df,
             create_func=customer_service.create_customer,
             required_columns=CUSTOMER_REQUIRED_COLUMNS,
             entity_name="客户",
-        )
-
-    try:
-        outcome = import_export_service.run_batch_import(
-            file_bytes=file.read(),
-            filename=file.filename,
-            user_id=str(g.current_user.get("user_id", "anon")),
-            idem_scope="import_customers",
-            parse_fn=lambda b, fn: import_export_service.parse_file_to_df(
-                file_bytes=b, filename=fn, cn_to_en=CUSTOMER_IMPORT_CN_TO_EN
-            ),
-            import_fn=_do_import,
-            redis_client=_get_redis_client(),
-        )
-    except import_export_service.FileTooLargeError as e:
-        return APIResponse.error(message=e.message, status_code=413)
-    except import_export_service.IdempotencyConflictError as e:
-        return APIResponse.error(e.message, error_code="IDEMPOTENCY_CONFLICT", status_code=409)
-    except RequiredFieldError as e:
-        return APIResponse.error(message=str(e), status_code=400)
-    except AppValidationError as e:
-        return APIResponse.error(message=str(e), status_code=400)
-
-    return APIResponse.success(
-        data={"imported_count": outcome.imported_count, "failed_count": outcome.failed_count, "failed_rows": outcome.failed_rows},
-        message=outcome.message,
+        ),
+        redis_client=_get_redis_client(),
     )
 
 

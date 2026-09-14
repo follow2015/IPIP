@@ -5,19 +5,9 @@
  * - 按存储类型容量汇总
  */
 import { useState, useMemo } from 'react';
-import {
-  Table,
-  Button,
-  Space,
-  Modal,
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  Tag,
-  Divider,
-  Popconfirm
-} from 'antd';
+import { Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Divider } from 'antd';
+import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
+import { useConfirm } from '@/utils/confirm';
 import { AppstoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   useDeviceStorageDetail,
@@ -45,6 +35,7 @@ function formatGb(gb: number): string {
 }
 
 function StorageTab({ deviceId }: StorageTabProps) {
+  const confirm = useConfirm();
   const { data: storageList, isLoading } = useDeviceStorageDetail(deviceId);
   const createStorage = useCreateStorage(deviceId);
   const updateStorage = useUpdateStorage(deviceId);
@@ -210,19 +201,27 @@ function StorageTab({ deviceId }: StorageTabProps) {
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
           />
-          <Popconfirm
-            title="确定删除该存储？"
-            onConfirm={async () => {
-              try {
-                await deleteStorage.mutateAsync(record.id);
-                message.success('删除成功');
-              } catch (err) {
-                message.error(err instanceof Error ? err.message : '删除失败');
-              }
-            }}
-          >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() =>
+              confirm({
+                title: '确定删除该存储？',
+                okText: '删除',
+                okButtonProps: { danger: true },
+                onOk: async () => {
+                  try {
+                    await deleteStorage.mutateAsync(record.id);
+                    message.success('删除成功');
+                  } catch (err) {
+                    message.error(err instanceof Error ? err.message : '删除失败');
+                  }
+                }
+              })
+            }
+          />
         </Space>
       )
     }
@@ -261,11 +260,20 @@ function StorageTab({ deviceId }: StorageTabProps) {
       )}
 
       <BatchActionBar count={batch.count} unit="条存储" onClear={batch.clear}>
-        <Popconfirm title={`确定删除选中的 ${batch.count} 条存储？`} onConfirm={handleBatchDelete}>
-          <Button danger icon={<DeleteOutlined />}>
-            批量删除
-          </Button>
-        </Popconfirm>
+        <Button
+          danger
+          icon={<DeleteOutlined />}
+          onClick={() =>
+            confirm({
+              title: `确定删除选中的 ${batch.count} 条存储？`,
+              okText: '删除',
+              okButtonProps: { danger: true },
+              onOk: handleBatchDelete
+            })
+          }
+        >
+          批量删除
+        </Button>
       </BatchActionBar>
 
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
@@ -282,7 +290,7 @@ function StorageTab({ deviceId }: StorageTabProps) {
         </Space>
       </div>
 
-      <Table
+      <DataTable
         columns={columns}
         dataSource={details}
         rowKey="id"
@@ -290,6 +298,9 @@ function StorageTab({ deviceId }: StorageTabProps) {
         size="small"
         scroll={{ x: 900 }}
         rowSelection={batch.rowSelection}
+        showCard={false}
+        searchable={false}
+        pagination={DENSE_PAGINATION}
       />
 
       {/* ─── 编辑 Modal ─── */}
