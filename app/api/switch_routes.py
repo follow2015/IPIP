@@ -238,6 +238,7 @@ def _map_switch_data(switch, ports):
 @router.route("/list", methods=["GET"])
 @doc(summary="查询交换机列表（分页）", tags=["交换机"], responses={200: "SwitchResponse", 401: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def list_switches():
     """查询交换机列表（分页）
 
@@ -270,6 +271,7 @@ def list_switches():
 @router.route("/<int:device_id>", methods=["GET"])
 @doc(summary="获取交换机详情", tags=["交换机"], responses={200: "SwitchResponse", 404: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def get_switch(device_id):
     """获取交换机详情包含端口列表
 
@@ -298,7 +300,7 @@ def get_switch(device_id):
 
 
 @router.route("/", methods=["POST"])
-@doc(summary="创建交换机", tags=["交换机"], responses={200: "SwitchResponse", 409: "ApiError", 500: "ApiError"})
+@doc(summary="创建交换机", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchCreate"}}}}, responses={200: "SwitchResponse", 409: "ApiError", 500: "ApiError"})
 @permission_required("switch:create")
 @api_exception_handler
 @transactional
@@ -382,7 +384,7 @@ def create_switch():
 
 
 @router.route("/<int:device_id>", methods=["PUT"])
-@doc(summary="更新交换机信息", tags=["交换机"], responses={200: "SwitchResponse", 404: "ApiError", 409: "ApiError", 500: "ApiError"})
+@doc(summary="更新交换机信息", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchUpdate"}}}}, responses={200: "SwitchResponse", 404: "ApiError", 409: "ApiError", 500: "ApiError"})
 @permission_required("switch:update")
 @api_exception_handler
 @transactional
@@ -510,6 +512,7 @@ def delete_switch(device_id):
 @router.route("/<int:device_id>/ports", methods=["GET"])
 @doc(summary="获取交换机端口列表", tags=["交换机"], responses={200: "SwitchPortResponse", 404: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def get_switch_ports(device_id):
     """获取交换机端口列表（含 max_speed 字段）
 
@@ -534,6 +537,7 @@ def get_switch_ports(device_id):
 @router.route("/switch_detail/<int:device_id>/ports", methods=["GET"])
 @doc(summary="获取交换机详情及端口列表", tags=["交换机"], responses={200: "SwitchResponse", 404: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def get_switch_detail_with_ports(device_id):
     """获取交换机详情及端口列表（前端 viewDetail 使用）
 
@@ -922,6 +926,7 @@ def scan_room(room_id):
 @router.route("/room/<int:room_id>/scan/progress", methods=["GET"])
 @doc(summary="查询机房扫描实时进度", tags=["交换机"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def scan_room_progress(room_id):
     """查询机房扫描实时进度
 
@@ -995,6 +1000,7 @@ def collect_switch_info(device_id):
 @router.route("/<int:device_id>/ports/<path:port_number>", methods=["GET"])
 @doc(summary="获取端口详情", tags=["交换机"], responses={200: "SwitchPortResponse", 404: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def get_port_detail(device_id, port_number):
     """获取端口详情（仅从 sw_info + sw_info_ip 读取，不触发 SSH）
 
@@ -1050,7 +1056,7 @@ def get_port_detail(device_id, port_number):
 
 
 @router.route("/<int:device_id>/ports/<path:port_number>", methods=["PUT"])
-@doc(summary="更新端口信息（客户归属+描述）", tags=["交换机"], responses={200: "ApiResponse", 404: "ApiError"})
+@doc(summary="更新端口信息（客户归属+描述）", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchPortInfoUpdate"}}}}, responses={200: "ApiResponse", 404: "ApiError"})
 @permission_required("switch:config")
 @transactional
 def update_port_info(device_id, port_number):
@@ -1120,6 +1126,7 @@ def update_port_info(device_id, port_number):
 @router.route("/<int:device_id>/ports/<path:port_number>/config", methods=["GET"])
 @doc(summary="获取端口配置文本", tags=["交换机"], responses={200: "SwitchPortResponse", 401: "ApiError"})
 @login_required
+@permission_required("switch:view")
 @transactional
 def fetch_port_config(device_id, port_number):
     """获取端口配置文本
@@ -1142,6 +1149,7 @@ def fetch_port_config(device_id, port_number):
 @router.route("/<int:device_id>/ports/<path:port_number>/refresh", methods=["GET"])
 @doc(summary="强制刷新端口配置", tags=["交换机"], responses={200: "SwitchPortResponse", 401: "ApiError"})
 @login_required
+@permission_required("switch:config")
 @transactional
 def refresh_port_detail(device_id, port_number):
     """强制刷新端口配置（跳过缓存，从设备实时读取并同步）
@@ -1262,6 +1270,7 @@ def clear_port_config(device_id, port_number):
 @router.route("/<int:device_id>/ports_list", methods=["GET"])
 @doc(summary="获取端口名称列表", tags=["交换机"], responses={200: "SwitchPortResponse", 401: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def get_ports_list(device_id):
     """端口名称列表
 
@@ -1273,7 +1282,7 @@ def get_ports_list(device_id):
 
 
 @router.route("/<int:device_id>/ports/action", methods=["POST"])
-@doc(summary="异步端口操作", tags=["交换机"], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
+@doc(summary="异步端口操作", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchPortAction"}}}}, responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
 @permission_required("switch:config")
 @transactional
 def port_action(device_id):
@@ -1386,7 +1395,7 @@ def port_action(device_id):
 
 
 @router.route("/<int:device_id>/ports/batch-action", methods=["POST"])
-@doc(summary="异步批量端口操作", tags=["交换机"], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
+@doc(summary="异步批量端口操作", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchBatchPortAction"}}}}, responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
 @permission_required("switch:config")
 def batch_port_action(device_id):
     """异步批量端口操作（提交后台线程执行，通过SSE推送结果）
@@ -1540,7 +1549,7 @@ def disable_port(device_id, port_number):
 
 
 @router.route("/<int:device_id>/ports/<path:port_number>/speed", methods=["POST"])
-@doc(summary="设置端口限速", tags=["交换机"], responses={200: "ApiResponse", 404: "ApiError"})
+@doc(summary="设置端口限速", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchPortSpeedSet"}}}}, responses={200: "ApiResponse", 404: "ApiError"})
 @permission_required("switch:config")
 @transactional
 def set_port_speed(device_id, port_number):
@@ -1570,7 +1579,7 @@ def set_port_speed(device_id, port_number):
 
 
 @router.route("/<int:device_id>/ports/<path:port_number>/vlan", methods=["POST"])
-@doc(summary="配置端口VLAN", tags=["交换机"], responses={200: "ApiResponse", 404: "ApiError"})
+@doc(summary="配置端口VLAN", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchPortVlanSet"}}}}, responses={200: "ApiResponse", 404: "ApiError"})
 @permission_required("switch:config")
 @transactional
 def set_port_vlan(device_id, port_number):
@@ -1626,7 +1635,7 @@ def delete_vlan(device_id, vlan_id):
 
 
 @router.route("/<int:device_id>/port-channels/<int:trunk_id>/ports", methods=["POST"])
-@doc(summary="加入Eth-Trunk", tags=["交换机"], responses={200: "ApiResponse", 404: "ApiError"})
+@doc(summary="加入Eth-Trunk", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchPortTrunkMemberAdd"}}}}, responses={200: "ApiResponse", 404: "ApiError"})
 @permission_required("switch:config")
 @transactional
 def add_port_to_trunk(device_id, trunk_id):
@@ -1682,7 +1691,7 @@ def delete_trunk(device_id, trunk_id):
 
 
 @router.route("/<int:device_id>/ports/<path:port_number>/ip", methods=["POST"])
-@doc(summary="配置端口IP", tags=["交换机"], responses={200: "ApiResponse", 404: "ApiError"})
+@doc(summary="配置端口IP", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchPortIpSet"}}}}, responses={200: "ApiResponse", 404: "ApiError"})
 @permission_required("switch:config")
 @transactional
 def set_port_ip(device_id, port_number):
@@ -1711,6 +1720,7 @@ def set_port_ip(device_id, port_number):
 @router.route("/<int:device_id>/ports/<path:port_number>/ip", methods=["GET"])
 @doc(summary="查询端口IP", tags=["交换机"], responses={200: "SwitchPortIPResponse", 401: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def get_port_ips(device_id, port_number):
     """查询端口IP
 
@@ -1772,7 +1782,7 @@ def delete_interface(device_id, port_number):
 
 
 @router.route("/<int:device_id>/port-channels", methods=["POST"])
-@doc(summary="创建链路聚合组(Eth-Trunk)", tags=["交换机"], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
+@doc(summary="创建链路聚合组(Eth-Trunk)", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchPortChannelCreate"}}}}, responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
 @permission_required("switch:config")
 @transactional
 def create_port_channel(device_id):
@@ -1829,6 +1839,7 @@ def remove_port_from_channel(device_id, port_number):
 @router.route("/scan/status", methods=["GET"])
 @doc(summary="获取扫描任务状态", tags=["交换机"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def scan_status():
     """获取扫描任务状态
 
@@ -1883,6 +1894,7 @@ def switch_events(device_id):
 @router.route("/<int:device_id>/ext", methods=["GET"])
 @doc(summary="查询交换机扩展信息", tags=["交换机"], responses={200: "SwitchResponse", 404: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def get_switch_ext(device_id):
     """查询交换机扩展信息
 
@@ -1900,7 +1912,7 @@ def get_switch_ext(device_id):
 
 
 @router.route("/<int:device_id>/ext", methods=["POST"])
-@doc(summary="创建交换机扩展信息", tags=["交换机"], responses={200: "SwitchResponse", 404: "ApiError"})
+@doc(summary="创建交换机扩展信息", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchExtCreate"}}}}, responses={200: "SwitchResponse", 404: "ApiError"})
 @permission_required("switch:create")
 @transactional
 def create_switch_ext(device_id):
@@ -1942,7 +1954,7 @@ def create_switch_ext(device_id):
 
 
 @router.route("/<int:device_id>/ext", methods=["PUT"])
-@doc(summary="更新交换机扩展信息", tags=["交换机"], responses={200: "SwitchResponse", 404: "ApiError"})
+@doc(summary="更新交换机扩展信息", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwitchExtUpdate"}}}}, responses={200: "SwitchResponse", 404: "ApiError"})
 @permission_required("switch:update")
 @transactional
 def update_switch_ext(device_id):
@@ -2015,7 +2027,7 @@ def update_switch_ext(device_id):
 
 
 @router.route("/batch-update", methods=["PUT"])
-@doc(summary="批量修改交换机远程信息", tags=["交换机"], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
+@doc(summary="批量修改交换机远程信息", tags=["交换机"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/BatchUpdateSwitches"}}}}, responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
 @permission_required("switch:update")
 @transactional
 def batch_update_switches():

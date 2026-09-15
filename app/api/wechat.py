@@ -14,7 +14,7 @@ from flask import Blueprint, g, redirect, request
 from app.services.user_service import UserService
 from app.services.wx_service import WeChatService
 from app.openapi.doc import doc, public
-from app.utils.auth import auth_manager, login_required
+from app.utils.auth import auth_manager, login_required, permission_required
 from app.utils.transactional import transactional
 from app.utils.qrcode_manager import QRCodeManager
 from config import get_config
@@ -77,7 +77,7 @@ def get_js_sdk_config():
 
 
 @wechat_bp.route("/miniprogram-login", methods=["POST"])
-@public(summary="微信小程序登录", tags=["认证"], responses={200: "ApiResponse", 400: "ApiError"})
+@public(summary="微信小程序登录", tags=["认证"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/WeChatMiniprogramLoginRequest"}}}})
 def miniprogram_login():
     """微信小程序登录
 
@@ -271,6 +271,7 @@ def web_auth_callback():
 @wechat_bp.route("/invalidate-cache", methods=["POST"])
 @doc(summary="清除微信相关缓存", tags=["认证"], responses={200: "ApiResponse", 403: "ApiError"})
 @login_required
+@permission_required("system:config")
 def invalidate_cache():
     """清除微信相关缓存
 
@@ -465,7 +466,7 @@ def get_qrcode_status(scene_id: str):
 
 
 @wechat_bp.route("/qrcode/confirm", methods=["POST"])
-@doc(summary="确认二维码", tags=["认证"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="确认二维码", tags=["认证"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/WeChatQRCodeConfirmRequest"}}}})
 @login_required
 @transactional
 def confirm_qrcode():
@@ -609,7 +610,7 @@ def confirm_qrcode():
 
 
 @wechat_bp.route("/qrcode/auto-confirm", methods=["POST"])
-@doc(summary="自动确认二维码（测试环境）", tags=["认证"], responses={200: "ApiResponse", 403: "ApiError"})
+@doc(summary="自动确认二维码（测试环境）", tags=["认证"], responses={200: "ApiResponse", 403: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/WeChatQRCodeAutoConfirmRequest"}}}})
 @login_required
 @transactional
 def auto_confirm_qrcode():

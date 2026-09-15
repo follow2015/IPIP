@@ -7,7 +7,7 @@
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
-from marshmallow import Schema, fields, validate, EXCLUDE
+from marshmallow import Schema, validate
 
 from app.openapi.doc import doc, public
 from app.api.base import APIResponse, api_exception_handler
@@ -26,19 +26,7 @@ device_config_bp = Blueprint("device_config", __name__)
 _device_config_service = DeviceConfigService(DeviceConfigBackupRepository(), DeviceConfigChangeRepository())
 
 
-class ConfigChangeRequestSchema(Schema):
-    """提交配置变更请求Schema（字段名对齐 DeviceConfigChange 模型）"""
-    class Meta:
-        unknown = EXCLUDE
-    change_summary = fields.Str(
-        required=True, validate=validate.Length(min=1, max=500),
-        error_messages={"required": "变更摘要不能为空"},
-    )
-    change_detail = fields.Str(allow_none=True)
-    backup_id = fields.Int(allow_none=True)
-
-
-
+from app.schemas.device_config import ConfigChangeRequestSchema
 
 @device_config_bp.route("/<int:device_id>/config", methods=["GET"])
 @doc(summary="获取设备最新配置快照", tags=["设备配置"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "DeviceConfigBackupResponse", 404: "ApiError"})

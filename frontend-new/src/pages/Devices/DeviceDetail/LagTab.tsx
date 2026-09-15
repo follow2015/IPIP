@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useMemo } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Button, Space, Form, Input, Select, Tag, Modal } from 'antd';
 import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined } from '@ant-design/icons';
@@ -50,12 +51,12 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
     return map;
   }, [ports]);
 
-  const [addModalOpen, setAddModalOpen] = useState(false);
+  const addModal = useDisclosure();
   const [addForm] = Form.useForm();
-  const [memberModalOpen, setMemberModalOpen] = useState(false);
+  const memberModal = useDisclosure();
   const [editingMemberLag, setEditingMemberLag] = useState<LinkAggregationGroup | null>(null);
   const [memberForm] = Form.useForm();
-  const [purposeModalOpen, setPurposeModalOpen] = useState(false);
+  const purposeModal = useDisclosure();
   const [editingLag, setEditingLag] = useState<LinkAggregationGroup | null>(null);
   const [purposeForm] = Form.useForm();
 
@@ -64,7 +65,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
       const values = await addForm.validateFields();
       await createLag.mutateAsync({ deviceId, data: values });
       message.success('链路聚合组创建成功');
-      setAddModalOpen(false);
+      addModal.close();
       addForm.resetFields();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -91,7 +92,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
     memberForm.setFieldsValue({
       member_port_ids: initialPortIds
     });
-    setMemberModalOpen(true);
+    memberModal.open();
   };
 
   const handleMemberSubmit = async () => {
@@ -103,7 +104,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
         portIds: values.member_port_ids ?? []
       });
       message.success('成员端口更新成功');
-      setMemberModalOpen(false);
+      memberModal.close();
       setEditingMemberLag(null);
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -113,7 +114,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
   const handleEditPurpose = (lag: LinkAggregationGroup) => {
     setEditingLag(lag);
     purposeForm.setFieldsValue({ purpose: lag.purpose ?? '' });
-    setPurposeModalOpen(true);
+    purposeModal.open();
   };
 
   const handlePurposeSubmit = async () => {
@@ -125,7 +126,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
         data: { purpose: values.purpose ?? '' }
       });
       message.success('用途更新成功');
-      setPurposeModalOpen(false);
+      purposeModal.close();
       setEditingLag(null);
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -240,7 +241,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
           </Button>
         )}
         {!hasSsh && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddModalOpen(true)}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => addModal.open()}>
             创建链路聚合组
           </Button>
         )}
@@ -260,10 +261,10 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
       {/* 创建链路聚合组弹窗 */}
       <Modal
         title="创建链路聚合组"
-        open={addModalOpen}
+        open={addModal.isOpen}
         onOk={handleAdd}
         onCancel={() => {
-          setAddModalOpen(false);
+          addModal.close();
           addForm.resetFields();
         }}
         destroyOnHidden
@@ -291,10 +292,10 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
       {!hasSsh && (
         <Modal
           title={`编辑成员端口 - ${editingMemberLag?.lag_name ?? ''}`}
-          open={memberModalOpen}
+          open={memberModal.isOpen}
           onOk={handleMemberSubmit}
           onCancel={() => {
-            setMemberModalOpen(false);
+            memberModal.close();
             setEditingMemberLag(null);
           }}
           destroyOnHidden
@@ -318,10 +319,10 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
       {/* 用途编辑弹窗（所有交换机可用） */}
       <Modal
         title={`编辑用途 - ${editingLag?.lag_name ?? ''}`}
-        open={purposeModalOpen}
+        open={purposeModal.isOpen}
         onOk={handlePurposeSubmit}
         onCancel={() => {
-          setPurposeModalOpen(false);
+          purposeModal.close();
           setEditingLag(null);
         }}
         destroyOnHidden

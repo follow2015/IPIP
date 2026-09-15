@@ -27,43 +27,44 @@ import { useState, useCallback } from 'react';
 import { useBatchCreateDevices } from '@/services/device';
 import type { BatchCreateResult, BatchCreateItemResult } from '@/types/models';
 import type { CreateDeviceRequest } from '@/services/device';
+import { useDisclosure } from '@/hooks/useDisclosure';
 
 export function useBatchDeviceCreate() {
   const mutation = useBatchCreateDevices();
   const [result, setResult] = useState<BatchCreateResult | null>(null);
-  const [resultOpen, setResultOpen] = useState(false);
+  const resultDisclosure = useDisclosure();
 
   const submit = useCallback(
     async (devices: CreateDeviceRequest[]): Promise<BatchCreateResult | null> => {
       const res = await mutation.mutateAsync(devices); // throws on network error
       const data = res.data ?? null;
       setResult(data);
-      if (data) setResultOpen(true);
+      if (data) resultDisclosure.open();
       return data;
     },
-    [mutation],
+    [mutation]
   );
 
-  const closeResult = useCallback(() => setResultOpen(false), []);
+  const closeResult = useCallback(() => resultDisclosure.close(), []);
 
   const getFailedIndices = useCallback(
     (failedItems: BatchCreateItemResult[]): Set<number> =>
-      new Set(failedItems.map(item => item.index)),
-    [],
+      new Set(failedItems.map((item) => item.index)),
+    []
   );
 
   const reset = useCallback(() => {
     setResult(null);
-    setResultOpen(false);
+    resultDisclosure.close();
   }, []);
 
   return {
     submit,
     isPending: mutation.isPending,
     result,
-    resultOpen,
+    resultOpen: resultDisclosure.isOpen,
     closeResult,
     getFailedIndices,
-    reset,
+    reset
   };
 }

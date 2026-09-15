@@ -6,6 +6,7 @@
  * 测试邮件时弹出 Modal 填写收件人地址。
  */
 import React, { useCallback, useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Form,
@@ -71,7 +72,7 @@ const MailConfigPage: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const [sslMode, setSslMode] = useState<'tls' | 'ssl' | 'none'>('tls');
   const [editing, setEditing] = useState(false);
-  const [testModalOpen, setTestModalOpen] = useState(false);
+  const testModalDisclosure = useDisclosure();
 
   const hasConfig = config && config.mail_server;
 
@@ -143,7 +144,7 @@ const MailConfigPage: React.FC = () => {
 
   const openTestModal = useCallback(() => {
     testForm.resetFields();
-    setTestModalOpen(true);
+    testModalDisclosure.open();
   }, [testForm]);
 
   const handleTestSend = useCallback(async () => {
@@ -152,7 +153,7 @@ const MailConfigPage: React.FC = () => {
       const result = await testMutation.mutateAsync({ recipient: values.recipient });
       if (result.success) {
         messageApi.success(result.message);
-        setTestModalOpen(false);
+        testModalDisclosure.close();
       } else {
         messageApi.error(result.message);
       }
@@ -184,9 +185,9 @@ const MailConfigPage: React.FC = () => {
   const testModal = (
     <Modal
       title="发送测试邮件"
-      open={testModalOpen}
+      open={testModalDisclosure.isOpen}
       onOk={handleTestSend}
-      onCancel={() => setTestModalOpen(false)}
+      onCancel={() => testModalDisclosure.close()}
       okText="发送"
       cancelText="取消"
       confirmLoading={testMutation.isPending}

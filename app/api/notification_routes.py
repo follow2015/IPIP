@@ -46,7 +46,7 @@ def notification_list():
 
 
 @router.route("/mark-read", methods=["POST"])
-@doc(summary="标记通知已读", tags=["通知"], responses={200: "ApiResponse"})
+@doc(summary="标记通知已读", tags=["通知"], responses={200: "ApiResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/NotificationMarkReadRequest"}}}})
 @login_required
 @transactional
 def mark_read():
@@ -101,7 +101,7 @@ def get_preferences():
 
 
 @router.route("/preferences", methods=["PUT"])
-@doc(summary="更新通知偏好", tags=["通知"], responses={200: "ApiResponse"})
+@doc(summary="更新通知偏好", tags=["通知"], responses={200: "ApiResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/NotificationPreferencesUpdateRequest"}}}})
 @login_required
 @transactional
 def update_preferences():

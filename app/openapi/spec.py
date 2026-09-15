@@ -75,8 +75,62 @@ def register_marshmallow_schemas(spec: APISpec):
     Args:
         spec: APISpec 实例
     """
-    from app.api.device import DeviceCreateSchema, DeviceUpdateSchema
-    from app.api.device import (
+    from app.schemas.device import (
+        DeviceCreateApiSchema as DeviceCreateSchema, DeviceUpdateSchema,
+    )
+    from app.api.deployment_plan import DeploymentPlanRequestSchema
+    from app.schemas.component_template import ComponentTemplateCreateRequestSchema, ComponentTemplateUpdateRequestSchema
+    from app.schemas.errors import ErrorReportRequestSchema
+    from app.schemas.logs import LogErrorReportRequestSchema, LogInfoReportRequestSchema
+    from app.schemas.mail_settings import MailConfigTestRequestSchema, MailConfigUpdateRequestSchema
+    from app.schemas.network import NetworkCustomerUpdateRequestSchema, NetworkNoAuthRebuildRequestSchema
+    from app.schemas.notification import NotificationMarkReadRequestSchema, NotificationPreferencesUpdateRequestSchema
+    from app.schemas.topology import TopologyApplyRequestSchema, TopologyAutoDetectRequestSchema, TopologyDiscoverRequestSchema
+    from app.schemas.voice_settings import VoiceConfigUpdateRequestSchema
+    from app.schemas.webhook_config import WebhookConfigCreateRequestSchema, WebhookConfigUpdateRequestSchema
+    from app.schemas.rbac import (
+        RBACRoleCreateRequestSchema,
+        RBACRoleUpdateRequestSchema,
+        RBACRoleBatchDeleteRequestSchema,
+        RBACRolePermissionsUpdateRequestSchema,
+        RBACUserRolesUpdateRequestSchema,
+    )
+    from app.schemas.wechat import (
+        WeChatMiniprogramLoginRequestSchema,
+        WeChatQRCodeConfirmRequestSchema,
+        WeChatQRCodeAutoConfirmRequestSchema,
+    )
+    from app.schemas.ip import (
+        IPBanRequestSchema,
+        IPBatchBanRequestSchema,
+        IPCustomerUpdateRequestSchema,
+        IPNotesUpdateRequestSchema,
+        IPBatchCustomerUpdateRequestSchema,
+        IPBatchNotesUpdateRequestSchema,
+        IPScanPortsRequestSchema,
+        IPScanNetworkRequestSchema,
+    )
+    from app.schemas.device_port import (
+        PortCreateRequestSchema,
+        PortUpdateRequestSchema,
+        PortSyncEnabledUpdateRequestSchema,
+    )
+    from app.schemas.switch import (
+        BatchUpdateSwitchesSchema,
+        SwitchBatchPortActionSchema,
+        SwitchCreateSchema,
+        SwitchExtCreateSchema,
+        SwitchExtUpdateSchema,
+        SwitchPortActionSchema,
+        SwitchPortChannelCreateSchema,
+        SwitchPortInfoUpdateSchema,
+        SwitchPortIpSetSchema,
+        SwitchPortSpeedSetSchema,
+        SwitchPortTrunkMemberAddSchema,
+        SwitchPortVlanSetSchema,
+        SwitchUpdateSchema,
+    )
+    from app.schemas.device import (
         BatchUpdateAssetSchema, BatchResetAssetSchema,
         BatchDeleteSchema, BatchUpdateDeviceStatusSchema,
         BatchUpdateHardwareSchema, DeviceStatusUpdateSchema,
@@ -86,31 +140,89 @@ def register_marshmallow_schemas(spec: APISpec):
         BatchCreateDevicesSchema, DeviceVLANCreateSchema,
         VLANMemberUpdateSchema, VLANFieldUpdateSchema,
         LAGCreateSchema, LAGMemberUpdateSchema, LAGFieldUpdateSchema,
+        DeviceRestoreSchema, BatchRestoreDevicesSchema, BatchPermanentDeleteSchema,
+        BatchUpdateMetricTemplateGroupSchema, BatchUpdatePortSyncEnabledSchema,
+        BatchUpdateDeviceConfigSchema, SwapNodePositionsSchema, PortLinkUpdateSchema,
     )
-    from app.api.cabinet import (
+    from app.schemas.cabinet import (
         CabinetCreateSchema, CabinetUpdateSchema,
         UPositionCheckSchema, UAssignSchema, SmartUAssignSchema,
         CabinetCapacityValidateSchema, CabinetOptimizeSchema,
         CabinetCustomerUpdateSchema,
     )
-    from app.api.customer import CustomerCreateSchema, CustomerUpdateSchema
-    from app.api.room import RoomCreateSchema, RoomUpdateSchema
-    from app.api.device_connection import DeviceConnectionCreateSchema, DeviceConnectionUpdateSchema
-    from app.api.device_config import ConfigChangeRequestSchema
-    from app.api.device_nics_port import NicPortBatchSchema, NicPortIncrementalBatchSchema, NicPortUpdateSchema
-    from app.api.device_storage import (
-        StorageAddSchema, StorageOverwriteSchema,
-        StorageUpdateSchema, StorageSerialCheckSchema,
-    )
-    from app.api.auth import LoginSchema, QRCodeConfirmSchema, QRCodeCompleteSchema
-    from app.api.audit import AuditLogQuerySchema
-    from app.api.vlan import VLANCreateSchema, VLANUpdateSchema
-    from app.api.virtual_room_routes import VirtualRoomCreateSchema, VirtualRoomUpdateSchema, VirtualRoomMembersSchema
-    from app.api.user import (
+    from app.schemas.customer import CustomerCreateSchema, CustomerUpdateSchema, CustomerTerminateRequestSchema
+    from app.schemas.room import RoomCreateSchema, RoomUpdateSchema
+    from app.schemas.device_connection import DeviceConnectionCreateSchema, DeviceConnectionUpdateSchema
+    from app.schemas.device_config import ConfigChangeRequestSchema
+    from app.schemas.device_nics_port import NicPortBatchSchema, NicPortIncrementalBatchSchema, NicPortUpdateSchema
+    from app.api.device_nics_port import NicPortBatchDeleteSchema
+    from app.schemas.device_storage import StorageAddSchema, StorageOverwriteSchema, StorageUpdateSchema, StorageSerialCheckSchema
+    from app.api.device_storage import StorageBatchDeleteSchema
+    from app.schemas.auth import LoginSchema, QRCodeConfirmSchema, QRCodeCompleteSchema
+    from app.schemas.audit import AuditLogQuerySchema
+    from app.schemas.vlan import VLANCreateSchema, VLANUpdateSchema
+    from app.schemas.virtual_room_routes import VirtualRoomCreateSchema, VirtualRoomUpdateSchema, VirtualRoomMembersSchema
+    from app.schemas.user import (
         UserLoginSchema, UserRegisterSchema, RefreshTokenSchema,
         UserUpdateRequestSchema, ChangePasswordSchema, ResetPasswordSchema,
     )
     from app.schemas.monitor import MonitorCredentialUpsertSchema
+    from app.schemas.monitor import (
+        DeviceMetricOverrideUpsertSchema,
+        DeviceTypeRecommendUpdateSchema,
+        MibScanImportSchema,
+        MibScanPersistRuleSchema,
+        MibScanRequestSchema,
+        MonitorAlertDependencyRuleCreateSchema,
+        MonitorAlertDependencyRuleUpdateSchema,
+        MonitorBatchMonitorEnabledSchema,
+        MonitorCheckBatchSchema,
+        MonitorConfigUpdateSchema,
+        MonitorCredentialPayloadUpdateSchema,
+        MonitorDeviceMonitorEnabledSchema,
+        MonitorEscalationPolicyCreateSchema,
+        MonitorEscalationPolicyUpdateSchema,
+        MonitorSilenceRuleCreateSchema,
+        MonitorSilenceRuleUpdateSchema,
+        MonitorSlaTargetCreateSchema,
+        MonitorSlaTargetUpdateSchema,
+        OidCategoryRuleCreateSchema,
+        OidCategoryRuleUpdateSchema,
+        VendorBrandCreateSchema,
+        VendorBrandUpdateSchema,
+    )
+    from app.schemas.monitor import (
+        DeviceMetricOverrideUpsertSchema,
+        DeviceTypeRecommendUpdateSchema,
+        MibScanImportSchema,
+        MibScanPersistRuleSchema,
+        MibScanRequestSchema,
+        MonitorAlertDependencyRuleCreateSchema,
+        MonitorAlertDependencyRuleUpdateSchema,
+        MonitorBatchMonitorEnabledSchema,
+        MonitorCheckBatchSchema,
+        MonitorConfigUpdateSchema,
+        MonitorCredentialPayloadUpdateSchema,
+        MonitorDeviceMonitorEnabledSchema,
+        MonitorEscalationPolicyCreateSchema,
+        MonitorEscalationPolicyUpdateSchema,
+        MonitorSilenceRuleCreateSchema,
+        MonitorSilenceRuleUpdateSchema,
+        MonitorSlaTargetCreateSchema,
+        MonitorSlaTargetUpdateSchema,
+        OidCategoryRuleCreateSchema,
+        OidCategoryRuleUpdateSchema,
+        VendorBrandCreateSchema,
+        VendorBrandUpdateSchema,
+    )
+    from app.openapi.schemas import (
+        MetricTemplateBatchToggleRequestSchema,
+        MonitorAlertAckRequestSchema,
+        MonitorAlertCloseRequestSchema,
+        MonitorCredentialBatchDeleteRequestSchema,
+        MonitorCredentialLinkRequestSchema,
+        MonitorCredentialPatchRequestSchema,
+    )
     from app.openapi.schemas import (
         MonitorCredentialListItemSchema,
         MonitorCredentialCreateSchema,
@@ -122,6 +234,14 @@ def register_marshmallow_schemas(spec: APISpec):
         "BatchUpdateAsset": BatchUpdateAssetSchema,
         "BatchResetAsset": BatchResetAssetSchema,
         "BatchDelete": BatchDeleteSchema,
+        "DeviceRestore": DeviceRestoreSchema,
+        "BatchRestoreDevices": BatchRestoreDevicesSchema,
+        "BatchPermanentDelete": BatchPermanentDeleteSchema,
+        "BatchUpdateMetricTemplateGroup": BatchUpdateMetricTemplateGroupSchema,
+        "BatchUpdatePortSyncEnabled": BatchUpdatePortSyncEnabledSchema,
+        "BatchUpdateDeviceConfig": BatchUpdateDeviceConfigSchema,
+        "SwapNodePositions": SwapNodePositionsSchema,
+        "PortLinkUpdate": PortLinkUpdateSchema,
         "BatchUpdateDeviceStatus": BatchUpdateDeviceStatusSchema,
         "BatchUpdateHardware": BatchUpdateHardwareSchema,
         "DeviceStatusUpdate": DeviceStatusUpdateSchema,
@@ -177,6 +297,85 @@ def register_marshmallow_schemas(spec: APISpec):
         "ResetPassword": ResetPasswordSchema,
         "MonitorCredentialUpsert": MonitorCredentialUpsertSchema,
         "MonitorCredentialCreate": MonitorCredentialCreateSchema,
+        "BatchUpdateSwitches": BatchUpdateSwitchesSchema,
+        "SwitchBatchPortAction": SwitchBatchPortActionSchema,
+        "SwitchCreate": SwitchCreateSchema,
+        "SwitchExtCreate": SwitchExtCreateSchema,
+        "SwitchExtUpdate": SwitchExtUpdateSchema,
+        "SwitchPortAction": SwitchPortActionSchema,
+        "SwitchPortChannelCreate": SwitchPortChannelCreateSchema,
+        "SwitchPortInfoUpdate": SwitchPortInfoUpdateSchema,
+        "SwitchPortIpSet": SwitchPortIpSetSchema,
+        "SwitchPortSpeedSet": SwitchPortSpeedSetSchema,
+        "SwitchPortTrunkMemberAdd": SwitchPortTrunkMemberAddSchema,
+        "SwitchPortVlanSet": SwitchPortVlanSetSchema,
+        "SwitchUpdate": SwitchUpdateSchema,
+        "DeviceMetricOverrideUpsert": DeviceMetricOverrideUpsertSchema,
+        "DeviceTypeRecommendUpdate": DeviceTypeRecommendUpdateSchema,
+        "MibScanImport": MibScanImportSchema,
+        "MibScanPersistRule": MibScanPersistRuleSchema,
+        "MibScanRequest": MibScanRequestSchema,
+        "MonitorAlertDependencyRuleCreate": MonitorAlertDependencyRuleCreateSchema,
+        "MonitorAlertDependencyRuleUpdate": MonitorAlertDependencyRuleUpdateSchema,
+        "MonitorBatchMonitorEnabled": MonitorBatchMonitorEnabledSchema,
+        "MonitorCheckBatch": MonitorCheckBatchSchema,
+        "MonitorConfigUpdate": MonitorConfigUpdateSchema,
+        "MonitorCredentialPayloadUpdate": MonitorCredentialPayloadUpdateSchema,
+        "MonitorDeviceMonitorEnabled": MonitorDeviceMonitorEnabledSchema,
+        "MonitorEscalationPolicyCreate": MonitorEscalationPolicyCreateSchema,
+        "MonitorEscalationPolicyUpdate": MonitorEscalationPolicyUpdateSchema,
+        "MonitorSilenceRuleCreate": MonitorSilenceRuleCreateSchema,
+        "MonitorSilenceRuleUpdate": MonitorSilenceRuleUpdateSchema,
+        "MonitorSlaTargetCreate": MonitorSlaTargetCreateSchema,
+        "MonitorSlaTargetUpdate": MonitorSlaTargetUpdateSchema,
+        "OidCategoryRuleCreate": OidCategoryRuleCreateSchema,
+        "OidCategoryRuleUpdate": OidCategoryRuleUpdateSchema,
+        "VendorBrandCreate": VendorBrandCreateSchema,
+        "VendorBrandUpdate": VendorBrandUpdateSchema,
+        "MetricTemplateBatchToggleRequest": MetricTemplateBatchToggleRequestSchema,
+        "MonitorAlertAckRequest": MonitorAlertAckRequestSchema,
+        "MonitorAlertCloseRequest": MonitorAlertCloseRequestSchema,
+        "MonitorCredentialBatchDeleteRequest": MonitorCredentialBatchDeleteRequestSchema,
+        "MonitorCredentialLinkRequest": MonitorCredentialLinkRequestSchema,
+        "MonitorCredentialPatchRequest": MonitorCredentialPatchRequestSchema,
+        "IPBanRequest": IPBanRequestSchema,
+        "IPBatchBanRequest": IPBatchBanRequestSchema,
+        "IPCustomerUpdateRequest": IPCustomerUpdateRequestSchema,
+        "IPNotesUpdateRequest": IPNotesUpdateRequestSchema,
+        "IPBatchCustomerUpdateRequest": IPBatchCustomerUpdateRequestSchema,
+        "IPBatchNotesUpdateRequest": IPBatchNotesUpdateRequestSchema,
+        "IPScanPortsRequest": IPScanPortsRequestSchema,
+        "IPScanNetworkRequest": IPScanNetworkRequestSchema,
+        "PortCreateRequest": PortCreateRequestSchema,
+        "PortUpdateRequest": PortUpdateRequestSchema,
+        "PortSyncEnabledUpdateRequest": PortSyncEnabledUpdateRequestSchema,
+        "WeChatMiniprogramLoginRequest": WeChatMiniprogramLoginRequestSchema,
+        "WeChatQRCodeConfirmRequest": WeChatQRCodeConfirmRequestSchema,
+        "WeChatQRCodeAutoConfirmRequest": WeChatQRCodeAutoConfirmRequestSchema,
+        "RBACRoleCreateRequest": RBACRoleCreateRequestSchema,
+        "RBACRoleUpdateRequest": RBACRoleUpdateRequestSchema,
+        "RBACRoleBatchDeleteRequest": RBACRoleBatchDeleteRequestSchema,
+        "RBACRolePermissionsUpdateRequest": RBACRolePermissionsUpdateRequestSchema,
+        "RBACUserRolesUpdateRequest": RBACUserRolesUpdateRequestSchema,
+        "DeploymentPlanRequest": DeploymentPlanRequestSchema,
+        "ComponentTemplateCreateRequest": ComponentTemplateCreateRequestSchema,
+        "ComponentTemplateUpdateRequest": ComponentTemplateUpdateRequestSchema,
+        "CustomerTerminateRequest": CustomerTerminateRequestSchema,
+        "ErrorReportRequest": ErrorReportRequestSchema,
+        "LogErrorReportRequest": LogErrorReportRequestSchema,
+        "LogInfoReportRequest": LogInfoReportRequestSchema,
+        "MailConfigTestRequest": MailConfigTestRequestSchema,
+        "MailConfigUpdateRequest": MailConfigUpdateRequestSchema,
+        "NetworkCustomerUpdateRequest": NetworkCustomerUpdateRequestSchema,
+        "NetworkNoAuthRebuildRequest": NetworkNoAuthRebuildRequestSchema,
+        "NotificationMarkReadRequest": NotificationMarkReadRequestSchema,
+        "NotificationPreferencesUpdateRequest": NotificationPreferencesUpdateRequestSchema,
+        "TopologyApplyRequest": TopologyApplyRequestSchema,
+        "TopologyAutoDetectRequest": TopologyAutoDetectRequestSchema,
+        "TopologyDiscoverRequest": TopologyDiscoverRequestSchema,
+        "VoiceConfigUpdateRequest": VoiceConfigUpdateRequestSchema,
+        "WebhookConfigCreateRequest": WebhookConfigCreateRequestSchema,
+        "WebhookConfigUpdateRequest": WebhookConfigUpdateRequestSchema,
     }
     for name, schema_cls in request_schema_map.items():
         spec.components.schema(name, schema=schema_cls())

@@ -52,7 +52,7 @@ def list_oid_category_rules():
 
 
 @monitor_bp.route("/oid-category-rules", methods=["POST"])
-@doc(summary="新增 OID 分类规则", tags=["监控"], responses={200: "OidCategoryRuleMutationResponse"})
+@doc(summary="新增 OID 分类规则", tags=["监控"], responses={200: "OidCategoryRuleMutationResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/OidCategoryRuleCreate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -64,7 +64,7 @@ def create_oid_category_rule():
 
 
 @monitor_bp.route("/oid-category-rules/<int:rule_id>", methods=["PATCH"])
-@doc(summary="更新 OID 分类规则", tags=["监控"], responses={200: "OidCategoryRuleMutationResponse"})
+@doc(summary="更新 OID 分类规则", tags=["监控"], responses={200: "OidCategoryRuleMutationResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/OidCategoryRuleUpdate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -98,7 +98,7 @@ def list_device_type_recommends():
 
 
 @monitor_bp.route("/device-type-recommends/<device_type>", methods=["PUT"])
-@doc(summary="更新设备类型推荐配置", tags=["监控"], responses={200: "DeviceTypeRecommendItem"})
+@doc(summary="更新设备类型推荐配置", tags=["监控"], responses={200: "DeviceTypeRecommendItem"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceTypeRecommendUpdate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -111,7 +111,7 @@ def update_device_type_recommend(device_type: str):
 
 
 @monitor_bp.route("/mib-scan", methods=["POST"])
-@doc(summary="MIB 扫描（对设备做 walk，返回 OID 清单）", tags=["监控"], responses={200: "MibScanResponse"})
+@doc(summary="MIB 扫描（对设备做 walk，返回 OID 清单）", tags=["监控"], responses={200: "MibScanResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MibScanRequest"}}}})
 @login_required
 @permission_required("monitor:config")
 def mib_scan():
@@ -136,7 +136,7 @@ def mib_scan():
 
 
 @monitor_bp.route("/mib-scan/import", methods=["POST"])
-@doc(summary="批量导入 OID 为指标模板", tags=["监控"], responses={200: "MetricTemplateListResponse"})
+@doc(summary="批量导入 OID 为指标模板", tags=["监控"], responses={200: "MetricTemplateListResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MibScanImport"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -161,7 +161,7 @@ def mib_scan_recommend_config():
 
 
 @monitor_bp.route("/mib-scan/persist-rule", methods=["POST"])
-@doc(summary="把启发式命中的 OID 类别沉淀为规则（P1）", tags=["监控"], responses={200: "OidCategoryRuleMutationResponse"})
+@doc(summary="把启发式命中的 OID 类别沉淀为规则（P1）", tags=["监控"], responses={200: "OidCategoryRuleMutationResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MibScanPersistRule"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -189,7 +189,7 @@ def list_vendor_brands():
 
 
 @monitor_bp.route("/vendor-brands", methods=["POST"])
-@doc(summary="新增厂商品牌", tags=["监控"], responses={200: "VendorBrandMutationResponse"})
+@doc(summary="新增厂商品牌", tags=["监控"], responses={200: "VendorBrandMutationResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/VendorBrandCreate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -201,7 +201,7 @@ def create_vendor_brand():
 
 
 @monitor_bp.route("/vendor-brands/<int:brand_id>", methods=["PATCH"])
-@doc(summary="更新厂商品牌", tags=["监控"], responses={200: "VendorBrandMutationResponse"})
+@doc(summary="更新厂商品牌", tags=["监控"], responses={200: "VendorBrandMutationResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/VendorBrandUpdate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional

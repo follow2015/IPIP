@@ -8,6 +8,7 @@
  * - 默认加载第一个机房，防止全量加载
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/utils/confirm';
 import { Button, Tag, Card } from 'antd';
@@ -52,7 +53,7 @@ function LinkAggregations() {
     room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined
   });
 
-  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const createModal = useDisclosure();
 
   const deleteLag = useDeleteLinkAggregationGroup();
   const handleDelete = useCallback(
@@ -185,11 +186,7 @@ function LinkAggregations() {
             ]}
             table={table}
             extra={
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => setCreateModalOpen(true)}
-              >
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => createModal.open()}>
                 新建
               </Button>
             }
@@ -221,10 +218,10 @@ function LinkAggregations() {
 
       {/* 创建链路聚合组弹窗 */}
       <LAGForm
-        open={createModalOpen}
-        onCancel={() => setCreateModalOpen(false)}
+        open={createModal.isOpen}
+        onCancel={() => createModal.close()}
         onSuccess={() => {
-          setCreateModalOpen(false);
+          createModal.close();
           refetch();
         }}
       />

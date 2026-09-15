@@ -198,7 +198,7 @@ def retry_alert(alert_id: int):
 
 
 @monitor_bp.route("/alerts/<int:alert_id>/ack", methods=["POST"])
-@doc(summary="确认/认领告警", tags=["监控"], responses={200: "MonitorAlertAckResponse"})
+@doc(summary="确认/认领告警", tags=["监控"], responses={200: "MonitorAlertAckResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorAlertAckRequest"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -236,7 +236,7 @@ def ack_alert(alert_id: int):
 
 
 @monitor_bp.route("/alerts/<int:alert_id>/close", methods=["POST"])
-@doc(summary="手动关闭告警", tags=["监控"], responses={200: "MonitorAlertCloseResponse"})
+@doc(summary="手动关闭告警", tags=["监控"], responses={200: "MonitorAlertCloseResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorAlertCloseRequest"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -274,7 +274,7 @@ def close_alert(alert_id: int):
 
 
 @monitor_bp.route("/alerts/batch-ack", methods=["POST"])
-@doc(summary="批量确认/认领告警", tags=["监控"], responses={200: "MonitorAlertBatchAckResponse"})
+@doc(summary="批量确认/认领告警", tags=["监控"], responses={200: "MonitorAlertBatchAckResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorAlertBatchAckRequest"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -312,7 +312,7 @@ def batch_ack_alerts():
 
 
 @monitor_bp.route("/alerts/batch-retry", methods=["POST"])
-@doc(summary="批量重试失败告警", tags=["监控"], responses={200: "MonitorAlertBatchRetryResponse"})
+@doc(summary="批量重试失败告警", tags=["监控"], responses={200: "MonitorAlertBatchRetryResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorAlertBatchRetryRequest"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -344,7 +344,7 @@ def batch_retry_alerts():
 
 
 @monitor_bp.route("/alerts/batch-close", methods=["POST"])
-@doc(summary="批量手动关闭告警", tags=["监控"], responses={200: "MonitorAlertBatchCloseResponse"})
+@doc(summary="批量手动关闭告警", tags=["监控"], responses={200: "MonitorAlertBatchCloseResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorAlertBatchCloseRequest"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -382,7 +382,7 @@ def batch_close_alerts():
 
 
 @monitor_bp.route("/devices/<int:device_id>/monitor-enabled", methods=["PATCH"])
-@doc(summary="设备级监控启停", tags=["监控"], responses={200: "MonitorDeviceMonitorEnabledResponse"})
+@doc(summary="设备级监控启停", tags=["监控"], responses={200: "MonitorDeviceMonitorEnabledResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorDeviceMonitorEnabled"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -403,7 +403,7 @@ def patch_device_monitor_enabled(device_id: int):
 
 
 @monitor_bp.route("/batch-monitor-enabled", methods=["PATCH"])
-@doc(summary="批量设备级监控启停", tags=["监控"], responses={200: "MonitorDeviceMonitorEnabledResponse"})
+@doc(summary="批量设备级监控启停", tags=["监控"], responses={200: "MonitorDeviceMonitorEnabledResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorBatchMonitorEnabled"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional

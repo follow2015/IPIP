@@ -10,6 +10,7 @@
  *       无 steps 时回退单级模式（wait_minutes + repeat_minutes）。
  */
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Button,
@@ -57,7 +58,7 @@ export default function EscalationPoliciesPage() {
   const createMut = useCreateEscalationPolicy();
   const updateMut = useUpdateEscalationPolicy();
   const deleteMut = useDeleteEscalationPolicy();
-  const [modalOpen, setModalOpen] = useState(false);
+  const modal = useDisclosure();
   const [editing, setEditing] = useState<MonitorEscalationPolicy | null>(null);
   const [form] = Form.useForm<MonitorEscalationPolicyInput>();
   const table = useTable({ initialPerPage: 20 });
@@ -69,7 +70,7 @@ export default function EscalationPoliciesPage() {
     setEditing(null);
     form.resetFields();
     form.setFieldsValue({ enabled: true, wait_minutes: 30, repeat_minutes: 0, steps: [] });
-    setModalOpen(true);
+    modal.open();
   };
 
   const openEdit = (record: MonitorEscalationPolicy) => {
@@ -93,7 +94,7 @@ export default function EscalationPoliciesPage() {
         enabled: s.enabled
       }))
     });
-    setModalOpen(true);
+    modal.open();
   };
 
   const handleSubmit = async () => {
@@ -125,7 +126,7 @@ export default function EscalationPoliciesPage() {
         await createMut.mutateAsync(payload);
         message.success('已创建');
       }
-      setModalOpen(false);
+      modal.close();
     } catch (err: unknown) {
       if (err instanceof Error && err.message) message.error(err.message);
     }
@@ -244,9 +245,9 @@ export default function EscalationPoliciesPage() {
 
       <Modal
         title={editing ? '编辑升级策略' : '新建升级策略'}
-        open={modalOpen}
+        open={modal.isOpen}
         onOk={handleSubmit}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => modal.close()}
         confirmLoading={createMut.isPending || updateMut.isPending}
         width={720}
         destroyOnHidden

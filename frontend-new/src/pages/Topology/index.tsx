@@ -9,6 +9,7 @@
  * - 自动推断拓扑字段
  */
 import React, { useState, useCallback, useMemo, useRef, useDeferredValue, useEffect } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Select,
@@ -55,12 +56,12 @@ const TopologyPage: React.FC = () => {
   const [virtualRoomId, setVirtualRoomId] = useState<number | undefined>(undefined);
   const [layout, setLayout] = useState<LayoutType>('force');
   const [selectedNode, setSelectedNode] = useState<TopologyNode | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawer = useDisclosure();
   const [highlightNodeId, setHighlightNodeId] = useState<number | null>(null);
   const [searchValue, setSearchValue] = useState('');
   const deferredSearch = useDeferredValue(searchValue);
-  const [autoDetectModalOpen, setAutoDetectModalOpen] = useState(false);
-  const [discoveryModalOpen, setDiscoveryModalOpen] = useState(false);
+  const autoDetectModal = useDisclosure();
+  const discoveryModal = useDisclosure();
   const graphRef = useRef<TopologyGraphHandle>(null);
   const { isMobile } = useResponsive();
 
@@ -87,7 +88,7 @@ const TopologyPage: React.FC = () => {
 
   const handleNodeClick = useCallback((node: TopologyNode) => {
     setSelectedNode(node);
-    setDrawerOpen(true);
+    drawer.open();
   }, []);
 
   const handleEdgeClick = useCallback((_edge: TopologyEdge) => {
@@ -120,7 +121,7 @@ const TopologyPage: React.FC = () => {
           if (data.changes.length === 0) {
             message.success('未发现需要推断的字段');
           } else {
-            setAutoDetectModalOpen(true);
+            autoDetectModal.open();
           }
         }
       }
@@ -134,7 +135,7 @@ const TopologyPage: React.FC = () => {
       {
         onSuccess: (data) => {
           message.success(`已更新 ${data.changes.length} 条记录`);
-          setAutoDetectModalOpen(false);
+          autoDetectModal.close();
         }
       }
     );
@@ -284,7 +285,7 @@ const TopologyPage: React.FC = () => {
                 type="primary"
                 ghost
                 icon={<NodeIndexOutlined />}
-                onClick={() => setDiscoveryModalOpen(true)}
+                onClick={() => discoveryModal.open()}
               >
                 LLDP 发现
               </Button>
@@ -384,26 +385,26 @@ const TopologyPage: React.FC = () => {
         node={selectedNode}
         edges={topologyData?.edges ?? []}
         nodeMap={nodeMap}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        open={drawer.isOpen}
+        onClose={() => drawer.close()}
         onLocateNode={(nodeId) => setHighlightNodeId(nodeId)}
       />
 
       {/* LLDP/CDP 发现 Modal（建议式，不自动覆盖） */}
       <LldpDiscoveryModal
-        open={discoveryModalOpen}
-        onClose={() => setDiscoveryModalOpen(false)}
+        open={discoveryModal.isOpen}
+        onClose={() => discoveryModal.close()}
         roomId={roomId}
       />
 
       {/* 自动推断预览 Modal */}
       <Modal
         title="自动推断结果预览"
-        open={autoDetectModalOpen}
-        onCancel={() => setAutoDetectModalOpen(false)}
+        open={autoDetectModal.isOpen}
+        onCancel={() => autoDetectModal.close()}
         width={isMobile ? 'calc(100vw - 24px)' : 600}
         footer={[
-          <Button key="cancel" onClick={() => setAutoDetectModalOpen(false)}>
+          <Button key="cancel" onClick={() => autoDetectModal.close()}>
             取消
           </Button>,
           <Button

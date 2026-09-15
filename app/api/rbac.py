@@ -72,7 +72,7 @@ def get_role(role_id):
 
 
 @rbac_bp.route("/roles/", methods=["POST"])
-@doc(summary="创建角色", tags=["RBAC"], responses={201: "RoleResponse", 409: "ApiError"})
+@doc(summary="创建角色", tags=["RBAC"], responses={201: "RoleResponse", 409: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RBACRoleCreateRequest"}}}})
 @login_required
 @permission_required("user:create")
 @api_exception_handler
@@ -97,7 +97,7 @@ def create_role():
 
 
 @rbac_bp.route("/roles/<int:role_id>/", methods=["PUT"])
-@doc(summary="更新角色", tags=["RBAC"], responses={200: "RoleResponse", 409: "ApiError"})
+@doc(summary="更新角色", tags=["RBAC"], responses={200: "RoleResponse", 409: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RBACRoleUpdateRequest"}}}})
 @login_required
 @permission_required("user:update")
 @api_exception_handler
@@ -141,7 +141,7 @@ def delete_role(role_id):
 
 
 @rbac_bp.route("/roles/batch-delete", methods=["POST"])
-@doc(summary="批量删除角色", tags=["RBAC"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="批量删除角色", tags=["RBAC"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RBACRoleBatchDeleteRequest"}}}})
 @login_required
 @permission_required("user:delete")
 @api_exception_handler
@@ -183,7 +183,7 @@ def get_role_permissions(role_id):
 
 
 @rbac_bp.route("/roles/<int:role_id>/permissions/", methods=["PUT", "POST"])
-@doc(summary="更新角色权限", tags=["RBAC"], responses={200: "PermissionResponse", 400: "ApiError"})
+@doc(summary="更新角色权限", tags=["RBAC"], responses={200: "PermissionResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RBACRolePermissionsUpdateRequest"}}}})
 @login_required
 @permission_required("user:update")
 @api_exception_handler
@@ -271,7 +271,7 @@ def get_user_roles(user_id):
 
 
 @rbac_bp.route("/users/<int:user_id>/roles/", methods=["PUT"])
-@doc(summary="更新用户角色", tags=["RBAC"], responses={200: "RoleResponse", 400: "ApiError"})
+@doc(summary="更新用户角色", tags=["RBAC"], responses={200: "RoleResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RBACUserRolesUpdateRequest"}}}})
 @login_required
 @permission_required("user:update")
 @api_exception_handler

@@ -1,6 +1,7 @@
 import { useConfirm } from '@/utils/confirm';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Button,
   Space,
@@ -132,9 +133,9 @@ function Network() {
   const copyInfo = useCopyInfo();
   const navigate = useNavigate();
 
-  const [assignOpen, setAssignOpen] = useState(false);
+  const assign = useDisclosure();
   const [assignRecord, setAssignRecord] = useState<IPNetwork | null>(null);
-  const [routesOpen, setRoutesOpen] = useState(false);
+  const routes = useDisclosure();
   const [assignForm] = Form.useForm();
 
   const [scanningRoomId, setScanningRoomId] = useState<number | null>(null);
@@ -153,7 +154,7 @@ function Network() {
   });
 
   const { data: routesData, isLoading: routesLoading } = useNetworkRoutes(
-    routesOpen
+    routes.isOpen
       ? { room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined }
       : undefined
   );
@@ -237,7 +238,7 @@ function Network() {
   const handleAssignOpen = (record: IPNetwork) => {
     setAssignRecord(record);
     assignForm.setFieldsValue({ customer_id: record.customer_id ?? undefined });
-    setAssignOpen(true);
+    assign.open();
   };
 
   const handleAssignSubmit = async () => {
@@ -254,7 +255,7 @@ function Network() {
         }
       });
       msg.success('客户分配成功');
-      setAssignOpen(false);
+      assign.close();
       refetch();
     } catch (err) {
       if (err instanceof Error) msg.error(err.message);
@@ -610,7 +611,7 @@ function Network() {
             table={table}
             extra={
               <>
-                <Button icon={<ApartmentOutlined />} onClick={() => setRoutesOpen(true)}>
+                <Button icon={<ApartmentOutlined />} onClick={() => routes.open()}>
                   路由列表
                 </Button>
                 <Button
@@ -633,9 +634,9 @@ function Network() {
       {/* 分配客户弹窗 */}
       <Modal
         title="分配客户"
-        open={assignOpen}
+        open={assign.isOpen}
         onOk={handleAssignSubmit}
-        onCancel={() => setAssignOpen(false)}
+        onCancel={() => assign.close()}
         destroyOnHidden
       >
         <Form form={assignForm} layout="vertical" initialValues={{ force: 'null_only' }}>
@@ -661,8 +662,8 @@ function Network() {
       {/* 路由列表弹窗 */}
       <Modal
         title="路由列表"
-        open={routesOpen}
-        onCancel={() => setRoutesOpen(false)}
+        open={routes.isOpen}
+        onCancel={() => routes.close()}
         footer={null}
         width={900}
         destroyOnHidden

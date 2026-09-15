@@ -19,7 +19,7 @@ from app.utils.transactional import transactional
 
 
 @monitor_bp.route("/credentials", methods=["POST"])
-@doc(summary="批量配置共享监控凭据", tags=["监控"], responses={200: "MonitorCredentialConfigResponse"})
+@doc(summary="批量配置共享监控凭据", tags=["监控"], responses={200: "MonitorCredentialConfigResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCredentialUpsert"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -75,7 +75,7 @@ def list_linked_devices(credential_id: int):
 
 
 @monitor_bp.route("/credentials/<int:credential_id>", methods=["PATCH"])
-@doc(summary="更新共享凭据（启停/改名）", tags=["监控"], responses={200: "MonitorCredentialPatchResponse"})
+@doc(summary="更新共享凭据（启停/改名）", tags=["监控"], responses={200: "MonitorCredentialPatchResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCredentialPatchRequest"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -129,7 +129,7 @@ def delete_credential(credential_id: int):
 @monitor_bp.route("/credentials/batch-delete", methods=["POST"])
 @doc(summary="批量删除共享凭据", tags=["监控"],
      responses={200: "MonitorCredentialBatchDeleteResponse", 400: "ApiError",
-                401: "ApiError", 403: "ApiError"})
+                401: "ApiError", 403: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCredentialBatchDeleteRequest"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -172,7 +172,7 @@ def batch_delete_credentials():
 
 @monitor_bp.route("/credentials/<int:credential_id>/link", methods=["POST"])
 @doc(summary="关联设备到已有共享凭据", tags=["监控"],
-     responses={200: "MonitorCredentialConfigResponse"})
+     responses={200: "MonitorCredentialConfigResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCredentialLinkRequest"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -201,7 +201,7 @@ def link_existing_credentials(credential_id: int):
     summary="共享凭据密文部分更新（影响所有关联设备）",
     tags=["监控"],
     responses={200: "MonitorCredentialPayloadUpdateResponse"},
-)
+request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCredentialPayloadUpdate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -238,7 +238,7 @@ def put_shared_credential_payload(credential_id: int):
     summary="单设备凭据密文部分更新（只影响本设备）",
     tags=["监控"],
     responses={200: "MonitorCredentialPayloadUpdateResponse"},
-)
+request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCredentialPayloadUpdate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional

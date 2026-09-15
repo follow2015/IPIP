@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useCallback } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, Spin, Button, Space, Tag, Dropdown, Descriptions, Result } from 'antd';
 import {
@@ -83,8 +84,8 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
   const updateStatus = useUpdateDeviceStatus();
   const message = useMessage();
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [deviceFormOpen, setDeviceFormOpen] = useState(false);
+  const form = useDisclosure();
+  const deviceForm = useDisclosure();
 
   const syncSwitchInfo = useSyncSwitchInfo();
   const handleRefreshDeviceInfo = () => {
@@ -356,11 +357,11 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
             </Button>
           )}
           {hasSsh && (
-            <Button type="primary" icon={<EditOutlined />} onClick={() => setFormOpen(true)}>
+            <Button type="primary" icon={<EditOutlined />} onClick={() => form.open()}>
               远程信息管理
             </Button>
           )}
-          <Button icon={<EditOutlined />} onClick={() => setDeviceFormOpen(true)}>
+          <Button icon={<EditOutlined />} onClick={() => deviceForm.open()}>
             编辑
           </Button>
           <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
@@ -398,21 +399,21 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
 
       {/* 编辑表单（简化版，仅交换机配置） */}
       <SwitchForm
-        open={formOpen}
+        open={form.isOpen}
         editRecord={switchData ?? null}
         onClose={() => {
-          setFormOpen(false);
+          form.close();
           refetch();
         }}
       />
 
       {/* 完整编辑表单（DeviceForm） */}
       <DeviceForm
-        open={deviceFormOpen}
+        open={deviceForm.isOpen}
         editRecord={null}
         editDeviceId={device.id}
         onClose={() => {
-          setDeviceFormOpen(false);
+          deviceForm.close();
           refetch();
         }}
       />

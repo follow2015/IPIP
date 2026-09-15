@@ -23,6 +23,7 @@ _topology_service = TopologyService()
 
 @router.route("/network", methods=["GET"])
 @login_required
+@permission_required("device:view")
 @api_exception_handler
 @doc(
     summary="获取网络层拓扑",
@@ -53,6 +54,7 @@ def get_network_topology():
 
 @router.route("/device", methods=["GET"])
 @login_required
+@permission_required("device:view")
 @api_exception_handler
 @doc(
     summary="获取设备层拓扑",
@@ -83,13 +85,14 @@ def get_device_topology():
 
 @router.route("/auto-detect", methods=["POST"])
 @login_required
+@permission_required("device:update")
 @api_exception_handler
 @transactional
 @doc(
     summary="自动推断拓扑字段",
     tags=["拓扑"],
     responses={200: {"description": "推断结果（dry_run=true时不写入DB）"}},
-)
+request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/TopologyAutoDetectRequest"}}}})
 def auto_detect_topology():
     """基于 N2N 连接自动推断 switch_role / layer / uplink_device_id / core_device_id"""
     data = request.get_json(silent=True) or {}
@@ -129,7 +132,7 @@ def _get_discovery_service():
     summary="LLDP/CDP 拓扑发现（只读，返回连接建议）",
     tags=["拓扑"],
     responses={200: {"description": "建议列表：match_status = existing/matched/partial/unknown_peer/port_occupied"}},
-)
+request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/TopologyDiscoverRequest"}}}})
 def discover_topology():
     """对交换机（单台或 ≤10 台）执行 LLDP/CDP 邻居发现
 
@@ -155,7 +158,7 @@ def discover_topology():
     summary="应用拓扑发现建议（仅 matched 项）",
     tags=["拓扑"],
     responses={200: {"description": "创建的 N2N 连接与跳过项"}},
-)
+request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/TopologyApplyRequest"}}}})
 def apply_discovered_topology():
     """将勾选的 matched 建议落库为 N2N 连接
 

@@ -8,7 +8,7 @@ from flask import Blueprint, request, g
 import hashlib
 from app.exceptions import PresetResponseError
 from app.utils.logging import get_logger
-from marshmallow import Schema, fields, validate, EXCLUDE
+from marshmallow import Schema
 from app.utils.time_utils import now_utc_naive
 
 from app.services import CustomerService
@@ -30,42 +30,7 @@ customer_service = CustomerService(CustomerRepository())
 logger = get_logger(__name__)
 
 
-class CustomerCreateSchema(Schema):
-    """创建客户请求验证Schema
-    
-    字段名与数据库模型保持一致：customer_name, customer_status
-    只有 customer_name 是必填，其他字段均可为空
-    """
-    
-    class Meta:
-        unknown = EXCLUDE  # 忽略未知字段
-
-    customer_name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    customer_status = fields.Int(load_default=CustomerStatus.ACTIVE.value)
-    contact_person = fields.Str(allow_none=True, validate=validate.Length(max=50))
-    contact_phone = fields.Str(allow_none=True, validate=validate.Length(max=20))
-    email = fields.Email(allow_none=True)  # 允许空值
-    address = fields.Str(allow_none=True, validate=validate.Length(max=200))
-    notes = fields.Str(allow_none=True, validate=validate.Length(max=500))
-
-
-class CustomerUpdateSchema(Schema):
-    """更新客户请求验证Schema
-    
-    字段名与数据库模型保持一致：customer_name, customer_status
-    """
-    
-    class Meta:
-        unknown = EXCLUDE  # 忽略未知字段
-
-    customer_name = fields.Str(validate=validate.Length(min=1, max=100))
-    customer_status = fields.Int()
-    contact_person = fields.Str(allow_none=True, validate=validate.Length(max=50))
-    contact_phone = fields.Str(allow_none=True, validate=validate.Length(max=20))
-    email = fields.Email(allow_none=True)  # 允许空值
-    address = fields.Str(allow_none=True, validate=validate.Length(max=200))
-    notes = fields.Str(allow_none=True, validate=validate.Length(max=500))
-
+from app.schemas.customer import CustomerCreateSchema, CustomerUpdateSchema
 
 @customer_bp.route("/", methods=["GET"])
 @doc(summary="获取客户列表", tags=["客户"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}, {"name": "status", "in": "query", "schema": {"type": "string"}}], responses={200: "CustomerResponse", 500: "ApiError"})
@@ -340,6 +305,7 @@ def get_customer_statistics(customer_id):
 @customer_bp.route("/<int:customer_id>/assets", methods=["GET"])
 @doc(summary="获取客户资产统计", tags=["客户"], parameters=[{"name": "customer_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 500: "ApiError"})
 @login_required
+@permission_required("customer:view")
 def get_customer_assets(customer_id):
     """获取客户资产统计
     
@@ -391,6 +357,7 @@ def get_customer_assets(customer_id):
 @customer_bp.route("/<int:customer_id>/assets-export", methods=["GET"])
 @doc(summary="导出客户资源Excel", tags=["客户"], parameters=[{"name": "customer_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError", 500: "ApiError"})
 @login_required
+@permission_required("customer:view")
 def export_customer_assets(customer_id):
     """导出客户资源统计 Excel（5 个 Sheet：概览/机柜/设备/网段/端口）
 
@@ -506,7 +473,7 @@ def download_customer_import_template():
 
 
 @customer_bp.route("/<int:customer_id>/terminate", methods=["POST"])
-@doc(summary="终止客户（主入口，原子释放全部资源）", tags=["客户"], responses={200: "CustomerResponse", 404: "ApiError", 409: "ApiError"})
+@doc(summary="终止客户（主入口，原子释放全部资源）", tags=["客户"], responses={200: "CustomerResponse", 404: "ApiError", 409: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/CustomerTerminateRequest"}}}})
 @login_required
 @permission_required("customer:terminate")
 @rate_limit_api

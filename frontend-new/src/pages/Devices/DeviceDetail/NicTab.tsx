@@ -5,6 +5,7 @@
  * - 仅 server/other 设备
  */
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { useConfirm } from '@/utils/confirm';
 import { Button, Space, Modal, Form, Input, InputNumber, Select } from 'antd';
 import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
@@ -66,11 +67,11 @@ function NicTab({ deviceId }: NicTabProps) {
 
   const { data: nicTemplates = [] } = useComponentTemplates('nic');
 
-  const [formOpen, setFormOpen] = useState(false);
+  const formDisclosure = useDisclosure();
   const [editingNic, setEditingNic] = useState<DeviceNicPort | null>(null);
   const [form] = Form.useForm();
 
-  const [templateOpen, setTemplateOpen] = useState(false);
+  const template = useDisclosure();
   const [templateForm] = Form.useForm();
 
   const batch = useBatchSelection<DeviceNicPort>({ dataSource: nics ?? [] });
@@ -80,7 +81,7 @@ function NicTab({ deviceId }: NicTabProps) {
   const handleEdit = (record: DeviceNicPort) => {
     setEditingNic(record);
     form.setFieldsValue(record);
-    setFormOpen(true);
+    formDisclosure.open();
   };
 
   const handleSubmit = async () => {
@@ -90,7 +91,7 @@ function NicTab({ deviceId }: NicTabProps) {
         await updateNic.mutateAsync({ portId: editingNic.id, data: values });
         message.success('更新成功');
       }
-      setFormOpen(false);
+      formDisclosure.close();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     }
@@ -128,7 +129,7 @@ function NicTab({ deviceId }: NicTabProps) {
     try {
       await batchCreateNics.mutateAsync({ ports });
       message.success(`已按模板创建 ${ports.length} 个端口`);
-      setTemplateOpen(false);
+      template.close();
       templateForm.resetFields();
     } catch (err) {
       message.error(err instanceof Error ? err.message : '创建失败');
@@ -237,7 +238,7 @@ function NicTab({ deviceId }: NicTabProps) {
           <Button
             icon={<AppstoreOutlined />}
             onClick={() => {
-              setTemplateOpen(true);
+              template.open();
               templateForm.resetFields();
             }}
           >
@@ -261,9 +262,9 @@ function NicTab({ deviceId }: NicTabProps) {
       {/* ─── 编辑 Modal ─── */}
       <Modal
         title="编辑端口"
-        open={formOpen}
+        open={formDisclosure.isOpen}
         onOk={handleSubmit}
-        onCancel={() => setFormOpen(false)}
+        onCancel={() => formDisclosure.close()}
         destroyOnHidden
       >
         <Form form={form} layout="vertical">
@@ -302,8 +303,8 @@ function NicTab({ deviceId }: NicTabProps) {
       {/* ─── 模板配置 Modal（复用 NicConfigFields） ─── */}
       <Modal
         title="模板配置"
-        open={templateOpen}
-        onCancel={() => setTemplateOpen(false)}
+        open={template.isOpen}
+        onCancel={() => template.close()}
         onOk={handleTemplateSubmit}
         okText={`确认创建`}
         confirmLoading={batchCreateNics.isPending}

@@ -8,6 +8,7 @@
  * buildThreshold/parseThreshold/renderThreshold，按 metric_type 动态渲染。
  */
 import { useMemo, useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Button,
@@ -64,7 +65,7 @@ export default function ThresholdOverridesPage() {
   const upsertMut = useUpsertThresholdOverride();
   const deleteMut = useDeleteThresholdOverride();
   const { data: templatesData } = useMetricTemplates();
-  const [modalOpen, setModalOpen] = useState(false);
+  const modal = useDisclosure();
   const [editing, setEditing] = useState<DeviceMetricOverride | null>(null);
   const [form] = Form.useForm<OverrideFormValues>();
   const table = useTable({ initialPerPage: 20 });
@@ -88,7 +89,7 @@ export default function ThresholdOverridesPage() {
     setEditing(null);
     form.resetFields();
     form.setFieldsValue({ enabled: true, metric_type: 'gauge' });
-    setModalOpen(true);
+    modal.open();
   };
 
   const openEdit = (record: DeviceMetricOverride) => {
@@ -102,7 +103,7 @@ export default function ThresholdOverridesPage() {
       note: record.note ?? undefined,
       ...parseThreshold(record.threshold, mt)
     });
-    setModalOpen(true);
+    modal.open();
   };
 
   const handleSubmit = async () => {
@@ -135,7 +136,7 @@ export default function ThresholdOverridesPage() {
       };
       await upsertMut.mutateAsync(payload);
       message.success(editing ? '已更新' : '已创建');
-      setModalOpen(false);
+      modal.close();
     } catch (err: unknown) {
       if (err instanceof Error && err.message) message.error(err.message);
     }
@@ -236,9 +237,9 @@ export default function ThresholdOverridesPage() {
 
       <Modal
         title={editing ? '编辑阈值覆盖' : '新建阈值覆盖'}
-        open={modalOpen}
+        open={modal.isOpen}
         onOk={handleSubmit}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => modal.close()}
         confirmLoading={upsertMut.isPending}
         width={600}
         destroyOnHidden

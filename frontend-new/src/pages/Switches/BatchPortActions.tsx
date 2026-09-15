@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Button,
   Space,
@@ -133,12 +134,12 @@ export default function BatchPortActions({
   const batchAction = useBatchPortAction();
   const { data: customerOptions } = useAllocatableCustomerOptions();
   const [localLoading, setLocalLoading] = useState(false);
-  const [vlanModalOpen, setVlanModalOpen] = useState(false);
-  const [descModalOpen, setDescModalOpen] = useState(false);
-  const [trunkModalOpen, setTrunkModalOpen] = useState(false);
-  const [customerModalOpen, setCustomerModalOpen] = useState(false);
-  const [speedModalOpen, setSpeedModalOpen] = useState(false);
-  const [cancelSpeedModalOpen, setCancelSpeedModalOpen] = useState(false);
+  const vlanModal = useDisclosure();
+  const descModal = useDisclosure();
+  const trunkModal = useDisclosure();
+  const customerModal = useDisclosure();
+  const speedModal = useDisclosure();
+  const cancelSpeedModal = useDisclosure();
   const [cancelSpeedForm] = Form.useForm();
   const [vlanForm] = Form.useForm();
   const [descForm] = Form.useForm();
@@ -219,7 +220,7 @@ export default function BatchPortActions({
       } else {
         submitLocalBatchAction({ vlan: String(values.vlan_id) });
       }
-      setVlanModalOpen(false);
+      vlanModal.close();
       vlanForm.resetFields();
     });
   };
@@ -233,7 +234,7 @@ export default function BatchPortActions({
       } else {
         submitLocalBatchAction({ description: values.description || '' });
       }
-      setDescModalOpen(false);
+      descModal.close();
       descForm.resetFields();
     });
   };
@@ -243,7 +244,7 @@ export default function BatchPortActions({
       submitBatchAction('add_port_to_trunk', {
         channel_id: values.channel_id
       });
-      setTrunkModalOpen(false);
+      trunkModal.close();
       trunkForm.resetFields();
     });
   };
@@ -257,7 +258,7 @@ export default function BatchPortActions({
       } else {
         submitLocalBatchAction({ customer_id: values.customer_id ?? null });
       }
-      setCustomerModalOpen(false);
+      customerModal.close();
       customerForm.resetFields();
     });
   };
@@ -276,7 +277,7 @@ export default function BatchPortActions({
         return;
       }
       submitBatchAction('set_port_speed', params);
-      setSpeedModalOpen(false);
+      speedModal.close();
       speedForm.resetFields();
     });
   };
@@ -294,7 +295,7 @@ export default function BatchPortActions({
         cancel_outbound: cancelOutbound
       };
       submitBatchAction('cancel_port_speed', params);
-      setCancelSpeedModalOpen(false);
+      cancelSpeedModal.close();
       cancelSpeedForm.resetFields();
     });
   };
@@ -308,22 +309,22 @@ export default function BatchPortActions({
         handleSimpleAction(key);
         break;
       case 'set_port_vlan':
-        setVlanModalOpen(true);
+        vlanModal.open();
         break;
       case 'update_port_info':
-        setDescModalOpen(true);
+        descModal.open();
         break;
       case 'assign_customer':
-        setCustomerModalOpen(true);
+        customerModal.open();
         break;
       case 'add_port_to_trunk':
-        setTrunkModalOpen(true);
+        trunkModal.open();
         break;
       case 'set_port_speed':
-        setSpeedModalOpen(true);
+        speedModal.open();
         break;
       case 'cancel_port_speed':
-        setCancelSpeedModalOpen(true);
+        cancelSpeedModal.open();
         break;
     }
   };
@@ -371,10 +372,10 @@ export default function BatchPortActions({
       {/* VLAN 配置弹窗 */}
       <Modal
         title="批量配置VLAN"
-        open={vlanModalOpen}
+        open={vlanModal.isOpen}
         onOk={handleVlanOk}
         onCancel={() => {
-          setVlanModalOpen(false);
+          vlanModal.close();
           vlanForm.resetFields();
         }}
         destroyOnHidden
@@ -414,10 +415,10 @@ export default function BatchPortActions({
       {/* 描述修改弹窗 */}
       <Modal
         title="批量修改端口描述"
-        open={descModalOpen}
+        open={descModal.isOpen}
         onOk={handleDescOk}
         onCancel={() => {
-          setDescModalOpen(false);
+          descModal.close();
           descForm.resetFields();
         }}
         destroyOnHidden
@@ -433,10 +434,10 @@ export default function BatchPortActions({
       {hasSsh && (
         <Modal
           title="批量加入链路聚合"
-          open={trunkModalOpen}
+          open={trunkModal.isOpen}
           onOk={handleTrunkOk}
           onCancel={() => {
-            setTrunkModalOpen(false);
+            trunkModal.close();
             trunkForm.resetFields();
           }}
           destroyOnHidden
@@ -456,10 +457,10 @@ export default function BatchPortActions({
       {/* 客户分配弹窗 */}
       <Modal
         title="批量分配客户"
-        open={customerModalOpen}
+        open={customerModal.isOpen}
         onOk={handleCustomerOk}
         onCancel={() => {
-          setCustomerModalOpen(false);
+          customerModal.close();
           customerForm.resetFields();
         }}
         destroyOnHidden
@@ -483,10 +484,10 @@ export default function BatchPortActions({
       {hasSsh && (
         <Modal
           title="批量限速"
-          open={speedModalOpen}
+          open={speedModal.isOpen}
           onOk={handleSpeedOk}
           onCancel={() => {
-            setSpeedModalOpen(false);
+            speedModal.close();
             speedForm.resetFields();
           }}
           destroyOnHidden
@@ -512,10 +513,10 @@ export default function BatchPortActions({
       {hasSsh && (
         <Modal
           title="批量取消限速"
-          open={cancelSpeedModalOpen}
+          open={cancelSpeedModal.isOpen}
           onOk={handleCancelSpeedOk}
           onCancel={() => {
-            setCancelSpeedModalOpen(false);
+            cancelSpeedModal.close();
             cancelSpeedForm.resetFields();
           }}
           destroyOnHidden

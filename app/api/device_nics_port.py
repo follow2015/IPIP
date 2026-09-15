@@ -9,7 +9,7 @@
              原文件为裸函数,Flask 无法路由
 """
 from flask import Blueprint, request
-from marshmallow import Schema, fields, validate, EXCLUDE
+from marshmallow import Schema, fields, EXCLUDE
 
 from app.openapi.doc import doc, public
 from app.services.device_nics_port_service import device_nics_port_service
@@ -25,30 +25,6 @@ device_nics_port_bp = Blueprint(
     url_prefix="/api/devices"
 )
 
-
-class NicPortBatchSchema(Schema):
-    """创建或更新设备网卡配置请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    nics = fields.List(fields.Dict(), required=True)
-
-
-class NicPortIncrementalBatchSchema(Schema):
-    """增量批量创建网卡端口请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    ports = fields.List(fields.Dict(), required=True)
-
-
-class NicPortUpdateSchema(Schema):
-    """更新单个端口请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    port_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    port_speed = fields.Str(validate=validate.Length(max=20), allow_none=True)
-    port_name = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    port_status = fields.Str(validate=validate.Length(max=20), allow_none=True)
-    description = fields.Str(validate=validate.Length(max=200), allow_none=True)
 
 
 class NicPortBatchDeleteSchema(Schema):
@@ -157,6 +133,7 @@ def batch_create_nics(device_id: int):
 @device_nics_port_bp.route("/<int:device_id>/nics", methods=["GET"])
 @doc(summary="获取设备网卡配置", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "DeviceNicPortResponse", 404: "ApiError"})
 @login_required
+@permission_required("device:view")
 @rate_limit_api
 @api_exception_handler
 def get_device_nics(device_id: int):
@@ -198,6 +175,7 @@ def delete_device_nics(device_id: int):
 @device_nics_port_bp.route("/<int:device_id>/available-ports", methods=["GET"])
 @doc(summary="获取设备可用端口列表", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "port_type", "in": "query", "schema": {"type": "string"}}, {"name": "port_speed", "in": "query", "schema": {"type": "string"}}], responses={200: "DeviceNicPortResponse", 404: "ApiError"})
 @login_required
+@permission_required("device:view")
 @rate_limit_api
 @api_exception_handler
 def get_available_ports(device_id: int):
@@ -224,6 +202,7 @@ def get_available_ports(device_id: int):
 @device_nics_port_bp.route("/<int:device_id>/nics/<int:port_id>", methods=["GET"])
 @doc(summary="获取单个端口详情", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "port_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "DeviceNicPortResponse", 404: "ApiError"})
 @login_required
+@permission_required("device:view")
 @rate_limit_api
 @api_exception_handler
 def get_single_port(device_id: int, port_id: int):
@@ -359,6 +338,7 @@ _port_bp = Blueprint(
 @_port_bp.route("/<int:port_id>", methods=["GET"])
 @doc(summary="根据ID获取端口详情", tags=["设备"], parameters=[{"name": "port_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "DeviceNicPortResponse", 404: "ApiError"})
 @login_required
+@permission_required("device:view")
 @rate_limit_api
 @api_exception_handler
 def get_port_by_id(port_id: int):
@@ -389,6 +369,7 @@ _template_bp = Blueprint(
 @_template_bp.route("/", methods=["GET"])
 @doc(summary="获取网卡模板列表", tags=["设备"], responses={200: "ApiResponse"})
 @login_required
+@permission_required("device:view")
 @rate_limit_api
 @api_exception_handler
 def get_nic_templates():

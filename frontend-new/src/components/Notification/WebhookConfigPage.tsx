@@ -4,6 +4,7 @@
  * 仅管理员可见。使用 Ant Design Table + Modal + Form 构建。
  */
 import React, { useCallback, useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Button,
   Space,
@@ -54,7 +55,7 @@ const WebhookConfigPage: React.FC = () => {
   const deleteMutation = useDeleteWebhookConfig();
   const testMutation = useTestWebhookConfig();
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const modal = useDisclosure();
   const [editingConfig, setEditingConfig] = useState<WebhookConfig | null>(null);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
@@ -63,7 +64,7 @@ const WebhookConfigPage: React.FC = () => {
     setEditingConfig(null);
     form.resetFields();
     form.setFieldsValue({ channel: 'wechat_work', enabled: true });
-    setModalOpen(true);
+    modal.open();
   }, [form]);
 
   const openEditModal = useCallback(
@@ -78,7 +79,7 @@ const WebhookConfigPage: React.FC = () => {
         applicable_types: record.applicable_types,
         applicable_severities: record.applicable_severities
       });
-      setModalOpen(true);
+      modal.open();
     },
     [form]
   );
@@ -93,7 +94,7 @@ const WebhookConfigPage: React.FC = () => {
           await createMutation.mutateAsync(values);
           messageApi.success('创建成功');
         }
-        setModalOpen(false);
+        modal.close();
       } catch {
         messageApi.error('操作失败');
       }
@@ -260,8 +261,8 @@ const WebhookConfigPage: React.FC = () => {
 
       <Modal
         title={editingConfig ? '编辑 Webhook 配置' : '新增 Webhook 配置'}
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        open={modal.isOpen}
+        onCancel={() => modal.close()}
         onOk={() => form.submit()}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
         width={560}

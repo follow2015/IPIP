@@ -14,8 +14,7 @@ from app.api.base import APIResponse
 from app.openapi.doc import doc
 from app.models.webhook_config import validate_webhook_url
 from app.services.webhook_config_service import webhook_config_service
-from app.utils.admin_guard import require_admin
-from app.utils.auth import login_required
+from app.utils.auth import login_required, permission_required
 from app.utils.http_client import post_json
 from app.utils.transactional import transactional
 from app.core.enums import ChannelType
@@ -30,24 +29,20 @@ router = Blueprint("webhook_configs", __name__, url_prefix="/api/webhook-configs
 @router.route("", methods=["GET"])
 @doc(summary="列出 Webhook 配置", tags=["Webhook配置"], responses={200: "ApiResponse"})
 @login_required
+@permission_required("system:config")
 def list_webhook_configs():
     """列出所有 Webhook 配置（管理员）。"""
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     data = webhook_config_service.list_configs()
     return APIResponse.success(data=data)
 
 
 @router.route("", methods=["POST"])
-@doc(summary="创建 Webhook 配置", tags=["Webhook配置"], responses={200: "ApiResponse"})
+@doc(summary="创建 Webhook 配置", tags=["Webhook配置"], responses={200: "ApiResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/WebhookConfigCreateRequest"}}}})
 @login_required
+@permission_required("system:config")
 @transactional
 def create_webhook_config():
     """创建 Webhook 配置（管理员）。"""
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     data = request.get_json(silent=True) or {}
     try:
         config = webhook_config_service.create_config(
@@ -68,14 +63,12 @@ def create_webhook_config():
 
 
 @router.route("/<int:config_id>", methods=["PUT"])
-@doc(summary="更新 Webhook 配置", tags=["Webhook配置"], responses={200: "ApiResponse"})
+@doc(summary="更新 Webhook 配置", tags=["Webhook配置"], responses={200: "ApiResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/WebhookConfigUpdateRequest"}}}})
 @login_required
+@permission_required("system:config")
 @transactional
 def update_webhook_config(config_id):
     """更新 Webhook 配置（管理员）。"""
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     data = request.get_json(silent=True) or {}
     try:
         config = webhook_config_service.update_config(config_id, data)
@@ -92,12 +85,10 @@ def update_webhook_config(config_id):
 @router.route("/<int:config_id>", methods=["DELETE"])
 @doc(summary="删除 Webhook 配置", tags=["Webhook配置"], responses={200: "ApiResponse"})
 @login_required
+@permission_required("system:config")
 @transactional
 def delete_webhook_config(config_id):
     """删除 Webhook 配置（管理员）。"""
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     result = webhook_config_service.delete_config(config_id)
     if not result:
         return APIResponse.error("配置不存在", "NOT_FOUND", 404)
@@ -107,14 +98,12 @@ def delete_webhook_config(config_id):
 @router.route("/<int:config_id>/test", methods=["POST"])
 @doc(summary="测试 Webhook 连通性", tags=["Webhook配置"], responses={200: "ApiResponse"})
 @login_required
+@permission_required("system:config")
 def test_webhook_config(config_id):
     """测试 Webhook 连通性（管理员）。
 
     发送一条测试消息到 Webhook URL，验证配置是否正确。
     """
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     config = webhook_config_service.get_config(config_id)
     if not config:
         return APIResponse.error("配置不存在", "NOT_FOUND", 404)

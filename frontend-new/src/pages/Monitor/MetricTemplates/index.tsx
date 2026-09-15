@@ -6,6 +6,7 @@
  * + index.tsx（列表+批量操作），本文件仅做列表与状态管理。
  */
 import { useMemo, useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Button,
@@ -81,7 +82,7 @@ export default function MetricTemplatesPage() {
   const getVendorLabel = (vid: string | null | undefined) =>
     vid ? (vendorLabelMap.get(vid) ?? vid) : null;
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const modal = useDisclosure();
   const [editingRecord, setEditingRecord] = useState<MetricTemplateItem | null>(null);
   const [form] = Form.useForm<MetricTemplateFormValues>();
   const table = useTable({ initialPerPage: 20 });
@@ -140,7 +141,7 @@ export default function MetricTemplatesPage() {
       poll_interval: 60,
       enabled: true
     });
-    setModalOpen(true);
+    modal.open();
   };
 
   const openEdit = (record: MetricTemplateItem) => {
@@ -167,11 +168,11 @@ export default function MetricTemplatesPage() {
       runbook_title: record.runbook_title ?? undefined,
       ...parseThreshold(record.threshold, record.metric_type ?? 'gauge')
     });
-    setModalOpen(true);
+    modal.open();
   };
 
   const closeModal = () => {
-    setModalOpen(false);
+    modal.close();
     setEditingRecord(null);
     form.resetFields();
   };
@@ -502,7 +503,7 @@ export default function MetricTemplatesPage() {
       </Card>
 
       <MetricTemplateModal
-        open={modalOpen}
+        open={modal.isOpen}
         editingRecord={editingRecord}
         form={form}
         onClose={closeModal}

@@ -172,7 +172,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DeploymentPlanRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -514,7 +518,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["LogErrorReportRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -556,7 +564,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["LogInfoReportRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -1526,7 +1538,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["WeChatMiniprogramLoginRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -1770,7 +1786,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["WeChatQRCodeConfirmRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -1812,7 +1832,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["WeChatQRCodeAutoConfirmRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -2587,7 +2611,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DeviceConnectionCreate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -2657,7 +2685,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PortCreateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -3038,7 +3070,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DeviceRestore"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -3072,7 +3108,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BatchRestoreDevices"];
+                };
+            };
             responses: never;
         };
         delete?: never;
@@ -3131,7 +3171,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BatchPermanentDelete"];
+                };
+            };
             responses: never;
         };
         delete?: never;
@@ -3653,7 +3697,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BatchUpdateMetricTemplateGroup"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -3703,7 +3751,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BatchUpdatePortSyncEnabled"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -3753,7 +3805,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BatchUpdateDeviceConfig"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -4115,7 +4171,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwapNodePositions"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -4466,7 +4526,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PortLinkUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -6821,7 +6885,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CustomerTerminateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -8268,7 +8336,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IPBanRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -8326,7 +8398,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IPBanRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -8384,7 +8460,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IPBatchBanRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -8426,7 +8506,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IPBatchBanRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -8601,7 +8685,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IPCustomerUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -8669,7 +8757,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IPNotesUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -8712,7 +8804,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IPBatchCustomerUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -8754,7 +8850,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IPBatchNotesUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -8880,7 +8980,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IPScanPortsRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -8922,7 +9026,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IPScanNetworkRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -9239,7 +9347,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["NetworkCustomerUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -9508,7 +9620,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["NetworkNoAuthRebuildRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -9617,7 +9733,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -9718,7 +9838,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchCreate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -10087,7 +10211,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchPortInfoUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -10340,7 +10468,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchPortAction"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -10390,7 +10522,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchBatchPortAction"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -10524,7 +10660,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchPortSpeedSet"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -10566,7 +10706,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchPortVlanSet"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -10650,7 +10794,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchPortTrunkMemberAdd"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -10760,7 +10908,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchPortIpSet"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -10896,7 +11048,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchPortChannelCreate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -11123,7 +11279,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchExtUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -11150,7 +11310,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SwitchExtCreate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -11191,7 +11355,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BatchUpdateSwitches"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -11310,7 +11478,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VLANCreate"];
+                };
+            };
             responses: {
                 201: {
                     headers: {
@@ -11377,7 +11549,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VLANUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -11825,7 +12001,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PortUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -11893,7 +12073,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DeviceConnectionUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -11979,7 +12163,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PortSyncEnabledUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12081,7 +12269,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorCredentialUpsert"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12218,7 +12410,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorCheckBatch"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12270,7 +12466,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorCredentialUpsert"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12360,7 +12560,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorCredentialPatchRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12390,7 +12594,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorCredentialBatchDeleteRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12448,7 +12656,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorCredentialLinkRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12481,7 +12693,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorCredentialPayloadUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12515,7 +12731,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorCredentialPayloadUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12822,7 +13042,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorAlertAckRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12856,7 +13080,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorAlertCloseRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12890,7 +13118,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorAlertBatchAckRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12924,7 +13156,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorAlertBatchRetryRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12958,7 +13194,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorAlertBatchCloseRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -12996,7 +13236,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorDeviceMonitorEnabled"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -13030,7 +13274,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorBatchMonitorEnabled"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -13145,7 +13393,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorConfigUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -13372,7 +13624,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MetricTemplateBatchToggleRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -13780,7 +14036,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorSilenceRuleCreate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -13836,7 +14096,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorSilenceRuleUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -13884,7 +14148,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DeviceMetricOverrideUpsert"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -13970,7 +14238,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorEscalationPolicyCreate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14026,7 +14298,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorEscalationPolicyUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14074,7 +14350,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorAlertDependencyRuleCreate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14130,7 +14410,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorAlertDependencyRuleUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14178,7 +14462,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorSlaTargetCreate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14234,7 +14522,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorSlaTargetUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14350,7 +14642,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["OidCategoryRuleCreate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14406,7 +14702,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["OidCategoryRuleUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14469,7 +14769,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DeviceTypeRecommendUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14504,7 +14808,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MibScanRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14538,7 +14846,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MibScanImport"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14606,7 +14918,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MibScanPersistRule"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14658,7 +14974,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VendorBrandCreate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -14714,7 +15034,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VendorBrandUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -16550,7 +16874,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["TopologyAutoDetectRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -16582,7 +16910,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["TopologyDiscoverRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -16614,7 +16946,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["TopologyApplyRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -16898,7 +17234,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ErrorReportRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -16966,7 +17306,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ComponentTemplateCreateRequest"];
+                };
+            };
             responses: {
                 201: {
                     headers: {
@@ -17033,7 +17377,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ComponentTemplateUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -17120,7 +17468,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VirtualRoomCreate"];
+                };
+            };
             responses: {
                 201: {
                     headers: {
@@ -17187,7 +17539,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VirtualRoomUpdate"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -17255,7 +17611,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VirtualRoomMembers"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -17442,7 +17802,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["NotificationMarkReadRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -17561,7 +17925,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferencesUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -17614,7 +17982,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["WebhookConfigCreateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -17647,7 +18019,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["WebhookConfigUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -17751,7 +18127,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MailConfigUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -17804,7 +18184,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MailConfigTestRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -17855,7 +18239,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VoiceConfigUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -17984,7 +18372,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RBACRoleCreateRequest"];
+                };
+            };
             responses: {
                 201: {
                     headers: {
@@ -18051,7 +18443,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RBACRoleUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -18120,7 +18516,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RBACRoleBatchDeleteRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -18187,7 +18587,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RBACRolePermissionsUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -18214,7 +18618,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RBACRolePermissionsUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -18365,7 +18773,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RBACUserRolesUpdateRequest"];
+                };
+            };
             responses: {
                 200: {
                     headers: {
@@ -18576,6 +18988,42 @@ export interface components {
         };
         BatchDelete: {
             ids: number[];
+        };
+        DeviceRestore: {
+            cabinet_id?: number | null;
+            u_position?: number | null;
+        };
+        BatchRestoreDevices: {
+            device_ids: number[];
+            cabinet_id?: number | null;
+            u_position?: number | null;
+        };
+        BatchPermanentDelete: {
+            device_ids: number[];
+        };
+        BatchUpdateMetricTemplateGroup: {
+            device_ids: number[];
+            metric_template_group_id?: number | null;
+        };
+        BatchUpdatePortSyncEnabled: {
+            device_ids: number[];
+            port_sync_enabled: boolean;
+        };
+        BatchUpdateDeviceConfig: {
+            ids: number[];
+        };
+        SwapNodePositions: {
+            source_position: number;
+            target_position: number;
+        };
+        PortLinkUpdate: {
+            connection_type?: string;
+            vlan_id?: number | null;
+            status?: string;
+            notes?: string | null;
+            bandwidth?: number | null;
+            description?: string | null;
+            lag_group_id?: number | null;
         };
         BatchUpdateDeviceStatus: {
             device_ids: number[];
@@ -18921,6 +19369,512 @@ export interface components {
             };
             name: string;
             device_ids?: number[];
+        };
+        BatchUpdateSwitches: {
+            device_ids: number[];
+            updates: {
+                [key: string]: unknown;
+            };
+            layer?: number | null;
+            password?: string | null;
+            switch_role?: number | null;
+        };
+        SwitchBatchPortAction: {
+            action: string;
+            ports?: string[];
+            port_range: string;
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        SwitchCreate: {
+            ip: string;
+            port: number;
+            username?: string;
+            password?: string;
+            protocol: string;
+            authentication_method?: string;
+            device_type?: string;
+            has_ssh: boolean;
+            mac_address?: string;
+            name?: string;
+            device_model?: string;
+            cabinet_id?: number | null;
+            u_position?: number | null;
+            height_u?: number | null;
+            status?: string | null;
+            customer_id?: number | null;
+            room_id?: number | null;
+            uplink_device_id?: number | null;
+            core_device_id?: number | null;
+            uplink_port_ids?: number[] | null;
+            port_num?: number | null;
+            hostname?: string | null;
+            switch_role?: number | null;
+            layer?: number | null;
+            ip_address?: string | null;
+            room_name?: string | null;
+        };
+        SwitchExtCreate: {
+            has_ssh?: boolean | null;
+            layer?: number | null;
+            switch_role?: number | null;
+            uplink_device_id?: number | null;
+            core_device_id?: number | null;
+            uplink_port_ids?: number[] | null;
+            is_core?: boolean | null;
+            uplink_sw_id?: number | null;
+            core_sw_id?: number | null;
+        };
+        SwitchExtUpdate: {
+            has_ssh?: boolean | null;
+            layer?: number | null;
+            switch_role?: number | null;
+            uplink_device_id?: number | null;
+            core_device_id?: number | null;
+            uplink_port_ids?: number[] | null;
+            is_core?: boolean | null;
+            uplink_sw_id?: number | null;
+            core_sw_id?: number | null;
+        };
+        SwitchPortAction: {
+            action: string;
+            port: string;
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        SwitchPortChannelCreate: {
+            channel_id: number;
+            member_ports?: string[];
+        };
+        SwitchPortInfoUpdate: {
+            description?: string | null;
+        };
+        SwitchPortIpSet: {
+            ip_address: string;
+            subnet_mask?: string | null;
+            is_secondary: boolean;
+        };
+        SwitchPortSpeedSet: {
+            inbound_speed: number;
+            outbound_speed: number;
+        };
+        SwitchPortTrunkMemberAdd: {
+            port: string;
+        };
+        SwitchPortVlanSet: {
+            vlan_id: number;
+            mode: string;
+        };
+        SwitchUpdate: {
+            ip?: string;
+            port?: number;
+            username?: string;
+            password?: string;
+            protocol?: string;
+            authentication_method?: string;
+            device_type?: string;
+            has_ssh?: boolean;
+            mac_address?: string;
+            name?: string;
+            device_model?: string;
+            cabinet_id?: number | null;
+            u_position?: number | null;
+            height_u?: number | null;
+            status?: string | null;
+            customer_id?: number | null;
+            room_id?: number | null;
+            uplink_device_id?: number | null;
+            core_device_id?: number | null;
+            uplink_port_ids?: number[] | null;
+            port_num?: number | null;
+            hostname?: string | null;
+            switch_role?: number | null;
+            layer?: number | null;
+            ip_address?: string | null;
+            room_name?: string | null;
+        };
+        DeviceMetricOverrideUpsert: {
+            device_id: number;
+            metric_key: string;
+            threshold: {
+                [key: string]: unknown;
+            };
+            enabled: boolean;
+            note?: string | null;
+        };
+        DeviceTypeRecommendUpdate: {
+            categories: string[];
+        };
+        MibScanImport: {
+            items: {
+                [key: string]: unknown;
+            }[];
+        };
+        MibScanPersistRule: {
+            oid: string;
+            device_type: string;
+            vendor_id?: string | null;
+        };
+        MibScanRequest: {
+            device_id: number;
+            timeout: number;
+        };
+        MonitorAlertDependencyRuleCreate: {
+            name: string;
+            upstream_device_id: number;
+            downstream_device_id: number;
+            alert_types?: string[] | null;
+            reason?: string | null;
+            enabled: boolean;
+        };
+        MonitorAlertDependencyRuleUpdate: {
+            name?: string;
+            upstream_device_id?: number;
+            downstream_device_id?: number;
+            alert_types?: string[] | null;
+            reason?: string | null;
+            enabled?: boolean;
+        };
+        MonitorBatchMonitorEnabled: {
+            device_ids: number[];
+            enabled: boolean;
+        };
+        MonitorCheckBatch: {
+            device_ids: number[];
+        };
+        MonitorConfigUpdate: {
+            updates: {
+                [key: string]: unknown;
+            };
+        };
+        MonitorCredentialPayloadUpdate: {
+            payload: {
+                [key: string]: unknown;
+            };
+            name?: string | null;
+        };
+        MonitorDeviceMonitorEnabled: {
+            enabled: boolean;
+        };
+        MonitorEscalationStepInput: {
+            step_no?: number;
+            wait_minutes: number;
+            escalate_severity?: string | null;
+            escalate_to_role_id?: number | null;
+            escalate_webhook_url?: string | null;
+            enabled: boolean;
+        };
+        MonitorEscalationPolicyCreate: {
+            name: string;
+            alert_type?: string | null;
+            severity?: string | null;
+            wait_minutes: number;
+            escalate_severity?: string | null;
+            escalate_to_role_id?: number | null;
+            escalate_webhook_url?: string | null;
+            repeat_minutes: number;
+            enabled: boolean;
+            steps?: components["schemas"]["MonitorEscalationStepInput"][] | null;
+        };
+        MonitorEscalationPolicyUpdate: {
+            name?: string;
+            alert_type?: string | null;
+            severity?: string | null;
+            wait_minutes?: number;
+            escalate_severity?: string | null;
+            escalate_to_role_id?: number | null;
+            escalate_webhook_url?: string | null;
+            repeat_minutes?: number;
+            enabled?: boolean;
+            steps?: components["schemas"]["MonitorEscalationStepInput"][] | null;
+        };
+        MonitorSilenceRuleCreate: {
+            name: string;
+            device_ids?: number[] | null;
+            alert_types?: string[] | null;
+            silence_from: string;
+            silence_until: string;
+            reason?: string | null;
+            enabled: boolean;
+        };
+        MonitorSilenceRuleUpdate: {
+            name?: string;
+            device_ids?: number[] | null;
+            alert_types?: string[] | null;
+            silence_from?: string;
+            silence_until?: string;
+            reason?: string | null;
+            enabled?: boolean;
+        };
+        MonitorSlaTargetCreate: {
+            name: string;
+            target_device_ids: number[];
+            target_ratio: number;
+            window_days: number;
+            description?: string | null;
+            enabled: boolean;
+        };
+        MonitorSlaTargetUpdate: {
+            name?: string;
+            target_device_ids?: number[];
+            target_ratio?: number;
+            window_days?: number;
+            description?: string | null;
+            enabled?: boolean;
+        };
+        OidCategoryRuleCreate: {
+            prefix: string;
+            category: string;
+            label?: string | null;
+            device_type?: string | null;
+            vendor_id?: string | null;
+            priority: number;
+            enabled: boolean;
+        };
+        OidCategoryRuleUpdate: {
+            prefix?: string;
+            category?: string;
+            label?: string | null;
+            device_type?: string | null;
+            vendor_id?: string | null;
+            priority?: number;
+            enabled?: boolean;
+        };
+        VendorBrandCreate: {
+            enterprise_no: string;
+            brand_name: string;
+            label: string;
+            device_type: string;
+            enabled: boolean;
+            sort_order: number;
+        };
+        VendorBrandUpdate: {
+            enterprise_no?: string;
+            brand_name?: string;
+            label?: string;
+            device_type?: string;
+            enabled?: boolean;
+            sort_order?: number;
+        };
+        MetricTemplateBatchToggleRequest: {
+            ids: number[];
+            enabled: boolean;
+        };
+        MonitorAlertAckRequest: {
+            note?: string | null;
+        };
+        MonitorAlertCloseRequest: {
+            reason?: string | null;
+        };
+        MonitorCredentialBatchDeleteRequest: {
+            ids: number[];
+        };
+        MonitorCredentialLinkRequest: {
+            device_ids: number[];
+        };
+        MonitorCredentialPatchRequest: {
+            enabled?: boolean | null;
+            name?: string | null;
+        };
+        IPBanRequest: {
+            ip_address: string;
+            room_id?: number | null;
+        };
+        IPBatchBanRequest: {
+            ip_list: string[];
+            room_id?: number | null;
+        };
+        IPCustomerUpdateRequest: {
+            customer_id?: number | null;
+            room_id?: number | null;
+        };
+        IPNotesUpdateRequest: {
+            notes?: string | null;
+            room_id?: number | null;
+        };
+        IPBatchCustomerUpdateRequest: {
+            ip_list: string[];
+            customer_id?: number | null;
+            room_id?: number | null;
+        };
+        IPBatchNotesUpdateRequest: {
+            ip_list: string[];
+            notes?: string | null;
+            room_id?: number | null;
+        };
+        IPScanPortsRequest: {
+            ports?: number[] | null;
+        };
+        IPScanNetworkRequest: {
+            ip_network: string;
+            room_id: number;
+        };
+        PortCreateRequest: {
+            port_name: string;
+            port_number?: string | null;
+            port_type?: string | null;
+            speed?: string | null;
+            vlan?: number | null;
+            usage_status?: string | null;
+            customer_id?: number | null;
+            description?: string | null;
+            card?: number | null;
+            slot?: number | null;
+        };
+        PortUpdateRequest: {
+            usage_status?: string | null;
+            description?: string | null;
+            vlan?: number | null;
+            customer_id?: number | null;
+            port_type?: string | null;
+            speed?: string | null;
+        };
+        PortSyncEnabledUpdateRequest: {
+            port_sync_enabled?: boolean | null;
+        };
+        WeChatMiniprogramLoginRequest: {
+            code: string;
+        };
+        WeChatQRCodeConfirmRequest: {
+            scene_id: string;
+            openid: string;
+            action?: string | null;
+        };
+        WeChatQRCodeAutoConfirmRequest: {
+            scene_id: string;
+            test_user_id?: string | null;
+        };
+        RBACRoleCreateRequest: {
+            name: string;
+            display_name?: string | null;
+            description?: string | null;
+            status: number | null;
+        };
+        RBACRoleUpdateRequest: {
+            name?: string;
+            display_name?: string | null;
+            description?: string | null;
+            status?: number | null;
+        };
+        RBACRoleBatchDeleteRequest: {
+            ids: number[];
+        };
+        RBACRolePermissionsUpdateRequest: {
+            permissions: string[];
+        };
+        RBACUserRolesUpdateRequest: {
+            role_ids: number[];
+        };
+        DeploymentPlanRequest: {
+            room_id: number | null;
+            count: number | null;
+            u_height: number;
+            power_per_unit: number;
+            bandwidth_mbps: number | null;
+            port_speed: string;
+            ip_scope: "public" | "private" | null;
+            ip_examples: number;
+            ip_pool_scope: "auto" | "room";
+        };
+        ComponentTemplateCreateRequest: {
+            category: string;
+            model: string;
+        };
+        ComponentTemplateUpdateRequest: {
+            category?: string | null;
+            model?: string | null;
+        };
+        CustomerTerminateRequest: {
+            reason?: string | null;
+        };
+        ErrorReportRequest: {
+            errors: unknown[];
+        };
+        LogErrorReportRequest: {
+            message?: string | null;
+            error?: unknown;
+            url?: string | null;
+            line?: number | null;
+            column?: number | null;
+            timestamp?: unknown;
+            userAgent?: string | null;
+        };
+        LogInfoReportRequest: {
+            message?: string | null;
+            level?: string | null;
+            data?: unknown;
+            timestamp?: unknown;
+        };
+        MailConfigTestRequest: {
+            recipient?: string | null;
+        };
+        MailConfigUpdateRequest: {
+            mail_use_ssl?: boolean | null;
+            mail_use_tls?: boolean | null;
+        };
+        NetworkCustomerUpdateRequest: {
+            network_id?: number | null;
+            customer_id?: number | null;
+            force?: boolean | null;
+        };
+        NetworkNoAuthRebuildRequest: {
+            room_id?: number | null;
+        };
+        NotificationMarkReadRequest: {
+            notification_ids?: number[] | null;
+        };
+        NotificationPreferencesUpdateRequest: {
+            channels?: {
+                [key: string]: unknown;
+            } | null;
+            subscribed_types?: string[] | null;
+            quiet_hours?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        TopologyApplyRequest: {
+            device_id?: number | null;
+            suggestions?: unknown[] | null;
+        };
+        TopologyAutoDetectRequest: {
+            room_id?: number | null;
+            dry_run?: boolean | null;
+            force?: boolean | null;
+        };
+        TopologyDiscoverRequest: {
+            device_id?: number | null;
+            device_ids?: number[] | null;
+        };
+        VoiceConfigUpdateRequest: {
+            provider?: "aliyun" | "tencent" | null;
+            play_times?: number | null;
+            volume?: number | null;
+            speed?: number | null;
+            call_timeout?: number | null;
+            voice_budget_hour?: number | null;
+            voice_budget_day?: number | null;
+        };
+        WebhookConfigCreateRequest: {
+            name: string;
+            channel?: string | null;
+            url?: string | null;
+            secret?: string | null;
+            enabled?: boolean | null;
+            message_template?: string | null;
+            applicable_types?: string[] | null;
+            applicable_severities?: string[] | null;
+        };
+        WebhookConfigUpdateRequest: {
+            name?: string | null;
+            channel?: string | null;
+            url?: string | null;
+            secret?: string | null;
+            enabled?: boolean | null;
+            message_template?: string | null;
+            applicable_types?: string[] | null;
+            applicable_severities?: string[] | null;
         };
         UserResponse: {
             id?: number;

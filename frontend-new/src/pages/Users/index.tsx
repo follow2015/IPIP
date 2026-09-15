@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Button, Switch, Space, Drawer, Tag, Checkbox, Typography, Input, Modal } from 'antd';
 import {
   PlusOutlined,
@@ -31,7 +32,7 @@ import { formatDateTime } from '@/utils/format';
 function Users() {
   const confirm = useConfirm();
   const navigate = useNavigate();
-  const [roleDrawerOpen, setRoleDrawerOpen] = useState(false);
+  const roleDrawer = useDisclosure();
   const [roleUser, setRoleUser] = useState<User | null>(null);
 
   const crud = useCrudPage<User>({
@@ -96,7 +97,7 @@ function Users() {
 
   const handleAssignRole = (r: User) => {
     setRoleUser(r);
-    setRoleDrawerOpen(true);
+    roleDrawer.open();
   };
 
   const handleSubmit = async (values: Record<string, unknown>) => {
@@ -243,10 +244,10 @@ function Users() {
 
       {/* 分配角色抽屉 */}
       <RoleAssignDrawer
-        open={roleDrawerOpen}
+        open={roleDrawer.isOpen}
         user={roleUser}
         onClose={() => {
-          setRoleDrawerOpen(false);
+          roleDrawer.close();
           setRoleUser(null);
         }}
         onSuccess={() => crud.refetch()}

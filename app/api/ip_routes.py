@@ -30,7 +30,7 @@ router = Blueprint("ip", __name__, url_prefix="/api/ip")
 
 
 @router.route("/ban", methods=["POST"])
-@doc(summary="封禁IP（通过交换机黑洞路由）", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError", 409: "ApiError", 503: "ApiError"})
+@doc(summary="封禁IP（通过交换机黑洞路由）", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError", 409: "ApiError", 503: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPBanRequest"}}}})
 @login_required
 @permission_required("ip:update")
 def ban_ip_endpoint():
@@ -72,7 +72,7 @@ def ban_ip_endpoint():
 
 
 @router.route("/unban", methods=["POST"])
-@doc(summary="解封IP（撤销交换机黑洞路由）", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError", 409: "ApiError", 503: "ApiError"})
+@doc(summary="解封IP（撤销交换机黑洞路由）", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError", 409: "ApiError", 503: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPBanRequest"}}}})
 @login_required
 @permission_required("ip:update")
 def unban_ip_endpoint():
@@ -114,7 +114,7 @@ def unban_ip_endpoint():
 
 
 @router.route("/ban/batch", methods=["POST"])
-@doc(summary="批量封禁IP", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="批量封禁IP", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPBatchBanRequest"}}}})
 @login_required
 @permission_required("ip:update")
 def batch_ban_endpoint():
@@ -157,7 +157,7 @@ def batch_ban_endpoint():
 
 
 @router.route("/unban/batch", methods=["POST"])
-@doc(summary="批量解封IP", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="批量解封IP", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPBatchBanRequest"}}}})
 @login_required
 @permission_required("ip:update")
 def batch_unban_endpoint():
@@ -202,6 +202,7 @@ def batch_unban_endpoint():
 @router.route("/<ip_address>/ban_status", methods=["GET"])
 @doc(summary="查询IP封禁状态", tags=["IP"], responses={200: "IPAddressResponse", 400: "ApiError", 404: "ApiError"})
 @login_required
+@permission_required("ip:view")
 def check_ban_status(ip_address):
     """查询 IP 封禁状态
 
@@ -249,6 +250,7 @@ def detect_ip_endpoint(ip_address):
 @router.route("/list", methods=["GET"])
 @doc(summary="查询IP列表（分页）", tags=["IP"], responses={200: "IPAddressResponse", 401: "ApiError"})
 @login_required
+@permission_required("ip:view")
 def list_ips():
     """查询 IP 列表（分页，含关联信息）
 
@@ -287,7 +289,7 @@ def list_ips():
 
 
 @router.route("/<ip_address>/customer", methods=["PUT"])
-@doc(summary="更新IP客户关联", tags=["IP"], responses={200: "ApiResponse", 404: "ApiError"})
+@doc(summary="更新IP客户关联", tags=["IP"], responses={200: "ApiResponse", 404: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPCustomerUpdateRequest"}}}})
 @login_required
 @permission_required("ip:update")
 @transactional
@@ -307,6 +309,7 @@ def update_ip_customer(ip_address):
 @router.route("/<ip_address>/notes", methods=["GET"])
 @doc(summary="获取IP备注", tags=["IP"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
+@permission_required("ip:view")
 def get_ip_notes(ip_address):
     """获取IP备注"""
     from app.services.ip_crud_service import IPCrudService
@@ -317,7 +320,7 @@ def get_ip_notes(ip_address):
 
 
 @router.route("/<ip_address>/notes", methods=["PUT"])
-@doc(summary="更新IP备注", tags=["IP"], responses={200: "ApiResponse", 404: "ApiError"})
+@doc(summary="更新IP备注", tags=["IP"], responses={200: "ApiResponse", 404: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPNotesUpdateRequest"}}}})
 @login_required
 @permission_required("ip:update")
 @transactional
@@ -335,7 +338,7 @@ def update_ip_notes(ip_address):
 
 
 @router.route("/batch/customer", methods=["POST"])
-@doc(summary="批量更新IP客户关联", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="批量更新IP客户关联", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPBatchCustomerUpdateRequest"}}}})
 @login_required
 @permission_required("ip:update")
 @transactional
@@ -373,7 +376,7 @@ def batch_update_ip_customer():
 
 
 @router.route("/batch/notes", methods=["POST"])
-@doc(summary="批量更新IP备注", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="批量更新IP备注", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPBatchNotesUpdateRequest"}}}})
 @login_required
 @permission_required("ip:update")
 @transactional
@@ -399,6 +402,7 @@ def batch_update_ip_notes():
 @router.route("/<ip_address>", methods=["GET"])
 @doc(summary="获取IP详细信息", tags=["IP"], responses={200: "IPAddressDetailResponse", 404: "ApiError"})
 @login_required
+@permission_required("ip:view")
 def get_ip_detail(ip_address):
     """获取IP详细信息（含5表JOIN关联数据）
 
@@ -425,7 +429,7 @@ def ping_ip(ip_address):
 
 
 @router.route("/<ip_address>/scan", methods=["POST"])
-@doc(summary="端口扫描IP", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="端口扫描IP", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPScanPortsRequest"}}}})
 @login_required
 @permission_required("ip:scan")
 def scan_ports(ip_address):
@@ -439,7 +443,7 @@ def scan_ports(ip_address):
 
 
 @router.route("/scan/network", methods=["POST"])
-@doc(summary="异步扫描网段内所有IP状态", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="异步扫描网段内所有IP状态", tags=["IP"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPScanNetworkRequest"}}}})
 @login_required
 @permission_required("ip:view")
 def scan_network():
@@ -538,6 +542,7 @@ def scan_network():
 @router.route("/statistics", methods=["GET"])
 @doc(summary="获取IP状态统计", tags=["IP"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
+@permission_required("ip:view")
 def ip_statistics():
     """获取IP状态统计
 

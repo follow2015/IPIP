@@ -5,6 +5,7 @@
  * - TemplateFormModal：新增/编辑，含客户归属 Select + 四类 spec 字段
  */
 import { useState, useMemo } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Tabs, Modal, Form, Select, Input, InputNumber, Tag, Button, Space, Switch } from 'antd';
 import DataTable from '@/components/DataTable';
 import { useConfirm } from '@/utils/confirm';
@@ -98,7 +99,7 @@ function ComponentTemplateManager() {
   const [activeCategory, setActiveCategory] = useState<string>('cpu');
   const filterTable = useTable();
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const modal = useDisclosure();
   const [editRecord, setEditRecord] = useState<ComponentTemplate | null>(null);
 
   const { data: templates, isLoading } = useComponentTemplates(
@@ -136,7 +137,7 @@ function ComponentTemplateManager() {
       sort_order: 0,
       remark: ''
     });
-    setModalOpen(true);
+    modal.open();
   };
 
   const handleEdit = (record: ComponentTemplate) => {
@@ -151,7 +152,7 @@ function ComponentTemplateManager() {
       sort_order: record.sort_order,
       remark: record.remark
     });
-    setModalOpen(true);
+    modal.open();
   };
 
   const handleDelete = async (id: number) => {
@@ -173,7 +174,7 @@ function ComponentTemplateManager() {
         await createTemplate.mutateAsync(values);
         message.success('创建成功');
       }
-      setModalOpen(false);
+      modal.close();
     } catch (err) {
       if (err instanceof Error) {
         message.error(err.message);
@@ -299,9 +300,9 @@ function ComponentTemplateManager() {
       {/* 新增/编辑弹窗 */}
       <Modal
         title={editRecord ? '编辑配件模板' : '新增配件模板'}
-        open={modalOpen}
+        open={modal.isOpen}
         onOk={handleFormSubmit}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => modal.close()}
         confirmLoading={createTemplate.isPending || updateTemplate.isPending}
         width={600}
         destroyOnHidden

@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, Spin, Button, Space, Tag, Dropdown, Descriptions, Result } from 'antd';
 import {
@@ -104,7 +105,7 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
     });
   };
 
-  const [formOpen, setFormOpen] = useState(false);
+  const form = useDisclosure();
 
   if (!device) {
     return <div>设备不存在</div>;
@@ -229,7 +230,7 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
               刷新设备信息
             </Button>
           )}
-          <Button type="primary" icon={<EditOutlined />} onClick={() => setFormOpen(true)}>
+          <Button type="primary" icon={<EditOutlined />} onClick={() => form.open()}>
             编辑
           </Button>
           <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
@@ -267,10 +268,10 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
 
       {/* 编辑表单 */}
       <DeviceForm
-        open={formOpen}
+        open={form.isOpen}
         editRecord={device}
         onClose={() => {
-          setFormOpen(false);
+          form.close();
           refetch();
         }}
       />

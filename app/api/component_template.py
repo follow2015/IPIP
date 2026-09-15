@@ -68,7 +68,7 @@ def get_template(template_id):
 
 
 @component_template_bp.route("", methods=["POST"])
-@doc(summary="创建配件模板", tags=["设备"], responses={201: "ApiResponse", 409: "ApiError"})
+@doc(summary="创建配件模板", tags=["设备"], responses={201: "ApiResponse", 409: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ComponentTemplateCreateRequest"}}}})
 @login_required
 @permission_required("device:update")
 @rate_limit_api
@@ -99,7 +99,7 @@ def create_template():
 
 
 @component_template_bp.route("/<int:template_id>", methods=["PUT"])
-@doc(summary="更新配件模板", tags=["设备"], responses={200: "ApiResponse", 404: "ApiError"})
+@doc(summary="更新配件模板", tags=["设备"], responses={200: "ApiResponse", 404: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ComponentTemplateUpdateRequest"}}}})
 @login_required
 @permission_required("device:update")
 @rate_limit_api

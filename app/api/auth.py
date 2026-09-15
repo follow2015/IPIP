@@ -19,31 +19,8 @@ from app.utils.transactional import transactional
 from app.persistence.user_repository import UserRepository
 from app.persistence.user_log_repository import UserLogRepository
 from config import Config
-from marshmallow import Schema, fields, validate, EXCLUDE
+from marshmallow import Schema
 
-
-class LoginSchema(Schema):
-    """用户登录请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    username = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    password = fields.Str(required=True, validate=validate.Length(min=1, max=200))
-    remember = fields.Bool(load_default=False)
-
-
-class QRCodeConfirmSchema(Schema):
-    """确认二维码登录请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    scene_id = fields.Str(required=True)
-    code = fields.Str(required=True, validate=validate.Length(min=1, max=200))
-
-
-class QRCodeCompleteSchema(Schema):
-    """完成二维码登录请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    scene_id = fields.Str(required=True)
 
 logger = get_logger(__name__)
 

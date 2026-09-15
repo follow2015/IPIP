@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useMemo, useCallback } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Link } from 'react-router-dom';
 import { Button, Form, Tag, Alert } from 'antd';
 import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
@@ -107,8 +108,8 @@ function ConnectionTab({ device }: ConnectionTabProps) {
   }, [isNetworkDevice, deviceConnections]);
 
   useD2NConnectionSync(deviceId, d2nSwitchIds);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editFormOpen, setEditFormOpen] = useState(false);
+  const formDisclosure = useDisclosure();
+  const editFormDisclosure = useDisclosure();
   const [editRecord, setEditRecord] = useState<DeviceConnection | PortLink | null>(null);
   const [editForm] = Form.useForm();
   const [form] = Form.useForm();
@@ -226,7 +227,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
     form.setFieldsValue({
       link_type: defaultLinkType
     });
-    setFormOpen(true);
+    formDisclosure.open();
   };
 
   const handleDelete = useCallback(
@@ -271,7 +272,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
       const { room_id, cabinet_id, ...payload } = values;
       await createConnection.mutateAsync(payload);
       message.success('创建成功');
-      setFormOpen(false);
+      formDisclosure.close();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     }
@@ -289,7 +290,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         description: (record as PortLink).description ?? undefined,
         lag_group_id: (record as PortLink).lag_group_id ?? undefined
       });
-      setEditFormOpen(true);
+      editFormDisclosure.open();
     },
     [editForm]
   );
@@ -313,7 +314,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         });
       }
       message.success('更新成功');
-      setEditFormOpen(false);
+      editFormDisclosure.close();
       setEditRecord(null);
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -515,9 +516,9 @@ function ConnectionTab({ device }: ConnectionTabProps) {
       />
 
       <ConnectionFormModal
-        open={formOpen}
+        open={formDisclosure.isOpen}
         onOk={handleSubmit}
-        onCancel={() => setFormOpen(false)}
+        onCancel={() => formDisclosure.close()}
         form={form}
         isNetworkDevice={isNetworkDevice}
         linkTypeOptions={linkTypeOptions}
@@ -532,10 +533,10 @@ function ConnectionTab({ device }: ConnectionTabProps) {
 
       {/* ── 编辑连接 Modal ── */}
       <ConnectionEditModal
-        open={editFormOpen}
+        open={editFormDisclosure.isOpen}
         onOk={handleEditSubmit}
         onCancel={() => {
-          setEditFormOpen(false);
+          editFormDisclosure.close();
           setEditRecord(null);
         }}
         form={editForm}

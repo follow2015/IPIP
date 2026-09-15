@@ -2039,3 +2039,57 @@ class VoiceChannelStatusSchema(Schema):
     supports_ack = fields.Bool()
     error = fields.Str(allow_none=True)
 
+
+
+class MetricTemplateBatchToggleRequestSchema(Schema):
+    """PATCH /metric-templates/batch-enabled 请求（T3.1 契约补齐）
+
+    对应 handler：`batch_toggle_metric_templates_enabled`——`ids` 须为非空整数数组，
+    `enabled` 须为布尔值（handler 内逐个校验）。
+    """
+    ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1))
+    enabled = fields.Bool(required=True)
+
+
+class MonitorAlertAckRequestSchema(Schema):
+    """POST /alerts/<id>/ack 请求（T3.1 契约补齐）
+
+    对应 handler：`ack_alert`（读取 `note`，非字符串则报错）。
+    """
+    note = fields.Str(allow_none=True)
+
+
+class MonitorAlertCloseRequestSchema(Schema):
+    """POST /alerts/<id>/close 请求（T3.1 契约补齐）
+
+    对应 handler：`close_alert`（读取 `reason`）。
+    """
+    reason = fields.Str(allow_none=True)
+
+
+class MonitorCredentialBatchDeleteRequestSchema(Schema):
+    """POST /credentials/batch-delete 请求（T3.1 契约补齐）
+
+    对应 handler：`batch_delete_credentials`（字段名是 `ids`，非 `credential_ids`）。
+    关联设备的凭据会被拒绝并返回失败明细，由前端展示。
+    """
+    ids = fields.List(fields.Int(), required=True)
+
+
+class MonitorCredentialLinkRequestSchema(Schema):
+    """POST /credentials/<id>/link 请求（T3.1 契约补齐）
+
+    对应 handler：`link_existing_credentials`（把已有凭据关联到若干设备）。
+    """
+    device_ids = fields.List(fields.Int(), required=True)
+
+
+class MonitorCredentialPatchRequestSchema(Schema):
+    """PATCH /credentials/<id> 请求（T3.1 契约补齐）
+
+    对应 handler：`patch_credential`——只改启用状态/名称，不触及密文；
+    handler 要求 `enabled` 与 `name` **至少提供一个**（运行时报错，见 handler）。
+    """
+    enabled = fields.Bool(allow_none=True)
+    name = fields.Str(allow_none=True)
+

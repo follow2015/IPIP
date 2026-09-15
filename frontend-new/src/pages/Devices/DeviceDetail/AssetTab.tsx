@@ -1,6 +1,7 @@
 import { useConfirm } from '@/utils/confirm';
 
 import { useState, useCallback } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import dayjs, { Dayjs } from 'dayjs';
 import { Descriptions, Tag, Button, Space, Form, Modal } from 'antd';
 import {
@@ -66,7 +67,7 @@ function AssetTab({ device }: AssetTabProps) {
   const updateDevice = useUpdateDevice();
   const resetAsset = useBatchResetDeviceAsset();
   const message = useMessage();
-  const [editOpen, setEditOpen] = useState(false);
+  const edit = useDisclosure();
   const [editForm] = Form.useForm();
   const [autoGenerate, setAutoGenerate] = useState(false);
 
@@ -87,7 +88,7 @@ function AssetTab({ device }: AssetTabProps) {
       lifecycle_years: device.lifecycle_years ?? undefined
     });
     setAutoGenerate(false);
-    setEditOpen(true);
+    edit.open();
   }, [device, editForm]);
 
   const handleEditSubmit = async () => {
@@ -126,7 +127,7 @@ function AssetTab({ device }: AssetTabProps) {
 
       await updateDevice.mutateAsync(payload);
       message.success('资产信息已更新');
-      setEditOpen(false);
+      edit.close();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     }
@@ -199,9 +200,9 @@ function AssetTab({ device }: AssetTabProps) {
       {/* 编辑弹窗 */}
       <Modal
         title="编辑资产信息"
-        open={editOpen}
+        open={edit.isOpen}
         onOk={handleEditSubmit}
-        onCancel={() => setEditOpen(false)}
+        onCancel={() => edit.close()}
         confirmLoading={updateDevice.isPending}
         width={680}
         destroyOnHidden

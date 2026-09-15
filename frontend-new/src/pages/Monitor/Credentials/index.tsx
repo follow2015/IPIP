@@ -13,6 +13,7 @@
  * + index.tsx（列表+统计+状态管理），本文件仅做列表与状态编排。
  */
 import { useState, useMemo } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Col,
@@ -78,9 +79,9 @@ export default function MonitorCredentials() {
 
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
-  const [formOpen, setFormOpen] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  const formDisclosure = useDisclosure();
+  const link = useDisclosure();
+  const edit = useDisclosure();
   const [editCred, setEditCred] = useState<MonitorCredentialListItem | null>(null);
 
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -182,7 +183,7 @@ export default function MonitorCredentials() {
 
   const handleOpenEdit = (cred: MonitorCredentialListItem) => {
     setEditCred(cred);
-    setEditOpen(true);
+    edit.open();
   };
 
   const credColumns = [
@@ -350,7 +351,11 @@ export default function MonitorCredentials() {
                 <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
                   刷新
                 </Button>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => setFormOpen(true)}>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => formDisclosure.open()}
+                >
                   新建凭据
                 </Button>
               </Space>
@@ -445,38 +450,38 @@ export default function MonitorCredentials() {
 
         {/* ── 右栏：凭据详情 + 关联设备 ────────────────────── */}
         <Col xs={24} lg={14}>
-          <CredentialDetail selectedCred={selectedCred} onOpenLink={() => setLinkOpen(true)} />
+          <CredentialDetail selectedCred={selectedCred} onOpenLink={() => link.open()} />
         </Col>
       </Row>
 
       {/* ── 新建凭据弹窗 ────────────────────────────────────── */}
       <CreateCredentialModal
-        open={formOpen}
+        open={formDisclosure.isOpen}
         form={form}
         onClose={() => {
-          setFormOpen(false);
+          formDisclosure.close();
           form.resetFields();
         }}
       />
 
       {/* ── 编辑密文弹窗 ────────────────────────────────────── */}
       <EditCredentialModal
-        open={editOpen}
+        open={edit.isOpen}
         editCred={editCred}
         editForm={editForm}
         onClose={() => {
-          setEditOpen(false);
+          edit.close();
           editForm.resetFields!();
         }}
       />
 
       {/* ── 关联设备弹窗 ────────────────────────────────────── */}
       <LinkDeviceModal
-        open={linkOpen}
+        open={link.isOpen}
         selectedCredId={selectedCredId}
         selectedCredName={selectedCred?.name ?? undefined}
         selectedCredProtocol={selectedCred?.protocol}
-        onClose={() => setLinkOpen(false)}
+        onClose={() => link.close()}
       />
     </div>
   );

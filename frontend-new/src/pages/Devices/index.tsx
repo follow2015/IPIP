@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Button, Space, Tag, Dropdown, Tooltip, Badge, Modal } from 'antd';
 import {
   PlusOutlined,
@@ -390,15 +391,15 @@ function Devices() {
   const table = useTable({ filterResets: DEVICE_FILTER_RESETS });
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [formOpen, setFormOpen] = useState(false);
+  const form = useDisclosure();
   const [editRecord, setEditRecord] = useState<Device | null>(null);
 
-  const [addDevicesOpen, setAddDevicesOpen] = useState(false);
+  const addDevices = useDisclosure();
   const [addDevicesDefaultTab, setAddDevicesDefaultTab] = useState<'batch' | 'clone'>('batch');
   const [cloneTemplateId, setCloneTemplateId] = useState<number | undefined>();
-  const [batchAssetOpen, setBatchAssetOpen] = useState(false);
-  const [batchConfigOpen, setBatchConfigOpen] = useState(false);
-  const [batchMonitorOpen, setBatchMonitorOpen] = useState(false);
+  const batchAsset = useDisclosure();
+  const batchConfig = useDisclosure();
+  const batchMonitor = useDisclosure();
   const [configTargets, setConfigTargets] = useState<Device[]>([]);
   const [monitorTargets, setMonitorTargets] = useState<Device[]>([]);
 
@@ -463,11 +464,11 @@ function Devices() {
 
   const handleAdd = () => {
     setEditRecord(null);
-    setFormOpen(true);
+    form.open();
   };
   const handleEdit = (record: Device) => {
     setEditRecord(record);
-    setFormOpen(true);
+    form.open();
   };
 
   const handleDelete = (record: Device) => {
@@ -499,17 +500,17 @@ function Devices() {
   const handleClone = (record: Device) => {
     setCloneTemplateId(record.id);
     setAddDevicesDefaultTab('clone');
-    setAddDevicesOpen(true);
+    addDevices.open();
   };
 
   const openAddDevices = (tab: 'batch' | 'clone') => {
     setCloneTemplateId(undefined);
     setAddDevicesDefaultTab(tab);
-    setAddDevicesOpen(true);
+    addDevices.open();
   };
 
   const handleAddDevicesClose = (refresh?: boolean) => {
-    setAddDevicesOpen(false);
+    addDevices.close();
     setCloneTemplateId(undefined);
     if (refresh) refetch();
   };
@@ -568,7 +569,7 @@ function Devices() {
       return;
     }
     setConfigTargets(devs);
-    setBatchConfigOpen(true);
+    batchConfig.open();
   };
 
   const handleBatchMonitor = () => {
@@ -587,7 +588,7 @@ function Devices() {
       return;
     }
     setMonitorTargets(devs);
-    setBatchMonitorOpen(true);
+    batchMonitor.open();
   };
 
   const selectedDeviceIds = batch.selectedKeys.map(Number);
@@ -729,7 +730,7 @@ function Devices() {
             批量变更状态
           </Button>
         </Dropdown>
-        <Button size="small" icon={<DollarOutlined />} onClick={() => setBatchAssetOpen(true)}>
+        <Button size="small" icon={<DollarOutlined />} onClick={() => batchAsset.open()}>
           批量修改资产信息
         </Button>
         <Button size="small" icon={<ToolOutlined />} onClick={handleBatchConfig}>
@@ -760,10 +761,10 @@ function Devices() {
       />
 
       <DeviceForm
-        open={formOpen}
+        open={form.isOpen}
         editRecord={editRecord}
         onClose={() => {
-          setFormOpen(false);
+          form.close();
           setEditRecord(null);
           refetch();
         }}
@@ -771,17 +772,17 @@ function Devices() {
 
       {/* 统一批量添加入口 — 替代原来的 BatchAddDeviceModal + QuickCloneDeviceModal */}
       <AddDevicesModal
-        open={addDevicesOpen}
+        open={addDevices.isOpen}
         onClose={handleAddDevicesClose}
         templateDeviceId={cloneTemplateId}
         defaultTab={addDevicesDefaultTab}
       />
 
       <BatchUpdateAssetModal
-        open={batchAssetOpen}
+        open={batchAsset.isOpen}
         deviceIds={selectedDeviceIds}
         onClose={(refresh) => {
-          setBatchAssetOpen(false);
+          batchAsset.close();
           if (refresh) {
             batch.clear();
             refetch();
@@ -790,10 +791,10 @@ function Devices() {
       />
 
       <BatchUpdateConfigModal
-        open={batchConfigOpen}
+        open={batchConfig.isOpen}
         devices={configTargets}
         onClose={(refresh) => {
-          setBatchConfigOpen(false);
+          batchConfig.close();
           if (refresh) {
             batch.clear();
             refetch();
@@ -802,10 +803,10 @@ function Devices() {
       />
 
       <BatchUpdateMonitorModal
-        open={batchMonitorOpen}
+        open={batchMonitor.isOpen}
         devices={monitorTargets}
         onClose={(refresh) => {
-          setBatchMonitorOpen(false);
+          batchMonitor.close();
           if (refresh) {
             batch.clear();
             refetch();

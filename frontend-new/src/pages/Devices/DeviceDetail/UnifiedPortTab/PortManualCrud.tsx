@@ -3,6 +3,7 @@
  * 工具栏（筛选 + 新增）+ 批量操作 + 端口列表 + 新增/编辑弹窗 + 增删改/批量 handler
  */
 import { useCallback, useMemo, useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import type { TableProps } from 'antd';
 import { Button, Alert, Switch, Tooltip, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
@@ -59,8 +60,8 @@ export function PortManualCrud({
 }: PortManualCrudProps) {
   const confirm = useConfirm();
   const message = useMessage();
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
+  const addModal = useDisclosure();
+  const editModal = useDisclosure();
   const [editingPort, setEditingPort] = useState<SwitchPort | null>(null);
 
   const updatePort = useUpdateNetworkPort(deviceId);
@@ -100,7 +101,7 @@ export function PortManualCrud({
 
   const handleEdit = useCallback((port: SwitchPort) => {
     setEditingPort(port);
-    setEditModalOpen(true);
+    editModal.open();
   }, []);
 
   const handleDelete = useCallback(
@@ -224,7 +225,7 @@ export function PortManualCrud({
                   跟随全局
                 </Button>
               )}
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddModalOpen(true)}>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => addModal.open()}>
                 新增端口
               </Button>
             </Space>
@@ -255,16 +256,16 @@ export function PortManualCrud({
       {/* 新增端口弹窗 */}
       <PortBatchAddModal
         deviceId={deviceId}
-        open={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
+        open={addModal.isOpen}
+        onClose={() => addModal.close()}
       />
 
       {/* 编辑端口弹窗 */}
       <PortEditModal
         deviceId={deviceId}
-        port={editModalOpen ? editingPort : null}
+        port={editModal.isOpen ? editingPort : null}
         onClose={() => {
-          setEditModalOpen(false);
+          editModal.close();
           setEditingPort(null);
         }}
       />

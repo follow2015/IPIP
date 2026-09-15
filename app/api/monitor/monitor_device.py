@@ -55,7 +55,7 @@ def get_device_metric_dashboard(device_id: int):
 
 
 @monitor_bp.route("/devices/<int:device_id>/credentials", methods=["PUT"])
-@doc(summary="配置监控凭据", tags=["监控"], responses={200: "MonitorCredentialConfigResponse"})
+@doc(summary="配置监控凭据", tags=["监控"], responses={200: "MonitorCredentialConfigResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCredentialUpsert"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -204,7 +204,7 @@ def _persist_check_result(device_id: int, result, protocol: str, cfg: dict):
 
 
 @monitor_bp.route("/check-batch", methods=["POST"])
-@doc(summary="批量手动触发设备探测", tags=["监控"], responses={200: "MonitorCheckBatchResponse"})
+@doc(summary="批量手动触发设备探测", tags=["监控"], responses={200: "MonitorCheckBatchResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCheckBatch"}}}})
 @login_required
 @permission_required("monitor:config")
 def check_batch():

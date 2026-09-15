@@ -44,7 +44,7 @@ class DeploymentPlanRequestSchema(Schema):
 
 @deployment_plan_bp.route("/plan", methods=["POST"])
 @doc(summary="上架方案查询（只读推荐）", tags=["Deployment"],
-     responses={200: "ApiResponse", 400: "ApiError", 401: "ApiError"})
+     responses={200: "ApiResponse", 400: "ApiError", 401: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeploymentPlanRequest"}}}})
 @login_required
 @permission_required("cabinet:view")
 @rate_limit_api

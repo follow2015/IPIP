@@ -4,7 +4,7 @@ from app.exceptions import PresetResponseError
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema
 
 from app.api.base import APIResponse
 from app.services.virtual_room_service import VirtualRoomService
@@ -23,30 +23,7 @@ _service = VirtualRoomService(VirtualRoomRepository())
 
 
 
-class VirtualRoomCreateSchema(Schema):
-    """虚拟机房创建参数
-
-    device_ids 允许为空（支持"先建空壳，后续通过 /members 接口添加成员"的工作流）。
-    full_scan 对空成员有 early return（status=skipped, reason=no_switches），
-    不会产生无意义的 Redis key 和进度记录。
-    """
-    name = fields.Str(required=True, validate=validate.Length(min=1, max=255))
-    description = fields.Str(validate=validate.Length(max=500), load_default="")
-    device_ids = fields.List(fields.Int(), load_default=[])
-
-
-class VirtualRoomUpdateSchema(Schema):
-    """虚拟机房更新参数"""
-    name = fields.Str(validate=validate.Length(min=1, max=255))
-    description = fields.Str(validate=validate.Length(max=500))
-
-
-class VirtualRoomMembersSchema(Schema):
-    """虚拟机房成员更新参数"""
-    device_ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1))
-
-
-
+from app.schemas.virtual_room_routes import VirtualRoomCreateSchema, VirtualRoomUpdateSchema, VirtualRoomMembersSchema
 
 @virtual_room_bp.route("/", methods=["GET"])
 @doc(summary="查询虚拟机房列表", tags=["虚拟机房"], responses={200: "VirtualRoomResponse"})
@@ -73,7 +50,7 @@ def get_virtual_room(virtual_room_id):
 
 
 @virtual_room_bp.route("/", methods=["POST"])
-@doc(summary="创建虚拟机房", tags=["虚拟机房"], responses={201: "VirtualRoomResponse", 400: "ApiError"})
+@doc(summary="创建虚拟机房", tags=["虚拟机房"], responses={201: "VirtualRoomResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/VirtualRoomCreate"}}}})
 @login_required
 @permission_required("switch:create")
 @transactional
@@ -91,7 +68,7 @@ def create_virtual_room():
 
 
 @virtual_room_bp.route("/<int:virtual_room_id>", methods=["PUT"])
-@doc(summary="更新虚拟机房", tags=["虚拟机房"], responses={200: "VirtualRoomResponse", 404: "ApiError"})
+@doc(summary="更新虚拟机房", tags=["虚拟机房"], responses={200: "VirtualRoomResponse", 404: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/VirtualRoomUpdate"}}}})
 @login_required
 @permission_required("switch:update")
 @transactional
@@ -125,7 +102,7 @@ def delete_virtual_room(virtual_room_id):
 
 
 @virtual_room_bp.route("/<int:virtual_room_id>/members", methods=["PUT"])
-@doc(summary="更新虚拟机房成员", tags=["虚拟机房"], responses={200: "VirtualRoomResponse", 404: "ApiError"})
+@doc(summary="更新虚拟机房成员", tags=["虚拟机房"], responses={200: "VirtualRoomResponse", 404: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/VirtualRoomMembers"}}}})
 @login_required
 @permission_required("switch:update")
 @transactional
@@ -335,6 +312,7 @@ def scan_virtual_room(virtual_room_id):
 @virtual_room_bp.route("/<int:virtual_room_id>/scan/progress", methods=["GET"])
 @doc(summary="查询虚拟机房扫描进度", tags=["虚拟机房"], responses={200: "ApiResponse"})
 @login_required
+@permission_required("switch:view")
 def scan_virtual_room_progress(virtual_room_id):
     """查询虚拟机房扫描进度"""
     scope = f"vr:{virtual_room_id}"

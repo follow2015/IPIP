@@ -41,7 +41,7 @@ def get_config():
 
 
 @monitor_bp.route("/config", methods=["PUT"])
-@doc(summary="在线修改监控运行配置", tags=["监控"], responses={200: "MonitorConfigUpdateResponse"})
+@doc(summary="在线修改监控运行配置", tags=["监控"], responses={200: "MonitorConfigUpdateResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorConfigUpdate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -162,7 +162,7 @@ def batch_delete_metric_templates():
 
 @monitor_bp.route("/metric-templates/batch-enabled", methods=["PATCH"])
 @doc(summary="批量启停指标模板", tags=["监控"],
-     responses={200: "MetricTemplateBatchToggleResponse"})
+     responses={200: "MetricTemplateBatchToggleResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MetricTemplateBatchToggleRequest"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional

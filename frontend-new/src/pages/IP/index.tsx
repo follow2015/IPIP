@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useCallback } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { useSearchParams } from 'react-router-dom';
 import { Button, Space, Tag, Tooltip, Modal } from 'antd';
 import {
@@ -51,12 +52,12 @@ function IP() {
   const confirm = useConfirm();
   const table = useTable();
   const [urlParams] = useSearchParams();
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [batchBanOpen, setBatchBanOpen] = useState(false);
-  const [batchEditOpen, setBatchEditOpen] = useState(false);
+  const editModal = useDisclosure();
+  const detailModal = useDisclosure();
+  const batchBan = useDisclosure();
+  const batchEdit = useDisclosure();
   const [batchEditMode, setBatchEditMode] = useState<'customer' | 'notes'>('customer');
-  const [statsOpen, setStatsOpen] = useState(false);
+  const stats = useDisclosure();
   const [selectedIP, setSelectedIP] = useState<IPAddress | null>(null);
   const [detailAddress, setDetailAddress] = useState('');
 
@@ -136,12 +137,12 @@ function IP() {
 
   const handleEdit = (record: IPAddress) => {
     setSelectedIP(record);
-    setEditModalOpen(true);
+    editModal.open();
   };
 
   const handleDetail = (record: IPAddress) => {
     setDetailAddress(record.ip_address);
-    setDetailModalOpen(true);
+    detailModal.open();
   };
 
   const handleBan = (record: IPAddress) => {
@@ -190,7 +191,7 @@ function IP() {
     try {
       await batchBanIP.mutateAsync({ ip_list: ips });
       msg.info('批量封禁已提交，完成后将通过消息通知您');
-      setBatchBanOpen(false);
+      batchBan.close();
       refetch();
     } catch (err) {
       msg.error(err instanceof Error ? err.message : '批量封禁失败');
@@ -251,7 +252,7 @@ function IP() {
       return;
     }
     setBatchEditMode(mode);
-    setBatchEditOpen(true);
+    batchEdit.open();
   };
 
   const handleBatchEditSubmit = async (values: { customer_id?: number | null; notes?: string }) => {
@@ -286,7 +287,7 @@ function IP() {
         }
         msg.success(`已更新 ${keys.length} 个 IP 的备注`);
       }
-      setBatchEditOpen(false);
+      batchEdit.close();
       batch.clear();
       refetch();
     } catch (err) {
@@ -364,7 +365,7 @@ function IP() {
         });
       }
       msg.success('更新成功');
-      setEditModalOpen(false);
+      editModal.close();
       refetch();
     } catch (err) {
       if (err instanceof Error) msg.error(err.message);
@@ -588,9 +589,9 @@ function IP() {
             switchOptions={switchOptions ?? []}
             scanNetworkPending={scanNetwork.isPending}
             onOpenBatchBan={() => {
-              setBatchBanOpen(true);
+              batchBan.open();
             }}
-            onOpenStats={() => setStatsOpen(true)}
+            onOpenStats={() => stats.open()}
             onExport={handleExport}
             onScanNetwork={handleScanNetwork}
           />
@@ -599,8 +600,8 @@ function IP() {
       />
 
       <IPEditModal
-        open={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
+        open={editModal.isOpen}
+        onClose={() => editModal.close()}
         ip={selectedIP}
         customerOptions={customerOptions ?? []}
         submitting={updateIPCustomer.isPending || updateIPNotes.isPending}
@@ -608,23 +609,23 @@ function IP() {
       />
 
       <IPDetailModal
-        open={detailModalOpen}
-        onClose={() => setDetailModalOpen(false)}
+        open={detailModal.isOpen}
+        onClose={() => detailModal.close()}
         detailAddress={detailAddress}
         loading={loadingDetail}
         detail={ipDetail}
       />
 
       <IPBatchBanModal
-        open={batchBanOpen}
-        onClose={() => setBatchBanOpen(false)}
+        open={batchBan.isOpen}
+        onClose={() => batchBan.close()}
         submitting={batchBanIP.isPending}
         onSubmit={handleBatchBanSubmit}
       />
 
       <IPStatsModal
-        open={statsOpen}
-        onClose={() => setStatsOpen(false)}
+        open={stats.isOpen}
+        onClose={() => stats.close()}
         stats={ipStats}
         scopeLabel={
           table.search || table.filters.room_id
@@ -634,12 +635,12 @@ function IP() {
       />
 
       <IPBatchEditModal
-        open={batchEditOpen}
+        open={batchEdit.isOpen}
         mode={batchEditMode}
         count={batch.count}
         customerOptions={customerOptions ?? []}
         submitting={batchUpdateIPCustomer.isPending || batchUpdateIPNotes.isPending}
-        onClose={() => setBatchEditOpen(false)}
+        onClose={() => batchEdit.close()}
         onSubmit={handleBatchEditSubmit}
       />
     </>

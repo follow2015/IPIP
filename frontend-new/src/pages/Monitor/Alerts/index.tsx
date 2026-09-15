@@ -6,6 +6,7 @@
  * failed 状态的告警可一键重试（乐观锁，仅 failed 行可重置）。
  */
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Tag,
@@ -112,7 +113,7 @@ export default function MonitorAlerts() {
   const [scope, setScope] = useState<'all' | 'mine'>('all');
   const [metricKey, setMetricKey] = useState<string>('');
   const [indexKey, setIndexKey] = useState<string>('');
-  const [ackModalOpen, setAckModalOpen] = useState(false);
+  const ackModal = useDisclosure();
   const [ackTarget, setAckTarget] = useState<MonitorAlertItem | null>(null);
   const [ackNote, setAckNote] = useState('');
   const { isMobile } = useResponsive();
@@ -211,7 +212,7 @@ export default function MonitorAlerts() {
   const openAckModal = (item: MonitorAlertItem) => {
     setAckTarget(item);
     setAckNote(item.ack_note ?? '');
-    setAckModalOpen(true);
+    ackModal.open();
   };
 
   const handleAckSubmit = async () => {
@@ -219,7 +220,7 @@ export default function MonitorAlerts() {
     try {
       await ackAlert.mutateAsync({ alertId: ackTarget.id, note: ackNote || undefined });
       message.success('已确认告警');
-      setAckModalOpen(false);
+      ackModal.close();
       setAckTarget(null);
     } catch (err: unknown) {
       message.error(err instanceof Error ? err.message : '确认请求失败');
@@ -646,10 +647,10 @@ export default function MonitorAlerts() {
       {/* G9: 确认告警 Modal */}
       <Modal
         title="确认告警"
-        open={ackModalOpen}
+        open={ackModal.isOpen}
         onOk={handleAckSubmit}
         onCancel={() => {
-          setAckModalOpen(false);
+          ackModal.close();
           setAckTarget(null);
         }}
         confirmLoading={ackAlert.isPending}

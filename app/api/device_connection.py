@@ -5,7 +5,7 @@
 提供设备连接管理的RESTful API端点。
 """
 from flask import Blueprint, request
-from marshmallow import Schema, fields, validate, EXCLUDE
+from marshmallow import Schema
 
 from app.openapi.doc import doc, public
 from app.services.device_connection_service import device_connection_service
@@ -15,32 +15,6 @@ from app.utils.transactional import transactional
 
 device_connection_bp = Blueprint("device_connection", __name__, url_prefix="/api/device-connections")
 
-
-class DeviceConnectionCreateSchema(Schema):
-    """创建设备连接请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    device_id = fields.Int(required=True)
-    switch_device_id = fields.Int(allow_none=True)
-    switch_port_id = fields.Int(allow_none=True)
-    peer_port_id = fields.Int(allow_none=True)
-    device_nics_port_id = fields.Int(allow_none=True)
-    link_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    connection_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    vlan_id = fields.Int(allow_none=True)
-    notes = fields.Str(validate=validate.Length(max=500), allow_none=True)
-
-
-class DeviceConnectionUpdateSchema(Schema):
-    """更新设备连接请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    device_id = fields.Int(allow_none=True)
-    switch_device_id = fields.Int(allow_none=True)
-    switch_port_id = fields.Int(allow_none=True)
-    connection_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    vlan_id = fields.Int(allow_none=True)
-    notes = fields.Str(validate=validate.Length(max=500), allow_none=True)
 
 
 @device_connection_bp.route("/", methods=["POST"])
@@ -92,6 +66,7 @@ def create_connection():
 @device_connection_bp.route("/", methods=["GET"])
 @doc(summary="获取设备连接列表", tags=["设备"], parameters=[{"name": "device_id", "in": "query", "schema": {"type": "integer"}}, {"name": "switch_device_id", "in": "query", "schema": {"type": "integer"}}], responses={200: "DeviceConnectionResponse", 400: "ApiError"})
 @login_required
+@permission_required("device:view")
 @rate_limit_api
 @api_exception_handler
 def get_connections():
@@ -120,6 +95,7 @@ def get_connections():
 @device_connection_bp.route("/<int:connection_id>", methods=["GET"])
 @doc(summary="获取单个设备连接", tags=["设备"], parameters=[{"name": "connection_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "DeviceConnectionResponse", 404: "ApiError"})
 @login_required
+@permission_required("device:view")
 @rate_limit_api
 @api_exception_handler
 def get_connection(connection_id):

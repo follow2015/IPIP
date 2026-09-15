@@ -9,7 +9,7 @@ from flask import Blueprint, request
 from app.api.base import APIResponse, api_exception_handler
 from app.utils import rate_limit_api
 from app.openapi.doc import doc
-from app.utils.auth import login_required
+from app.utils.auth import login_required, permission_required
 
 logger = get_logger(__name__)
 
@@ -17,7 +17,7 @@ logs_bp = Blueprint("logs", __name__)
 
 
 @logs_bp.route("/error", methods=["POST"])
-@doc(summary="接收前端错误日志", tags=["用户"], responses={200: "ApiResponse", 401: "ApiError"})
+@doc(summary="接收前端错误日志", tags=["用户"], responses={200: "ApiResponse", 401: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/LogErrorReportRequest"}}}})
 @login_required
 @rate_limit_api
 @api_exception_handler
@@ -71,7 +71,7 @@ def log_error():
 
 
 @logs_bp.route("/info", methods=["POST"])
-@doc(summary="接收前端信息日志", tags=["用户"], responses={200: "ApiResponse", 401: "ApiError"})
+@doc(summary="接收前端信息日志", tags=["用户"], responses={200: "ApiResponse", 401: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/LogInfoReportRequest"}}}})
 @login_required
 @rate_limit_api
 @api_exception_handler
@@ -120,6 +120,7 @@ def log_info():
 @logs_bp.route("/", methods=["GET"])
 @doc(summary="获取最近日志", tags=["用户"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
+@permission_required("audit:view")
 @rate_limit_api
 @api_exception_handler
 def get_logs():
@@ -150,6 +151,7 @@ def get_logs():
 @logs_bp.route("/stats", methods=["GET"])
 @doc(summary="获取日志统计", tags=["用户"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
+@permission_required("audit:view")
 @rate_limit_api
 @api_exception_handler
 def get_log_stats():

@@ -7,7 +7,7 @@
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema
 
 from app.exceptions import PresetResponseError
 from app.exceptions.validation import ValidationError
@@ -42,21 +42,7 @@ _device_service = DeviceService(DeviceRepository())
 
 
 
-class RoomCreateSchema(Schema):
-    name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    location = fields.Str(load_default="", validate=validate.Length(max=200))
-    contact = fields.Str(load_default="", validate=validate.Length(max=100))
-    contact_phone = fields.Str(load_default="", validate=validate.Length(max=50))
-
-
-class RoomUpdateSchema(Schema):
-    name = fields.Str(validate=validate.Length(min=1, max=100))
-    location = fields.Str(validate=validate.Length(max=200))
-    contact = fields.Str(validate=validate.Length(max=100))
-    contact_phone = fields.Str(validate=validate.Length(max=50))
-
-
-
+from app.schemas.room import RoomCreateSchema, RoomUpdateSchema
 
 def _get_room_or_404(room_id: int):
     """获取机房，不存在时返回 (None, error_response)"""

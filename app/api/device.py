@@ -37,280 +37,11 @@ device_service = DeviceService(DeviceRepository())
 cabinet_service = CabinetService(CabinetRepository())
 
 
-class DeviceUpdateSchema(Schema):
-    """更新设备请求验证Schema"""
-
-    class Meta:
-        unknown = EXCLUDE  # 忽略未知字段
-
-    id = fields.Int(dump_only=True)  # 只读，不参与验证
-    device_name = fields.Str(validate=validate.Length(min=1, max=100), allow_none=True)
-    cabinet_id = fields.Int(validate=validate.Range(min=1), allow_none=True)
-    device_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    brand = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    device_model = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    serial_number = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    u_position = fields.Int(validate=validate.Range(min=0), allow_none=True)  # 允许0（节点设备不占用U位）
-    height_u = fields.Int(validate=validate.Range(min=0, max=50), allow_none=True)  # 允许0（节点设备）
-    power = fields.Float(validate=validate.Range(min=0), allow_none=True)
-    ip_address = fields.Str(allow_none=True)
-    management_ip = fields.Str(allow_none=True)
-    mac_address = fields.Str(allow_none=True)
-    customer_id = fields.Int(validate=validate.Range(min=1), allow_none=True)
-    status = fields.Int(validate=validate.Range(min=0, max=7), allow_none=True)
-    notes = fields.Str(validate=validate.Length(max=500), allow_none=True)
-    cpu = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    cpu_way = fields.Int(validate=validate.Range(min=1, max=8), allow_none=True)
-    cpu_cores = fields.Int(validate=validate.Range(min=1), allow_none=True)
-    memory = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    memory_size_gb = fields.Int(validate=validate.Range(min=0), allow_none=True)
-    storage = fields.Str(validate=validate.Length(max=200), allow_none=True)
-    storage_summary = fields.Str(validate=validate.Length(max=200), allow_none=True)
-    hostname = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    os_version = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    responsible_person = fields.Int(validate=validate.Range(min=1), allow_none=True)  # 责任人ID（外键关联users.id）
-    parent_device_id = fields.Int(allow_none=True)
-    is_chassis = fields.Bool(allow_none=True)
-    node_position = fields.Int(allow_none=True)
-    node_row = fields.Int(allow_none=True)
-    node_col = fields.Int(allow_none=True)
-    total_nodes = fields.Int(allow_none=True)
-    node_rows = fields.Int(allow_none=True)
-    node_cols = fields.Int(allow_none=True)
-    device_subtype = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    node_naming_pattern = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    asset_number = fields.Str(validate=validate.Length(max=64), allow_none=True)
-    supplier = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    supplier_contact = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    contract_number = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    purchase_date = NullableDate(allow_none=True)
-    purchase_price = fields.Float(validate=validate.Range(min=0), allow_none=True)
-    invoice_number = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    warranty_start = NullableDate(allow_none=True)
-    warranty_end = NullableDate(allow_none=True)
-    warranty_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    online_date = NullableDate(allow_none=True)
-    offline_date = NullableDate(allow_none=True)
-    lifecycle_years = fields.Int(validate=validate.Range(min=1, max=30), allow_none=True)
-    ipmi_address = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    ipmi_username = fields.Str(validate=validate.Length(max=64), allow_none=True)
-    ipmi_password = fields.Str(validate=validate.Length(max=255), allow_none=True)
-    switch_config = fields.Dict(allow_none=True)
-    cpu_template_id    = fields.Integer(load_default=None)
-    memory_template_id = fields.Integer(load_default=None)
-    memory_dimm_count  = fields.Integer(load_default=None)
-    gpu                = fields.Str(validate=validate.Length(max=200), allow_none=True)
-    gpu_count          = fields.Integer(load_default=None, allow_none=True)
-    gpu_template_id    = fields.Integer(load_default=None, allow_none=True)
-    auto_create_nodes = fields.Bool(load_default=False)
-    node_hardware = fields.Dict(allow_none=True)
-    storage_items = fields.List(fields.Dict(), load_default=[])
-    nic_ports = fields.List(fields.Dict(), load_default=[])
-    overwrite_nodes = fields.Bool(load_default=False)
-    metric_template_group_id = fields.Int(allow_none=True)
-
-
-class BatchUpdateAssetSchema(Schema):
-    """批量更新设备资产信息请求Schema"""
-
-    class Meta:
-        unknown = EXCLUDE
-
-    ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1))
-    auto_generate_asset_number = fields.Bool(load_default=False)
-    supplier = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    supplier_contact = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    contract_number = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    purchase_date = NullableDate(allow_none=True)
-    purchase_price = fields.Float(validate=validate.Range(min=0), allow_none=True)
-    invoice_number = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    warranty_start = NullableDate(allow_none=True)
-    warranty_end = NullableDate(allow_none=True)
-    warranty_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    online_date = NullableDate(allow_none=True)
-    offline_date = NullableDate(allow_none=True)
-    lifecycle_years = fields.Int(validate=validate.Range(min=1, max=30), allow_none=True)
-
-
-class BatchResetAssetSchema(Schema):
-    """批量重置设备资产信息请求Schema"""
-
-    class Meta:
-        unknown = EXCLUDE
-
-    ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1))
-
-
-class BatchDeleteSchema(Schema):
-    """批量删除请求Schema"""
-
-    class Meta:
-        unknown = EXCLUDE
-
-    ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1))
-
-
-class BatchUpdateDeviceStatusSchema(Schema):
-    """批量更新设备状态请求Schema"""
-
-    class Meta:
-        unknown = EXCLUDE
-
-    device_ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1))
-    status = fields.Int(required=True, validate=validate.Range(min=0, max=7))
-
-
-class BatchUpdateHardwareSchema(Schema):
-    """批量更新设备硬件配置请求Schema"""
-
-    class Meta:
-        unknown = EXCLUDE
-
-    ids = fields.List(fields.Int(), required=True, validate=validate.Length(min=1))
-    cpu = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    cpu_way = fields.Int(validate=validate.Range(min=1, max=8), allow_none=True)
-    cpu_cores = fields.Int(validate=validate.Range(min=1), allow_none=True)
-    cpu_template_id = fields.Int(allow_none=True)
-    memory = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    memory_size_gb = fields.Int(validate=validate.Range(min=0), allow_none=True)
-    memory_template_id = fields.Int(allow_none=True)
-    gpu = fields.Str(validate=validate.Length(max=200), allow_none=True)
-    gpu_count = fields.Int(allow_none=True)
-    gpu_template_id = fields.Int(allow_none=True)
-    storage_summary = fields.Str(validate=validate.Length(max=200), allow_none=True)
-    os_version = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    ipmi_address = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    ipmi_username = fields.Str(validate=validate.Length(max=64), allow_none=True)
-    ipmi_password = fields.Str(validate=validate.Length(max=255), allow_none=True)
-
-
-class DeviceStatusUpdateSchema(Schema):
-    """更新设备状态请求Schema"""
-
-    class Meta:
-        unknown = EXCLUDE
-
-    status = fields.Int(required=True, validate=validate.Range(min=0, max=7))
-
-
-class DeviceLocationUpdateSchema(Schema):
-    """更新设备位置请求Schema"""
-
-    class Meta:
-        unknown = EXCLUDE
-
-    cabinet_id = fields.Int(required=True, validate=validate.Range(min=1))
-    u_position = fields.Int(validate=validate.Range(min=0), allow_none=True)
-    height_u = fields.Int(validate=validate.Range(min=0, max=50), allow_none=True)
-
-
-class SerialNumberGenerateSchema(Schema):
-    """生成序列号请求Schema"""
-
-    class Meta:
-        unknown = EXCLUDE
-
-    prefix = fields.Str(load_default="SN")
-    format_type = fields.Str(load_default="numeric")
-    length = fields.Int(load_default=8)
-
-
-class SerialNumberCheckSchema(Schema):
-    """检查序列号唯一性请求Schema"""
-
-    class Meta:
-        unknown = EXCLUDE
-
-    serial_number = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    exclude_id = fields.Int(allow_none=True)
-
-
-class NodePositionCheckSchema(Schema):
-    """检查节点位置重复请求Schema"""
-
-    class Meta:
-        unknown = EXCLUDE
-
-    chassis_id = fields.Int(required=True)
-    node_position = fields.Int(required=True)
-    exclude_device_id = fields.Int(allow_none=True)
-
-
-class SwitchPortUpdateSchema(Schema):
-    """更新交换机端口请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    port_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    port_name = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    speed = fields.Str(validate=validate.Length(max=20), allow_none=True)
-    status = fields.Str(validate=validate.Length(max=20), allow_none=True)
-    description = fields.Str(validate=validate.Length(max=200), allow_none=True)
-    vlan = fields.Int(allow_none=True)
-
-
-class BatchCreateSwitchPortsSchema(Schema):
-    """批量创建交换机端口请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    device_id = fields.Int(required=True)
-    ports = fields.List(fields.Dict(), required=True)
-
-
-class BatchCreateDevicesSchema(Schema):
-    """批量创建设备请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    devices = fields.List(fields.Dict(), required=True)
-
-
-class DeviceVLANCreateSchema(Schema):
-    """在设备上创建VLAN请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    vlan_id = fields.Int(required=True)
-    name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    purpose = fields.Str(validate=validate.Length(max=200), allow_none=True)
-    subnet_id = fields.Int(allow_none=True)
-    room_id = fields.Int(allow_none=True)
-    status = fields.Int(allow_none=True)
-
-
-class VLANMemberUpdateSchema(Schema):
-    """更新VLAN成员端口请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    port_ids = fields.List(fields.Int(), required=True)
-
-
-class VLANFieldUpdateSchema(Schema):
-    """更新VLAN字段请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    purpose = fields.Str(validate=validate.Length(max=200), allow_none=True)
-    name = fields.Str(validate=validate.Length(max=100), allow_none=True)
-
-
-class LAGCreateSchema(Schema):
-    """创建链路聚合组请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    lag_name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    lag_type = fields.Str(validate=validate.Length(max=50), allow_none=True)
-
-
-class LAGMemberUpdateSchema(Schema):
-    """更新LAG成员端口请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    port_ids = fields.List(fields.Int(), required=True)
-
-
-class LAGFieldUpdateSchema(Schema):
-    """更新链路聚合组字段请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    purpose = fields.Str(validate=validate.Length(max=200), allow_none=True)
-
+from app.schemas.device import (
+    DeviceUpdateSchema,
+    BatchDeleteSchema,
+    DeviceVLANCreateSchema,
+)
 
 @device_bp.route("/", methods=["GET"])
 @doc(summary="获取设备列表", tags=["设备"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}, {"name": "cabinet_id", "in": "query", "schema": {"type": "integer"}}, {"name": "room_id", "in": "query", "schema": {"type": "integer"}}, {"name": "customer_id", "in": "query", "schema": {"type": "integer"}}, {"name": "device_type", "in": "query", "schema": {"type": "string"}}, {"name": "device_subtype", "in": "query", "schema": {"type": "string"}}, {"name": "status", "in": "query", "schema": {"type": "integer"}}, {"name": "parent_device_id", "in": "query", "schema": {"type": "integer"}}, {"name": "is_chassis", "in": "query", "schema": {"type": "integer"}}, {"name": "has_ssh", "in": "query", "schema": {"type": "string"}}], responses={200: "DeviceResponse", 500: "ApiError"})
@@ -974,7 +705,7 @@ def get_deleted_devices():
 
 
 @device_bp.route("/<int:device_id>/restore", methods=["POST"])
-@doc(summary="恢复已删除设备", tags=["设备"], responses={200: "DeviceResponse"})
+@doc(request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceRestore"}}}}, summary="恢复已删除设备", tags=["设备"], responses={200: "DeviceResponse"})
 @login_required
 @permission_required("device:update")
 @rate_limit_api
@@ -1012,7 +743,7 @@ def restore_device(device_id):
 
 
 @device_bp.route("/batch-restore", methods=["POST"])
-@doc(summary="批量恢复已删除设备", tags=["设备"])
+@doc(request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/BatchRestoreDevices"}}}}, summary="批量恢复已删除设备", tags=["设备"])
 @login_required
 @permission_required("device:update")
 @rate_limit_api
@@ -1072,7 +803,7 @@ def permanent_delete_device(device_id):
 
 
 @device_bp.route("/batch-permanent-delete", methods=["POST"])
-@doc(summary="批量永久删除设备", tags=["设备"])
+@doc(request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/BatchPermanentDelete"}}}}, summary="批量永久删除设备", tags=["设备"])
 @login_required
 @permission_required("device:delete")
 @rate_limit_api
@@ -1567,7 +1298,7 @@ def batch_update_device_asset():
 
 
 @device_bp.route("/batch-metric-template-group", methods=["POST"])
-@doc(summary="批量设置/清除设备指标模板组", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError", 500: "ApiError"})
+@doc(request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/BatchUpdateMetricTemplateGroup"}}}}, summary="批量设置/清除设备指标模板组", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError", 500: "ApiError"})
 @login_required
 @permission_required("device:update")
 @rate_limit_api
@@ -1598,7 +1329,7 @@ def batch_update_device_metric_template_group():
 
 
 @device_bp.route("/batch-port-sync-enabled", methods=["POST"])
-@doc(summary="批量设置/清除设备端口同步开关", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError", 500: "ApiError"})
+@doc(request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/BatchUpdatePortSyncEnabled"}}}}, summary="批量设置/清除设备端口同步开关", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError", 500: "ApiError"})
 @login_required
 @permission_required("device:update")
 @rate_limit_api
@@ -1639,7 +1370,7 @@ def batch_update_device_port_sync_enabled():
 
 
 @device_bp.route("/batch-update-config", methods=["POST"])
-@doc(
+@doc(request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/BatchUpdateDeviceConfig"}}}}, 
     summary="批量修改设备配置",
     tags=["设备"],
     responses={200: "ApiResponse", 400: "ApiError", 500: "ApiError"},
@@ -1868,7 +1599,7 @@ def check_node_position():
 
 
 @device_bp.route("/<int:chassis_id>/swap-node-positions", methods=["POST"])
-@doc(summary="拖拽更换机箱节点位置", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
+@doc(request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SwapNodePositions"}}}}, summary="拖拽更换机箱节点位置", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
 @login_required
 @permission_required("device:update")
 @rate_limit_api
@@ -1911,6 +1642,7 @@ def swap_node_positions(chassis_id):
 @device_bp.route("/<int:device_id>/vlans", methods=["GET"])
 @doc(summary="获取设备VLAN列表", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def list_device_vlans(device_id):
     """获取设备VLAN列表（所有交换机可用，has_ssh无关）
 
@@ -1965,6 +1697,7 @@ def create_device_vlan(device_id):
 @device_bp.route("/<int:device_id>/vlans/<int:vlan_db_id>/members", methods=["GET"])
 @doc(summary="获取VLAN成员端口列表", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "vlan_db_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def get_vlan_members(device_id, vlan_db_id):
     """获取VLAN成员端口列表
 
@@ -2036,6 +1769,7 @@ def update_device_vlan(device_id, vlan_db_id):
 @device_bp.route("/<int:device_id>/port-links", methods=["GET"])
 @doc(summary="获取设备端口互联关系", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
+@permission_required("device:view")
 def get_device_port_links(device_id):
     """查询设备的端口互联关系（network_to_network）
 
@@ -2084,7 +1818,7 @@ def disconnect_port_link(device_id, connection_id):
 
 
 @device_bp.route("/<int:device_id>/port-links/<int:connection_id>", methods=["PUT"])
-@doc(summary="更新端口互联关系", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "connection_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
+@doc(request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/PortLinkUpdate"}}}}, summary="更新端口互联关系", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "connection_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
 @login_required
 @permission_required("device:update")
 @transactional
@@ -2124,6 +1858,7 @@ def update_port_link(device_id, connection_id):
 @device_bp.route("/<int:device_id>/port-channels", methods=["GET"])
 @doc(summary="获取设备LAG列表", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def list_device_port_channels(device_id):
     """获取设备LAG列表（所有交换机可用）
 
@@ -2188,6 +1923,7 @@ def delete_device_port_channel(device_id, lag_id):
 @device_bp.route("/<int:device_id>/port-channels/<int:lag_id>/members", methods=["GET"])
 @doc(summary="获取LAG成员端口列表", tags=["设备"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "lag_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
+@permission_required("switch:view")
 def get_lag_members(device_id, lag_id):
     """获取LAG成员端口列表
 

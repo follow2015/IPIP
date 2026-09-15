@@ -10,6 +10,7 @@
  * 协议（source）相同的模板归入同一分组。
  */
 import { useMemo, useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Button,
@@ -67,7 +68,7 @@ export default function MetricTemplateGroupsSection() {
   const addTemplates = useAddTemplatesToGroup();
   const removeTemplate = useRemoveTemplateFromGroup();
 
-  const [groupModalOpen, setGroupModalOpen] = useState(false);
+  const groupModal = useDisclosure();
   const [editingGroup, setEditingGroup] = useState<MetricTemplateGroupItem | null>(null);
   const [groupForm] = Form.useForm<GroupFormValues>();
 
@@ -89,7 +90,7 @@ export default function MetricTemplateGroupsSection() {
       display_order: 0,
       enabled: true
     });
-    setGroupModalOpen(true);
+    groupModal.open();
   };
 
   const openEditGroup = (g: MetricTemplateGroupItem) => {
@@ -103,7 +104,7 @@ export default function MetricTemplateGroupsSection() {
       enabled: g.enabled ?? true,
       description: g.description ?? undefined
     });
-    setGroupModalOpen(true);
+    groupModal.open();
   };
 
   const handleGroupSubmit = async () => {
@@ -125,7 +126,7 @@ export default function MetricTemplateGroupsSection() {
         await createGroup.mutateAsync(payload);
         message.success('模板组已创建');
       }
-      setGroupModalOpen(false);
+      groupModal.close();
       groupForm.resetFields();
     } catch (e) {
       message.error(e instanceof Error ? e.message : '保存模板组失败');
@@ -278,10 +279,10 @@ export default function MetricTemplateGroupsSection() {
       {/* 组新增/编辑弹窗 */}
       <Modal
         title={editingGroup ? '编辑指标模板组' : '新增指标模板组'}
-        open={groupModalOpen}
+        open={groupModal.isOpen}
         onOk={handleGroupSubmit}
         onCancel={() => {
-          setGroupModalOpen(false);
+          groupModal.close();
           groupForm.resetFields();
         }}
         confirmLoading={createGroup.isPending || updateGroup.isPending}

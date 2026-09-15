@@ -29,6 +29,7 @@ dashboard_bp = Blueprint("dashboard", __name__)
 @dashboard_bp.route("/stats", methods=["GET"])
 @doc(summary="获取仪表盘统计数据", tags=["仪表盘"], responses={200: "DashboardStatsResponse", 401: "ApiError"})
 @login_required
+@permission_required("system:stats")
 def get_stats():
     """获取仪表盘统计数据
 
@@ -136,6 +137,7 @@ def get_stats():
 @dashboard_bp.route("/activities", methods=["GET"])
 @doc(summary="获取最近活动记录", tags=["仪表盘"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
+@permission_required("system:stats")
 def get_activities():
     """获取最近活动记录（基于 UserLog 登录日志）
 
@@ -194,6 +196,7 @@ def get_activities():
 @dashboard_bp.route("/system-status", methods=["GET"])
 @doc(summary="获取系统状态", tags=["仪表盘"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
+@permission_required("system:stats")
 def get_system_status():
     """获取系统状态"""
     try:
@@ -276,6 +279,7 @@ def get_system_status():
 @dashboard_bp.route("/", methods=["GET"])
 @doc(summary="获取仪表盘统计数据（兼容旧接口）", tags=["仪表盘"], responses={200: "DashboardStatsResponse", 401: "ApiError"})
 @login_required
+@permission_required("system:stats")
 def get_dashboard_stats():
     """获取仪表盘统计数据（兼容旧接口）"""
     return get_stats()

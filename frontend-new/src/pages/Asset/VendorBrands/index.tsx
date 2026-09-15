@@ -3,6 +3,7 @@
  * 后端 API 路径不变：/monitor/vendor-brands
  */
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Table,
@@ -40,7 +41,7 @@ export default function VendorBrandsPage() {
   const updateMut = useUpdateVendorBrand();
   const deleteMut = useDeleteVendorBrand();
   const message = useMessage();
-  const [modalOpen, setModalOpen] = useState(false);
+  const modal = useDisclosure();
   const [editing, setEditing] = useState<VendorBrand | null>(null);
   const [form] = Form.useForm();
   const table = useTable({ initialPerPage: 50 });
@@ -50,13 +51,13 @@ export default function VendorBrandsPage() {
     setEditing(null);
     form.resetFields();
     form.setFieldsValue({ enabled: true, sort_order: 0, device_type: 'server' });
-    setModalOpen(true);
+    modal.open();
   };
 
   const openEdit = (brand: VendorBrand) => {
     setEditing(brand);
     form.setFieldsValue(brand);
-    setModalOpen(true);
+    modal.open();
   };
 
   const handleSave = async () => {
@@ -69,7 +70,7 @@ export default function VendorBrandsPage() {
         await createMut.mutateAsync(values);
         message.success('新增成功');
       }
-      setModalOpen(false);
+      modal.close();
     } catch (err: unknown) {
       message.error(err instanceof Error ? err.message : '保存失败');
     }
@@ -175,9 +176,9 @@ export default function VendorBrandsPage() {
       />
       <Modal
         title={editing ? '编辑品牌' : '新增品牌'}
-        open={modalOpen}
+        open={modal.isOpen}
         onOk={handleSave}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => modal.close()}
         confirmLoading={createMut.isPending || updateMut.isPending}
         width={560}
       >

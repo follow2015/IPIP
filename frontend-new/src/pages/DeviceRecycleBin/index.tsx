@@ -1,5 +1,6 @@
 import { useConfirm, type ConfirmFn } from '@/utils/confirm';
 import { useState, useCallback, useMemo } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Button, Space, Select, Tag, Input, Typography, Alert, Modal } from 'antd';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
 import BatchActionBar from '@/components/BatchActionBar';
@@ -153,14 +154,14 @@ export default function DeviceRecycleBin() {
   const table = useTable({ filterResets: RECYCLE_BIN_FILTER_RESETS });
   const msg = useMessage();
 
-  const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const restoreModal = useDisclosure();
   const [restoringDevice, setRestoringDevice] = useState<Device | null>(null);
   const [restoreCabinetId, setRestoreCabinetId] = useState<number | undefined>();
   const [restoreUPosition, setRestoreUPosition] = useState<number | undefined>();
   const [locationConflict, setLocationConflict] = useState(false);
   const [conflictMsg, setConflictMsg] = useState('');
 
-  const [batchRestoreModalOpen, setBatchRestoreModalOpen] = useState(false);
+  const batchRestoreModal = useDisclosure();
   const [batchRestoreCabinetId, setBatchRestoreCabinetId] = useState<number | undefined>();
   const [batchRestoreUPosition, setBatchRestoreUPosition] = useState<number | undefined>();
 
@@ -206,7 +207,7 @@ export default function DeviceRecycleBin() {
     setRestoreUPosition(undefined);
     setLocationConflict(false);
     setConflictMsg('');
-    setRestoreModalOpen(true);
+    restoreModal.open();
   }, []);
 
   const doRestore = useCallback(() => {
@@ -234,7 +235,7 @@ export default function DeviceRecycleBin() {
               parts.push(`，已重建 ${result.children_restored} 个子节点`);
             }
             msg.success(parts.join(''));
-            setRestoreModalOpen(false);
+            restoreModal.close();
           } else if (result?.location_conflict) {
             setLocationConflict(true);
             const conflicts = result.conflict_devices || [];
@@ -257,7 +258,7 @@ export default function DeviceRecycleBin() {
   const handleBatchRestore = useCallback(() => {
     setBatchRestoreCabinetId(undefined);
     setBatchRestoreUPosition(undefined);
-    setBatchRestoreModalOpen(true);
+    batchRestoreModal.open();
   }, []);
 
   const doBatchRestore = useCallback(() => {
@@ -272,7 +273,7 @@ export default function DeviceRecycleBin() {
           const result = (res?.data ?? res) as unknown as BatchResult;
           msg.success(`成功恢复 ${result?.success?.length || 0} 个设备`);
           batch.clear();
-          setBatchRestoreModalOpen(false);
+          batchRestoreModal.close();
         },
         onError: () => msg.error('批量恢复失败')
       }
@@ -400,9 +401,9 @@ export default function DeviceRecycleBin() {
       {/* 恢复弹窗 */}
       <Modal
         title="恢复设备"
-        open={restoreModalOpen}
+        open={restoreModal.isOpen}
         onOk={doRestore}
-        onCancel={() => setRestoreModalOpen(false)}
+        onCancel={() => restoreModal.close()}
         confirmLoading={restoreMutation.isPending}
         okText="确认恢复"
       >
@@ -499,9 +500,9 @@ export default function DeviceRecycleBin() {
       {/* 批量恢复弹窗 */}
       <Modal
         title="批量恢复"
-        open={batchRestoreModalOpen}
+        open={batchRestoreModal.isOpen}
         onOk={doBatchRestore}
-        onCancel={() => setBatchRestoreModalOpen(false)}
+        onCancel={() => batchRestoreModal.close()}
         confirmLoading={batchRestoreMutation.isPending}
         okText="确认恢复"
       >

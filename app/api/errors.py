@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 
 @errors_bp.route('/report', methods=['POST'])
-@doc(summary='接收前端错误报告', tags=['健康检查'], responses={200: 'ApiResponse', 400: 'ApiError'})
+@doc(summary='接收前端错误报告', tags=['健康检查'], responses={200: 'ApiResponse', 400: 'ApiError'}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorReportRequest"}}}})
 @login_required
 @rate_limit_api
 def report_error():

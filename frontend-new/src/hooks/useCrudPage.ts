@@ -1,6 +1,7 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useCallback } from 'react';
 
+import { useDisclosure } from './useDisclosure';
 import { useTable, type UseTableReturn } from './useTable';
 import { useMessage } from './useMessage';
 import type { PaginatedData, PaginationParams } from '@/types/api';
@@ -47,7 +48,7 @@ export function useCrudPage<
   const { useList, useDelete, nameKey, nameLabel, buildListParams } = options;
 
   const table = useTable();
-  const [formOpen, setFormOpen] = useState(false);
+  const form = useDisclosure();
   const [editRecord, setEditRecord] = useState<T | null>(null);
   const deleteMutation = useDelete();
   const message = useMessage();
@@ -59,12 +60,12 @@ export function useCrudPage<
 
   const handleAdd = useCallback(() => {
     setEditRecord(null);
-    setFormOpen(true);
+    form.open();
   }, []);
 
   const handleEdit = useCallback((record: T) => {
     setEditRecord(record);
-    setFormOpen(true);
+    form.open();
   }, []);
 
   const handleDelete = useCallback(
@@ -90,7 +91,7 @@ export function useCrudPage<
   );
 
   const closeForm = useCallback(() => {
-    setFormOpen(false);
+    form.close();
     setEditRecord(null);
     refetch();
   }, [refetch]);
@@ -100,7 +101,7 @@ export function useCrudPage<
     data,
     isLoading,
     refetch,
-    formOpen,
+    formOpen: form.isOpen,
     editRecord,
     handleAdd,
     handleEdit,

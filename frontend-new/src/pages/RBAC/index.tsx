@@ -1,5 +1,6 @@
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useState, useMemo } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Table, Button, Space, Card, Tabs, Tag, Switch } from 'antd';
 import {
   PlusOutlined,
@@ -26,9 +27,9 @@ import { useMessage } from '@/hooks/useMessage';
 
 function RBAC() {
   const [activeTab, setActiveTab] = useState('roles');
-  const [formOpen, setFormOpen] = useState(false);
+  const form = useDisclosure();
   const [editRecord, setEditRecord] = useState<Role | null>(null);
-  const [permAssignOpen, setPermAssignOpen] = useState(false);
+  const permAssign = useDisclosure();
   const [permAssignRole, setPermAssignRole] = useState<Role | null>(null);
 
   const { data: rolesData, isLoading: rolesLoading, refetch: refetchRoles } = useRoleList();
@@ -47,12 +48,12 @@ function RBAC() {
 
   const handleAdd = () => {
     setEditRecord(null);
-    setFormOpen(true);
+    form.open();
   };
 
   const handleEdit = (r: Role) => {
     setEditRecord(r);
-    setFormOpen(true);
+    form.open();
   };
 
   const confirmAction = useConfirmAction();
@@ -70,7 +71,7 @@ function RBAC() {
 
   const handlePermAssign = (r: Role) => {
     setPermAssignRole(r);
-    setPermAssignOpen(true);
+    permAssign.open();
   };
 
   const handleFormSubmit = async (values: Record<string, unknown>) => {
@@ -85,7 +86,7 @@ function RBAC() {
         await createRole.mutateAsync(values as unknown as CreateRoleRequest);
         message.success('创建成功');
       }
-      setFormOpen(false);
+      form.close();
       refetchRoles();
     } catch (err) {
       message.error(err instanceof Error ? err.message : '操作失败');
@@ -218,19 +219,19 @@ function RBAC() {
       />
 
       <RoleForm
-        open={formOpen}
+        open={form.isOpen}
         editRecord={editRecord}
-        onCancel={() => setFormOpen(false)}
+        onCancel={() => form.close()}
         onOk={handleFormSubmit}
         loading={createRole.isPending || updateRole.isPending}
       />
 
       <PermissionAssign
-        open={permAssignOpen}
+        open={permAssign.isOpen}
         role={permAssignRole}
         permissions={permissions}
         onClose={() => {
-          setPermAssignOpen(false);
+          permAssign.close();
           setPermAssignRole(null);
         }}
         onSuccess={() => refetchRoles()}

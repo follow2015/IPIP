@@ -5,6 +5,7 @@
  * 的 reachable 聚合计算实际达成度。
  */
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Button,
@@ -51,7 +52,7 @@ export default function SlaTargetsPage() {
   const createMut = useCreateSlaTarget();
   const updateMut = useUpdateSlaTarget();
   const deleteMut = useDeleteSlaTarget();
-  const [modalOpen, setModalOpen] = useState(false);
+  const modal = useDisclosure();
   const [editing, setEditing] = useState<MonitorSlaTarget | null>(null);
   const message = useMessage();
   const [form] = Form.useForm<{
@@ -71,7 +72,7 @@ export default function SlaTargetsPage() {
     setEditing(null);
     form.resetFields();
     form.setFieldsValue({ enabled: true, window_days: 30, target_ratio: 0.99 });
-    setModalOpen(true);
+    modal.open();
   };
 
   const openEdit = (record: MonitorSlaTarget) => {
@@ -84,7 +85,7 @@ export default function SlaTargetsPage() {
       description: record.description ?? undefined,
       enabled: record.enabled
     });
-    setModalOpen(true);
+    modal.open();
   };
 
   const handleSubmit = async () => {
@@ -113,7 +114,7 @@ export default function SlaTargetsPage() {
         await createMut.mutateAsync(payload);
         message.success('已创建');
       }
-      setModalOpen(false);
+      modal.close();
     } catch (err: unknown) {
       if (err instanceof Error && err.message) message.error(err.message);
     }
@@ -263,9 +264,9 @@ export default function SlaTargetsPage() {
 
       <Modal
         title={editing ? '编辑 SLA 目标' : '新建 SLA 目标'}
-        open={modalOpen}
+        open={modal.isOpen}
         onOk={handleSubmit}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => modal.close()}
         confirmLoading={createMut.isPending || updateMut.isPending}
         width={560}
         destroyOnHidden

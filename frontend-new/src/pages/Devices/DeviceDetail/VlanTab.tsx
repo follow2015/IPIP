@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useMemo } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Button, Space, Form, InputNumber, Input, Select, Modal } from 'antd';
 import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SyncOutlined } from '@ant-design/icons';
@@ -57,10 +58,10 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
     return map;
   }, [ports]);
 
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
+  const addModal = useDisclosure();
+  const editModal = useDisclosure();
   const [editingVlan, setEditingVlan] = useState<VLAN | null>(null);
-  const [memberModalOpen, setMemberModalOpen] = useState(false);
+  const memberModal = useDisclosure();
   const [editingMemberVlan, setEditingMemberVlan] = useState<VLAN | null>(null);
   const [memberForm] = Form.useForm();
   const [addForm] = Form.useForm();
@@ -71,7 +72,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
       const values = await addForm.validateFields();
       await createVLAN.mutateAsync(values);
       message.success('VLAN 创建成功');
-      setAddModalOpen(false);
+      addModal.close();
       addForm.resetFields();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -86,7 +87,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
       purpose: vlan.purpose ?? '',
       status: vlan.status
     });
-    setEditModalOpen(true);
+    editModal.open();
   };
 
   const handleEditSubmit = async () => {
@@ -98,7 +99,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         data: { purpose: values.purpose ?? '', name: values.name }
       });
       message.success('VLAN 更新成功');
-      setEditModalOpen(false);
+      editModal.close();
       setEditingVlan(null);
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -125,7 +126,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
     memberForm.setFieldsValue({
       member_port_ids: initialPortIds
     });
-    setMemberModalOpen(true);
+    memberModal.open();
   };
 
   const handleMemberSubmit = async () => {
@@ -137,7 +138,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         portIds: values.member_port_ids ?? []
       });
       message.success('成员端口更新成功');
-      setMemberModalOpen(false);
+      memberModal.close();
       setEditingMemberVlan(null);
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -233,7 +234,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
           </Button>
         )}
         {!hasSsh && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddModalOpen(true)}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => addModal.open()}>
             新增 VLAN
           </Button>
         )}
@@ -253,10 +254,10 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
       {/* 新增 VLAN 弹窗 */}
       <Modal
         title="新增 VLAN"
-        open={addModalOpen}
+        open={addModal.isOpen}
         onOk={handleAdd}
         onCancel={() => {
-          setAddModalOpen(false);
+          addModal.close();
           addForm.resetFields();
         }}
         destroyOnHidden
@@ -281,10 +282,10 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
       {/* 编辑 VLAN 弹窗 */}
       <Modal
         title="编辑 VLAN"
-        open={editModalOpen}
+        open={editModal.isOpen}
         onOk={handleEditSubmit}
         onCancel={() => {
-          setEditModalOpen(false);
+          editModal.close();
           setEditingVlan(null);
         }}
         destroyOnHidden
@@ -313,10 +314,10 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
       {!hasSsh && (
         <Modal
           title={`编辑成员端口 - VLAN ${editingMemberVlan?.vlan_id ?? ''}`}
-          open={memberModalOpen}
+          open={memberModal.isOpen}
           onOk={handleMemberSubmit}
           onCancel={() => {
-            setMemberModalOpen(false);
+            memberModal.close();
             setEditingMemberVlan(null);
           }}
           destroyOnHidden

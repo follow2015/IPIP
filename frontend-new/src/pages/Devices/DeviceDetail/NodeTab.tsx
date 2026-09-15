@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import type { DragEvent } from 'react';
 import {
   Button,
@@ -61,10 +62,10 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
   const [dragOverTarget, setDragOverTarget] = useState<number | null>(null);
   const [swapping, setSwapping] = useState(false);
 
-  const [formOpen, setFormOpen] = useState(false);
+  const formDisclosure = useDisclosure();
   const [form] = Form.useForm();
 
-  const [fillOpen, setFillOpen] = useState(false);
+  const fill = useDisclosure();
   const [fillForm] = Form.useForm();
 
   const { data: chassisDetail } = useDeviceDetail(deviceId);
@@ -77,7 +78,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
 
   const watchedNodePosition = Form.useWatch('node_position', form);
   useEffect(() => {
-    if (!formOpen || !watchedNodePosition || !deviceName) return;
+    if (!formDisclosure.isOpen || !watchedNodePosition || !deviceName) return;
     const pattern = chassisDetail?.node_naming_pattern || '{chassis}-Node{pos}';
     const nodeCols = chassisDetail?.node_cols || 1;
     const row = Math.ceil(watchedNodePosition / nodeCols);
@@ -93,7 +94,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       .replace('{COL}', String(col));
     form.setFieldValue('device_name', newName);
     form.setFieldValue('notes', `${deviceName} 节点 ${watchedNodePosition}`);
-  }, [formOpen, watchedNodePosition, deviceName, chassisDetail, form]);
+  }, [formDisclosure.isOpen, watchedNodePosition, deviceName, chassisDetail, form]);
 
   const handleAdd = () => {
     if (vacantCount === 0) {
@@ -110,7 +111,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       device_name: deviceName ? `${deviceName}-Node${currentCount + 1}` : '',
       status: DeviceStatusCode.AVAILABLE
     });
-    setFormOpen(true);
+    formDisclosure.open();
   };
 
   const handleDelete = (record: Device) => {
@@ -144,7 +145,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
         nic_ports: nicPorts.length > 0 ? nicPorts : undefined
       });
       message.success('节点创建成功');
-      setFormOpen(false);
+      formDisclosure.close();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     }
@@ -159,7 +160,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     fillForm.setFieldsValue({
       fill_count: vacantCount
     });
-    setFillOpen(true);
+    fill.open();
   };
 
   const handleFillSubmit = async () => {
@@ -202,7 +203,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       });
 
       message.success(`已生成 ${fillCount} 个子节点`);
-      setFillOpen(false);
+      fill.close();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
     }
@@ -441,9 +442,9 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       {/* 新增节点弹窗 */}
       <Modal
         title="新增节点"
-        open={formOpen}
+        open={formDisclosure.isOpen}
         onOk={handleSubmit}
-        onCancel={() => setFormOpen(false)}
+        onCancel={() => formDisclosure.close()}
         confirmLoading={createDevice.isPending}
         width={780}
         destroyOnHidden
@@ -521,9 +522,9 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       {/* 填满空余节点弹窗 */}
       <Modal
         title="填满空余节点位置"
-        open={fillOpen}
+        open={fill.isOpen}
         onOk={handleFillSubmit}
-        onCancel={() => setFillOpen(false)}
+        onCancel={() => fill.close()}
         confirmLoading={updateDevice.isPending}
         width={780}
         destroyOnHidden

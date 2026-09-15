@@ -15,7 +15,7 @@ from app.services.user_service import UserService
 from app.services.security_service import SecurityService
 from app.persistence.user_repository import UserRepository
 from app.persistence.user_log_repository import UserLogRepository
-from marshmallow import Schema, fields, validate, EXCLUDE
+from marshmallow import Schema
 
 from app.utils import (
     auth_manager,
@@ -27,63 +27,8 @@ from app.utils import (
 from app.utils.transactional import transactional
 
 
-class UserLoginSchema(Schema):
-    """用户登录请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    username = fields.Str(required=True)
-    password = fields.Str(required=True)
-
-
-class UserRegisterSchema(Schema):
-    """用户注册请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    username = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    password = fields.Str(required=True, validate=validate.Length(min=6, max=200))
-    email = fields.Str(required=True, validate=validate.Length(max=200))
-    role = fields.Str(validate=validate.Length(max=50), allow_none=True)
-
-
-class RefreshTokenSchema(Schema):
-    """刷新令牌请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    refresh_token = fields.Str(required=True)
-
-
-class UserUpdateRequestSchema(Schema):
-    """更新用户信息请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    username = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    name = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    email = fields.Str(validate=validate.Length(max=200), allow_none=True)
-    department = fields.Str(validate=validate.Length(max=100), allow_none=True)
-    contact_phone = fields.Str(validate=validate.Length(max=50), allow_none=True)
-    status = fields.Int(allow_none=True)
-    password = fields.Str(validate=validate.Length(min=6, max=200), allow_none=True)
-
-
-class ChangePasswordSchema(Schema):
-    """修改密码请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    username = fields.Str(required=True)
-    user_id = fields.Int(required=True)
-    old_password = fields.Str(required=True)
-    new_password = fields.Str(required=True, validate=validate.Length(min=6))
-    confirm_password = fields.Str(required=True)
-
-
-class ResetPasswordSchema(Schema):
-    """重置密码请求Schema"""
-    class Meta:
-        unknown = EXCLUDE
-    password = fields.Str(required=True, validate=validate.Length(min=6))
-
-
 logger = get_logger(__name__)
+
 user_bp = Blueprint("user", __name__)
 
 user_service = UserService(UserRepository(), UserLogRepository())

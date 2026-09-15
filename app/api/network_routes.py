@@ -25,6 +25,7 @@ router = Blueprint("network", __name__, url_prefix="/api/network")
 @router.route("/routes", methods=["GET"])
 @doc(summary="查询路由列表", tags=["网段"], responses={200: "IPNetworkResponse", 401: "ApiError"})
 @login_required
+@permission_required("network:view")
 def list_routes():
     """查询路由列表
 
@@ -70,6 +71,7 @@ def list_routes():
 @router.route("/info", methods=["GET"])
 @doc(summary="查询网段详细信息", tags=["网段"], responses={200: "IPNetworkResponse", 400: "ApiError", 401: "ApiError"})
 @login_required
+@permission_required("network:view")
 def network_info():
     """查询网段详细信息
 
@@ -89,6 +91,7 @@ def network_info():
 @router.route("/usage", methods=["GET"])
 @doc(summary="查询网段使用率", tags=["网段"], responses={200: "IPNetworkResponse", 400: "ApiError", 401: "ApiError"})
 @login_required
+@permission_required("network:view")
 def network_usage():
     """查询网段使用率
 
@@ -131,6 +134,7 @@ def network_usage():
 @router.route("/list", methods=["GET"])
 @doc(summary="分页获取网段列表", tags=["网段"], responses={200: "IPNetworkResponse", 401: "ApiError"})
 @login_required
+@permission_required("network:view")
 def get_networks():
     """分页获取网段列表"""
     from app.services.network_service import NetworkService
@@ -174,7 +178,7 @@ def delete_network(ip_network):
 
 
 @router.route("/<path:ip_network>/customer", methods=["PUT"])
-@doc(summary="更新网段客户", tags=["网段"], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"})
+@doc(summary="更新网段客户", tags=["网段"], responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/NetworkCustomerUpdateRequest"}}}})
 @login_required
 @permission_required("network:update")
 @transactional
@@ -203,6 +207,7 @@ def update_network_customer(ip_network):
 @router.route("/ip_networks", methods=["GET"])
 @doc(summary="分页获取IP网段", tags=["网段"], responses={200: "IPNetworkResponse", 401: "ApiError"})
 @login_required
+@permission_required("network:view")
 def get_ip_networks():
     """分页获取IP网段"""
     from app.services.network_service import NetworkService
@@ -220,6 +225,7 @@ def get_ip_networks():
 @router.route("/<path:ip_network>/ips", methods=["GET"])
 @doc(summary="获取网段详情（含IP列表和状态统计）", tags=["网段"], responses={200: "IPNetworkResponse", 400: "ApiError", 401: "ApiError"})
 @login_required
+@permission_required("network:view")
 def get_network_detail(ip_network):
     """获取网段详情（含基本信息+IP列表+状态统计+路由关联信息）
 
@@ -456,6 +462,7 @@ def trigger_full_scan(room_id):
 @router.route("/scan/status/<int:room_id>", methods=["GET"])
 @doc(summary="查询扫描进度", tags=["网段"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
+@permission_required("network:view")
 def get_scan_status(room_id):
     """查询扫描进度"""
     from app.services.scan_redis import ScanRedis
@@ -476,6 +483,7 @@ def get_scan_status(room_id):
 @router.route("/no-auth-fallback/<int:room_id>", methods=["GET"])
 @doc(summary="查询降级映射", tags=["网段"], responses={200: "ApiResponse", 401: "ApiError"})
 @login_required
+@permission_required("system:config")
 def get_no_auth_fallback(room_id):
     """查询当前所有降级映射"""
     from app.services.scan_redis import ScanRedis
@@ -493,7 +501,7 @@ def get_no_auth_fallback(room_id):
 
 
 @router.route("/no-auth-fallback/rebuild", methods=["POST"])
-@doc(summary="手动重建Redis降级映射", tags=["网段"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="手动重建Redis降级映射", tags=["网段"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/NetworkNoAuthRebuildRequest"}}}})
 @login_required
 @permission_required("system:config")
 def rebuild_no_auth_fallback():

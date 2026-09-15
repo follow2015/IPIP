@@ -5,6 +5,7 @@
  * 用于计划内维护、已知问题处理等场景避免告警噪声。
  */
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Button,
@@ -54,7 +55,7 @@ export default function SilenceRulesPage() {
   const createMut = useCreateSilenceRule();
   const updateMut = useUpdateSilenceRule();
   const deleteMut = useDeleteSilenceRule();
-  const [modalOpen, setModalOpen] = useState(false);
+  const modal = useDisclosure();
   const [editing, setEditing] = useState<MonitorSilenceRule | null>(null);
   const message = useMessage();
   const [form] = Form.useForm<{
@@ -73,7 +74,7 @@ export default function SilenceRulesPage() {
     setEditing(null);
     form.resetFields();
     form.setFieldsValue({ enabled: true });
-    setModalOpen(true);
+    modal.open();
   };
 
   const openEdit = (record: MonitorSilenceRule) => {
@@ -86,7 +87,7 @@ export default function SilenceRulesPage() {
       enabled: record.enabled,
       range: [dayjs(ensureUtc(record.silence_from)), dayjs(ensureUtc(record.silence_until))]
     });
-    setModalOpen(true);
+    modal.open();
   };
 
   const handleSubmit = async () => {
@@ -119,7 +120,7 @@ export default function SilenceRulesPage() {
         await createMut.mutateAsync(payload);
         message.success('已创建');
       }
-      setModalOpen(false);
+      modal.close();
     } catch (err: unknown) {
       if (err instanceof Error && err.message) message.error(err.message);
     }
@@ -237,9 +238,9 @@ export default function SilenceRulesPage() {
 
       <Modal
         title={editing ? '编辑静默规则' : '新建静默规则'}
-        open={modalOpen}
+        open={modal.isOpen}
         onOk={handleSubmit}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => modal.close()}
         confirmLoading={createMut.isPending || updateMut.isPending}
         width={560}
         destroyOnHidden

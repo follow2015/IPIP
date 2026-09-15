@@ -5,6 +5,7 @@
  * - 子组件成为纯展示组件，易于测试和 Storybook 文档化
  */
 import React, { useEffect, useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Layout, theme, Drawer } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
@@ -40,10 +41,10 @@ function AppLayout() {
 
   const { isMobile } = useResponsive();
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawer = useDisclosure();
 
   useEffect(() => {
-    if (!isMobile) setDrawerOpen(false);
+    if (!isMobile) drawer.close();
   }, [isMobile]);
 
   useEffect(() => {
@@ -68,12 +69,12 @@ function AppLayout() {
       {isMobile ? (
         <Drawer
           placement="left"
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
+          open={drawer.isOpen}
+          onClose={() => drawer.close()}
           width={220}
           styles={{ body: { padding: 0 } }}
         >
-          <Sidebar collapsed={false} onNavigate={() => setDrawerOpen(false)} />
+          <Sidebar collapsed={false} onNavigate={() => drawer.close()} />
         </Drawer>
       ) : (
         <Sider
@@ -103,7 +104,7 @@ function AppLayout() {
       >
         <Header
           sidebarCollapsed={isMobile ? false : sidebarCollapsed}
-          onToggleSidebar={isMobile ? () => setDrawerOpen(true) : toggleSidebar}
+          onToggleSidebar={isMobile ? () => drawer.open() : toggleSidebar}
           theme={themeMode}
           onToggleTheme={toggleTheme}
           user={user}

@@ -7,7 +7,7 @@ VLAN API
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema
 
 from app.api.base import APIResponse
 from app.services.vlan_service import VLANService
@@ -28,27 +28,7 @@ _vlan_service = VLANService(VLANRepository())
 
 
 
-class VLANCreateSchema(Schema):
-    """VLAN创建参数"""
-    vlan_id = fields.Int(required=True, validate=validate.Range(min=1, max=4094))
-    name = fields.Str(required=True, validate=validate.Length(min=1, max=64))
-    purpose = fields.Str(load_default=None, validate=validate.Length(max=200))
-    subnet_id = fields.Int(load_default=None)
-    room_id = fields.Int(load_default=None)
-    device_id = fields.Int(required=True)
-    status = fields.Int(load_default=1)
-
-
-class VLANUpdateSchema(Schema):
-    """VLAN更新参数"""
-    name = fields.Str(validate=validate.Length(min=1, max=64))
-    purpose = fields.Str(validate=validate.Length(max=200))
-    subnet_id = fields.Int()
-    room_id = fields.Int()
-    status = fields.Int()
-
-
-
+from app.schemas.vlan import VLANCreateSchema, VLANUpdateSchema
 
 @vlan_bp.route("/", methods=["GET"])
 @doc(summary="查询VLAN列表", tags=["VLAN"], responses={200: "VLANResponse", 401: "ApiError"})
@@ -116,7 +96,7 @@ def get_vlan(vlan_id):
 
 
 @vlan_bp.route("/", methods=["POST"])
-@doc(summary="创建VLAN", tags=["VLAN"], responses={201: "VLANResponse", 409: "ApiError"})
+@doc(summary="创建VLAN", tags=["VLAN"], responses={201: "VLANResponse", 409: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/VLANCreate"}}}})
 @login_required
 @permission_required("switch:create")
 @transactional
@@ -137,7 +117,7 @@ def create_vlan():
 
 
 @vlan_bp.route("/<int:vlan_id>", methods=["PUT"])
-@doc(summary="更新VLAN", tags=["VLAN"], responses={200: "VLANResponse", 404: "ApiError"})
+@doc(summary="更新VLAN", tags=["VLAN"], responses={200: "VLANResponse", 404: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/VLANUpdate"}}}})
 @login_required
 @permission_required("switch:update")
 @transactional

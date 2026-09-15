@@ -5,6 +5,7 @@
  * - 触发扫描 + 扫描进度
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { useConfirm } from '@/utils/confirm';
 import { Button, Tag, Space, Tooltip, Progress } from 'antd';
 import {
@@ -33,7 +34,7 @@ import type { GlobalEvent } from '@/hooks/useGlobalEvents';
 
 function VirtualRooms() {
   const confirm = useConfirm();
-  const [membersOpen, setMembersOpen] = useState(false);
+  const members = useDisclosure();
   const [membersRecord, setMembersRecord] = useState<VirtualRoom | null>(null);
   const [scanningId, setScanningId] = useState<number | null>(null);
   const scanVirtualRoom = useScanVirtualRoom();
@@ -90,7 +91,7 @@ function VirtualRooms() {
 
   const handleMembers = (record: VirtualRoom) => {
     setMembersRecord(record);
-    setMembersOpen(true);
+    members.open();
   };
 
   const handleScan = async (record: VirtualRoom) => {
@@ -266,10 +267,10 @@ function VirtualRooms() {
       />
       <VirtualRoomForm open={formOpen} editRecord={editRecord} onClose={closeForm} />
       <VirtualRoomMembers
-        open={membersOpen}
+        open={members.isOpen}
         record={membersRecord}
         onClose={() => {
-          setMembersOpen(false);
+          members.close();
           setMembersRecord(null);
           refetch();
         }}

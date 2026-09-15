@@ -35,7 +35,7 @@ def list_silence_rules():
 
 
 @monitor_bp.route("/silence-rules", methods=["POST"])
-@doc(summary="创建静默规则", tags=["监控"], responses={200: "MonitorSilenceRuleItem"})
+@doc(summary="创建静默规则", tags=["监控"], responses={200: "MonitorSilenceRuleItem"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorSilenceRuleCreate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -53,7 +53,7 @@ def create_silence_rule():
 
 
 @monitor_bp.route("/silence-rules/<int:rule_id>", methods=["PATCH"])
-@doc(summary="更新静默规则", tags=["监控"], responses={200: "MonitorSilenceRuleItem"})
+@doc(summary="更新静默规则", tags=["监控"], responses={200: "MonitorSilenceRuleItem"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorSilenceRuleUpdate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -95,7 +95,7 @@ def list_threshold_overrides():
 
 
 @monitor_bp.route("/threshold-overrides", methods=["POST"])
-@doc(summary="upsert 阈值覆盖", tags=["监控"], responses={200: "DeviceMetricOverrideItem"})
+@doc(summary="upsert 阈值覆盖", tags=["监控"], responses={200: "DeviceMetricOverrideItem"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceMetricOverrideUpsert"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -135,7 +135,7 @@ def list_escalation_policies():
 
 
 @monitor_bp.route("/escalation-policies", methods=["POST"])
-@doc(summary="创建升级策略", tags=["监控"], responses={200: "MonitorEscalationPolicyItem"})
+@doc(summary="创建升级策略", tags=["监控"], responses={200: "MonitorEscalationPolicyItem"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorEscalationPolicyCreate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -153,7 +153,7 @@ def create_escalation_policy():
 
 
 @monitor_bp.route("/escalation-policies/<int:policy_id>", methods=["PATCH"])
-@doc(summary="更新升级策略", tags=["监控"], responses={200: "MonitorEscalationPolicyItem"})
+@doc(summary="更新升级策略", tags=["监控"], responses={200: "MonitorEscalationPolicyItem"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorEscalationPolicyUpdate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -193,7 +193,7 @@ def list_alert_dependency_rules():
 
 
 @monitor_bp.route("/alert-dependency-rules", methods=["POST"])
-@doc(summary="创建告警依赖抑制规则", tags=["监控"], responses={200: "MonitorAlertDependencyRuleItem"})
+@doc(summary="创建告警依赖抑制规则", tags=["监控"], responses={200: "MonitorAlertDependencyRuleItem"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorAlertDependencyRuleCreate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -211,7 +211,7 @@ def create_alert_dependency_rule():
 
 
 @monitor_bp.route("/alert-dependency-rules/<int:rule_id>", methods=["PATCH"])
-@doc(summary="更新告警依赖抑制规则", tags=["监控"], responses={200: "MonitorAlertDependencyRuleItem"})
+@doc(summary="更新告警依赖抑制规则", tags=["监控"], responses={200: "MonitorAlertDependencyRuleItem"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorAlertDependencyRuleUpdate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -251,7 +251,7 @@ def list_sla_targets():
 
 
 @monitor_bp.route("/sla-targets", methods=["POST"])
-@doc(summary="创建 SLA 目标", tags=["监控"], responses={200: "MonitorSlaTargetItem"})
+@doc(summary="创建 SLA 目标", tags=["监控"], responses={200: "MonitorSlaTargetItem"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorSlaTargetCreate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
@@ -269,7 +269,7 @@ def create_sla_target():
 
 
 @monitor_bp.route("/sla-targets/<int:target_id>", methods=["PATCH"])
-@doc(summary="更新 SLA 目标", tags=["监控"], responses={200: "MonitorSlaTargetItem"})
+@doc(summary="更新 SLA 目标", tags=["监控"], responses={200: "MonitorSlaTargetItem"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorSlaTargetUpdate"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional

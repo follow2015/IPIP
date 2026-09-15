@@ -10,6 +10,7 @@
  * 约束：绝不渲染凭据明文；列表只展示 name/protocol/linked_count。
  */
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Select,
@@ -62,7 +63,7 @@ export default function CredentialTab({ device }: { device: Device }) {
   const [protocol, setProtocol] = useState<string>('snmp');
   const [selectedCredId, setSelectedCredId] = useState<number | undefined>(undefined);
 
-  const [editOpen, setEditOpen] = useState(false);
+  const edit = useDisclosure();
   const [editTarget, setEditTarget] = useState<{ protocol: string; credentialId: number } | null>(
     null
   );
@@ -215,7 +216,7 @@ export default function CredentialTab({ device }: { device: Device }) {
 
   const handleOpenEdit = (p: string, credentialId: number) => {
     setEditTarget({ protocol: p, credentialId });
-    setEditOpen(true);
+    edit.open();
   };
 
   const editInitialValues = (() => {
@@ -257,7 +258,7 @@ export default function CredentialTab({ device }: { device: Device }) {
     try {
       await updateDeviceCred.mutateAsync({ payload, name: (values.name as string) || undefined });
       message.success('本机凭据已更新');
-      setEditOpen(false);
+      edit.close();
       editForm.resetFields();
     } catch (err) {
       message.error(err instanceof Error ? err.message : '更新失败');
@@ -433,9 +434,9 @@ export default function CredentialTab({ device }: { device: Device }) {
       {/* 4. 本机编辑密文弹窗（P0-2 设备级） */}
       <Modal
         title={`编辑本机凭据密文（${editTarget?.protocol ?? ''}）`}
-        open={editOpen}
+        open={edit.isOpen}
         onCancel={() => {
-          setEditOpen(false);
+          edit.close();
           editForm.resetFields();
         }}
         onOk={handleSubmitEdit}

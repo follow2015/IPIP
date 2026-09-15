@@ -15,8 +15,7 @@ from flask import Blueprint, request, g
 
 from app.api.base import APIResponse
 from app.openapi.doc import doc
-from app.utils.admin_guard import require_admin
-from app.utils.auth import login_required
+from app.utils.auth import login_required, permission_required
 from app.utils.transactional import transactional
 
 logger = get_logger(__name__)
@@ -65,23 +64,19 @@ def _get_smtp_params(data: dict | None = None) -> dict:
 @router.route("", methods=["GET"])
 @doc(summary="获取邮件服务器配置", tags=["邮件配置"], responses={200: "ApiResponse"})
 @login_required
+@permission_required("system:config")
 def get_mail_config():
     """获取当前邮件服务器配置（管理员），密码脱敏。"""
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     return APIResponse.success(data=_get_db_config())
 
 
 @router.route("", methods=["PUT"])
-@doc(summary="更新邮件服务器配置", tags=["邮件配置"], responses={200: "ApiResponse"})
+@doc(summary="更新邮件服务器配置", tags=["邮件配置"], responses={200: "ApiResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MailConfigUpdateRequest"}}}})
 @login_required
+@permission_required("system:config")
 @transactional
 def update_mail_config():
     """更新邮件服务器配置（管理员），写入数据库。"""
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     data = request.get_json()
     if not data:
         return APIResponse.error("请求数据不能为空")
@@ -128,12 +123,10 @@ def update_mail_config():
 @router.route("", methods=["DELETE"])
 @doc(summary="删除邮件服务器配置", tags=["邮件配置"], responses={200: "ApiResponse"})
 @login_required
+@permission_required("system:config")
 @transactional
 def delete_mail_config():
     """删除邮件服务器配置（管理员），清空数据库中的所有配置项。"""
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     try:
         from app.models.mail_setting import MailSetting
         MailSetting.delete_all()
@@ -146,8 +139,9 @@ def delete_mail_config():
 
 
 @router.route("/test", methods=["POST"])
-@doc(summary="测试邮件服务器连通性", tags=["邮件配置"], responses={200: "ApiResponse"})
+@doc(summary="测试邮件服务器连通性", tags=["邮件配置"], responses={200: "ApiResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MailConfigTestRequest"}}}})
 @login_required
+@permission_required("system:config")
 def test_mail_config():
     """测试邮件服务器连通性（管理员），发送一封测试邮件。
 
@@ -155,9 +149,6 @@ def test_mail_config():
     - recipient: 收件人邮箱地址（必填）
     - 其余字段用于测试未保存的配置（可选）
     """
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     data = request.get_json(silent=True) or {}
     recipient = data.get("recipient", "").strip()
     if not recipient:

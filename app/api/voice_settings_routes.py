@@ -9,8 +9,7 @@ from flask import Blueprint, request, g
 from app.exceptions import PresetResponseError
 from app.api.base import APIResponse
 from app.openapi.doc import doc
-from app.utils.admin_guard import require_admin
-from app.utils.auth import login_required
+from app.utils.auth import login_required, permission_required
 from app.utils.transactional import transactional
 from app.utils.logging import get_logger
 
@@ -31,25 +30,21 @@ _NUMERIC_RANGES = {
 @router.route("", methods=["GET"])
 @doc(summary="获取语音通知配置", tags=["语音配置"], responses={200: "VoiceConfig"})
 @login_required
+@permission_required("system:config")
 def get_voice_config():
     """获取语音通知配置（管理员），敏感字段脱敏。"""
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     from app.models.voice_setting import VoiceSetting
 
     return APIResponse.success(data=VoiceSetting.get_all())
 
 
 @router.route("", methods=["PUT"])
-@doc(summary="更新语音通知配置", tags=["语音配置"], responses={200: "VoiceConfig"})
+@doc(summary="更新语音通知配置", tags=["语音配置"], responses={200: "VoiceConfig"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/VoiceConfigUpdateRequest"}}}})
 @login_required
+@permission_required("system:config")
 @transactional
 def update_voice_config():
     """更新语音通知配置（管理员）。"""
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     data = request.get_json() or {}
     if not data:
         return APIResponse.error("请求数据不能为空")
@@ -97,6 +92,7 @@ def update_voice_config():
 @router.route("/test", methods=["POST"])
 @doc(summary="测试语音呼叫", tags=["语音配置"], responses={200: "ApiResponse"})
 @login_required
+@permission_required("system:config")
 def test_voice_call():
     """向当前管理员的 contact_phone 发起一次测试呼叫（异步全链路）。
 
@@ -108,9 +104,6 @@ def test_voice_call():
         200 {task_id, receipt_id}：前端可提示"已发起，请留意手机"。
         呼叫结果经回调写入 receipt，可在通知中心查看。
     """
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     from app.models.user import User
     from app.models.voice_setting import VoiceSetting
     from app.models.notification import Notification, NotificationReceipt
@@ -175,11 +168,9 @@ def test_voice_call():
 @router.route("/status", methods=["GET"])
 @doc(summary="查询语音渠道就绪状态", tags=["语音配置"], responses={200: "VoiceChannelStatus"})
 @login_required
+@permission_required("system:config")
 def voice_channel_status():
     """返回语音渠道是否就绪及缺失的配置项，便于前端引导配置。"""
-    if not require_admin():
-        return APIResponse.error("权限不足", "FORBIDDEN", 403)
-
     from app.models.voice_setting import VoiceSetting
     from app.services.channels.voice_providers import get_voice_provider
 

@@ -1,6 +1,7 @@
 import { useConfirm } from '@/utils/confirm';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import { Button, Space, Tag, Popover, Segmented, Collapse, Card, Input, Typography } from 'antd';
 import {
   PlusOutlined,
@@ -42,12 +43,12 @@ function Switches() {
   const table = useTable();
   const navigate = useNavigate();
 
-  const [formOpen, setFormOpen] = useState(false);
+  const form = useDisclosure();
   const [editRecord, setEditRecord] = useState<Switch | null>(null);
-  const [deviceFormOpen, setDeviceFormOpen] = useState(false);
+  const deviceForm = useDisclosure();
   const [deviceEditRecord, setDeviceEditRecord] = useState<Device | null>(null);
   const [groupMode, setGroupMode] = useState<'group' | 'flat'>('group');
-  const [batchUpdateOpen, setBatchUpdateOpen] = useState(false);
+  const batchUpdate = useDisclosure();
   const [batchUpdateTargets, setBatchUpdateTargets] = useState<Switch[]>([]);
   const deleteSwitch = useDeleteSwitch();
   const scanRoom = useScanRoom();
@@ -132,15 +133,15 @@ function Switches() {
 
   const handleAdd = () => {
     setDeviceEditRecord(null);
-    setDeviceFormOpen(true);
+    deviceForm.open();
   };
   const handleEdit = (r: Switch) => {
     setEditRecord(r);
-    setFormOpen(true);
+    form.open();
   };
   const handleFullEdit = (r: Switch) => {
     setDeviceEditRecord({ id: r.device_id } as Device);
-    setDeviceFormOpen(true);
+    deviceForm.open();
   };
   const handleDetail = (r: Switch) => navigate(`/switches/${r.device_id}`);
   const confirmAction = useConfirmAction();
@@ -360,7 +361,7 @@ function Switches() {
       return;
     }
     setBatchUpdateTargets(targets);
-    setBatchUpdateOpen(true);
+    batchUpdate.open();
   };
 
   const filterAndActions = (
@@ -508,32 +509,32 @@ function Switches() {
         </Card>
       )}
       <SwitchForm
-        open={formOpen}
+        open={form.isOpen}
         editRecord={editRecord}
         onClose={() => {
-          setFormOpen(false);
+          form.close();
           setEditRecord(null);
           refetch();
         }}
       />
       {/* DeviceForm：新增交换机 + 完整编辑 */}
       <DeviceForm
-        open={deviceFormOpen}
+        open={deviceForm.isOpen}
         editRecord={null}
         editDeviceId={deviceEditRecord?.id}
         defaultDeviceType={deviceEditRecord ? undefined : DeviceType.NETWORK}
         onClose={() => {
-          setDeviceFormOpen(false);
+          deviceForm.close();
           setDeviceEditRecord(null);
           refetch();
         }}
       />
       {/* 批量修改远程信息 */}
       <BatchUpdateSwitchModal
-        open={batchUpdateOpen}
+        open={batchUpdate.isOpen}
         selectedSwitches={batchUpdateTargets}
         onClose={() => {
-          setBatchUpdateOpen(false);
+          batchUpdate.close();
           batch.clear();
           refetch();
         }}

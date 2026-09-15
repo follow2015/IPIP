@@ -60,7 +60,7 @@ def _reject_managed_or_400(device_id):
 
 
 @router.route("/<int:device_id>/ports", methods=["POST"])
-@doc(summary="手动创建端口", tags=["设备"], responses={200: "ApiResponse", 409: "ApiError"})
+@doc(summary="手动创建端口", tags=["设备"], responses={200: "ApiResponse", 409: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/PortCreateRequest"}}}})
 @login_required
 @permission_required("device:update")
 @transactional
@@ -83,6 +83,7 @@ def create_port(device_id):
 @router.route("/<int:device_id>/ports/<path:port_name>", methods=["GET"])
 @doc(summary="获取端口详情", tags=["设备"], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
+@permission_required("device:view")
 def get_port(device_id, port_name):
     """获取端口详情"""
     from app.persistence.switch_port_repository import NetworkPortRepository
@@ -94,7 +95,7 @@ def get_port(device_id, port_name):
 
 
 @router.route("/<int:device_id>/ports/<path:port_name>", methods=["PUT"])
-@doc(summary="更新端口", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="更新端口", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/PortUpdateRequest"}}}})
 @login_required
 @permission_required("device:update")
 @transactional
@@ -147,6 +148,7 @@ def delete_port(device_id, port_name):
 @router.route("/<int:device_id>/vlans/<int:vlan_db_id>", methods=["GET"])
 @doc(summary="获取VLAN详情", tags=["设备"], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
+@permission_required("device:view")
 def get_vlan(device_id, vlan_db_id):
     """获取 VLAN 详情"""
     from app.services.vlan_service import VLANService
@@ -182,6 +184,7 @@ def delete_vlan(device_id, vlan_db_id):
 @router.route("/<int:device_id>/port-channels/<int:lag_id>", methods=["GET"])
 @doc(summary="获取LAG详情", tags=["设备"], responses={200: "ApiResponse", 404: "ApiError"})
 @login_required
+@permission_required("device:view")
 def get_lag(device_id, lag_id):
     """获取 LAG 详情"""
     from app.services.link_aggregation_service import LinkAggregationService
@@ -195,7 +198,7 @@ def get_lag(device_id, lag_id):
 
 
 @router.route("/<int:device_id>/connections", methods=["POST"])
-@doc(summary="创建D2N连接", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="创建D2N连接", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceConnectionCreate"}}}})
 @login_required
 @permission_required("device:update")
 @transactional
@@ -211,7 +214,7 @@ def create_connection(device_id):
 
 
 @router.route("/<int:device_id>/connections/<int:conn_id>", methods=["PUT"])
-@doc(summary="更新连接", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError"})
+@doc(summary="更新连接", tags=["设备"], responses={200: "ApiResponse", 400: "ApiError"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceConnectionUpdate"}}}})
 @login_required
 @permission_required("device:update")
 @transactional
@@ -275,7 +278,7 @@ def get_port_sync_enabled(device_id: int):
 
 
 @router.route("/<int:device_id>/port-sync-enabled", methods=["PUT"])
-@doc(summary="设置设备端口同步开关", tags=["设备"], responses={200: "DevicePortSyncEnabledUpdateResponse"})
+@doc(summary="设置设备端口同步开关", tags=["设备"], responses={200: "DevicePortSyncEnabledUpdateResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/PortSyncEnabledUpdateRequest"}}}})
 @login_required
 @permission_required("device:update")
 @transactional

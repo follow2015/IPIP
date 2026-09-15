@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Tag,
@@ -48,7 +49,7 @@ export default function Skills() {
   const confirm = useConfirm();
   const [skills, setSkills] = useState<SkillSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawer = useDisclosure();
   const [detail, setDetail] = useState<SkillDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const message = useMessage();
@@ -98,7 +99,7 @@ export default function Skills() {
   };
 
   const handleViewDetail = async (name: string) => {
-    setDrawerOpen(true);
+    drawer.open();
     setDetailLoading(true);
     try {
       const data = await getSkill(name);
@@ -122,7 +123,7 @@ export default function Skills() {
     }
   };
 
-  const [editOpen, setEditOpen] = useState(false);
+  const edit = useDisclosure();
   const [editInitial, setEditInitial] = useState<SkillWritePayload | undefined>();
   const [editMode, setEditMode] = useState<'create' | 'update'>('create');
   const [submitting, setSubmitting] = useState(false);
@@ -130,7 +131,7 @@ export default function Skills() {
   const handleCreate = () => {
     setEditMode('create');
     setEditInitial(undefined);
-    setEditOpen(true);
+    edit.open();
   };
 
   const handleEdit = async (name: string) => {
@@ -139,7 +140,7 @@ export default function Skills() {
       const { source: _s, enabled: _e, _path: _p, ...payload } = detail;
       setEditMode('update');
       setEditInitial(payload as SkillWritePayload);
-      setEditOpen(true);
+      edit.open();
     } catch (err) {
       message.error(err instanceof Error ? err.message : '加载技能详情失败');
     }
@@ -165,7 +166,7 @@ export default function Skills() {
         await updateSkillContent(payload.name, payload);
         message.success('已保存');
       }
-      setEditOpen(false);
+      edit.close();
       fetchSkills();
     } catch (err) {
       message.error(err instanceof Error ? err.message : '保存失败');
@@ -338,9 +339,9 @@ export default function Skills() {
 
       <Drawer
         title="技能详情"
-        open={drawerOpen}
+        open={drawer.isOpen}
         onClose={() => {
-          setDrawerOpen(false);
+          drawer.close();
           setDetail(null);
         }}
         width="90%"
@@ -436,8 +437,8 @@ export default function Skills() {
       {/* 创建/编辑技能 Modal（方案 §4.3） */}
       <Modal
         title={editMode === 'create' ? '新建技能' : '编辑技能'}
-        open={editOpen}
-        onCancel={() => setEditOpen(false)}
+        open={edit.isOpen}
+        onCancel={() => edit.close()}
         footer={null}
         width="90%"
         style={{ maxWidth: 720 }}
@@ -446,7 +447,7 @@ export default function Skills() {
         <SkillEditForm
           initial={editInitial}
           onSubmit={handleSubmit}
-          onCancel={() => setEditOpen(false)}
+          onCancel={() => edit.close()}
           submitting={submitting}
         />
       </Modal>

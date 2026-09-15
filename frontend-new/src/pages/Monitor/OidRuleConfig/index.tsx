@@ -8,6 +8,7 @@
  * 厂商品牌管理已迁移至独立页面 /asset/vendor-brands（资产管理分组下）
  */
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Tabs,
@@ -66,7 +67,7 @@ function CategoryRulesTab() {
   const updateMut = useUpdateOidCategoryRule();
   const deleteMut = useDeleteOidCategoryRule();
   const message = useMessage();
-  const [modalOpen, setModalOpen] = useState(false);
+  const modal = useDisclosure();
   const [editing, setEditing] = useState<OidCategoryRule | null>(null);
   const [form] = Form.useForm();
   const watchDeviceType = Form.useWatch('device_type', form) ?? '';
@@ -100,7 +101,7 @@ function CategoryRulesTab() {
     setEditing(null);
     form.resetFields();
     form.setFieldsValue({ priority: 10, enabled: true, device_type: '', vendor_id: '' });
-    setModalOpen(true);
+    modal.open();
   };
 
   const openEdit = (rule: OidCategoryRule) => {
@@ -110,7 +111,7 @@ function CategoryRulesTab() {
       device_type: rule.device_type ?? '',
       vendor_id: rule.vendor_id ?? ''
     });
-    setModalOpen(true);
+    modal.open();
   };
 
   const handleSave = async () => {
@@ -128,7 +129,7 @@ function CategoryRulesTab() {
         await createMut.mutateAsync(payload);
         message.success('新增成功');
       }
-      setModalOpen(false);
+      modal.close();
     } catch (err: unknown) {
       message.error(err instanceof Error ? err.message : '保存失败');
     }
@@ -241,9 +242,9 @@ function CategoryRulesTab() {
       />
       <Modal
         title={editing ? '编辑规则' : '新增规则'}
-        open={modalOpen}
+        open={modal.isOpen}
         onOk={handleSave}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => modal.close()}
         confirmLoading={createMut.isPending || updateMut.isPending}
         width={560}
       >

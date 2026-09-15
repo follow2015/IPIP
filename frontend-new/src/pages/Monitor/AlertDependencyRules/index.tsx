@@ -8,6 +8,7 @@
  * 手动规则：在此页显式配置上游→下游的依赖关系，可覆盖/补充自动推断
  */
 import { useState } from 'react';
+import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
   Button,
@@ -53,7 +54,7 @@ export default function AlertDependencyRulesPage() {
   const createMut = useCreateAlertDependencyRule();
   const updateMut = useUpdateAlertDependencyRule();
   const deleteMut = useDeleteAlertDependencyRule();
-  const [modalOpen, setModalOpen] = useState(false);
+  const modal = useDisclosure();
   const [editing, setEditing] = useState<MonitorAlertDependencyRule | null>(null);
   const message = useMessage();
   const [form] = Form.useForm<{
@@ -72,7 +73,7 @@ export default function AlertDependencyRulesPage() {
     setEditing(null);
     form.resetFields();
     form.setFieldsValue({ enabled: true });
-    setModalOpen(true);
+    modal.open();
   };
 
   const openEdit = (record: MonitorAlertDependencyRule) => {
@@ -85,7 +86,7 @@ export default function AlertDependencyRulesPage() {
       reason: record.reason ?? undefined,
       enabled: record.enabled
     });
-    setModalOpen(true);
+    modal.open();
   };
 
   const handleSubmit = async () => {
@@ -110,7 +111,7 @@ export default function AlertDependencyRulesPage() {
         await createMut.mutateAsync(payload);
         message.success('已创建');
       }
-      setModalOpen(false);
+      modal.close();
     } catch (err: unknown) {
       if (err instanceof Error && err.message) message.error(err.message);
     }
@@ -219,9 +220,9 @@ export default function AlertDependencyRulesPage() {
 
       <Modal
         title={editing ? '编辑依赖抑制规则' : '新建依赖抑制规则'}
-        open={modalOpen}
+        open={modal.isOpen}
         onOk={handleSubmit}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => modal.close()}
         confirmLoading={createMut.isPending || updateMut.isPending}
         width={560}
         destroyOnHidden

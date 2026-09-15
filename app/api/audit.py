@@ -7,7 +7,7 @@
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema
 
 from app.api.base import APIResponse
 from app.services.audit_service import AuditService
@@ -23,19 +23,7 @@ _audit_service = AuditService()
 
 
 
-class AuditLogQuerySchema(Schema):
-    """审计日志查询参数"""
-    user_id = fields.Int(load_default=None)
-    action = fields.Str(load_default=None)
-    resource = fields.Str(load_default=None)
-    resource_id = fields.Int(load_default=None)
-    start_time = fields.Str(load_default=None, metadata={"description": "起始时间 ISO8601"})
-    end_time = fields.Str(load_default=None, metadata={"description": "结束时间 ISO8601"})
-    page = fields.Int(load_default=1, validate=validate.Range(min=1))
-    per_page = fields.Int(load_default=20, validate=validate.Range(min=1, max=100))
-
-
-
+from app.schemas.audit import AuditLogQuerySchema
 
 @audit_bp.route("/logs", methods=["GET"])
 @doc(summary="查询审计日志", tags=["审计"], responses={200: "AuditLogResponse", 401: "ApiError"})
