@@ -12,6 +12,7 @@ from marshmallow import Schema, fields, validate
 from app.api.base import APIResponse
 from app.services.vlan_service import VLANService
 from app.persistence.vlan_repository import VLANRepository
+from app.exceptions import PresetResponseError
 from app.exceptions.validation import ValidationError
 from app.exceptions.data_access import RecordNotFoundError
 from app.openapi.doc import doc, public
@@ -130,7 +131,9 @@ def create_vlan():
         vlan = _vlan_service.create(data)
         return APIResponse.success(data=vlan.to_dict(), message="VLAN创建成功", status_code=201)
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="VLAN_CONFLICT", status_code=409)
+        raise PresetResponseError(
+            message=str(e), error_code="VLAN_CONFLICT", status_code=409
+        ) from e
 
 
 @vlan_bp.route("/<int:vlan_id>", methods=["PUT"])
@@ -149,9 +152,13 @@ def update_vlan(vlan_id):
         vlan = _vlan_service.update(vlan_id, data)
         return APIResponse.success(data=vlan.to_dict(), message="VLAN更新成功")
     except RecordNotFoundError as e:
-        return APIResponse.error(str(e), error_code="VLAN_NOT_FOUND", status_code=404)
+        raise PresetResponseError(
+            message=str(e), error_code="VLAN_NOT_FOUND", status_code=404
+        ) from e
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="VALIDATION_ERROR", status_code=422)
+        raise PresetResponseError(
+            message=str(e), error_code="VALIDATION_ERROR", status_code=422
+        ) from e
 
 
 @vlan_bp.route("/<int:vlan_id>", methods=["DELETE"])

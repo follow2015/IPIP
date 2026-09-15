@@ -16,6 +16,7 @@ from app.services import DeviceService, CabinetService
 from app.services.network_device_service import NetworkDeviceService
 from app.api.monitor import monitor_service
 from app.api.base import APIResponse
+from app.exceptions import PresetResponseError
 from app.utils import (
     login_required,
     permission_required,
@@ -493,18 +494,10 @@ def create_device():
 
     switch_config = data.pop("switch_config", None)
     if device_type == "network" and switch_config and isinstance(switch_config, dict):
-        try:
-            nd_svc = NetworkDeviceService()
-            device, _switch = nd_svc.create_network_device(data, switch_config)
-        except Exception as e:
-            logger.error("网络设备创建失败: %s", e)
-            return APIResponse.error(message="网络设备创建失败", error_code="DEVICE_CREATE_ERROR", status_code=500)
+        nd_svc = NetworkDeviceService()
+        device, _switch = nd_svc.create_network_device(data, switch_config)
     else:
-        try:
-            device = device_service.create_device(data)
-        except Exception as e:
-            logger.error("设备创建失败: %s", e)
-            return APIResponse.error(message="设备创建失败", error_code="DEVICE_CREATE_ERROR", status_code=500)
+        device = device_service.create_device(data)
 
     return APIResponse.success(data=device.to_dict(), message="设备创建成功", status_code=201)
 
@@ -571,25 +564,17 @@ def update_device(device_id):
     switch_config = data.pop("switch_config", None)
     effective_device_type = data.get("device_type") or device.device_type
     if effective_device_type == "network" and switch_config and isinstance(switch_config, dict):
-        try:
-            nd_svc = NetworkDeviceService()
-            updated_device = nd_svc.update_network_device(device_id, data, switch_config)
-        except Exception as e:
-            logger.error("网络设备更新失败: %s", e)
-            return APIResponse.error(message="网络设备更新失败", error_code="DEVICE_UPDATE_ERROR", status_code=500)
+        nd_svc = NetworkDeviceService()
+        updated_device = nd_svc.update_network_device(device_id, data, switch_config)
     else:
-        try:
-            updated_device = device_service.update_device(
-                device_id, data,
-                auto_create_nodes=auto_create_nodes,
-                node_hardware=node_hardware,
-                storage_items=storage_items,
-                nic_ports=nic_ports,
-                overwrite_nodes=overwrite_nodes,
-            )
-        except Exception as e:
-            logger.error("设备更新失败: %s", e)
-            return APIResponse.error(message="设备更新失败", error_code="DEVICE_UPDATE_ERROR", status_code=500)
+        updated_device = device_service.update_device(
+            device_id, data,
+            auto_create_nodes=auto_create_nodes,
+            node_hardware=node_hardware,
+            storage_items=storage_items,
+            nic_ports=nic_ports,
+            overwrite_nodes=overwrite_nodes,
+        )
 
     return APIResponse.success(data=updated_device.to_dict(), message="设备更新成功")
 
@@ -617,7 +602,9 @@ def delete_device(device_id):
         device_service.delete_device(device_id)
     except Exception as e:
         logger.error("设备删除失败: %s", e)
-        return APIResponse.error(message="设备删除失败", error_code="DEVICE_DELETE_ERROR", status_code=500)
+        raise PresetResponseError(
+            message="设备删除失败", error_code="DEVICE_DELETE_ERROR", status_code=500
+        ) from e
 
     return APIResponse.success(message="设备删除成功")
 
@@ -790,7 +777,7 @@ def update_switch_port(port_id):
         return APIResponse.error(message="端口更新失败", error_code="UPDATE_FAILED", status_code=500)
     except Exception as e:
         logger.error("更新端口失败: port_id=%d, error=%s", port_id, e)
-        return APIResponse.error(message="操作失败", status_code=500)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/switch-ports/batch", methods=["POST"])
@@ -846,7 +833,7 @@ def batch_create_switch_ports():
         )
     except Exception as e:
         logger.error("批量创建端口失败: %s", str(e), exc_info=True)
-        return APIResponse.error(message="操作失败", status_code=500)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/switch-ports/device/<int:device_id>", methods=["DELETE"])
@@ -876,7 +863,7 @@ def delete_device_switch_ports(device_id):
         )
     except Exception as e:
         logger.error("删除设备端口失败: device_id=%d, error=%s", device_id, str(e))
-        return APIResponse.error(message="删除设备端口失败", status_code=500)
+        raise PresetResponseError(message="删除设备端口失败", status_code=500) from e
 
 
 @device_bp.route("/batch-delete", methods=["POST"])
@@ -1016,10 +1003,12 @@ def restore_device(device_id):
                 error_code="LOCATION_CONFLICT", status_code=409
             )
     except ValidationError as e:
-        return APIResponse.error(message=str(e), status_code=400)
+        raise PresetResponseError(message=str(e), status_code=400) from e
     except Exception as e:
         logger.error("恢复设备 %d 失败: %s", device_id, str(e))
-        return APIResponse.error(message="恢复设备失败", error_code="DEVICE_RESTORE_ERROR", status_code=500)
+        raise PresetResponseError(
+            message="恢复设备失败", error_code="DEVICE_RESTORE_ERROR", status_code=500
+        ) from e
 
 
 @device_bp.route("/batch-restore", methods=["POST"])
@@ -1052,7 +1041,9 @@ def batch_restore_devices():
         )
     except Exception as e:
         logger.error("批量恢复设备失败: %s", str(e))
-        return APIResponse.error(message="批量恢复设备失败", error_code="BATCH_RESTORE_ERROR", status_code=500)
+        raise PresetResponseError(
+            message="批量恢复设备失败", error_code="BATCH_RESTORE_ERROR", status_code=500
+        ) from e
     return APIResponse.success(data=result, message=f"成功恢复 {len(result['success'])} 个设备")
 
 
@@ -1070,10 +1061,14 @@ def permanent_delete_device(device_id):
 
         return APIResponse.success(message="设备已永久删除")
     except ValidationError as e:
-        return APIResponse.error(message=str(e), status_code=400)
+        raise PresetResponseError(message=str(e), status_code=400) from e
     except Exception as e:
         logger.error("永久删除设备 %d 失败: %s", device_id, str(e))
-        return APIResponse.error(message="永久删除设备失败", error_code="DEVICE_PERMANENT_DELETE_ERROR", status_code=500)
+        raise PresetResponseError(
+            message="永久删除设备失败",
+            error_code="DEVICE_PERMANENT_DELETE_ERROR",
+            status_code=500,
+        ) from e
 
 
 @device_bp.route("/batch-permanent-delete", methods=["POST"])
@@ -1414,10 +1409,10 @@ def change_device_status(device_id):
 
         return APIResponse.success(message="设备状态更新成功")
     except ValueError as e:
-        return APIResponse.error(message=str(e), status_code=400)
+        raise PresetResponseError(message=str(e), status_code=400) from e
     except Exception as e:
         logger.error("更改设备状态失败: %s", str(e))
-        return APIResponse.error(message="操作失败", status_code=500)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/<int:device_id>/location", methods=["PUT"])
@@ -1451,10 +1446,10 @@ def update_device_location(device_id):
 
         return APIResponse.success(message="设备位置更新成功")
     except ValueError as e:
-        return APIResponse.error(message=str(e), status_code=400)
+        raise PresetResponseError(message=str(e), status_code=400) from e
     except Exception as e:
         logger.error("更新设备位置失败: %s", str(e))
-        return APIResponse.error(message="操作失败", status_code=500)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/batch-update-status", methods=["POST"])
@@ -1490,10 +1485,10 @@ def batch_update_device_status():
 
         return APIResponse.success(message=f"成功更新 {len(device_ids)} 台设备状态")
     except ValueError as e:
-        return APIResponse.error(message=str(e), status_code=400)
+        raise PresetResponseError(message=str(e), status_code=400) from e
     except Exception as e:
         logger.error("批量更新设备状态失败: %s", str(e))
-        return APIResponse.error(message="操作失败", status_code=500)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/batch-update-hardware", methods=["POST"])
@@ -1527,7 +1522,7 @@ def batch_update_device_hardware():
         return APIResponse.success(data=result, message=f"更新 {result['updated']} 台，跳过 {result['skipped']} 台")
     except Exception as e:
         logger.error("批量更新硬件配置失败: %s", str(e))
-        return APIResponse.error(message="操作失败", status_code=500)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/batch-update-asset", methods=["POST"])
@@ -1568,7 +1563,7 @@ def batch_update_device_asset():
         return APIResponse.success(data=result, message=f"更新 {result['updated']} 台，跳过 {result['skipped']} 台")
     except Exception as e:
         logger.error("批量更新资产信息失败: %s", str(e))
-        return APIResponse.error(message="操作失败", status_code=500)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/batch-metric-template-group", methods=["POST"])
@@ -1599,7 +1594,7 @@ def batch_update_device_metric_template_group():
         )
     except Exception as e:
         logger.error("批量更新指标模板组失败: %s", str(e))
-        return APIResponse.error(message=str(e), status_code=400)
+        raise PresetResponseError(message=str(e), status_code=400) from e
 
 
 @device_bp.route("/batch-port-sync-enabled", methods=["POST"])
@@ -1640,7 +1635,7 @@ def batch_update_device_port_sync_enabled():
         )
     except Exception as e:
         logger.error("批量更新端口同步开关失败: %s", str(e))
-        return APIResponse.error(message=str(e), status_code=400)
+        raise PresetResponseError(message=str(e), status_code=400) from e
 
 
 @device_bp.route("/batch-update-config", methods=["POST"])
@@ -1687,7 +1682,7 @@ def batch_update_device_config():
         )
     except Exception as e:
         logger.error("批量修改设备配置失败: %s", str(e), exc_info=True)
-        return APIResponse.error(message="操作失败", status_code=500)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/batch-reset-asset", methods=["POST"])
@@ -1719,7 +1714,7 @@ def batch_reset_device_asset():
         return APIResponse.success(data=result, message=f"重置 {result['updated']} 台，跳过 {result['skipped']} 台")
     except Exception as e:
         logger.error("批量重置资产信息失败: %s", str(e))
-        return APIResponse.error(message="操作失败", status_code=500)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/generate-serial-number", methods=["POST"])
@@ -1901,10 +1896,14 @@ def swap_node_positions(chassis_id):
     try:
         result = device_service.swap_node_positions(chassis_id, source, target)
     except ValidationError as e:
-        return APIResponse.error(message=str(e), error_code="VALIDATION_ERROR", status_code=400)
+        raise PresetResponseError(
+            message=str(e), error_code="VALIDATION_ERROR", status_code=400
+        ) from e
     except Exception as e:  # noqa: BLE001
         logger.error("交换节点位置失败: %s", e)
-        return APIResponse.error(message="交换节点位置失败", error_code="DEVICE_UPDATE_ERROR", status_code=500)
+        raise PresetResponseError(
+            message="交换节点位置失败", error_code="DEVICE_UPDATE_ERROR", status_code=500
+        ) from e
     return APIResponse.success(data=result, message="节点位置已更新")
 
 
@@ -1958,7 +1957,9 @@ def create_device_vlan(device_id):
         vlan = vlan_svc.create(data)
         return APIResponse.success(data=vlan.to_dict(), message="VLAN创建成功", status_code=201)
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="VLAN_CONFLICT", status_code=409)
+        raise PresetResponseError(
+            message=str(e), error_code="VLAN_CONFLICT", status_code=409
+        ) from e
 
 
 @device_bp.route("/<int:device_id>/vlans/<int:vlan_db_id>/members", methods=["GET"])
@@ -2160,7 +2161,9 @@ def create_device_port_channel(device_id):
         group = lag_svc.create(data)
         return APIResponse.success(data=group.to_dict(), message="链路聚合组创建成功", status_code=201)
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="LAG_CONFLICT", status_code=409)
+        raise PresetResponseError(
+            message=str(e), error_code="LAG_CONFLICT", status_code=409
+        ) from e
 
 
 @device_bp.route("/<int:device_id>/port-channels/<int:lag_id>", methods=["DELETE"])

@@ -1,12 +1,3 @@
-/**
- * Axios 实例 + 请求/响应拦截器
- *
- * 改动说明（重构）：
- * - post / put 的 data 参数改为泛型 D extends object，消除调用方 33 处 `as unknown as` 强制转换
- * - handleUnauthorized 防重入逻辑不变，注释更清晰
- * - Token 自动刷新：401 时尝试用 refresh_token 换新 access_token
- * - 消除 as any：使用 ApiErrorData 接口替代
- */
 import axios, {
   AxiosError,
   InternalAxiosRequestConfig,
@@ -44,6 +35,18 @@ apiClient.interceptors.request.use(
 
 let isRefreshing = false;
 let pendingRequests: Array<(err?: Error) => void> = [];
+
+function resolvePendingRequests(): void {
+  const waiters = pendingRequests;
+  pendingRequests = [];
+  waiters.forEach((cb) => cb());
+}
+
+function rejectPendingRequests(err: Error): void {
+  const waiters = pendingRequests;
+  pendingRequests = [];
+  waiters.forEach((cb) => cb(err));
+}
 
 async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = sessionStorage.getItem('refresh_token');
@@ -109,30 +112,28 @@ apiClient.interceptors.response.use(
         if (refreshToken) {
           if (!isRefreshing) {
             isRefreshing = true;
+            let newToken: string | null = null;
+            let refreshFailure: Error | null = null;
             try {
-              const newToken = await refreshAccessToken();
-              isRefreshing = false;
-
-              if (newToken) {
-                pendingRequests.forEach((cb) => cb());
-                pendingRequests = [];
-
-                originalRequest._retry = true;
-                originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                return apiClient(originalRequest);
-              } else {
-                const refreshErr = new Error('Token 刷新失败，请重新登录');
-                pendingRequests.forEach((cb) => cb(refreshErr));
-                pendingRequests = [];
-                handleUnauthorized();
-              }
+              newToken = await refreshAccessToken();
             } catch {
+              refreshFailure = new Error('Token 刷新异常，请重新登录');
+            } finally {
               isRefreshing = false;
-              const refreshErr = new Error('Token 刷新异常，请重新登录');
-              pendingRequests.forEach((cb) => cb(refreshErr));
-              pendingRequests = [];
-              handleUnauthorized();
             }
+
+            if (newToken) {
+              resolvePendingRequests();
+
+              originalRequest._retry = true;
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              return apiClient(originalRequest);
+            }
+
+            const refreshErr = refreshFailure ?? new Error('Token 刷新失败，请重新登录');
+            rejectPendingRequests(refreshErr);
+            handleUnauthorized();
+            return Promise.reject(refreshErr);
           }
 
           return new Promise((resolve, reject) => {

@@ -1,28 +1,3 @@
-/**
- * useBatchSelection — 列表页批量选择统一 Hook
- *
- * 解决散落在各页面的重复模式：
- * - 各自 useState(selectedRowKeys) + 手写 rowSelection 对象
- * - rowKey 不统一（"id" / String(id) / "ip_address"）导致 selectedRowKeys 类型混乱
- * - 批量弹窗消费已选行时手写 keySet 过滤 dataSource
- * - 翻页是否保留选择各写各的
- *
- * 本 Hook 统一：
- * 1. 内部把 key 归一化为 string，消除 number/string 混用与 `as number[]` 强转隐患
- * 2. preserveSelectedRowKeys 默认 true（翻页保留已选项）
- * 3. 由 dataSource + getRowKey 自动派生 selectedRows，替换手写的 keySet 过滤
- * 4. 暴露 rowSelection 直接透传给 <Table>/<DataTable rowSelection>
- *
- * 用法：
- * ```tsx
- * const batch = useBatchSelection<Device>({
- *   dataSource: data?.items ?? [],
- *   getRowKey: (r) => String(r.id ?? ''), // 必须与表格 rowKey 完全一致
- * });
- * <DataTable rowSelection={batch.rowSelection} ... />
- * // 批量删除：batch.selectedKeys.map(Number)（内部归一化为 string，消费时需转 number）；弹窗消费：batch.selectedRows
- * ```
- */
 import { useCallback, useMemo, useState } from 'react';
 import type { Key } from 'react';
 import type { TableProps } from 'antd';
@@ -36,13 +11,27 @@ export interface UseBatchSelectionOptions<T> {
 export interface UseBatchSelectionReturn<T> {
   selectedKeys: Key[];
   setSelectedKeys: (keys: Key[]) => void;
-  selectedRows: T[];
-  hasSelection: boolean;
   count: number;
+  completeSelectedRows: T[] | null;
+  unresolvedSelectedCount: number;
+  isSelectionFullyResolved: boolean;
+  hasSelection: boolean;
   rowSelection: TableProps<T>['rowSelection'];
   clear: () => void;
   allCurrentPageSelected: boolean;
   toggleSelectAllOnPage: (rows: T[]) => void;
+}
+
+export function scopeViolationMessage<T>(
+  batch: Pick<UseBatchSelectionReturn<T>, 'unresolvedSelectedCount'>,
+  actionLabel: string,
+  unit = '项'
+): string {
+  return (
+    `「${actionLabel}」需要逐条读取已选内容，仅支持当前页勾选：` +
+    `另有 ${batch.unresolvedSelectedCount} ${unit}已选但不在当前页。` +
+    '请先取消跨页选择（清空后在本页重新勾选）再操作。'
+  );
 }
 
 function defaultGetRowKey<T>(record: T): Key {
@@ -63,12 +52,17 @@ export function useBatchSelection<T extends object>(
 
   const keySet = useMemo(() => new Set(selectedKeys.map(String)), [selectedKeys]);
 
-  const selectedRows = useMemo(() => {
+  const pageSelectedRows = useMemo(() => {
     if (!dataSource) return [];
     return dataSource.filter((r) => keySet.has(String(getRowKey(r))));
   }, [dataSource, keySet, getRowKey]);
 
   const count = selectedKeys.length;
+  const unresolvedSelectedCount = count - pageSelectedRows.length;
+  const isSelectionFullyResolved = unresolvedSelectedCount === 0;
+
+  const completeSelectedRows = isSelectionFullyResolved ? pageSelectedRows : null;
+
   const hasSelection = count > 0;
 
   const rowSelection = useMemo<TableProps<T>['rowSelection']>(
@@ -107,9 +101,11 @@ export function useBatchSelection<T extends object>(
   return {
     selectedKeys,
     setSelectedKeys,
-    selectedRows,
-    hasSelection,
     count,
+    completeSelectedRows,
+    unresolvedSelectedCount,
+    isSelectionFullyResolved,
+    hasSelection,
     rowSelection,
     clear,
     allCurrentPageSelected,

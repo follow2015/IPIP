@@ -6,6 +6,7 @@
 """
 from flask import Blueprint, request, g
 import hashlib
+from app.exceptions import PresetResponseError
 from app.utils.logging import get_logger
 from marshmallow import Schema, fields, validate, EXCLUDE
 from app.utils.time_utils import now_utc_naive
@@ -631,5 +632,5 @@ def rebuild_termination_archive(customer_id):
         archive_repo.save(archive)
     except Exception as e:
         logger.error("重建终止存档 PDF 失败: %s", str(e))
-        return APIResponse.error(message="PDF 重建失败", status_code=500)
+        raise PresetResponseError(message="PDF 重建失败", status_code=500) from e
     return APIResponse.success(message="PDF 重建成功", data={"pdf_size": archive.pdf_size})

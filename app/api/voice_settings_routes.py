@@ -6,6 +6,7 @@
 """
 from flask import Blueprint, request, g
 
+from app.exceptions import PresetResponseError
 from app.api.base import APIResponse
 from app.openapi.doc import doc
 from app.utils.admin_guard import require_admin
@@ -85,10 +86,12 @@ def update_voice_config():
         logger.info("语音通知配置已更新: user_id=%s", g.current_user["user_id"])
         return APIResponse.success(data=VoiceSetting.get_all(), message="配置已保存")
     except ValueError as exc:
-        return APIResponse.error(str(exc))
+        raise PresetResponseError(message=str(exc), status_code=400) from exc
     except Exception as exc:
         logger.exception("语音配置更新失败")
-        return APIResponse.error(f"配置保存失败: {exc}")
+        raise PresetResponseError(
+            message=f"配置保存失败: {exc}", status_code=400
+        ) from exc
 
 
 @router.route("/test", methods=["POST"])

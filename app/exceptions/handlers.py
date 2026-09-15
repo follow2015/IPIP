@@ -12,7 +12,7 @@ from marshmallow import ValidationError as MarshmallowValidationError
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from werkzeug.exceptions import HTTPException
 
-from .base import BaseAppException
+from .base import BaseAppException, PresetResponseError
 from .business import BusinessLogicError
 from .data_access import DataAccessError, DataIntegrityError
 from .system import SystemError
@@ -58,6 +58,33 @@ def register_error_handlers(app: Flask) -> None:
             status_code=error.status_code
         )
     
+    @app.errorhandler(PresetResponseError)
+    def handle_preset_response(error: PresetResponseError) -> Tuple[Dict[str, Any], int]:
+        """还原 API 层预置的业务响应（审计 P0#2 收口）
+
+        与 handle_base_app_exception 的关键差别：本处理器**不把 code 兜底为类名、
+        也不输出 details**，从而与 `APIResponse.error(message, error_code, status_code)`
+        的原行为逐字段一致（error_code 仅显式提供时才出现）。
+
+        抛出方（端点）已负责记录日志，此处不重复记录，避免日志噪声。
+
+        Args:
+            error: 预置响应异常
+
+        Returns:
+            Tuple: (响应数据, HTTP状态码)
+        """
+        logger.debug(
+            "预置响应异常（异常已传播，事务由 @transactional 回滚）: %s - %s",
+            error.error_code, error.message
+        )
+
+        return _api_response().error(
+            message=error.message,
+            error_code=error.error_code,
+            status_code=error.status_code
+        )
+
     @app.errorhandler(ValidationError)
     def handle_validation_error(error: ValidationError) -> Tuple[Dict[str, Any], int]:
         """处理验证错误

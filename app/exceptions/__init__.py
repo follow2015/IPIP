@@ -5,7 +5,7 @@
 提供应用程序的统一异常处理机制。
 """
 
-from .base import BaseAppException
+from .base import BaseAppException, PresetResponseError
 from .business import (
     BusinessLogicError,
     DuplicateUserError,
@@ -52,6 +52,7 @@ from .handlers import register_error_handlers
 
 __all__ = [
     "BaseAppException",
+    "PresetResponseError",
 
     "ValidationError",
     "SchemaValidationError",

@@ -205,10 +205,14 @@ class MetricAlertService:
         静默（G4.1）/风暴抑制（G13）/SSE 权限发布（G1），不再裸入箱。
         """
         from app.models.monitor_alert_outbox import MonitorAlertOutbox
-        from app.services.monitoring.alert_ingress import build_dedup_key
+        from app.services.monitoring.alert_ingress import (
+            build_dedup_key,
+            build_notification_key,
+        )
 
         action = "raise" if breached else "recover"
         idem_key = build_dedup_key(alert_type, device_id, metric_key, index, action)
+        notif_key = build_notification_key(idem_key)
         payload = {
             "type": alert_type,
             "severity": severity,
@@ -219,7 +223,7 @@ class MetricAlertService:
             "source_module": "monitor_metrics",
             "target_type": "device",
             "target_id": device_id,
-            "idempotency_key": idem_key,
+            "idempotency_key": notif_key,
             "allow_broadcast": True,
         }
 

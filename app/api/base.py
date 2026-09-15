@@ -11,6 +11,7 @@ from flask import jsonify, request
 from marshmallow import Schema
 from marshmallow import ValidationError as MarshmallowValidationError
 
+from app.exceptions.base import PresetResponseError
 from app.exceptions.validation import ValidationError
 from app.exceptions.handlers import handle_api_exception
 from app.utils.logging import get_logger
@@ -187,6 +188,8 @@ def api_exception_handler(f):
                 'request_method': request.method
             })
             return APIResponse.error(e.message, "VALIDATION_ERROR", 400)
+        except PresetResponseError:
+            raise
         except Exception as e:
             try:
                 from extensions import db

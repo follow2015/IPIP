@@ -62,6 +62,21 @@ def _load_config():
         )
 
 
+def get_throttle_seconds() -> int:
+    """G13 降频窗口（秒）——供「通知幂等键」按同一窗口对齐幕次。
+
+    ○8（审计 #187）：trap 告警的设计去重语义是**按节流窗口去重**（"300s 节流
+    = 5 分钟去重"）。故其通知幂等键的幕次必须与节流窗口**同桶**：同一窗口内
+    （含降频后聚合放行的那一条）复用同一键 → 真正实现"5 分钟去重"；跨窗口换键
+    → 允许再次通知。桶大小与节流若不一致，节流要么被拆成刷屏（键每桶都不同），
+    要么永久失效（键恒定 → 只发第一次后永远被幂等去重）。
+    """
+    try:
+        return int(_load_config()[3])
+    except Exception:
+        return 300
+
+
 def should_emit(dedup_key: str, now: Optional[float] = None) -> SuppressionDecision:
     """判定一条告警是否应放行。
 

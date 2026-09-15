@@ -4,6 +4,7 @@
 
 提供用户登录、注册、令牌刷新等端点，业务逻辑已移至服务层。
 """
+from app.exceptions import PresetResponseError
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request, g
@@ -692,4 +693,4 @@ def reset_user_password(user_id):
         return APIResponse.success(data={"reset": True, "new_password": new_password}, message="密码重置成功，请通过安全渠道通知用户新密码")
     except Exception as e:
         logger.error(f"重置密码失败: user_id={user_id}, error={e}")
-        return APIResponse.error(message=str(e), status_code=500)
+        raise PresetResponseError(message=str(e), status_code=500) from e

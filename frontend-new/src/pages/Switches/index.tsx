@@ -29,7 +29,7 @@ import {
   SWITCH_DEVICE_TYPE_OPTIONS
 } from '@/types/enums';
 import { useTable } from '@/hooks/useTable';
-import { useBatchSelection } from '@/hooks/useBatchSelection';
+import { useBatchSelection, scopeViolationMessage } from '@/hooks/useBatchSelection';
 import { useMessage } from '@/hooks/useMessage';
 import { useGlobalEventListener, type GlobalEvent } from '@/hooks/useGlobalEvents';
 
@@ -48,6 +48,7 @@ function Switches() {
   const [deviceEditRecord, setDeviceEditRecord] = useState<Device | null>(null);
   const [groupMode, setGroupMode] = useState<'group' | 'flat'>('group');
   const [batchUpdateOpen, setBatchUpdateOpen] = useState(false);
+  const [batchUpdateTargets, setBatchUpdateTargets] = useState<Switch[]>([]);
   const deleteSwitch = useDeleteSwitch();
   const scanRoom = useScanRoom();
   const message = useMessage();
@@ -352,6 +353,16 @@ function Switches() {
   const managedSwitches = useMemo(() => switchList.filter((s) => s.has_ssh), [switchList]);
   const unmanagedSwitches = useMemo(() => switchList.filter((s) => !s.has_ssh), [switchList]);
 
+  const handleBatchUpdate = () => {
+    const targets = batch.completeSelectedRows;
+    if (targets === null) {
+      message.warning(scopeViolationMessage(batch, '批量修改', '台设备'));
+      return;
+    }
+    setBatchUpdateTargets(targets);
+    setBatchUpdateOpen(true);
+  };
+
   const filterAndActions = (
     <FilterBar
       filters={[
@@ -397,11 +408,7 @@ function Switches() {
           <Button icon={<ExportOutlined />} onClick={handleExport}>
             导出CSV
           </Button>
-          <Button
-            icon={<EditOutlined />}
-            disabled={batch.count === 0}
-            onClick={() => setBatchUpdateOpen(true)}
-          >
+          <Button icon={<EditOutlined />} disabled={batch.count === 0} onClick={handleBatchUpdate}>
             批量修改{batch.count > 0 ? `(${batch.count})` : ''}
           </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
@@ -411,8 +418,6 @@ function Switches() {
       }
     />
   );
-
-  const selectedSwitches = batch.selectedRows;
 
   const rowSelection = batch.rowSelection;
 
@@ -526,7 +531,7 @@ function Switches() {
       {/* 批量修改远程信息 */}
       <BatchUpdateSwitchModal
         open={batchUpdateOpen}
-        selectedSwitches={selectedSwitches}
+        selectedSwitches={batchUpdateTargets}
         onClose={() => {
           setBatchUpdateOpen(false);
           batch.clear();

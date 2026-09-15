@@ -23,6 +23,7 @@ from app.utils import (
     validation_manager,
 )
 from app.utils.transactional import transactional
+from app.exceptions import PresetResponseError
 from app.exceptions.data_access import RecordNotFoundError
 from app.openapi.doc import doc, public
 
@@ -319,7 +320,7 @@ def create_cabinet():
         )
     except Exception as e:
         logger.error("机柜创建失败: %s", e)
-        return APIResponse.error(message="机柜创建失败", status_code=500)
+        raise PresetResponseError(message="机柜创建失败", status_code=500) from e
 
 
 @cabinet_bp.route("/<int:cabinet_id>", methods=["PUT"])
@@ -908,19 +909,19 @@ def update_cabinet_customer(cabinet_id):
             message="机柜客户更新成功"
         )
     
-    except RecordNotFoundError:
-        return APIResponse.error(
+    except RecordNotFoundError as e:
+        raise PresetResponseError(
             message="机柜不存在",
             error_code="CABINET_NOT_FOUND",
             status_code=404
-        )
+        ) from e
     except Exception as e:
         logger.error("更新机柜客户失败: %s", e)
-        return APIResponse.error(
+        raise PresetResponseError(
             message="服务器内部错误",
             error_code="INTERNAL_ERROR",
             status_code=500
-        )
+        ) from e
 
 
 @cabinet_bp.route("/by-room/<int:room_id>", methods=["GET"])
@@ -1135,7 +1136,7 @@ def update_cabinet_usage(cabinet_id):
         return APIResponse.success(message="机柜使用情况更新成功")
     except Exception as e:
         logger.error("更新机柜使用情况失败: %s", str(e))
-        return APIResponse.error(message="服务器内部错误", status_code=500)
+        raise PresetResponseError(message="服务器内部错误", status_code=500) from e
 
 
 @cabinet_bp.route("/by-number/<cabinet_number>", methods=["GET"])

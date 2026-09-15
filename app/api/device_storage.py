@@ -13,6 +13,7 @@ from app.services.device_storage_service import device_storage_service
 from app.api.base import APIResponse, api_exception_handler
 from app.utils import login_required, permission_required, rate_limit_api
 from app.utils.transactional import transactional
+from app.exceptions import PresetResponseError
 from app.exceptions.validation import ValidationError
 
 device_storage_bp = Blueprint(
@@ -150,7 +151,9 @@ def add_device_storage(device_id):
             template_id=data.get("template_id"),
         )
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="STORAGE_VALIDATION_ERROR", status_code=400)
+        raise PresetResponseError(
+            message=str(e), error_code="STORAGE_VALIDATION_ERROR", status_code=400
+        ) from e
 
     return APIResponse.success(message="硬盘添加成功", status_code=201)
 
@@ -178,7 +181,9 @@ def update_device_storage_config(device_id):
             device_id, data.get("storage_config", [])
         )
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="STORAGE_VALIDATION_ERROR", status_code=400)
+        raise PresetResponseError(
+            message=str(e), error_code="STORAGE_VALIDATION_ERROR", status_code=400
+        ) from e
 
     return APIResponse.success(message="存储配置更新成功")
 
@@ -208,7 +213,9 @@ def update_storage(storage_id):
             serial_number=data.get("serial_number"),
         )
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="STORAGE_VALIDATION_ERROR", status_code=400)
+        raise PresetResponseError(
+            message=str(e), error_code="STORAGE_VALIDATION_ERROR", status_code=400
+        ) from e
 
     return APIResponse.success(message="硬盘信息更新成功")
 
@@ -225,7 +232,9 @@ def delete_storage(storage_id):
     try:
         device_storage_service.delete_device_storage(storage_id)
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="STORAGE_NOT_FOUND", status_code=404)
+        raise PresetResponseError(
+            message=str(e), error_code="STORAGE_NOT_FOUND", status_code=404
+        ) from e
 
     return APIResponse.success(message="硬盘记录删除成功")
 

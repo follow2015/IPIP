@@ -30,6 +30,7 @@ import { fetchSSETicket } from '@/services/sseTicket';
 
 const FALLBACK_POLL_INTERVAL = 30_000;
 const SSE_MAX_FAILURES = 3;
+const SSE_DEGRADED_RETRY_INTERVAL = 5 * 60_000;
 
 interface UseSSEConnectionOptions {
   url: string;
@@ -67,6 +68,7 @@ export function useSSEConnection({
     let es: EventSource | null = null;
     let cancelled = false;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const startFallbackPolling = () => {
       if (fallbackTimer) return;
@@ -81,10 +83,30 @@ export function useSSEConnection({
       }
     };
 
-    (async () => {
+    const closeEventSource = () => {
+      if (!es) return;
+      try {
+        es.close();
+      } catch {
+      }
+      es = null;
+    };
+
+    const degradeToPolling = () => {
+      closeEventSource();
+      startFallbackPolling();
+      if (retryTimer) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        failCountRef.current = 0;
+        void connect();
+      }, SSE_DEGRADED_RETRY_INTERVAL);
+    };
+
+    async function connect() {
       const ticket = await fetchSSETicket();
       if (cancelled || !ticket) {
-        if (ticket === null && token) startFallbackPolling();
+        if (ticket === null && token) degradeToPolling();
         return;
       }
       const sseUrl = `${url}${url.includes('?') ? '&' : '?'}ticket=${encodeURIComponent(ticket)}`;
@@ -112,18 +134,24 @@ export function useSSEConnection({
         es.onerror = () => {
           failCountRef.current += 1;
           if (failCountRef.current >= SSE_MAX_FAILURES) {
-            startFallbackPolling();
+            degradeToPolling();
           }
         };
       } catch {
-        startFallbackPolling();
+        degradeToPolling();
       }
-    })();
+    }
+
+    void connect();
 
     return () => {
       cancelled = true;
-      es?.close();
+      closeEventSource();
       stopFallbackPolling();
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
     };
   }, [url, enabled, token, label]);
 }

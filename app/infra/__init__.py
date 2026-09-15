@@ -491,7 +491,7 @@ class SSHManager:
             if Config.SSH_PASSPHRASE:
                 params["passphrase"] = Config.SSH_PASSPHRASE
         else:
-            params["password"] = switch.password
+            params["password"] = switch.plain_password
 
         if switch.device_type == SwitchDeviceTypeCode.HUAWEI:
             version = ""

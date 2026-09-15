@@ -15,6 +15,7 @@ from app.models.device import Device
 from app.core.enums import DeviceStatus
 from app.persistence.device_repository import DeviceRepository
 from app.utils.cache import cache_manager, cached
+from app.exceptions.base import BaseAppException
 from app.exceptions.validation import ValidationError
 from config import get_config
 from app.services.switch_events import emit_resource_change_global
@@ -1257,14 +1258,16 @@ class DeviceService:
 
                     if storage_items:
                         try:
-                            from app.persistence.device_storage_repository import (
-                                DeviceStorageRepository,
-                            )
+                            with self.session.begin_nested():
+                                from app.persistence.device_storage_repository import (
+                                    DeviceStorageRepository,
+                                )
 
-                            DeviceStorageRepository(self.session).delete_by_device(device_id)
-                            self._create_storage_items(device_id, storage_items)
+                                resolved_storage = self._resolve_storage_items(storage_items)
+                                DeviceStorageRepository(self.session).delete_by_device(device_id)
+                                self._persist_storage_items(device_id, resolved_storage)
                             storage_created += len(storage_items)
-                        except Exception as e:
+                        except BaseAppException as e:
                             logger.warning(
                                 "批量配置-存储创建跳过 设备%d: %s", device_id, e
                             )
@@ -1702,54 +1705,95 @@ class DeviceService:
             chassis.id, created_count, n_rows, n_cols, len(existing_positions),
         )
 
-    def _create_storage_items(self, device_id: int, items: List[Dict]) -> None:
-        """创建设备存储条目，支持从配件模板自动填充字段。"""
-        from app.models.device_storage import DeviceStorage
-        from datetime import datetime, timezone
-        now = now_utc_naive()
-        global_slot = 1  # 全局槽位计数器，跨 storage_items 递增
+    def _resolve_storage_items(self, items: List[Dict]) -> List[Tuple[Dict, Dict]]:
+        """解析存储条目并补全配件模板字段（**纯解析，不写库**）。
 
+        与 `_persist_storage_items` 配对，使调用方可以「**先解析校验、后删除旧记录**」：
+        `_resolve_component_template` 对不存在/停用/类别不符的模板抛 `ValidationError`，
+        若该异常发生在「旧记录已删除」之后，就会造成不可逆的数据丢失（审计 P0#1）。
+
+        Args:
+            items: storage_items 载荷
+
+        Returns:
+            [(原 item, 补全后的字段 dict)]；字段 dict **不含** slot_number，
+            槽位在落库阶段按全局计数器分配（与旧实现逐条等价）。
+
+        Raises:
+            ValidationError: 模板不存在 / 类别不符 / 已停用
+        """
+        resolved: List[Tuple[Dict, Dict]] = []
         for item in items:
             template_id = item.get("template_id")
-            storage_type   = item.get("storage_type", "")
-            capacity       = item.get("capacity", "")
+            storage_type = item.get("storage_type", "")
+            capacity = item.get("capacity", "")
             interface_type = item.get("interface_type")
-            capacity_gb    = item.get("capacity_gb")
-            manufacturer   = item.get("manufacturer")
-            model_name     = item.get("model")
+            capacity_gb = item.get("capacity_gb")
+            manufacturer = item.get("manufacturer")
+            model_name = item.get("model")
 
             if template_id:
                 tpl = self._resolve_component_template(template_id, "disk")
                 spec = tpl.get("spec") or {}
-                storage_type   = storage_type   or spec.get("storage_type", "")
-                capacity_gb    = capacity_gb    or spec.get("capacity_gb")
+                storage_type = storage_type or spec.get("storage_type", "")
+                capacity_gb = capacity_gb or spec.get("capacity_gb")
                 interface_type = interface_type or spec.get("interface_type")
-                manufacturer   = manufacturer   or tpl.get("brand")
-                model_name     = model_name     or tpl.get("model")
+                manufacturer = manufacturer or tpl.get("brand")
+                model_name = model_name or tpl.get("model")
                 if not capacity and capacity_gb:
                     capacity = _format_capacity(capacity_gb)
 
             if not storage_type or not capacity:
                 continue
 
-            count = item.get("count", 1) or 1
-            for i in range(count):
-                st = DeviceStorage(
-                    device_id=device_id,
-                    storage_type=storage_type,
-                    capacity=capacity,
-                    capacity_gb=capacity_gb,
-                    interface_type=interface_type,
-                    manufacturer=manufacturer,
-                    model=model_name,
-                    template_id=template_id,
-                    slot_number=item.get("slot_number", global_slot),
-                    status="normal",
-                    created_at=now,
-                    updated_at=now,
+            resolved.append(
+                (
+                    item,
+                    {
+                        "storage_type": storage_type,
+                        "capacity": capacity,
+                        "capacity_gb": capacity_gb,
+                        "interface_type": interface_type,
+                        "manufacturer": manufacturer,
+                        "model": model_name,
+                        "template_id": template_id,
+                    },
                 )
-                self.session.add(st)
+            )
+        return resolved
+
+    def _persist_storage_items(self, device_id: int, resolved: List[Tuple[Dict, Dict]]) -> None:
+        """落库已解析的存储条目（flush-only，由调用方统一 commit/rollback）。
+
+        槽位分配：`slot_number` 取条目显式值，否则用跨条目递增的全局计数器
+        （count 展开的多个副本逐个递增），与旧实现保持逐条等价。
+        """
+        from app.models.device_storage import DeviceStorage
+
+        now = now_utc_naive()
+        global_slot = 1
+        for item, fields in resolved:
+            count = item.get("count", 1) or 1
+            for _ in range(count):
+                self.session.add(
+                    DeviceStorage(
+                        device_id=device_id,
+                        slot_number=item.get("slot_number", global_slot),
+                        status="normal",
+                        created_at=now,
+                        updated_at=now,
+                        **fields,
+                    )
+                )
                 global_slot += 1
+
+    def _create_storage_items(self, device_id: int, items: List[Dict]) -> None:
+        """创建设备存储条目，支持从配件模板自动填充字段。
+
+        组合入口（先解析、后落库）；不涉及删除既有记录。
+        需要「覆盖」语义的调用方应自行在解析成功后删除旧记录（见 batch_update_config）。
+        """
+        self._persist_storage_items(device_id, self._resolve_storage_items(items))
 
     def _create_nic_ports(self, device_id: int, ports: List[Dict]) -> None:
         """创建网卡端口记录，支持从配件模板展开多端口。

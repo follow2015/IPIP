@@ -448,6 +448,44 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         closed = result.rowcount
         return {"closed": closed, "not_found": len(ids) - closed}
 
+    def auto_close_device_alerts(
+        self,
+        device_id: int,
+        alert_type: Optional[str] = None,
+        reason: Optional[str] = None,
+        now=None,
+    ) -> int:
+        """自动闭合某设备尚未关闭的告警行（恢复路径调用）；返回闭合行数。
+
+        ○9（审计 #187）：`closed_at IS NULL` 是"当前活跃告警"的**唯一**判据 ——
+        依赖抑制（alert_dependency_service）、活跃告警计数、G4.2 升级扫描都读它。
+        但 `closed_at` 此前**只有人工 close API** 会写，恢复路径只新增一条
+        `device_recovered` 行、从不闭合旧的 `device_unreachable` 行 →
+        该行 `closed_at` 永远为 NULL → "上游有活跃告警"对本设备**永久成立**
+        → 其所有下游设备的同类型告警被永久抑制，且随运行时间单调累积
+        （核心交换机抖动一次即造成大面积"该发没发"）。
+        恢复时闭合，使该判据重新可信。
+
+        - `alert_type` 缺省闭合该设备**全部**未关闭告警；连通性恢复只应传
+          `device_unreachable`（指标告警有各自独立的告警态与恢复路径，
+          不能被连通性恢复顺手清掉）。
+        - `closed_by` 置 None、`close_reason` 标注自动闭合，与人工关闭区分。
+        - 幂等：只更新 `closed_at IS NULL` 的行，重复调用不影响已闭合行；
+          提交决策交调用方（与状态 upsert / 入箱同一事务）。
+        """
+        ts = now if now is not None else now_utc_naive()
+        stmt = sa_update(MonitorAlertOutbox).where(
+            MonitorAlertOutbox.device_id == device_id,
+            MonitorAlertOutbox.closed_at.is_(None),
+        )
+        if alert_type is not None:
+            stmt = stmt.where(MonitorAlertOutbox.alert_type == alert_type)
+        result = self.session.execute(
+            stmt.values(closed_at=ts, close_reason=reason, closed_by=None)
+        )
+        self.session.flush()
+        return result.rowcount
+
     def find_failed(self, limit: int = 50) -> List[MonitorAlertOutbox]:
         """按 id 升序取最多 limit 条失败行（死信恢复用）。"""
         return (

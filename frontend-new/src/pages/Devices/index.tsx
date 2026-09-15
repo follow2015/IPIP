@@ -28,7 +28,7 @@ import {
   useBatchResetDeviceAsset
 } from '@/services/device';
 import { useMessage, useModal } from '@/hooks/useMessage';
-import { useBatchSelection } from '@/hooks/useBatchSelection';
+import { useBatchSelection, scopeViolationMessage } from '@/hooks/useBatchSelection';
 import { BatchActionBar } from '@/components/BatchActionBar';
 import { useRoomOptions } from '@/services/room';
 import { useAllocatableCustomerOptions } from '@/services/customer';
@@ -399,6 +399,8 @@ function Devices() {
   const [batchAssetOpen, setBatchAssetOpen] = useState(false);
   const [batchConfigOpen, setBatchConfigOpen] = useState(false);
   const [batchMonitorOpen, setBatchMonitorOpen] = useState(false);
+  const [configTargets, setConfigTargets] = useState<Device[]>([]);
+  const [monitorTargets, setMonitorTargets] = useState<Device[]>([]);
 
   const deleteDevice = useDeleteDevice();
   const batchDelete = useBatchDeleteDevices();
@@ -551,7 +553,11 @@ function Devices() {
   };
 
   const handleBatchConfig = () => {
-    const devs = batch.selectedRows;
+    const devs = batch.completeSelectedRows;
+    if (devs === null) {
+      message.warning(scopeViolationMessage(batch, '批量修改配置', '台设备'));
+      return;
+    }
     if (devs.length === 0) {
       message.error('未找到所选设备，请重新勾选');
       return;
@@ -561,11 +567,16 @@ function Devices() {
       message.error('批量修改配置要求所选设备的子类型必须一致');
       return;
     }
+    setConfigTargets(devs);
     setBatchConfigOpen(true);
   };
 
   const handleBatchMonitor = () => {
-    const devs = batch.selectedRows;
+    const devs = batch.completeSelectedRows;
+    if (devs === null) {
+      message.warning(scopeViolationMessage(batch, '批量修改监控', '台设备'));
+      return;
+    }
     if (devs.length === 0) {
       message.error('未找到所选设备，请重新勾选');
       return;
@@ -575,10 +586,11 @@ function Devices() {
       message.error('批量修改监控要求所选设备的子类型必须一致');
       return;
     }
+    setMonitorTargets(devs);
     setBatchMonitorOpen(true);
   };
 
-  const selectedDevices = batch.selectedRows;
+  const selectedDeviceIds = batch.selectedKeys.map(Number);
 
   const handlers = useMemo(
     () => ({
@@ -767,7 +779,7 @@ function Devices() {
 
       <BatchUpdateAssetModal
         open={batchAssetOpen}
-        deviceIds={batch.selectedKeys.map(Number)}
+        deviceIds={selectedDeviceIds}
         onClose={(refresh) => {
           setBatchAssetOpen(false);
           if (refresh) {
@@ -779,7 +791,7 @@ function Devices() {
 
       <BatchUpdateConfigModal
         open={batchConfigOpen}
-        devices={selectedDevices}
+        devices={configTargets}
         onClose={(refresh) => {
           setBatchConfigOpen(false);
           if (refresh) {
@@ -791,7 +803,7 @@ function Devices() {
 
       <BatchUpdateMonitorModal
         open={batchMonitorOpen}
-        devices={selectedDevices}
+        devices={monitorTargets}
         onClose={(refresh) => {
           setBatchMonitorOpen(false);
           if (refresh) {

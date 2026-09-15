@@ -4,6 +4,7 @@
 
 提供认证相关的HTTP端点，业务逻辑已移至服务层。
 """
+from app.exceptions import PresetResponseError
 from app.utils.logging import get_logger
 import re
 from typing import Dict, Optional
@@ -295,10 +296,12 @@ def login():
 
     except AuthError as e:
         logger.warning("登录认证失败: %s - %s", username, e.message)
-        return APIResponse.error(message=e.message, status_code=e.status_code)
+        raise PresetResponseError(message=e.message, status_code=e.status_code) from e
     except Exception as e:
         logger.error("登录过程发生错误: %s - %s", username, str(e))
-        return APIResponse.error(message="登录失败，请稍后重试", status_code=500)
+        raise PresetResponseError(
+            message="登录失败，请稍后重试", status_code=500
+        ) from e
 
 
 @auth_bp.route("/logout", methods=["POST"])

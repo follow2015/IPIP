@@ -14,6 +14,7 @@ from app.utils.transactional import transactional
 from app.services.rbac_service import rbac_service
 from app.openapi.doc import doc, public
 from app.utils.auth import login_required, permission_required
+from app.exceptions import PresetResponseError
 from app.exceptions.validation import ValidationError
 
 logger = get_logger(__name__)
@@ -90,7 +91,7 @@ def create_role():
         role = rbac_service.create_role(data)
     except ValidationError as e:
         status_code = 409 if "已存在" in str(e) else 400
-        return APIResponse.error(str(e), status_code=status_code)
+        raise PresetResponseError(message=str(e), status_code=status_code) from e
 
     return APIResponse.success(data=role.to_dict(), message="角色创建成功", status_code=201)
 
@@ -114,7 +115,7 @@ def update_role(role_id):
     try:
         role = rbac_service.update_role(role_id, data)
     except ValidationError as e:
-        return APIResponse.error(str(e), status_code=409)
+        raise PresetResponseError(message=str(e), status_code=409) from e
 
     if not role:
         return APIResponse.error(message="角色不存在", status_code=404)
@@ -132,7 +133,7 @@ def delete_role(role_id):
     try:
         result = rbac_service.delete_role(role_id)
     except ValidationError as e:
-        return APIResponse.error(str(e), status_code=400)
+        raise PresetResponseError(message=str(e), status_code=400) from e
 
     if not result:
         return APIResponse.error(message="角色不存在", status_code=404)
@@ -202,7 +203,9 @@ def update_role_permissions(role_id):
     try:
         result = rbac_service.update_role_permissions(role_id, permission_codes)
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="VALIDATION_ERROR", status_code=400)
+        raise PresetResponseError(
+            message=str(e), error_code="VALIDATION_ERROR", status_code=400
+        ) from e
 
     if result is None:
         return APIResponse.error(message="角色不存在", status_code=404)
@@ -288,7 +291,9 @@ def update_user_roles(user_id):
     try:
         result = rbac_service.update_user_roles(user_id, role_ids)
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="VALIDATION_ERROR", status_code=400)
+        raise PresetResponseError(
+            message=str(e), error_code="VALIDATION_ERROR", status_code=400
+        ) from e
 
     if result is None:
         return APIResponse.error(message="用户不存在", status_code=404)

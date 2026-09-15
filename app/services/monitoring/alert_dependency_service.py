@@ -10,7 +10,11 @@
 
 判定逻辑：
 - 查下游设备的所有上游（手动规则 + 拓扑父设备）
-- 任一上游有同 alert_type 的 active 告警（closed_at IS NULL）→ 抑制
+- 任一上游有同 alert_type 的 active 告警 → 抑制。active 判据 =
+  `closed_at IS NULL`（未闭合）**且**未超过「最大存活时长」
+  （`MONITOR_DEP_UPSTREAM_ALERT_MAX_AGE`，默认 7 天）——两项缺一不可：
+  闭合由 `monitor_service` 在恢复时写入（○9 修复前从不写，导致抑制永久化），
+  存活上限则是历史遗留行的兜底
 - alert_types 为 null 的规则匹配全部告警类型
 - fail-open：判定失败不阻断告警
 
@@ -102,16 +106,46 @@ def invalidate_cache():
 
 
 
+_UPSTREAM_ALERT_MAX_AGE_SECONDS = 7 * 24 * 3600
+
+
+def _upstream_alert_max_age_seconds() -> int:
+    """读取上游告警最大存活时长配置（非法/缺失回退默认 7 天）。"""
+    raw = _UPSTREAM_ALERT_MAX_AGE_SECONDS
+    try:
+        from flask import current_app
+        raw = current_app.config.get(
+            "MONITOR_DEP_UPSTREAM_ALERT_MAX_AGE", _UPSTREAM_ALERT_MAX_AGE_SECONDS
+        )
+    except Exception:
+        pass
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return _UPSTREAM_ALERT_MAX_AGE_SECONDS
+    return value if value > 0 else _UPSTREAM_ALERT_MAX_AGE_SECONDS
+
+
 def _upstream_has_active_alert(upstream_device_id: int, alert_type: str) -> bool:
-    """查询上游设备是否有指定类型的 active 告警（closed_at IS NULL）"""
+    """查询上游设备是否有指定类型的 active 告警。
+
+    active 判据 = `closed_at IS NULL`（未闭合）**且** `created_at` 未超过
+    「最大存活时长」（见 `_UPSTREAM_ALERT_MAX_AGE_SECONDS`）。
+    """
+    from datetime import timedelta
+
     from app.models.monitor_alert_outbox import MonitorAlertOutbox
+    from app.utils.time_utils import now_utc_naive
     from extensions import db
+
+    cutoff = now_utc_naive() - timedelta(seconds=_upstream_alert_max_age_seconds())
     q = (
         db.session.query(MonitorAlertOutbox.id)
         .filter(
             MonitorAlertOutbox.device_id == upstream_device_id,
             MonitorAlertOutbox.alert_type == alert_type,
             MonitorAlertOutbox.closed_at.is_(None),
+            MonitorAlertOutbox.created_at >= cutoff,
         )
         .limit(1)
     )

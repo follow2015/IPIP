@@ -4,6 +4,7 @@
 
 提供微信小程序登录、网页授权登录、二维码扫码登录和JS-SDK配置等功能。
 """
+from app.exceptions import PresetResponseError
 from app.utils.logging import get_logger
 from urllib.parse import quote
 
@@ -600,11 +601,11 @@ def confirm_qrcode():
         
     except Exception as e:
         logger.error("确认二维码失败: error=%s", str(e), exc_info=True)
-        return APIResponse.error(
+        raise PresetResponseError(
             message="操作失败",
             error_code="QR_CONFIRM_ERROR",
             status_code=500
-        )
+        ) from e
 
 
 @wechat_bp.route("/qrcode/auto-confirm", methods=["POST"])
@@ -746,8 +747,8 @@ def auto_confirm_qrcode():
         
     except Exception as e:
         logger.error("自动确认失败: error=%s", str(e), exc_info=True)
-        return APIResponse.error(
+        raise PresetResponseError(
             message="自动确认失败",
             error_code="AUTO_CONFIRM_ERROR",
             status_code=500
-        )
+        ) from e

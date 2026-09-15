@@ -140,6 +140,18 @@ class _LockWatchdog:
 _redis_client_cache_lock = threading.Lock()
 _redis_client_cache: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
+_LOOP_ERROR_BACKOFF_SECONDS = 5.0
+
+
+def _redis_timeout(app, config_key: str, default: float) -> float:
+    """读取 Redis 超时配置，非法值（非数字 / ≤0）回退默认值。"""
+    raw = app.config.get(config_key, default)
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
 
 def _redis_client(app) -> "redis.Redis":
     """返回该 app 的共享 redis 客户端（每 app 一池，弱引用缓存）。
@@ -163,7 +175,10 @@ def _redis_client(app) -> "redis.Redis":
         password = app.config.get("REDIS_PASSWORD", "") or None
         db = app.config.get("REDIS_DB", 0)
         client = redis.Redis(
-            host=host, port=port, password=password, db=db, decode_responses=True
+            host=host, port=port, password=password, db=db, decode_responses=True,
+            socket_timeout=_redis_timeout(app, "MONITOR_REDIS_SOCKET_TIMEOUT", 5.0),
+            socket_connect_timeout=_redis_timeout(app, "MONITOR_REDIS_CONNECT_TIMEOUT", 3.0),
+            health_check_interval=30,
         )
         _redis_client_cache[app] = client
         return client
@@ -545,29 +560,36 @@ def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) 
     )
     try:
         while not stop_event.is_set():
-            interval = _resolve_loop_interval(app, loop_name, interval)
-            if _acquire_lock(r, loop_name, interval):
-                try:
-                    with _LockWatchdog(r, loop_name, interval):
-                        stats = _run_one_round(
-                            app, loop_name, monitor_service,
-                            executor=executor, stop_event=stop_event,
-                        )
-                    if stats.get("failed", 0) > 0:
-                        logger.warning(
-                            "监控轮询一轮有失败 loop=%s checked=%d failed=%d total=%d",
-                            loop_name, stats["checked"], stats["failed"], stats["total"],
-                        )
-                except Exception:
-                    logger.error("监控轮询一轮异常（已吞掉，继续循环） loop=%s", loop_name, exc_info=True)
-                finally:
+            try:
+                interval = _resolve_loop_interval(app, loop_name, interval)
+                if _acquire_lock(r, loop_name, interval):
                     try:
-                        release_owner_lock(r, f"monitor:lock:{loop_name}")
+                        with _LockWatchdog(r, loop_name, interval):
+                            stats = _run_one_round(
+                                app, loop_name, monitor_service,
+                                executor=executor, stop_event=stop_event,
+                            )
+                        if stats.get("failed", 0) > 0:
+                            logger.warning(
+                                "监控轮询一轮有失败 loop=%s checked=%d failed=%d total=%d",
+                                loop_name, stats["checked"], stats["failed"], stats["total"],
+                            )
                     except Exception:
-                        logger.warning("监控轮询锁释放失败 loop=%s", loop_name, exc_info=True)
-            from app.services.monitoring.adapters.base_adapter import get_orphan_count
-            logger.debug("监控轮询一轮结束 loop=%s orphan_count=%d", loop_name, get_orphan_count())
-            stop_event.wait(interval)
+                        logger.error("监控轮询一轮异常（已吞掉，继续循环） loop=%s", loop_name, exc_info=True)
+                    finally:
+                        try:
+                            release_owner_lock(r, f"monitor:lock:{loop_name}")
+                        except Exception:
+                            logger.warning("监控轮询锁释放失败 loop=%s", loop_name, exc_info=True)
+                from app.services.monitoring.adapters.base_adapter import get_orphan_count
+                logger.debug("监控轮询一轮结束 loop=%s orphan_count=%d", loop_name, get_orphan_count())
+                stop_event.wait(interval)
+            except Exception:
+                logger.error(
+                    "监控轮询循环异常（已吞掉，本轮作废并退避 %.0fs） loop=%s",
+                    _LOOP_ERROR_BACKOFF_SECONDS, loop_name, exc_info=True,
+                )
+                stop_event.wait(_LOOP_ERROR_BACKOFF_SECONDS)
     finally:
         executor.shutdown(wait=False)
 

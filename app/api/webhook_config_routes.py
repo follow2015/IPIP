@@ -19,6 +19,7 @@ from app.utils.auth import login_required
 from app.utils.http_client import post_json
 from app.utils.transactional import transactional
 from app.core.enums import ChannelType
+from app.exceptions import PresetResponseError
 from app.exceptions.validation import ValidationError
 
 logger = get_logger(__name__)
@@ -55,9 +56,13 @@ def create_webhook_config():
     except ValidationError as e:
         error_code = "DUPLICATE_ERROR" if "已存在" in str(e) else "BAD_REQUEST"
         status_code = 409 if "已存在" in str(e) else 400
-        return APIResponse.error(str(e), error_code, status_code)
+        raise PresetResponseError(
+            message=str(e), error_code=error_code, status_code=status_code
+        ) from e
     except ValueError as e:
-        return APIResponse.error(str(e), "BAD_REQUEST", 400)
+        raise PresetResponseError(
+            message=str(e), error_code="BAD_REQUEST", status_code=400
+        ) from e
 
     return APIResponse.success(data=config.to_dict(), message="创建成功")
 
@@ -75,7 +80,9 @@ def update_webhook_config(config_id):
     try:
         config = webhook_config_service.update_config(config_id, data)
     except ValueError as e:
-        return APIResponse.error(str(e), "BAD_REQUEST", 400)
+        raise PresetResponseError(
+            message=str(e), error_code="BAD_REQUEST", status_code=400
+        ) from e
 
     if not config:
         return APIResponse.error("配置不存在", "NOT_FOUND", 404)

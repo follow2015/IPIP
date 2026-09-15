@@ -12,6 +12,7 @@ from app.openapi.doc import doc, public
 from app.services.component_template_service import component_template_service
 from app.utils import login_required, permission_required, rate_limit_api
 from app.utils.transactional import transactional
+from app.exceptions import PresetResponseError
 from app.exceptions.validation import ValidationError
 
 component_template_bp = Blueprint(
@@ -92,7 +93,7 @@ def create_template():
     try:
         t = component_template_service.create_template(data)
     except ValidationError as e:
-        return APIResponse.error(message=str(e), status_code=409)
+        raise PresetResponseError(message=str(e), status_code=409) from e
 
     return APIResponse.success(data=t.to_dict(), message="模板创建成功", status_code=201)
 
@@ -113,7 +114,7 @@ def update_template(template_id):
     try:
         t = component_template_service.update_template(template_id, data)
     except ValidationError as e:
-        return APIResponse.error(message=str(e), status_code=409)
+        raise PresetResponseError(message=str(e), status_code=409) from e
 
     if not t:
         return APIResponse.error(message="模板不存在", status_code=404)

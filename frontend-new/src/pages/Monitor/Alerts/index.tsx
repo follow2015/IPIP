@@ -47,7 +47,6 @@ import {
   type MonitorAlertAggregationItem,
   useExportAlerts,
   type MonitorAlertItem,
-  type MonitorAlertDetail,
   type MonitorAlertQuery
 } from '@/services/monitor';
 import { useMessage } from '@/hooks/useMessage';
@@ -131,7 +130,7 @@ export default function MonitorAlerts() {
     per_page: table.perPage
   };
 
-  const { data, isLoading, isFetching } = useMonitorAlerts(query);
+  const { data, isLoading, isFetching, refetch } = useMonitorAlerts(query);
 
   const batch = useBatchSelection<MonitorAlertItem>({
     dataSource: data?.items ?? [],
@@ -509,7 +508,7 @@ export default function MonitorAlerts() {
           />
           <Button
             icon={<ReloadOutlined />}
-            onClick={() => table.setPage(table.page)}
+            onClick={() => refetch()}
             loading={isFetching}
             block={isMobile}
           >

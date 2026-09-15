@@ -1116,6 +1116,15 @@ class MonitorService:
                 session=repo.session, now=now,
             )
         elif tr.alert_action == "recovered":
+            MonitorAlertOutboxRepository(session=repo.session).auto_close_device_alerts(
+                device.id,
+                alert_type=getattr(
+                    NotificationTypeCode.DEVICE_UNREACHABLE, "value",
+                    NotificationTypeCode.DEVICE_UNREACHABLE,
+                ),
+                reason="auto: device recovered",
+                now=now,
+            )
             self._enqueue_alert(
                 device, NotificationTypeCode.DEVICE_RECOVERED, "info", result, tr.episode, protocol, 0,
                 resolved=None, session=repo.session, now=now,

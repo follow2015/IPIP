@@ -50,7 +50,12 @@ class MonitorAlertOutbox(BaseModel):
     dedup_key = db.Column(
         db.String(191),
         nullable=False,
-        comment="= notify idempotency_key，去重/幂等",
+        comment=(
+            "稳态去重键（build_dedup_key 产出的 5 段键）：供 G13 风暴抑制桶"
+            "与 dedup_key LIKE 过滤。注意它**不再等于** notify 的 "
+            "idempotency_key —— 后者由 build_notification_key 在稳态键上追加"
+            "「幕次」令牌（审计 #187 ○8），二者职责分离，见 alert_ingress"
+        ),
     )
     payload_json = db.Column(
         LONGTEXT,

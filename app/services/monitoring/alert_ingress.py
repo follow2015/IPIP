@@ -16,7 +16,10 @@
 - SSE publish 失败不影响 outbox 落库。
 """
 import json
+from datetime import datetime, timedelta, timezone
+
 from app.utils.logging import get_logger
+from app.utils.time_utils import now_utc_naive
 from typing import Optional, Tuple
 
 logger = get_logger(__name__)
@@ -262,6 +265,50 @@ def build_dedup_key(
         str(index) if index is not None else "",
         str(action) if action is not None else "",
     ])
+
+
+
+_EPOCH = datetime(1970, 1, 1)
+
+
+def build_notification_key(
+    dedup_key: str,
+    now: Optional[datetime] = None,
+    *,
+    bucket_seconds: int = 0,
+) -> str:
+    """由稳态去重键派生「带幕次」的通知幂等键：``{dedup_key}#{幕次令牌}``。
+
+    幕次令牌是告警**发生时刻**的紧凑表示（naive UTC，``YYYYmmddTHHMMSS``）。
+
+    Args:
+        dedup_key: ``build_dedup_key`` 产出的稳态键（不携带幕次）
+        now: 告警时刻（naive UTC）。缺省取 ``now_utc_naive()``；
+            tz-aware 入参统一折算为 UTC 再去掉 tzinfo，避免不同时区进程
+            产生不同令牌。
+        bucket_seconds: 幕次时间桶大小（秒）。``0``（默认）= 不设桶，幕次即
+            秒级时刻——适用于**去重完全由状态机驱动**的指标告警（同幕次内
+            不会再产生过渡，故秒级已足以区分两幕）。``>0`` = 把时刻对齐到该
+            秒数的桶——适用于 trap 这类**按节流窗口去重**的告警：同一节流
+            窗口内（含聚合放行的那一条）必须复用同一幂等键，否则"节流"
+            反被拆成刷屏；跨窗口才允许再次通知。
+
+    为什么追加在末尾且用 ``#`` 分隔：``dedup_key`` 的 5 段契约（供
+    ``parse_dedup_key`` 与 ``dedup_key LIKE '%:段:%'`` 过滤）保持完好——每段
+    后仍是冒号，第 5 段仅多出 ``#`` 后缀，且该后缀**只出现在通知幂等键上**，
+    不出现在 outbox 行的 `dedup_key` 里。
+
+    注意：秒级幕次依赖「同一 (device, metric, index) 的两幕之间至少相隔一个
+    轮询周期」（指标告警的过渡由状态机按轮次产生，不会同秒连发）。若极端情况下
+    同秒复用同一幕次，退化为**去重**（少发一条）而非丢失——是安全方向。
+    """
+    ts = now if now is not None else now_utc_naive()
+    if ts.tzinfo is not None:
+        ts = ts.astimezone(timezone.utc).replace(tzinfo=None)
+    if bucket_seconds and bucket_seconds > 0:
+        epoch = int((ts - _EPOCH).total_seconds())
+        ts = _EPOCH + timedelta(seconds=epoch - (epoch % bucket_seconds))
+    return f"{dedup_key}#{ts.strftime('%Y%m%dT%H%M%S')}"
 
 
 def parse_dedup_key(dedup_key: str) -> dict:

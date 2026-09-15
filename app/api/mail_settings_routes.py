@@ -6,6 +6,7 @@
 配置存储在数据库 mail_settings 表中（key-value 行存储），
 不修改 .env 文件，避免注入风险和并发问题。
 """
+from app.exceptions import PresetResponseError
 from app.utils.logging import get_logger
 import smtplib
 from email.mime.text import MIMEText
@@ -118,10 +119,10 @@ def update_mail_config():
         logger.info("邮件服务器配置已更新: user_id=%s", g.current_user["user_id"])
         return APIResponse.success(data=_get_db_config(), message="配置已保存")
     except ValueError as e:
-        return APIResponse.error(str(e))
+        raise PresetResponseError(message=str(e), status_code=400) from e
     except Exception as e:
         logger.exception("邮件配置更新失败")
-        return APIResponse.error(f"配置保存失败: {e}")
+        raise PresetResponseError(message=f"配置保存失败: {e}", status_code=400) from e
 
 
 @router.route("", methods=["DELETE"])
@@ -141,7 +142,7 @@ def delete_mail_config():
         return APIResponse.success(message="配置已删除")
     except Exception as e:
         logger.exception("邮件配置删除失败")
-        return APIResponse.error(f"删除失败: {e}")
+        raise PresetResponseError(message=f"删除失败: {e}", status_code=400) from e
 
 
 @router.route("/test", methods=["POST"])

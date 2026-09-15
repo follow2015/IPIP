@@ -9,6 +9,7 @@ from app.utils.logging import get_logger
 from flask import Blueprint, request
 from marshmallow import Schema, fields, validate
 
+from app.exceptions import PresetResponseError
 from app.exceptions.validation import ValidationError
 from app.services.room_service import RoomService
 from app.services.device_service import DeviceService
@@ -146,10 +147,14 @@ def create_room():
         ))
         return APIResponse.success(data=room.to_dict(), message="机房创建成功", status_code=201)
     except ValidationError as e:
-        return APIResponse.error(message=str(e), error_code="ROOM_VALIDATION_ERROR", status_code=409)
+        raise PresetResponseError(
+            message=str(e), error_code="ROOM_VALIDATION_ERROR", status_code=409
+        ) from e
     except Exception as e:
         logger.error(f"创建机房失败: {e}", exc_info=True)
-        return APIResponse.error(message="创建机房失败", error_code="ROOM_CREATE_ERROR", status_code=500)
+        raise PresetResponseError(
+            message="创建机房失败", error_code="ROOM_CREATE_ERROR", status_code=500
+        ) from e
 
 
 @room_bp.route("/<int:room_id>", methods=["PUT"])
@@ -184,10 +189,14 @@ def update_room(room_id):
         ))
         return APIResponse.success(data=updated_room.to_dict(), message="机房更新成功")
     except ValidationError as e:
-        return APIResponse.error(message=str(e), error_code="ROOM_VALIDATION_ERROR", status_code=409)
+        raise PresetResponseError(
+            message=str(e), error_code="ROOM_VALIDATION_ERROR", status_code=409
+        ) from e
     except Exception as e:
         logger.error(f"更新机房失败: {e}", exc_info=True)
-        return APIResponse.error(message="更新机房失败", error_code="ROOM_UPDATE_ERROR", status_code=500)
+        raise PresetResponseError(
+            message="更新机房失败", error_code="ROOM_UPDATE_ERROR", status_code=500
+        ) from e
 
 
 @room_bp.route("/<int:room_id>", methods=["DELETE"])
@@ -215,10 +224,14 @@ def delete_room(room_id):
         ))
         return APIResponse.success(message="机房删除成功")
     except ValidationError as e:
-        return APIResponse.error(message=str(e), error_code="ROOM_DELETE_CONFLICT", status_code=409)
+        raise PresetResponseError(
+            message=str(e), error_code="ROOM_DELETE_CONFLICT", status_code=409
+        ) from e
     except Exception as e:
         logger.error(f"删除机房失败: {e}", exc_info=True)
-        return APIResponse.error(message="删除机房失败", error_code="ROOM_DELETE_ERROR", status_code=500)
+        raise PresetResponseError(
+            message="删除机房失败", error_code="ROOM_DELETE_ERROR", status_code=500
+        ) from e
 
 
 @room_bp.route("/batch-delete", methods=["POST"])

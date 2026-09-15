@@ -13,7 +13,8 @@ ASGI 应用入口 — Starlette 路由 + 启停生命周期
 鉴权：
     浏览器 EventSource 不支持自定义 Header，凭据通过 URL 传递。
     优先使用一次性 ticket（?ticket=，由 Flask POST /api/sse/ticket 签发，短效且单用），
-    回退兼容长期 access token（?token= / Authorization: Bearer 头）。
+    回退兼容长期 access token（?token= / Authorization: Bearer 头，仅限 type=access）。
+    两条路径都会查询 Flask 侧撤销集合（P0#4），故已登出/已撤销的令牌无法建连。
 """
 import asyncio
 import logging
@@ -95,7 +96,7 @@ class SSEAuthMiddleware:
             payload = await auth.verify_sse_ticket(ticket)
         else:
             token = auth.extract_token_from_request(scope)
-            payload = auth.verify_token(token) if token else None
+            payload = await auth.verify_token(token) if token else None
 
         if not payload:
             response = JSONResponse(

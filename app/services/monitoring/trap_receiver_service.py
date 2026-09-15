@@ -129,13 +129,18 @@ class TrapIngressService:
         from app.models.monitor_alert_outbox import MonitorAlertOutbox
         from app.services.monitoring.alert_ingress import (
             build_dedup_key,
+            build_notification_key,
             governance_should_emit,
             publish_monitor_alert_event,
         )
+        from app.services.monitoring.alert_suppression_service import get_throttle_seconds
 
         device_id = device.id
         index = self._matcher.extract_index(rule, varbinds)
         idem_key = build_dedup_key(TRAP_ALERT_TYPE, device_id, rule["name"], index, "raise")
+        notif_key = build_notification_key(
+            idem_key, bucket_seconds=get_throttle_seconds()
+        )
 
         title = rule.get("title") or rule["name"]
         content = rule.get("content") or ""
@@ -159,7 +164,7 @@ class TrapIngressService:
             "source_module": "trapd",
             "target_type": "device",
             "target_id": device_id,
-            "idempotency_key": idem_key,
+            "idempotency_key": notif_key,
             "allow_broadcast": True,
         }
 

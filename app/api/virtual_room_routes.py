@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """虚拟机房 API 路由"""
+from app.exceptions import PresetResponseError
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
@@ -84,7 +85,9 @@ def create_virtual_room():
         vr = _service.create(data)
         return APIResponse.success(data=vr.to_dict(include_relations=True), message="虚拟机房创建成功", status_code=201)
     except Exception as e:
-        return APIResponse.error(str(e), error_code="CREATE_FAILED", status_code=400)
+        raise PresetResponseError(
+            message=str(e), error_code="CREATE_FAILED", status_code=400
+        ) from e
 
 
 @virtual_room_bp.route("/<int:virtual_room_id>", methods=["PUT"])
@@ -100,7 +103,9 @@ def update_virtual_room(virtual_room_id):
         vr = _service.update(virtual_room_id, data)
         return APIResponse.success(data=vr.to_dict(include_relations=True), message="虚拟机房更新成功")
     except Exception as e:
-        return APIResponse.error(str(e), error_code="UPDATE_FAILED", status_code=400)
+        raise PresetResponseError(
+            message=str(e), error_code="UPDATE_FAILED", status_code=400
+        ) from e
 
 
 @virtual_room_bp.route("/<int:virtual_room_id>", methods=["DELETE"])
@@ -114,7 +119,9 @@ def delete_virtual_room(virtual_room_id):
         _service.delete(virtual_room_id)
         return APIResponse.success(message="虚拟机房删除成功")
     except Exception as e:
-        return APIResponse.error(str(e), error_code="DELETE_FAILED", status_code=400)
+        raise PresetResponseError(
+            message=str(e), error_code="DELETE_FAILED", status_code=400
+        ) from e
 
 
 @virtual_room_bp.route("/<int:virtual_room_id>/members", methods=["PUT"])
@@ -130,7 +137,9 @@ def update_virtual_room_members(virtual_room_id):
         vr = _service.update_members(virtual_room_id, data["device_ids"])
         return APIResponse.success(data=vr.to_dict(include_relations=True), message="成员更新成功")
     except Exception as e:
-        return APIResponse.error(str(e), error_code="UPDATE_FAILED", status_code=400)
+        raise PresetResponseError(
+            message=str(e), error_code="UPDATE_FAILED", status_code=400
+        ) from e
 
 
 

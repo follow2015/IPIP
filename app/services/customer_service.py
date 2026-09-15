@@ -1022,10 +1022,10 @@ class CustomerService:
             "partial_ips": len(assets["networks"]["partial_ips"]),
         }
 
-        from app.models.device import Device
         from app.models.network_port import NetworkPort
+        from app.persistence.device_repository import DeviceRepository
         device_detail_rows = []
-        for d in Device.query.filter_by(customer_id=customer_id).all():
+        for d in DeviceRepository().find_by_customer_id(customer_id):
             d_dict = d.to_dict()
             device_detail_rows.append({
                 "device_name": d_dict.get("device_name", ""),
@@ -1078,7 +1078,7 @@ class CustomerService:
         import pandas as pd
         from io import BytesIO
         from app.models.network_port import NetworkPort
-        from app.models.device import Device
+        from app.persistence.device_repository import DeviceRepository
 
         assets = self.get_customer_assets(customer_id)
         summary = assets["summary"]
@@ -1135,7 +1135,7 @@ class CustomerService:
         )
 
         device_rows = []
-        devices = Device.query.filter_by(customer_id=customer_id).all()
+        devices = DeviceRepository().find_by_customer_id(customer_id)
         for d in devices:
             d_dict = d.to_dict()
             cabinet_num = d.cabinet.cabinet_number if d.cabinet else ""

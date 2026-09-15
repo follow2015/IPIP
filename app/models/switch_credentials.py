@@ -6,11 +6,15 @@
 from app.core.enums import SwitchDeviceTypeCode
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy.dialects.mysql import INTEGER
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 
 from app.models.base import BaseModel, TINYINT
 from app.utils.ip_codec import ip_to_int as _ip_to_int  # P1-3 收敛：瘦封装，语义不变
+from app.utils.logging import get_logger
+from app.utils.security.encryption import decrypt, encrypt, is_encrypted
 from extensions import db
+
+logger = get_logger(__name__)
 
 
 def _mask_to_prefix(subnet_mask: str) -> int:
@@ -55,6 +59,46 @@ class SwitchCredentials(BaseModel):
     mac_address = db.Column(db.String(17), comment="管理口MAC")
 
     device = relationship("Device", foreign_keys=[device_id], backref=db.backref("switch_credential", uselist=False, lazy="joined"), lazy="joined")
+
+    @validates("password")
+    def _encrypt_password_on_write(self, key, value):
+        """写入前自动加密（幂等；审计 P0#3）。
+
+        列注释声明 password 是「AES-256-GCM 加密后密码」，但修复前所有写入路径
+        （`SwitchCredentials(**data)` / `setattr(switch, "password", ...)`）都直接落
+        明文 —— 本 hook 把它收敛到模型层，覆盖全部写入路径。
+
+        与 IPMI 凭据同一范式（见 app/utils/security/ipmi_validator.py
+        的 `validate_ipmi_password_on_write`）：密钥（SWITCH_SECRET_KEY）缺失时
+        `encrypt()` 抛 ValueError，采取 **fail-close** —— 宁可写入失败也不落明文。
+        """
+        if value is None or value == "":
+            return value
+        if is_encrypted(value):
+            return value
+        return encrypt(value)
+
+    @property
+    def plain_password(self) -> str:
+        """解密后的明文密码（供 netmiko 构建连接参数）。
+
+        兼容三种存量形态，任一情况下都返回值而非抛错，避免单条脏数据让采集整体失效：
+        - 新格式密文（ENC:AES256GCM:）→ 解密；
+        - 历史明文 → 原样返回（灰度期/未迁移数据仍可用）；
+        - 密文解密失败（如密钥轮换）→ 记 warning 后原样返回。
+        """
+        value = self.password
+        if not value or not is_encrypted(value):
+            return value
+        try:
+            return decrypt(value)
+        except ValueError:
+            logger.warning(
+                "交换机凭据解密失败（device_id=%s），请检查 SWITCH_SECRET_KEY",
+                self.device_id,
+                exc_info=True,
+            )
+            return value
 
     def get_netmiko_device_type(self) -> str:
         """返回 netmiko 兼容的设备类型字符串
