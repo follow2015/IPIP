@@ -495,7 +495,7 @@ def get_no_auth_fallback(room_id):
             key = f"no_auth_fallback:{room_id}"
             mapping = redis_client.hgetall(key)
             return APIResponse.success(mapping)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - Redis 读取失败时把错误回传给调用方（已构造 error 响应，非静默）
         return APIResponse.error(str(e))
     return APIResponse.success({})
 
@@ -521,6 +521,6 @@ def rebuild_no_auth_fallback():
                 room_id, SwitchExtRepository(), SwitchRepository()
             )
             return APIResponse.success({"room_id": room_id, "status": "rebuilt"})
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - 重建过程异常时回传错误（已构造 error 响应）
         return APIResponse.error(str(e))
     return APIResponse.error("Redis 不可用")

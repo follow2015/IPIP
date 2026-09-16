@@ -853,6 +853,23 @@ class MonitorConfigUpdateResponseSchema(Schema):
     requires_restart = fields.List(fields.Str())
 
 
+class MonitorAlertDeliverySchema(Schema):
+    """告警的**真实渠道投递结果**（B-18③）。
+
+    outbox 的 `status='sent'` 只表示"通知已入队/落库"，不代表渠道投递成功；
+    真实投递由 notification_delivery_worker 异步完成，结果落在
+    notification_receipts.channel_status。本对象是读取侧合并后的摘要：
+
+    - `channels`：渠道名 → 状态（`ok` / `failed:<异常类名>` / `skipped:*`）
+    - `delivered` / `failed`：派生列表，便于前端直接展示
+    - `has_record`：是否已产生投递记录（false = 尚未重放或无需外部渠道）
+    """
+    channels = fields.Dict(keys=fields.Str(), values=fields.Str())
+    delivered = fields.List(fields.Str())
+    failed = fields.List(fields.Str())
+    has_record = fields.Bool()
+
+
 class MonitorAlertListItemSchema(Schema):
     """GET /alerts 列表项（outerjoin devices；设备删除后 device_* 为 None）。"""
 
@@ -868,6 +885,7 @@ class MonitorAlertListItemSchema(Schema):
     status = fields.Str()
     attempts = fields.Int()
     last_error = fields.Str(allow_none=True)
+    delivery = fields.Nested(MonitorAlertDeliverySchema)
     created_at = fields.Str(allow_none=True)
     sent_at = fields.Str(allow_none=True)
     acknowledged_by = fields.Str(allow_none=True)

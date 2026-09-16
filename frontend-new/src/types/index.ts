@@ -31,7 +31,6 @@ export type {
   Permission,
   DashboardStats,
   ImportResult,
-  SSHOperationRequest,
   PingResult,
   PortScanResult,
   LoginData,

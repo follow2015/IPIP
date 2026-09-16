@@ -70,7 +70,7 @@ def _get_interconnect_ports(sw_id: int) -> set[str]:
                 ports.add(normalize_port(conn.peer_port.port_name))
 
         return ports
-    except Exception:
+    except Exception:  # noqa: BLE001 - 遍历连接关系异常时返回空集合：MAC 归属信息缺失不应中断主流程
         return set()
 
 

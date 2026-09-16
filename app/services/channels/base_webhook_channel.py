@@ -56,30 +56,7 @@ SEVERITY_EMOJI = {
 
 DEFAULT_WEBHOOK_TIMEOUT = 10
 
-_CREDENTIAL_PATTERNS = (
-    re.compile(r"(access_token=)[^&\s'\"]+", re.IGNORECASE),
-    re.compile(r"([?&]key=)[^&\s'\"]+", re.IGNORECASE),
-    re.compile(r"([?&]sign=)[^&\s'\"]+", re.IGNORECASE),
-    re.compile(r"(/hook/)[0-9a-zA-Z-]{8,}"),
-)
-
-
-def redact_credentials(text: str) -> str:
-    """抹掉文本中的 webhook 凭证，供日志安全输出。
-
-    为什么必须做：凭证在 URL 上，而 `requests.raise_for_status()` 的异常消息
-    含完整 URL —— 原样进日志等于把"能向群里发消息的凭证"写进日志聚合系统
-    （日志的留存期与可见面通常远大于进程内存里的那条配置）。
-
-    Args:
-        text: 任意可能含凭证的文本（通常是异常消息）。
-
-    Returns:
-        str: 凭证值被替换为 `***` 的文本。
-    """
-    for pattern in _CREDENTIAL_PATTERNS:
-        text = pattern.sub(r"\1***", text)
-    return text
+from app.utils.redaction import _CREDENTIAL_PATTERNS, redact_credentials  # noqa: F401
 
 
 def _matches(cfg: WebhookConfig, notification: Notification) -> bool:

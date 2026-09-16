@@ -41,6 +41,7 @@ class DeviceEventBus {
   private reconnectDelay = 1000;
   private destroyed = false;
   private unrecoverable = false;
+  private generation = 0;
 
   constructor(private readonly deviceId: number) {
     this.connect();
@@ -48,6 +49,7 @@ class DeviceEventBus {
 
   private async connect(): Promise<void> {
     if (this.destroyed || this.unrecoverable) return;
+    const gen = this.generation; // B-19：本次续作的代次
 
     if (this.source) {
       this.source.close();
@@ -55,17 +57,13 @@ class DeviceEventBus {
     }
     const token = useAuthStore.getState().token;
     if (!token) {
-      this.reconnectTimer = setTimeout(() => {
-        void this.connect();
-      }, 1000);
+      this.scheduleReconnect(gen, 1000, false);
       return;
     }
     const ticket = await fetchSSETicket(this.deviceId);
+    if (this.destroyed || this.unrecoverable || gen !== this.generation) return;
     if (!ticket) {
-      this.reconnectTimer = setTimeout(() => {
-        void this.connect();
-      }, this.reconnectDelay);
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
+      this.scheduleReconnect(gen, this.reconnectDelay);
       return;
     }
     const base = `/realtime/sse/switch/${this.deviceId}`;
@@ -94,18 +92,26 @@ class DeviceEventBus {
     };
   }
 
+  private scheduleReconnect(gen: number, delay: number, backoff = true): void {
+    if (this.destroyed || this.unrecoverable || gen !== this.generation) return;
+    this.reconnectTimer = setTimeout(() => {
+      void this.connect();
+    }, delay);
+    if (backoff) this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
+  }
+
   private async checkRecoverable(): Promise<void> {
+    const gen = this.generation; // B-19：本次续作的代次
     const ticket = await fetchSSETicket(this.deviceId);
+    if (this.destroyed || gen !== this.generation) return;
     if (!ticket) {
-      this.reconnectTimer = setTimeout(() => {
-        void this.connect();
-      }, this.reconnectDelay);
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
+      this.scheduleReconnect(gen, this.reconnectDelay);
       return;
     }
     try {
       const url = `/realtime/sse/switch/${this.deviceId}?ticket=${encodeURIComponent(ticket)}`;
       const res = await fetch(url, { method: 'HEAD' });
+      if (this.destroyed || gen !== this.generation) return;
       if (res.status === 404 || res.status === 410) {
         this.unrecoverable = true;
         console.warn(
@@ -115,8 +121,7 @@ class DeviceEventBus {
       }
     } catch {
     }
-    this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectDelay);
-    this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
+    this.scheduleReconnect(gen, this.reconnectDelay);
   }
 
   private dispatch(event: DeviceChangeEvent): void {
@@ -156,6 +161,7 @@ class DeviceEventBus {
 
   destroy(): void {
     this.destroyed = true;
+    this.generation += 1; // B-19：作废所有"在途"的异步续作（await 后不再建连/排定时器）
     this.source?.close();
     this.source = null;
     if (this.reconnectTimer) {

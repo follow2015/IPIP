@@ -240,7 +240,7 @@ class DeviceNicsPortService:
         try:
             deleted = self.repo.delete_device_ports(device_id)
             return (True, f"成功删除 {deleted} 个端口")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - 删除失败时把错误回传给调用方（已构造失败元组，非静默）
             return (False, f"删除端口失败: {e}")
 
     def batch_delete_ports(self, device_id: int, port_ids: List[int]) -> Dict:

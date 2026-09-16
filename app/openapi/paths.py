@@ -72,7 +72,7 @@ def register_all_paths(spec: APISpec):
                     path=path,
                     operations={method: operation},
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - 跳过重复注册等错误：同一 path 可能已被其他蓝图注册
                 pass
 
 

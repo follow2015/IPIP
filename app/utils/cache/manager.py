@@ -391,7 +391,7 @@ class UnifiedCacheManager(CacheManager):
         try:
             import sys
             return sys.getsizeof(value)
-        except Exception:
+        except Exception:  # noqa: BLE001 - getsizeof 失败时返回 0（内存统计非关键路径）
             return 0
     
     

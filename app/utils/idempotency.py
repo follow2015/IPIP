@@ -41,14 +41,14 @@ def _get_redis_client():
         from app.utils.cache import cache_manager
         if cache_manager.primary_storage and cache_manager.primary_storage.redis_client:
             return cache_manager.primary_storage.redis_client
-    except Exception:
+    except Exception:  # noqa: BLE001 - 取 cache_manager 主 Redis 客户端失败时继续尝试下一种来源
         pass
     try:
         from app.services.network_scanner_service import ScanOrchestrator
         client = ScanOrchestrator._get_redis_client()
         if client:
             return client
-    except Exception:
+    except Exception:  # noqa: BLE001 - 取 ScanOrchestrator Redis 客户端失败时返回 None（调用方按无幂等处理）
         pass
     return None
 

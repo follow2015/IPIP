@@ -164,7 +164,7 @@ def format_timestamp(timestamp) -> str:
         if hasattr(timestamp, "strftime"):
             return timestamp.strftime("%Y-%m-%d %H:%M:%S")
         return str(timestamp)
-    except Exception:
+    except Exception:  # noqa: BLE001 - 时间戳格式化失败时返回 N/A，保证展示层不抛错
         return "N/A"
 
 
@@ -520,7 +520,7 @@ def format_timestamp(timestamp) -> str:
         if hasattr(timestamp, "strftime"):
             return timestamp.strftime("%Y-%m-%d %H:%M:%S")
         return str(timestamp)
-    except Exception:
+    except Exception:  # noqa: BLE001 - 时间戳格式化失败时返回 N/A，保证展示层不抛错
         return "N/A"
 
 

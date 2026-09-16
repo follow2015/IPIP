@@ -12,8 +12,13 @@ from app.utils.logging.manager import get_logger
 
 
 def _get_current_user_id():
-    """延迟导入避免循环依赖: auth → logging → decorators → auth"""
-    from app.utils.auth import get_current_user_id
+    """获取当前登录用户 ID。
+
+    P1-11 起改从 `app.utils.request_context` 取（实现已从认证服务析出为纯 flask.g
+    访问器）：utils -> utils 才是真的 utils -> utils，且此处仍保持延迟导入，
+    因为 utils.logging 会在很早的导入阶段被拉起。
+    """
+    from app.utils.request_context import get_current_user_id
     return get_current_user_id()
 
 

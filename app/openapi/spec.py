@@ -434,6 +434,7 @@ def register_marshmallow_schemas(spec: APISpec):
         MonitorCheckBatchResponseSchema,
         MonitorCredentialPayloadUpdateResponseSchema,
         MonitorAlertListItemSchema,
+        MonitorAlertDeliverySchema,
         MonitorAlertListResponseSchema,
         MonitorAlertRetryResponseSchema,
         MonitorIncidentItemSchema,
@@ -600,6 +601,7 @@ def register_marshmallow_schemas(spec: APISpec):
         "MonitorCheckBatchResponse": MonitorCheckBatchResponseSchema,
         "MonitorCredentialPayloadUpdateResponse": MonitorCredentialPayloadUpdateResponseSchema,
         "MonitorAlertListItem": MonitorAlertListItemSchema,
+        "MonitorAlertDelivery": MonitorAlertDeliverySchema,
         "MonitorAlertListResponse": MonitorAlertListResponseSchema,
         "MonitorAlertRetryResponse": MonitorAlertRetryResponseSchema,
         "MonitorIncidentItem": MonitorIncidentItemSchema,
@@ -712,7 +714,7 @@ def register_marshmallow_schemas(spec: APISpec):
     for name, schema_cls in response_schema_map.items():
         try:
             spec.components.schema(name, schema=schema_cls())
-        except Exception:
+        except Exception:  # noqa: BLE001 - 跳过 MarshmallowPlugin 已自动注册的同名 schema，避免重复注册报错
             pass
 
     spec.components.schema("LinkedDevicesResponse", component={

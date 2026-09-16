@@ -97,7 +97,7 @@ class SecurityValidator:
                 return False
 
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001 - 校验异常一律返回 False（保守拒绝，不因内部错误误判为通过）
             return False
 
     @staticmethod

@@ -2,9 +2,15 @@
 """
 通知外部渠道后台投递线程
 
-不引入任务队列中间件（Celery/RQ）——量级上，通知投递不需要跨进程/持久化重试，
-一个进程内的 queue.Queue + 单条守护线程完全够用，风格与 notification_cleanup.py
-的 threading.Timer 方案保持一致。
+不引入任务队列中间件（Celery/RQ）——量级上，一个进程内的 queue.Queue + 单条守护线程
+完全够用，风格与 notification_cleanup.py 的 threading.Timer 方案保持一致。
+
+**B-18① 进程重启丢任务**：内存队列在重启/崩溃时会丢掉未处理任务（`_drain_queue`
+只是 best-effort，且挡不住 SIGKILL）。补法**不是**加标记或建表，而是利用一个
+**既有的、天然的**待投递判据：`receipt.delivered_channels`（该用户分配到的渠道，
+notify() 写入）减去 `receipt.channel_status`（已落库的投递结果）——**差集即未投递**。
+于是启动时用 `recover_pending_deliveries()` 反查并重投即可，无需迁移、不动表结构，
+且**崩溃场景同样覆盖**。中长期若要跨进程统一，再迁 DB outbox。
 
 多进程部署（gunicorn -w N）下每个 worker 各自有一条独立的投递线程 + 独立队列，
 互不影响——这里不需要像 SSE 场景那样做跨进程统一（投递没有"顺序/去重必须全局
@@ -31,7 +37,8 @@ def enqueue_delivery(notification_id: int, user_ids: list[int]) -> None:
     """由 notify() 在 DB 提交后调用，非阻塞入队。
 
     队列满（maxsize=1000）属极端情况：先尽力阻塞 1s 入队以减少丢失，
-    仍失败则记 critical 死信日志（不再静默丢弃）。中长期应迁移到 DB outbox。
+    仍失败则记 critical 死信日志（不再静默丢弃）。被丢弃的任务**不会永久丢失**：
+    其渠道结果未落库，下次进程启动时会由 `recover_pending_deliveries()` 回补（B-18①）。
     """
     try:
         _delivery_queue.put_nowait({"notification_id": notification_id, "user_ids": user_ids})
@@ -48,8 +55,9 @@ def enqueue_delivery(notification_id: int, user_ids: list[int]) -> None:
 def _drain_queue(app) -> None:
     """进程退出前尽力排空队列（best-effort，无法应对 SIGKILL）。
 
-    多 worker 部署下每个进程各自排空自己的内存队列；无法覆盖崩溃场景，
-    中长期应以 DB outbox 替代内存队列实现持久化。
+    多 worker 部署下每个进程各自排空自己的内存队列。**未排空的部分不再丢失**：
+    其对应的 `channel_status` 仍缺少非 inbox 渠道键，下次进程启动时
+    `recover_pending_deliveries()` 会据此把它们捞回来重投（B-18①）。
     """
     drained = 0
     while not _delivery_queue.empty():
@@ -102,6 +110,37 @@ def _should_skip_cooldown(type_: str, source_module: str | None, channel_name: s
         return False
 
 
+_CHANNEL_SEND_MAX_ATTEMPTS = 3
+_CHANNEL_SEND_BACKOFF_SECONDS = 0.3  # 线性退避；单渠道最坏阻塞 ≈0.9s
+
+_CHANNEL_NO_RETRY = frozenset({ChannelType.VOICE})
+
+
+def _send_with_retry(channel, *args) -> tuple[bool, int]:
+    """有限重试地投递一条渠道消息，返回 ``(是否成功, 尝试次数)``。
+
+    仅对**异常**重试（返回值 False 视为确定性结果）；非幂等渠道只尝试一次。
+    重试耗尽后仍抛最后一次异常，保持调用方既有的 `failed:<异常类名>` 记录语义。
+    """
+    name = channel.get_channel_name()
+    max_attempts = 1 if name in _CHANNEL_NO_RETRY else _CHANNEL_SEND_MAX_ATTEMPTS
+    last_exc: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return bool(channel.send(*args)), attempt
+        except Exception as exc:  # noqa: BLE001 - 逐次重试，耗尽后原样抛出
+            last_exc = exc
+            if attempt < max_attempts:
+                delay = _CHANNEL_SEND_BACKOFF_SECONDS * attempt
+                logger.warning(
+                    "渠道 %s 第 %d/%d 次投递异常，%.1fs 后重试: %s",
+                    name, attempt, max_attempts, delay, exc,
+                )
+                time.sleep(delay)
+    assert last_exc is not None
+    raise last_exc
+
+
 def _process_one(app, task: dict) -> None:
     """处理一条投递任务"""
     from app.models.notification import Notification, NotificationReceipt
@@ -121,12 +160,14 @@ def _process_one(app, task: dict) -> None:
                     logger.debug("广播渠道 %s 命中冷却，跳过", ch_name)
                     continue
                 try:
-                    ok = channel.send(notification)
+                    ok, _attempts = _send_with_retry(channel, notification)
                     if not ok:
                         logger.warning(
                             "广播渠道 %s 投递未成功（无匹配配置或全部失败）"
                             " notification_id=%s", ch_name, notification.id,
                         )
+                    elif _attempts > 1:
+                        logger.info("广播渠道 %s 重试后成功 attempts=%d", ch_name, _attempts)
                 except Exception:
                     logger.exception("广播渠道 %s 投递失败", ch_name)
 
@@ -161,7 +202,7 @@ def _process_one(app, task: dict) -> None:
                         continue
                     try:
                         _t0 = time.perf_counter()
-                        ok = channel.send(notification, receipt, user)
+                        ok, _attempts = _send_with_retry(channel, notification, receipt, user)
                         _duration_ms = int((time.perf_counter() - _t0) * 1000)
                         status.update(dict(receipt.channel_status or {}))
                         if name == ChannelType.VOICE and ok:
@@ -169,8 +210,8 @@ def _process_one(app, task: dict) -> None:
                         else:
                             status[name] = "ok" if ok else "failed:unknown"
                         logger.info(
-                            "渠道投递完成 channel=%s user_id=%s duration_ms=%d ok=%s",
-                            name, uid, _duration_ms, ok,
+                            "渠道投递完成 channel=%s user_id=%s duration_ms=%d ok=%s attempts=%d",
+                            name, uid, _duration_ms, ok, _attempts,
                         )
                     except Exception as exc:
                         logger.exception("渠道 %s 投递失败 user_id=%s", name, uid)
@@ -203,14 +244,14 @@ def _poll_rate_limit_alerts(app) -> None:
 
     with app.app_context():
         try:
-            from app.utils.auth import rate_limiter
+            from app.utils.rate_limiting.decorators import rate_limiter
             if not hasattr(rate_limiter, 'storage'):
                 return
             monitor = getattr(rate_limiter, '_monitor', None)
             if monitor is None or not hasattr(monitor, 'get_alerts'):
                 return
             alerts = monitor.get_alerts()
-        except Exception:
+        except Exception:  # noqa: BLE001 - rate_limiter 未挂载 _monitor 时跳过监控采集（限流本身仍生效）
             return
 
         for alert in alerts:
@@ -231,9 +272,81 @@ def _poll_rate_limit_alerts(app) -> None:
             _rate_limit_alerts_last_clear = now
 
 
+_RECOVER_LOOKBACK_HOURS = 24
+_RECOVER_MAX_TASKS = 200
+
+
+def _pending_channels(receipt) -> list:
+    """该 receipt 中「已分配渠道」减去「已落库投递结果」的差集（排除 inbox）。
+
+    `notify()` 创建 receipt 时写入 `delivered_channels`（该用户实际分配到的渠道）
+    与初始 `channel_status`（inbox 预置 `ok`），**非 inbox 渠道的结果由本模块
+    worker 写入**——因此"缺失"即"未投递"，且该状态**持久化在 DB 里**：
+    进程重启/SIGKILL 后依然成立，无需额外写标记。
+    """
+    delivered = receipt.delivered_channels or []
+    status = receipt.channel_status or {}
+    return [c for c in delivered if c != ChannelType.INBOX and c not in status]
+
+
+def recover_pending_deliveries(app, lookback_hours: int = _RECOVER_LOOKBACK_HOURS,
+                               max_tasks: int = _RECOVER_MAX_TASKS) -> int:
+    """启动回补因进程重启/崩溃丢失的投递任务（B-18①），返回回补条数。
+
+    判据见 `_pending_channels`：`delivered_channels − channel_status` 的差集非空
+    即该通知尚有渠道未投递。按 notification 聚合用户后逐条 `_process_one` 重投。
+
+    边界（避免启动瞬间的突发外部投递）：
+    - 只看 `created_at` 在 `lookback_hours` 内的通知；
+    - 单次最多 `max_tasks` 条；
+    - 任何异常都只记日志、不影响正常投递链路（回补是 best-effort）。
+    """
+    from datetime import timedelta
+
+    from app.models.notification import Notification, NotificationReceipt
+    from app.utils.time_utils import now_utc_naive
+    from extensions import db
+
+    try:
+        with app.app_context():
+            cutoff = now_utc_naive() - timedelta(hours=lookback_hours)
+            rows = (
+                db.session.query(NotificationReceipt, Notification.id)
+                .join(Notification, Notification.id == NotificationReceipt.notification_id)
+                .filter(Notification.created_at >= cutoff)
+                .order_by(Notification.id.desc())
+                .limit(max_tasks * 5)
+                .all()
+            )
+            by_notification: dict = {}
+            for receipt, nid in rows:
+                if not _pending_channels(receipt):
+                    continue
+                if nid not in by_notification and len(by_notification) >= max_tasks:
+                    break
+                by_notification.setdefault(nid, []).append(receipt.user_id)
+        if not by_notification:
+            return 0
+
+        recovered = 0
+        for nid, user_ids in by_notification.items():
+            try:
+                _process_one(app, {"notification_id": nid, "user_ids": user_ids})
+                recovered += 1
+            except Exception:  # noqa: BLE001 - 单条失败不影响其余回补
+                logger.exception("启动回补投递失败 notification_id=%s", nid)
+        logger.info("启动回补投递完成: %d 条（重启/崩溃丢失的投递任务已重投）", recovered)
+        return recovered
+    except Exception:  # noqa: BLE001 - 回补失败不影响正常投递
+        logger.exception("启动回补投递失败（不影响正常投递链路）")
+        return 0
+
+
 def _delivery_loop(app) -> None:
-    """后台投递线程主循环"""
+    """后台投递线程主循环（先回补上次进程遗留的未投递任务）"""
     last_rate_limit_poll = 0.0
+
+    recover_pending_deliveries(app)
 
     while True:
         try:

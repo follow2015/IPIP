@@ -678,7 +678,7 @@ def sync_switch_ports(device_id):
             if redis_client:
                 try:
                     redis_client.delete(lock_key)
-                except Exception:
+                except Exception:  # noqa: BLE001 - 释放扫描锁失败可忽略：锁带 TTL，会自然过期
                     pass
 
     from flask import current_app
@@ -736,7 +736,7 @@ def scan_switch(device_id):
             if scan_redis_client:
                 try:
                     scan_redis_client.delete(scan_lock_key)
-                except Exception:
+                except Exception:  # noqa: BLE001 - 释放扫描锁失败可忽略：锁带 TTL，会自然过期
                     pass
 
     from flask import current_app

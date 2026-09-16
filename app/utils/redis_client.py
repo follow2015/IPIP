@@ -71,7 +71,8 @@ def get_redis_client():
                 socket_keepalive=True,
             )
             _client.ping()
-            logger.info("SSE Redis Pub/Sub 已启用: %s", redis_url)
+            from app.utils.redaction import redact_credentials
+            logger.info("SSE Redis Pub/Sub 已启用: %s", redact_credentials(str(redis_url)))
             return _client
         except Exception as exc:  # noqa: BLE001
             logger.warning("REDIS_URL 已配置但连接失败，事件将被静默丢弃: %s", exc)

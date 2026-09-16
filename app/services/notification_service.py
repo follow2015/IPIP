@@ -8,6 +8,7 @@
 P0 实现 inbox 渠道（站内信持久化），P2 扩展 email/webhook 等。
 P2 修订：外部渠道（email/webhook）改为后台线程异步投递，不阻塞主业务请求。
 """
+from sqlalchemy.exc import IntegrityError
 from app.utils.logging import get_logger
 from datetime import datetime, timezone
 from app.utils.time_utils import now_utc_naive
@@ -211,8 +212,19 @@ class NotificationService:
             target_id=str(target_id) if target_id is not None else None,
             idempotency_key=idempotency_key,
         )
-        self._notif_repo.session.add(notification)
-        self._notif_repo.session.flush()  # 拿到 notification.id
+        try:
+            with self._notif_repo.session.begin_nested():
+                self._notif_repo.session.add(notification)
+                self._notif_repo.session.flush()  # 拿到 notification.id
+        except IntegrityError:
+            if not idempotency_key:
+                raise
+            existing = self._notif_repo.find_one({"idempotency_key": idempotency_key})
+            logger.warning(
+                "通知幂等去重（并发竞态命中唯一键）: key=%s 已存在=%s",
+                idempotency_key, bool(existing),
+            )
+            return None
 
         user_ids = self._resolve_targets(target_type, target_id)
 
@@ -550,7 +562,7 @@ def _is_request_context() -> bool:
     try:
         from flask import has_request_context
         return has_request_context()
-    except Exception:
+    except Exception:  # noqa: BLE001 - 非请求上下文（如后台任务）中 has_request_context 不可用，按 False 处理
         return False
 
 

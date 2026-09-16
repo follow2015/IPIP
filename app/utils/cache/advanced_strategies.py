@@ -179,7 +179,7 @@ class MultiLevelCacheStrategy(CacheStrategy):
                 return len(json.dumps(value, ensure_ascii=False).encode('utf-8'))
             else:
                 return len(str(value).encode('utf-8'))
-        except Exception:
+        except Exception:  # noqa: BLE001 - 序列化失败时按 1KB 估算，避免内存评估抛错中断缓存写入
             return 1024  # 默认1KB
     
     def get_metrics(self) -> Dict[str, CacheMetrics]:

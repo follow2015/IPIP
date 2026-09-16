@@ -34,7 +34,7 @@ def _get_redis():
         from app.services.monitoring.monitor_worker import _redis_client
         from flask import current_app
         return _redis_client(current_app._get_current_object())
-    except Exception:
+    except Exception:  # noqa: BLE001 - worker 尚未初始化或 app 上下文缺失时返回 None（调用方按无 Redis 处理）
         return None
 
 

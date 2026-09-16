@@ -10,6 +10,8 @@
 4. 任一规则同时设备命中 + 类型命中 → 静默
 
 缓存：Redis key `monitor:silence:active` 缓存活跃规则列表，TTL 60s。
+**缓存项必须带上 `silence_from`/`silence_until`**：缓存存的是「写入时刻」的活跃集合，
+TTL 内规则窗口可能自然到期，命中缓存后要用当前 `now` 重新过滤（见 `_in_window`）。
 """
 import json
 from app.utils.logging import get_logger
@@ -25,7 +27,11 @@ _CACHE_TTL = 60  # 秒
 
 
 def _load_active_rules(now: datetime) -> List[dict]:
-    """从 DB 加载当前活跃的静默规则（enabled + 时间窗口内）"""
+    """从 DB 加载当前活跃的静默规则（enabled + 时间窗口内）。
+
+    返回项**含窗口字段**：它们会被一并写入 Redis 缓存，供命中缓存时用当前
+    `now` 重新过滤（见 `_in_window`）。
+    """
     from app.persistence.monitor_silence_rule_repository import MonitorSilenceRuleRepository
     repo = MonitorSilenceRuleRepository()
     rules = repo.find_active(now)
@@ -34,19 +40,55 @@ def _load_active_rules(now: datetime) -> List[dict]:
             "id": r.id,
             "device_ids": r.device_ids,
             "alert_types": r.alert_types,
+            "silence_from": _iso(r.silence_from),
+            "silence_until": _iso(r.silence_until),
         }
         for r in rules
     ]
 
 
+def _iso(dt) -> Optional[str]:
+    """datetime → ISO 字符串（供 JSON 缓存）；None 原样返回。"""
+    return dt.isoformat() if dt is not None else None
+
+
+def _as_naive_utc(dt):
+    """统一为 naive UTC，避免 aware/naive 混比抛 TypeError。"""
+    if dt is None or dt.tzinfo is None:
+        return dt
+    from datetime import timezone
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _in_window(rule: dict, now: datetime) -> bool:
+    """缓存中的规则在 `now` 时刻是否仍在静默窗口内。
+
+    缓存存的是**写入时刻**的活跃集合，60s TTL 内窗口可能已自然到期——若不重过滤，
+    窗口结束后的告警仍会被静默最多 60s（漏报）。规则增删改已由 `invalidate_cache()`
+    覆盖，这里只补「窗口自然到期」这一种。
+
+    兼容：老格式缓存项没有窗口字段（部署后 60s 内可能仍在）→ 保守按活跃处理。
+    """
+    start = _as_naive_utc(_parse_iso(rule.get("silence_from")))
+    until = _as_naive_utc(_parse_iso(rule.get("silence_until")))
+    if start is None or until is None:
+        return True
+    ts = _as_naive_utc(now)
+    return start <= ts <= until
+
+
 def _get_active_rules(now: datetime) -> List[dict]:
-    """获取活跃规则（Redis 缓存 → DB 回源）"""
+    """获取活跃规则（Redis 缓存 → DB 回源）。
+
+    命中缓存时**必须用当前 `now` 重新过滤窗口**：缓存项是写入时刻的活跃集合，
+    直接返回会让窗口已到期的规则继续静默最多 60s。
+    """
     r = get_redis_client()
     if r is not None:
         try:
             cached = r.get(_CACHE_KEY)
             if cached:
-                return json.loads(cached)
+                return [x for x in json.loads(cached) if _in_window(x, now)]
         except Exception:
             logger.warning("silence_service 缓存读取失败 key=%s", _CACHE_KEY, exc_info=True)
 
@@ -85,7 +127,7 @@ def is_silenced(device_id: int, alert_type: str,
         return False
     except Exception as exc:
         logger.warning("silence_service.is_silenced 失败: %s", exc)
-        return False  # 失败时不静默（避免误吞告警）
+        return False
 
 
 def invalidate_cache():

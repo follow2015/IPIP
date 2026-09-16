@@ -422,18 +422,6 @@ export interface CloneDeviceData {
   [key: string]: unknown;
 }
 
-export interface SSHOperationRequest {
-  action:
-    | 'enable'
-    | 'disable'
-    | 'speed_limit'
-    | 'set_vlan'
-    | 'set_trunk'
-    | 'configure_ip'
-    | 'delete_config';
-  params?: Record<string, unknown>;
-}
-
 export interface PortScanResult {
   ip: string;
   open_ports: number[];

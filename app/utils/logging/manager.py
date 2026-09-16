@@ -75,7 +75,7 @@ class UnifiedLogger(StructuredLogger):
         record_extra = {}
         
         if has_request_context():
-            from app.utils.auth import get_current_user_id
+            from app.utils.request_context import get_current_user_id
             record_extra.update({
                 'request_id': getattr(g, 'request_id', None),
                 'user_id': get_current_user_id(),
@@ -368,7 +368,7 @@ class UnifiedLogManager(LogManager):
             if hasattr(g, 'start_time'):
                 duration = time.time() - g.start_time
                 
-                from app.utils.auth import get_current_user_id
+                from app.utils.request_context import get_current_user_id
                 logger = self.get_logger('app.request')
                 logger.log_request({
                     'method': request.method,

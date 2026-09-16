@@ -242,7 +242,7 @@ class SSHManager:
             if conn:
                 try:
                     conn.disconnect()
-                except Exception:
+                except Exception:  # noqa: BLE001 - finally 中断连失败可忽略：连接已不可用，不应掩盖原始异常
                     pass
 
     def test_connection(self, switch_info: dict) -> dict:
@@ -268,7 +268,7 @@ class SSHManager:
                         "details": {"output": output[:200] if output else ""},
                     }
                 return {"success": False, "message": "连接创建失败", "details": {}}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - 连接创建失败时返回 success=False 及错误信息（已回传，非静默）
             return {"success": False, "message": str(e), "details": {}}
 
     def execute_command(self, connection, command: str) -> str:

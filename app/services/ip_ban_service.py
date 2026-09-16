@@ -1198,7 +1198,7 @@ def check_ban_consistency(room_id: int = None) -> dict:
         redis_pending = False
         try:
             redis_pending = cache_manager.get(redis_key) is not None
-        except Exception:
+        except Exception:  # noqa: BLE001 - Redis 不可用时按『无 pending 记录』处理（降级为仅查库）
             pass
 
         if not redis_pending:

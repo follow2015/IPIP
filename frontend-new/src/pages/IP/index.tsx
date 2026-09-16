@@ -463,7 +463,7 @@ function IP() {
                 type="link"
                 size="small"
                 onClick={() => handlePing(record)}
-                loading={pingIP.isPending}
+                loading={pingIP.isPending && pingIP.variables === record.ip_address}
               >
                 Ping
               </Button>
@@ -479,7 +479,7 @@ function IP() {
                 type="link"
                 size="small"
                 onClick={() => handleScan(record)}
-                loading={scanIP.isPending}
+                loading={scanIP.isPending && scanIP.variables === record.ip_address}
               >
                 扫描
               </Button>

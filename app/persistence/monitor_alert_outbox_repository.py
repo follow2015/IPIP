@@ -25,6 +25,27 @@ def _backoff_seconds(attempts: int) -> int:
     return min(2 ** attempts, 300)
 
 
+def _empty_delivery_summary() -> Dict[str, Any]:
+    """无投递记录时的占位摘要（B-18③）。"""
+    return {"channels": {}, "delivered": [], "failed": [], "has_record": False}
+
+
+def _build_delivery_summary(channel_status_map: Optional[dict]) -> Dict[str, Any]:
+    """把 `notification_receipts.channel_status` 归一为可读摘要（B-18③）。
+
+    取值形态（见 notification_delivery_worker）：``ok`` / ``failed:<异常类名>`` /
+    ``skipped:unavailable`` / ``skipped:cooldown``，voice 还有回调写入的终态。
+    此处**原样保留** `channels`，并派生 `delivered` / `failed` 列表供前端直接展示。
+    """
+    channels = dict(channel_status_map or {})
+    return {
+        "channels": channels,
+        "delivered": sorted(c for c, v in channels.items() if v == "ok"),
+        "failed": sorted(c for c, v in channels.items() if str(v).startswith("failed")),
+        "has_record": bool(channels),
+    }
+
+
 def _safe_loads(s: Optional[str]) -> Optional[Any]:
     """安全解析 JSON 字符串，失败返回 None。"""
     if not s:
@@ -231,6 +252,9 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
                 "closed_at": r.closed_at.isoformat() if r.closed_at else None,
                 "close_reason": r.close_reason,
             })
+        summary = self.delivery_summary([i["dedup_key"] for i in items])
+        for item in items:
+            item["delivery"] = summary.get(item["dedup_key"]) or _empty_delivery_summary()
         return total, items
 
     @staticmethod
@@ -303,7 +327,7 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         )
         if r is None:
             return None
-        return {
+        result = {
             "id": r.id,
             "device_id": r.device_id,
             "device_name": r.device_name,
@@ -323,6 +347,56 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
             "acknowledged_at": r.acknowledged_at.isoformat() if r.acknowledged_at else None,
             "ack_note": r.ack_note,
         }
+        result["delivery"] = self.delivery_summary([r.dedup_key]).get(
+            r.dedup_key
+        ) or _empty_delivery_summary()
+        return result
+
+    def delivery_summary(self, dedup_keys: List[str]) -> Dict[str, Dict[str, Any]]:
+        """B-18③：按 `dedup_key` 关联各渠道的真实投递结果。
+
+        **为什么需要**：outbox 的 `status='sent'` 只表示"通知已入队/落库"，
+        **不代表渠道投递成功**——真实投递由 `notification_delivery_worker` 异步完成，
+        结果落在 `notification_receipts.channel_status`。此前读取端只暴露 `status`，
+        告警列表/详情把"已入队"呈现成了"已投递"，用户可能实际没收到却看到成功。
+
+        **关联键**：`monitor_alert_outbox.dedup_key` **直接复用** notify 的
+        `idempotency_key`（见 monitor_service 的 `add(...)` 调用与注释），后者在
+        `notifications` 上有 `unique=True` → 一条 outbox 行对应 0 或 1 条通知。
+
+        **不改写 outbox 状态**：`sent` 的"已入队"语义保持不变，本方法只做**读取侧合并**，
+        故无需迁移、无并发风险。批量查询（两次 IN）避免列表页 N+1。
+        """
+        from app.models.notification import Notification, NotificationReceipt
+
+        keys = [k for k in (dedup_keys or []) if k]
+        if not keys:
+            return {}
+        out: Dict[str, Dict[str, Any]] = {k: _empty_delivery_summary() for k in keys}
+
+        rows = (
+            self.session.query(Notification.id, Notification.idempotency_key)
+            .filter(Notification.idempotency_key.in_(keys))
+            .all()
+        )
+        notif_to_key = {nid: key for nid, key in rows}
+        if not notif_to_key:
+            return out
+
+        receipts = (
+            self.session.query(NotificationReceipt)
+            .filter(NotificationReceipt.notification_id.in_(list(notif_to_key)))
+            .all()
+        )
+        merged: Dict[str, dict] = {}
+        for rec in receipts:
+            key = notif_to_key.get(rec.notification_id)
+            if key is None:
+                continue
+            merged.setdefault(key, {}).update(dict(rec.channel_status or {}))
+        for key, channels in merged.items():
+            out[key] = _build_delivery_summary(channels)
+        return out
 
     def reset_to_pending(self, row_id: int) -> bool:
         """乐观锁重试：仅当 status=='failed' 时重置为 pending 并保留 attempts/last_error。

@@ -213,7 +213,7 @@ function DataTable<T extends object>({
                   title={
                     rowSelection ? (
                       <Checkbox
-                        checked={selectedKeys.includes(rowKeyFn(record))}
+                        checked={selectedKeySet.has(String(rowKeyFn(record)))}
                         disabled={rowSelection.getCheckboxProps?.(record)?.disabled}
                         onChange={handleCardCheck(record)}
                       />

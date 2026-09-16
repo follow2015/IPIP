@@ -29,10 +29,10 @@ class CustomerCreateSchema(Schema):
 
 class CustomerUpdateSchema(Schema):
     """更新客户请求验证Schema
-    
+
     字段名与数据库模型保持一致：customer_name, customer_status
     """
-    
+
     class Meta:
         unknown = EXCLUDE  # 忽略未知字段
 
@@ -43,6 +43,7 @@ class CustomerUpdateSchema(Schema):
     email = fields.Email(allow_none=True)  # 允许空值
     address = fields.Str(allow_none=True, validate=validate.Length(max=200))
     notes = fields.Str(allow_none=True, validate=validate.Length(max=500))
+    reason = fields.Str(allow_none=True, validate=validate.Length(max=500))
 
 class CustomerTerminateRequestSchema(Schema):
     """终止客户（`POST /customers/<int:customer_id>/terminate`）。

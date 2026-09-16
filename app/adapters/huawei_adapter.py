@@ -308,7 +308,7 @@ class HuaweiAdapter(BaseDeviceAdapter):
                 m = re.search(r'SN\s*:\s*(\S+)', esn_output)
                 if m:
                     serial = m.group(1)
-            except Exception:
+            except Exception:  # noqa: BLE001 - 解析 ESN 失败时保留 serial=None，仍返回已解析的其他字段
                 pass
         return ParsedDeviceInfo(model=model, version=version, serial=serial, uptime=uptime, brand="Huawei")
 

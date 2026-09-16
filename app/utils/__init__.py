@@ -4,15 +4,6 @@
 
 包含各种工具类和辅助函数。
 """
-from app.utils.auth import (
-    AuthenticationManager,
-    PermissionManager,
-    auth_manager,
-    login_required,
-    permission_manager,
-    permission_required,
-    role_required,
-)
 from app.utils.cache import UnifiedCacheManager, cache_manager
 from app.utils.cache import cached
 from app.exceptions.handlers import register_error_handlers
@@ -40,10 +31,24 @@ from app.utils.rate_limiting.decorators import (
     rate_limit_login,
     rate_limiter,
 )
+_LAZY_AUTH_NAMES = frozenset({
+    "AuthenticationManager",
+    "PermissionManager",
+    "auth_manager",
+    "permission_manager",
+    "login_required",
+    "permission_required",
+    "role_required",
+})
+
+
 def __getattr__(name):
     if name == 'APIResponse':
         from app.api.base import APIResponse
         return APIResponse
+    if name in _LAZY_AUTH_NAMES:
+        import importlib
+        return getattr(importlib.import_module('app.utils.auth'), name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 from app.exceptions.validation import ValidationError
 from app.utils.validation import ValidationManager, validation_manager

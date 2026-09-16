@@ -19189,6 +19189,7 @@ export interface components {
             email?: string | null;
             address?: string | null;
             notes?: string | null;
+            reason?: string | null;
         };
         RoomCreate: {
             name: string;
@@ -20593,6 +20594,14 @@ export interface components {
             updated_fields?: string[];
             credential_migrated?: boolean;
         };
+        MonitorAlertDelivery: {
+            channels?: {
+                [key: string]: string;
+            };
+            delivered?: string[];
+            failed?: string[];
+            has_record?: boolean;
+        };
         MonitorAlertListItem: {
             id?: number;
             device_id?: number | null;
@@ -20606,6 +20615,7 @@ export interface components {
             status?: string;
             attempts?: number;
             last_error?: string | null;
+            delivery?: components["schemas"]["MonitorAlertDelivery"];
             created_at?: string | null;
             sent_at?: string | null;
             acknowledged_by?: string | null;

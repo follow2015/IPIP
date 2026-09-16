@@ -73,7 +73,7 @@ def get_throttle_seconds() -> int:
     """
     try:
         return int(_load_config()[3])
-    except Exception:
+    except Exception:  # noqa: BLE001 - 配置不可用时保守回退 300 秒，与 _load_config 的默认值一致
         return 300
 
 

@@ -79,7 +79,7 @@ class MonitorCredential(BaseModel):
         """返回非敏感字段（编辑弹窗预填用）。解密失败/无 app 上下文时返回空 dict。"""
         try:
             payload = json.loads(decrypt(self.encrypted_payload))
-        except Exception:
+        except Exception:  # noqa: BLE001 - 解密失败或无 app 上下文时返回空 dict（与 docstring 声明的降级语义一致）
             return {}
         meta: dict = {}
         for key, value in payload.items():

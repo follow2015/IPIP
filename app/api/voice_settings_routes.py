@@ -181,7 +181,7 @@ def voice_channel_status():
     try:
         provider = get_voice_provider(provider_name)
         ready = provider.is_config_ready(config)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - provider 构造/就绪检查失败时返回 ready=False 并回传 error 文本
         return APIResponse.success(data={
             "enabled": enabled, "provider": provider_name,
             "ready": False, "missing": [], "error": str(exc),

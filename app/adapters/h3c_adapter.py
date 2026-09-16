@@ -340,7 +340,7 @@ class H3CAdapter(BaseDeviceAdapter):
                 m = re.search(r'SN\s*[:\s]+(\S+)', sn_output)
                 if m:
                     serial = m.group(1)
-            except Exception:
+            except Exception:  # noqa: BLE001 - 解析 SN 失败时保留 serial=None，仍返回已解析的其他字段（部分成功优于整体失败）
                 pass
         return ParsedDeviceInfo(model=model, version=version, serial=serial, uptime=uptime, brand="H3C")
 

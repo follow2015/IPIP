@@ -101,7 +101,7 @@ def _ipmi_collect_metrics(credential: dict, bmc_ip: str, timeout: int) -> dict:
     result: dict = {}
     try:
         from pyghmi.ipmi.command import Command
-    except Exception as exc:  # pragma: no cover - 依赖缺失
+    except Exception as exc:  # pragma: no cover - 依赖缺失  # noqa: BLE001 - pyghmi 依赖缺失时返回空结果（该适配器在无 IPMI 环境下降级）
         return result
 
     username = credential.get("username", "")

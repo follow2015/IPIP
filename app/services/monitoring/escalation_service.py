@@ -169,8 +169,10 @@ def _publish_escalation(alert: MonitorAlertOutbox,
         try:
             _signed_webhook_post(escalate_webhook_url, payload)
         except Exception as exc:
+            from app.utils.redaction import redact_credentials
             logger.warning("升级 webhook 失败 alert_id=%s url=%s: %s",
-                           alert.id, escalate_webhook_url, exc)
+                           alert.id, redact_credentials(str(escalate_webhook_url)),
+                           redact_credentials(str(exc)))
 
     try:
         from extensions import db

@@ -117,7 +117,7 @@ def _upstream_alert_max_age_seconds() -> int:
         raw = current_app.config.get(
             "MONITOR_DEP_UPSTREAM_ALERT_MAX_AGE", _UPSTREAM_ALERT_MAX_AGE_SECONDS
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - 无 app 上下文或配置缺失时沿用模块默认值
         pass
     try:
         value = int(raw)

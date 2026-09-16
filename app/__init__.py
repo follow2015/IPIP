@@ -453,6 +453,9 @@ def register_middlewares(app: Flask):
     from app.middleware.https_guard import register_https_guard
     register_https_guard(app)
 
+    from app.middleware.security_headers import register_security_headers
+    register_security_headers(app)
+
     logger.info("中间件注册完成")
 
 

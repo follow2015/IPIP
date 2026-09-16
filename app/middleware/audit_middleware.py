@@ -168,7 +168,7 @@ class AuditMiddleware:
                 first = created[0]
                 if isinstance(first, dict) and 'id' in first:
                     return first['id']
-        except Exception:
+        except Exception:  # noqa: BLE001 - 解析 ORM 新增对象 id 失败时返回 None：审计降级不应影响主请求
             pass
 
         return None

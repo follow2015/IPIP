@@ -222,7 +222,7 @@ class TopologyDiscoveryService:
         try:
             output = self.ssh_manager.send_show_command(cred, command, timeout=60)
             return output or "", None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - SSH 执行失败时返回 (None, 错误信息) 交调用方处理（已回传）
             return None, f"SSH 执行失败 [{command}]: {e}"
 
     def _build_suggestion(self, switch_device_id: int,
