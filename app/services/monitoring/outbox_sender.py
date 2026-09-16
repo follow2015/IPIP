@@ -110,6 +110,9 @@ class MonitorOutboxSender:
             return True
         r = self._get_redis(app)
         if r is None:
+            logger.warning(
+                "outbox 轮锁 Redis 不可用，本轮 fail-open 双跑（幂等键兜底去重）"
+            )
             return True
         try:
             from app.utils.concurrency.redis_lock import owner_token

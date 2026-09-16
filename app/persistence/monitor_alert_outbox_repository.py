@@ -80,11 +80,13 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         """按 id 升序取最多 limit 条待发行（先进先出）。
 
         并发说明（P0-3）：此处**刻意不加** ``FOR UPDATE SKIP LOCKED``。发件器
-        ``send_pending`` 为隔离失败行采用「逐行 commit」（见 P8 回归测试），第一次
-        commit 就会释放本批次剩余行的行锁，SKIP LOCKED 只能保护到第一行，属于
-        「看似安全实则半失效」的写法。进程间互斥改由发件器的 Redis 锁
-        ``monitor:lock:outbox`` 提供（见 ``MonitorOutboxSender._acquire_round_lock``），
-        与逐行提交语义正交。
+        ``send_pending`` 采用「成功行每 ``commit_every`` 条批量提交 + 失败行隔离
+        提交」（见 P8 回归测试）——**第一次 commit 就会释放本批次剩余行的行锁**，
+        SKIP LOCKED 只能保护到第一次 commit 之前，属于「看似安全实则半失效」的
+        写法。要让 SKIP LOCKED 真正生效，须把发件改成「整批一个事务」，与"单条
+        失败只隔离该行"的故障隔离设计冲突。进程间互斥改由发件器的 Redis 锁
+        ``monitor:lock:outbox`` 提供（见 ``MonitorOutboxSender._acquire_round_lock``）；
+        Redis 不可用 fail-open 时由幂等键 + IntegrityError 归一（B-17）兜底正确性。
         """
         return (
             self.session.query(MonitorAlertOutbox)
