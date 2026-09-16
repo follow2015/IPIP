@@ -303,5 +303,9 @@ def get_statistics():
 
         return APIResponse.success(data={'data': stats})
     except Exception as e:
-        logger.error(f"获取统计信息失败: {e}")
-        return APIResponse.error(str(e), status_code=500)
+        logger.error(f"获取统计信息失败: {e}", exc_info=True)
+        return APIResponse.error(
+            message="获取统计信息失败",
+            error_code="DASHBOARD_STATISTICS_ERROR",
+            status_code=500,
+        )

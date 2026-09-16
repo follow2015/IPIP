@@ -10,6 +10,7 @@
 """
 from sqlalchemy import Index, text
 from sqlalchemy.dialects.mysql import BIGINT
+from sqlalchemy import UniqueConstraint
 
 from app.models.base import BaseModel
 from extensions import db
@@ -20,8 +21,8 @@ class MonitorEscalationStep(BaseModel):
 
     __tablename__ = "monitor_escalation_step"
     __table_args__ = (
-        Index("ix_mes_policy", "policy_id"),
-        Index("ix_mes_policy_step", "policy_id", "step_no", unique=True),
+        UniqueConstraint('policy_id', 'step_no', name='ix_mes_policy_step'),
+        Index('fk_mes_role', 'escalate_to_role_id'),
         {"comment": "监控告警升级链步骤（P2-11，多级升级）"},
     )
 

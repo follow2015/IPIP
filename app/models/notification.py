@@ -8,6 +8,7 @@
 """
 from sqlalchemy import Index
 from sqlalchemy.orm import relationship
+from sqlalchemy import UniqueConstraint
 
 from app.models.base import BaseModel
 from extensions import db
@@ -18,11 +19,12 @@ class Notification(BaseModel):
 
     __tablename__ = "notifications"
     __table_args__ = (
-        Index("idx_notification_type", "type"),
-        Index("idx_notification_severity", "severity"),
-        Index("idx_notification_target", "target_type", "target_id"),
-        Index("idx_notification_source", "source_module"),
-        Index("idx_notification_created", "created_at"),
+        UniqueConstraint('idempotency_key', name='uk_idempotency_key'),
+        Index('idx_notification_type', 'type'),
+        Index('idx_notification_severity', 'severity'),
+        Index('idx_notification_target', 'target_type', 'target_id'),
+        Index('idx_notification_source', 'source_module'),
+        Index('idx_notification_created', 'created_at'),
         {"comment": "统一消息通知表"},
     )
 

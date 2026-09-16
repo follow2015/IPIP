@@ -6,6 +6,7 @@
 """
 
 from dataclasses import dataclass
+from app.core.enums import DeviceStatus
 from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -108,6 +109,9 @@ class CabinetUCalculator:
             if filter_parent_only and device.get("parent_device_id"):
                 continue
             if device.get("deleted_at") is not None:
+                continue
+            status = device.get("status")
+            if status is not None and int(status) == DeviceStatus.SCRAPPED:
                 continue
             yield device
 

@@ -18,10 +18,9 @@ class IPAllocationLog(db.Model):
     """
     __tablename__ = "ip_allocation_logs"
     __table_args__ = (
-        Index("idx_alloc_ip", "ip_address", "room_id"),
+        db.Index('fk_alloc_room', 'room_id'),
+        db.Index('fk_alloc_operator', 'operator_id'),
         Index("idx_alloc_ip_time", "ip_address", "room_id", "created_at"),  # 按IP+机房查分配历史+时间排序
-        Index("idx_alloc_operator", "operator_id"),
-        Index("idx_alloc_created", "created_at"),
         {"comment": "IP分配历史日志"},
     )
 

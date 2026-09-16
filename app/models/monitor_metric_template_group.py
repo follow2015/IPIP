@@ -79,11 +79,8 @@ class MonitorMetricTemplateGroupItem(BaseModel):
 
     __tablename__ = "monitor_metric_template_group_items"
     __table_args__ = (
-        UniqueConstraint(
-            "group_id", "template_id",
-            name="uq_mmtgi_group_template",
-        ),
-        Index("ix_mmtgi_group_id", "group_id"),
+        db.UniqueConstraint('group_id', 'template_id', name='uq_mmtgi_group_template'),
+        db.Index('template_id', 'template_id'),
         {"comment": "模板组-模板关联（勾选指标入组）"},
     )
 

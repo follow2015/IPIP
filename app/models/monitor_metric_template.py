@@ -17,6 +17,7 @@ metric_type：
 """
 from sqlalchemy import Index
 
+from sqlalchemy import UniqueConstraint
 from app.models.base import BaseModel, BIGINT_UNSIGNED
 from extensions import db
 
@@ -28,7 +29,8 @@ class MonitorMetricTemplate(BaseModel):
 
     id = db.Column(BIGINT_UNSIGNED(), primary_key=True, autoincrement=True, comment="主键ID")
     __table_args__ = (
-        Index("uq_metric_tpl_devtype_metric_vendor", "device_type", "metric_key", "vendor", unique=True),
+        UniqueConstraint('device_type', 'metric_key', 'vendor', name='uq_metric_tpl_devtype_metric_vendor'),
+        Index('ix_metric_tpl_category', 'category'),
         {
             "comment": "监控指标模板，驱动 SNMP/IPMI 指标采集",
         },

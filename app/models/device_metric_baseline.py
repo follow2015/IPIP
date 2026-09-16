@@ -21,10 +21,7 @@ class DeviceMetricBaseline(BaseModel):
 
     __tablename__ = "device_metric_baseline"
     __table_args__ = (
-        Index("uq_dmb_device_metric_hour_dow",
-              "device_id", "metric_key", "index_key", "hour_of_day", "day_of_week",
-              unique=True),
-        Index("ix_dmb_device_metric", "device_id", "metric_key"),
+        db.UniqueConstraint('device_id', 'metric_key', 'index_key', 'hour_of_day', 'day_of_week', name='uq_dmb_device_metric_hour_dow'),
         {"comment": "设备指标基线（按小时×星期分桶，滑动28天）"},
     )
 

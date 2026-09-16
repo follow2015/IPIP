@@ -16,9 +16,10 @@ class AIDiagnosisSession(BaseModel):
 
     __tablename__ = "ai_diagnosis_sessions"
     __table_args__ = (
-        Index("idx_ai_diag_device_user", "device_id", "user_id"),
-        Index("idx_ai_diag_skill_status", "skill_name", "status"),
-        Index("idx_ai_diag_incident_status", "incident_id", "status"),
+        db.Index('idx_ai_diag_device_user', 'device_id', 'user_id'),
+        db.Index('idx_ai_diag_skill_status', 'skill_name', 'status'),
+        db.Index('fk_ai_diag_user', 'user_id'),
+        db.Index('idx_ai_diag_incident_status', 'incident_id', 'status'),
         {"comment": "AI 诊断会话持久化"},
     )
 

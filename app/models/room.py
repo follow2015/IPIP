@@ -25,6 +25,8 @@ class Room(BaseModel):
 
     __tablename__ = "rooms"
     __table_args__ = (
+        db.Index('ix_jf_manager_db_name', 'name'),
+        db.Index('idx_room_deleted_status', 'status'),
         {"comment": "机房信息表"},
     )
 

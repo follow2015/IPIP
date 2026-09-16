@@ -23,13 +23,14 @@ class Device(BaseModel):
     __tablename__ = "devices"
     __soft_delete__ = True  # 启用软删除，DELETE 改为设置 deleted_at
     __table_args__ = (
-        Index("idx_device_type_subtype", "device_type", "device_subtype"),
-        Index("idx_device_status_cabinet", "status", "cabinet_id"),
-        Index("idx_device_customer_status", "customer_id", "status"),
-        Index("idx_device_name", "device_name"),
-        Index("idx_device_created_at", "created_at"),
-        Index("idx_device_deleted", "deleted_at"),
-        CheckConstraint("status BETWEEN 0 AND 7", name="ck_device_status_range"),
+        Index('idx_device_deleted_type_status', 'deleted_at', 'device_type', 'status'),
+        Index('idx_device_cabinet_u', 'cabinet_id', 'u_position'),
+        Index('idx_device_serial', 'serial_number'),
+        Index('idx_device_management_ip', 'management_ip'),
+        Index('idx_device_name', 'device_name'),
+        Index('idx_device_customer', 'customer_id'),
+        Index('fk_device_responsible_person', 'responsible_person'),
+        Index('ix_devices_mmtg', 'metric_template_group_id'),
         {"comment": "设备信息核心表（身份/位置/状态）"},
     )
 

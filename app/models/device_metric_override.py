@@ -6,6 +6,7 @@
 """
 from sqlalchemy import Index, text
 
+from sqlalchemy import UniqueConstraint
 from app.models.base import BaseModel, BIGINT_UNSIGNED
 from extensions import db
 
@@ -17,13 +18,7 @@ class DeviceMetricOverride(BaseModel):
 
     id = db.Column(BIGINT_UNSIGNED(), primary_key=True, autoincrement=True, comment="主键ID")
     __table_args__ = (
-        Index(
-            "uq_dmo_device_metric",
-            "device_id",
-            "metric_key",
-            unique=True,
-        ),
-        Index("ix_dmo_device", "device_id"),
+        UniqueConstraint('device_id', 'metric_key', name='uq_dmo_device_metric'),
         {"comment": "设备级阈值覆盖（G4.3，按 device_id+metric_key 覆盖全局阈值）"},
     )
 

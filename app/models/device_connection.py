@@ -25,9 +25,13 @@ class DeviceConnection(BaseModel):
 
     __tablename__ = "device_connections"
     __table_args__ = (
-        Index("idx_device_nics_port", "device_nics_port_id"),
-        Index("idx_dc_vlan_id", "vlan_id"),
-        Index("idx_dc_device_switch", "device_id", "switch_device_id"),  # D2N连接按设备+交换机联合筛选
+        db.Index('idx_dc_server_search', 'device_id', 'device_nics_port_id'),
+        db.Index('idx_dc_switch_search', 'switch_device_id', 'switch_port_id'),
+        db.Index('idx_dc_status_lag', 'status', 'lag_group_id'),
+        db.Index('idx_dc_nics_port', 'device_nics_port_id'),
+        db.Index('fk_dc_lag_group', 'lag_group_id'),
+        db.Index('fk_switch_port_id', 'switch_port_id'),
+        db.Index('idx_dc_device_switch', 'device_id', 'switch_device_id'),
         {"comment": "设备连接表(D2N)"},
     )
 
@@ -35,21 +39,18 @@ class DeviceConnection(BaseModel):
         db.BigInteger,
         db.ForeignKey("devices.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
         comment="设备ID（服务器）",
     )
     switch_device_id = db.Column(
         db.BigInteger,
         db.ForeignKey("devices.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
         comment="交换机设备ID",
     )
     switch_port_id = db.Column(
         db.BigInteger,
         db.ForeignKey("network_ports.id", ondelete="SET NULL"),
         nullable=True,
-        index=True,
         comment="交换机端口ID(兼容旧数据)",
     )
 

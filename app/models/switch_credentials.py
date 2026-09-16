@@ -43,7 +43,7 @@ class SwitchCredentials(BaseModel):
     """
     __tablename__ = "switch_credentials"
     __table_args__ = (
-        Index("uk_switch_device", "device_id", unique=True),
+        Index("uk_switch_device", "device_id"),
         {"comment": "交换机凭据(1:1扩展devices,仅认证信息)"},
     )
 
@@ -139,7 +139,7 @@ class SwitchStatusCache(BaseModel):
     """
     __tablename__ = "switch_status_cache"
     __table_args__ = (
-        Index("uk_ssc_device", "device_id", unique=True),
+        Index("uk_ssc_device", "device_id"),
         {"comment": "交换机采集状态缓存(1:1扩展devices)"},
     )
 
@@ -161,10 +161,12 @@ class IPSwitchInfo(BaseModel):
     """
     __tablename__ = "ip_switch_info"
     __table_args__ = (
-        UniqueConstraint("ip_address", "room_id", name="uk_isi_ip_room"),
-        Index("idx_isi_switch", "switch_id"),
-        Index("idx_isi_room", "room_id"),
-        Index("idx_isi_ip_int", "ip_int"),  # ip_int 范围查询索引
+        db.UniqueConstraint('ip_address', 'room_id', name='uk_isi_ip_room'),
+        db.Index('idx_isi_switch_port', 'switch_id', 'port_id'),
+        db.Index('idx_isi_ip_int', 'ip_int'),
+        db.Index('idx_isi_mac_room', 'mac_address', 'room_id'),
+        db.Index('fk_isi_port', 'port_id'),
+        db.Index('fk_isi_room', 'room_id'),
         {"comment": "IP交换机信息(替代旧ip_info)"},
     )
 
@@ -199,11 +201,9 @@ class SwitchPortIP(BaseModel):
     """交换机端口IP"""
     __tablename__ = "switch_port_ips"
     __table_args__ = (
-        Index("idx_spi_device", "device_id"),
-        Index("idx_spi_port", "port_id"),
-        Index("idx_spi_device_vlan", "device_id", "vlan"),
-        Index("idx_spi_ip_int", "ip_int"),  # ip_int 范围查询索引
-        UniqueConstraint("device_id", "port_name", "ip_address", name="uk_spi_device_port_ip"),
+        db.Index('idx_spi_device', 'device_id'),
+        db.Index('idx_spi_port', 'port_id'),
+        db.Index('idx_spi_ip_int', 'ip_int'),
         {"comment": "交换机端口IP"},
     )
 

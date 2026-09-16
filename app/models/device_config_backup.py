@@ -14,10 +14,7 @@ class DeviceConfigBackup(db.Model):
     """
     __tablename__ = "device_config_backups"
     __table_args__ = (
-        Index("idx_config_device", "device_id"),
-        Index("idx_config_device_time", "device_id", "created_at"),  # 按设备查备份历史+时间排序
         Index("idx_config_hash", "config_hash"),
-        Index("idx_config_created", "created_at"),
         {"comment": "设备配置备份"},
     )
 
@@ -52,9 +49,10 @@ class DeviceConfigChange(db.Model):
     """
     __tablename__ = "device_config_changes"
     __table_args__ = (
-        Index("idx_change_device", "device_id"),
-        Index("idx_change_status", "status"),
-        Index("idx_change_requested", "requested_by"),
+        db.Index('idx_change_device_status', 'device_id', 'status'),
+        db.Index('idx_change_requested', 'requested_by'),
+        db.Index('fk_change_approver', 'approved_by'),
+        db.Index('fk_change_backup', 'backup_id'),
         {"comment": "设备配置变更审批"},
     )
 

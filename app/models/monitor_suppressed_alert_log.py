@@ -22,9 +22,10 @@ class MonitorSuppressedAlertLog(BaseModel):
 
     __tablename__ = "monitor_suppressed_alert_log"
     __table_args__ = (
-        Index("ix_msal_incident", "incident_id"),
-        Index("ix_msal_upstream", "upstream_device_id"),
-        Index("ix_msal_created_at", "created_at"),
+        Index('idx_msal_incident', 'incident_id'),
+        Index('idx_msal_upstream', 'upstream_device_id'),
+        Index('idx_msal_created_at', 'created_at'),
+        Index('fk_msal_device', 'device_id'),
         {"comment": "被依赖抑制告警留痕（事件影响面统计，不参与投递）"},
     )
 

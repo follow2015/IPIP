@@ -29,9 +29,8 @@ class MonitorCredential(BaseModel):
 
     __tablename__ = "monitor_credentials"
     __table_args__ = (
-        Index("ix_mc_protocol", "protocol"),
-        UniqueConstraint("protocol", "payload_hash", name="uk_mc_protocol_hash"),
-        UniqueConstraint("protocol", "name", name="uk_mc_protocol_name"),
+        UniqueConstraint('protocol', 'name', name='uk_mc_protocol_name'),
+        UniqueConstraint('protocol', 'payload_hash', name='uk_mc_protocol_hash'),
         {"comment": "设备监控共享凭据（AES-256-GCM加密）"},
     )
 
@@ -95,7 +94,8 @@ class DeviceMonitorCredential(BaseModel):
 
     __tablename__ = "device_monitor_credentials"
     __table_args__ = (
-        UniqueConstraint("credential_id", "device_id", name="uk_dmc_cred_device"),
+        db.UniqueConstraint('credential_id', 'device_id', name='uk_dmc_cred_device'),
+        db.Index('fk_dmc_device', 'device_id'),
         {"comment": "设备监控凭据关联（多对多）"},
     )
 

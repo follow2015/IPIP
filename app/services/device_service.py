@@ -2153,12 +2153,20 @@ class DeviceService:
                     f"原机柜已不存在 (ID: {target_cabinet_id})，无法恢复到原位置，"
                     "请指定其他机柜恢复"
                 )
-            conflict_result = cabinet.check_u_position_conflict(
-                target_u_position, height_u, exclude_device_id=device_id
+            conflicts = self.device_repository.check_u_position_conflict(
+                target_cabinet_id, target_u_position, height_u, exclude_id=device_id
             )
-            if conflict_result["has_conflict"]:
+            if conflicts:
                 location_conflict = True
-                conflict_devices = conflict_result["conflicting_devices"]
+                conflict_devices = [
+                    {
+                        "id":         d.id,
+                        "name":       d.device_name,
+                        "u_position": d.u_position,
+                        "height_u":   d.height_u,
+                    }
+                    for d in conflicts
+                ]
 
         if location_conflict:
             return {

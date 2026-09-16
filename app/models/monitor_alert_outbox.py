@@ -23,11 +23,13 @@ class MonitorAlertOutbox(BaseModel):
 
     __tablename__ = "monitor_alert_outbox"
     __table_args__ = (
-        Index("ix_mao_status", "status"),
-        Index("ix_mao_dedup_key", "dedup_key"),
-        Index("ix_mao_created_at", "created_at"),
-        Index("ix_mao_acknowledged_at", "acknowledged_at"),
-        Index("ix_mao_incident", "incident_id"),
+        Index('ix_mao_status', 'status'),
+        Index('ix_mao_dedup_key', 'dedup_key'),
+        Index('ix_mao_created_at', 'created_at'),
+        Index('ix_mao_device', 'device_id'),
+        Index('ix_mao_acknowledged_at', 'acknowledged_at'),
+        Index('ix_mao_closed_at', 'closed_at'),
+        Index('idx_mao_incident', 'incident_id'),
         {"comment": "监控告警发件箱（outbox 模式，解耦状态落库与告警投递）"},
     )
 

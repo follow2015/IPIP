@@ -16,9 +16,8 @@ class Role(BaseModel):
 
     __tablename__ = "roles"
     __table_args__ = (
-        Index("idx_role_name", "name"),
-        Index("idx_role_status", "status"),
-        UniqueConstraint("name", name="uk_role_name"),
+        UniqueConstraint('name', name='uk_role_name'),
+        Index('idx_role_status', 'status'),
         {"comment": "角色信息表"},
     )
 
@@ -75,9 +74,8 @@ class Permission(BaseModel):
 
     __tablename__ = "permissions"
     __table_args__ = (
-        Index("idx_permission_code", "code"),
-        Index("idx_permission_category", "category"),
-        UniqueConstraint("code", name="uk_permission_code"),
+        db.UniqueConstraint('code', name='uk_permission_code'),
+        db.Index('idx_permission_category', 'category'),
         {"comment": "权限信息表"},
     )
 
@@ -107,9 +105,8 @@ class UserRole(BaseModel):
 
     __tablename__ = "user_roles"
     __table_args__ = (
-        Index("idx_user_role_user_id", "user_id"),
-        Index("idx_user_role_role_id", "role_id"),
-        UniqueConstraint("user_id", "role_id", name="uk_user_role"),
+        db.UniqueConstraint('user_id', 'role_id', name='uk_user_role'),
+        db.Index('idx_user_role_role_id', 'role_id'),
         {"comment": "用户角色关联表"},
     )
 
@@ -135,11 +132,8 @@ class RolePermission(BaseModel):
 
     __tablename__ = "role_permissions"
     __table_args__ = (
-        Index("idx_role_permission_role_id", "role_id"),
-        Index("idx_role_permission_permission_id", "permission_id"),
-        UniqueConstraint(
-            "role_id", "permission_id",
-            name="uk_role_permission"),
+        db.UniqueConstraint('role_id', 'permission_id', name='uk_role_permission'),
+        db.Index('idx_role_permission_permission_id', 'permission_id'),
         {"comment": "角色权限关联表"},
     )
 

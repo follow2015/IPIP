@@ -27,8 +27,6 @@ class UserLog(db.Model):
 
     __tablename__ = "users_log"
     __table_args__ = (
-        Index("idx_user_id", "user_id"),
-        Index("idx_user_login_time", "user_id", "login_time"),  # 按用户查登录历史+时间排序
         {"comment": "用户登录日志表"},
     )
 

@@ -24,8 +24,10 @@ class DeviceNicsPort(BaseModel):
     
     __tablename__ = "device_nics_port"
     __table_args__ = (
-        Index("uk_device_nic_port", "device_id", "nic_number", "port_number", unique=True),  # 前缀覆盖 idx_device_id
-        Index("idx_port_type_speed", "port_type", "port_speed"),
+        db.UniqueConstraint('device_id', 'nic_number', 'port_number', name='uk_device_nic_port'),
+        db.Index('idx_dnp_device_status', 'device_id', 'port_status'),
+        db.Index('idx_port_type_speed', 'port_type', 'port_speed'),
+        db.Index('fk_dnp_template', 'template_id'),
         {"comment": "设备网卡端口表"},
     )
     
@@ -39,7 +41,7 @@ class DeviceNicsPort(BaseModel):
     nic_number = db.Column(db.Integer, nullable=False, comment="网卡编号")
     nic_name = db.Column(db.String(100), nullable=False, default="", comment="网卡名称")
     template_id = db.Column(db.BigInteger, db.ForeignKey('component_templates.id',
-                      ondelete='SET NULL'), nullable=True, index=True,
+                      ondelete='SET NULL'), nullable=True,
                       comment='网卡模板ID')
     port_number = db.Column(db.Integer, nullable=False, comment="端口编号")
     port_name = db.Column(db.String(50), comment="端口名称(如eth0, ens192等)")

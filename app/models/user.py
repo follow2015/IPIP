@@ -6,6 +6,7 @@
 """
 from sqlalchemy import Index
 from sqlalchemy.orm import relationship
+from sqlalchemy import UniqueConstraint
 
 from app.models.base import BaseModel
 from app.core.enums import UserStatus
@@ -22,11 +23,11 @@ class User(BaseModel):
 
     __tablename__ = "users"
     __table_args__ = (
-        Index("idx_user_email", "email"),
-        Index("idx_user_openid", "openid"),
-        Index("idx_user_status", "status"),
-        Index("idx_user_created_at", "created_at"),
-        Index("idx_user_external_dn", "external_dn"),
+        db.UniqueConstraint('username', name='username'),
+        db.Index('idx_user_status_created', 'status', 'created_at'),
+        db.Index('idx_user_openid', 'openid'),
+        db.Index('idx_user_email', 'email'),
+        db.Index('idx_user_external_dn', 'external_dn'),
         {"comment": "用户信息表"},
     )
 

@@ -5,6 +5,7 @@ ip_networks 只管理网段（CIDR+gateway+归属），
 """
 from sqlalchemy import Index
 from sqlalchemy.dialects.mysql import INTEGER
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel, TINYINT
@@ -38,11 +39,10 @@ class IPNetwork(BaseModel):
     """
     __tablename__ = "ip_networks"
     __table_args__ = (
-        Index("idx_net_switch", "switch_id"),
-        Index("idx_net_room", "room_id"),
-        Index("idx_net_customer", "customer_id"),
-        Index("idx_net_network_int", "network_int"),  # network_int 范围查询索引
-        Index("uk_net_switch_port_room", "network", "switch_id", "port", "room_id", unique=True),
+        UniqueConstraint('network', 'switch_id', 'port', 'room_id', name='uk_net_switch_port_room'),
+        Index('idx_net_room_customer', 'room_id', 'customer_id'),
+        Index('idx_net_network_int_prefix', 'network_int', 'prefix'),
+        Index('idx_net_switch_room', 'switch_id', 'room_id'),
         {"comment": "IP网段规划(仅网段信息)"},
     )
 
@@ -82,8 +82,12 @@ class SwitchRoute(BaseModel):
     """交换机路由条目"""
     __tablename__ = "switch_routes"
     __table_args__ = (
-        Index("uk_route_switch_dest_nexthop_type", "switch_id", "destination", "nexthop", "route_type", unique=True),  # 前缀覆盖 idx_route_switch
-        Index("idx_route_dest_int", "destination_int", "destination_prefix"),  # 整数化范围查询索引
+        db.UniqueConstraint('switch_id', 'destination', 'nexthop', 'route_type', name='uk_route_switch_dest_nexthop_type'),
+        db.Index('idx_route_switch_room', 'switch_id', 'room_id'),
+        db.Index('idx_route_dest_int_prefix', 'destination_int', 'destination_prefix'),
+        db.Index('fk_route_room', 'room_id'),
+        db.Index('fk_route_network', 'network_id'),
+        db.Index('fk_route_customer', 'customer_id'),
         {"comment": "交换机路由条目"},
     )
 

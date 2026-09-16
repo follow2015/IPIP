@@ -22,7 +22,10 @@ class DeviceStorage(BaseModel):
 
     __tablename__ = "device_storage"
     __table_args__ = (
-        Index("idx_storage_device_type", "device_id", "storage_type"),  # 按设备+存储类型聚合查询
+        db.UniqueConstraint('serial_number', name='serial_number'),
+        db.Index('idx_ds_device_status', 'device_id', 'status'),
+        db.Index('fk_ds_template', 'template_id'),
+        db.Index('idx_storage_device_type', 'device_id', 'storage_type'),
         {"comment": "设备存储表"},
     )
 
@@ -30,7 +33,6 @@ class DeviceStorage(BaseModel):
         db.BigInteger,
         db.ForeignKey("devices.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
         comment="设备ID",
     )
     storage_type = db.Column(db.String(50), nullable=False, comment="存储类型（HDD/SSD/NVMe等）")
@@ -41,10 +43,10 @@ class DeviceStorage(BaseModel):
     manufacturer = db.Column(db.String(100), nullable=True, comment="制造商")
     model = db.Column(db.String(100), nullable=True, comment="型号")
     template_id = db.Column(db.BigInteger, db.ForeignKey('component_templates.id',
-                      ondelete='SET NULL'), nullable=True, index=True,
+                      ondelete='SET NULL'), nullable=True,
                       comment='硬盘模板ID')
     serial_number = db.Column(
-        db.String(100), nullable=True, unique=True, index=True, comment="序列号（全局唯一）"
+        db.String(100), nullable=True, comment="序列号（全局唯一）"
     )
     firmware = db.Column(db.String(50), nullable=True, comment="固件版本")
     status = db.Column(db.String(20), nullable=False, default="normal", comment="运行状态: normal/warning/error/offline")

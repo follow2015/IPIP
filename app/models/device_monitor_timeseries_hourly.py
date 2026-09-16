@@ -20,6 +20,7 @@ class DeviceMonitorTimeseriesHourly(db.Model):
 
     __tablename__ = "device_monitor_timeseries_hourly"
     __table_args__ = (
+        db.Index('ix_dmth_bucket', 'hour_bucket'),
         {
             "comment": "监控时序小时级预聚合，事件分区表保留窗口外只保留此表，保留90天",
         },

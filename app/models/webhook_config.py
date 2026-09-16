@@ -87,8 +87,9 @@ class WebhookConfig(BaseModel):
 
     __tablename__ = "webhook_configs"
     __table_args__ = (
-        Index("idx_webhook_channel", "channel"),
-        Index("idx_webhook_enabled", "enabled"),
+        Index('idx_webhook_channel', 'channel'),
+        Index('idx_webhook_enabled', 'enabled'),
+        Index('fk_webhook_created_by', 'created_by'),
         {"comment": "Webhook 渠道配置表"},
     )
 

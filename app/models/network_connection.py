@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy import Index
 from sqlalchemy.orm import relationship
+from sqlalchemy import UniqueConstraint
 
 from app.models.base import BaseModel
 from extensions import db
@@ -23,10 +24,11 @@ class NetworkConnection(BaseModel):
 
     __tablename__ = "network_connections"
     __table_args__ = (
-        Index("idx_nc_local_device", "local_device_id"),
-        Index("idx_nc_peer_device", "peer_device_id"),
-        Index("idx_nc_lag_group", "lag_group_id"),
-        Index("idx_nc_vlan_id", "vlan_id"),
+        UniqueConstraint('local_port_id', name='uq_local_port'),
+        UniqueConstraint('peer_port_id', name='uq_peer_port'),
+        Index('idx_nc_local_topology', 'local_device_id', 'peer_device_id'),
+        Index('idx_lag_group', 'lag_group_id'),
+        Index('fk_nc_peer_dev', 'peer_device_id'),
         {"comment": "网络设备间连接表(N2N)"},
     )
 

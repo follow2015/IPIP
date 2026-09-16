@@ -25,11 +25,10 @@ class NetworkPort(BaseModel):
     """
     __tablename__ = "network_ports"
     __table_args__ = (
-        UniqueConstraint("device_id", "port_name", name="uq_device_port_name"),
-        Index("ix_np_link_status", "link_status"),
-        Index("ix_np_customer_id", "customer_id"),
-        Index("ix_np_data_source", "data_source"),
-        Index("idx_np_vlan", "vlan"),
+        UniqueConstraint('device_id', 'port_name', name='uq_device_port_name'),
+        Index('idx_np_device_status_link', 'device_id', 'usage_status', 'link_status'),
+        Index('ix_np_customer_id', 'customer_id'),
+        Index('idx_np_lag_group', 'lag_group_id'),
         {"extend_existing": True},
     )
 

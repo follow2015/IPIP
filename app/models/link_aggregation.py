@@ -1,6 +1,7 @@
 """链路聚合组模型"""
 from sqlalchemy import Index
 from sqlalchemy.orm import relationship
+from sqlalchemy import UniqueConstraint
 
 from app.models.base import BaseModel, TINYINT
 from extensions import db
@@ -15,8 +16,8 @@ class LinkAggregationGroup(BaseModel):
     """
     __tablename__ = "link_aggregation_groups"
     __table_args__ = (
-        Index("uk_lag_device_name", "device_id", "lag_name", unique=True),
-        Index("idx_lag_device", "device_id"),
+        UniqueConstraint('device_id', 'lag_name', name='uk_lag_device_name'),
+        Index('idx_lag_device_status', 'device_id', 'status'),
         {"comment": "链路聚合组"},
     )
 

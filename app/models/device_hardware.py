@@ -19,6 +19,9 @@ class DeviceHardware(BaseModel):
 
     __tablename__ = "device_hardware"
     __table_args__ = (
+        db.Index('idx_hardware_gpu_template', 'gpu_template_id'),
+        db.Index('fk_hw_memory_template', 'memory_template_id'),
+        db.Index('idx_hw_templates', 'cpu_template_id', 'memory_template_id'),
         Index("uk_hardware_device", "device_id", unique=True),
         Index("idx_hardware_os", "os_version"),
         Index("idx_hardware_memory_gb", "memory_size_gb"),

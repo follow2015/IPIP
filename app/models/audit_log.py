@@ -19,10 +19,7 @@ class AuditLog(db.Model):
     __tablename__ = "audit_logs"
     __table_args__ = (
         Index("idx_audit_user", "user_id"),
-        Index("idx_audit_action", "action"),
-        Index("idx_audit_resource", "resource", "resource_id"),
         Index("idx_audit_resource_time", "resource", "resource_id", "created_at"),  # 按资源+时间范围查询
-        Index("idx_audit_created", "created_at"),
         {"comment": "操作审计日志"},
     )
 

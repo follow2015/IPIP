@@ -336,5 +336,5 @@ def get_all_rooms():
             message="获取机房列表成功"
         )
     except Exception as e:
-        logger.error(f"获取所有机房列表失败: {str(e)}")
-        return APIResponse.error(message=f"获取机房列表失败: {str(e)}", status_code=500)
+        logger.error(f"获取机房列表失败: {e}", exc_info=True)
+        return APIResponse.error(message="获取机房列表失败", error_code="ROOM_LIST_ERROR", status_code=500)

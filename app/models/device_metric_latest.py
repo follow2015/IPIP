@@ -21,12 +21,8 @@ class DeviceMetricLatest(BaseModel):
 
     __tablename__ = "device_metric_latest"
     __table_args__ = (
-        UniqueConstraint(
-            "device_id", "metric_key", "index_key",
-            name="uq_dml_device_metric_index",
-        ),
-        Index("ix_dml_device_id", "device_id"),
-        Index("ix_dml_metric_key", "metric_key"),
+        UniqueConstraint('device_id', 'metric_key', 'index_key', name='uq_dml_device_metric_index'),
+        Index('ix_dml_metric_key', 'metric_key'),
         {"comment": "设备指标当前值（每次采集 upsert，含正常值）"},
     )
 

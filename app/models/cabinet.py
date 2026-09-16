@@ -24,11 +24,9 @@ class Cabinet(BaseModel):
 
     __tablename__ = "cabinets"
     __table_args__ = (
-        UniqueConstraint("room_id", "cabinet_number", name="uk_cabinet_room_number"),
-        Index("idx_cabinet_customer",    "customer_id"),
-        Index("idx_cabinet_status",      "status"),
-        Index("idx_cabinet_created_at",  "created_at"),
-        Index("idx_cabinet_room_status", "room_id", "status"),  # 前缀覆盖 idx_cabinet_room
+        db.UniqueConstraint('room_id', 'cabinet_number', name='uk_cabinet_room_number'),
+        db.Index('idx_cabinet_deleted_room_status', 'room_id', 'status'),
+        db.Index('idx_cabinet_customer', 'customer_id'),
         {"comment": "机柜信息表"},
     )
 
@@ -36,7 +34,7 @@ class Cabinet(BaseModel):
         db.String(255), nullable=False, comment="机柜编号"
     )
     room_id = db.Column(
-        db.Integer, ForeignKey("rooms.id"), nullable=False, index=True,
+        db.Integer, ForeignKey("rooms.id"), nullable=False,
         comment="所属机房ID"
     )
     location = db.Column(db.String(255), comment="具体位置")
@@ -148,40 +146,6 @@ class Cabinet(BaseModel):
             return not (required & used) and (start_u + u_height - 1) <= self.total_u
 
         return any(r["count"] >= u_height for r in self.get_available_u_ranges())
-
-    def check_u_position_conflict(
-        self,
-        u_position: int,
-        height_u: int,
-        exclude_device_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        """检查指定 U 位区间是否与现有设备冲突。
-
-        Args:
-            u_position: 起始 U 位
-            height_u: 设备高度
-            exclude_device_id: 排除该设备 ID（用于更新场景）
-
-        Returns:
-            {"has_conflict": bool, "conflicting_devices": List[Dict]}
-        """
-        required = set(range(u_position, u_position + height_u))
-        conflicting: List[Dict[str, Any]] = []
-
-        for device in self._parent_devices:
-            if exclude_device_id and device.id == exclude_device_id:
-                continue
-            if device.u_position and device.height_u:
-                occupied = set(range(device.u_position, device.u_position + device.height_u))
-                if required & occupied:
-                    conflicting.append({
-                        "id":         device.id,
-                        "name":       device.device_name,
-                        "u_position": device.u_position,
-                        "height_u":   device.height_u,
-                    })
-
-        return {"has_conflict": bool(conflicting), "conflicting_devices": conflicting}
 
     def update_usage(self) -> None:
         """重新计算并同步 used_u / used_power 冗余字段。

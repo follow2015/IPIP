@@ -1107,8 +1107,12 @@ def _verify_ban_output(output: str, ip: str, action: str) -> None:
                 raise BanConfigNotFoundError(
                     reason=f"交换机返回: {match.group()!r} — {output[:200]}"
                 )
+        logger.error(
+            "交换机命令输出异常: action=%s ip=%s keyword=%r\n原始输出:\n%s",
+            action, ip, match.group(), output[:500],
+        )
         raise BanCommandFailed(
-            f"{action} 命令输出异常（关键词: {match.group()!r}）\n输出: {output[:500]}"
+            f"{action} 命令输出异常（关键词: {match.group()!r}），详情见服务端日志"
         )
 
 

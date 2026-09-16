@@ -20,9 +20,10 @@ class MonitorIncident(BaseModel):
 
     __tablename__ = "monitor_incident"
     __table_args__ = (
-        Index("ix_incident_key", "incident_key"),
-        Index("ix_incident_status", "status"),
-        Index("ix_incident_last_alert", "last_alert_at"),
+        Index('idx_incident_key', 'incident_key'),
+        Index('idx_incident_status', 'status'),
+        Index('idx_incident_last_alert', 'last_alert_at'),
+        Index('fk_incident_root_device', 'root_device_id'),
         {"comment": "监控事件（告警聚合后的运营单元）"},
     )
 

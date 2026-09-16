@@ -637,5 +637,5 @@ def reset_user_password(user_id):
         logger.info(f"用户 {user_id} 通过API成功重置密码")
         return APIResponse.success(data={"reset": True, "new_password": new_password}, message="密码重置成功，请通过安全渠道通知用户新密码")
     except Exception as e:
-        logger.error(f"重置密码失败: user_id={user_id}, error={e}")
-        raise PresetResponseError(message=str(e), status_code=500) from e
+        logger.error(f"重置密码失败: user_id={user_id}, error={e}", exc_info=True)
+        raise PresetResponseError(message="重置密码失败", status_code=500) from e

@@ -16,13 +16,12 @@ class VirtualRoom(BaseModel):
     """虚拟机房主表"""
     __tablename__ = "virtual_rooms"
     __table_args__ = (
-        Index("idx_virtual_room_name", "name"),
-        Index("uq_virtual_room_name", "name", unique=True),
+        UniqueConstraint('name', name='uq_virtual_room_name'),
         {"comment": "虚拟机房（逻辑扫描单元）"},
     )
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="主键ID")
-    name = db.Column(db.String(255), nullable=False, unique=True, comment="虚拟机房名称")
+    name = db.Column(db.String(255), nullable=False, comment="虚拟机房名称")
     description = db.Column(db.String(500), comment="描述")
     last_scan_at = db.Column(db.DateTime, nullable=True, comment="最近扫描完成时间")
     last_scan_scope = db.Column(db.String(32), nullable=True, comment="最近扫描 scope 标识")
@@ -51,8 +50,7 @@ class VirtualRoomMember(db.Model):
     """
     __tablename__ = "virtual_room_members"
     __table_args__ = (
-        UniqueConstraint("virtual_room_id", "device_id", name="uq_vr_member"),
-        Index("idx_vrm_device", "device_id"),
+        db.Index('idx_vrm_device', 'device_id'),
         {"comment": "虚拟机房成员（交换机）关联表"},
     )
 

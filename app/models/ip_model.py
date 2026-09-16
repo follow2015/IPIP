@@ -26,10 +26,10 @@ class IPManager(BaseModel):
     """
     __tablename__ = "ip_addresses"
     __table_args__ = (
-        UniqueConstraint("ip_address", "room_id", name="uq_ip_room"),
-        Index("ix_ip_manager_status", "status"),
-        Index("ix_ip_manager_room", "room_id"),
-        Index("ix_ip_int", "ip_int"),  # ip_int 范围查询索引
+        UniqueConstraint("ip_address", "room_id", name="unique_ip_room"),
+        Index("idx_ip_deleted_room_status", "room_id", "status"),
+        Index("idx_ip_int_status", "ip_int", "status"),
+        Index("fk_customer", "customer_id"),
         Index("ix_ip_last_active", "last_active_at"),  # 陈旧度清理索引
         {"extend_existing": True},
     )
@@ -86,7 +86,12 @@ class IPBanRecord(BaseModel):
     """
     __tablename__ = "ip_ban_records"
     __table_args__ = (
-        Index("idx_ban_ip_room_active", "ip_address", "room_id", "is_active"),
+        db.Index('idx_ban_lookup', 'is_active', 'room_id', 'switch_id'),
+        db.Index('idx_ban_ip_int', 'ip_int', 'is_active'),
+        db.Index('idx_ban_ip_room_active', 'ip_address', 'room_id', 'is_active'),
+        db.Index('fk_ban_operator', 'operator_id'),
+        db.Index('fk_ban_switch_device', 'switch_id'),
+        db.Index('fk_ip_ban_records_room_id', 'room_id'),
         {"extend_existing": True},
     )
 

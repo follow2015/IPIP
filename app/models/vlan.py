@@ -17,10 +17,9 @@ class VLAN(BaseModel):
     """
     __tablename__ = "vlans"
     __table_args__ = (
-        UniqueConstraint("device_id", "vlan_id", name="uq_vlan_device"),
-        Index("idx_vlan_status", "status"),
-        Index("idx_vlan_device_status", "device_id", "status"),  # 前缀覆盖 idx_vlan_device
-        Index("idx_vlan_room_status", "room_id", "status"),      # 前缀覆盖 idx_vlan_room
+        UniqueConstraint('device_id', 'vlan_id', name='uq_vlan_device'),
+        Index('idx_vlan_room_status', 'room_id', 'status'),
+        Index('fk_vlan_subnet', 'subnet_id'),
         {"comment": "VLAN资源（设备维度）"},
     )
 

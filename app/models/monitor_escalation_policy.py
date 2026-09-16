@@ -21,8 +21,9 @@ class MonitorEscalationPolicy(BaseModel):
 
     id = db.Column(BIGINT_UNSIGNED(), primary_key=True, autoincrement=True, comment="主键ID")
     __table_args__ = (
-        Index("ix_mep_enabled", "enabled"),
-        Index("ix_mep_alert_type", "alert_type"),
+        Index('ix_mep_enabled', 'enabled'),
+        Index('ix_mep_alert_type', 'alert_type'),
+        Index('fk_mep_role', 'escalate_to_role_id'),
         {"comment": "监控告警升级策略（G4.2，未确认告警到期升级）"},
     )
 
