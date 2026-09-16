@@ -115,9 +115,9 @@ def update_mail_config():
         return APIResponse.success(data=_get_db_config(), message="配置已保存")
     except ValueError as e:
         raise PresetResponseError(message=str(e), status_code=400) from e
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.exception("邮件配置更新失败")
-        raise PresetResponseError(message=f"配置保存失败: {e}", status_code=400) from e
+        raise PresetResponseError(message="配置保存失败", status_code=500) from e
 
 
 @router.route("", methods=["DELETE"])
@@ -133,9 +133,9 @@ def delete_mail_config():
 
         logger.info("邮件服务器配置已删除: user_id=%s", g.current_user["user_id"])
         return APIResponse.success(message="配置已删除")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.exception("邮件配置删除失败")
-        raise PresetResponseError(message=f"删除失败: {e}", status_code=400) from e
+        raise PresetResponseError(message="删除邮件配置失败", status_code=500) from e
 
 
 @router.route("/test", methods=["POST"])
@@ -200,6 +200,18 @@ def test_mail_config():
             f"连接被重置（{params['server']}:{params['port']}），"
             f"可能是加密方式与端口不匹配：SSL 用端口 465，STARTTLS 用端口 587"
         )
-    except Exception as e:
-        logger.exception("邮件测试失败")
-        return APIResponse.error(f"测试失败（{params['server']}:{params['port']}）: {e}")
+    except OSError as e:
+        logger.warning(
+            "邮件测试无法连接: server=%s port=%s error=%s", params["server"], params["port"], e
+        )
+        return APIResponse.error(
+            f"无法连接到邮件服务器（{params['server']}:{params['port']}），"
+            f"请检查服务器地址、端口是否正确"
+        )
+    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+        logger.error("邮件测试失败: %s", e, exc_info=True)
+        return APIResponse.error(
+            message="邮件测试失败，详情见服务端日志",
+            error_code="MAIL_TEST_ERROR",
+            status_code=500,
+        )

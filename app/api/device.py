@@ -1312,6 +1312,8 @@ def batch_update_device_metric_template_group():
 
     供「批量修改监控」弹窗使用：选中多台设备统一绑定（或清除）某个指标模板组。
     """
+    from app.exceptions.validation import ValidationError
+
     try:
         data = request.get_json(silent=True) or {}
         device_ids = data.get("device_ids") or []
@@ -1323,9 +1325,11 @@ def batch_update_device_metric_template_group():
             data=result,
             message=f"更新 {result['updated']} 台，跳过 {result['skipped']} 台",
         )
-    except Exception as e:
-        logger.error("批量更新指标模板组失败: %s", str(e))
+    except ValidationError as e:
         raise PresetResponseError(message=str(e), status_code=400) from e
+    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+        logger.error("批量更新指标模板组失败: %s", e, exc_info=True)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/batch-port-sync-enabled", methods=["POST"])
@@ -1344,6 +1348,8 @@ def batch_update_device_port_sync_enabled():
     供「批量修改监控」弹窗使用：选中多台网络设备统一开启/关闭/跟随全局端口同步。
     仅对网络设备（device_type='network'）生效，非网络设备跳过。
     """
+    from app.exceptions.validation import ValidationError
+
     try:
         data = request.get_json(silent=True) or {}
         device_ids = data.get("device_ids") or []
@@ -1364,9 +1370,11 @@ def batch_update_device_port_sync_enabled():
             data=result,
             message="，".join(parts),
         )
-    except Exception as e:
-        logger.error("批量更新端口同步开关失败: %s", str(e))
+    except ValidationError as e:
         raise PresetResponseError(message=str(e), status_code=400) from e
+    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+        logger.error("批量更新端口同步开关失败: %s", e, exc_info=True)
+        raise PresetResponseError(message="操作失败", status_code=500) from e
 
 
 @device_bp.route("/batch-update-config", methods=["POST"])

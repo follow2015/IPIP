@@ -82,10 +82,10 @@ def update_voice_config():
         return APIResponse.success(data=VoiceSetting.get_all(), message="配置已保存")
     except ValueError as exc:
         raise PresetResponseError(message=str(exc), status_code=400) from exc
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.exception("语音配置更新失败")
         raise PresetResponseError(
-            message=f"配置保存失败: {exc}", status_code=400
+            message="配置保存失败", status_code=500
         ) from exc
 
 

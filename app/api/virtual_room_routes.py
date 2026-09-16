@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """虚拟机房 API 路由"""
-from app.exceptions import PresetResponseError
+from app.exceptions import PresetResponseError, ValidationError
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
@@ -61,9 +61,14 @@ def create_virtual_room():
     try:
         vr = _service.create(data)
         return APIResponse.success(data=vr.to_dict(include_relations=True), message="虚拟机房创建成功", status_code=201)
-    except Exception as e:
+    except ValidationError as e:
         raise PresetResponseError(
             message=str(e), error_code="CREATE_FAILED", status_code=400
+        ) from e
+    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+        logger.error("创建虚拟机房失败: %s", e, exc_info=True)
+        raise PresetResponseError(
+            message="创建虚拟机房失败", error_code="CREATE_FAILED", status_code=500
         ) from e
 
 
@@ -79,9 +84,14 @@ def update_virtual_room(virtual_room_id):
     try:
         vr = _service.update(virtual_room_id, data)
         return APIResponse.success(data=vr.to_dict(include_relations=True), message="虚拟机房更新成功")
-    except Exception as e:
+    except ValidationError as e:
         raise PresetResponseError(
             message=str(e), error_code="UPDATE_FAILED", status_code=400
+        ) from e
+    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+        logger.error("更新虚拟机房失败: id=%s error=%s", virtual_room_id, e, exc_info=True)
+        raise PresetResponseError(
+            message="更新虚拟机房失败", error_code="UPDATE_FAILED", status_code=500
         ) from e
 
 
@@ -95,9 +105,14 @@ def delete_virtual_room(virtual_room_id):
     try:
         _service.delete(virtual_room_id)
         return APIResponse.success(message="虚拟机房删除成功")
-    except Exception as e:
+    except ValidationError as e:
         raise PresetResponseError(
             message=str(e), error_code="DELETE_FAILED", status_code=400
+        ) from e
+    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+        logger.error("删除虚拟机房失败: id=%s error=%s", virtual_room_id, e, exc_info=True)
+        raise PresetResponseError(
+            message="删除虚拟机房失败", error_code="DELETE_FAILED", status_code=500
         ) from e
 
 
@@ -113,9 +128,14 @@ def update_virtual_room_members(virtual_room_id):
     try:
         vr = _service.update_members(virtual_room_id, data["device_ids"])
         return APIResponse.success(data=vr.to_dict(include_relations=True), message="成员更新成功")
-    except Exception as e:
+    except ValidationError as e:
         raise PresetResponseError(
             message=str(e), error_code="UPDATE_FAILED", status_code=400
+        ) from e
+    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+        logger.error("更新虚拟机房成员失败: id=%s error=%s", virtual_room_id, e, exc_info=True)
+        raise PresetResponseError(
+            message="更新虚拟机房成员失败", error_code="UPDATE_FAILED", status_code=500
         ) from e
 
 
