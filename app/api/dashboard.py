@@ -283,29 +283,3 @@ def get_system_status():
 def get_dashboard_stats():
     """获取仪表盘统计数据（兼容旧接口）"""
     return get_stats()
-
-
-@dashboard_bp.route("/statistics", methods=["GET"])
-@doc(summary="获取系统统计信息", tags=["仪表盘"], responses={200: "ApiResponse", 401: "ApiError"})
-@login_required
-@permission_required("system:stats")
-def get_statistics():
-    """获取系统统计信息
-
-    统计IP状态、机房和交换机的相关信息。
-    """
-    try:
-        from app.services.network_service import NetworkService
-        from app.persistence.network_repo import NetworkRepository
-        from app.persistence.ip_repositories import IPManagerRepository
-        network_svc = NetworkService(NetworkRepository(), IPManagerRepository())
-        stats = network_svc.get_statistics()
-
-        return APIResponse.success(data={'data': stats})
-    except Exception as e:
-        logger.error(f"获取统计信息失败: {e}", exc_info=True)
-        return APIResponse.error(
-            message="获取统计信息失败",
-            error_code="DASHBOARD_STATISTICS_ERROR",
-            status_code=500,
-        )
