@@ -22,6 +22,7 @@ from app.persistence.network_connection_repository import NetworkConnectionRepos
 from app.services.switch_event_schema import OpType
 from app.services.switch_events import emit_resource_change
 from app.utils.port_name_parser import parse_port_name
+from app.exceptions.business import ResourceConflictError
 from app.exceptions.validation import ValidationError
 from app.services.vlan_service import VLANService
 
@@ -64,7 +65,8 @@ class PortManagementService:
             NetworkPort: 创建的端口对象
 
         Raises:
-            ValidationError: 端口名已存在
+            ValidationError: 端口名为空
+            ResourceConflictError: 端口名已存在（HTTP 409）
         """
         port_name = data.get("port_name")
         if not port_name:
@@ -72,7 +74,9 @@ class PortManagementService:
 
         existing = self.port_repo.find_port_by_name(device_id, port_name)
         if existing:
-            raise ValidationError(f"端口 {port_name} 已存在")
+            raise ResourceConflictError(
+                "端口", resource_id=port_name, message=f"端口 {port_name} 已存在"
+            )
 
         parsed = parse_port_name(port_name)
 

@@ -6,6 +6,7 @@ API 层不再直接使用 db.session 或 Model.query。
 """
 from typing import Any, Dict, List, Optional
 
+from app.exceptions.business import ResourceConflictError
 from app.exceptions.validation import ValidationError
 from app.models.rbac import Role, Permission
 from app.models.user import User
@@ -69,7 +70,8 @@ class RbacService:
         """创建角色。
 
         Raises:
-            ValidationError: 名称缺失或重复
+            ValidationError: 名称或显示名称为空
+            ResourceConflictError: 角色名称已存在（HTTP 409）
         """
         name = data.get("name", "").strip()
         display_name = data.get("display_name", "").strip()
@@ -78,7 +80,9 @@ class RbacService:
             raise ValidationError("角色名称和显示名称不能为空")
 
         if self.role_repository.find_by_name(name):
-            raise ValidationError("角色名称已存在")
+            raise ResourceConflictError(
+                "角色", resource_id=name, message="角色名称已存在"
+            )
 
         role = Role(
             name=name,

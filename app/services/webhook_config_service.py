@@ -7,6 +7,7 @@ API 层不再直接使用 db.session 或 Model.query。
 from typing import Any, Dict, List, Optional
 
 from app.core.enums import ChannelType, BROADCAST_CHANNELS
+from app.exceptions.business import ResourceConflictError
 from app.exceptions.validation import ValidationError
 from app.models.webhook_config import WebhookConfig, validate_webhook_url
 from app.persistence.webhook_config_repository import WebhookConfigRepository
@@ -36,7 +37,8 @@ class WebhookConfigService:
         """创建 Webhook 配置。
 
         Raises:
-            ValidationError: 必填项缺失、渠道无效、名称重复、URL 不合法
+            ValidationError: 必填项缺失、渠道无效、URL 不合法
+            ResourceConflictError: 同渠道下名称重复（HTTP 409）
         """
         name = data.get("name")
         channel = data.get("channel")
@@ -50,7 +52,10 @@ class WebhookConfigService:
 
         existing = self.webhook_config_repository.find_by_name_channel(name, channel)
         if existing:
-            raise ValidationError(f"同渠道下已存在同名 Webhook 配置: {name}")
+            raise ResourceConflictError(
+                "Webhook 配置", resource_id=name,
+                message=f"同渠道下已存在同名 Webhook 配置: {name}",
+            )
 
         validate_webhook_url(url)
 

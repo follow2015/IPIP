@@ -28,7 +28,8 @@ from app.utils.logging import get_logger
 from flask import Blueprint, request
 
 from app.api.base import APIResponse, ErrorCode
-from app.exceptions.validation import ValidationError
+from app.exceptions import PresetResponseError
+from app.exceptions.business import ResourceConflictError
 from app.services.port_management_service import port_management_service
 from app.openapi.doc import doc, public
 from app.utils.auth import login_required, permission_required
@@ -74,11 +75,13 @@ def create_port(device_id):
     try:
         port = port_management_service.create_port(device_id, data)
         return APIResponse.success(data=port.to_dict(), message="端口创建成功")
-    except ValidationError as e:
+    except ResourceConflictError as e:
         logger.warning("创建端口失败: %s", e)
-        if "已存在" in str(e):
-            return APIResponse.error(str(e), ErrorCode.DUPLICATE_ERROR, 409)
-        raise
+        raise PresetResponseError(
+            message=e.message,
+            error_code=ErrorCode.DUPLICATE_ERROR,
+            status_code=409,
+        ) from e
 
 
 @router.route("/<int:device_id>/ports/<path:port_name>", methods=["GET"])

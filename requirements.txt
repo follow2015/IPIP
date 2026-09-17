@@ -59,6 +59,14 @@ gunicorn==23.0.0
 #    安装顺序侥幸停在 0.45.3，故问题被长期掩盖）。realtime_gateway 自身
 #    的 requirements.txt 只要求 starlette>=0.37.0，0.45.3 功能无损。
 starlette==0.45.3
+# 本仓代码**不 import fastapi**（实时网关用 starlette；`rg "import fastapi" app/ realtime_gateway/`
+# 零命中），但仍然显式钉住（审计 A-P2-3），理由有两条：
+#   1. 它是**约束链的一环**，而不是无关的传递依赖 —— chromadb==1.0.0 硬锁
+#      fastapi==0.115.9，而 fastapi 又约束 starlette<0.46.0（见上）。不写出来时，
+#      这条链只能靠读 chromadb 的元数据才知道，starlette 的上界就成了"魔法数字"；
+#   2. 不写出来时，fastapi 的实际版本由 chromadb 决定，上游一改就静默漂移，
+#      而 0.115.9 正是上面那条上界的**唯一依据**。
+fastapi==0.115.9
 
 # ── AI 能力 (Phase 0-4) ──────────────────────────────────────────────
 openai>=1.99,<3  # OpenAI 兼容 LLM 客户端

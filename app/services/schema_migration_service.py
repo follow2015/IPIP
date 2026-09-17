@@ -18,12 +18,25 @@ schema_migrations；``flask db-status`` 查看状态；``flask db-upgrade --dry-
 上述流程只能覆盖「已经写了迁移」的变更，挡不住两种漏网：迁移文件压根没写
 （手工改了 baseline 或模型），或写了却没在目标环境执行——两者最终都表现为
 同一类事故：ORM 按模型全列拼 SELECT，库里没这列 → 1054 Unknown column →
-运行时崩。为此提供 ``flask db-check``（见 `collect_missing_columns`），
-直接以 ORM 元数据为准核对真实库，列出缺失的表/列。
+运行时崩。为此提供 ``flask db-check``（见 `collect_schema_drift`），
+直接以 ORM 元数据为准核对真实库，列出缺失的表/列/索引。
+
+索引也纳入检测（2026-09-17，审计 A-P1-1）：缺索引**不会**像缺列那样当场炸，
+只会让查询静默退化为全表扫描 —— 正是这种"没有报错"的性质，让索引漂移能长期
+潜伏（`tests/migrations/test_index_declaration_parity.py` 的 docstring 记录了
+两次因此产生的误判）。注意两项检测**管的不是同一件事**：
+
+- 本函数（``flask db-check`` / 启动自检）：**模型 ↔ 实时库**；
+- `test_index_declaration_parity.py`：**模型 ↔ 权威 baseline DDL**（离线，不连库）。
+
+**已知边界**：只检测 ``Index(...)``（含 ``Column(index=True)`` 自动生成的），
+不检测 ``UniqueConstraint``。唯一约束在 MySQL 里的实际索引名可能是自动生成的
+（``Column(unique=True)`` 无名），按名字比对必产假阳性，而按列集合比对又要处理
+InnoDB 向二级索引追加主键列的存储细节 —— 收益/复杂度不划算，故显式留给后续。
 
 纪律：
 - 模型改动与迁移文件同一 commit（防模型↔库漂移）；
-- 是否漂移以 `collect_missing_columns` / flask db-check 的判定为准，
+- 是否漂移以 `collect_schema_drift` / flask db-check 的判定为准，
   不以「模型看着对」或「迁移好像跑过」为准；
 - 数据回填也走迁移链（.py 内批处理），不放 DDL 文件；
 - 已知 MySQL 8.4 硬约束见项目 memory：分区表无 FK(1506)、表 COMMENT 先于
@@ -37,6 +50,16 @@ from pathlib import Path
 VERSION_FILE_RE = re.compile(r"^(\d{4})_[a-z0-9_]+\.py$")
 
 VERSION_TABLE = "schema_migrations"
+
+_COLUMNS_SQL = (
+    "SELECT table_name, column_name FROM information_schema.columns "
+    "WHERE table_schema = DATABASE()"
+)
+
+_INDEXES_SQL = (
+    "SELECT table_name, index_name FROM information_schema.statistics "
+    "WHERE table_schema = DATABASE()"
+)
 
 VERSION_TABLE_DDL = (
     f"CREATE TABLE IF NOT EXISTS {VERSION_TABLE} ("
@@ -171,34 +194,40 @@ class SchemaMigrationRunner:
         self._conn.commit()
 
 
-def collect_missing_columns(session) -> list[str]:
-    """比对 ORM 元数据与实际库，返回「模型已声明但库中缺失」的表/列清单。
+def collect_schema_drift(session) -> list[str]:
+    """比对 ORM 元数据与实际库，返回「模型已声明但库中缺失」的表/列/索引清单。
 
     模型↔库漂移的唯一判定实现，供三种调用方共用（避免多份实现各说各话）：
     CLI `flask db-check`、应用启动自检、以及 mysql_only 回归测试。
 
-    仅适用于 MySQL：依赖 information_schema.columns。非 MySQL 方言（测试的
-    SQLite）须由调用方跳过。
+    仅适用于 MySQL：依赖 information_schema.columns / .statistics。非 MySQL 方言
+    （测试的 SQLite）须由调用方跳过。
 
     Args:
         session: SQLAlchemy Session，须处于 app context 内（ORM metadata 已注册）。
 
     Returns:
-        人类可读的漂移描述列表；空列表表示无漂移。
+        人类可读的漂移描述列表；空列表表示无漂移。每条形如
+        `缺表：<表>（模型已声明，库中不存在）` / `缺列：<表>.<列>（...）` /
+        `缺索引：<表>.<索引名>（...）`。
+
+    命名沿革：原名 `collect_missing_columns`，覆盖索引后名字不再准确（P1 审计
+    A-P1-1），故一并更名；旧名无保留别名 —— 它是内部 API，全仓仅 3 个调用方，
+    留别名只会让"只查列"的旧口径在别处复活。
     """
     from sqlalchemy import text
 
     from extensions import db
 
-    rows = session.execute(
-        text(
-            "SELECT table_name, column_name FROM information_schema.columns "
-            "WHERE table_schema = DATABASE()"
-        )
-    ).fetchall()
+    rows = session.execute(text(_COLUMNS_SQL)).fetchall()
     actual: dict[str, set] = {}
     for table_name, column_name in rows:
         actual.setdefault(table_name, set()).add(column_name)
+
+    index_rows = session.execute(text(_INDEXES_SQL)).fetchall()
+    actual_indexes: dict[str, set] = {}
+    for table_name, index_name in index_rows:
+        actual_indexes.setdefault(table_name, set()).add(index_name.casefold())
 
     problems: list[str] = []
     for table in db.metadata.sorted_tables:
@@ -210,5 +239,11 @@ def collect_missing_columns(session) -> list[str]:
             if column.name not in cols:
                 problems.append(
                     f"缺列：{table.name}.{column.name}（模型已声明，库中不存在）"
+                )
+        present = actual_indexes.get(table.name, set())
+        for index in table.indexes:
+            if index.name and index.name.casefold() not in present:
+                problems.append(
+                    f"缺索引：{table.name}.{index.name}（模型已声明，库中不存在）"
                 )
     return problems

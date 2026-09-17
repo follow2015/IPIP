@@ -19,6 +19,7 @@ from app.utils.http_client import post_json
 from app.utils.transactional import transactional
 from app.core.enums import ChannelType
 from app.exceptions import PresetResponseError
+from app.exceptions.business import ResourceConflictError
 from app.exceptions.validation import ValidationError
 
 logger = get_logger(__name__)
@@ -48,11 +49,13 @@ def create_webhook_config():
         config = webhook_config_service.create_config(
             data, created_by=g.current_user["user_id"]
         )
-    except ValidationError as e:
-        error_code = "DUPLICATE_ERROR" if "已存在" in str(e) else "BAD_REQUEST"
-        status_code = 409 if "已存在" in str(e) else 400
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code=error_code, status_code=status_code
+            message=e.message, error_code="DUPLICATE_ERROR", status_code=409
+        ) from e
+    except ValidationError as e:
+        raise PresetResponseError(
+            message=e.message, error_code="BAD_REQUEST", status_code=400
         ) from e
     except ValueError as e:
         raise PresetResponseError(

@@ -15,6 +15,7 @@ from app.services.rbac_service import rbac_service
 from app.openapi.doc import doc, public
 from app.utils.auth import login_required, permission_required
 from app.exceptions import PresetResponseError
+from app.exceptions.business import ResourceConflictError
 from app.exceptions.validation import ValidationError
 
 logger = get_logger(__name__)
@@ -89,9 +90,10 @@ def create_role():
     data = request.get_json(silent=True) or {}
     try:
         role = rbac_service.create_role(data)
+    except ResourceConflictError as e:
+        raise PresetResponseError(message=e.message, status_code=409) from e
     except ValidationError as e:
-        status_code = 409 if "已存在" in str(e) else 400
-        raise PresetResponseError(message=str(e), status_code=status_code) from e
+        raise PresetResponseError(message=e.message, status_code=400) from e
 
     return APIResponse.success(data=role.to_dict(), message="角色创建成功", status_code=201)
 

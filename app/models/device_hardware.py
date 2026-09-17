@@ -43,7 +43,7 @@ class DeviceHardware(BaseModel):
     gpu = db.Column(db.String(200), comment="GPU配置描述")
     gpu_count = db.Column(db.SmallInteger, comment="GPU数量")
     gpu_template_id = db.Column(db.BigInteger, db.ForeignKey('component_templates.id',
-                        ondelete='SET NULL'), nullable=True, index=True,
+                        ondelete='SET NULL'), nullable=True,
                         comment='GPU模板ID')
 
     storage_summary = db.Column(db.String(200), comment="存储配置摘要")
@@ -59,10 +59,10 @@ class DeviceHardware(BaseModel):
     device_config = db.Column(JSON, comment="扩展配置")
 
     cpu_template_id    = db.Column(db.BigInteger, db.ForeignKey('component_templates.id',
-                            ondelete='SET NULL'), nullable=True, index=True,
+                            ondelete='SET NULL'), nullable=True,
                             comment='CPU模板ID')
     memory_template_id = db.Column(db.BigInteger, db.ForeignKey('component_templates.id',
-                            ondelete='SET NULL'), nullable=True, index=True,
+                            ondelete='SET NULL'), nullable=True,
                             comment='内存模板ID')
 
     device = relationship(
