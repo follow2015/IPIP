@@ -135,7 +135,7 @@ select_pip_index() {
     log "使用 PIP_INDEX_URL 强制指定的 pip 源: $PIP_INDEX_URL"
     return 0
   fi
-  local official_kbps tuna_kbps
+  local official_kbps
   log "实测 pip 下载吞吐（探测包 ${PIP_PROBE_PACKAGE}，上限 ${PIP_INSTALL_TIMEOUT}s/源）..."
   official_kbps=$(probe_speed_kbps "$PIP_INDEX_OFFICIAL")
   log "  官方源 pypi.org：$(human_speed "${official_kbps:-0}")"
@@ -336,22 +336,6 @@ if [ "$UPGRADE" -eq 1 ]; then
   log "升级模式：默认跳过种子导入（--skip-seed）"
 fi
 
-# ── 解析最终 torch flavor（C：持久化，避免 GPU 静默降级为 CPU）────
-# 用户显式指定 --cpu/--gpu/--gpu-fast → 尊重用户选择并据以持久化；
-# 未指定时若上次安装写入了 gpu 状态，则沿用 gpu，避免“下载新的再次执行安装”
-# 因默认 cpu 而悄悄把生产 GPU 环境的 torch 换成 CPU 版。
-FLAVOR_STATE="$PROJECT_ROOT/instance/.install-flavor"
-if [ "$TORCH_FLAVOR_EXPLICIT" -eq 1 ]; then
-  RESOLVED_FLAVOR="$TORCH_FLAVOR"
-else
-  if [ -f "$FLAVOR_STATE" ] && [ "$(cat "$FLAVOR_STATE" 2>/dev/null)" = "gpu" ]; then
-    RESOLVED_FLAVOR="gpu"
-    warn "沿用上次安装的 GPU 版 torch（状态文件 $FLAVOR_STATE）；如需强制改回 CPU 版请显式加 --cpu"
-  else
-    RESOLVED_FLAVOR="cpu"
-  fi
-fi
-
 # ── 0. 代码副本同步到固定安装目录 ──────────────────────────────
 # 重装/升级时 .env、instance/（运行时数据）、logs/ 不被覆盖；.venv 由第 2 步
 # 在安装目录内新建。--delete 让安装目录与代码副本严格一致（陈旧文件不留存）。
@@ -379,6 +363,30 @@ fi
 cd "$PROJECT_ROOT"
 
 log "项目根目录: $PROJECT_ROOT"
+
+# ── 解析最终 torch flavor（C：持久化，避免 GPU 静默降级为 CPU）────
+# 用户显式指定 --cpu/--gpu/--gpu-fast → 尊重用户选择并据以持久化；
+# 未指定时若上次安装记录为 gpu，则沿用 gpu（连同多镜像预取标志 --gpu-fast），
+# 避免“下载新的再次执行安装”因默认 cpu 而悄悄把生产 GPU 环境的 torch 换成 CPU 版。
+# 记录文件在 /opt/ipip/instance/ 下（instance/ 不随第 0 步同步覆盖），故解析放在同步之后。
+# 文件格式：第 1 行 flavor（cpu|gpu），第 2 行 cuda_multi_mirror（0|1）；旧版单行文件第 2 行为空。
+FLAVOR_STATE="$PROJECT_ROOT/instance/.install-flavor"
+if [ "$TORCH_FLAVOR_EXPLICIT" -eq 1 ]; then
+  RESOLVED_FLAVOR="$TORCH_FLAVOR"
+else
+  SAVED_FLAVOR="$(head -n1 "$FLAVOR_STATE" 2>/dev/null || true)"
+  SAVED_CUDA_MIRROR="$(sed -n '2p' "$FLAVOR_STATE" 2>/dev/null || true)"
+  if [ "$SAVED_FLAVOR" = "gpu" ]; then
+    RESOLVED_FLAVOR="gpu"
+    CUDA_MULTI_MIRROR="${SAVED_CUDA_MIRROR:-0}"
+    warn "沿用上次安装的 GPU 版 torch（记录文件 $FLAVOR_STATE）；如需强制改回 CPU 版请显式加 --cpu"
+    if [ "$CUDA_MULTI_MIRROR" = "1" ]; then
+      log "沿用多镜像分散预取（--gpu-fast 等价）"
+    fi
+  else
+    RESOLVED_FLAVOR="cpu"
+  fi
+fi
 
 # ── 1. 系统依赖与版本基线检查 ──────────────────────────────
 log "=== [1/7] 检查系统依赖与版本基线 ==="
@@ -526,7 +534,7 @@ prefetch_one_wheel() {
   local pkg="$1" fn="$2" mirror="$3" out="$PIP_WHEEL_CACHE/$2"
   local u="" full="" total="" seg n="$CUDA_SEGMENTS" i s e fin
   [ -f "$out" ] && { log "  已缓存 $pkg"; return 0; }
-  u=$(curl -s -m 20 "$mirror/simple/$pkg/" | grep -oE "href=\"[^\"]*$fn[^\"]*\"" | head -1 | sed 's/href="//;s/"$//')
+  u=$(curl -s -m 20 "$mirror/simple/$pkg/" | grep -oE "href=\"[^\"]*${fn}[^\"]*\"" | head -1 | sed 's/href="//;s/"$//')
   if [ -z "$u" ]; then warn "  $pkg 在 ${mirror#https://} 未找到，跳过"; return 1; fi
   case "$u" in
     http*) full="$u" ;;
@@ -644,10 +652,11 @@ else
   log "torch 版本：GPU（CUDA）"
 fi
 
-# 持久化本次最终 flavor，供下次升级沿用（避免 GPU 静默降级为 CPU）
+# 持久化本次最终 flavor 与多镜像预取标志，供下次升级沿用
+# （避免 GPU 静默降级为 CPU，以及 --gpu-fast 的多镜像分散在升级时丢失）
 mkdir -p "$PROJECT_ROOT/instance"
-printf '%s' "$RESOLVED_FLAVOR" > "$FLAVOR_STATE"
-log "torch flavor 已记录到 $FLAVOR_STATE: $RESOLVED_FLAVOR"
+printf '%s\n%s\n' "$RESOLVED_FLAVOR" "$CUDA_MULTI_MIRROR" > "$FLAVOR_STATE"
+log "torch flavor 已记录到 $FLAVOR_STATE: $RESOLVED_FLAVOR（cuda_multi_mirror=$CUDA_MULTI_MIRROR）"
 
 run_timed "升级 pip" script -qec "$VENV_PY -m pip install --upgrade pip wheel setuptools $PIP_INDEX_ARG --timeout 30 --retries 3" /dev/null
 
@@ -824,7 +833,8 @@ try:
                 ("$DB_NAME",))
     sys.stdout.write("1" if cur.fetchone()[0] > 0 else "0")
     c.close()
-except Exception:
+except Exception as e:
+    sys.stderr.write("schema_migrations 探测失败（%s），按未初始化处理：将走 baseline 全量导入\n" % e)
     sys.stdout.write("0")
 PYEOF
   )
