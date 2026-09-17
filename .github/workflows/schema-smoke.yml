@@ -45,6 +45,10 @@ jobs:
       MYSQL_USER: root
       MYSQL_PASSWORD: ""
       MYSQL_DATABASE: ip_manager
+      # 迁移链重放会触发整个 Flask 应用初始化（config.get_config().validate()），
+      # 生产配置强制要求 SECRET_KEY/JWT_SECRET_KEY/SWITCH_SECRET_KEY。CI 无 .env，
+      # 故用 development 配置（自动生成随机密钥，跳过硬性密钥校验），使重放可跑通。
+      FLASK_ENV: development
 
     steps:
       - name: Checkout
