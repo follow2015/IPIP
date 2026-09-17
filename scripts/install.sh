@@ -40,6 +40,7 @@
 #   bash scripts/install.sh --skip-db          # 跳过数据库初始化
 #   bash scripts/install.sh --skip-seed        # 跳过种子导入
 #   bash scripts/install.sh --with-units       # 额外安装 systemd 进程托管 unit（需 root）
+#   bash scripts/install.sh --upgrade          # 升级模式：沿用已装 torch flavor、走迁移升级、跳过种子
 #   bash scripts/install.sh --help
 #
 # torch 版本选择说明（重要）：
@@ -277,8 +278,10 @@ SKIP_DB=0
 SKIP_SEED=0
 SKIP_MODELS=0
 TORCH_FLAVOR="cpu"      # cpu（默认）| gpu
+TORCH_FLAVOR_EXPLICIT=0 # 1=用户显式指定了 --cpu/--gpu/--gpu-fast（C：用于决定是否沿用上次 flavor）
 CUDA_MULTI_MIRROR=0     # 1=用多镜像分散并行预取 CUDA 大包（--gpu-fast）
 WITH_UNITS=0            # 1=安装完成后渲染并安装 systemd unit（T2.1）
+UPGRADE=0               # 1=升级模式（A）：沿用已装 flavor、走迁移升级路径、默认跳过种子
 UNITS_USER=""           # 空=由 install-units.sh 决定默认账号（ipip）
 UNITS_GROUP=""
 UNITS_SCRIPT=""         # 空=按仓库布局自动探测
@@ -289,10 +292,11 @@ while [ $# -gt 0 ]; do
     --skip-db)       SKIP_DB=1; shift ;;
     --skip-seed)     SKIP_SEED=1; shift ;;
     --skip-models)   SKIP_MODELS=1; shift ;;
-    --cpu)           TORCH_FLAVOR="cpu"; shift ;;
-    --gpu)           TORCH_FLAVOR="gpu"; shift ;;
-    --gpu-fast)      TORCH_FLAVOR="gpu"; CUDA_MULTI_MIRROR=1; shift ;;
+    --cpu)           TORCH_FLAVOR="cpu"; TORCH_FLAVOR_EXPLICIT=1; shift ;;
+    --gpu)           TORCH_FLAVOR="gpu"; TORCH_FLAVOR_EXPLICIT=1; shift ;;
+    --gpu-fast)      TORCH_FLAVOR="gpu"; CUDA_MULTI_MIRROR=1; TORCH_FLAVOR_EXPLICIT=1; shift ;;
     --with-units)    WITH_UNITS=1; shift ;;
+    --upgrade)       UPGRADE=1; shift ;;
     # 取值形式（同时支持 "--k v" 与 "--k=v"）
     # 缺值时给出与前文一致的 [ERROR] 提示，而不是 bash 默认的 "line N: 2: ..."
     --units-user)
@@ -323,6 +327,30 @@ HELP
     *) die "未知参数: $1（用 --help 查看用法）" ;;
   esac
 done
+
+# ── 升级模式默认值（A）────────────────────────────────────────
+# 升级模式：默认跳过种子导入（种子本身幂等，但每次重跑会向 .credentials 重复追加
+# 管理员明文密码，多次升级后文件膨胀且易误读）。如需重建管理员可单独跑 seed_all.sh。
+if [ "$UPGRADE" -eq 1 ]; then
+  SKIP_SEED=1
+  log "升级模式：默认跳过种子导入（--skip-seed）"
+fi
+
+# ── 解析最终 torch flavor（C：持久化，避免 GPU 静默降级为 CPU）────
+# 用户显式指定 --cpu/--gpu/--gpu-fast → 尊重用户选择并据以持久化；
+# 未指定时若上次安装写入了 gpu 状态，则沿用 gpu，避免“下载新的再次执行安装”
+# 因默认 cpu 而悄悄把生产 GPU 环境的 torch 换成 CPU 版。
+FLAVOR_STATE="$PROJECT_ROOT/instance/.install-flavor"
+if [ "$TORCH_FLAVOR_EXPLICIT" -eq 1 ]; then
+  RESOLVED_FLAVOR="$TORCH_FLAVOR"
+else
+  if [ -f "$FLAVOR_STATE" ] && [ "$(cat "$FLAVOR_STATE" 2>/dev/null)" = "gpu" ]; then
+    RESOLVED_FLAVOR="gpu"
+    warn "沿用上次安装的 GPU 版 torch（状态文件 $FLAVOR_STATE）；如需强制改回 CPU 版请显式加 --cpu"
+  else
+    RESOLVED_FLAVOR="cpu"
+  fi
+fi
 
 # ── 0. 代码副本同步到固定安装目录 ──────────────────────────────
 # 重装/升级时 .env、instance/（运行时数据）、logs/ 不被覆盖；.venv 由第 2 步
@@ -573,7 +601,7 @@ PYEOF
 }
 
 # ── torch 版本选择（CPU 默认 / GPU 需显式 --gpu）──────────────
-if [ "$TORCH_FLAVOR" = "cpu" ]; then
+if [ "$RESOLVED_FLAVOR" = "cpu" ]; then
   # CPU 版仅 torch 本体 ≈190MB，无 CUDA 依赖。
   # ⚠️ 该源的"首页响应时间"不能当作速度判据：实测首页仅 57KB/s，但 wheel 真实
   # 下载可达 2.8MB/s。判断源快慢必须测真实文件（本项目反复踩过的坑）。
@@ -615,6 +643,11 @@ else
   fi
   log "torch 版本：GPU（CUDA）"
 fi
+
+# 持久化本次最终 flavor，供下次升级沿用（避免 GPU 静默降级为 CPU）
+mkdir -p "$PROJECT_ROOT/instance"
+printf '%s' "$RESOLVED_FLAVOR" > "$FLAVOR_STATE"
+log "torch flavor 已记录到 $FLAVOR_STATE: $RESOLVED_FLAVOR"
 
 run_timed "升级 pip" script -qec "$VENV_PY -m pip install --upgrade pip wheel setuptools $PIP_INDEX_ARG --timeout 30 --retries 3" /dev/null
 
@@ -772,7 +805,44 @@ PYEOF
   # 各迁移的效果，导入后按清单 stamp 版本即可与升级过的库保持一致。
   SCHEMA_FILE="$PROJECT_ROOT/migrations/versions/0000_baseline.sql"
   COVERS_FILE="$PROJECT_ROOT/migrations/versions/0000_baseline.covers"
-  if [ -f "$SCHEMA_FILE" ]; then
+
+  # ── 升级路径判定（B）────────────────────────────────────────
+  # 库已初始化（schema_migrations 表存在）→ 只应用待执行迁移，不再整库重导 baseline。
+  # 重导对“改动已有表结构”的迁移无效（CREATE TABLE IF NOT EXISTS 会跳过已有表），
+  # 且每次更新都白跑 1584 行 DDL + 15 个触发器。新建库才走 baseline 全量导入 + stamp。
+  # 探测失败（如库暂不可连）按“未初始化”处理，仍走 baseline 全量，避免升级路径误判。
+  DB_INITIALIZED=$("$VENV_PY" - << PYEOF || echo 0
+import pymysql, os, sys
+try:
+    c = pymysql.connect(host="$DB_HOST", port=int("$DB_PORT"), user="$DB_USER",
+                        init_command="SET time_zone='+00:00'",
+                        password=os.getenv("MYSQL_PASSWORD",""), charset="utf8mb4",
+                        autocommit=True)
+    cur = c.cursor()
+    cur.execute("SELECT COUNT(*) FROM information_schema.tables "
+                "WHERE table_schema=%s AND table_name='schema_migrations'",
+                ("$DB_NAME",))
+    sys.stdout.write("1" if cur.fetchone()[0] > 0 else "0")
+    c.close()
+except Exception:
+    sys.stdout.write("0")
+PYEOF
+  )
+  DB_INITIALIZED="${DB_INITIALIZED:-0}"
+
+  if [ "$DB_INITIALIZED" = "1" ]; then
+    log "检测到数据库已初始化（schema_migrations 存在），走升级路径：仅应用待执行迁移"
+    # flask db-upgrade 应用 migrations/versions 中尚未记账的迁移（幂等、可重跑），
+    # 并自行把已应用版本写入 schema_migrations，无需手动 stamp。
+    if run_timed "应用数据库迁移 (flask db-upgrade)" \
+        "$VENV_PY" -m flask --app wsgi:app db-upgrade; then
+      :
+    else
+      die "数据库迁移失败。请先手工预检：
+        $VENV_PY -m flask --app wsgi:app db-upgrade --dry-run
+      并排查 migrations/versions 与当前 schema 的漂移后再重跑本脚本。"
+    fi
+  elif [ -f "$SCHEMA_FILE" ]; then
     log "导入 $(basename "$SCHEMA_FILE")..."
     if [ -n "$MYSQL_CLIENT" ]; then
       # mysql CLI 原生支持 DELIMITER 指令
@@ -963,13 +1033,27 @@ log "          sudo $VENV_PY scripts/credentials.py reset-mysql  # 重置 MySQL 
 log "留档文件: $PROJECT_ROOT/.credentials（权限 600，含历次生成的明文凭据）"
 
 log "============================================================"
-log "安装完成 ✅"
-if [ "$UNITS_INSTALLED" -eq 1 ]; then
+if [ "$UPGRADE" -eq 1 ]; then
+  # 升级模式：新代码已落到 $PROJECT_ROOT，但运行中的进程仍持有旧代码，
+  # 必须重启服务才能生效——这是「下载新版再次执行安装」最易遗漏的一步。
+  log "升级安装完成 ✅  新代码已落到 $PROJECT_ROOT"
+  log "⚠️ 运行中的服务仍加载旧代码，需重启后方可生效："
+  # 按当前实际托管方式给出对应重启命令（优先认 systemd，否则走 start.sh）
+  if systemctl list-unit-files 2>/dev/null | grep -qE '^ipip-'; then
+    log "  sudo systemctl restart ipip.target      # 重启全部 ipip 服务（systemd 托管）"
+    log "  # 或逐个重启：sudo systemctl restart ipip-flask ipip-gateway ipip-monitor ipip-celery"
+  else
+    log "  cd $PROJECT_ROOT && bash scripts/start.sh restart   # 重启全部服务（start.sh 托管）"
+  fi
+  log "验证: curl -fsS http://127.0.0.1:${FLASK_PORT:-5000}/api/health/check"
+elif [ "$UNITS_INSTALLED" -eq 1 ]; then
+  log "安装完成 ✅"
   log "下一步:"
   log "  1) 按 install-units.sh 输出的清单逐个 enable 并验证"
   log "  2) systemctl enable ipip.target        # 开机自启聚合"
   log "  3) curl -fsS http://127.0.0.1:${FLASK_PORT:-5000}/api/health/check"
 else
+  log "安装完成 ✅"
   log "下一步: 编辑 .env 确认配置后，执行 bash scripts/start.sh 启动系统"
   log "  需要 systemd 托管进程时：重跑本脚本并加 --with-units"
 fi
