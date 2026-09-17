@@ -63,10 +63,14 @@ jobs:
           echo "❌ MySQL 在 60s 内未就绪"
           exit 1
 
+      # 迁移链重放会执行各迁移的 apply()，其中可能 `from app.* import ...`
+      # 触发整个 Flask 应用初始化（config.py 依赖 python-dotenv 等运行时包），
+      # 故此处必须装齐完整运行时依赖（与 install.sh 真实安装路径一致），
+      # 不能只装 pymysql（import_sql.py 用的驱动也已包含在 requirements.txt 中）。
       - name: 安装 Python 依赖
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install pymysql
+          python3 -m pip install -r requirements.txt
 
       # 全新安装的权威 DDL 源是迁移基线（含分区表 + 15 个触发器），
       # 快照覆盖范围由 0000_baseline.covers 清单声明。
