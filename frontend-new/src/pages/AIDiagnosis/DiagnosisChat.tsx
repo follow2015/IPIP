@@ -346,7 +346,10 @@ export default function DiagnosisChat() {
           }
           description={rollbackFailures.slice(0, 3).map((f) => (
             <Tag key={f.id} color="red">
-              设备 {f.device_id} | {f.skill_name} | {f.created_at}
+              {/* 设备名快照优先、回落裸 ID：这条告警说的正是"某台设备卡在
+                  已变更未回滚"，而设备很可能已被删除 ⇒ 只认 ID 会显示成
+                  `设备 null`（后端已把 device_id 置空、靠快照列自证）。 */}
+              设备 {f.device_name ?? f.device_id} | {f.skill_name} | {f.created_at}
             </Tag>
           ))}
           style={{ marginBottom: 16 }}

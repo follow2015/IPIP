@@ -7,6 +7,7 @@ API 层不再直接使用 db.session 或 Model.query。
 from typing import Any, Dict, List, Optional
 
 from app.exceptions.validation import ValidationError
+from app.exceptions.business import ResourceConflictError
 from app.models.component_template import ComponentTemplate
 from app.persistence.component_template_repository import ComponentTemplateRepository
 from app.utils.logging import get_logger
@@ -44,7 +45,8 @@ class ComponentTemplateService:
         """创建配件模板。
 
         Raises:
-            ValidationError: 类别/型号缺失，或三元组重复
+            ValidationError: 类别/型号缺失
+            ResourceConflictError: 同 (类别, 客户, 型号) 三元组已存在（HTTP 409）
         """
         category = data.get("category")
         model = data.get("model")
@@ -59,7 +61,11 @@ class ComponentTemplateService:
             model=model,
         )
         if exists:
-            raise ValidationError("该类别下已存在同名型号模板")
+            raise ResourceConflictError(
+                "配件模板",
+                str(model),
+                message="该类别下已存在同名型号模板",
+            )
 
         template = ComponentTemplate(
             category=category,
@@ -82,7 +88,7 @@ class ComponentTemplateService:
         """更新配件模板。
 
         Raises:
-            ValidationError: 三元组冲突
+            ResourceConflictError: 同 (类别, 客户, 型号) 三元组已存在（HTTP 409）
         """
         template = self.template_repository.find_by_id(template_id)
         if not template:
@@ -100,7 +106,11 @@ class ComponentTemplateService:
                 category=new_category, customer_id=new_customer_id, model=new_model
             )
             if exists:
-                raise ValidationError("该类别下已存在同名型号模板")
+                raise ResourceConflictError(
+                    "配件模板",
+                    str(new_model),
+                    message="该类别下已存在同名型号模板",
+                )
 
         for field in (
             "category", "customer_id", "brand", "model",

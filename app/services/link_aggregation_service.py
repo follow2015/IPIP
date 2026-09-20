@@ -11,6 +11,7 @@ from app.models.link_aggregation import LinkAggregationGroup
 from app.persistence.link_aggregation_repository import LinkAggregationRepository
 from app.persistence.switch_port_repository import NetworkPortRepository
 from app.exceptions.validation import ValidationError
+from app.exceptions.business import ResourceConflictError
 
 logger = get_logger(__name__)
 
@@ -79,11 +80,15 @@ class LinkAggregationService:
             LinkAggregationGroup: 创建的聚合组记录
 
         Raises:
-            ValidationError: 聚合组名在该设备已存在
+            ResourceConflictError: 聚合组名在该设备已存在（HTTP 409）
         """
         existing = self.repo.find_by_device_and_name(data['device_id'], data['lag_name'])
         if existing:
-            raise ValidationError(f"聚合组 {data['lag_name']} 在该设备已存在")
+            raise ResourceConflictError(
+                "聚合组",
+                str(data["lag_name"]),
+                message=f"聚合组 {data['lag_name']} 在该设备已存在",
+            )
         return self.repo.create(data)
 
     def delete(self, lag_id: int) -> bool:

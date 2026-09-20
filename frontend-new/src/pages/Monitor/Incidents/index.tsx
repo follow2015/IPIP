@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { Card, Tag, Space, Select, Button, Drawer, Descriptions, Typography, Tooltip } from 'antd';
+import {
+  Card,
+  Tag,
+  Space,
+  Select,
+  Button,
+  Drawer,
+  Descriptions,
+  Typography,
+  Tooltip,
+  Input
+} from 'antd';
 import DataTable from '@/components/DataTable';
 import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -33,12 +44,28 @@ const STATUS_COLOR: Record<string, string> = {
   closed: 'default'
 };
 
+function renderDeviceRef(id: number | null, name: string | null) {
+  if (!name) return id != null ? String(id) : '-';
+  if (id != null) return name;
+  return (
+    <Space size={4}>
+      <span>{name}</span>
+      <Tooltip title="设备已被彻底删除；本行由设备名快照保留（引用列已置空）">
+        <Tag color="default" style={{ marginInlineEnd: 0 }}>
+          已删除
+        </Tag>
+      </Tooltip>
+    </Space>
+  );
+}
+
 export default function MonitorIncidents() {
   const [params, setParams] = useState<IncidentListParams>({
     page: 1,
     per_page: 20
   });
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [deviceNameInput, setDeviceNameInput] = useState('');
 
   const { data, isLoading, refetch, isFetching } = useIncidents(params);
   const { data: detail, isLoading: detailLoading } = useIncidentDetail(selectedId);
@@ -47,6 +74,12 @@ export default function MonitorIncidents() {
   const total = data?.total ?? 0;
 
   const { isMobile } = useResponsive();
+
+  const submitDeviceName = (value: string) => {
+    const next = value.trim();
+    setDeviceNameInput(value);
+    setParams((p) => ({ ...p, device_name: next || undefined, page: 1 }));
+  };
 
   const columns: ColumnsType<IncidentItem> = [
     {
@@ -153,7 +186,20 @@ export default function MonitorIncidents() {
         </Space>
       }
       extra={
-        <Space>
+        <Space wrap>
+          {/* 服务端检索（子串、不区分大小写）：走 device_name 查询参数，命中
+              设备名快照 —— 设备被彻底删除后按 ID 已查不到，只能按名字回溯。
+              刻意不用 DataTable 自带的 searchable：那是**客户端**过滤，只会筛
+              当前一页（服务端分页下表现为"明明有却搜不到"），故本页保持
+              searchable={false}。 */}
+          <Input.Search
+            allowClear
+            placeholder="按设备名搜历史事件"
+            style={{ width: isMobile ? '100%' : 220 }}
+            value={deviceNameInput}
+            onChange={(e) => setDeviceNameInput(e.target.value)}
+            onSearch={submitDeviceName}
+          />
           <Select
             allowClear
             placeholder="状态过滤"
@@ -222,7 +268,9 @@ export default function MonitorIncidents() {
                   ? (REASON_LABEL[detail.reason_code] ?? detail.reason_code)
                   : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="根因设备">{detail.root_device_id ?? '-'}</Descriptions.Item>
+              <Descriptions.Item label="根因设备">
+                {renderDeviceRef(detail.root_device_id, detail.root_device_name)}
+              </Descriptions.Item>
               <Descriptions.Item label="首告时间">
                 {detail.first_alert_at ? formatDateTime(detail.first_alert_at) : '-'}
               </Descriptions.Item>
@@ -256,15 +304,26 @@ export default function MonitorIncidents() {
               <DataTable
                 searchable={false}
                 showCard={false}
-                rowKey={(r) => `${r.device_id}-${r.created_at}`}
+                rowKey="id"
                 size="small"
                 pagination={{ pageSize: 5 }}
                 dataSource={detail.suppressed_logs}
                 columns={[
-                  { title: '设备 ID', dataIndex: 'device_id', width: 90 },
+                  {
+                    title: '设备',
+                    dataIndex: 'device_name',
+                    width: 160,
+                    render: (_: string | null, r) => renderDeviceRef(r.device_id, r.device_name)
+                  },
                   { title: '告警类型', dataIndex: 'alert_type', width: 140 },
                   { title: '严重级别', dataIndex: 'severity', width: 90 },
-                  { title: '上游设备', dataIndex: 'upstream_device_id', width: 100 },
+                  {
+                    title: '上游设备',
+                    dataIndex: 'upstream_device_name',
+                    width: 160,
+                    render: (_: string | null, r) =>
+                      renderDeviceRef(r.upstream_device_id, r.upstream_device_name)
+                  },
                   {
                     title: '时间',
                     dataIndex: 'created_at',

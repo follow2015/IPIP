@@ -496,9 +496,9 @@ def terminate_customer(customer_id):
         from app.exceptions.business import BusinessLogicError
         from app.exceptions.data_access import RecordNotFoundError
         if isinstance(e, RecordNotFoundError):
-            return APIResponse.error(message=str(e), error_code="CUSTOMER_NOT_FOUND", status_code=404)
+            return APIResponse.error(message=e.message, error_code="CUSTOMER_NOT_FOUND", status_code=404)
         if isinstance(e, BusinessLogicError):
-            return APIResponse.error(message=str(e), error_code=e.code, status_code=e.status_code)
+            return APIResponse.error(message=e.message, error_code=e.code, status_code=e.status_code)
         raise
     return APIResponse.success(data=customer.to_dict(), message="客户已终止")
 

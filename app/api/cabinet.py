@@ -348,7 +348,7 @@ def force_delete_cabinet(cabinet_id):
         )
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="CABINET_FORCE_DELETE_INVALID", status_code=404
+            message=e.message, error_code="CABINET_FORCE_DELETE_INVALID", status_code=404
         ) from e
     except Exception as e:
         logger.error(f"强制删除机柜失败: {e}", exc_info=True)

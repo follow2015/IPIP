@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from app.models.ai_diagnosis_session import AIDiagnosisSession
 from app.utils.logging import get_logger
 from extensions import db
+from sqlalchemy import or_
 
 logger = get_logger(__name__)
 
@@ -24,6 +25,27 @@ def _truncate_summary(text: str) -> str:
     if len(text) <= MAX_SUMMARY_CHARS:
         return text
     return text[:MAX_SUMMARY_CHARS] + "…（完整结论见诊断会话）"
+
+
+def _device_name_of(device_id: Optional[int]) -> Optional[str]:
+    """取设备名用于写入快照列；设备不存在时返回 None。
+
+    快照在**写入时刻**取一次：本列不允许随设备改名而联动（它是历史值，
+    故意不加外键），但也不能一直空着 —— 空着的快照列在读取面上等于
+    "设备已删除的行无法自证是哪台设备"（迁移 0015 的全部意义）。
+    设备彻底删除前 ``DeviceService._dispose_monitor_trace`` 会把本列
+    **刷新为最终名**，所以"创建时写一次 + 删除时刷一次"是完整的口径。
+    """
+    if not device_id:
+        return None
+    from app.models.device import Device
+
+    name = (
+        db.session.query(Device.device_name)
+        .filter(Device.id == device_id)
+        .scalar()
+    )
+    return name or None
 
 
 class DiagnosisSessionService:
@@ -45,6 +67,7 @@ class DiagnosisSessionService:
         """
         session = AIDiagnosisSession(
             device_id=device_id,
+            device_name=_device_name_of(device_id),
             user_id=user_id,
             skill_name=skill_name,
             question=question,
@@ -168,11 +191,16 @@ class DiagnosisSessionService:
         runner 创建会话时还不知道 LLM 会诊断哪台设备（device_id 由工具调用
         参数决定），故结束阶段从 rounds 中提取后回填，支撑"这台设备上次
         同样故障怎么修的"这类按设备回溯的查询。
+
+        同步回填设备名快照：本函数是「device_id 从无到有」的唯一入口，
+        若只补 ID 不补名字，这一批会话的快照列会永远为空。
         """
         session = db.session.get(AIDiagnosisSession, session_id)
         if session is None:
             return
         session.device_id = device_id
+        if not session.device_name:
+            session.device_name = _device_name_of(device_id)
         db.session.flush()
 
     def mark_rollback_failed(self, session_id: int) -> None:
@@ -222,7 +250,12 @@ class DiagnosisSessionService:
 
         query = db.session.query(AIDiagnosisSession)
         if visible is not None:
-            query = query.filter(AIDiagnosisSession.device_id.in_(list(visible)))
+            query = query.filter(
+                or_(
+                    AIDiagnosisSession.device_id.in_(list(visible)),
+                    AIDiagnosisSession.device_id.is_(None),
+                )
+            )
         if device_id:
             if visible is not None and device_id not in visible:
                 return None

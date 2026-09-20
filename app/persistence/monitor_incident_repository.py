@@ -12,6 +12,18 @@ from app.models.monitor_alert_outbox import MonitorAlertOutbox
 from app.models.monitor_incident import MonitorIncident
 from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
 from extensions import db
+from sqlalchemy import or_
+
+_LIKE_ESCAPE = "\\"
+
+
+def _escape_like(value: str) -> str:
+    """转义 LIKE 通配符（含转义字符自身，顺序不可颠倒）。"""
+    return (
+        value.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
+        .replace("%", _LIKE_ESCAPE + "%")
+        .replace("_", _LIKE_ESCAPE + "_")
+    )
 
 
 class IncidentRepository:
@@ -33,6 +45,11 @@ class IncidentRepository:
 
         Args:
             now: 事件首末告警时间（测试注入）；None 取当前 UTC 时间。
+
+        创建时一并落 ``root_device_name`` 快照：本列在设备彻底删除前会由
+        ``DeviceService._dispose_monitor_trace`` 刷成最终名，但若创建时不写，
+        整个"设备还活着"的期间事件列表都只能显示裸 ID —— 而那是绝大多数时间。
+        设备不存在时不编造，保持 NULL（读取面回落 ID）。
         """
         ts = now if now is not None else now_utc_naive()
         inc = MonitorIncident(
@@ -42,6 +59,7 @@ class IncidentRepository:
             status="active",
             reason_code=reason_code,
             root_device_id=root_device_id,
+            root_device_name=self._device_name_of(root_device_id),
             alert_count=1,
             device_count=1,
             first_alert_at=ts,
@@ -50,6 +68,18 @@ class IncidentRepository:
         self.session.add(inc)
         self.session.flush()
         return inc
+
+    def _device_name_of(self, device_id: Optional[int]) -> Optional[str]:
+        """取设备名用于写快照列；设备不存在时 None。"""
+        if not device_id:
+            return None
+        from app.models.device import Device
+
+        return (
+            self.session.query(Device.device_name)
+            .filter(Device.id == device_id)
+            .scalar()
+        ) or None
 
     def find_active_by_key(self, incident_key: str) -> Optional[MonitorIncident]:
         """按归并键查活跃事件（status != closed）。
@@ -155,43 +185,86 @@ class IncidentRepository:
         inc.closed_at = now_utc_naive()
         self.session.flush()
 
-    def list_active(self, limit: int = 50, offset: int = 0) -> list:
-        """列出活跃事件，按末次告警时间倒序。"""
+
+    def _device_name_predicate(self, device_name: str):
+        """构造"设备名快照命中"的 SQL 条件（三个快照列的并集）。"""
+        pattern = f"%{_escape_like(device_name)}%"
+        suppressed_hit = (
+            self.session.query(MonitorSuppressedAlertLog.incident_id)
+            .filter(
+                or_(
+                    MonitorSuppressedAlertLog.device_name.ilike(
+                        pattern, escape=_LIKE_ESCAPE),
+                    MonitorSuppressedAlertLog.upstream_device_name.ilike(
+                        pattern, escape=_LIKE_ESCAPE),
+                ),
+                MonitorSuppressedAlertLog.incident_id.isnot(None),
+            )
+        )
+        return or_(
+            MonitorIncident.root_device_name.ilike(pattern, escape=_LIKE_ESCAPE),
+            MonitorIncident.id.in_(suppressed_hit),
+        )
+
+    def _filtered_query(
+        self,
+        status: Optional[str] = None,
+        device_name: Optional[str] = None,
+    ):
+        """列表与计数的**共用**查询骨架（保证两者口径恒等）。
+
+        ``status=None`` ⇒ 非 closed（默认列表语义）；显式给值 ⇒ 等值过滤。
+        """
+        query = self.session.query(MonitorIncident)
+        if status:
+            query = query.filter(MonitorIncident.status == status)
+        else:
+            query = query.filter(MonitorIncident.status != "closed")
+        if device_name:
+            query = query.filter(self._device_name_predicate(device_name))
+        return query
+
+    def list_incidents(
+        self,
+        status: Optional[str] = None,
+        device_name: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list:
+        """列出事件（按末次告警时间倒序），支持状态 + 设备名快照过滤。"""
         return (
-            self.session.query(MonitorIncident)
-            .filter(MonitorIncident.status != "closed")
+            self._filtered_query(status, device_name)
             .order_by(MonitorIncident.last_alert_at.desc())
             .limit(limit)
             .offset(offset)
             .all()
         )
+
+    def count_incidents(
+        self,
+        status: Optional[str] = None,
+        device_name: Optional[str] = None,
+    ) -> int:
+        """与 :meth:`list_incidents` **同口径**的总数（供分页 total）。"""
+        return self._filtered_query(status, device_name).count()
+
+    def list_active(self, limit: int = 50, offset: int = 0) -> list:
+        """列出活跃事件，按末次告警时间倒序。"""
+        return self.list_incidents(status=None, device_name=None,
+                                   limit=limit, offset=offset)
 
     def list_by_status(self, status: str, limit: int = 50, offset: int = 0) -> list:
         """按状态列事件（支持显式查 closed）。"""
-        return (
-            self.session.query(MonitorIncident)
-            .filter(MonitorIncident.status == status)
-            .order_by(MonitorIncident.last_alert_at.desc())
-            .limit(limit)
-            .offset(offset)
-            .all()
-        )
+        return self.list_incidents(status=status, device_name=None,
+                                   limit=limit, offset=offset)
 
     def count_active(self) -> int:
         """活跃事件总数（用于分页 total）。"""
-        return (
-            self.session.query(MonitorIncident)
-            .filter(MonitorIncident.status != "closed")
-            .count()
-        )
+        return self.count_incidents(status=None, device_name=None)
 
     def count_by_status(self, status: str) -> int:
         """指定状态事件总数（用于分页 total）。"""
-        return (
-            self.session.query(MonitorIncident)
-            .filter(MonitorIncident.status == status)
-            .count()
-        )
+        return self.count_incidents(status=status, device_name=None)
 
     def list_alerts_by_incident(self, incident_id: int, limit: int = 200) -> list:
         """事件关联的入箱告警（按时间倒序，最多 limit 条）。

@@ -12,7 +12,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from app.core.enums import ChannelType
-from app.services.channels.base import PersonalChannel
+from app.services.channels.base import PersonalChannel, TransientChannelError
 from app.models.notification import Notification, NotificationReceipt
 from app.models.user import User
 
@@ -81,8 +81,13 @@ class EmailChannel(PersonalChannel):
             self._send_smtp(msg, cfg)
             logger.info("邮件通知已发送: user_id=%s notification_id=%s", user.id, notification.id)
             return True
+        except (smtplib.SMTPException, OSError, TimeoutError) as exc:
+            logger.exception("邮件发送失败（瞬时，可重试）: user_id=%s notification_id=%s",
+                             user.id, notification.id)
+            raise TransientChannelError(f"SMTP 投递瞬时失败: {type(exc).__name__}") from exc
         except Exception:
-            logger.exception("邮件发送失败: user_id=%s notification_id=%s", user.id, notification.id)
+            logger.exception("邮件发送失败（确定性，不重试）: user_id=%s notification_id=%s",
+                             user.id, notification.id)
             return False
 
     def _build_message(self, notification: Notification, user: User, cfg: dict) -> MIMEMultipart:

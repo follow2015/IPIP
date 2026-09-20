@@ -15,6 +15,8 @@ from app.utils import login_required, permission_required
 
 _INCIDENT_STATUS_WHITELIST = {"active", "acknowledged", "closed"}
 
+_DEVICE_NAME_MAX_LEN = 100
+
 
 @monitor_bp.route("/incidents", methods=["GET"])
 @doc(summary="查询事件列表", tags=["监控"], responses={200: "MonitorIncidentListResponse"})
@@ -25,6 +27,10 @@ def list_incidents():
 
     Query:
         status: 显式状态过滤（active/acknowledged/closed）；不传则返回非 closed
+        device_name: 按**设备名快照**模糊检索（子串、不区分大小写）。
+            覆盖「该设备是根因」与「该设备是被牵连的下游」两类角色，
+            是设备行被物理删除后回溯"这台机器当年反复出什么问题"的唯一入口
+            （引用列已置空，按 ID 查必然查不到）。长度上限 100。
         page / per_page: 分页
     """
     try:
@@ -39,14 +45,18 @@ def list_incidents():
             f"status 仅支持 {sorted(_INCIDENT_STATUS_WHITELIST)}", status_code=400,
         )
 
+    device_name = (request.args.get("device_name") or "").strip() or None
+    if device_name is not None and len(device_name) > _DEVICE_NAME_MAX_LEN:
+        raise BusinessLogicError(
+            f"device_name 长度不能超过 {_DEVICE_NAME_MAX_LEN} 个字符", status_code=400,
+        )
+
     repo = IncidentRepository()
     offset = (page - 1) * per_page
-    if status:
-        items = repo.list_by_status(status, limit=per_page, offset=offset)
-        total = repo.count_by_status(status)
-    else:
-        items = repo.list_active(limit=per_page, offset=offset)
-        total = repo.count_active()
+    items = repo.list_incidents(
+        status=status, device_name=device_name, limit=per_page, offset=offset,
+    )
+    total = repo.count_incidents(status=status, device_name=device_name)
     return APIResponse.paginated(
         data=[i.to_dict() for i in items],
         page=page, per_page=per_page, total=total,

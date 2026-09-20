@@ -381,7 +381,11 @@ class RoomService:
         """
         col_number = data.get("col_number")
         if self.channel_repository.find_by_room_and_col(room_id, col_number):
-            raise ValidationError(f"第 {col_number} 列位已存在通道配置")
+            raise ResourceConflictError(
+                "房间通道",
+                str(col_number),
+                message=f"第 {col_number} 列位已存在通道配置",
+            )
 
         try:
             channel = self.channel_repository.create({"room_id": room_id, **data})
@@ -409,7 +413,11 @@ class RoomService:
         if new_col != channel.col_number and self.channel_repository.find_by_room_and_col(
             room_id, new_col
         ):
-            raise ValidationError(f"第 {new_col} 列位已存在通道配置")
+            raise ResourceConflictError(
+                "房间通道",
+                str(new_col),
+                message=f"第 {new_col} 列位已存在通道配置",
+            )
 
         try:
             updated = self.channel_repository.update(
@@ -455,7 +463,11 @@ class RoomService:
         row_number = data.get("row_number")
         col_number = data.get("col_number")
         if self.marker_repository.find_by_position(room_id, row_number, col_number):
-            raise ValidationError(f"位置（第{row_number}行 第{col_number}列）已存在占位标记")
+            raise ResourceConflictError(
+                "占位标记",
+                f"{row_number}-{col_number}",
+                message=f"位置（第{row_number}行 第{col_number}列）已存在占位标记",
+            )
 
         try:
             marker = self.marker_repository.create({"room_id": room_id, **data})
@@ -486,7 +498,11 @@ class RoomService:
         if (new_row, new_col) != (marker.row_number, marker.col_number) and (
             self.marker_repository.find_by_position(room_id, new_row, new_col)
         ):
-            raise ValidationError(f"位置（第{new_row}行 第{new_col}列）已存在占位标记")
+            raise ResourceConflictError(
+                "占位标记",
+                f"{new_row}-{new_col}",
+                message=f"位置（第{new_row}行 第{new_col}列）已存在占位标记",
+            )
 
         try:
             updated = self.marker_repository.update(
@@ -572,7 +588,11 @@ class RoomService:
         data["room_number"] = room_number
 
         if self.room_repository.check_room_number_exists(name, room_number):
-            raise ValidationError(f"机房「{name}」下已存在房间号 {room_number}")
+            raise ResourceConflictError(
+                "机房",
+                str(room_number),
+                message=f"机房「{name}」下已存在房间号 {room_number}",
+            )
 
         _normalize_grouping_fields(data)
         data.setdefault("status", 0)
@@ -615,7 +635,11 @@ class RoomService:
         if eff_name and eff_number and self.room_repository.check_room_number_exists(
             eff_name, eff_number, exclude_id=room_id
         ):
-            raise ValidationError(f"机房「{eff_name}」下已存在房间号 {eff_number}")
+            raise ResourceConflictError(
+                "机房",
+                str(eff_number),
+                message=f"机房「{eff_name}」下已存在房间号 {eff_number}",
+            )
 
         _normalize_grouping_fields(data)
         try:
@@ -637,17 +661,24 @@ class RoomService:
         只删一个**空机房**及其布局配置（通道/占位标记）；不触碰设备及其关联数据。
 
         Raises:
-            ValidationError: 机房不存在或存在关联交换机/机柜
+            ValidationError: 机房不存在
+            ResourceConflictError: 存在关联交换机或机柜（HTTP 409）
         """
         if not self.room_repository.find_by_id(room_id):
             raise ValidationError("机房不存在")
 
         deps = self.room_repository.check_room_dependencies(room_id)
         if deps["switch_count"] > 0:
-            raise ValidationError("该机房下有交换机，无法删除")
+            raise ResourceConflictError(
+                "机房",
+                str(room_id),
+                message="该机房下有交换机，无法删除",
+            )
         if deps["cabinet_count"] > 0:
-            raise ValidationError(
-                f"该机房下还有 {deps['cabinet_count']} 台机柜，无法删除（请先清空机柜）"
+            raise ResourceConflictError(
+                "机房",
+                str(room_id),
+                message=f"该机房下还有 {deps['cabinet_count']} 台机柜，无法删除（请先清空机柜）",
             )
 
         self.channel_repository.delete_by_room_id(room_id)

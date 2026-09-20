@@ -116,8 +116,8 @@ def update_role(role_id):
     data = request.get_json(silent=True) or {}
     try:
         role = rbac_service.update_role(role_id, data)
-    except ValidationError as e:
-        raise PresetResponseError(message=str(e), status_code=409) from e
+    except ResourceConflictError as e:
+        raise PresetResponseError(message=e.message, status_code=409) from e
 
     if not role:
         return APIResponse.error(message="角色不存在", status_code=404)
@@ -135,7 +135,7 @@ def delete_role(role_id):
     try:
         result = rbac_service.delete_role(role_id)
     except ValidationError as e:
-        raise PresetResponseError(message=str(e), status_code=400) from e
+        raise PresetResponseError(message=e.message, status_code=400) from e
 
     if not result:
         return APIResponse.error(message="角色不存在", status_code=404)
@@ -206,7 +206,7 @@ def update_role_permissions(role_id):
         result = rbac_service.update_role_permissions(role_id, permission_codes)
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="VALIDATION_ERROR", status_code=400
+            message=e.message, error_code="VALIDATION_ERROR", status_code=400
         ) from e
 
     if result is None:
@@ -294,7 +294,7 @@ def update_user_roles(user_id):
         result = rbac_service.update_user_roles(user_id, role_ids)
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="VALIDATION_ERROR", status_code=400
+            message=e.message, error_code="VALIDATION_ERROR", status_code=400
         ) from e
 
     if result is None:

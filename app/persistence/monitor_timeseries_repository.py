@@ -15,7 +15,11 @@ from app.utils.time_utils import now_utc_naive, utc_today
 
 from sqlalchemy import distinct, func, text
 
-from app.models.device_monitor_probe_events import DeviceMonitorProbeEvents
+from app.core.enums import MonitorProtocolCode
+from app.models.device_monitor_probe_events import (
+    DeviceMonitorProbeEvents,
+    ping_quality_from_extra,
+)
 from app.models.device_monitor_timeseries_hourly import DeviceMonitorTimeseriesHourly
 from app.models.device_monitor_timeseries_daily import DeviceMonitorTimeseriesDaily
 from app.persistence.base import SQLAlchemyRepository
@@ -41,6 +45,14 @@ _ALLOWED_PARTITION_TABLES = frozenset({
 
 
 def _row_to_dict(r: DeviceMonitorProbeEvents) -> Dict[str, Any]:
+    """历史明细单行序列化（``list_events`` 用；前端"最近探测明细"表直接吃这个）。
+
+    ⚠️ 这里是**第二处**序列化（另一处是 ``DeviceMonitorProbeEvents.to_dict``），
+    且两者**刻意不合并**：本函数把时间戳补 ``Z``（UTC 标记），``to_dict`` 不补 ——
+    合并会改动已上线接口的时间语义（跨层时间统一仍在收敛中）。
+    但 ping 质量的派生**必须共用** ``ping_quality_from_extra``：派生逻辑分叉 =
+    同一个数在两处算法不同，而不会有任何门禁发现。
+    """
     return {
         "id": r.id,
         "device_id": r.device_id,
@@ -52,6 +64,7 @@ def _row_to_dict(r: DeviceMonitorProbeEvents) -> Dict[str, Any]:
         "is_alert": r.is_alert,
         "error": r.error,
         "extra": r.extra,
+        **ping_quality_from_extra(r.extra),
         "probed_at": r.probed_at.isoformat() + "Z" if r.probed_at else None,
         "created_at": r.created_at.isoformat() + "Z" if r.created_at else None,
     }
@@ -120,6 +133,69 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         )
         return [_row_to_dict(r) for r in rows]
 
+    QUALITY_SAMPLE_LIMIT = 10000
+
+    def _aggregate_quality(
+        self,
+        device_id: int,
+        *,
+        from_: Optional[Any] = None,
+        to_: Optional[Any] = None,
+        protocol: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """聚合 ping 质量（平均/最大丢包率、平均抖动、有效样本数）。
+
+        三个刻意的行为：
+
+        * 协议过滤会**整条跳过取数** —— 只有 ``ping`` 会写质量值，调用方明确只要
+          snmp/ipmi 时这组 JSON 行必然为空，不必为它付 I/O。
+        * 一个有效样本都没有时返回 ``avg_loss_pct=None`` + ``quality_samples=0``，
+          **不是 0%**。0% 是"测了而且没丢"，是绿灯；"没测"必须长得不像绿灯。
+        * ``avg_jitter_ms`` 只对**同时有抖动值**的行取平均（丢包行可能没有抖动），
+          且与 ``avg_loss_pct`` 的样本数可以不同 —— 不要用 ``quality_samples`` 去除它。
+        """
+        empty = {
+            "avg_loss_pct": None,
+            "max_loss_pct": None,
+            "avg_jitter_ms": None,
+            "quality_samples": 0,
+        }
+        if protocol and protocol != MonitorProtocolCode.PING.value:
+            return empty
+
+        M = DeviceMonitorProbeEvents
+        q = self.session.query(M.extra).filter(M.device_id == device_id)
+        if protocol:
+            q = q.filter(M.protocol == protocol)
+        if from_ is not None:
+            q = q.filter(M.probed_at >= from_)
+        if to_ is not None:
+            q = q.filter(M.probed_at <= to_)
+        rows = (
+            q.filter(M.extra.isnot(None))
+            .order_by(M.probed_at.desc())
+            .limit(self.QUALITY_SAMPLE_LIMIT)
+            .all()
+        )
+
+        losses: List[float] = []
+        jitters: List[float] = []
+        for (extra,) in rows:
+            quality = ping_quality_from_extra(extra)
+            if quality["loss_pct"] is None:
+                continue
+            losses.append(quality["loss_pct"])
+            if quality["jitter_ms"] is not None:
+                jitters.append(quality["jitter_ms"])
+        if not losses:
+            return empty
+        return {
+            "avg_loss_pct": round(sum(losses) / len(losses), 2),
+            "max_loss_pct": round(max(losses), 2),
+            "avg_jitter_ms": round(sum(jitters) / len(jitters), 2) if jitters else None,
+            "quality_samples": len(losses),
+        }
+
     def aggregate_events(
         self,
         device_id: int,
@@ -186,6 +262,9 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
             "p95_latency_ms": int(p95_latency) if p95_latency is not None else None,
             "latency_samples": int(lat_count),
             "down_episodes": int(down_episodes),
+            **self._aggregate_quality(
+                device_id, from_=from_, to_=to_, protocol=protocol
+            ),
         }
 
     def aggregate_hourly(
@@ -234,6 +313,10 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
             "p95_latency_ms": None,
             "latency_samples": int(lat_samples),
             "down_episodes": int(down_hours),
+            "avg_loss_pct": None,
+            "max_loss_pct": None,
+            "avg_jitter_ms": None,
+            "quality_samples": 0,
         }
 
     def _is_mysql(self) -> bool:

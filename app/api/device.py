@@ -17,6 +17,7 @@ from app.services.network_device_service import NetworkDeviceService
 from app.api.monitor import monitor_service
 from app.api.base import APIResponse
 from app.exceptions import PresetResponseError
+from app.exceptions.business import ResourceConflictError
 from app.utils import (
     login_required,
     permission_required,
@@ -734,7 +735,7 @@ def restore_device(device_id):
                 error_code="LOCATION_CONFLICT", status_code=409
             )
     except ValidationError as e:
-        raise PresetResponseError(message=str(e), status_code=400) from e
+        raise PresetResponseError(message=e.message, status_code=400) from e
     except Exception as e:
         logger.error("恢复设备 %d 失败: %s", device_id, str(e))
         raise PresetResponseError(
@@ -792,7 +793,7 @@ def permanent_delete_device(device_id):
 
         return APIResponse.success(message="设备已永久删除")
     except ValidationError as e:
-        raise PresetResponseError(message=str(e), status_code=400) from e
+        raise PresetResponseError(message=e.message, status_code=400) from e
     except Exception as e:
         logger.error("永久删除设备 %d 失败: %s", device_id, str(e))
         raise PresetResponseError(
@@ -1326,7 +1327,7 @@ def batch_update_device_metric_template_group():
             message=f"更新 {result['updated']} 台，跳过 {result['skipped']} 台",
         )
     except ValidationError as e:
-        raise PresetResponseError(message=str(e), status_code=400) from e
+        raise PresetResponseError(message=e.message, status_code=400) from e
     except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("批量更新指标模板组失败: %s", e, exc_info=True)
         raise PresetResponseError(message="操作失败", status_code=500) from e
@@ -1371,7 +1372,7 @@ def batch_update_device_port_sync_enabled():
             message="，".join(parts),
         )
     except ValidationError as e:
-        raise PresetResponseError(message=str(e), status_code=400) from e
+        raise PresetResponseError(message=e.message, status_code=400) from e
     except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("批量更新端口同步开关失败: %s", e, exc_info=True)
         raise PresetResponseError(message="操作失败", status_code=500) from e
@@ -1636,7 +1637,7 @@ def swap_node_positions(chassis_id):
         result = device_service.swap_node_positions(chassis_id, source, target)
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="VALIDATION_ERROR", status_code=400
+            message=e.message, error_code="VALIDATION_ERROR", status_code=400
         ) from e
     except Exception as e:  # noqa: BLE001
         logger.error("交换节点位置失败: %s", e)
@@ -1696,9 +1697,9 @@ def create_device_vlan(device_id):
         vlan_svc = VLANService(VLANRepository())
         vlan = vlan_svc.create(data)
         return APIResponse.success(data=vlan.to_dict(), message="VLAN创建成功", status_code=201)
-    except ValidationError as e:
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code="VLAN_CONFLICT", status_code=409
+            message=e.message, error_code="VLAN_CONFLICT", status_code=409
         ) from e
 
 
@@ -1903,9 +1904,9 @@ def create_device_port_channel(device_id):
         lag_svc = LinkAggregationService(LinkAggregationRepository())
         group = lag_svc.create(data)
         return APIResponse.success(data=group.to_dict(), message="链路聚合组创建成功", status_code=201)
-    except ValidationError as e:
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code="LAG_CONFLICT", status_code=409
+            message=e.message, error_code="LAG_CONFLICT", status_code=409
         ) from e
 
 

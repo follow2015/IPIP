@@ -115,6 +115,11 @@ def _get_pysnmp_async():
             if _pysnmp_async is None:
                 import pysnmp.hlapi.v3arch.asyncio as _mod
                 _pysnmp_async = _mod
+                from app.services.monitoring.mib_availability_service import (
+                    ensure_vendor_mib_source,
+                )
+
+                ensure_vendor_mib_source()
     return _pysnmp_async
 
 
@@ -307,7 +312,15 @@ def _build_oid_identity(pysnmp_module, oid: str | None, mib: str | None, symbol:
     在 ``resolve_with_mib`` 时触发 ``load_modules`` 加载厂商 MIB（如 HH3C-OAM-MIB），
     而 pysnmp 不自带这些 MIB 文件，报 ``MibNotFoundError``。
 
-    解法：用 ``pyasn1.type.univ.ObjectIdentifier`` 构造，pysnmp 走不同解析分支，
+    解法分三级（顺序即优先级）：
+    1. 模板填了数字 OID → 直接构造（首选，最稳）；
+    2. (mib, symbol) 命中 ``_MIB_SYMBOL_OID_FALLBACK`` → 转数字 OID；
+    3. **(mib, symbol) 用本地 MIB 树解析**（含 ``mibs/vendor/``，见 P2-6 与
+       ``mib_availability_service.resolve_symbol_oid``）→ 得到数字 OID。
+    三级都不成，才退到 ``ObjectIdentity(mib, symbol)``；该分支的实际效果是
+    "walk 返回空"（原因见下方注释），调用方把它当"没数据"处理。
+
+    用 ``pyasn1.type.univ.ObjectIdentifier`` 构造数字 OID 的原因：pysnmp 走不同解析分支，
     ``resolve_with_mib`` 时 ``__modName`` 为空，不触发厂商 MIB 加载。
 
     Returns:
@@ -316,6 +329,14 @@ def _build_oid_identity(pysnmp_module, oid: str | None, mib: str | None, symbol:
     """
     if not oid and mib and symbol:
         oid = _MIB_SYMBOL_OID_FALLBACK.get((mib, symbol))
+    if not oid and mib and symbol:
+        from app.services.monitoring.mib_availability_service import (
+            resolve_symbol_oid,
+        )
+
+        _resolved, _reason = resolve_symbol_oid(mib, symbol)
+        if _resolved:
+            oid = _resolved
     if oid:
         try:
             from pyasn1.type import univ as _asn1_univ

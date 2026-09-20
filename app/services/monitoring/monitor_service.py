@@ -27,6 +27,7 @@ from app.services.monitoring.adapters.base_adapter import (
     _is_ip_address,
     monitor_timeout_seconds,
 )
+from app.services.monitoring.adapters.ping_adapter import PING_QUALITY_METRIC_KEYS
 from app.services.monitoring.protocol_registry import (
     device_type_to_protocols,
     protocol_requires_credential,
@@ -578,14 +579,82 @@ class MonitorService:
             from app.services.monitoring.metric_collector import MetricCollector
 
             collector = MetricCollector(self._template_repo, _tpl_cache=self._tpl_cache)
-            return collector.collect(device, adapter, cred)
+            collected = collector.collect(device, adapter, cred)
         except Exception:  # noqa: BLE001 - 采集失败静默降级，不中断主探测
             logger.warning(
                 "设备 %s 指标采集失败（已降级跳过）",
                 getattr(device, "id", None),
                 exc_info=True,
             )
+            collected = {}
+        quality = self.collect_ping_quality_metrics(device)
+        if quality:
+            for key, table in quality.items():
+                collected.setdefault(key, table)
+        return collected
+
+    def collect_ping_quality_metrics(self, device) -> dict:
+        """采集 ping 连通性质量指标（丢包率 / 抖动 / 平均 RTT）。
+
+        返回 ``{metric_key: {index: value}}``（与 SNMP 采集同契约，故阈值评估、
+        时序写入、告警入箱全部复用既有链路）；未启用质量模板 / 未开 quality
+        模式 / 采样解析失败时返回 ``{}``（= 不写指标，而不是写 0）。
+
+        不抛异常：与 `collect_device_metrics` 同口径，采集失败静默降级。
+        """
+        try:
+            templates = self._template_repo.find_enabled_by_device_type(
+                getattr(device, "device_type", "other") or "other",
+                vendor=getattr(device, "brand", None),
+            )
+            wanted = [
+                self._template_to_spec(t) for t in (templates or [])
+                if getattr(t, "metric_key", None) in PING_QUALITY_METRIC_KEYS
+            ]
+            if not wanted:
+                return {}
+            adapter = self._adapters.get(MonitorProtocolCode.PING.value)
+            if adapter is None or not hasattr(adapter, "collect_metrics"):
+                return {}
+            cred = self.credential_service.get_decrypted(
+                device.id, MonitorProtocolCode.PING.value
+            )
+            db.session.commit()  # 网络 I/O 前归还连接（同 collect_device_metrics 口径）
+            raw = adapter.collect_metrics(device, cred, wanted)
+            if not raw:
+                return {}
+            from app.services.monitoring.metric_collector import MetricCollector
+
+            return MetricCollector(
+                self._template_repo, _tpl_cache=self._tpl_cache
+            ).evaluate(raw, wanted)
+        except Exception:  # noqa: BLE001 - 质量采集失败不影响主探测
+            logger.warning(
+                "设备 %s ping 质量指标采集失败（已降级跳过）",
+                getattr(device, "id", None),
+                exc_info=True,
+            )
             return {}
+
+    @staticmethod
+    def _template_to_spec(tpl) -> dict:
+        """把 ORM 模板展平成 `MetricCollector._to_spec` 同构的 dict。
+
+        刻意与 `MetricCollector._to_spec` 字段一致：适配器只按
+        `metric_key` / `metric_type` / `threshold` 取用，展平后可跨 session
+        安全传递（同 worker 里"缓存 ORM 对象会 DetachedInstanceError"的教训）。
+        """
+        return {
+            "metric_key": tpl.metric_key,
+            "mib": getattr(tpl, "mib", None),
+            "oid_symbol": getattr(tpl, "oid_symbol", None),
+            "oid": getattr(tpl, "oid", None),
+            "zabbix_item_key": getattr(tpl, "zabbix_item_key", None),
+            "index_kind": getattr(tpl, "index_kind", None),
+            "metric_type": getattr(tpl, "metric_type", None),
+            "unit": getattr(tpl, "unit", None),
+            "threshold": getattr(tpl, "threshold", None),
+        }
 
     def get_device_status(self, device_id: int) -> dict:
         """查询设备监控状态（供 API 层调用，避免路由层直接访问 Repository）。

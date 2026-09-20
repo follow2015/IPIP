@@ -63,7 +63,7 @@ def create_virtual_room():
         return APIResponse.success(data=vr.to_dict(include_relations=True), message="虚拟机房创建成功", status_code=201)
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="CREATE_FAILED", status_code=400
+            message=e.message, error_code="CREATE_FAILED", status_code=400
         ) from e
     except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("创建虚拟机房失败: %s", e, exc_info=True)
@@ -86,7 +86,7 @@ def update_virtual_room(virtual_room_id):
         return APIResponse.success(data=vr.to_dict(include_relations=True), message="虚拟机房更新成功")
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="UPDATE_FAILED", status_code=400
+            message=e.message, error_code="UPDATE_FAILED", status_code=400
         ) from e
     except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("更新虚拟机房失败: id=%s error=%s", virtual_room_id, e, exc_info=True)
@@ -107,7 +107,7 @@ def delete_virtual_room(virtual_room_id):
         return APIResponse.success(message="虚拟机房删除成功")
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="DELETE_FAILED", status_code=400
+            message=e.message, error_code="DELETE_FAILED", status_code=400
         ) from e
     except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("删除虚拟机房失败: id=%s error=%s", virtual_room_id, e, exc_info=True)
@@ -130,7 +130,7 @@ def update_virtual_room_members(virtual_room_id):
         return APIResponse.success(data=vr.to_dict(include_relations=True), message="成员更新成功")
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="UPDATE_FAILED", status_code=400
+            message=e.message, error_code="UPDATE_FAILED", status_code=400
         ) from e
     except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("更新虚拟机房成员失败: id=%s error=%s", virtual_room_id, e, exc_info=True)

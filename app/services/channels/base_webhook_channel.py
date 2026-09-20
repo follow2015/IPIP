@@ -42,7 +42,11 @@ from typing import Any, Dict, Optional, Tuple
 
 from app.models.notification import Notification
 from app.models.webhook_config import WebhookConfig
-from app.services.channels.base import BroadcastChannel, ensure_webhook_success
+from app.services.channels.base import (
+    BroadcastChannel,
+    TransientChannelError,
+    ensure_webhook_success,
+)
 from app.utils.http_client import post_json
 from app.utils.logging import get_logger
 
@@ -57,6 +61,27 @@ SEVERITY_EMOJI = {
 DEFAULT_WEBHOOK_TIMEOUT = 10
 
 from app.utils.redaction import _CREDENTIAL_PATTERNS, redact_credentials  # noqa: F401
+
+
+def _is_transient_http_error(exc: BaseException) -> bool:
+    """HTTP/网络层异常是否属**瞬时**（可重试）—— B-39 的判别函数。
+
+    * 连接/读取超时、连接错误 ⇒ **瞬时**（网络抖动，重试有意义）；
+    * `HTTPError`：**5xx** ⇒ 瞬时（对端故障）；**4xx** ⇒ 确定性
+      （URL / 凭证 / 签名 / 关键词不匹配等配置错，重试只会重复被拒）；
+    * 其余异常（含 `ensure_webhook_success` 抛出的业务码 `RuntimeError`）
+      ⇒ 确定性 —— 企微/飞书在"关键词不匹配、机器人被移除"等场景返回
+      **HTTP 200 + 非零业务码**，重试同样只会重复被拒。
+
+    ⚠️ 判别刻意精确到异常类型与状态码，**不用**"任何异常都算瞬时"：
+    那会把程序缺陷也变成重试对象，白跑 3 次并掩盖真因。
+    """
+    import requests
+
+    if isinstance(exc, (requests.Timeout, requests.ConnectionError)):
+        return True
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    return isinstance(status, int) and 500 <= status < 600
 
 
 def _matches(cfg: WebhookConfig, notification: Notification) -> bool:
@@ -114,19 +139,30 @@ class BaseWebhookChannel(BroadcastChannel):
             return False
 
         any_success = False
+        transient_error: Exception | None = None
         for cfg in configs:
             if not _matches(cfg, notification):
                 continue
             try:
                 self._post_to_webhook(cfg, notification)
                 any_success = True
+            except TransientChannelError as exc:
+                transient_error = exc
+                logger.warning(
+                    "%s Webhook 投递瞬时失败（可重试） config_id=%s name=%s: %s",
+                    self.display_name, cfg.id, cfg.name, exc,
+                )
             except Exception:
                 logger.exception(
                     "%s Webhook 投递失败 config_id=%s name=%s",
                     self.display_name, cfg.id, cfg.name,
                 )
 
-        return any_success
+        if any_success:
+            return True
+        if transient_error is not None:
+            raise TransientChannelError(str(transient_error))
+        return False
 
     def _post_to_webhook(self, cfg: WebhookConfig, notification: Notification) -> None:
         """构造 payload → 加签 → POST → HTTP 校验 → 业务码校验。
@@ -143,6 +179,8 @@ class BaseWebhookChannel(BroadcastChannel):
             ensure_webhook_success(resp, self.display_name)
         except Exception as exc:
             detail = redact_credentials(f"{type(exc).__name__}: {exc}")
+            if _is_transient_http_error(exc):
+                raise TransientChannelError(detail) from None
             raise RuntimeError(detail) from None  # from None：否则 traceback 会把未脱敏的原始消息带出来
         logger.info("%s Webhook 投递成功 config_id=%s", self.display_name, cfg.id)
 

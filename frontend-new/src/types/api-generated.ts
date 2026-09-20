@@ -14199,6 +14199,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/monitor/metric-templates/oid-audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MetricTemplateOidAuditResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/monitor/metric-templates/seed": {
         parameters: {
             query?: never;
@@ -21393,6 +21427,7 @@ export interface components {
             status?: string;
             reason_code?: string | null;
             root_device_id?: number | null;
+            root_device_name?: string | null;
             alert_count?: number;
             device_count?: number;
             first_alert_at?: string | null;
@@ -21406,10 +21441,12 @@ export interface components {
         MonitorIncidentSuppressedLog: {
             id?: number;
             device_id?: number | null;
+            device_name?: string | null;
             alert_type?: string;
             severity?: string;
             reason_code?: string;
             upstream_device_id?: number | null;
+            upstream_device_name?: string | null;
             incident_id?: number | null;
             created_at?: string | null;
         };
@@ -21520,6 +21557,9 @@ export interface components {
             extra?: {
                 [key: string]: unknown;
             } | null;
+            loss_pct?: number | null;
+            jitter_ms?: number | null;
+            samples?: number | null;
             probed_at?: string;
             created_at?: string;
         };
@@ -21541,6 +21581,10 @@ export interface components {
             p95_latency_ms?: number | null;
             latency_samples?: number;
             down_episodes?: number;
+            avg_loss_pct?: number | null;
+            max_loss_pct?: number | null;
+            avg_jitter_ms?: number | null;
+            quality_samples?: number;
         };
         DeviceMetricAlertStateItem: {
             id?: number;
@@ -21605,6 +21649,36 @@ export interface components {
             updated?: number;
             total?: number;
             enabled?: boolean;
+        };
+        MetricTemplateOidAuditItem: {
+            metric_key?: string | null;
+            device_type?: string | null;
+            source?: string;
+            mib?: string | null;
+            oid_symbol?: string | null;
+            oid?: string | null;
+            resolvable?: boolean;
+            reason?: string;
+            reason_label?: string;
+            resolved_oid?: string | null;
+        };
+        MetricTemplateOidAuditResponse: {
+            total?: number;
+            resolvable?: number;
+            unresolved?: number;
+            items?: components["schemas"]["MetricTemplateOidAuditItem"][];
+            unresolved_items?: components["schemas"]["MetricTemplateOidAuditItem"][];
+            missing_mibs?: {
+                [key: string]: string[];
+            };
+            reason_counts?: {
+                [key: string]: number;
+            };
+            reason_labels?: {
+                [key: string]: string;
+            };
+            vendor_mib_dir?: string;
+            vendor_uncompiled_mibs?: string[];
         };
         MonitorCredentialBatchDeleteFailure: {
             id?: number;
@@ -22038,6 +22112,7 @@ export interface components {
         AIDiagnosisSession: {
             id: number;
             device_id: number | null;
+            device_name: string | null;
             user_id: number;
             skill_name: string;
             question: string;

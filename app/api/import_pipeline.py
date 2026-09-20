@@ -74,9 +74,9 @@ def run_import(
     except import_export_service.IdempotencyConflictError as e:
         return APIResponse.error(e.message, error_code="IDEMPOTENCY_CONFLICT", status_code=409)
     except RequiredFieldError as e:
-        return APIResponse.error(message=str(e), status_code=400)
+        return APIResponse.error(message=e.message, status_code=400)
     except AppValidationError as e:
-        return APIResponse.error(message=str(e), status_code=400)
+        return APIResponse.error(message=e.message, status_code=400)
 
     if after_success is not None:
         try:

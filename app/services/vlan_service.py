@@ -11,6 +11,7 @@ from app.models.vlan import VLAN
 from app.persistence.vlan_repository import VLANRepository, VLANPortMemberRepository
 from app.persistence.switch_port_repository import NetworkPortRepository
 from app.exceptions.validation import ValidationError
+from app.exceptions.business import ResourceConflictError
 
 logger = get_logger(__name__)
 
@@ -60,7 +61,8 @@ class VLANService:
             VLAN: 创建的VLAN记录
 
         Raises:
-            ValidationError: VLAN ID在该设备已存在
+            ValidationError: 必填参数缺失（如未指定 device_id）
+            ResourceConflictError: 该设备上 VLAN ID 已存在（HTTP 409）
         """
         device_id = data.get('device_id')
         if not device_id:
@@ -68,7 +70,11 @@ class VLANService:
 
         existing = self.repo.find_by_device_and_vlan_id(device_id, data['vlan_id'])
         if existing:
-            raise ValidationError(f"设备上 VLAN {data['vlan_id']} 已存在")
+            raise ResourceConflictError(
+                "VLAN",
+                str(data["vlan_id"]),
+                message=f"设备上 VLAN {data['vlan_id']} 已存在",
+            )
 
         if not data.get('room_id'):
             data['room_id'] = self._derive_room_id(device_id)

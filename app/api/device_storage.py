@@ -41,7 +41,7 @@ def get_device_storage_grouped(device_id):
     try:
         data = device_storage_service.get_device_storage(device_id, grouped=True)
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="DEVICE_NOT_FOUND", status_code=404)
+        return APIResponse.error(e.message, error_code="DEVICE_NOT_FOUND", status_code=404)
     return APIResponse.success(data=data, message="获取硬盘分组统计成功")
 
 
@@ -61,7 +61,7 @@ def get_device_storage(device_id):
     try:
         data = device_storage_service.get_device_storage(device_id, grouped=grouped)
     except ValidationError as e:
-        return APIResponse.error(str(e), error_code="DEVICE_NOT_FOUND", status_code=404)
+        return APIResponse.error(e.message, error_code="DEVICE_NOT_FOUND", status_code=404)
     return APIResponse.success(data=data, message="获取存储列表成功")
 
 
@@ -112,7 +112,7 @@ def add_device_storage(device_id):
         )
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="STORAGE_VALIDATION_ERROR", status_code=400
+            message=e.message, error_code="STORAGE_VALIDATION_ERROR", status_code=400
         ) from e
 
     return APIResponse.success(message="硬盘添加成功", status_code=201)
@@ -142,7 +142,7 @@ def update_device_storage_config(device_id):
         )
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="STORAGE_VALIDATION_ERROR", status_code=400
+            message=e.message, error_code="STORAGE_VALIDATION_ERROR", status_code=400
         ) from e
 
     return APIResponse.success(message="存储配置更新成功")
@@ -174,7 +174,7 @@ def update_storage(storage_id):
         )
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="STORAGE_VALIDATION_ERROR", status_code=400
+            message=e.message, error_code="STORAGE_VALIDATION_ERROR", status_code=400
         ) from e
 
     return APIResponse.success(message="硬盘信息更新成功")
@@ -193,7 +193,7 @@ def delete_storage(storage_id):
         device_storage_service.delete_device_storage(storage_id)
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="STORAGE_NOT_FOUND", status_code=404
+            message=e.message, error_code="STORAGE_NOT_FOUND", status_code=404
         ) from e
 
     return APIResponse.success(message="硬盘记录删除成功")

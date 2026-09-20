@@ -12,6 +12,7 @@ from marshmallow import Schema
 from app.exceptions import PresetResponseError
 from app.exceptions.base import BaseAppException
 from app.exceptions.validation import ValidationError
+from app.exceptions.business import ResourceConflictError
 from app.services.room_service import RoomService
 from app.services.device_service import DeviceService
 from app.api.base import APIResponse
@@ -253,9 +254,9 @@ def create_room():
             emit_resource_change_global("room", "create", ids=[room.id]),
         ))
         return APIResponse.success(data=room.to_dict(), message="机房创建成功", status_code=201)
-    except ValidationError as e:
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_NUMBER_CONFLICT", status_code=409
+            message=e.message, error_code="ROOM_NUMBER_CONFLICT", status_code=409
         ) from e
     except BaseAppException:
         raise
@@ -297,9 +298,9 @@ def update_room(room_id):
             emit_resource_change_global("room", "update", ids=[room_id]),
         ))
         return APIResponse.success(data=updated_room.to_dict(), message="机房更新成功")
-    except ValidationError as e:
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_NUMBER_CONFLICT", status_code=409
+            message=e.message, error_code="ROOM_NUMBER_CONFLICT", status_code=409
         ) from e
     except BaseAppException:
         raise
@@ -334,9 +335,9 @@ def delete_room(room_id):
             emit_resource_change_global("room", "delete", ids=[room_id]),
         ))
         return APIResponse.success(message="机房删除成功")
-    except ValidationError as e:
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_DELETE_CONFLICT", status_code=409
+            message=e.message, error_code="ROOM_DELETE_CONFLICT", status_code=409
         ) from e
     except Exception as e:
         logger.error(f"删除机房失败: {e}", exc_info=True)
@@ -383,7 +384,7 @@ def force_delete_room(room_id):
         )
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_FORCE_DELETE_INVALID", status_code=404
+            message=e.message, error_code="ROOM_FORCE_DELETE_INVALID", status_code=404
         ) from e
     except Exception as e:
         logger.error(f"强制删除机房失败: {e}", exc_info=True)
@@ -500,9 +501,9 @@ def create_room_channel(room_id):
         return APIResponse.success(
             data=channel.to_dict(), message="通道创建成功", status_code=201
         )
-    except ValidationError as e:
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_CHANNEL_CONFLICT", status_code=409
+            message=e.message, error_code="ROOM_CHANNEL_CONFLICT", status_code=409
         ) from e
     except BaseAppException:
         raise
@@ -541,9 +542,9 @@ def update_room_channel(room_id, channel_id):
             emit_resource_change_global("room_channel", "update", ids=[room_id]),
         ))
         return APIResponse.success(data=channel.to_dict(), message="通道更新成功")
-    except ValidationError as e:
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_CHANNEL_CONFLICT", status_code=409
+            message=e.message, error_code="ROOM_CHANNEL_CONFLICT", status_code=409
         ) from e
     except BaseAppException:
         raise
@@ -575,7 +576,7 @@ def delete_room_channel(room_id, channel_id):
         return APIResponse.success(message="通道删除成功")
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_CHANNEL_NOT_FOUND", status_code=404
+            message=e.message, error_code="ROOM_CHANNEL_NOT_FOUND", status_code=404
         ) from e
     except Exception as e:
         logger.error(f"删除机房通道失败: {e}", exc_info=True)
@@ -628,9 +629,9 @@ def create_room_layout_marker(room_id):
         return APIResponse.success(
             data=marker.to_dict(), message="占位标记创建成功", status_code=201
         )
-    except ValidationError as e:
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_MARKER_CONFLICT", status_code=409
+            message=e.message, error_code="ROOM_MARKER_CONFLICT", status_code=409
         ) from e
     except BaseAppException:
         raise
@@ -669,9 +670,9 @@ def update_room_layout_marker(room_id, marker_id):
             emit_resource_change_global("room_layout_marker", "update", ids=[room_id]),
         ))
         return APIResponse.success(data=marker.to_dict(), message="占位标记更新成功")
-    except ValidationError as e:
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_MARKER_CONFLICT", status_code=409
+            message=e.message, error_code="ROOM_MARKER_CONFLICT", status_code=409
         ) from e
     except BaseAppException:
         raise
@@ -703,7 +704,7 @@ def delete_room_layout_marker(room_id, marker_id):
         return APIResponse.success(message="占位标记删除成功")
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_MARKER_NOT_FOUND", status_code=404
+            message=e.message, error_code="ROOM_MARKER_NOT_FOUND", status_code=404
         ) from e
     except Exception as e:
         logger.error(f"删除机房占位标记失败: {e}", exc_info=True)

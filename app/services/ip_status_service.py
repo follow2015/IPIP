@@ -16,7 +16,9 @@ import ipaddress
 from app.utils.logging import get_logger
 import math
 import platform
+import re
 import time
+from dataclasses import dataclass
 from typing import Callable, List, Optional, Set, Tuple
 
 from sqlalchemy import bindparam
@@ -34,6 +36,179 @@ FAST_PROBE_PORTS: tuple = tuple(Config.COMMON_PORTS)
 DEFAULT_TIMEOUT: float = 1.5
 
 SAFE_MAX_CONCURRENT: int = 30
+
+
+
+DEFAULT_PING_SAMPLES: int = 5
+DEFAULT_PING_INTERVAL_MS: int = 200
+MIN_PING_INTERVAL_MS: int = 200
+MAX_PING_SAMPLES: int = 60
+
+_PING_LOSS_RE = re.compile(r"([\d.]+)%\s*packet\s+loss", re.IGNORECASE)
+_PING_RTT_RE = re.compile(
+    r"=\s*([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)\s*ms", re.IGNORECASE
+)
+
+
+def _ping_cmd(ip: str, count: int, interval_ms: int, timeout: float) -> list:
+    """构造连续采样 ping 命令（平台参数差异见下）。
+
+    ⚠️ `-W` 的单位在三家实现里**不一致**，这是本函数唯一需要按平台分支的地方：
+      · Windows：`-w` 毫秒；
+      · Darwin (macOS)：`-W` **毫秒**；
+      · Linux (iputils)：`-W` **秒**（故向上取整，至少 1 秒）。
+    把 Darwin 按 Linux 处理会让超时变成几毫秒（实测：`ping -c 1 -W 5` 在 macOS
+    上是 5ms 超时）—— 现有单发探测 `_async_ping` 就有这个平台差异，
+    本函数**刻意与它分开写**，不顺手改它（改探测超时会动到生产行为）。
+    """
+    system = platform.system().lower()
+    interval_s = max(interval_ms, MIN_PING_INTERVAL_MS) / 1000.0
+    if system == "windows":
+        return [
+            "ping", "-n", str(count),
+            "-w", str(int(timeout * 1000)),
+            ip,
+        ]
+    if system == "darwin":
+        return [
+            "ping", "-c", str(count),
+            "-i", f"{interval_s:g}",
+            "-W", str(int(timeout * 1000)),
+            ip,
+        ]
+    return [
+        "ping", "-c", str(count),
+        "-i", f"{interval_s:g}",
+        "-W", str(max(1, int(math.ceil(timeout)))),
+        ip,
+    ]
+
+
+@dataclass
+class PingQuality:
+    """一次连续采样的质量结果。
+
+    ``parsed=False`` 表示汇总行没解析出来（ping 版本/本地化差异）。此时
+    ``loss_pct``/``jitter_ms`` 为 None —— **不编造 0**：把"没测出来"写成
+    "0% 丢包"会让质量监控给出假绿灯，比不显示更危险。
+    """
+
+    sent: int = 0
+    received: int = 0
+    loss_pct: Optional[float] = None
+    rtt_min_ms: Optional[float] = None
+    rtt_avg_ms: Optional[float] = None
+    rtt_max_ms: Optional[float] = None
+    jitter_ms: Optional[float] = None
+    parsed: bool = False
+
+    @property
+    def reachable(self) -> bool:
+        """是否有任何一个回包（比"exit code == 0"更宽容：部分丢包也是可达）。"""
+        return self.received > 0
+
+
+def parse_ping_summary(output: str, expected: int = 0) -> PingQuality:
+    """解析 ping 汇总输出（纯函数，便于用真机抓取的样例直接钉住）。
+
+    只认汇总行，不解析逐包行 —— 逐包行在 macOS 上是
+    ``64 bytes from ...: icmp_seq=0 ttl=.. time=18.9 ms``、iputils 是
+    ``64 bytes from ...: icmp_seq=1 ttl=.. time=1.23 ms``，格式差异更大且
+    **丢包时根本不出现**，用它统计丢包反而要额外处理"哪些 seq 缺失"。
+    汇总行两家都稳定给出 transmitted/received/loss 与四元 RTT 统计。
+    """
+    q = PingQuality(sent=expected)
+    if not output:
+        return q
+
+    m = _PING_LOSS_RE.search(output)
+    if m:
+        try:
+            q.loss_pct = float(m.group(1))
+        except ValueError:  # pragma: no cover - 正则已限定数字
+            q.loss_pct = None
+
+    sent_m = re.search(r"(\d+)\s+packets?\s+transmitted", output, re.IGNORECASE)
+    if sent_m:
+        q.sent = int(sent_m.group(1))
+    if q.loss_pct is not None and q.sent:
+        q.received = int(round(q.sent * (100.0 - q.loss_pct) / 100.0))
+
+    r = _PING_RTT_RE.search(output)
+    if r:
+        try:
+            q.rtt_min_ms = float(r.group(1))
+            q.rtt_avg_ms = float(r.group(2))
+            q.rtt_max_ms = float(r.group(3))
+            q.jitter_ms = float(r.group(4))
+        except ValueError:  # pragma: no cover - 正则已限定数字
+            pass
+
+    q.parsed = q.loss_pct is not None
+    return q
+
+
+async def async_ping_quality(
+    ip: str,
+    count: int = DEFAULT_PING_SAMPLES,
+    interval_ms: int = DEFAULT_PING_INTERVAL_MS,
+    timeout: float = DEFAULT_TIMEOUT,
+) -> PingQuality:
+    """连续采样 ping（一次子进程、N 个包），返回丢包率与抖动。
+
+    与 ``_async_ping`` 的差别：那个是"一发即答"的连通性判定（丢弃 stdout）；
+    本函数**读回汇总输出**，因此拿到的是操作系统测得的真实 RTT 统计。
+
+    进程启动失败 / 目标不可达等一切异常都转换为 ``PingQuality``（``parsed``
+    可能为 False），绝不向上抛 —— 与适配器层"单台设备失败不影响整轮"的口径一致。
+    """
+    count = max(1, min(int(count), MAX_PING_SAMPLES))
+    cmd = _ping_cmd(ip, count, interval_ms, timeout)
+    interval_s = max(interval_ms, MIN_PING_INTERVAL_MS) / 1000.0
+    budget = interval_s * count + timeout * count + 3.0
+    proc = None
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=budget)
+        return parse_ping_summary(
+            (stdout or b"").decode("utf-8", errors="replace"), expected=count
+        )
+    except asyncio.TimeoutError:
+        logger.debug("ping 质量采样超时: ip=%s budget=%.1fs", ip, budget)
+        if proc and proc.returncode is None:
+            try:
+                proc.kill()
+                await proc.wait()
+            except Exception:  # noqa: BLE001
+                logger.debug("终止 ping 子进程失败: ip=%s", ip, exc_info=True)
+        return PingQuality(sent=count)
+    except (OSError, FileNotFoundError) as e:
+        logger.debug("ping 质量采样启动失败 ip=%s: %s", ip, e)
+        return PingQuality(sent=count)
+
+
+def ping_quality(
+    ip: str,
+    count: int = DEFAULT_PING_SAMPLES,
+    interval_ms: int = DEFAULT_PING_INTERVAL_MS,
+    timeout: float = DEFAULT_TIMEOUT,
+) -> PingQuality:
+    """``async_ping_quality`` 的同步包装（内部自建独立 event loop）。
+
+    与 ``detect_ip_status`` 同样的用法：适配器 ``probe()`` 是同步接口
+    （MonitorService 线程池模型），故此处自建 loop，不与调用方的事件循环纠缠。
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(
+            async_ping_quality(ip, count=count, interval_ms=interval_ms, timeout=timeout)
+        )
+    finally:
+        loop.close()
 
 
 

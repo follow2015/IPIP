@@ -20,6 +20,7 @@ import {
   Statistic,
   Row,
   Col,
+  Tooltip,
   Typography
 } from 'antd';
 import {
@@ -45,7 +46,9 @@ import {
   useBatchDeleteMetricTemplates,
   useBatchToggleMetricTemplateEnabled,
   useVendorBrands,
-  type MetricTemplateItem
+  useMetricTemplateOidAudit,
+  type MetricTemplateItem,
+  type MetricTemplateOidAuditItem
 } from '@/services/monitor';
 import {
   DEVICE_TYPE_LABEL,
@@ -72,6 +75,12 @@ export default function MetricTemplatesPage() {
   const { data: vendorBrands } = useVendorBrands();
   const message = useMessage();
 
+  const {
+    data: oidAudit,
+    isFetching: auditFetching,
+    refetch: refetchAudit
+  } = useMetricTemplateOidAudit();
+
   const vendorLabelMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const v of vendorBrands?.items ?? []) {
@@ -81,6 +90,20 @@ export default function MetricTemplatesPage() {
   }, [vendorBrands]);
   const getVendorLabel = (vid: string | null | undefined) =>
     vid ? (vendorLabelMap.get(vid) ?? vid) : null;
+
+  const oidAuditMap = useMemo(() => {
+    const m = new Map<string, MetricTemplateOidAuditItem>();
+    for (const it of oidAudit?.items ?? []) {
+      m.set(`${it.device_type ?? ''}::${it.metric_key ?? ''}`, it);
+    }
+    return m;
+  }, [oidAudit]);
+
+  const auditKeyOf = (r: MetricTemplateItem) => `${r.device_type ?? ''}::${r.metric_key ?? ''}`;
+
+  const unresolvedCount = oidAudit?.unresolved ?? 0;
+
+  const uncompiledVendorMibs = oidAudit?.vendor_uncompiled_mibs ?? [];
 
   const modal = useDisclosure();
   const [editingRecord, setEditingRecord] = useState<MetricTemplateItem | null>(null);
@@ -317,14 +340,27 @@ export default function MetricTemplatesPage() {
       title: '数字 OID',
       dataIndex: 'oid',
       width: 200,
-      render: (v: string) =>
-        v ? (
-          <Text code style={{ fontSize: 11 }}>
-            {v}
-          </Text>
-        ) : (
-          '-'
-        )
+      render: (v: string, r: MetricTemplateItem) => {
+        const audit = oidAuditMap.get(auditKeyOf(r));
+        return (
+          <Space size={4}>
+            {v ? (
+              <Text code style={{ fontSize: 11 }}>
+                {v}
+              </Text>
+            ) : (
+              <Text type="secondary">-</Text>
+            )}
+            {/* 只有审计**明确判定**不可解析才标红。审计未返回 / 该行不在结果里
+                时保持沉默 —— 猜成"正常"是假绿灯，猜成"坏"是误报，两者都糟。 */}
+            {audit && !audit.resolvable && (
+              <Tooltip title={audit.reason_label}>
+                <Tag color="error">采不到</Tag>
+              </Tooltip>
+            )}
+          </Space>
+        );
+      }
     },
     {
       title: '阈值',
@@ -424,6 +460,86 @@ export default function MetricTemplatesPage() {
           message="指标模板与阈值是告警生效的前置条件"
           description="设备需先启用监控并绑定凭据，再在此页面对应指标模板启用并配置阈值后，采集到的异常值才会触发告警。仅创建模板但未启用、或未配置阈值，均不会产生告警。"
         />
+        {/* P2-6：OID 解析失败可见化。
+            此前这条信息在界面上**根本不存在**：采集侧所有请求都带 lookupMib=False，
+            解析不出数字 OID 的模板表现为「采集成功、但少了几项指标、且不报错」，
+            运维只能靠"某个指标怎么一直没数据"反推。这里把本地判定结果摆到台面上。
+
+            ⚠️ 审计未返回时**不渲染**（而不是渲染成绿色"正常"）：未知 ≠ 正常，
+            把"还没查"显示成"没问题"正是本仓吃过亏的假绿灯。 */}
+        {oidAudit && (
+          <Alert
+            type={unresolvedCount > 0 ? 'warning' : 'success'}
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={
+              unresolvedCount > 0
+                ? `有 ${unresolvedCount} 条指标模板解析不出 OID，永远不会采到数据`
+                : `全部 ${oidAudit.total ?? 0} 条指标模板的 OID 均可解析`
+            }
+            action={
+              <Button size="small" loading={auditFetching} onClick={() => refetchAudit()}>
+                重新审计
+              </Button>
+            }
+            description={
+              unresolvedCount > 0 ? (
+                <Space direction="vertical" size={4} style={{ display: 'flex' }}>
+                  <span>
+                    这些模板解析不出数字 OID，采集侧不会向设备发出任何请求 ⇒
+                    <Text strong>永远采不到数据，且不会报错</Text>。
+                  </span>
+                  {Object.entries(oidAudit.missing_mibs ?? {}).map(([mib, keys]) => (
+                    <span key={mib}>
+                      缺少 MIB <Text code>{mib}</Text>，影响 {keys.length} 条：
+                      {keys.slice(0, 6).join('、')}
+                      {keys.length > 6 ? ` 等 ${keys.length} 条` : ''}
+                    </span>
+                  ))}
+                  {(oidAudit.unresolved_items ?? [])
+                    .filter((it) => !it.mib)
+                    .map((it) => (
+                      <span key={`${it.device_type}-${it.metric_key}`}>
+                        <Text code>{it.metric_key}</Text>：{it.reason_label}
+                      </span>
+                    ))}
+                  {uncompiledVendorMibs.length > 0 && (
+                    <span>
+                      厂商 MIB 目录里已有 {uncompiledVendorMibs.join('、')}
+                      （源文件在、但没有 .py 编译产物 ⇒ 需先编译；pysnmp 不会自动编译文本 MIB）。
+                    </span>
+                  )}
+                  <span>
+                    处理办法：把厂商 MIB 文件放进 <Text code>{oidAudit.vendor_mib_dir}</Text>
+                    （注意厂商再分发许可，请从设备官网自行获取），并编译成 pysnmp 能加载的 .py；
+                    或直接给该模板填上数字 OID。
+                  </span>
+                </Space>
+              ) : (
+                <Space direction="vertical" size={4} style={{ display: 'flex' }}>
+                  <span>本地 MIB 树与内置兜底表已覆盖全部模板；与采集侧用的是同一个解析器。</span>
+                  {/* 判定依据分布：让"审计确实逐条看过了"可见，而不是一句空洞的"正常"。
+                      没有这一行的话，审计对象为空（比如模板全被删光）也会显示绿色"正常"。
+                      文案取自后端回传的 reason_labels，**不在前端自建映射**。 */}
+                  {Object.keys(oidAudit.reason_counts ?? {}).length > 0 && (
+                    <Space size={4} wrap>
+                      {Object.entries(oidAudit.reason_counts ?? {}).map(([reason, count]) => (
+                        <Tooltip
+                          key={reason}
+                          title={(oidAudit.reason_labels ?? {})[reason] ?? reason}
+                        >
+                          <Tag>
+                            {reason}: {count}
+                          </Tag>
+                        </Tooltip>
+                      ))}
+                    </Space>
+                  )}
+                </Space>
+              )
+            }
+          />
+        )}
         <Space wrap style={{ marginBottom: 16 }}>
           <Input
             allowClear

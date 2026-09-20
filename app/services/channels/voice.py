@@ -85,10 +85,19 @@ class VoiceChannel(PersonalChannel):
         Returns:
             True 表示已成功入队（**非呼叫成功**）；实际结果由回调写入。
 
-        事务安全：`_process_one` 的模式是 send → 覆盖 status → 统一 commit。
-        若 commit 回滚，task 已入 broker 但 DB 无记录，task 会读到空状态重复呼叫；
-        且局部 status dict 会覆盖掉本方法写入的 voice_task_id。
-        故此处**先 commit 再 delay**，由 worker 侧合并而非覆盖 voice 状态。
+        事务安全（A-P1-3 起更新：worker 由"整条通知一次提交"改为**逐用户提交**）：
+
+        * 本方法**仍必须先 commit 再 delay**。入 broker 与落库是两种介质：若反过来先 delay、
+          指望 worker 那次提交来落库，一旦该提交失败/回滚，task 已在 broker 里而 DB 无记录
+          ⇒ task 读到空状态、**重复呼叫**。先 commit 才能保证
+          "broker 里有 task ⇔ DB 里有 receipt 的 queued 状态"这一前提成立。
+        * worker 侧的 `status.update(dict(receipt.channel_status or {}))` 仍必须是**合并而非覆盖**
+          —— 因为本方法会先写入 `voice` 状态与 `voice_task_id`（回调路由靠 task_id 取消待重试任务）。
+        * 那个"合并会读到最新值"依赖 session 默认的 `expire_on_commit=True`：worker**自己**的逐用户
+          提交用 `_commit_without_expire` 显式绕开过期（否则每用户重读，会破坏 A-P1-2 的取数判据），
+          而**本方法内部的 commit 仍走默认过期**，故 worker 合并时仍能读到本次写入。
+          ⇒ **不要**为省一次重读而全局关闭 `expire_on_commit`：那会让 worker 用内存旧值覆盖
+          回调刚落库的语音终态（answered 等），退回"重复外呼并烧预算"的老问题。
         """
         from app.tasks.voice_tasks import send_voice_call
         from extensions import db

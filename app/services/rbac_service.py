@@ -98,7 +98,7 @@ class RbacService:
         """更新角色。
 
         Raises:
-            ValidationError: 名称重复
+            ResourceConflictError: 角色名称已存在（HTTP 409）
         """
         role = self.role_repository.find_by_id(role_id)
         if not role:
@@ -108,7 +108,9 @@ class RbacService:
         if new_name != role.name:
             conflict = self.role_repository.find_by_name_exclude_id(new_name, role_id)
             if conflict:
-                raise ValidationError("角色名称已存在")
+                raise ResourceConflictError(
+                    "角色", new_name, message="角色名称已存在"
+                )
 
         role.name = new_name
         role.display_name = data.get("display_name", role.display_name)

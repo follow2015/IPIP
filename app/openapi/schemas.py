@@ -1111,6 +1111,7 @@ class MonitorIncidentItemSchema(Schema):
     status = fields.Str()
     reason_code = fields.Str(allow_none=True)
     root_device_id = fields.Int(allow_none=True)
+    root_device_name = fields.Str(allow_none=True)
     alert_count = fields.Int()
     device_count = fields.Int()
     first_alert_at = fields.Str(allow_none=True)
@@ -1130,10 +1131,12 @@ class MonitorIncidentSuppressedLogSchema(Schema):
 
     id = fields.Int()
     device_id = fields.Int(allow_none=True)
+    device_name = fields.Str(allow_none=True)
     alert_type = fields.Str()
     severity = fields.Str()
     reason_code = fields.Str()
     upstream_device_id = fields.Int(allow_none=True)
+    upstream_device_name = fields.Str(allow_none=True)
     incident_id = fields.Int(allow_none=True)
     created_at = fields.Str(allow_none=True)
 
@@ -1166,7 +1169,9 @@ class MonitorDeviceMonitorEnabledResponseSchema(Schema):
 
 
 class MonitorProbeHistoryItemSchema(Schema):
-    """单条探测历史（对齐 DeviceMonitorProbeEvents.to_dict()）"""
+    """单条探测历史（对齐 DeviceMonitorProbeEvents.to_dict() 与
+    ``monitor_timeseries_repository._row_to_dict``）
+    """
 
     id = fields.Int()
     device_id = fields.Int()
@@ -1178,6 +1183,9 @@ class MonitorProbeHistoryItemSchema(Schema):
     is_alert = fields.Bool()
     error = fields.Str(allow_none=True)
     extra = fields.Dict(allow_none=True)
+    loss_pct = fields.Float(allow_none=True)
+    jitter_ms = fields.Float(allow_none=True)
+    samples = fields.Int(allow_none=True)
     probed_at = fields.Str()
     created_at = fields.Str()
 
@@ -1205,6 +1213,10 @@ class MonitorProbeTrendsResponseSchema(Schema):
     p95_latency_ms = fields.Int(allow_none=True)
     latency_samples = fields.Int()
     down_episodes = fields.Int()
+    avg_loss_pct = fields.Float(allow_none=True)
+    max_loss_pct = fields.Float(allow_none=True)
+    avg_jitter_ms = fields.Float(allow_none=True)
+    quality_samples = fields.Int()
 
 
 class DeviceMetricAlertStateItemSchema(Schema):
@@ -1261,6 +1273,77 @@ class MetricTemplateListResponseSchema(Schema):
 
     data = fields.List(fields.Nested(MetricTemplateItemSchema))
     pagination = fields.Nested(PaginationMetaSchema)
+
+
+
+
+class MetricTemplateOidAuditItemSchema(Schema):
+    """单条模板的 OID 可解析性判定。
+
+    ``resolvable=False`` 的含义是**确定采不到**（不是"可能有问题"）：
+    本地既没有数字 OID、也没有兜底表条目、也没有能解析出该符号的 MIB，
+    而采集侧必须先拿到数字 OID 才能发请求 —— 见
+    ``mib_availability_service`` 模块 docstring。
+
+    ``reason`` 是机器可读分支，``reason_label`` 是同一份文案的人话版；
+    两者都必须在响应里，**不要只给 reason 让前端自己映射** ——
+    那就又多了一份会漂移的映射表。
+    """
+
+    metric_key = fields.Str(allow_none=True)
+    device_type = fields.Str(
+        allow_none=True,
+        metadata={"description": "模板身份是 (device_type, metric_key)，前端按此二元组对行"},
+    )
+    source = fields.Str()
+    mib = fields.Str(allow_none=True)
+    oid_symbol = fields.Str(allow_none=True)
+    oid = fields.Str(allow_none=True)
+    resolvable = fields.Bool()
+    reason = fields.Str(metadata={"description": "机器可读结论，见 mib_availability_service.REASON_*"})
+    reason_label = fields.Str(metadata={"description": "面向人的解释与动作，与 reason 同一份真源"})
+    resolved_oid = fields.Str(allow_none=True, metadata={"description": "解析出的数字 OID；解析不出为 null"})
+
+
+class MetricTemplateOidAuditResponseSchema(Schema):
+    """GET /monitor/metric-templates/oid-audit 响应。
+
+    ``items`` 是逐条明细（用于列表逐行标注），``unresolved_items`` 是其中
+    ``resolvable=False`` 的子集（用于汇总卡片）。两者由后端同一次判定产出，
+    前端**不要**自己再过滤一遍 —— 两份过滤逻辑漂移就会出现"卡片说 3 条、表里 5 条红"。
+    """
+
+    total = fields.Int()
+    resolvable = fields.Int(metadata={"description": "可正常采集的模板条数"})
+    unresolved = fields.Int(metadata={"description": "解析不出 OID、确定采不到的模板条数"})
+    items = fields.List(fields.Nested(MetricTemplateOidAuditItemSchema))
+    unresolved_items = fields.List(fields.Nested(MetricTemplateOidAuditItemSchema))
+    missing_mibs = fields.Dict(
+        keys=fields.Str(),
+        values=fields.List(fields.Str()),
+        metadata={"description": "缺失 MIB 名 → 受影响的 metric_key 列表（按 MIB 归并才好行动）"},
+    )
+    reason_counts = fields.Dict(keys=fields.Str(), values=fields.Int())
+    reason_labels = fields.Dict(
+        keys=fields.Str(),
+        values=fields.Str(),
+        metadata={
+            "description": (
+                "本次出现过的 reason → 面向人的解释与动作（后端同一份文案）。"
+                "回传它是为了让前端**不要**自建映射表 —— 两边各一份必然漂移"
+            )
+        },
+    )
+    vendor_mib_dir = fields.Str(metadata={"description": "厂商 MIB 投放目录（绝对路径）"})
+    vendor_uncompiled_mibs = fields.List(
+        fields.Str(),
+        metadata={
+            "description": (
+                "目录里已放源文件、但缺 .py 编译产物的 MIB 名。"
+                "用来区分「我拷进去了但没编译」与「我真没拷」"
+            )
+        },
+    )
 
 
 class MetricTemplateUpsertResponseSchema(Schema):
@@ -1913,6 +1996,7 @@ class AIDiagnosisSessionSchema(Schema):
     """
     id = fields.Int(required=True)
     device_id = fields.Int(required=True, allow_none=True)
+    device_name = fields.Str(required=True, allow_none=True)
     user_id = fields.Int(required=True)
     skill_name = fields.Str(required=True)
     question = fields.Str(required=True)

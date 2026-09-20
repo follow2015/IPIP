@@ -92,6 +92,32 @@ def list_metric_templates():
     return APIResponse.paginated(data=data, page=1, per_page=len(data) or 1, total=len(data))
 
 
+@monitor_bp.get("/metric-templates/oid-audit")
+@doc(
+    summary="审计指标模板的 OID 可解析性（P2-6）",
+    tags=["监控"],
+    responses={200: "MetricTemplateOidAuditResponse"},
+)
+@login_required
+@permission_required("monitor:view")
+def audit_metric_template_oids():
+    """逐条判定指标模板的 OID 能不能解析出来，并给出"解析不出来"的清单。
+
+    为什么这是个**离线**接口、还单独开一个端点：排障现场常常连不上设备，而
+    "本地缺这个 MIB"这件事与设备无关，纯本地即可判定。真去连设备时，"设备没
+    这个 OID"和"我们根本没解析出要问的 OID"在返回的空结果上**长得一模一样** ——
+    这正是要消灭的黑洞（表现为"采集成功但指标缺几项，且不报错"）。
+
+    不并进 ``GET /metric-templates``：那个响应体是 ``data: [...]`` 的分页列表契约，
+    塞进汇总对象会破坏既有前端与契约快照；且审计要加载 MIB（读盘+解析）有成本，
+    列表页每次刷新都跑一遍不划算。
+    """
+    from app.services.monitoring.metric_template_service import list_metric_templates as _list
+    from app.services.monitoring.mib_availability_service import audit_templates
+
+    return APIResponse.success(data=audit_templates(_list()))
+
+
 @monitor_bp.put("/metric-templates")
 @doc(summary="新增/更新指标模板（幂等）", tags=["监控"], responses={200: "MetricTemplateUpsertResponse"})
 @login_required

@@ -6,6 +6,7 @@
 内部读取明文一律走 `get_raw()`。
 """
 from app.models.base import BaseModel
+from app.utils.cache.storages import MemoryCacheStorage
 from extensions import db
 
 
@@ -65,16 +66,35 @@ class VoiceSetting(BaseModel):
 
     @classmethod
     def get_raw_batch(cls, keys) -> dict[str, str | None]:
-        """n3：批量读取原始配置（一次 IN 查询替代 N 次单查）。
+        """批量读取原始配置（一次 IN 查询替代 N 次单查），带**进程内短 TTL 缓存**。
 
-        通知热路径 get_voice_config_from_db 原逐 key 调 get_raw（每用户约 20 次 SQL）。
-        本方法一次查询取回所有请求键，缺失的 key 回退 DEFAULTS，与 get_raw 语义一致。
+        n3：原逐 key 调 `get_raw`（每用户约 20 次 SQL）→ 一次 `IN`。
+        B-37：再加 30s 进程内缓存 —— 理由与 `MailSetting.get_raw_batch` 完全同源
+        （`VoiceChannel.is_available` 也在**逐用户**循环里被调用；每次查询都会触发 autoflush，
+        是长时间持行锁的**根源**，A-P1-3 消除其危害、本项消除模式本身）。
+        失效：`set` / `bulk_set`（经 `set`）/ `delete_all` 在**同一进程内立即**清；
+        **跨进程**最多滞后一个 TTL。刻意**不用 Redis**：只求"少查库"，不需跨进程一致性。
         """
-        valid = [k for k in keys if k in cls.ALLOWED_KEYS]
-        result = {k: cls.DEFAULTS.get(k) for k in keys}
-        if not valid:
-            return result
-        rows = cls.query.filter(cls.key.in_(valid)).all()
+        cached = cls._raw_cache.get(cls._CACHE_KEY)
+        if not isinstance(cached, dict):
+            cached = cls._load_all_raw()
+            cls._raw_cache.set(cls._CACHE_KEY, cached, ttl=cls._CACHE_TTL_SECONDS)
+        return {k: cached.get(k, cls.DEFAULTS.get(k)) for k in keys}
+
+    _CACHE_TTL_SECONDS = 30
+    _CACHE_KEY = "raw_all"
+    _raw_cache = MemoryCacheStorage()
+
+    @classmethod
+    def invalidate_raw_cache(cls) -> None:
+        """清掉 `get_raw_batch` 的进程内缓存（**所有写入路径都必须调用**）。"""
+        cls._raw_cache.delete(cls._CACHE_KEY)
+
+    @classmethod
+    def _load_all_raw(cls) -> dict:
+        """读**全部**白名单键（一次 IN 查询），缺失键回退 DEFAULTS。"""
+        result = {k: cls.DEFAULTS.get(k) for k in cls.ALLOWED_KEYS}
+        rows = cls.query.filter(cls.key.in_(list(cls.ALLOWED_KEYS))).all()
         for row in rows:
             result[row.key] = row.value
         return result
@@ -113,10 +133,11 @@ class VoiceSetting(BaseModel):
             row.value = value
         else:
             db.session.add(cls(key=key, value=value))
+        cls.invalidate_raw_cache()  # B-37：写入即失效，保证本进程内读到的立刻是新值
 
     @classmethod
     def bulk_set(cls, updates: dict) -> None:
-        """批量写入配置值；`****` 占位符视为"未修改"并跳过。"""
+        """批量写入配置值；`****` 占位符视为"未修改"并跳过（逐个走 `set`，失效在其中）。"""
         for key, value in updates.items():
             if key in cls.ALLOWED_KEYS and value is not None:
                 if value == "****":

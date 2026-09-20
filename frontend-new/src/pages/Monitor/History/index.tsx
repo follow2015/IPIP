@@ -180,6 +180,95 @@ export default function MonitorHistory() {
 
   const hasData = (history?.items?.length ?? 0) > 0;
 
+  const qualityTrends = (trends?.quality_samples ?? 0) > 0 ? trends : null;
+
+  const formatPct = (v: number | null | undefined) => (v == null ? '—' : `${v}%`);
+
+  const qualityItems = useMemo(
+    () =>
+      (history?.items ?? []).filter(
+        (i: ProbeHistoryItem) => i.loss_pct != null || i.jitter_ms != null
+      ),
+    [history]
+  );
+  const hasQuality = qualityItems.length > 0;
+
+  const lossData = useMemo(
+    () =>
+      (history?.items ?? [])
+        .filter((i: ProbeHistoryItem) => i.loss_pct != null)
+        .map((i) => ({
+          time: i.probed_at ? dayjs(ensureUtc(i.probed_at)).format('YYYY-MM-DD HH:mm:ss') : '',
+          loss: i.loss_pct as number
+        })),
+    [history]
+  );
+
+  const jitterData = useMemo(
+    () =>
+      (history?.items ?? [])
+        .filter((i: ProbeHistoryItem) => i.jitter_ms != null)
+        .map((i) => ({
+          time: i.probed_at ? dayjs(ensureUtc(i.probed_at)).format('YYYY-MM-DD HH:mm:ss') : '',
+          jitter: i.jitter_ms as number
+        })),
+    [history]
+  );
+
+  const lossConfig = useMemo(
+    () => ({
+      data: lossData,
+      xField: 'time' as const,
+      yField: 'loss' as const,
+      height: 220,
+      point: { size: 3 },
+      style: { stroke: token.colorError },
+      axis: {
+        y: { title: '丢包率 (%)' },
+        x: { title: false }
+      },
+      tooltip: { title: 'time' },
+      legend: false,
+      animation: false
+    }),
+    [lossData, token.colorError]
+  );
+
+  const jitterConfig = useMemo(
+    () => ({
+      data: jitterData,
+      xField: 'time' as const,
+      yField: 'jitter' as const,
+      height: 220,
+      point: { size: 3 },
+      style: { stroke: token.colorWarning },
+      axis: {
+        y: { title: '抖动 (ms)' },
+        x: { title: false }
+      },
+      tooltip: { title: 'time' },
+      legend: false,
+      animation: false
+    }),
+    [jitterData, token.colorWarning]
+  );
+
+  const renderLoss = (v: number | null) =>
+    v == null ? (
+      <Text type="secondary">—</Text>
+    ) : v > 0 ? (
+      <Tag color="error">{v}%</Tag>
+    ) : (
+      <Tag color="success">0%</Tag>
+    );
+
+  const renderJitter = (v: number | null) =>
+    v == null ? (
+      <Text type="secondary">—</Text>
+    ) : (
+      <Tag color={v > 20 ? 'error' : v > 5 ? 'warning' : 'success'}>{v} ms</Tag>
+    );
+
   const latencyConfig = useMemo(
     () => ({
       data: latencyData,
@@ -259,6 +348,27 @@ export default function MonitorHistory() {
       render: (v: number | null) => (v == null ? '—' : v)
     },
     {
+      title: '丢包率',
+      dataIndex: 'loss_pct',
+      key: 'loss_pct',
+      width: 110,
+      render: (v: number | null) => renderLoss(v)
+    },
+    {
+      title: '抖动(ms)',
+      dataIndex: 'jitter_ms',
+      key: 'jitter_ms',
+      width: 110,
+      render: (v: number | null) => renderJitter(v)
+    },
+    {
+      title: '采样包数',
+      dataIndex: 'samples',
+      key: 'samples',
+      width: 100,
+      render: (v: number | null) => (v == null ? '—' : v)
+    },
+    {
       title: '连续失败',
       dataIndex: 'consecutive_failures',
       key: 'consecutive_failures',
@@ -292,6 +402,8 @@ export default function MonitorHistory() {
       </div>
       <Text type="secondary" style={{ fontSize: 12 }}>
         延迟 {r.latency_ms == null ? '—' : `${r.latency_ms} ms`} · 连续失败 {r.consecutive_failures}
+        {r.loss_pct != null && ` · 丢包 ${r.loss_pct}%`}
+        {r.jitter_ms != null && ` · 抖动 ${r.jitter_ms} ms`}
       </Text>
       {r.error && (
         <Text type="danger" style={{ fontSize: 12 }}>
@@ -440,6 +552,60 @@ export default function MonitorHistory() {
             </Col>
           </Row>
 
+          {/* P0-2 ping 质量卡片：仅在该设备窗口内确有质量样本时出现。
+              没有样本时整块不渲染 —— 不拿 0% 填四个卡片说"一切正常"。 */}
+          {qualityTrends && (
+            <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+              <Col xs={12} sm={8} md={6}>
+                <Card size="small" variant="borderless">
+                  <Statistic
+                    title="平均丢包率"
+                    value={formatPct(qualityTrends.avg_loss_pct)}
+                    valueStyle={{
+                      fontFamily: 'Fira Code, monospace',
+                      fontWeight: 600,
+                      color:
+                        (qualityTrends.avg_loss_pct ?? 0) > 0
+                          ? token.colorError
+                          : token.colorSuccess
+                    }}
+                  />
+                </Card>
+              </Col>
+              <Col xs={12} sm={8} md={6}>
+                <Card size="small" variant="borderless">
+                  <Statistic
+                    title="最大丢包率"
+                    value={formatPct(qualityTrends.max_loss_pct)}
+                    valueStyle={{ fontFamily: 'Fira Code, monospace', fontWeight: 600 }}
+                  />
+                </Card>
+              </Col>
+              <Col xs={12} sm={8} md={6}>
+                <Card size="small" variant="borderless">
+                  <Statistic
+                    title="平均抖动"
+                    value={
+                      qualityTrends.avg_jitter_ms == null
+                        ? '—'
+                        : `${qualityTrends.avg_jitter_ms} ms`
+                    }
+                    valueStyle={{ fontFamily: 'Fira Code, monospace', fontWeight: 600 }}
+                  />
+                </Card>
+              </Col>
+              <Col xs={12} sm={8} md={6}>
+                <Card size="small" variant="borderless">
+                  <Statistic
+                    title="质量采样次数"
+                    value={qualityTrends.quality_samples}
+                    valueStyle={{ fontFamily: 'Fira Code, monospace', fontWeight: 600 }}
+                  />
+                </Card>
+              </Col>
+            </Row>
+          )}
+
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
             <Col xs={24} lg={24}>
               <Card
@@ -461,6 +627,37 @@ export default function MonitorHistory() {
               </Card>
             </Col>
           </Row>
+
+          {/* P0-2 ping 质量趋势：丢包率与抖动分开画。
+              刻意**不合并成一张双 Y 轴图**：% 与 ms 量纲不同，共用一张图时
+              两条线的相对高低会被 Y 轴缩放随机决定，读图人会得出错误结论。
+              也没有与延迟合并：延迟高但零丢包（链路正常、只是远）与
+              延迟不高却偶发丢包（链路有损）是两种完全不同的故障。 */}
+          {hasQuality && (
+            <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+              <Col xs={24} lg={24}>
+                <Card
+                  title="Ping 质量趋势（丢包率 / 抖动）"
+                  size="small"
+                  variant="borderless"
+                  extra={<LineChartOutlined style={{ color: token.colorTextSecondary }} />}
+                >
+                  {lossData.length > 0 ? (
+                    <Line {...lossConfig} />
+                  ) : (
+                    <Empty description="暂无丢包率数据" style={{ padding: '24px 0' }} />
+                  )}
+                  <div style={{ marginTop: 8 }}>
+                    {jitterData.length > 0 ? (
+                      <Line {...jitterConfig} />
+                    ) : (
+                      <Empty description="暂无抖动数据" style={{ padding: '24px 0' }} />
+                    )}
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+          )}
 
           {/* P1-9: 指标当前值 */}
           {deviceId > 0 && (metricLatestData?.items ?? []).length > 0 && (

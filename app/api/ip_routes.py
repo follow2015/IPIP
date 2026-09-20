@@ -55,9 +55,9 @@ def ban_ip_endpoint():
     try:
         ban_result = service.ban_ip(ip_address=ip_address, room_id=room_id)
     except IPAlreadyBannedException as e:
-        return APIResponse.error(str(e), ErrorCode.DUPLICATE_ERROR, 409)
+        return APIResponse.error(e.message, ErrorCode.DUPLICATE_ERROR, 409)
     except (NoCoreSwitch, BanCommandFailed) as e:
-        return APIResponse.error(str(e), status_code=503)
+        return APIResponse.error(e.message, status_code=503)
     except ValueError as e:
         return APIResponse.error(str(e), ErrorCode.VALIDATION_ERROR, 400)
 
@@ -97,9 +97,9 @@ def unban_ip_endpoint():
     try:
         unban_result = service.unban_ip(ip_address=ip_address, room_id=room_id)
     except IPNotBannedException as e:
-        return APIResponse.error(str(e), ErrorCode.DUPLICATE_ERROR, 409)
+        return APIResponse.error(e.message, ErrorCode.DUPLICATE_ERROR, 409)
     except (NoCoreSwitch, BanCommandFailed) as e:
-        return APIResponse.error(str(e), status_code=503)
+        return APIResponse.error(e.message, status_code=503)
     except ValueError as e:
         return APIResponse.error(str(e), ErrorCode.VALIDATION_ERROR, 400)
 
@@ -366,7 +366,7 @@ def batch_update_ip_customer():
         from app.exceptions.business import BusinessLogicError
         from app.exceptions.data_access import RecordNotFoundError
         if isinstance(e, (BusinessLogicError, RecordNotFoundError)):
-            return APIResponse.error(str(e), ErrorCode.BUSINESS_ERROR, getattr(e, "status_code", 400))
+            return APIResponse.error(e.message, ErrorCode.BUSINESS_ERROR, getattr(e, "status_code", 400))
         raise
 
     from app.services.ip_crud_service import IPCrudService

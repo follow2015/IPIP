@@ -15,7 +15,18 @@ notify() 写入）减去 `receipt.channel_status`（已落库的投递结果）�
 多进程部署（gunicorn -w N）下每个 worker 各自有一条独立的投递线程 + 独立队列，
 互不影响——这里不需要像 SSE 场景那样做跨进程统一（投递没有"顺序/去重必须全局
 一致"的硬要求，冷却窗口按进程各自维护即可接受轻微的过量发送，好过复杂的跨进程协调）。
+
+**B-40 任务级有界并发**：单条线程串行消费时，一台慢 SMTP（实测单用户可拖 63s）
+会按 63s/用户堵死整条队列——期间**其他通知也投不出去**。B-40 起 `_delivery_loop`
+把"处理一条通知"提交到专用有界池（默认 4，`NOTIFICATION_DELIVERY_WORKERS` 可调）：
+一条慢通知只占 1 个池线程，其余线程继续投别的通知。并发安全性依据：
+① 冷却判定是单条原子 `SET NX`；② 每任务自带 `app_context`（session 按上下文隔离）；
+③ 跨进程竞态本来就存在（每个 gunicorn worker 一条线程），池只提高概率、不扩大类别。
+⚠️ **同一通知内的用户仍是串行**：voice 渠道在 `send` 内写调用方 session，
+用户级并行有跨线程 ORM 危险——那是独立的一项，不在本改动内。
 """
+from concurrent.futures import ThreadPoolExecutor
+
 from app.core.enums import ChannelType
 from app.utils.logging import get_logger
 import queue
@@ -30,6 +41,10 @@ _COOLDOWN_SECONDS = 300  # 同 type+source+channel 5 分钟内只投递一次，
 _RATE_LIMIT_POLL_INTERVAL = 60  # RateLimitMonitor 轮询间隔（秒）
 DELIVERY_TIMEOUT = 5  # 投递队列拉取超时时间（秒）
 _seen_rate_limit_alerts: set[str] = set()  # 已通知过的限流告警去重游标
+
+_DEFAULT_DELIVERY_WORKERS = 4
+
+_inflight = threading.BoundedSemaphore(_DEFAULT_DELIVERY_WORKERS * 2)
 _rate_limit_alerts_last_clear = 0.0  # 上次清空去重集合的时间戳
 
 
@@ -141,10 +156,68 @@ def _send_with_retry(channel, *args) -> tuple[bool, int]:
     raise last_exc
 
 
+def _prefetch_targets(notification, raw_user_ids) -> tuple[list, dict, dict]:
+    """一次 IN 批量取回本任务的 User 与 Receipt。
+
+    Returns:
+        ``(user_ids, users_by_id, receipts_by_user)``；``user_ids`` 已做 ``None`` 归一。
+
+    A-P1-2：替代「每用户 2 次查询」（500 人广播 = 1000 次 DB 往返）。
+    ⚠️ notify() 主流程早有同族修法（`notification_service.py` 的 "n1"：
+    "批量加载用户（一次 IN 查询）替代逐用户 find_by_id 的 N+1"），但只覆盖了**创建侧**、
+    漏了**投递侧**，本处补齐。
+
+    ⚠️ 已知边界（**未分块**）：`user_ids` 直接进 `IN`。广播可达数千用户，大 IN 会受
+    MySQL `max_allowed_packet` / `range_optimizer_max_mem_size` 与 SQLite 绑定变量上限影响。
+    不改的理由：创建侧对同一批 `user_ids` 早就是同样的未分块 `IN`，此处不引入新形态。
+    """
+    from app.models.notification import NotificationReceipt
+    from app.models.user import User
+
+    user_ids = raw_user_ids or []
+    users_by_id: dict = {}
+    receipts_by_user: dict = {}
+    if not user_ids:
+        return user_ids, users_by_id, receipts_by_user
+
+    users_by_id = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
+    for receipt in NotificationReceipt.query.filter(
+        NotificationReceipt.notification_id == notification.id,
+        NotificationReceipt.user_id.in_(user_ids),
+    ).all():
+        receipts_by_user.setdefault(receipt.user_id, receipt)
+    return user_ids, users_by_id, receipts_by_user
+
+
+def _commit_without_expire(session) -> None:
+    """提交，但**不**让已加载对象过期（使逐用户提交不产生任何额外的重读 SELECT）。
+
+    ⚠️ 只包 **worker 自己这一次** commit，**不修改全局口径**：渠道内部的 commit
+    （`VoiceChannel.send` 里的两次 `db.session.commit()`）仍走默认 ``expire_on_commit=True``，
+    从而 worker 随后的 ``status.update(dict(receipt.channel_status or {}))`` 会**重读**
+    数据库里的最新值 —— N5 的语音终态保护正是建立在这个"重读"上
+    （见 `channels/voice.py` 的"事务安全"说明与本函数调用处的 merge 注释）。
+
+    若图省事**全局**关掉该开关：voice 的内部 commit 也不再过期，worker 会把内存旧值写回、
+    覆盖语音回调刚落库的终态 ⇒ 轮询看不到结果 → 超时重试 → **同一人被重复外呼并烧掉外呼
+    预算**；而**现有 N5 用例抓不到这个回归**（它用 _FakeReceipt + MagicMock session，
+    不经历真实的过期语义）。故必须把"不过期"的范围限制在一次提交之内。
+    """
+    from sqlalchemy.orm import scoped_session
+
+    real = session() if isinstance(session, scoped_session) else session
+
+    prev = real.expire_on_commit
+    real.expire_on_commit = False
+    try:
+        real.commit()
+    finally:
+        real.expire_on_commit = prev
+
+
 def _process_one(app, task: dict) -> None:
     """处理一条投递任务"""
-    from app.models.notification import Notification, NotificationReceipt
-    from app.models.user import User
+    from app.models.notification import Notification
     from app.services.notification_service import NotificationService
     from extensions import db
 
@@ -179,11 +252,13 @@ def _process_one(app, task: dict) -> None:
                 if ch.get_channel_name() != ChannelType.INBOX
             }
 
-            for uid in task["user_ids"]:
-                receipt = NotificationReceipt.query.filter_by(
-                    notification_id=notification.id, user_id=uid
-                ).first()
-                user = User.query.get(uid)
+            user_ids, users_by_id, receipts_by_user = _prefetch_targets(
+                notification, task["user_ids"]
+            )
+
+            for uid in user_ids:
+                receipt = receipts_by_user.get(uid)
+                user = users_by_id.get(uid)
                 if not receipt or not user:
                     continue
 
@@ -222,7 +297,7 @@ def _process_one(app, task: dict) -> None:
                 receipt.channel_status = status
                 flag_modified(receipt, "channel_status")
 
-            db.session.commit()
+                _commit_without_expire(db.session)
     except Exception:
         db.session.rollback()
         logger.exception("通知投递结果落库失败 notification_id=%s", task.get("notification_id"))
@@ -342,16 +417,91 @@ def recover_pending_deliveries(app, lookback_hours: int = _RECOVER_LOOKBACK_HOUR
         return 0
 
 
+def _get_pool_size(app) -> int:
+    """投递并发数（B-40）：读配置并兜底。
+
+    ⚠️ 两条路径的越界语义**不同**（复审 M2 澄清，勿合并表述）：
+    · env 路径（生产）：`config._env_num(..., min_value=1)` 已把 0/负数/非法值
+      **回退成默认 4**，根本到不了这里；
+    · 程序化路径（测试/代码内直接改 app.config）：此处钳 `max(1, n)`、
+      非法值回退默认。
+    两条路径的结果都安全（0 个并发不可能出现）。
+    """
+    raw = app.config.get(
+        "NOTIFICATION_DELIVERY_WORKERS", _DEFAULT_DELIVERY_WORKERS
+    )
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "NOTIFICATION_DELIVERY_WORKERS 配置非法（%r），回退默认 %d",
+            raw, _DEFAULT_DELIVERY_WORKERS,
+        )
+        return _DEFAULT_DELIVERY_WORKERS
+    return max(1, n)
+
+
+def _create_pool(app) -> ThreadPoolExecutor:
+    """投递专用池。**不复用**全局 task_executor：那批是用户触发的扫描任务
+    （容量 4、带 task_id 跟踪与 SSE task_failed 兜底推送），语义与容量都不同，
+    混用会互相挤占。"""
+    global _inflight
+    n = _get_pool_size(app)
+    _inflight = threading.BoundedSemaphore(n * 2)
+    return ThreadPoolExecutor(
+        max_workers=n, thread_name_prefix="notif_delivery"
+    )
+
+
+def _safe_process_one(app, task) -> None:
+    """池线程里的异常捕获点：旧串行实现靠循环级 try/except，上池后异常
+    发生在池线程里，不在这里捕获会被 Future **静默吞掉**（连日志都没有）。"""
+    try:
+        _process_one(app, task)
+    except Exception:
+        logger.exception(
+            "通知投递任务处理失败 notification_id=%s", task.get("notification_id")
+        )
+
+
+def _run_task(app, task) -> None:
+    """池线程入口：执行 + 归还在途额度。额度在 `_handle_task`（循环线程）acquire，
+    必须在任务**完成后**才还——acquire/release 跨线程配对正是背压的机关。"""
+    try:
+        _safe_process_one(app, task)
+    finally:
+        _inflight.release()
+
+
+def _handle_task(app, executor: ThreadPoolExecutor, task: dict) -> None:
+    """单任务处理：先占在途额度（**阻塞点=背压点**），再提交池；退出期回退同步。
+
+    ⚠️ B-28 实测坑：解释器退出时 concurrent.futures 的 `_python_exit` 已把
+    `_shutdown` 置真，此后 `submit()` 必抛 "cannot schedule new futures after
+    shutdown"——不回退的话退出期反复 submit 会刷屏（曾 4.3 万行）并拖住退出。
+    回退同步即保持旧版"退出前尽力而为"语义，任务也不丢（额度当场归还，
+    同步路径不占在途名额）。
+    """
+    _inflight.acquire()
+    try:
+        executor.submit(_run_task, app, task)
+    except Exception:
+        _inflight.release()
+        _safe_process_one(app, task)
+
+
 def _delivery_loop(app) -> None:
     """后台投递线程主循环（先回补上次进程遗留的未投递任务）"""
     last_rate_limit_poll = 0.0
 
     recover_pending_deliveries(app)
 
+    executor = _create_pool(app)
+
     while True:
         try:
             task = _delivery_queue.get(timeout=DELIVERY_TIMEOUT)
-            _process_one(app, task)
+            _handle_task(app, executor, task)
         except queue.Empty:
             pass
         except Exception:

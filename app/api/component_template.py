@@ -14,6 +14,8 @@ from app.utils import login_required, permission_required, rate_limit_api
 from app.utils.transactional import transactional
 from app.exceptions import PresetResponseError
 from app.exceptions.validation import ValidationError
+from app.exceptions.business import ResourceConflictError
+from app.exceptions.business import ResourceConflictError
 
 component_template_bp = Blueprint(
     "component_template", __name__, url_prefix="/api/component-templates"
@@ -92,8 +94,8 @@ def create_template():
 
     try:
         t = component_template_service.create_template(data)
-    except ValidationError as e:
-        raise PresetResponseError(message=str(e), status_code=409) from e
+    except ResourceConflictError as e:
+        raise PresetResponseError(message=e.message, status_code=409) from e
 
     return APIResponse.success(data=t.to_dict(), message="模板创建成功", status_code=201)
 
@@ -113,8 +115,8 @@ def update_template(template_id):
 
     try:
         t = component_template_service.update_template(template_id, data)
-    except ValidationError as e:
-        raise PresetResponseError(message=str(e), status_code=409) from e
+    except ResourceConflictError as e:
+        raise PresetResponseError(message=e.message, status_code=409) from e
 
     if not t:
         return APIResponse.error(message="模板不存在", status_code=404)

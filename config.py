@@ -149,6 +149,10 @@ class Config:
     DEBUG = False
     TESTING = False
 
+    NOTIFICATION_DELIVERY_WORKERS = _env_num(
+        "NOTIFICATION_DELIVERY_WORKERS", 4, min_value=1
+    )
+
     NETMIKO_SESSION_LOG = False
 
     MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")

@@ -18,6 +18,24 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+class TransientChannelError(Exception):
+    """**瞬时**失败（网络抖动 / 超时 / 5xx），**可以重试**。
+
+    B-39 的背景：`_send_with_retry` 的重试**只对异常生效**（返回 `False` 被当作"确定性结果"），
+    而三个生产通道实现**全部**把异常吞成 `False` ⇒ 重试分支**永不进入** ——
+    B-18 方案 A 想解决的"临时故障不再等于永久丢失"在 email / webhook 上**根本没生效**。
+
+    约定（本类就是这条约定的载体）：
+    * **瞬时**失败 ⇒ **抛本异常**（由 `_send_with_retry` 重试，耗尽后原样上抛，
+      worker 侧记为 `failed:TransientChannelError`）；
+    * **确定性**失败（未配置 / 用户无邮箱 / 关键词不匹配 等业务码拒绝）⇒ 仍 `return False`
+      （重试无意义，且会拖慢单线程队列）。
+
+    ⚠️ 判别必须**精确到异常类型**，不能图省事写成"任何异常都算瞬时"：
+    否则把程序缺陷（如 payload 构造 bug）也变成重试对象，白跑 3 次还掩盖真因。
+    """
+
+
 def ensure_webhook_success(resp, channel_name: str) -> None:
     """N3：校验 webhook 业务的返回码——HTTP 200 不等于投递成功。
 

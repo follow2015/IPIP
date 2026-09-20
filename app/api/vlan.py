@@ -14,6 +14,7 @@ from app.services.vlan_service import VLANService
 from app.persistence.vlan_repository import VLANRepository
 from app.exceptions import PresetResponseError
 from app.exceptions.validation import ValidationError
+from app.exceptions.business import ResourceConflictError
 from app.exceptions.data_access import RecordNotFoundError
 from app.openapi.doc import doc, public
 from app.utils import login_required, permission_required, rate_limit_api
@@ -110,9 +111,9 @@ def create_vlan():
     try:
         vlan = _vlan_service.create(data)
         return APIResponse.success(data=vlan.to_dict(), message="VLAN创建成功", status_code=201)
-    except ValidationError as e:
+    except ResourceConflictError as e:
         raise PresetResponseError(
-            message=str(e), error_code="VLAN_CONFLICT", status_code=409
+            message=e.message, error_code="VLAN_CONFLICT", status_code=409
         ) from e
 
 
@@ -133,11 +134,11 @@ def update_vlan(vlan_id):
         return APIResponse.success(data=vlan.to_dict(), message="VLAN更新成功")
     except RecordNotFoundError as e:
         raise PresetResponseError(
-            message=str(e), error_code="VLAN_NOT_FOUND", status_code=404
+            message=e.message, error_code="VLAN_NOT_FOUND", status_code=404
         ) from e
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="VALIDATION_ERROR", status_code=422
+            message=e.message, error_code="VALIDATION_ERROR", status_code=422
         ) from e
 
 

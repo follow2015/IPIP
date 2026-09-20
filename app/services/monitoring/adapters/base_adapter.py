@@ -75,11 +75,18 @@ def get_orphan_count() -> int:
 @dataclass
 class ProbeResult:
     """统一探测结果，供 MonitorService 消费，不关心具体协议细节"""
+
     reachable: bool
     latency_ms: int | None = None
     extra: dict = field(default_factory=dict)
     error: str | None = None
     skipped: bool = False
+    loss_pct: float | None = None
+    """丢包率百分比（0~100）。None = 未做质量采样或采样未解析出汇总行。"""
+    jitter_ms: float | None = None
+    """抖动（毫秒）= 连续采样的 RTT 平均偏差（ping 汇总行的 stddev/mdev 列）。"""
+    samples: int | None = None
+    """本次质量采样实际发出的探测包数。"""
 
 
 class MonitorAdapter(ABC):

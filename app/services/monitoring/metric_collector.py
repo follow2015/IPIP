@@ -183,6 +183,18 @@ class MetricCollector:
         oid = tpl.get("oid") or ""
         return any(oid.startswith(p) for p in cls._TIMETICKS_OID_PREFIXES)
 
+    def evaluate(self, raw: dict, templates) -> dict:
+        """公开入口：把"原始值"评估成消费方可直接落库/告警的形状。
+
+        为什么需要它：``collect_device_metrics`` 的返回契约是**已评估**形状
+        ``{metric_key: {index: {"value", "severity", "breached"}}}``
+        （`DeviceMetricLatestRepository.upsert_many` / `MetricAlertService.process`
+        都按这个形状取值）。凡是不经本类 ``collect()`` 得到的原始值
+        （如 Ping 适配器正交补充的连通性质量指标），都必须过一遍阈值评估，
+        否则下游会把一个裸标量当成 dict 取 ``.get("value")`` 而静默拿到默认值。
+        """
+        return self._evaluate(raw, templates)
+
     def _evaluate(self, raw: dict, templates) -> dict:
         """对原始采集结果按模板阈值评估，产出告警判定。
 

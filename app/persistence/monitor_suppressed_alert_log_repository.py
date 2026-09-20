@@ -3,10 +3,31 @@
 
 项目 C5 约束：DB 访问必须走 Repository 层，禁止在 Service 内裸写 query。
 """
-from typing import Optional
+from typing import Dict, Iterable, Optional
 
 from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
 from extensions import db
+
+
+def device_names_of(device_ids: Iterable[Optional[int]]) -> Dict[int, str]:
+    """批量取设备名（``{id: name}``，一次 IN 查询）。
+
+    供写入留痕时**同时**填充两个快照列用：逐条查会退化成 2N 条查询
+    （L2 聚合一次要落 30+ 条留痕），所以这里显式做成批量原型。
+
+    不存在的 ID 不出现在返回值里（调用方据此保持快照为 NULL）。
+    """
+    from app.models.device import Device
+
+    ids = [i for i in device_ids if i]
+    if not ids:
+        return {}
+    rows = (
+        db.session.query(Device.id, Device.device_name)
+        .filter(Device.id.in_(set(ids)))
+        .all()
+    )
+    return {r[0]: r[1] for r in rows if r[1]}
 
 
 class SuppressedAlertLogRepository:
@@ -33,13 +54,24 @@ class SuppressedAlertLogRepository:
             reason_code: L2_manual_rule / L2_topology。
             upstream_device_id: 命中的上游设备 ID（根因侧）。
             incident_id: 已归属事件时直接写入，否则留待 L2 聚合回填。
+
+        写入时**一并落设备名快照**（两个 ID 合成一次查询）。理由：本表的
+        ``device_id`` 会在设备彻底删除时被置空，置空后 ``device_name`` 是这行
+        唯一的可读标识；若创建时不写，新产出的行在设备删除前一直显示裸 ID、
+        删除后才有名字 —— 而"删除前"才是绝大多数时间。
+        设备不存在（写入时已删）时快照留 NULL，不编造。
         """
+        names = device_names_of([device_id, upstream_device_id])
         row = MonitorSuppressedAlertLog(
             device_id=device_id,
+            device_name=names.get(device_id),
             alert_type=alert_type,
             severity=severity,
             reason_code=reason_code,
             upstream_device_id=upstream_device_id,
+            upstream_device_name=(
+                names.get(upstream_device_id) if upstream_device_id else None
+            ),
             incident_id=incident_id,
         )
         self.session.add(row)

@@ -673,6 +673,9 @@ export interface ProbeHistoryItem {
   is_alert: boolean;
   error: string | null;
   extra: Record<string, unknown> | null;
+  loss_pct: number | null;
+  jitter_ms: number | null;
+  samples: number | null;
   probed_at: string;
   created_at: string;
 }
@@ -850,7 +853,10 @@ export function useUpsertMetricTemplate() {
       const res = await put<{ id: number }>(`/monitor/metric-templates`, payload);
       return res.data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.monitor.metricTemplatesCrud })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.monitor.metricTemplatesCrud });
+      qc.invalidateQueries({ queryKey: queryKeys.monitor.metricTemplateOidAudit });
+    }
   });
 }
 
@@ -859,6 +865,21 @@ export type DeviceTraffic = components['schemas']['DeviceTrafficResponse'];
 export type MetricTemplateList = components['schemas']['MetricTemplateListResponse'];
 
 export type MetricTemplateItem = components['schemas']['MetricTemplateItem'];
+
+export type MetricTemplateOidAudit = components['schemas']['MetricTemplateOidAuditResponse'];
+
+export type MetricTemplateOidAuditItem = components['schemas']['MetricTemplateOidAuditItem'];
+
+export function useMetricTemplateOidAudit(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.monitor.metricTemplateOidAudit,
+    queryFn: async () => {
+      const res = await get<MetricTemplateOidAudit>('/monitor/metric-templates/oid-audit');
+      return res.data;
+    },
+    enabled
+  });
+}
 
 export interface MetricTemplateUpsert {
   device_type: string;
@@ -1530,6 +1551,7 @@ export interface IncidentItem {
   status: string;
   reason_code: string | null;
   root_device_id: number | null;
+  root_device_name: string | null;
   alert_count: number;
   device_count: number;
   first_alert_at: string | null;
@@ -1562,10 +1584,12 @@ export interface IncidentRelatedAlert {
 export interface IncidentSuppressedLog {
   id: number;
   device_id: number | null;
+  device_name: string | null;
   alert_type: string;
   severity: string;
   reason_code: string;
   upstream_device_id: number | null;
+  upstream_device_name: string | null;
   incident_id: number | null;
   created_at: string | null;
 }
@@ -1577,6 +1601,7 @@ export interface IncidentDetail extends IncidentItem {
 
 export interface IncidentListParams {
   status?: string;
+  device_name?: string;
   page?: number;
   per_page?: number;
 }
@@ -1587,6 +1612,7 @@ export function useIncidents(params: IncidentListParams = {}) {
     queryFn: async () => {
       const qs = new URLSearchParams();
       if (params.status) qs.set('status', params.status);
+      if (params.device_name) qs.set('device_name', params.device_name);
       if (params.page) qs.set('page', String(params.page));
       if (params.per_page) qs.set('per_page', String(params.per_page));
       const res = await get<PaginatedData<IncidentItem>>(`/monitor/incidents?${qs.toString()}`);

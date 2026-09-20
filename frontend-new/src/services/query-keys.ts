@@ -221,6 +221,7 @@ export const queryKeys = {
     oidCategoryRulesCrud: ['monitor', 'oid-category-rules', 'crud'] as const,
     vendorBrandsCrud: ['monitor', 'vendor-brands', 'crud'] as const,
     metricTemplatesCrud: ['monitor', 'metric-templates', 'crud'] as const,
+    metricTemplateOidAudit: ['monitor', 'metric-templates', 'oid-audit'] as const,
     thresholdOverridesCrud: ['monitor', 'threshold-overrides', 'crud'] as const,
     deviceTypeRecommends: ['monitor', 'device-type-recommends'] as const,
     recommendConfig: (deviceType: string) => ['monitor', 'recommend-config', deviceType] as const
