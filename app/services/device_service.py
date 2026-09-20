@@ -707,8 +707,15 @@ class DeviceService:
         logger.info("删除设备成功: device_id=%d", device_id)
         return True
 
-    def _cleanup_device_dependencies(self, device_id: int) -> None:
+    def _cleanup_device_dependencies(self, device_id: int, purge: bool = False) -> Dict[str, int]:
         """清理设备关联数据
+
+        ``purge`` 区分两种调用场景，**只影响留痕类数据的处置方式**：
+        - ``False``：软删（``delete_device``）—— 设备行仍在，留痕原样保留，
+          恢复后关联完好；
+        - ``True``：彻底删（``permanent_delete_device`` / 批量彻底删）—— 设备行
+          即将物理删除，留痕改为"写设备名快照 + 置空设备引用"（不删行）。
+        详见 ``_delete_monitor_related`` 与 ``_dispose_monitor_trace``。
 
         在删除设备前调用，按依赖顺序清理：
         1. 子节点（自引用 parent_device_id）
@@ -751,6 +758,10 @@ class DeviceService:
             DeviceConfigBackupRepository, DeviceConfigChangeRepository,
         )
 
+        from app.services.device_connection_service import DeviceConnectionService
+        peer_released = DeviceConnectionService.release_peer_occupations(session, device_id)
+        ips_released = self._release_ip_occupations(session, device_id)
+
         DeviceConnectionRepository(session).delete_device_connections(device_id)
         DeviceConnectionRepository(session).delete_switch_connections(device_id)
         DeviceNicsPortRepository(session).delete_device_ports(device_id)
@@ -763,9 +774,96 @@ class DeviceService:
 
         self._delete_switch_related(session, device_id)
 
-        self._delete_monitor_related(session, device_id)
+        disposed = self._delete_monitor_related(session, device_id, purge=purge)
 
         session.flush()
+        return {
+            "released_network_ports": peer_released.get("released_network_ports", 0),
+            "released_nics_ports": peer_released.get("released_nics_ports", 0),
+            "released_ips": ips_released,
+            "disposed_trace_refs": disposed,
+        }
+
+    @staticmethod
+    def _release_ip_occupations(session, device_id: int) -> int:
+        """把设备用过的 IP 释放回机房 IP 池（``ip_addresses.status → UNUSED``），返回释放行数。
+
+        **只改状态，绝不删行** —— 口径来源（2026-09-18 拍板）："设备删除只删硬件
+        相关，占用一律**释放**，不删占用记录"。``ip_addresses`` 行就是机房 IP 池的
+        占用记录；设备路径此前既不删它也不释放它，于是设备退役后它的 IP 永久
+        显示"活跃"。（注意：**机房**强删确实会删池 —— ``_FORCE_DELETE_ROOM_SCOPED``
+        里有 ``("ip_addresses", "room_id")``，那是"机房都没了、池也该没"的另一条语义，
+        与设备/机柜路径刻意区分。）
+
+        IP 来源两类（真库实测规模）
+        --------------------------
+        * ``switch_port_ips.ip_address``：设备端口上配置的 IP。真库 70 行，
+          **60 行命中池**（这是唯一真正的"设备端口 ↔ IP 池"绑定；
+          ``network_ports.ip_address`` 存的是带掩码的 ``10.88.13.2/30``，
+          与池 **0 命中**，故不采用）。
+        * ``devices.management_ip``：真库 14 台有值，13 台命中池。
+
+        两道限定
+        --------
+        * ``customer_id IS NULL``：有客户归属的 IP 是**客户资产**，不随设备生命周期
+          释放（真库 771 行有归属）；
+        * ``status != UNUSED``：已经是 UNUSED 的不重复写。
+
+        ⚠️ 已知边界（有意保留、不静默处理）
+        ----------------------------------
+        匹配用的是 **IP 字面量**（``switch_port_ips`` 没有 room_id，无法可靠限定机房）。
+        真库实测池内同址重复仅 **1 组**（``10.0.1.2`` ×2，且两行 ``room_id`` 都是 NULL），
+        且 ``switch_port_ips`` 的 IP **0 次**命中多行 ⇒ 当前不会误伤。若将来出现
+        跨机房同址，本方法会**多释放**（释放 ≠ 删除，且 SSH 可达设备的下一次扫描会
+        按实际在线情况把状态改回来，可自愈）—— 命中多行时会打 WARNING 留痕，
+        便于事后核对。
+        """
+        from app.core.enums import IPStatus
+        from app.models.device import Device
+        from app.models.ip_model import IPManager
+        from app.models.switch_credentials import SwitchPortIP
+
+        device = session.query(Device).filter(Device.id == device_id).first()
+        raw_ips = set()
+        if device and device.management_ip:
+            raw_ips.add(device.management_ip)
+        for (ip,) in session.query(SwitchPortIP.ip_address).filter(
+            SwitchPortIP.device_id == device_id
+        ).all():
+            if ip:
+                raw_ips.add(ip)
+
+        ips = {str(ip).split("/")[0].strip() for ip in raw_ips if str(ip).strip()}
+        ips.discard("")
+        if not ips:
+            return 0
+
+        rows = session.query(IPManager).filter(
+            IPManager.ip_address.in_(sorted(ips)),
+            IPManager.customer_id.is_(None),
+            IPManager.status != int(IPStatus.UNUSED),
+        ).all()
+
+        for ip in sorted(ips):
+            matched = [r for r in rows if str(r.ip_address) == ip]
+            if len(matched) > 1:
+                logger.warning(
+                    "释放 IP 占用时 %s 命中池内 %d 行（跨机房同址？）—— 已全部置为 UNUSED，"
+                    "请核对是否多释放；设备 device_id=%d",
+                    ip, len(matched), device_id,
+                )
+
+        released = 0
+        for row in rows:
+            row.status = int(IPStatus.UNUSED)
+            released += 1
+        if released:
+            session.flush()
+            logger.info(
+                "删除设备 %d：已释放 IP 占用 %d 个（status→UNUSED，池行保留）",
+                device_id, released,
+            )
+        return released
 
     @staticmethod
     def _delete_switch_related(session, device_id: int) -> None:
@@ -792,19 +890,41 @@ class DeviceService:
         session.query(IPBanRecord).filter_by(switch_id=device_id).delete()
 
     @staticmethod
-    def _delete_monitor_related(session, device_id: int) -> None:
-        """清理设备监控相关数据（设备删除时级联）。
+    def _delete_monitor_related(session, device_id: int, purge: bool = False) -> int:
+        """清理设备监控相关数据；**留痕三表保留**（purge 时改为快照 + 置空）。
 
-        清理目标：
-        - DeviceMonitorStatus：监控状态行（reachable/last_checked_at 等）
-        - DeviceMetricAlertState：指标告警态（温度/磁盘/端口/RAID/中断的 breached 标记）
-        - MonitorAlertOutbox：告警发件箱（未投递的告警/恢复通知）
+        - DeviceMonitorStatus：监控状态行（reachable/last_checked_at）
+        - DeviceMetricAlertState：指标告警态（breached 标记）
+        - MonitorAlertOutbox：告警发件箱（**投递队列**，非留痕；设备删后无人消费）
         - DeviceMonitorCredential：设备-凭据关联（多对多中间表）
         - DeviceMonitorTimeseriesHourly：时序聚合数据
 
+        `MonitorIncident` / `MonitorSuppressedAlertLog` / `AIDiagnosisSession`。
+        2026-09-18 拍板：**三条删除路径（设备/机柜/机房）统一保留留痕**。
+        容量依据（真库实测）：三表合计 349 行；按同口径外推 @100 台约 372MB/年，
+        而时序明细表 90 天稳态 285GB（比值约 790:1）⇒ 删除留痕对容量零贡献；
+        反过来，设备退役后"这台机器当年反复出什么问题"只能靠它们回答。
+
+        两种模式：
+        - ``purge=False``（**软删**）：**原样保留**，不动设备引用 —— 设备行仍在，
+          ``restore_device`` 之后关联完好；
+        - ``purge=True``（**彻底删**）：**先写设备名快照、再置空设备引用** —— 设备行
+          即将被物理删除，置空后靠快照自证（迁移 0015 的 ``*_device_name`` 列）。
+
+        ⚠️ 为什么必须应用层显式处置，不能靠 DB ``ON DELETE SET NULL``：
+        ① 软删走 UPDATE，**不触发任何 DB 级联**（而软删恰恰是"不置空"的分支）；
+        ② 强删走裸 SQL，MySQL 会 SET NULL，但 CI 的 SQLite 默认不开
+           ``PRAGMA foreign_keys`` ⇒ 同一语义两种库表现不同，产出的是假判据；
+        ③ ``monitor_suppressed_alert_log.upstream_device_id`` **无外键**，
+           DB 既不置空也不报 1451，只能应用层处置。
+        判据见 ``tests/test_device_delete_fk_closure.py::SEMANTIC_MUST_DISPOSE``。
+
         不清理 MonitorCredential 本身：凭据可被多设备共享，仅解除关联。
-        时序原始表（device_monitor_probe_events）按设备分区/按时间过期，
-        此处不清理（由独立 TTL 任务回收）。
+        分区时序表（``device_monitor_probe_events`` / ``device_metric_timeseries``）
+        此处**刻意不逐行删**：二者是 RANGE(时间) 分区表（真库 26 万 / 2170 万行），
+        回收机制是 ``drop_expired_{event,metric}_partitions()`` 按天 DROP 分区；
+        按 device_id 逐行 DELETE 要跨全部分区、把删除事务拖长，与分区设计相悖。
+        台账与理由见门禁的 ``SOFT_REF_ACCEPTED``。
         """
         from app.models.device_monitor_status import DeviceMonitorStatus
         from app.models.device_metric_alert_state import DeviceMetricAlertState
@@ -817,6 +937,118 @@ class DeviceService:
         session.query(MonitorAlertOutbox).filter_by(device_id=device_id).delete()
         session.query(DeviceMonitorCredential).filter_by(device_id=device_id).delete()
         session.query(DeviceMonitorTimeseriesHourly).filter_by(device_id=device_id).delete()
+
+        if purge:
+            return DeviceService._dispose_monitor_trace(session, device_id)
+        return 0
+
+    @staticmethod
+    def _dispose_monitor_trace(session, device_id: int) -> int:
+        """彻底删前对留痕三表的处置：**写设备名快照 → 置空设备引用（不删行）**。
+
+        顺序不可颠倒：快照必须在本设备行被物理删除**之前**取，否则名字来源即消失
+        （强删是 `session.delete(device)`，本函数在其之前调用）。
+
+        每条 UPDATE 只命中"当前仍指向本设备"的行：
+        - 已处置过的行（device_id 已 NULL）不会被再次命中，故直接写快照是安全的；
+        - `upstream_device_id` 侧同理，被删设备就是那条留痕的"上游设备"，
+          名字用同一个快照值，无需另查其他设备。
+        """
+        from app.models.device import Device
+        from app.models.monitor_incident import MonitorIncident
+        from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
+        from app.models.ai_diagnosis_session import AIDiagnosisSession
+
+        device = session.query(Device).filter(Device.id == device_id).first()
+        name = getattr(device, "device_name", None) if device else None
+
+        n1 = session.query(MonitorIncident).filter(
+            MonitorIncident.root_device_id == device_id,
+        ).update(
+            {
+                MonitorIncident.root_device_name: name,
+                MonitorIncident.root_device_id: None,
+            },
+            synchronize_session=False,
+        )
+
+        n2 = session.query(MonitorSuppressedAlertLog).filter(
+            MonitorSuppressedAlertLog.device_id == device_id,
+        ).update(
+            {
+                MonitorSuppressedAlertLog.device_name: name,
+                MonitorSuppressedAlertLog.device_id: None,
+            },
+            synchronize_session=False,
+        )
+
+        n3 = session.query(MonitorSuppressedAlertLog).filter(
+            MonitorSuppressedAlertLog.upstream_device_id == device_id,
+        ).update(
+            {
+                MonitorSuppressedAlertLog.upstream_device_name: name,
+                MonitorSuppressedAlertLog.upstream_device_id: None,
+            },
+            synchronize_session=False,
+        )
+
+        n4 = session.query(AIDiagnosisSession).filter(
+            AIDiagnosisSession.device_id == device_id,
+        ).update(
+            {
+                AIDiagnosisSession.device_name: name,
+                AIDiagnosisSession.device_id: None,
+            },
+            synchronize_session=False,
+        )
+
+        session.flush()
+        return sum(n or 0 for n in (n1, n2, n3, n4))
+
+    @staticmethod
+    def _dispose_monitor_trace_batch(session, device_ids: List[int]) -> None:
+        """``_dispose_monitor_trace`` 的**批量版**：一次处置一批设备（机房型强删用）。
+
+        单设备版是"每台设备 1 次查询 + 4 条 UPDATE"；机房强删动辄上百台设备，
+        逐台执行会产生 5N 条语句。本方法摊平为 **1 条名字查询 + 4 条 executemany
+        UPDATE**：名字快照一次取回（id → device_name），每张留痕表用 WHERE 绑定
+        参数逐行携带各自的快照值，语义与单设备版完全一致——只命中"当前仍指向
+        该设备"的行，写快照后置空引用，已处置过的行不会被再次命中。
+
+        顺序同样不可颠倒：必须在 devices 行被物理删除**之前**调用。
+        """
+        if not device_ids:
+            return
+
+        from sqlalchemy import bindparam, update
+
+        from app.models.device import Device
+        from app.models.monitor_incident import MonitorIncident
+        from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
+        from app.models.ai_diagnosis_session import AIDiagnosisSession
+
+        id_name = dict(
+            session.query(Device.id, Device.device_name)
+            .filter(Device.id.in_(device_ids))
+            .all()
+        )
+        rows = [{"_device_id": did, "_device_name": id_name.get(did)} for did in device_ids]
+
+        targets = [
+            (MonitorIncident, "root_device_id", "root_device_name"),
+            (MonitorSuppressedAlertLog, "device_id", "device_name"),
+            (MonitorSuppressedAlertLog, "upstream_device_id", "upstream_device_name"),
+            (AIDiagnosisSession, "device_id", "device_name"),
+        ]
+        for model, ref_col, name_col in targets:
+            table = model.__table__
+            session.execute(
+                update(table)
+                .where(table.c[ref_col] == bindparam("_device_id"))
+                .values({name_col: bindparam("_device_name"), ref_col: None}),
+                rows,
+            )
+        session.flush()
 
     def change_device_status(self, device_id: int, new_status: int) -> Optional[Device]:
         """状态机转换"""
@@ -2350,7 +2582,7 @@ class DeviceService:
 
         try:
             with self.session.begin_nested():
-                self._cleanup_device_dependencies(device_id)
+                self._cleanup_device_dependencies(device_id, purge=True)
 
                 session.delete(device)
                 session.flush()
@@ -2432,12 +2664,29 @@ class DeviceService:
 
         return results
 
-    def batch_permanent_delete_devices(self, device_ids: List[int]) -> Dict[str, Any]:
-        """批量永久删除设备（单次事务，全部成功或全部回滚）"""
+    def batch_permanent_delete_devices(
+        self, device_ids: List[int], include_live: bool = False
+    ) -> Dict[str, Any]:
+        """批量永久删除设备（单次事务，全部成功或全部回滚）。
+
+        ``include_live``
+        ----------------
+        * ``False``（默认，API 批量彻底删的口径）：**只接受已软删的设备**，
+          未软删的进 ``failed``（"先删进回收站，再彻底删"是产品约定，不能绕过）。
+        * ``True``（机柜强删口径）：柜内**未软删**的设备先按软删语义落地位置快照
+          （``_save_location_to_config`` → 置 ``deleted_at`` → 清空位置字段），
+          再物理删除。语义等价于"先把它们放进回收站再清空"，**保留**了
+          `delete_device` 的位置快照动作（否则机箱子节点的位置信息会丢）。
+
+        返回值额外带三个**释放/处置计数**（都不是"删除行数"，用下划线前缀区分）：
+        ``released_network_ports`` / ``released_nics_ports`` / ``released_ips`` /
+        ``disposed_trace_refs``。机柜强删要把它们回给前端。
+        """
         from app.models.device import Device
 
         session = self.session
-        results = {"success": [], "failed": []}
+        results = {"success": [], "failed": [], "released_network_ports": 0,
+                   "released_nics_ports": 0, "released_ips": 0, "disposed_trace_refs": 0}
 
         try:
             with self.session.begin_nested():
@@ -2447,15 +2696,28 @@ class DeviceService:
                         results["failed"].append({"device_id": did, "error": "设备不存在"})
                         continue
                     if device.deleted_at is None:
-                        results["failed"].append({"device_id": did, "error": "设备未被软删除"})
-                        continue
-                    self._cleanup_device_dependencies(did)
+                        if not include_live:
+                            results["failed"].append(
+                                {"device_id": did, "error": "设备未被软删除"}
+                            )
+                            continue
+                        self._save_location_to_config(device)
+                        device.deleted_at = now_utc_naive()
+                        self._clear_device_location_inline(device)
+                        session.flush()
+                    counters = self._cleanup_device_dependencies(did, purge=True)
+                    for key in ("released_network_ports", "released_nics_ports",
+                                "released_ips", "disposed_trace_refs"):
+                        results[key] += counters.get(key, 0)
                     session.delete(device)
                     results["success"].append(did)
                 session.flush()
         except Exception as e:
             results["failed"] = [{"device_id": did, "error": str(e)} for did in device_ids]
             results["success"] = []
+            for key in ("released_network_ports", "released_nics_ports",
+                        "released_ips", "disposed_trace_refs"):
+                results[key] = 0
             return results
 
         for did in results["success"]:

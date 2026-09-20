@@ -4,16 +4,27 @@
  * - 机房平面图（RoomLayout 组件）
  * - 机柜统计概览
  */
-import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Descriptions, Spin, Button, Tag, Row, Col, Statistic, Result } from 'antd';
+import { useState } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Card, Descriptions, Spin, Button, Tag, Row, Col, Statistic, Result, Space } from 'antd';
 import {
   ArrowLeftOutlined,
   DatabaseOutlined,
   ThunderboltOutlined,
-  AppstoreOutlined
+  AppstoreOutlined,
+  SettingOutlined,
+  AppstoreAddOutlined
 } from '@ant-design/icons';
-import { useRoomSuspenseDetail, useRoomCabinets } from '@/services/room';
+import {
+  useRoomSuspenseDetail,
+  useRoomCabinets,
+  useRoomChannels,
+  useRoomLayoutMarkers
+} from '@/services/room';
 import RoomLayout from '@/components/RoomLayout';
+import ChannelConfigModal from '@/components/RoomLayout/ChannelConfigModal';
+import MarkerConfigModal from '@/components/RoomLayout/MarkerConfigModal';
+import { usePermission } from '@/hooks/usePermission';
 import { ROOM_STATUS_MAP } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
 import type { Cabinet } from '@/types/models';
@@ -44,8 +55,18 @@ function RoomDetail() {
 
 function RoomDetailContent({ roomId }: { roomId: number }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const highlightCabinetId = Number(searchParams.get('cabinetId')) || undefined;
   const { data: room } = useRoomSuspenseDetail(roomId);
   const { data: cabinets, isLoading: cabinetsLoading } = useRoomCabinets(roomId);
+  const { data: channels } = useRoomChannels(roomId);
+  const { data: markers } = useRoomLayoutMarkers(roomId);
+
+  const { hasPermission } = usePermission();
+  const canConfigLayout = hasPermission('room:layout_config');
+  const [channelModalOpen, setChannelModalOpen] = useState(false);
+  const [markerModalOpen, setMarkerModalOpen] = useState(false);
 
   if (!room) {
     return <div>机房不存在</div>;
@@ -74,7 +95,12 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
       <Card title={`机房详情 - ${room.name}`}>
         <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
           <Descriptions.Item label="机房名称">{room.name}</Descriptions.Item>
+          <Descriptions.Item label="房间号">{room.room_number || '-'}</Descriptions.Item>
           <Descriptions.Item label="状态">{renderStatus(room.status)}</Descriptions.Item>
+          {/* 楼栋 / 楼层：总览页按它们分组与过滤，详情页也理应能看到——
+              否则从总览点进来会"看不到刚才那个分组依据"，像是信息丢了 */}
+          <Descriptions.Item label="楼栋">{room.building || '-'}</Descriptions.Item>
+          <Descriptions.Item label="楼层">{room.floor || '-'}</Descriptions.Item>
           <Descriptions.Item label="位置">{room.location || '-'}</Descriptions.Item>
           <Descriptions.Item label="机柜数">{totalCabinets}</Descriptions.Item>
           <Descriptions.Item label="联系人">{room.contact || '-'}</Descriptions.Item>
@@ -107,11 +133,46 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
         </Row>
       </Card>
 
-      <Card title="机房平面图" style={{ marginTop: 16 }}>
+      <Card
+        title="机房平面图"
+        style={{ marginTop: 16 }}
+        extra={
+          canConfigLayout ? (
+            <Space>
+              <Button icon={<SettingOutlined />} onClick={() => setChannelModalOpen(true)}>
+                配置通道
+              </Button>
+              <Button icon={<AppstoreAddOutlined />} onClick={() => setMarkerModalOpen(true)}>
+                管理占位标记
+              </Button>
+            </Space>
+          ) : null
+        }
+      >
         <Spin spinning={cabinetsLoading}>
-          <RoomLayout cabinets={cabinetList} />
+          <RoomLayout
+            cabinets={cabinetList}
+            channels={channels}
+            markers={markers}
+            highlightCabinetIds={highlightCabinetId ? [highlightCabinetId] : undefined}
+          />
         </Spin>
       </Card>
+
+      {canConfigLayout ? (
+        <>
+          <ChannelConfigModal
+            roomId={roomId}
+            open={channelModalOpen}
+            onClose={() => setChannelModalOpen(false)}
+          />
+          <MarkerConfigModal
+            roomId={roomId}
+            open={markerModalOpen}
+            onClose={() => setMarkerModalOpen(false)}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

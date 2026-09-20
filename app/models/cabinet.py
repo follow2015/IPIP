@@ -25,6 +25,7 @@ class Cabinet(BaseModel):
     __tablename__ = "cabinets"
     __table_args__ = (
         db.UniqueConstraint('room_id', 'cabinet_number', name='uk_cabinet_room_number'),
+        db.UniqueConstraint('room_id', 'row', 'col', name='uk_cabinet_position'),
         db.Index('idx_cabinet_deleted_room_status', 'room_id', 'status'),
         db.Index('idx_cabinet_customer', 'customer_id'),
         {"comment": "机柜信息表"},

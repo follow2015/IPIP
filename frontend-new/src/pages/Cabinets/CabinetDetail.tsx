@@ -1,20 +1,16 @@
-/**
- * 机柜详情页
- * - 机柜基本信息（完整字段）
- * - U 位可视化（展示实际设备占用）
- * - 跳转查看该机柜下的设备
- */
 
 import { useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Descriptions, Spin, Button, Tag, Result } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { Card, Descriptions, Spin, Button, Tag, Result, Space } from 'antd';
+import { ArrowLeftOutlined, EnvironmentOutlined } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCabinetSuspenseDetail, useCabinetWithDevices } from '@/services/cabinet';
+import { useRoomChannels } from '@/services/room';
 import { useUpdateDevice } from '@/services/device';
 import { useVendorBrands } from '@/services/monitor';
 import { queryKeys } from '@/services/query-keys';
 import UPositionSelector from '@/components/UPositionSelector';
+import { CHANNEL_TYPE_LABEL, paletteKeyOf } from '@/components/RoomLayout/palette';
 import type {
   OccupiedPosition,
   RackDeviceType,
@@ -24,11 +20,22 @@ import type {
 import { formatDateTime } from '@/utils/format';
 import { useMessage } from '@/hooks/useMessage';
 import { CABINET_STATUS_MAP, DeviceStatusCode } from '@/types/enums';
-import type { Cabinet, Device } from '@/types/models';
+import type { Cabinet, Device, RoomChannel } from '@/types/models';
 
 function renderStatus(v: number) {
   const s = CABINET_STATUS_MAP[v as keyof typeof CABINET_STATUS_MAP];
   return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{v}</Tag>;
+}
+
+function ChannelTag({ channel, side }: { channel: RoomChannel; side: string }) {
+  const typeLabel = CHANNEL_TYPE_LABEL[channel.channel_type] ?? channel.channel_type;
+  return (
+    <Tag color={paletteKeyOf(channel.channel_type)}>
+      {side}
+      {typeLabel}
+      {channel.enclosed ? '·封闭' : '·开放'}
+    </Tag>
+  );
 }
 
 function CabinetDetail() {
@@ -63,6 +70,7 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
 
   const { data: cabinet } = useCabinetSuspenseDetail(cabinetId);
   const { data: cabinetWithDevices } = useCabinetWithDevices(cabinetId);
+  const { data: channels } = useRoomChannels(cabinet?.room_id ?? 0);
   const updateDevice = useUpdateDevice();
   const { data: vendorBrands } = useVendorBrands();
   const message = useMessage();
@@ -152,6 +160,15 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
 
   const c = cabinet as Cabinet;
 
+  const hasPosition = c.row != null && c.col != null && c.row > 0 && c.col > 0;
+
+  const leftChannel = hasPosition
+    ? (channels ?? []).find((ch) => ch.col_number === c.col! - 1)
+    : undefined;
+  const rightChannel = hasPosition
+    ? (channels ?? []).find((ch) => ch.col_number === c.col!)
+    : undefined;
+
   return (
     <div>
       <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
@@ -170,6 +187,35 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
           <Descriptions.Item label="所属机房">{c.room_name}</Descriptions.Item>
           <Descriptions.Item label="机房位置">{c.room_location ?? '-'}</Descriptions.Item>
           <Descriptions.Item label="具体位置">{c.location ?? '-'}</Descriptions.Item>
+          {/*
+            平面图位置（设计文档 §3.4）：此前 row/col 填了却完全不展示，运维想知道
+            机柜在第几行第几列只能跳回平面图自己找；加了通道后这个缺口更明显
+            （冷/热通道信息理应跟着位置一起露出）。
+          */}
+          <Descriptions.Item label="平面图位置">
+            {hasPosition ? (
+              <Space size={4} wrap>
+                <span>
+                  第 {c.row} 行 第 {c.col} 列
+                </span>
+                {leftChannel ? <ChannelTag channel={leftChannel} side="左侧" /> : null}
+                {rightChannel ? <ChannelTag channel={rightChannel} side="右侧" /> : null}
+                {!leftChannel && !rightChannel ? (
+                  <span style={{ color: '#8c8c8c' }}>通道未标注</span>
+                ) : null}
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<EnvironmentOutlined />}
+                  onClick={() => navigate(`/rooms/${c.room_id}?cabinetId=${c.id}`)}
+                >
+                  在平面图中查看
+                </Button>
+              </Space>
+            ) : (
+              <span style={{ color: '#8c8c8c' }}>未设置（可在机柜表单中填写行号与列号）</span>
+            )}
+          </Descriptions.Item>
           <Descriptions.Item label="租赁客户">{c.customer_name ?? '-'}</Descriptions.Item>
           <Descriptions.Item label="U位容量">{c.total_u}U</Descriptions.Item>
           <Descriptions.Item label="已用U位">

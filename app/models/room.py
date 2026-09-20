@@ -5,6 +5,7 @@
 from typing import Any, Dict, List, TYPE_CHECKING
 
 from sqlalchemy.orm import relationship
+from sqlalchemy import UniqueConstraint
 
 from app.models.base import BaseModel
 from extensions import db
@@ -19,6 +20,14 @@ class Room(BaseModel):
 
     管理机房的基本信息，包括名称、位置、联系人等。
     一个机房可以包含多个机柜。
+
+    **身份与分组语义（实施计划《机房房间号与名称分组改造》）**：
+    - `name` 是**分组键 + 展示名**，允许多条 Room 记录共用同一名称（同一物理
+      机房拆成多条记录时天然归为一组，总览按名称分组）；
+    - `room_number` 是记录的业务身份，在**机房名称组内唯一**
+      （组合唯一 `uk_room_name_number (name, room_number)`）；
+    - `building`/`floor` 保留为补充信息与筛选维度，不参与分组。
+
     删除即物理删除（依赖检查由 RoomService.delete 把关）；
     软删除仅保留给设备（DeviceRecycleBin 回收站）。
     """
@@ -27,16 +36,32 @@ class Room(BaseModel):
     __table_args__ = (
         db.Index('ix_jf_manager_db_name', 'name'),
         db.Index('idx_room_deleted_status', 'status'),
+        UniqueConstraint("name", "room_number", name="uk_room_name_number"),
         {"comment": "机房信息表"},
     )
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment="主键ID")
 
-    name = db.Column(db.String(255), nullable=False, comment="机房名称")
+    name = db.Column(db.String(255), nullable=False, comment="机房名称(分组键+展示名,可重复)")
+    room_number = db.Column(
+        db.String(50),
+        nullable=False,
+        comment="房间号(机房名称组内唯一,记录的业务身份)",
+    )
     status = db.Column(db.Integer, default=RoomStatus.NORMAL.value, nullable=False, comment="状态：0-正常，1-停用 (RoomStatus)")
     location = db.Column(db.String(255), comment="机房位置")
     contact = db.Column(db.String(255), comment="联系人")
     contact_phone = db.Column(db.String(50), comment="联系电话")
+    building = db.Column(
+        db.String(100),
+        nullable=True,
+        comment="所属建筑/园区(用于跨机房总览分组展示,自由文本)",
+    )
+    floor = db.Column(
+        db.String(20),
+        nullable=True,
+        comment="所属楼层(用于跨机房总览按楼层过滤,自由文本;字符串而非整数以容纳 B1/M 等写法)",
+    )
 
     cabinets = relationship(
         "Cabinet",

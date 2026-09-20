@@ -57,6 +57,19 @@ export type User = MakeRequired<components['schemas']['UserResponse']>;
 
 export type Room = MakeRequired<components['schemas']['RoomResponse']>;
 
+export type RoomChannel = MakeRequired<components['schemas']['RoomChannelResponse']>;
+
+export type RoomLayoutMarker = MakeRequired<components['schemas']['RoomLayoutMarkerResponse']>;
+
+export type RoomOverviewItem = MakeRequired<components['schemas']['RoomOverviewItem']>;
+
+export type RoomOverviewGroup = Omit<
+  MakeRequired<components['schemas']['RoomOverviewGroup']>,
+  'rooms'
+> & {
+  rooms: RoomOverviewItem[];
+};
+
 export type Cabinet = MakeRequired<components['schemas']['CabinetResponse']>;
 
 export type CabinetUtilization = MakeRequired<components['schemas']['CabinetUtilizationResponse']>;
@@ -89,7 +102,9 @@ export type AuditLog = MakeRequired<components['schemas']['AuditLogResponse']>;
 
 export type VLAN = MakeRequired<components['schemas']['VLANResponse']>;
 
-export type LinkAggregationGroup = MakeRequired<components['schemas']['LinkAggregationGroupResponse']>;
+export type LinkAggregationGroup = MakeRequired<
+  components['schemas']['LinkAggregationGroupResponse']
+>;
 
 export type IPNetwork = MakeRequired<components['schemas']['IPNetworkResponse']>;
 
@@ -128,6 +143,14 @@ export type RoomCreate = components['schemas']['RoomCreate'];
 
 export type RoomUpdate = components['schemas']['RoomUpdate'];
 
+export type RoomChannelCreate = components['schemas']['RoomChannelCreate'];
+
+export type RoomChannelUpdate = components['schemas']['RoomChannelUpdate'];
+
+export type RoomLayoutMarkerCreate = components['schemas']['RoomLayoutMarkerCreate'];
+
+export type RoomLayoutMarkerUpdate = components['schemas']['RoomLayoutMarkerUpdate'];
+
 export type AuditLogQuery = components['schemas']['AuditLogQuery'];
 
 export type VLANCreate = components['schemas']['VLANCreate'];
@@ -139,29 +162,35 @@ export type TopologyNode = MakeRequired<components['schemas']['TopologyNode']>;
 export type TopologyEdge = MakeRequired<components['schemas']['TopologyEdge']>;
 export type TopologyStats = MakeRequired<components['schemas']['TopologyStats']>;
 export type TopologyResponse = MakeRequired<components['schemas']['TopologyResponse']>;
-export type TopologyAutoDetectChangeField = MakeRequired<components['schemas']['TopologyAutoDetectChangeField']>;
-export type TopologyAutoDetectChange = MakeRequired<components['schemas']['TopologyAutoDetectChange']>;
-export type TopologyAutoDetectResponse = MakeRequired<components['schemas']['TopologyAutoDetectResponse']>;
+export type TopologyAutoDetectChangeField = MakeRequired<
+  components['schemas']['TopologyAutoDetectChangeField']
+>;
+export type TopologyAutoDetectChange = MakeRequired<
+  components['schemas']['TopologyAutoDetectChange']
+>;
+export type TopologyAutoDetectResponse = MakeRequired<
+  components['schemas']['TopologyAutoDetectResponse']
+>;
 
 
 import type { paths } from './api-generated';
 
 export type ApiPaths = paths;
 
-export type GetResponse<
-  Path extends keyof paths,
-> = paths[Path] extends { get: { responses: { 200: { content: { 'application/json': infer R } } } } }
+export type GetResponse<Path extends keyof paths> = paths[Path] extends {
+  get: { responses: { 200: { content: { 'application/json': infer R } } } };
+}
   ? R
   : never;
 
-export type PostRequestBody<
-  Path extends keyof paths,
-> = paths[Path] extends { post: { requestBody: { content: { 'application/json': infer R } } } }
+export type PostRequestBody<Path extends keyof paths> = paths[Path] extends {
+  post: { requestBody: { content: { 'application/json': infer R } } };
+}
   ? R
   : never;
 
-export type PostResponse<
-  Path extends keyof paths,
-> = paths[Path] extends { post: { responses: { 200: { content: { 'application/json': infer R } } } } }
+export type PostResponse<Path extends keyof paths> = paths[Path] extends {
+  post: { responses: { 200: { content: { 'application/json': infer R } } } };
+}
   ? R
   : never;

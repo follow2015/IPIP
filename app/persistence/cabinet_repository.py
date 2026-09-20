@@ -82,6 +82,38 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             logger.error(f"根据机柜编号查找失败 (cabinet_number={cabinet_number}): {e}")
             raise QueryExecutionError("查找机柜失败", original_error=e)
 
+    def find_by_position(
+        self, room_id: int, row: int, col: int, exclude_id: Optional[int] = None
+    ) -> Optional[Cabinet]:
+        """查找占用指定格子的机柜（坐标唯一性校验用）。
+
+        与 `uk_cabinet_position` 唯一约束配套：约束是最终防线（防并发写入），
+        本方法用于在提交前给出可读的错误提示。
+
+        Args:
+            room_id: 机房 ID
+            row: 行号
+            col: 列号
+            exclude_id: 需要排除的机柜 ID（编辑场景下排除自身）
+
+        Returns:
+            占用该格子的机柜；未被占用时返回 None
+        """
+        try:
+            query = self._base_query().filter(
+                Cabinet.room_id == room_id,
+                Cabinet.row == row,
+                Cabinet.col == col,
+            )
+            if exclude_id is not None:
+                query = query.filter(Cabinet.id != exclude_id)
+            return query.first()
+        except SQLAlchemyError as e:
+            logger.error(
+                f"按坐标查找机柜失败 (room_id={room_id}, row={row}, col={col}): {e}"
+            )
+            raise QueryExecutionError("查找机柜失败", original_error=e)
+
 
     def find_by_room_id(self, room_id: int) -> List[Cabinet]:
         """根据机房 ID 查找机柜，按编号排序。
@@ -308,6 +340,70 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         except SQLAlchemyError as e:
             logger.error(f"获取机柜统计信息失败: {e}")
             raise QueryExecutionError("获取机柜统计信息失败", original_error=e)
+
+    def get_overview_stats_by_room(self) -> Dict[int, Dict[str, Any]]:
+        """按机房聚合机柜统计，一次 SQL 拿全部机房（跨机房总览用，避免 N+1）。
+
+        **口径说明（设计文档 §2.3）**：这里用冗余字段 `cabinets.used_u` / `used_power`
+        求和，而不像 `Cabinet.to_dict()` 那样实时遍历 devices 计算 `u_usage_rate`。
+        原因是总览一次要覆盖几十个机房，实时计算会触发大量设备查询；冗余字段由
+        `CabinetService.update_usage()` 在设备增删改时维护，正常情况与实时值一致。
+        若总览与机柜详情对不上，应优先排查 update_usage 的调用漏点，而不是改这里的口径。
+
+        Returns:
+            {room_id: {
+                "cabinet_count": int,
+                "total_u": int, "used_u": int,
+                "total_power": int, "used_power": int,
+                "status_counts": {status_code: count},
+            }}
+        """
+        try:
+            rows = (
+                self._base_query()
+                .with_entities(
+                    Cabinet.room_id,
+                    func.count(Cabinet.id).label("cabinet_count"),
+                    func.sum(func.coalesce(Cabinet.total_u, 0)).label("total_u"),
+                    func.sum(func.coalesce(Cabinet.used_u, 0)).label("used_u"),
+                    func.sum(func.coalesce(Cabinet.total_power, 0)).label("total_power"),
+                    func.sum(func.coalesce(Cabinet.used_power, 0)).label("used_power"),
+                )
+                .group_by(Cabinet.room_id)
+                .all()
+            )
+
+            result: Dict[int, Dict[str, Any]] = {}
+            for row in rows:
+                result[row.room_id] = {
+                    "cabinet_count": int(row.cabinet_count or 0),
+                    "total_u": int(row.total_u or 0),
+                    "used_u": int(row.used_u or 0),
+                    "total_power": int(row.total_power or 0),
+                    "used_power": int(row.used_power or 0),
+                    "status_counts": {},
+                }
+
+            status_rows = (
+                self._base_query()
+                .with_entities(
+                    Cabinet.room_id,
+                    Cabinet.status,
+                    func.count(Cabinet.id).label("cnt"),
+                )
+                .group_by(Cabinet.room_id, Cabinet.status)
+                .all()
+            )
+            for row in status_rows:
+                entry = result.get(row.room_id)
+                if entry is None:
+                    continue
+                entry["status_counts"][int(row.status or 0)] = int(row.cnt or 0)
+
+            return result
+        except SQLAlchemyError as e:
+            logger.error(f"按机房聚合机柜统计失败: {e}")
+            raise QueryExecutionError("聚合机柜统计失败", original_error=e)
 
     def get_room_cabinet_statistics(self, room_id: int) -> Dict[str, Any]:
         """获取指定机房的机柜统计信息。

@@ -106,12 +106,13 @@ def create_app(config_name: str = None) -> Flask:
         start_delivery_worker(app)
         register_ops_alert_callbacks()
 
+        is_testing_env = config_name == "testing" or bool(getattr(config, "TESTING", False))
         in_process = os.getenv("MONITOR_WORKER_IN_PROCESS")
         in_process = (
             in_process.lower() == "true" if in_process is not None
             else app.config.get("MONITOR_WORKER_IN_PROCESS", True)
         )
-        if app.config.get("MONITOR_ENABLED", True) and in_process:
+        if not is_testing_env and app.config.get("MONITOR_ENABLED", True) and in_process:
             from app.services.monitoring.monitor_worker import start_monitor_worker
             monitor_threads, monitor_stop_event = start_monitor_worker(app)
             import atexit

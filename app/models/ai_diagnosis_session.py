@@ -27,7 +27,14 @@ class AIDiagnosisSession(BaseModel):
         db.BigInteger,
         ForeignKey("devices.id", ondelete="SET NULL"),
         nullable=True,
-        comment="设备ID（诊断目标设备，设备删除时保留会话供回溯）",
+        comment="设备ID（诊断目标设备；设备删除时**保留会话**、只把本列置空，"
+        "见 device_service._delete_monitor_related）",
+    )
+    device_name = db.Column(
+        db.String(100),
+        nullable=True,
+        comment="诊断目标设备名快照：置空 device_id 前先写入，"
+        "使会话在设备行已物理删除后仍能自证是哪台设备（迁移 0015）",
     )
     user_id = db.Column(
         db.BigInteger,

@@ -83,11 +83,98 @@ class RoomResponseSchema(Schema):
     """机房响应（对齐 Room.to_dict()）"""
     id = fields.Int()
     name = fields.Str()
+    room_number = fields.Str()
     status = fields.Int()
     location = fields.Str(allow_none=True)
     contact = fields.Str(allow_none=True)
     contact_phone = fields.Str(allow_none=True)
+    building = fields.Str(allow_none=True)
+    floor = fields.Str(allow_none=True)
     cabinet_count = fields.Int()
+    created_at = fields.Str()
+    updated_at = fields.Str()
+
+
+class RoomOverviewItemSchema(Schema):
+    """跨机房总览中的单个机房概要（设计文档 §2.3 / §3.3）"""
+
+    id = fields.Int()
+    name = fields.Str()
+    room_number = fields.Str()
+    status = fields.Int()
+    location = fields.Str(allow_none=True)
+    building = fields.Str(allow_none=True)
+    floor = fields.Str(allow_none=True)
+    cabinet_count = fields.Int()
+    u_usage_rate = fields.Int()
+    power_usage_rate = fields.Int()
+    status_distribution = fields.Dict(keys=fields.Str(), values=fields.Int())
+
+
+class RoomOverviewGroupSchema(Schema):
+    """按机房名称分组的总览（实施计划 D5：分组键 building → name，name 必填无"未分组"）"""
+
+    name = fields.Str()
+    room_count = fields.Int()
+    cabinet_count = fields.Int()
+    u_usage_rate = fields.Int()
+    power_usage_rate = fields.Int()
+    rooms = fields.List(fields.Nested(RoomOverviewItemSchema))
+
+
+class RoomOverviewResponseSchema(Schema):
+    """GET /api/rooms/overview 的 data 部分"""
+
+    groups = fields.List(fields.Nested(RoomOverviewGroupSchema))
+
+
+class RoomBuildingsResponseSchema(Schema):
+    """GET /api/rooms/buildings 的 data 部分（已使用的楼栋去重值）"""
+
+    buildings = fields.List(fields.Str())
+
+
+class RoomFloorsResponseSchema(Schema):
+    """GET /api/rooms/floors 的 data 部分（已使用的楼层去重值）
+
+    支持按楼栋联动过滤：`?building=A栋` 只返回该楼栋下出现过的楼层。
+    不联动的话，A 栋与 B 栋各自的"3层"会混在一起，筛选时无法区分。
+    """
+
+    floors = fields.List(fields.Str())
+
+
+class RoomChannelResponseSchema(Schema):
+    """机房通道响应（对齐 RoomChannel.to_dict()）
+
+    display_name 为计算字段：未填 label 时由后端生成
+    "第 N 列与第 N+1 列之间" / "第 1 列外侧"。
+    """
+    id = fields.Int()
+    room_id = fields.Int()
+    col_number = fields.Int()
+    channel_type = fields.Str()
+    enclosed = fields.Bool()
+    supply = fields.Str(allow_none=True)
+    label = fields.Str(allow_none=True)
+    notes = fields.Str(allow_none=True)
+    display_name = fields.Str(allow_none=True)
+    created_at = fields.Str()
+    updated_at = fields.Str()
+
+
+class RoomLayoutMarkerResponseSchema(Schema):
+    """机房平面图占位标记响应（对齐 RoomLayoutMarker.to_dict()）
+
+    row_number / col_number 允许为 0——门、端头空调等位于机柜网格之外。
+    """
+    id = fields.Int()
+    room_id = fields.Int()
+    row_number = fields.Int()
+    col_number = fields.Int()
+    marker_type = fields.Str()
+    label = fields.Str(allow_none=True)
+    notes = fields.Str(allow_none=True)
     created_at = fields.Str()
     updated_at = fields.Str()
 

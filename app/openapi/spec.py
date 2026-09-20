@@ -151,7 +151,14 @@ def register_marshmallow_schemas(spec: APISpec):
         CabinetCustomerUpdateSchema,
     )
     from app.schemas.customer import CustomerCreateSchema, CustomerUpdateSchema, CustomerTerminateRequestSchema
-    from app.schemas.room import RoomCreateSchema, RoomUpdateSchema
+    from app.schemas.room import (
+        RoomChannelCreateSchema,
+        RoomChannelUpdateSchema,
+        RoomCreateSchema,
+        RoomLayoutMarkerCreateSchema,
+        RoomLayoutMarkerUpdateSchema,
+        RoomUpdateSchema,
+    )
     from app.schemas.device_connection import DeviceConnectionCreateSchema, DeviceConnectionUpdateSchema
     from app.schemas.device_config import ConfigChangeRequestSchema
     from app.schemas.device_nics_port import NicPortBatchSchema, NicPortIncrementalBatchSchema, NicPortUpdateSchema
@@ -270,6 +277,10 @@ def register_marshmallow_schemas(spec: APISpec):
         "CustomerUpdate": CustomerUpdateSchema,
         "RoomCreate": RoomCreateSchema,
         "RoomUpdate": RoomUpdateSchema,
+        "RoomChannelCreate": RoomChannelCreateSchema,
+        "RoomChannelUpdate": RoomChannelUpdateSchema,
+        "RoomLayoutMarkerCreate": RoomLayoutMarkerCreateSchema,
+        "RoomLayoutMarkerUpdate": RoomLayoutMarkerUpdateSchema,
         "DeviceConnectionCreate": DeviceConnectionCreateSchema,
         "DeviceConnectionUpdate": DeviceConnectionUpdateSchema,
         "ConfigChangeRequest": ConfigChangeRequestSchema,
@@ -386,6 +397,11 @@ def register_marshmallow_schemas(spec: APISpec):
         LoginUserResponseSchema,
         VerifyDataResponseSchema,
         RoomResponseSchema,
+        RoomOverviewResponseSchema,
+        RoomBuildingsResponseSchema,
+        RoomFloorsResponseSchema,
+        RoomChannelResponseSchema,
+        RoomLayoutMarkerResponseSchema,
         CabinetResponseSchema,
         CabinetUtilizationResponseSchema,
         DeviceResponseSchema,
@@ -552,6 +568,11 @@ def register_marshmallow_schemas(spec: APISpec):
         "LoginUserResponse": LoginUserResponseSchema,
         "VerifyDataResponse": VerifyDataResponseSchema,
         "RoomResponse": RoomResponseSchema,
+        "RoomOverviewResponse": RoomOverviewResponseSchema,
+        "RoomBuildingsResponse": RoomBuildingsResponseSchema,
+        "RoomFloorsResponse": RoomFloorsResponseSchema,
+        "RoomChannelResponse": RoomChannelResponseSchema,
+        "RoomLayoutMarkerResponse": RoomLayoutMarkerResponseSchema,
         "CabinetResponse": CabinetResponseSchema,
         "CabinetUtilizationResponse": CabinetUtilizationResponseSchema,
         "DeviceResponse": DeviceResponseSchema,

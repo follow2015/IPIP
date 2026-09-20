@@ -21,6 +21,7 @@
 - 优雅退出：threading.Event 作 stop 信号；create_app 里注册 atexit 置位并 join 全部线程。
 """
 import threading
+import time
 import weakref
 from app.utils.time_utils import now_utc_naive
 from app.utils.concurrency.redis_lock import owner_token, release_owner_lock
@@ -141,6 +142,43 @@ _redis_client_cache_lock = threading.Lock()
 _redis_client_cache: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 _LOOP_ERROR_BACKOFF_SECONDS = 5.0
+
+_STOP_POLL_SECONDS = 1.0
+
+_LOOP_ERROR_LOG_BURST = 5
+_LOOP_ERROR_LOG_INTERVAL = 60.0
+_loop_error_log_state: dict = {}
+
+
+def _log_loop_error(loop_name: str) -> None:
+    """循环级异常日志（带突发抑制，B-28）。
+
+    前 `_LOOP_ERROR_LOG_BURST` 次打**完整堆栈**（第一次就能定位根因）；此后每
+    `_LOOP_ERROR_LOG_INTERVAL` 秒只打一条**摘要**。动机：进程退出阶段同一异常
+    每轮必抛，未抑制时实测刷出 4.3 万行（还会因 logging stream 已关闭而演变成
+    "报错 → 写日志失败 → 再报错"的洪水）。
+
+    这是**限流不是吞错** —— 异常仍被吞掉并继续循环（○7 的既有语义不变），
+    只是日志不再随循环次数线性膨胀。故断言"Redis 拒连时必须反复重试"的测试
+    应当断言 `_acquire_lock` 的**调用次数**（不受本函数影响），而不是日志行数。
+    """
+    import time as _time
+
+    state = _loop_error_log_state.setdefault(loop_name, [0, 0.0])
+    state[0] += 1
+    now = _time.monotonic()
+    if state[0] <= _LOOP_ERROR_LOG_BURST:
+        logger.error(
+            "监控轮询循环异常（已吞掉，本轮作废并退避 %.0fs） loop=%s",
+            _LOOP_ERROR_BACKOFF_SECONDS, loop_name, exc_info=True,
+        )
+        state[1] = now
+    elif now - state[1] >= _LOOP_ERROR_LOG_INTERVAL:
+        logger.error(
+            "监控轮询循环异常持续（连续 %d 次，本轮作废并退避 %.0fs；完整堆栈见前 %d 条） loop=%s",
+            state[0], _LOOP_ERROR_BACKOFF_SECONDS, _LOOP_ERROR_LOG_BURST, loop_name,
+        )
+        state[1] = now
 
 
 def _redis_timeout(app, config_key: str, default: float) -> float:
@@ -287,6 +325,8 @@ def _try_sync_non_managed_ports(device) -> None:
         if cred is None or collector is None:
             return  # 无 SNMP / Zabbix 凭据，无法采集
 
+        db.session.commit()
+
         if not has_ssh:
             from app.services.monitoring.port_sync_service import PortSyncService
             PortSyncService().sync_device_ports(
@@ -398,18 +438,30 @@ def _run_one_round(app, loop_name: str, monitor_service, executor=None, stop_eve
 
         own_executor = executor is None
         pool_size = app.config.get("MONITOR_THREAD_POOL_SIZE", 20)
-        ex = executor or ThreadPoolExecutor(max_workers=pool_size)
+        ex = executor or ThreadPoolExecutor(
+            max_workers=pool_size, thread_name_prefix=f"monitor-{loop_name}"
+        )
         checked = 0
         failed = 0
+        aborted = False
         try:
             futures = [
                 ex.submit(_check_one_device, app, monitor_service, did)
                 for did in target_ids
             ]
             for f in futures:
+                while not f.done():
+                    if stop_event is not None and stop_event.is_set():
+                        aborted = True
+                        break
+                    if stop_event is not None:
+                        stop_event.wait(_STOP_POLL_SECONDS)  # 可被 set 立即唤醒
+                    else:
+                        time.sleep(_STOP_POLL_SECONDS)
+                if aborted:
+                    break
                 try:
-                    ok = f.result()
-                    if ok:
+                    if f.result():
                         checked += 1
                     else:
                         failed += 1
@@ -420,7 +472,10 @@ def _run_one_round(app, loop_name: str, monitor_service, executor=None, stop_eve
         finally:
             if own_executor:
                 ex.shutdown(wait=False)
-        return {"checked": checked, "failed": failed, "total": len(target_ids)}
+        stats = {"checked": checked, "failed": failed, "total": len(target_ids)}
+        if aborted:
+            stats["aborted"] = True
+        return stats
 
 
 def _check_monitor_interrupted(app, monitor_service, enabled_ids: list, loop_name: str) -> None:
@@ -569,7 +624,9 @@ def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) 
                                 app, loop_name, monitor_service,
                                 executor=executor, stop_event=stop_event,
                             )
-                        if stats.get("failed", 0) > 0:
+                        if stats.get("aborted"):
+                            logger.info("监控轮询本轮因停机中止 loop=%s", loop_name)
+                        elif stats.get("failed", 0) > 0:
                             logger.warning(
                                 "监控轮询一轮有失败 loop=%s checked=%d failed=%d total=%d",
                                 loop_name, stats["checked"], stats["failed"], stats["total"],
@@ -585,13 +642,12 @@ def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) 
                 logger.debug("监控轮询一轮结束 loop=%s orphan_count=%d", loop_name, get_orphan_count())
                 stop_event.wait(interval)
             except Exception:
-                logger.error(
-                    "监控轮询循环异常（已吞掉，本轮作废并退避 %.0fs） loop=%s",
-                    _LOOP_ERROR_BACKOFF_SECONDS, loop_name, exc_info=True,
-                )
+                if stop_event.is_set():
+                    break
+                _log_loop_error(loop_name)
                 stop_event.wait(_LOOP_ERROR_BACKOFF_SECONDS)
     finally:
-        executor.shutdown(wait=False)
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 

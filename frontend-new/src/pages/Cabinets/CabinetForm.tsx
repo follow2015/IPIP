@@ -1,18 +1,10 @@
-/**
- * 机柜表单（新增/编辑 Modal）
- * - 支持单条和批量创建模式
- * - 批量模式支持机柜编号智能解析：
- *   - 逗号分隔：m11,m13,n10
- *   - 范围展开：h1-10 → h1,h2,...,h10
- *   - 混合：m11,m13,h1-3,n10
- *   - 保持前导零：h01-03 → h01,h02,h03
- */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Form, Input, InputNumber, Select, Switch, Alert, Tag, Space } from 'antd';
 import { useCreateCabinet, useUpdateCabinet, useBatchCreateCabinet } from '@/services/cabinet';
 import { useMessage } from '@/hooks/useMessage';
-import { useRoomOptions } from '@/services/room';
+import { useRoomCabinets, useRoomLayoutMarkers, useRoomOptions } from '@/services/room';
 import { useAllocatableCustomerOptions } from '@/services/customer';
+import { MARKER_TYPE_LABEL } from '@/components/RoomLayout/palette';
 import { CABINET_STATUS_OPTIONS } from '@/types/enums';
 import type { Cabinet } from '@/types/models';
 
@@ -71,6 +63,31 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
       }
     }
   }, [open, editRecord, form]);
+
+
+  const watchedRoomId = Form.useWatch('room_id', form) as number | undefined;
+  const watchedRow = Form.useWatch('row', form) as number | null | undefined;
+  const watchedCol = Form.useWatch('col', form) as number | null | undefined;
+
+  const { data: roomCabinets } = useRoomCabinets(watchedRoomId ?? 0);
+  const { data: roomMarkers } = useRoomLayoutMarkers(watchedRoomId ?? 0);
+
+  const occupiedBy = useMemo(() => {
+    if (!watchedRow || !watchedCol) return null;
+    return (
+      (roomCabinets ?? []).find(
+        (c) => c.row === watchedRow && c.col === watchedCol && c.id !== editRecord?.id
+      ) ?? null
+    );
+  }, [roomCabinets, watchedRow, watchedCol, editRecord]);
+
+  const markerAtCell = useMemo(() => {
+    if (!watchedRow || !watchedCol) return null;
+    return (
+      (roomMarkers ?? []).find((m) => m.row_number === watchedRow && m.col_number === watchedCol) ??
+      null
+    );
+  }, [roomMarkers, watchedRow, watchedCol]);
 
   const handleCabinetNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!batchMode) return;
@@ -247,6 +264,27 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
                 <InputNumber min={1} style={{ width: '100%' }} placeholder="如：1" />
               </Form.Item>
             </div>
+
+            {/* 占用提示：机柜冲突是硬的（后端唯一约束会拒），标记冲突是软的（允许重叠） */}
+            {occupiedBy ? (
+              <Alert
+                type="error"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={`第 ${watchedRow} 行 第 ${watchedCol} 列已被机柜 ${occupiedBy.cabinet_number} 占用`}
+                description="同一机房的一个格子只能放一台机柜。请更换行列号，否则提交会被拒绝。"
+              />
+            ) : markerAtCell ? (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={`该位置已标记为占位设施（${
+                  MARKER_TYPE_LABEL[markerAtCell.marker_type] ?? markerAtCell.marker_type
+                }）`}
+                description="占位设施通常表示该格子不放机柜。确需放置可继续提交，平面上会以冲突角标提示。"
+              />
+            ) : null}
           </>
         )}
 

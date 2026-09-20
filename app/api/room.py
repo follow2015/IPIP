@@ -10,6 +10,7 @@ from flask import Blueprint, request
 from marshmallow import Schema
 
 from app.exceptions import PresetResponseError
+from app.exceptions.base import BaseAppException
 from app.exceptions.validation import ValidationError
 from app.services.room_service import RoomService
 from app.services.device_service import DeviceService
@@ -42,7 +43,14 @@ _device_service = DeviceService(DeviceRepository())
 
 
 
-from app.schemas.room import RoomCreateSchema, RoomUpdateSchema
+from app.schemas.room import (
+    RoomChannelCreateSchema,
+    RoomChannelUpdateSchema,
+    RoomCreateSchema,
+    RoomLayoutMarkerCreateSchema,
+    RoomLayoutMarkerUpdateSchema,
+    RoomUpdateSchema,
+)
 
 def _get_room_or_404(room_id: int):
     """获取机房，不存在时返回 (None, error_response)"""
@@ -57,35 +65,47 @@ def _get_room_or_404(room_id: int):
 
 
 @room_bp.route("/", methods=["GET"])
-@doc(summary="获取机房列表", tags=["机房"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}], responses={200: "RoomResponse", 500: "ApiError"})
+@doc(summary="获取机房列表", tags=["机房"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}, {"name": "building", "in": "query", "schema": {"type": "string"}}, {"name": "floor", "in": "query", "schema": {"type": "string"}}, {"name": "status", "in": "query", "schema": {"type": "integer"}}], responses={200: "RoomResponse", 500: "ApiError"})
 @login_required
 @permission_required("room:view")
 @rate_limit_api
 def list_rooms():
-    """获取机房列表（支持分页、搜索过滤）
+    """获取机房列表（支持分页、搜索与楼栋/楼层/状态筛选）
 
     Query Parameters:
         page (int): 页码，默认 1
         per_page (int): 每页数量，默认 20，最大 100
         search (str): 搜索关键词，模糊匹配名称/位置（可选）
+        building (str): 按楼栋筛选（可选，前端 FilterBar 联想下拉）
+        floor (str): 按楼层筛选（可选）
+        status (int): 按状态筛选（可选；不传默认只看正常机房）
     """
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 100)
     search = request.args.get("search", type=str)
+    building = request.args.get("building", type=str)
+    floor = request.args.get("floor", type=str)
+    status = request.args.get("status", type=int)
+
+    filters: dict = {"status": status} if status is not None else {"status": 0}
+    if building:
+        filters["building"] = building
+    if floor:
+        filters["floor"] = floor
 
     try:
         if search:
             result = _room_service.room_repository.search(
                 search_fields=["name", "location"],
                 keyword=search,
-                filters={"status": 0},
+                filters=filters,
                 page=page,
                 page_size=per_page,
             )
             rooms = result.get("data", [])
             total = result.get("total_count", 0)
         else:
-            rooms, total = _room_service.get_paginated(page=page, per_page=per_page, filters={"status": 0})
+            rooms, total = _room_service.get_paginated(page=page, per_page=per_page, filters=filters)
 
         return APIResponse.paginated(
             data=[room.to_dict() for room in rooms],
@@ -97,6 +117,107 @@ def list_rooms():
     except Exception as e:
         logger.error(f"获取机房列表失败: {e}", exc_info=True)
         return APIResponse.error(message="获取机房列表失败", error_code="ROOM_LIST_ERROR", status_code=500)
+
+
+@room_bp.route("/overview", methods=["GET"])
+@doc(summary="跨机房总览", tags=["机房"], responses={200: "RoomOverviewResponse", 500: "ApiError"})
+@login_required
+@permission_required("room:view")
+@rate_limit_api
+def get_rooms_overview():
+    """获取跨机房总览（按 building 分组）
+
+    汇总各机房的机柜数、U 位利用率、功率利用率与状态分布；同一楼栋的机房聚在一起，
+    未填 building 的归入"未分组"并排在最后（设计文档 §2.3 / §3.3）。
+    """
+    try:
+        return APIResponse.success(
+            data={"groups": _room_service.get_overview()},
+            message="获取机房总览成功",
+        )
+    except Exception as e:
+        logger.error(f"获取机房总览失败: {e}", exc_info=True)
+        return APIResponse.error(
+            message="获取机房总览失败", error_code="ROOM_OVERVIEW_ERROR", status_code=500
+        )
+
+
+@room_bp.route("/buildings", methods=["GET"])
+@doc(summary="获取楼栋列表", tags=["机房"], responses={200: "RoomBuildingsResponse", 500: "ApiError"})
+@login_required
+@permission_required("room:view")
+@rate_limit_api
+def get_room_buildings():
+    """获取当前已使用的楼栋去重值（供机房表单的联想选项，设计文档 §2.4）"""
+    try:
+        return APIResponse.success(
+            data={"buildings": _room_service.get_buildings()},
+            message="获取楼栋列表成功",
+        )
+    except Exception as e:
+        logger.error(f"获取楼栋列表失败: {e}", exc_info=True)
+        return APIResponse.error(
+            message="获取楼栋列表失败", error_code="ROOM_BUILDINGS_ERROR", status_code=500
+        )
+
+
+@room_bp.route("/floors", methods=["GET"])
+@doc(
+    summary="获取楼层列表",
+    tags=["机房"],
+    parameters=[
+        {
+            "name": "building",
+            "in": "query",
+            "required": False,
+            "schema": {"type": "string"},
+            "description": "限定楼栋；不传则返回全部楼栋出现过的楼层",
+        }
+    ],
+    responses={200: "RoomFloorsResponse", 500: "ApiError"},
+)
+@login_required
+@permission_required("room:view")
+@rate_limit_api
+def get_room_floors():
+    """获取当前已使用的楼层去重值（供表单联想与总览页楼层筛选）
+
+    支持 `?building=A栋` 联动过滤：A 栋与 B 栋各自的"3层"含义不同，
+    不限定楼栋会让下拉里出现无法区分的重复项。
+    """
+    try:
+        building = request.args.get("building") or None
+        return APIResponse.success(
+            data={"floors": _room_service.get_floors(building)},
+            message="获取楼层列表成功",
+        )
+    except Exception as e:
+        logger.error(f"获取楼层列表失败: {e}", exc_info=True)
+        return APIResponse.error(
+            message="获取楼层列表失败", error_code="ROOM_FLOORS_ERROR", status_code=500
+        )
+
+
+@room_bp.route("/name-options", methods=["GET"])
+@doc(summary="机房名称联想选项", tags=["机房"], responses={200: "ApiResponse", 500: "ApiError"})
+@login_required
+@permission_required("room:view")
+@rate_limit_api
+def get_room_name_options():
+    """机房名称联想选项（[{name, room_count}]，实施计划 D3 名称强联想）
+
+    前端据此提示"将并入「X」机房组（现有 N 条记录）"；不在选项中的名称视为新建组。
+    """
+    try:
+        return APIResponse.success(
+            data={"options": _room_service.get_room_name_options()},
+            message="获取名称联想选项成功",
+        )
+    except Exception as e:
+        logger.error(f"获取名称联想选项失败: {e}", exc_info=True)
+        return APIResponse.error(
+            message="获取名称联想选项失败", error_code="ROOM_NAME_OPTIONS_ERROR", status_code=500
+        )
 
 
 @room_bp.route("/<int:room_id>", methods=["GET"])
@@ -134,8 +255,10 @@ def create_room():
         return APIResponse.success(data=room.to_dict(), message="机房创建成功", status_code=201)
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_VALIDATION_ERROR", status_code=409
+            message=str(e), error_code="ROOM_NUMBER_CONFLICT", status_code=409
         ) from e
+    except BaseAppException:
+        raise
     except Exception as e:
         logger.error(f"创建机房失败: {e}", exc_info=True)
         raise PresetResponseError(
@@ -176,8 +299,10 @@ def update_room(room_id):
         return APIResponse.success(data=updated_room.to_dict(), message="机房更新成功")
     except ValidationError as e:
         raise PresetResponseError(
-            message=str(e), error_code="ROOM_VALIDATION_ERROR", status_code=409
+            message=str(e), error_code="ROOM_NUMBER_CONFLICT", status_code=409
         ) from e
+    except BaseAppException:
+        raise
     except Exception as e:
         logger.error(f"更新机房失败: {e}", exc_info=True)
         raise PresetResponseError(
@@ -217,6 +342,53 @@ def delete_room(room_id):
         logger.error(f"删除机房失败: {e}", exc_info=True)
         raise PresetResponseError(
             message="删除机房失败", error_code="ROOM_DELETE_ERROR", status_code=500
+        ) from e
+
+
+@room_bp.route("/<int:room_id>/force", methods=["DELETE"])
+@doc(
+    summary="强制删除机房",
+    tags=["机房"],
+    parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+    responses={200: "ApiResponse", 404: "ApiError", 500: "ApiError"},
+)
+@login_required
+@permission_required("room:force_delete")
+@rate_limit_api
+@transactional
+def force_delete_room(room_id):
+    """强制删除机房：跳过依赖检查，级联物理删除机柜、设备及其全部关联数据
+
+    ⚠️ **不可恢复**。
+
+    为什么用独立端点而不是 `DELETE /rooms/{id}?force=true`：权限位不同
+    （`room:force_delete` vs `room:delete`）。独立端点让权限由装饰器天然分离，
+    不必在函数体里手写条件检查——那种写法一旦漏掉就是越权，而这里漏掉是 403。
+    """
+    _, err = _get_room_or_404(room_id)
+    if err:
+        return err
+
+    try:
+        counts = _room_service.force_delete(room_id)
+        on_commit(lambda: (
+            cache_manager.invalidate_pattern("room:*"),
+            cache_manager.invalidate_pattern("cabinet:*"),
+            cache_manager.invalidate_pattern("device:*"),
+            cache_manager.invalidate_pattern("devices:*"),
+            emit_resource_change_global("room", "force_delete", ids=[room_id]),
+        ))
+        return APIResponse.success(
+            data={"deleted": counts}, message="机房及其关联数据已强制删除"
+        )
+    except ValidationError as e:
+        raise PresetResponseError(
+            message=str(e), error_code="ROOM_FORCE_DELETE_INVALID", status_code=404
+        ) from e
+    except Exception as e:
+        logger.error(f"强制删除机房失败: {e}", exc_info=True)
+        raise PresetResponseError(
+            message="强制删除机房失败", error_code="ROOM_FORCE_DELETE_ERROR", status_code=500
         ) from e
 
 
@@ -282,6 +454,262 @@ def get_room_cabinets(room_id):
     return APIResponse.success(
         data=[c.to_dict() for c in cabinets], message="获取机柜列表成功"
     )
+
+
+
+
+@room_bp.route("/<int:room_id>/channels", methods=["GET"])
+@doc(summary="获取机房通道列表", tags=["机房"], parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "RoomChannelResponse", 404: "ApiError"})
+@login_required
+@permission_required("room:view")
+@rate_limit_api
+def get_room_channels(room_id):
+    """获取机房下的所有通道配置（按列号升序）"""
+    _, err = _get_room_or_404(room_id)
+    if err:
+        return err
+
+    channels = _room_service.get_channels(room_id)
+    return APIResponse.success(
+        data=[c.to_dict() for c in channels], message="获取通道列表成功"
+    )
+
+
+@room_bp.route("/<int:room_id>/channels", methods=["POST"])
+@doc(summary="新增机房通道", tags=["机房"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomChannelCreate"}}}}, parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={201: "RoomChannelResponse", 404: "ApiError", 409: "ApiError", 500: "ApiError"})
+@login_required
+@permission_required("room:layout_config")
+@rate_limit_api
+@transactional
+def create_room_channel(room_id):
+    """新增通道配置
+
+    Request Body: RoomChannelCreateSchema
+    """
+    _, err = _get_room_or_404(room_id)
+    if err:
+        return err
+
+    data = validation_manager.validate_schema(request.json, RoomChannelCreateSchema())
+    try:
+        channel = _room_service.create_channel(room_id, data)
+        on_commit(lambda: (
+            cache_manager.invalidate_pattern(f"room:channels:{room_id}"),
+            emit_resource_change_global("room_channel", "create", ids=[room_id]),
+        ))
+        return APIResponse.success(
+            data=channel.to_dict(), message="通道创建成功", status_code=201
+        )
+    except ValidationError as e:
+        raise PresetResponseError(
+            message=str(e), error_code="ROOM_CHANNEL_CONFLICT", status_code=409
+        ) from e
+    except BaseAppException:
+        raise
+    except Exception as e:
+        logger.error(f"新增机房通道失败: {e}", exc_info=True)
+        raise PresetResponseError(
+            message="新增机房通道失败", error_code="ROOM_CHANNEL_CREATE_ERROR", status_code=500
+        ) from e
+
+
+@room_bp.route("/<int:room_id>/channels/<int:channel_id>", methods=["PUT"])
+@doc(summary="更新机房通道", tags=["机房"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomChannelUpdate"}}}}, parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "channel_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "RoomChannelResponse", 400: "ApiError", 404: "ApiError", 409: "ApiError", 500: "ApiError"})
+@login_required
+@permission_required("room:layout_config")
+@rate_limit_api
+@transactional
+def update_room_channel(room_id, channel_id):
+    """更新通道配置
+
+    Request Body: RoomChannelUpdateSchema（所有字段可选）
+    """
+    _, err = _get_room_or_404(room_id)
+    if err:
+        return err
+
+    data = validation_manager.validate_schema(request.json, RoomChannelUpdateSchema())
+    if not data:
+        return APIResponse.error(
+            message="没有提供有效的更新字段", error_code="ROOM_CHANNEL_NO_UPDATE", status_code=400
+        )
+
+    try:
+        channel = _room_service.update_channel(room_id, channel_id, data)
+        on_commit(lambda: (
+            cache_manager.invalidate_pattern(f"room:channels:{room_id}"),
+            emit_resource_change_global("room_channel", "update", ids=[room_id]),
+        ))
+        return APIResponse.success(data=channel.to_dict(), message="通道更新成功")
+    except ValidationError as e:
+        raise PresetResponseError(
+            message=str(e), error_code="ROOM_CHANNEL_CONFLICT", status_code=409
+        ) from e
+    except BaseAppException:
+        raise
+    except Exception as e:
+        logger.error(f"更新机房通道失败: {e}", exc_info=True)
+        raise PresetResponseError(
+            message="更新机房通道失败", error_code="ROOM_CHANNEL_UPDATE_ERROR", status_code=500
+        ) from e
+
+
+@room_bp.route("/<int:room_id>/channels/<int:channel_id>", methods=["DELETE"])
+@doc(summary="删除机房通道", tags=["机房"], parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "channel_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError", 409: "ApiError", 500: "ApiError"})
+@login_required
+@permission_required("room:layout_config")
+@rate_limit_api
+@transactional
+def delete_room_channel(room_id, channel_id):
+    """删除通道配置"""
+    _, err = _get_room_or_404(room_id)
+    if err:
+        return err
+
+    try:
+        _room_service.delete_channel(room_id, channel_id)
+        on_commit(lambda: (
+            cache_manager.invalidate_pattern(f"room:channels:{room_id}"),
+            emit_resource_change_global("room_channel", "delete", ids=[room_id]),
+        ))
+        return APIResponse.success(message="通道删除成功")
+    except ValidationError as e:
+        raise PresetResponseError(
+            message=str(e), error_code="ROOM_CHANNEL_NOT_FOUND", status_code=404
+        ) from e
+    except Exception as e:
+        logger.error(f"删除机房通道失败: {e}", exc_info=True)
+        raise PresetResponseError(
+            message="删除机房通道失败", error_code="ROOM_CHANNEL_DELETE_ERROR", status_code=500
+        ) from e
+
+
+
+
+@room_bp.route("/<int:room_id>/layout-markers", methods=["GET"])
+@doc(summary="获取机房占位标记列表", tags=["机房"], parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "RoomLayoutMarkerResponse", 404: "ApiError"})
+@login_required
+@permission_required("room:view")
+@rate_limit_api
+def get_room_layout_markers(room_id):
+    """获取机房下的所有占位标记（按行列升序）"""
+    _, err = _get_room_or_404(room_id)
+    if err:
+        return err
+
+    markers = _room_service.get_layout_markers(room_id)
+    return APIResponse.success(
+        data=[m.to_dict() for m in markers], message="获取占位标记列表成功"
+    )
+
+
+@room_bp.route("/<int:room_id>/layout-markers", methods=["POST"])
+@doc(summary="新增机房占位标记", tags=["机房"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomLayoutMarkerCreate"}}}}, parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={201: "RoomLayoutMarkerResponse", 404: "ApiError", 409: "ApiError", 500: "ApiError"})
+@login_required
+@permission_required("room:layout_config")
+@rate_limit_api
+@transactional
+def create_room_layout_marker(room_id):
+    """新增占位标记
+
+    Request Body: RoomLayoutMarkerCreateSchema
+    """
+    _, err = _get_room_or_404(room_id)
+    if err:
+        return err
+
+    data = validation_manager.validate_schema(request.json, RoomLayoutMarkerCreateSchema())
+    try:
+        marker = _room_service.create_layout_marker(room_id, data)
+        on_commit(lambda: (
+            cache_manager.invalidate_pattern(f"room:markers:{room_id}"),
+            emit_resource_change_global("room_layout_marker", "create", ids=[room_id]),
+        ))
+        return APIResponse.success(
+            data=marker.to_dict(), message="占位标记创建成功", status_code=201
+        )
+    except ValidationError as e:
+        raise PresetResponseError(
+            message=str(e), error_code="ROOM_MARKER_CONFLICT", status_code=409
+        ) from e
+    except BaseAppException:
+        raise
+    except Exception as e:
+        logger.error(f"新增机房占位标记失败: {e}", exc_info=True)
+        raise PresetResponseError(
+            message="新增机房占位标记失败", error_code="ROOM_MARKER_CREATE_ERROR", status_code=500
+        ) from e
+
+
+@room_bp.route("/<int:room_id>/layout-markers/<int:marker_id>", methods=["PUT"])
+@doc(summary="更新机房占位标记", tags=["机房"], request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomLayoutMarkerUpdate"}}}}, parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "marker_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "RoomLayoutMarkerResponse", 400: "ApiError", 404: "ApiError", 409: "ApiError", 500: "ApiError"})
+@login_required
+@permission_required("room:layout_config")
+@rate_limit_api
+@transactional
+def update_room_layout_marker(room_id, marker_id):
+    """更新占位标记
+
+    Request Body: RoomLayoutMarkerUpdateSchema（所有字段可选）
+    """
+    _, err = _get_room_or_404(room_id)
+    if err:
+        return err
+
+    data = validation_manager.validate_schema(request.json, RoomLayoutMarkerUpdateSchema())
+    if not data:
+        return APIResponse.error(
+            message="没有提供有效的更新字段", error_code="ROOM_MARKER_NO_UPDATE", status_code=400
+        )
+
+    try:
+        marker = _room_service.update_layout_marker(room_id, marker_id, data)
+        on_commit(lambda: (
+            cache_manager.invalidate_pattern(f"room:markers:{room_id}"),
+            emit_resource_change_global("room_layout_marker", "update", ids=[room_id]),
+        ))
+        return APIResponse.success(data=marker.to_dict(), message="占位标记更新成功")
+    except ValidationError as e:
+        raise PresetResponseError(
+            message=str(e), error_code="ROOM_MARKER_CONFLICT", status_code=409
+        ) from e
+    except BaseAppException:
+        raise
+    except Exception as e:
+        logger.error(f"更新机房占位标记失败: {e}", exc_info=True)
+        raise PresetResponseError(
+            message="更新机房占位标记失败", error_code="ROOM_MARKER_UPDATE_ERROR", status_code=500
+        ) from e
+
+
+@room_bp.route("/<int:room_id>/layout-markers/<int:marker_id>", methods=["DELETE"])
+@doc(summary="删除机房占位标记", tags=["机房"], parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}, {"name": "marker_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError", 409: "ApiError", 500: "ApiError"})
+@login_required
+@permission_required("room:layout_config")
+@rate_limit_api
+@transactional
+def delete_room_layout_marker(room_id, marker_id):
+    """删除占位标记"""
+    _, err = _get_room_or_404(room_id)
+    if err:
+        return err
+
+    try:
+        _room_service.delete_layout_marker(room_id, marker_id)
+        on_commit(lambda: (
+            cache_manager.invalidate_pattern(f"room:markers:{room_id}"),
+            emit_resource_change_global("room_layout_marker", "delete", ids=[room_id]),
+        ))
+        return APIResponse.success(message="占位标记删除成功")
+    except ValidationError as e:
+        raise PresetResponseError(
+            message=str(e), error_code="ROOM_MARKER_NOT_FOUND", status_code=404
+        ) from e
+    except Exception as e:
+        logger.error(f"删除机房占位标记失败: {e}", exc_info=True)
+        raise PresetResponseError(
+            message="删除机房占位标记失败", error_code="ROOM_MARKER_DELETE_ERROR", status_code=500
+        ) from e
 
 
 @room_bp.route("/<int:room_id>/statistics", methods=["GET"])

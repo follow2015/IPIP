@@ -5,7 +5,7 @@
 提供机房相关的数据访问方法。
 """
 from app.utils.logging import get_logger
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
@@ -13,7 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.exceptions.data_access import QueryExecutionError
 from app.persistence.base import QueryOptimizationMixin, SQLAlchemyRepository
 from app.models.room import Room
-from app.core.enums import CabinetStatus, RoomStatus
+from app.core.enums import RoomStatus
 
 logger = get_logger(__name__)
 
@@ -43,6 +43,9 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def check_room_name_exists(self, room_name: str, exclude_id: Optional[int] = None) -> bool:
         """检查机房名称是否已存在（排除已软删除的机房）
 
+        .. deprecated:: 名称已放开为分组键（可重复），本方法不再被查重使用，
+            保留备查；组合唯一见 `check_room_number_exists`。
+
         Args:
             room_name: 机房名称
             exclude_id: 排除的机房 ID（用于更新时去重）
@@ -64,6 +67,51 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         except SQLAlchemyError as e:
             logger.error(f"检查机房名称存在性失败 (room_name={room_name}): {e}")
             raise QueryExecutionError("检查机房名称存在性失败", original_error=e)
+
+    def check_room_number_exists(
+        self, name: str, room_number: str, exclude_id: Optional[int] = None
+    ) -> bool:
+        """检查（机房名称, 房间号）组合是否已存在（唯一键 uk_room_name_number 的应用层前置）
+
+        名称已放开为分组键（可重复），同一名称组内房间号必须唯一——
+        组合查重给出可读的 409，数据库唯一约束只做并发兜底。
+
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
+        if not room_number or not name:
+            return False
+
+        try:
+            query = self._base_query().filter(
+                Room.name == name,
+                Room.room_number == room_number,
+            )
+            if exclude_id is not None:
+                query = query.filter(Room.id != exclude_id)
+
+            return self.session.query(query.exists()).scalar()
+        except SQLAlchemyError as e:
+            logger.error(f"检查房间号存在性失败 (name={name}, room_number={room_number}): {e}")
+            raise QueryExecutionError("检查房间号存在性失败", original_error=e)
+
+    def find_name_options(self) -> List[Dict[str, Any]]:
+        """机房名称联想选项：[{name, room_count}]（按名称分组计数，升序）
+
+        供表单强联想使用（实施计划 D3）：前端据此提示"将并入「X」机房组（现有 N 条记录）"。
+        """
+        try:
+            rows = (
+                self._base_query()
+                .with_entities(Room.name, func.count(Room.id))
+                .group_by(Room.name)
+                .order_by(Room.name)
+                .all()
+            )
+            return [{"name": name, "room_count": count} for name, count in rows]
+        except SQLAlchemyError as e:
+            logger.error(f"查询机房名称联想选项失败: {e}")
+            raise QueryExecutionError("查询机房名称联想选项失败", original_error=e)
 
 
     def check_room_dependencies(self, room_id: int) -> Dict[str, int]:
@@ -93,7 +141,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
             cabinet_count = (
                 self.session.query(func.count(Cabinet.id))
-                .filter(Cabinet.room_id == room_id, Cabinet.status == CabinetStatus.DISABLED)
+                .filter(Cabinet.room_id == room_id)
                 .scalar()
                 or 0
             )
@@ -102,6 +150,49 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         except SQLAlchemyError as e:
             logger.error(f"检查机房依赖关系失败 (room_id={room_id}): {e}")
             raise QueryExecutionError("检查机房依赖关系失败", original_error=e)
+
+    def find_distinct_buildings(self) -> List[str]:
+        """已使用的 building 去重值（升序，排除空值）。
+
+        供机房表单的联想选项使用（设计文档 §2.4）：不限定枚举，运维可自由新增楼栋名。
+        """
+        try:
+            rows = (
+                self._base_query()
+                .with_entities(Room.building)
+                .filter(Room.building.isnot(None), Room.building != "")
+                .distinct()
+                .order_by(Room.building)
+                .all()
+            )
+            return [row[0] for row in rows]
+        except SQLAlchemyError as e:
+            logger.error(f"查询楼栋去重值失败: {e}")
+            raise QueryExecutionError("查询楼栋失败", original_error=e)
+
+    def find_distinct_floors(self, building: Optional[str] = None) -> List[str]:
+        """已使用的 floor 去重值（升序，排除空值）。
+
+        供机房表单的联想选项与总览页的楼层筛选使用。
+
+        Args:
+            building: 指定时只返回该楼栋下出现过的楼层。**联动是必需的而非优化**：
+                不限定楼栋时，A 栋与 B 栋各自的"3层"会混在同一个下拉里，
+                用户选"3层"分不清是哪一栋的。
+        """
+        try:
+            query = (
+                self._base_query()
+                .with_entities(Room.floor)
+                .filter(Room.floor.isnot(None), Room.floor != "")
+            )
+            if building:
+                query = query.filter(Room.building == building)
+            rows = query.distinct().order_by(Room.floor).all()
+            return [row[0] for row in rows]
+        except SQLAlchemyError as e:
+            logger.error(f"查询楼层去重值失败: {e}")
+            raise QueryExecutionError("查询楼层失败", original_error=e)
 
     def get_room_statistics(self, room_id: int) -> Dict[str, int]:
         """获取单个机房统计信息（机柜数 + 交换机数）
@@ -145,7 +236,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
             rooms_with_cabinets: int = (
                 self.session.query(func.count(func.distinct(Cabinet.room_id)))
-                .filter(Cabinet.room_id.isnot(None), Cabinet.status == CabinetStatus.DISABLED)
+                .filter(Cabinet.room_id.isnot(None))
                 .scalar()
                 or 0
             )
@@ -165,7 +256,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
             has_cabinet_sq = (
                 self.session.query(Cabinet.room_id)
-                .filter(Cabinet.room_id.isnot(None), Cabinet.status == CabinetStatus.DISABLED)
+                .filter(Cabinet.room_id.isnot(None))
                 .distinct()
                 .subquery()
             )

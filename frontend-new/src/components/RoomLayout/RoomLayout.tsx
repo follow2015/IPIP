@@ -1,13 +1,43 @@
-import React, { useMemo, useCallback, useState } from 'react';
-import { Tooltip, Progress, Empty, Input, Segmented, Button, theme } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
-import type { GlobalToken } from 'antd';
+import React, { useMemo, useCallback, useEffect, useRef, useState } from 'react';
+import { Tooltip, Empty, Input, Segmented, Button, Space, theme } from 'antd';
+import {
+  SearchOutlined,
+  ZoomInOutlined,
+  ZoomOutOutlined,
+  ExpandOutlined,
+  WarningFilled
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { CABINET_STATUS_MAP, CabinetStatusCode } from '@/types/enums';
+import { CABINET_STATUS_MAP } from '@/types/enums';
 import type { Cabinet } from '@/types/models';
+import CabinetNode from './CabinetNode';
+import ChannelLayer from './ChannelLayer';
+import MarkerNode from './MarkerNode';
+import {
+  ChannelLegend,
+  DuplicatedCabinetList,
+  StatusLegend,
+  UnpositionedCabinetList
+} from './RoomLayoutParts';
+import { DEFAULT_STATUS, MARKER_TYPE_LABEL } from './palette';
+import {
+  cellLeft,
+  cellTop,
+  gridBounds,
+  gridHeight,
+  gridWidth,
+  groupCabinetsByCell,
+  isMarkerPositioned,
+  isPositioned
+} from './geometry';
+import type { RoomChannel, RoomLayoutMarker } from '@/types/models';
+import { clampScale, scrollForZoom, toScaleTransform } from './view-transform';
 
 interface RoomLayoutProps {
   cabinets: Cabinet[];
+  channels?: RoomChannel[];
+  markers?: RoomLayoutMarker[];
+  highlightCabinetIds?: number[];
   readOnly?: boolean;
 }
 
@@ -35,90 +65,112 @@ const DENSITY_OPTIONS = (Object.keys(DENSITY_CONFIG) as DensityKey[]).map((key) 
   value: key
 }));
 
-type StatusPaletteKey = 'red' | 'green' | 'blue' | 'orange' | 'purple';
-
-interface StatusPalette {
-  bg: string;
-  accent: string;
-  border: string;
-  text: string;
-}
-
-const DEFAULT_STATUS = CabinetStatusCode.AVAILABLE;
-
-const STATUS_PALETTE_KEYS: Record<number, StatusPaletteKey> = {
-  [CabinetStatusCode.DISABLED]: 'red',
-  [CabinetStatusCode.AVAILABLE]: 'green',
-  [CabinetStatusCode.IN_USE]: 'blue',
-  [CabinetStatusCode.MAINTENANCE]: 'orange',
-  [CabinetStatusCode.RESERVED]: 'purple'
-};
-
-function getStatusPalette(token: GlobalToken, status: number): StatusPalette {
-  const key = STATUS_PALETTE_KEYS[status] ?? 'blue';
-  return {
-    bg: token[`${key}1`],
-    accent: token[`${key}5`],
-    border: token[`${key}6`],
-    text: token[`${key}7`]
-  };
-}
-
-function extractRowPrefix(cabinetNumber: string): string {
+function extractCabinetPrefix(cabinetNumber: string): string {
   const match = cabinetNumber.match(/^[A-Za-z]+/);
   return match ? match[0].toUpperCase() : '';
 }
 
-function isPositioned(cabinet: Cabinet): boolean {
-  return cabinet.row != null && cabinet.col != null && cabinet.row > 0 && cabinet.col > 0;
-}
+const NO_CHANNELS: RoomChannel[] = [];
+const NO_MARKERS: RoomLayoutMarker[] = [];
 
-function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
+function RoomLayout({
+  cabinets,
+  channels = NO_CHANNELS,
+  markers = NO_MARKERS,
+  highlightCabinetIds,
+  readOnly = false
+}: RoomLayoutProps) {
   const navigate = useNavigate();
   const { token } = theme.useToken();
 
   const [density, setDensity] = useState<DensityKey>('standard');
   const [keyword, setKeyword] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedMarkerId, setSelectedMarkerId] = useState<number | null>(null);
 
   const { cellWidth, cellHeight, gap, showCustomer } = DENSITY_CONFIG[density];
 
-  const { maxRow, maxCol, positioned, unpositioned, rowLabels } = useMemo(() => {
-    const cellMap = new Map<string, Cabinet>();
-    for (const c of cabinets) {
-      if (isPositioned(c)) {
-        cellMap.set(`${c.row},${c.col}`, c);
-      }
-    }
-    const positioned = [...cellMap.values()];
+  const bounds = useMemo(() => gridBounds(cabinets, markers), [cabinets, markers]);
+  const { minRow, minCol, maxCol, rows, cols } = bounds;
+  const rowOffset = minRow - 1;
+  const colOffset = minCol - 1;
+
+  const { positioned, unpositioned, duplicatedCabinets, colLabels } = useMemo(() => {
+    const positioned: Cabinet[] = [];
+    const duplicatedCabinets: Cabinet[] = [];
+    groupCabinetsByCell(cabinets).forEach((list) => {
+      const sorted = [...list].sort((a, b) => a.id - b.id);
+      positioned.push(sorted[0]);
+      duplicatedCabinets.push(...sorted.slice(1));
+    });
+
     const unpositioned = cabinets.filter((c) => !isPositioned(c));
 
-    const maxRow = positioned.length ? Math.max(...positioned.map((c) => c.row!)) : 0;
-    const maxCol = positioned.length ? Math.max(...positioned.map((c) => c.col!)) : 0;
-
-    const rowLabels: string[] = [];
-    for (let r = 1; r <= maxRow; r++) {
-      const prefixCounts = new Map<string, number>();
-      for (const c of positioned) {
-        if (c.row !== r) continue;
-        const prefix = extractRowPrefix(c.cabinet_number);
-        if (prefix) {
-          prefixCounts.set(prefix, (prefixCounts.get(prefix) ?? 0) + 1);
-        }
+    const prefixCountsByCol = new Map<number, Map<string, number>>();
+    for (const cab of positioned) {
+      if (cab.col == null) continue; // 未定位机柜不参与列头（防御，isPositioned 已滤）
+      const prefix = extractCabinetPrefix(cab.cabinet_number);
+      if (!prefix) continue;
+      let counts = prefixCountsByCol.get(cab.col);
+      if (!counts) {
+        counts = new Map();
+        prefixCountsByCol.set(cab.col, counts);
       }
-      let bestPrefix = '';
-      let bestCount = 0;
-      prefixCounts.forEach((count, prefix) => {
-        if (count > bestCount) {
-          bestCount = count;
-          bestPrefix = prefix;
-        }
-      });
-      rowLabels.push(bestPrefix);
+      counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
     }
 
-    return { maxRow, maxCol, positioned, unpositioned, rowLabels };
-  }, [cabinets]);
+    const colLabels: string[] = [];
+    for (let c = minCol; c <= maxCol; c++) {
+      const counts = prefixCountsByCol.get(c);
+      let best = '';
+      let bestCount = 0;
+      counts?.forEach((count, prefix) => {
+        if (count > bestCount) {
+          bestCount = count;
+          best = prefix;
+        }
+      });
+      colLabels.push(best);
+    }
+
+    return { positioned, unpositioned, duplicatedCabinets, colLabels };
+  }, [cabinets, minCol, maxCol]);
+
+  const highlightSet = useMemo(() => new Set(highlightCabinetIds ?? []), [highlightCabinetIds]);
+
+  const visibleMarkers = useMemo(() => markers.filter(isMarkerPositioned), [markers]);
+
+  const occupiedCells = useMemo(
+    () => new Set(positioned.map((c) => `${c.row},${c.col}`)),
+    [positioned]
+  );
+
+  const renderableMarkers = useMemo(
+    () => visibleMarkers.filter((m) => !occupiedCells.has(`${m.row_number},${m.col_number}`)),
+    [visibleMarkers, occupiedCells]
+  );
+
+  const cellConflicts = useMemo(() => {
+    const map = new Map<string, { cabinetNumbers: string[]; markerNames: string[] }>();
+
+    groupCabinetsByCell(cabinets).forEach((list, key) => {
+      if (list.length > 1) {
+        map.set(key, { cabinetNumbers: list.map((c) => c.cabinet_number), markerNames: [] });
+      }
+    });
+
+    for (const marker of visibleMarkers) {
+      const key = `${marker.row_number},${marker.col_number}`;
+      if (!occupiedCells.has(key)) continue;
+      const entry = map.get(key) ?? { cabinetNumbers: [], markerNames: [] };
+      entry.markerNames.push(
+        marker.label || MARKER_TYPE_LABEL[marker.marker_type] || marker.marker_type
+      );
+      map.set(key, entry);
+    }
+
+    return map;
+  }, [cabinets, visibleMarkers, occupiedCells]);
 
   const legendStatuses = useMemo(
     () => [...new Set(cabinets.map((c) => c.status ?? DEFAULT_STATUS))].sort((a, b) => a - b),
@@ -145,7 +197,13 @@ function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
   );
 
   const handleSelect = useCallback((cabinetId: number) => {
+    setSelectedMarkerId(null);
     setSelectedId(cabinetId);
+  }, []);
+
+  const handleSelectMarker = useCallback((markerId: number) => {
+    setSelectedId(null);
+    setSelectedMarkerId((prev) => (prev === markerId ? null : markerId));
   }, []);
 
   const handleOpen = useCallback(
@@ -156,168 +214,89 @@ function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
     [navigate, readOnly]
   );
 
-  const renderCell = (cabinet: Cabinet) => {
-    const status = cabinet.status ?? DEFAULT_STATUS;
-    const palette = getStatusPalette(token, status);
-    const statusInfo = CABINET_STATUS_MAP[status as keyof typeof CABINET_STATUS_MAP];
-    const uUsageRate = cabinet.u_usage_rate ?? 0;
-    const powerUsageRate = cabinet.power_usage_rate ?? 0;
 
-    const dimmed = matchedIds != null && !matchedIds.has(cabinet.id);
-    const highlighted = matchedIds != null && matchedIds.has(cabinet.id);
-    const selected = selectedId === cabinet.id;
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const panRef = useRef<{ x: number; y: number } | null>(null);
+  const [panning, setPanning] = useState(false);
 
-    const cellContent = (
-      <div
-        role="button"
-        tabIndex={0}
-        aria-pressed={selected}
-        onClick={() => handleSelect(cabinet.id)}
-        onDoubleClick={() => handleOpen(cabinet.id)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleSelect(cabinet.id);
-          }
-        }}
-        style={{
-          width: cellWidth,
-          height: cellHeight,
-          boxSizing: 'border-box',
-          backgroundColor: palette.bg,
-          border: `2px solid ${palette.border}`,
-          borderRadius: 6,
-          padding: '6px 8px',
-          cursor: readOnly ? 'default' : 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          transition: 'all 0.2s ease',
-          position: 'relative',
-          overflow: 'hidden',
-          opacity: dimmed ? 0.25 : 1,
-          outline: selected
-            ? `2px solid ${token.colorPrimary}`
-            : highlighted
-              ? `2px solid ${token.colorWarning}`
-              : undefined,
-          outlineOffset: 2
-        }}
-        onMouseEnter={(e) => {
-          if (!readOnly) {
-            (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.03)';
-            (e.currentTarget as HTMLDivElement).style.boxShadow = token.boxShadowSecondary;
-          }
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
-          (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            backgroundColor: palette.accent,
-            borderRadius: '6px 6px 0 0'
-          }}
-        />
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: token.colorText,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}
-        >
-          {cabinet.cabinet_number}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Progress
-            percent={uUsageRate}
-            size="small"
-            showInfo={false}
-            strokeColor={uUsageRate > 80 ? token.colorError : palette.accent}
-            railColor={token.colorFillSecondary}
-            style={{ flex: 1, margin: 0, minWidth: 0 }}
-          />
-          <span
-            style={{
-              fontSize: 11,
-              color: token.colorTextSecondary,
-              minWidth: 32,
-              textAlign: 'right'
-            }}
-          >
-            {uUsageRate}%
-          </span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: token.colorTextSecondary }}>
-            {cabinet.device_count ?? 0}台
-          </span>
-          <span style={{ fontSize: 10, color: palette.text, fontWeight: 500 }}>
-            {statusInfo?.label ?? ''}
-          </span>
-        </div>
-        {showCustomer && cabinet.customer_name ? (
-          <div
-            style={{
-              fontSize: 10,
-              color: token.colorTextSecondary,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}
-          >
-            {cabinet.customer_name}
-          </div>
-        ) : null}
-      </div>
-    );
+  const zoomWithAnchor = useCallback(
+    (nextScale: number, pointerX: number, pointerY: number) => {
+      const el = viewportRef.current;
+      if (!el || nextScale === scale) return;
+      el.scrollLeft = scrollForZoom(el.scrollLeft, pointerX, scale, nextScale);
+      el.scrollTop = scrollForZoom(el.scrollTop, pointerY, scale, nextScale);
+      setScale(nextScale);
+    },
+    [scale]
+  );
 
-    return (
-      <Tooltip
-        title={
-          <div style={{ fontSize: 12, lineHeight: 1.8 }}>
-            <div>
-              <strong>{cabinet.cabinet_number}</strong>
-            </div>
-            <div>状态：{statusInfo?.label ?? status}</div>
-            <div>
-              U位：{cabinet.used_u ?? 0}/{cabinet.total_u ?? 42}U ({uUsageRate}%)
-            </div>
-            {cabinet.total_power ? (
-              <div>
-                功率：{cabinet.used_power ?? 0}/{cabinet.total_power}W ({powerUsageRate}%)
-              </div>
-            ) : null}
-            <div>设备：{cabinet.device_count ?? 0}台</div>
-            {isPositioned(cabinet) ? (
-              <div>
-                位置：第{cabinet.row}行 第{cabinet.col}列
-              </div>
-            ) : (
-              <div>位置：未定位</div>
-            )}
-            {cabinet.customer_name ? <div>客户：{cabinet.customer_name}</div> : null}
-            {cabinet.notes ? <div>备注：{cabinet.notes}</div> : null}
-          </div>
-        }
-        placement="top"
-      >
-        {cellContent}
-      </Tooltip>
-    );
-  };
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      zoomWithAnchor(
+        clampScale(scale * (e.deltaY < 0 ? 1.1 : 1 / 1.1)),
+        e.clientX - rect.left,
+        e.clientY - rect.top
+      );
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [scale, zoomWithAnchor]);
 
-  if (cabinets.length === 0) {
-    return <Empty description="该机房暂无机柜" />;
+  const handlePanStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest('[role="button"]')) return;
+    panRef.current = { x: e.clientX, y: e.clientY };
+    setPanning(true);
+  }, []);
+
+  useEffect(() => {
+    if (!panning) return;
+    const onMove = (e: MouseEvent) => {
+      const last = panRef.current;
+      const el = viewportRef.current;
+      if (!last || !el) return;
+      el.scrollLeft -= e.clientX - last.x;
+      el.scrollTop -= e.clientY - last.y;
+      panRef.current = { x: e.clientX, y: e.clientY };
+    };
+    const onUp = () => setPanning(false);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, [panning]);
+
+  const zoomAtCenter = useCallback(
+    (factor: number) => {
+      const el = viewportRef.current;
+      if (!el) return;
+      zoomWithAnchor(clampScale(scale * factor), el.clientWidth / 2, el.clientHeight / 2);
+    },
+    [scale, zoomWithAnchor]
+  );
+
+  const resetView = useCallback(() => {
+    const el = viewportRef.current;
+    setScale(1);
+    if (el) {
+      el.scrollLeft = 0;
+      el.scrollTop = 0;
+    }
+  }, []);
+
+  const layoutWidth = ROW_HEADER_WIDTH + gap + gridWidth(cols, cellWidth, gap);
+  const layoutHeight = COL_HEADER_HEIGHT + gap + gridHeight(rows, cellHeight, gap);
+
+  if (cabinets.length === 0 && markers.length === 0) {
+    return <Empty description="该机房暂无机柜与占位标记" />;
   }
 
   /*
@@ -356,6 +335,18 @@ function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
           onChange={(value) => setDensity(value as DensityKey)}
           options={DENSITY_OPTIONS}
         />
+        <Space.Compact>
+          <Button
+            icon={<ZoomOutOutlined />}
+            onClick={() => zoomAtCenter(1 / 1.2)}
+            aria-label="缩小"
+          />
+          <Button icon={<ZoomInOutlined />} onClick={() => zoomAtCenter(1.2)} aria-label="放大" />
+          <Button icon={<ExpandOutlined />} onClick={resetView} aria-label="复位缩放" />
+        </Space.Compact>
+        <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
+          缩放 {Math.round(scale * 100)}%
+        </span>
       </div>
 
       {/* 选中信息条：同时提供显式跳转入口（双击不便发现、键盘无法触发） */}
@@ -401,137 +392,201 @@ function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
       ) : null}
 
       {/* 状态图例 */}
-      {legendStatuses.length > 0 ? (
+      {legendStatuses.length > 0 ? <StatusLegend statuses={legendStatuses} token={token} /> : null}
+
+      {/* 通道图例：仅有配置时显示，避免给未使用该特性的机房增加视觉噪音 */}
+      {channels.length > 0 ? <ChannelLegend token={token} /> : null}
+
+      {rows > 0 && cols > 0 ? (
         <div
+          ref={viewportRef}
+          data-testid="room-layout-viewport"
+          onMouseDown={handlePanStart}
           style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            gap: 12,
-            marginBottom: 12
+            overflow: 'auto',
+            maxHeight: '70vh',
+            paddingBottom: 8,
+            cursor: panning ? 'grabbing' : 'grab',
+            userSelect: panning ? 'none' : undefined
           }}
         >
-          <span style={{ fontSize: 12, color: token.colorTextTertiary }}>状态</span>
-          {legendStatuses.map((status) => {
-            const palette = getStatusPalette(token, status);
-            const info = CABINET_STATUS_MAP[status as keyof typeof CABINET_STATUS_MAP];
-            return (
-              <span
-                key={status}
+          {/*
+            占位层：按 scale 撑出与缩放后内容一致的滚动空间。
+            transform 不改变布局尺寸，若无此层，滚动条范围会停留在未缩放的尺寸上
+            （缩小时滚动条多余、放大时又滚不到边）。
+          */}
+          <div
+            data-testid="room-layout-canvas"
+            style={{ width: layoutWidth * scale, height: layoutHeight * scale }}
+          >
+            <div
+              style={{
+                display: 'inline-grid',
+                gridTemplateColumns: `${ROW_HEADER_WIDTH}px auto`,
+                gridTemplateRows: `${COL_HEADER_HEIGHT}px auto`,
+                gap,
+                alignItems: 'center',
+                transform: toScaleTransform(scale),
+                transformOrigin: '0 0'
+              }}
+            >
+              {/* 列头：线性量级，承担坐标参照；显示该列编号前缀（取不到则回退"列N"） */}
+              <div
+                data-testid="room-layout-col-headers"
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontSize: 12,
-                  color: token.colorTextSecondary
+                  gridColumn: 2,
+                  gridRow: 1,
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${cols}, ${cellWidth}px)`,
+                  gap
                 }}
               >
-                <span
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: 3,
-                    backgroundColor: palette.bg,
-                    border: `1px solid ${palette.border}`,
-                    display: 'inline-block'
-                  }}
+                {Array.from({ length: cols }, (_, i) => (
+                  <div
+                    key={`col-header-${i}`}
+                    style={{
+                      textAlign: 'center',
+                      fontSize: 12,
+                      color: token.colorTextSecondary,
+                      fontWeight: 500
+                    }}
+                  >
+                    {colLabels[i] ? `${colLabels[i]}(${minCol + i})` : `列${minCol + i}`}
+                  </div>
+                ))}
+              </div>
+
+              {/* 行头：线性量级，只显示行号（编号前缀属于"列"，已移到列头） */}
+              <div
+                data-testid="room-layout-row-headers"
+                style={{
+                  gridColumn: 1,
+                  gridRow: 2,
+                  display: 'grid',
+                  gridTemplateRows: `repeat(${rows}, ${cellHeight}px)`,
+                  gap
+                }}
+              >
+                {Array.from({ length: rows }, (_, i) => (
+                  <div
+                    key={`row-header-${i}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 12,
+                      color: token.colorTextSecondary,
+                      fontWeight: 500
+                    }}
+                  >
+                    {minRow + i}
+                  </div>
+                ))}
+              </div>
+
+              {/*
+              平面主体：只为有机柜的格子建 DOM，空位由容器背景网格线表达。
+              网格线画在间隙正中（cell + gap/2），避开不透明机柜色块下方，
+              否则线会被色块盖住而不可见。
+              机柜为绝对定位，故容器只需 position: relative；尺寸由几何函数算出，
+              与改造前 grid 的 width/height 公式完全一致（保证既有断言不变）。
+              后续 §3.1 通道色带、§3.2 标记、上架模拟预览都在此容器内叠加 SVG 图层。
+            */}
+              <div
+                data-testid="room-layout-grid"
+                style={{
+                  gridColumn: 2,
+                  gridRow: 2,
+                  position: 'relative',
+                  width: gridWidth(cols, cellWidth, gap),
+                  height: gridHeight(rows, cellHeight, gap),
+                  backgroundImage: `linear-gradient(to right, ${token.colorBorderSecondary} 1px, transparent 1px), linear-gradient(to bottom, ${token.colorBorderSecondary} 1px, transparent 1px)`,
+                  backgroundSize: `${cellWidth + gap}px ${cellHeight + gap}px`,
+                  backgroundPosition: `${cellWidth + gap / 2}px ${cellHeight + gap / 2}px`
+                }}
+              >
+                {/* 通道色带：绝对定位覆盖层；渲染在机柜之前，DOM 顺序在前 = 视觉在下 */}
+                <ChannelLayer
+                  channels={channels}
+                  rows={rows}
+                  cols={cols}
+                  cellWidth={cellWidth}
+                  cellHeight={cellHeight}
+                  gap={gap}
+                  token={token}
+                  colOffset={colOffset}
                 />
-                {info?.label ?? status}
-              </span>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {maxRow > 0 && maxCol > 0 ? (
-        <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
-          <div
-            style={{
-              display: 'inline-grid',
-              gridTemplateColumns: `${ROW_HEADER_WIDTH}px auto`,
-              gridTemplateRows: `${COL_HEADER_HEIGHT}px auto`,
-              gap,
-              alignItems: 'center'
-            }}
-          >
-            {/* 列头：线性量级，承担坐标参照 */}
-            <div
-              style={{
-                gridColumn: 2,
-                gridRow: 1,
-                display: 'grid',
-                gridTemplateColumns: `repeat(${maxCol}, ${cellWidth}px)`,
-                gap
-              }}
-            >
-              {Array.from({ length: maxCol }, (_, i) => (
-                <div
-                  key={`col-header-${i}`}
-                  style={{
-                    textAlign: 'center',
-                    fontSize: 12,
-                    color: token.colorTextSecondary,
-                    fontWeight: 500
-                  }}
-                >
-                  列{i + 1}
-                </div>
-              ))}
-            </div>
-
-            {/* 行头：线性量级，括号内为物理行号 */}
-            <div
-              style={{
-                gridColumn: 1,
-                gridRow: 2,
-                display: 'grid',
-                gridTemplateRows: `repeat(${maxRow}, ${cellHeight}px)`,
-                gap
-              }}
-            >
-              {Array.from({ length: maxRow }, (_, i) => (
-                <div
-                  key={`row-header-${i}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 12,
-                    color: token.colorTextSecondary,
-                    fontWeight: 500
-                  }}
-                >
-                  {rowLabels[i] ? `${rowLabels[i]}(${i + 1})` : `行${i + 1}`}
-                </div>
-              ))}
-            </div>
-
-            {/*
-            平面主体：只为有机柜的格子建 DOM，空位由容器背景网格线表达。
-            网格线画在间隙正中（cell + gap/2），避开不透明机柜色块下方，
-            否则线会被色块盖住而不可见。
-          */}
-            <div
-              data-testid="room-layout-grid"
-              style={{
-                gridColumn: 2,
-                gridRow: 2,
-                display: 'grid',
-                gridTemplateColumns: `repeat(${maxCol}, ${cellWidth}px)`,
-                gridTemplateRows: `repeat(${maxRow}, ${cellHeight}px)`,
-                gap,
-                width: maxCol * (cellWidth + gap) - gap,
-                height: maxRow * (cellHeight + gap) - gap,
-                backgroundImage: `linear-gradient(to right, ${token.colorBorderSecondary} 1px, transparent 1px), linear-gradient(to bottom, ${token.colorBorderSecondary} 1px, transparent 1px)`,
-                backgroundSize: `${cellWidth + gap}px ${cellHeight + gap}px`,
-                backgroundPosition: `${cellWidth + gap / 2}px ${cellHeight + gap / 2}px`
-              }}
-            >
-              {positioned.map((cabinet) => (
-                <div key={cabinet.id} style={{ gridColumn: cabinet.col!, gridRow: cabinet.row! }}>
-                  {renderCell(cabinet)}
-                </div>
-              ))}
+                {/* 占位标记：与机柜同为"占据格子"的内容，同样画在机柜之前 */}
+                {renderableMarkers.map((marker) => (
+                  <MarkerNode
+                    key={marker.id}
+                    marker={marker}
+                    token={token}
+                    left={cellLeft(marker.col_number - colOffset, cellWidth, gap)}
+                    top={cellTop(marker.row_number - rowOffset, cellHeight, gap)}
+                    cellWidth={cellWidth}
+                    cellHeight={cellHeight}
+                    selected={selectedMarkerId === marker.id}
+                    onSelect={handleSelectMarker}
+                  />
+                ))}
+                {positioned.map((cabinet) => (
+                  <CabinetNode
+                    key={cabinet.id}
+                    cabinet={cabinet}
+                    token={token}
+                    left={cellLeft(cabinet.col! - colOffset, cellWidth, gap)}
+                    top={cellTop(cabinet.row! - rowOffset, cellHeight, gap)}
+                    cellWidth={cellWidth}
+                    cellHeight={cellHeight}
+                    showCustomer={showCustomer}
+                    dimmed={matchedIds != null && !matchedIds.has(cabinet.id)}
+                    highlighted={
+                      (matchedIds != null && matchedIds.has(cabinet.id)) ||
+                      highlightSet.has(cabinet.id)
+                    }
+                    selected={selectedId === cabinet.id}
+                    readOnly={readOnly}
+                    onSelect={handleSelect}
+                    onOpen={handleOpen}
+                  />
+                ))}
+                {/* 冲突角标画在机柜之后（DOM 顺序在后 = 视觉在上），免得被机柜格子盖住 */}
+                {[...cellConflicts.entries()].map(([key, info]) => {
+                  const [r, c] = key.split(',').map(Number);
+                  const reasons: string[] = [];
+                  if (info.cabinetNumbers.length > 1) {
+                    reasons.push(
+                      `该位置有 ${info.cabinetNumbers.length} 台机柜：${info.cabinetNumbers.join('、')}`
+                    );
+                  }
+                  if (info.markerNames.length > 0) {
+                    reasons.push(`该位置还标有占位设施：${info.markerNames.join('、')}`);
+                  }
+                  return (
+                    <Tooltip
+                      key={`conflict-${key}`}
+                      title={
+                        <div
+                          style={{ fontSize: 12 }}
+                        >{`${reasons.join('；')}。请核实并修正。`}</div>
+                      }
+                    >
+                      <WarningFilled
+                        data-testid={`cell-conflict-${r}-${c}`}
+                        style={{
+                          position: 'absolute',
+                          left: cellLeft(c - colOffset, cellWidth, gap) + cellWidth - 9,
+                          top: cellTop(r - rowOffset, cellHeight, gap) - 5,
+                          fontSize: 14,
+                          color: token.colorWarning,
+                          zIndex: 2
+                        }}
+                      />
+                    </Tooltip>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -539,56 +594,27 @@ function RoomLayout({ cabinets, readOnly = false }: RoomLayoutProps) {
         <Empty description="暂无机柜位置信息，请在机柜表单中设置行号和列号" />
       )}
 
-      {unpositioned.length > 0 ? (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 13, color: token.colorTextSecondary, marginBottom: 8 }}>
-            未设置位置的机柜（{unpositioned.length}个）
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {unpositioned.map((c) => {
-              const status = c.status ?? DEFAULT_STATUS;
-              const palette = getStatusPalette(token, status);
-              const dimmed = matchedIds != null && !matchedIds.has(c.id);
-              const selected = selectedId === c.id;
-              return (
-                <Tooltip
-                  key={c.id}
-                  title={`${c.cabinet_number} - ${
-                    CABINET_STATUS_MAP[status as keyof typeof CABINET_STATUS_MAP]?.label ?? ''
-                  }`}
-                >
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleSelect(c.id)}
-                    onDoubleClick={() => handleOpen(c.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleSelect(c.id);
-                      }
-                    }}
-                    style={{
-                      padding: '4px 12px',
-                      backgroundColor: palette.bg,
-                      border: `1px solid ${palette.border}`,
-                      borderRadius: 4,
-                      fontSize: 12,
-                      cursor: readOnly ? 'default' : 'pointer',
-                      color: token.colorText,
-                      opacity: dimmed ? 0.25 : 1,
-                      outline: selected ? `2px solid ${token.colorPrimary}` : undefined,
-                      outlineOffset: 2
-                    }}
-                  >
-                    {c.cabinet_number}
-                  </div>
-                </Tooltip>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+      {/*
+        位置冲突的机柜：与同机房其它机柜填了相同行列号，未在平面图上显示。
+        这一段是必需而非锦上添花——没有它，被挤掉的机柜在整个界面上完全不可见，
+        运维会以为机柜根本没创建成功（真实案例：A1 被新建的 A8 顶替）。
+      */}
+      <DuplicatedCabinetList
+        cabinets={duplicatedCabinets}
+        readOnly={readOnly}
+        onOpen={handleOpen}
+        token={token}
+      />
+
+      <UnpositionedCabinetList
+        cabinets={unpositioned}
+        matchedIds={matchedIds}
+        selectedId={selectedId}
+        readOnly={readOnly}
+        token={token}
+        onSelect={handleSelect}
+        onOpen={handleOpen}
+      />
     </div>
   );
 }

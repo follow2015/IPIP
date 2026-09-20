@@ -1,28 +1,45 @@
-/**
- * 机房管理页面
- * - 列表查询、新增、编辑、删除
- * - 点击跳转查看该机房下的机柜
- */
 import { useNavigate } from 'react-router-dom';
 import { Button, Tag, Space } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, AppstoreOutlined } from '@ant-design/icons';
 import DataTable from '@/components/DataTable';
+import FilterBar from '@/components/FilterBar';
 import IdCell from '@/components/IdCell';
 import RoomForm from './RoomForm';
-import { useRoomList, useDeleteRoom } from '@/services/room';
+import { useRoomList, useDeleteRoom, useRoomBuildings, useRoomFloors } from '@/services/room';
 import { ROOM_STATUS_MAP } from '@/types/enums';
 import type { Room } from '@/types/models';
 import { useCrudPage } from '@/hooks/useCrudPage';
 import { formatDateTime } from '@/utils/format';
+import type { PaginationParams } from '@/types/api';
+
+type RoomListParams = PaginationParams & {
+  search?: string;
+  building?: string;
+  floor?: string;
+  status?: number;
+};
 
 function Rooms() {
   const navigate = useNavigate();
-  const crud = useCrudPage<Room>({
+  const crud = useCrudPage<Room, RoomListParams>({
     useList: useRoomList,
     useDelete: useDeleteRoom,
     nameKey: 'name',
-    nameLabel: '机房'
+    nameLabel: '机房',
+    buildListParams: (tp) => ({
+      page: tp.page,
+      per_page: tp.per_page,
+      search: tp.search,
+      building: typeof tp.filters?.building === 'string' ? tp.filters.building : undefined,
+      floor: typeof tp.filters?.floor === 'string' ? tp.filters.floor : undefined,
+      status: tp.filters?.status ? Number(tp.filters.status) : undefined
+    })
   });
+
+  const { data: buildingOptions } = useRoomBuildings();
+  const buildingFilterValue =
+    typeof crud.table.filters.building === 'string' ? crud.table.filters.building : undefined;
+  const { data: floorOptions } = useRoomFloors(buildingFilterValue);
 
   const handleDetail = (record: Room) => {
     navigate(`/rooms/${record.id}`);
@@ -37,6 +54,26 @@ function Rooms() {
       render: (id: number) => <IdCell value={id} />
     },
     { title: '机房名称', dataIndex: 'name', key: 'name' },
+    {
+      title: '房间号',
+      dataIndex: 'room_number',
+      key: 'room_number',
+      width: 110
+    },
+    {
+      title: '楼栋',
+      dataIndex: 'building',
+      key: 'building',
+      width: 120,
+      render: (v: string | null) => v || '-'
+    },
+    {
+      title: '楼层',
+      dataIndex: 'floor',
+      key: 'floor',
+      width: 90,
+      render: (v: string | null) => v || '-'
+    },
     { title: '位置', dataIndex: 'location', key: 'location' },
     {
       title: '状态',
@@ -92,6 +129,50 @@ function Rooms() {
     }
   ];
 
+  const filterBar = (
+    <FilterBar
+      table={crud.table}
+      filters={[
+        {
+          key: 'building',
+          label: '全部楼栋',
+          type: 'select',
+          width: 150,
+          showSearch: true,
+          options: (buildingOptions ?? []).map((b) => ({ label: b, value: b }))
+        },
+        {
+          key: 'floor',
+          label: buildingFilterValue ? '全部楼层' : '楼层（先选楼栋）',
+          type: 'select',
+          width: 150,
+          showSearch: true,
+          options: (floorOptions ?? []).map((f) => ({ label: f, value: f }))
+        },
+        {
+          key: 'status',
+          label: '全部状态',
+          type: 'select',
+          width: 120,
+          options: Object.entries(ROOM_STATUS_MAP).map(([value, s]) => ({
+            label: s.label,
+            value: Number(value)
+          }))
+        }
+      ]}
+      extra={
+        <Space>
+          <Button icon={<AppstoreOutlined />} onClick={() => navigate('/rooms/overview')}>
+            机房总览
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={crud.handleAdd}>
+            新增机房
+          </Button>
+        </Space>
+      }
+    />
+  );
+
   return (
     <div>
       <DataTable<Room>
@@ -109,11 +190,7 @@ function Rooms() {
         searchValue={crud.table.search}
         onSearch={crud.table.setSearch}
         onRefresh={() => crud.refetch()}
-        toolbar={
-          <Button type="primary" icon={<PlusOutlined />} onClick={crud.handleAdd}>
-            新增机房
-          </Button>
-        }
+        toolbar={filterBar}
       />
       <RoomForm open={crud.formOpen} editRecord={crud.editRecord} onClose={crud.closeForm} />
     </div>

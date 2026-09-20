@@ -22,9 +22,12 @@ from app.utils import (
     rate_limit_api,
     validation_manager,
 )
-from app.utils.transactional import transactional
-from app.exceptions import PresetResponseError
+from app.utils.transactional import transactional, on_commit
+from app.exceptions import BaseAppException, PresetResponseError
 from app.exceptions.data_access import RecordNotFoundError
+from app.exceptions.validation import ValidationError
+from app.utils.cache.manager import cache_manager
+from app.services.switch_events import emit_resource_change_global
 from app.openapi.doc import doc, public
 
 cabinet_bp = Blueprint("cabinet", __name__)
@@ -231,6 +234,8 @@ def create_cabinet():
             message=message,
             status_code=201 if created else 400,
         )
+    except BaseAppException:
+        raise
     except Exception as e:
         logger.error("机柜创建失败: %s", e)
         raise PresetResponseError(message="机柜创建失败", status_code=500) from e
@@ -300,6 +305,56 @@ def delete_cabinet(cabinet_id):
 
     cabinet_service.delete_cabinet(cabinet_id)
     return APIResponse.success(message="机柜删除成功")
+
+
+@cabinet_bp.route("/<int:cabinet_id>/force", methods=["DELETE"])
+@doc(summary="强制删除机柜", tags=["机柜"], parameters=[{"name": "cabinet_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError", 500: "ApiError"})
+@login_required
+@permission_required("cabinet:force_delete")
+@rate_limit_api
+@transactional
+def force_delete_cabinet(cabinet_id):
+    """强制删除机柜：跳过依赖检查，物理删除柜内设备及其全部关联数据
+
+    ⚠️ **不可恢复**。会把柜内**全部**设备（含回收站中的软删设备）连同其硬件、
+    端口、IP、凭据、监控历史、诊断会话一并物理删除。
+
+    为什么是独立端点而不是 `DELETE /cabinets/{id}?force=true`：权限位不同
+    （`cabinet:force_delete` vs `cabinet:delete`）。独立端点让权限由装饰器天然分离，
+    不必在函数体里手写条件检查——那种写法一旦漏掉就是越权，而这里漏掉是 403。
+    （与 `app/api/room.py::force_delete_room` 同一决策）
+
+    ⚠️ 历史包袱：`DELETE /cabinets/{id}` 曾经接受 `force` 并落到 ORM 级联
+    （`Cabinet.devices` 的 `cascade="all, delete-orphan"`），**完全绕过设备清理链路**
+    ⇒ 子表有行时撞外键整体回滚、子表无行时静默留残行。该开关已移除，
+    现在"随设备一起销毁"**只有本端点这一条路径**。
+    """
+    if not cabinet_service.get_by_id(cabinet_id):
+        return APIResponse.error(
+            message="机柜不存在", error_code="CABINET_NOT_FOUND", status_code=404
+        )
+
+    try:
+        counts = cabinet_service.force_delete(cabinet_id)
+        on_commit(lambda: (
+            cache_manager.invalidate_pattern("room:*"),
+            cache_manager.invalidate_pattern("cabinet:*"),
+            cache_manager.invalidate_pattern("device:*"),
+            cache_manager.invalidate_pattern("devices:*"),
+            emit_resource_change_global("cabinet", "force_delete", ids=[cabinet_id]),
+        ))
+        return APIResponse.success(
+            data={"deleted": counts}, message="机柜及其柜内设备已强制删除"
+        )
+    except ValidationError as e:
+        raise PresetResponseError(
+            message=str(e), error_code="CABINET_FORCE_DELETE_INVALID", status_code=404
+        ) from e
+    except Exception as e:
+        logger.error(f"强制删除机柜失败: {e}", exc_info=True)
+        raise PresetResponseError(
+            message="强制删除机柜失败", error_code="CABINET_FORCE_DELETE_ERROR", status_code=500
+        ) from e
 
 
 @cabinet_bp.route("/<int:cabinet_id>/devices", methods=["GET"])

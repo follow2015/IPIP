@@ -56,6 +56,8 @@ from app.models.network_port import NetworkPort
 from app.models.notification import Notification, NotificationReceipt
 from app.models.rbac import Permission, Role, RolePermission, UserRole
 from app.models.room import Room
+from app.models.room_channel import RoomChannel
+from app.models.room_layout_marker import RoomLayoutMarker
 from app.models.switch_credentials import IPSwitchInfo, SwitchCredentials, SwitchPortIP, SwitchStatusCache
 from app.models.switch_route import IPNetwork, SwitchRoute
 from app.models.user import User
@@ -126,6 +128,8 @@ __all__ = [
     "Role",
     "RolePermission",
     "Room",
+    "RoomChannel",
+    "RoomLayoutMarker",
     "SwitchCredentials",
     "SwitchPortIP",
     "SwitchRoute",

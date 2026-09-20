@@ -35,7 +35,11 @@ import type {
   TopologyNode as OApiTopologyNode,
   TopologyEdge as OApiTopologyEdge,
   TopologyStats as OApiTopologyStats,
-  TopologyAutoDetectChange as OApiTopologyAutoDetectChange
+  TopologyAutoDetectChange as OApiTopologyAutoDetectChange,
+  RoomChannel as OApiRoomChannel,
+  RoomLayoutMarker as OApiRoomLayoutMarker,
+  RoomOverviewItem as OApiRoomOverviewItem,
+  RoomOverviewGroup as OApiRoomOverviewGroup
 } from './api-bridge';
 
 
@@ -65,6 +69,14 @@ export interface LoginData extends Omit<OApiLoginData, 'user'> {
 export interface Room extends OApiRoom {
   cabinets?: Cabinet[];
 }
+
+export type RoomChannel = OApiRoomChannel;
+
+export type RoomLayoutMarker = OApiRoomLayoutMarker;
+
+export type RoomOverviewItem = OApiRoomOverviewItem;
+
+export type RoomOverviewGroup = OApiRoomOverviewGroup;
 
 
 /**

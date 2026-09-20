@@ -33,7 +33,14 @@ class MonitorSuppressedAlertLog(BaseModel):
         db.BigInteger,
         db.ForeignKey("devices.id", ondelete="SET NULL"),
         nullable=True,
-        comment="被抑制告警的设备ID（设备删除后置空，留痕行保留）",
+        comment="被抑制告警的设备ID（设备删除时**保留留痕行**、只把本列置空，"
+        "见 device_service._delete_monitor_related）",
+    )
+    device_name = db.Column(
+        db.String(100),
+        nullable=True,
+        comment="被抑制设备名快照：置空 device_id 前先写入，"
+        "使留痕在设备行已物理删除后仍能自证（迁移 0015）",
     )
     alert_type = db.Column(
         db.String(40),
@@ -53,7 +60,13 @@ class MonitorSuppressedAlertLog(BaseModel):
     upstream_device_id = db.Column(
         db.BigInteger,
         nullable=True,
-        comment="命中的上游设备ID（根因侧，用于归属事件）",
+        comment="命中的上游设备ID（根因侧，用于归属事件；"
+        "⚠️ 无外键，DB 不会置空 —— 设备删除时由应用层显式处置）",
+    )
+    upstream_device_name = db.Column(
+        db.String(100),
+        nullable=True,
+        comment="上游设备名快照：置空 upstream_device_id 前先写入（迁移 0015）",
     )
     incident_id = db.Column(
         db.BigInteger,
@@ -72,10 +85,12 @@ class MonitorSuppressedAlertLog(BaseModel):
         data = {
             "id": self.id,
             "device_id": self.device_id,
+            "device_name": self.device_name,
             "alert_type": self.alert_type,
             "severity": self.severity,
             "reason_code": self.reason_code,
             "upstream_device_id": self.upstream_device_id,
+            "upstream_device_name": self.upstream_device_name,
             "incident_id": self.incident_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

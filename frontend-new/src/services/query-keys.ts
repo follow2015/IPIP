@@ -19,8 +19,14 @@ export const queryKeys = {
     detail: (id: number) => ['rooms', id] as const,
     cabinets: (id: number) => ['rooms', id, 'cabinets'] as const,
     devices: (id: number) => ['rooms', id, 'devices'] as const,
+    channels: (id: number) => ['rooms', id, 'channels'] as const,
+    markers: (id: number) => ['rooms', id, 'markers'] as const,
     statistics: (id: number) => ['rooms', id, 'stats'] as const,
-    options: ['rooms', 'options'] as const
+    options: ['rooms', 'options'] as const,
+    overview: ['rooms', 'overview'] as const,
+    buildings: ['rooms', 'buildings'] as const,
+    floors: (building?: string) => ['rooms', 'floors', building ?? null] as const,
+    nameOptions: ['rooms', 'name-options'] as const
   },
 
   cabinets: {

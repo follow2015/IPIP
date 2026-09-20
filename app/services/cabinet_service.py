@@ -6,10 +6,13 @@
 - 所有数据访问必须经由 CabinetRepository，禁止直接使用 db_manager / 裸 SQL
 - Service 方法为实例方法，便于测试与依赖注入
 """
+from sqlalchemy.exc import IntegrityError
+
 from app.utils.logging import get_logger
 from typing import Any, Dict, List, Optional
 
-from app.exceptions.data_access import RecordNotFoundError
+from app.exceptions.business import ResourceConflictError
+from app.exceptions.data_access import DataAccessError, RecordNotFoundError
 from app.exceptions.validation import ValidationError
 from app.models.cabinet import Cabinet
 from app.persistence.cabinet_repository import CabinetRepository
@@ -32,6 +35,44 @@ _STRATEGY_MAP: Dict[str, UPositionStrategy] = {
     "auto_best_fit":  UPositionStrategy.AUTO_BEST_FIT,
     "best_fit":       UPositionStrategy.AUTO_BEST_FIT,
 }
+
+
+def _raise_cabinet_unique_conflict(
+    error: DataAccessError,
+    cabinet_number: str,
+    row: Optional[int],
+    col: Optional[int],
+) -> None:
+    """把唯一键竞态导致的机柜写入失败还原为可读 409；非唯一键冲突时不做任何事（调用方补 raise）。
+
+    cabinets 有两个唯一键：`cabinet_number` 与 `uk_cabinet_position(room_id, row, col)`。
+    前置校验与写入之间存在竞态窗口，基类把 IntegrityError 包装为
+    DataAccessError(500)，此处依据 DBAPI 原始消息区分冲突键并给出带上下文的
+    ResourceConflictError(409)（编号冲突的消息里必含 cabinet_number 列名/约束名）。
+    """
+    if not isinstance(getattr(error, "original_error", None), IntegrityError):
+        return
+    orig = str(getattr(error.original_error, "orig", "") or "")
+    if "cabinet_number" in orig:
+        raise ResourceConflictError(
+            resource_type="机柜编号",
+            resource_id=cabinet_number,
+            conflict_reason="已被其它机柜占用",
+            message=f"机柜编号 '{cabinet_number}' 已被占用（可能由并发操作创建），请刷新后重试",
+        ) from error
+    if row is None or col is None:
+        raise ResourceConflictError(
+            resource_type="机柜",
+            resource_id=cabinet_number,
+            conflict_reason="唯一键冲突",
+            message="机柜数据与其它记录冲突（可能由并发操作创建），请刷新后重试",
+        ) from error
+    raise ResourceConflictError(
+        resource_type="机柜位置",
+        resource_id=f"第 {row} 行 第 {col} 列",
+        conflict_reason="已被其它机柜占用",
+        message=f"第 {row} 行 第 {col} 列已被其它机柜占用（可能由并发操作创建），请刷新后重试",
+    ) from error
 
 
 def _parse_strategy(strategy: str) -> UPositionStrategy:
@@ -162,12 +203,26 @@ class CabinetService:
 
         Raises:
             ValidationError: 机柜编号已存在
+            ResourceConflictError: 竞态下唯一约束兜底命中（HTTP 409，带编号/坐标信息）
         """
         payload = self._normalize_cabinet_payload(data)
         if self.check_cabinet_number_exists(payload.get("cabinet_number", "")):
             raise ValidationError(f"机柜编号 '{payload.get('cabinet_number')}' 已存在")
 
-        cabinet = self.cabinet_repository.create(payload)
+        self._assert_position_available(
+            payload.get("room_id"), payload.get("row"), payload.get("col")
+        )
+
+        try:
+            cabinet = self.cabinet_repository.create(payload)
+        except DataAccessError as e:
+            _raise_cabinet_unique_conflict(
+                e,
+                payload.get("cabinet_number", ""),
+                payload.get("row"),
+                payload.get("col"),
+            )
+            raise
         self._invalidate_cabinet_cache(cabinet.id, cabinet.room_id)
         emit_resource_change_global("cabinet", "create", ids=[cabinet.id])
         return cabinet
@@ -190,6 +245,13 @@ class CabinetService:
             if self.check_cabinet_number_exists(payload["cabinet_number"], exclude_id=cabinet_id):
                 raise ValidationError(f"机柜编号 '{payload['cabinet_number']}' 已存在")
 
+        self._assert_position_available(
+            payload.get("room_id", old_cabinet.room_id),
+            payload.get("row", old_cabinet.row),
+            payload.get("col", old_cabinet.col),
+            exclude_id=cabinet_id,
+        )
+
         if payload.get("customer_id") == "":
             payload["customer_id"] = None
 
@@ -201,7 +263,16 @@ class CabinetService:
             from app.persistence.customer_repository import CustomerRepository
             CustomerService(CustomerRepository()).assert_allocatable(new_customer_id)
 
-        cabinet = self.cabinet_repository.update(cabinet_id, payload)
+        try:
+            cabinet = self.cabinet_repository.update(cabinet_id, payload)
+        except DataAccessError as e:
+            _raise_cabinet_unique_conflict(
+                e,
+                payload.get("cabinet_number", old_cabinet.cabinet_number),
+                payload.get("row", old_cabinet.row),
+                payload.get("col", old_cabinet.col),
+            )
+            raise
         self._invalidate_cabinet_cache(cabinet_id, old_cabinet.room_id)
         if cabinet and cabinet.room_id != old_cabinet.room_id:
             cache_manager.invalidate_pattern(f"room:{cabinet.room_id}:*")
@@ -234,15 +305,28 @@ class CabinetService:
             cabinet_id, customer_id,
         )
 
-    def delete_cabinet(self, cabinet_id: int, force: bool = False) -> bool:
-        """删除机柜。
+    def delete_cabinet(self, cabinet_id: int) -> bool:
+        """删除机柜（物理删除，含依赖检查）：只删一个**空机柜**。
 
         Args:
-            force: True 时强制删除（即使有关联设备）
+            无。**这里刻意没有 `force` 参数** —— 机柜删除只有两种语义，各自一条路径：
+            - 「删空机柜」= 本方法（`DELETE /api/cabinets/<id>`，权限 `cabinet:delete`）
+            - 「连柜内设备一起物理销毁」= `force_delete`（`DELETE /api/cabinets/<id>/force`，
+              权限 `cabinet:force_delete`）
+
+            ⚠️ 历史包袱：这里曾有一个 `force=True` 开关，它会落到
+            `CabinetRepository.delete` → `base.py` 的 `session.delete(entity)`，
+            而 `Cabinet.devices` 关系带 `cascade="all, delete-orphan"`
+            ⇒ **级联物理删 `devices` 行、完全绕过设备清理链路**
+            （`DeviceService._cleanup_device_dependencies`）。后果随子表是否有行而分叉：
+            子表有行 ⇒ 撞外键**整体回滚**（对外 DataAccessError/500）；子表无行 ⇒
+            设备被静默物理删，配置/监控/诊断等关联行全成残行，且**无任何日志**。
+            （2026-09-18 用真实 fixture 实测复现，见 `.workbuddy/memory/2026-09-18.md`）
+            ⇒ 该开关已**移除**：现在传 `force=` 是 `TypeError`（响，且不可能"绕过"）。
 
         Raises:
             RecordNotFoundError: 机柜不存在
-            ValidationError: 有关联设备且非强制删除
+            ValidationError: 有关联设备（在库或回收站）
         """
         cabinet = self.get_by_id_or_raise(cabinet_id)
         room_id = cabinet.room_id
@@ -254,10 +338,11 @@ class CabinetService:
                 "请先恢复这些设备（或彻底删除）后再删除机柜。"
             )
 
-        if not force and cabinet.devices:
+        if cabinet.devices:
             raise ValidationError(
                 f"机柜下还有 {len(cabinet.devices)} 个设备，无法删除。"
-                "请先删除所有设备或使用强制删除（force=True）。"
+                "请先删除所有设备；若要连同设备一起物理销毁，"
+                "请改用强制删除（需 `cabinet:force_delete` 权限）。"
             )
 
         result = self.cabinet_repository.delete(cabinet_id)
@@ -266,17 +351,104 @@ class CabinetService:
             emit_resource_change_global("cabinet", "delete", ids=[cabinet_id])
         return result
 
-    def batch_delete_cabinets(
-        self, cabinet_ids: List[int], force: bool = False
-    ) -> Dict[str, Any]:
-        """批量删除机柜，返回各 ID 的成功/失败情况。"""
+    def force_delete(self, cabinet_id: int) -> Dict[str, int]:
+        """强制删除机柜：跳过依赖检查，物理删除机柜内全部设备及其关联数据。
+
+        ⚠️ **不可恢复**。与 `delete_cabinet()` 的分工见其 docstring。
+
+        **语义 = "机柜 = 一批设备的批量彻底删 + 删机柜本体"**（2026-09-18 拍板）
+        ----------------------------------------------------------------------
+        改造前这里是**裸 SQL 直删**：按 `room_service._FORCE_DELETE_DEVICE_SCOPED`
+        逐表 `DELETE ... WHERE device_id IN (...)`，最后删 `devices` + `cabinets`。
+        它删得干净，但**只做删除、不做两件同样必须做的事**：
+
+        1. **释放占用**：机柜内设备在**柜外**设备端口上留下的 ``occupied``；
+        2. **留痕处置**：`monitor_incident` / `monitor_suppressed_alert_log` /
+           `ai_diagnosis_sessions` 的行要**保留**并补设备名快照（裸 SQL 直删
+           `devices` 只会让 FK ``SET NULL`` 把引用置空，留痕从此无法解读出是哪台设备）。
+
+        用户口径："设备删除只删硬件相关，占用一律**释放**；机柜也是一样的" ⇒ 机柜
+        不该有两套语义。所以本方法改为**复用设备彻底删链路**
+        （``DeviceService.batch_permanent_delete_devices(..., include_live=True)``），
+        释放与留痕处置由那条链路统一提供，`room_service` 与它不再各写一份。
+
+        **为什么不再保留裸 SQL 清单**：清单与设备链路**必然漂移**，而漂移的后果是
+        静默留下孤儿行（未强制外键的库）或撞 1451 整体回滚（生产 MySQL）。现在
+        "新增一张带 device 外键的表"只需改设备链路一处。
+
+        Args:
+            cabinet_id: 机柜 ID
+
+        Returns:
+            ``{表名/计数字段: 数值}``，供 API 回给前端展示、也便于测试断言。
+            含 `devices`（彻底删台数）与 `_released_network_ports`、
+            `_released_ips`、`_disposed_trace_refs` 三个**释放/处置**计数 ——
+            它们不是"删除行数"，前缀下划线以示区分。
+
+        Raises:
+            ValidationError: 机柜不存在
+        """
+        if not self.cabinet_repository.find_by_id(cabinet_id):
+            raise ValidationError("机柜不存在")
+
+        from sqlalchemy import text
+
+        session = self.cabinet_repository.session
+        counts: Dict[str, int] = {}
+
+        device_ids = [
+            row[0]
+            for row in session.execute(
+                text("SELECT id FROM devices WHERE cabinet_id = :cid"),
+                {"cid": cabinet_id},
+            ).fetchall()
+        ]
+        if device_ids:
+            counts["devices"] = len(device_ids)
+
+        from app.persistence.device_repository import DeviceRepository
+        from app.services.device_service import DeviceService
+
+        svc = DeviceService(DeviceRepository(session))
+        result = svc.batch_permanent_delete_devices(device_ids, include_live=True)
+
+        failed = result.get("failed") or []
+        if failed:
+            detail = "; ".join(
+                f"device_id={f.get('device_id')}: {f.get('error')}" for f in failed
+            )
+            raise ValidationError(f"机柜内设备未能全部彻底删除，操作已回滚：{detail}")
+
+        for key, value in (("released_network_ports", "_released_network_ports"),
+                           ("released_ips", "_released_ips"),
+                           ("disposed_trace_refs", "_disposed_trace_refs")):
+            if result.get(key):
+                counts[value] = result[key]
+
+        deleted = session.query(Cabinet).filter(Cabinet.id == cabinet_id).delete(
+            synchronize_session=False
+        )
+        counts["cabinets"] = deleted or 0
+
+        session.flush()
+        logger.warning(
+            f"【强制删除】机柜及其柜内设备/关联数据已物理删除 (cabinet_id={cabinet_id})：{counts}"
+        )
+        return counts
+
+    def batch_delete_cabinets(self, cabinet_ids: List[int]) -> Dict[str, Any]:
+        """批量删除机柜（仅空机柜），返回各 ID 的成功/失败情况。
+
+        语义 = 逐个调 `delete_cabinet`：有机柜内设备的会失败并记进 `errors`。
+        要连设备一起销毁请用 `force_delete`（逐个调）—— 批量强删刻意不提供。
+        """
         deleted: List[int]         = []
         failed:  List[int]         = []
         errors:  Dict[int, str]    = {}
 
         for cid in cabinet_ids:
             try:
-                self.delete_cabinet(cid, force=force)
+                self.delete_cabinet(cid)
                 deleted.append(cid)
             except (RecordNotFoundError, ValidationError) as e:
                 failed.append(cid)
@@ -736,6 +908,41 @@ class CabinetService:
         子节点过滤由算法层 _iter_effective 统一处理。
         """
         return [d.to_dict() for d in cabinet.devices if d.deleted_at is None]
+
+    def _assert_position_available(
+        self,
+        room_id: Optional[int],
+        row: Optional[int],
+        col: Optional[int],
+        exclude_id: Optional[int] = None,
+    ) -> None:
+        """校验机房的某个格子是否已被其它机柜占用（设计文档 §3.4）。
+
+        与 `uk_cabinet_position` 唯一约束配套：约束是最终防线（挡并发写入），
+        本方法负责在提交前给出可读的错误提示。
+
+        `row` / `col` 任一为 None 表示"未设置位置"，不占用任何格子，直接放行——
+        未定位机柜可以有任意多个。
+
+        Raises:
+            ResourceConflictError: 该格子已被其它机柜占用（HTTP 409）
+        """
+        if room_id is None or row is None or col is None:
+            return
+
+        occupied = self.cabinet_repository.find_by_position(room_id, row, col, exclude_id)
+        if occupied is None:
+            return
+
+        raise ResourceConflictError(
+            resource_type="机柜位置",
+            resource_id=f"第 {row} 行 第 {col} 列",
+            conflict_reason=f"已被机柜 {occupied.cabinet_number} 占用",
+            message=(
+                f"第 {row} 行 第 {col} 列已被机柜 {occupied.cabinet_number} 占用，"
+                "请更换行列号"
+            ),
+        )
 
     def _normalize_cabinet_payload(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """统一字段命名（兼容旧 API 字段名 → 标准字段名）。

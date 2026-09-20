@@ -326,6 +326,7 @@ _LABEL_CN = {
     "device_id": "设备 ID", "device_name": "设备名", "hostname": "主机名",
     "name": "名称", "title": "标题", "status": "状态", "state": "状态",
     "room": "机房", "room_id": "机房 ID", "room_name": "机房",
+    "room_number": "房间号（机房名称组内唯一，实施计划《机房房间号与名称分组改造》）",
     "cabinet": "机柜", "cabinet_id": "机柜 ID", "cabinet_name": "机柜",
     "port": "端口", "ports": "端口", "vlan": "VLAN", "vlans": "VLAN",
     "customer": "客户", "customers": "客户", "customer_name": "客户名",

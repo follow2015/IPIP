@@ -69,15 +69,21 @@ def _coerce_pool_scope(value: Any) -> Any:
 
 
 def _resolve_room_id(args: Dict[str, Any]) -> Any:
-    """room_id / room_name 混合解析；都缺省返回 None（全部机房择优）。
+    """room_id / room_name（+可选 room_number）混合解析；都缺省返回 None（全部机房择优）。
 
     名称解析启发式（用户口述"机房A"与库名"room-A"/"常青机房"常无公共
     子串）：先对原词做 ilike 精确 → 包含匹配；再剥离"机房"字样用剩余
     token 重试两级匹配（"机房A"→"A"）。唯一命中直接用；多个候选列出
     供复问；零命中报错并附可选机房清单。
+
+    名称可重复（实施计划《机房房间号与名称分组改造》）：精确命中多条时——
+    - args 带 room_number → 按 (name, room_number) 组合定位；
+    - 未带 → 列出候选（名称 + 房间号）请用户指明房间号或 ID，
+      **不得静默取第一条**（改造前 `.first()` 的取值随数据库返回顺序漂移）。
     """
     room_id = args.get("room_id")
     room_name = args.get("room_name") or args.get("room")
+    room_number = args.get("room_number")
     if room_id not in (None, ""):
         return room_id
     if room_name:
@@ -89,19 +95,36 @@ def _resolve_room_id(args: Dict[str, Any]) -> Any:
         if stripped and stripped != name:
             tokens.append(stripped)
 
-        for token in tokens:
-            room = Room.query.filter(Room.name.ilike(token)).first()
-            if room is not None:
-                return room.id
-        for token in tokens:
-            matches = Room.query.filter(Room.name.ilike(f"%{token}%")).all()
+        def _pick(matches):
+            """从精确/包含命中的记录里挑出目标机房；同名多条时按房间号消歧"""
+            if not matches:
+                return None
+            if room_number not in (None, ""):
+                by_number = [r for r in matches if r.room_number == str(room_number).strip()]
+                if not by_number:
+                    cand = "、".join(
+                        f"{r.name}/{r.room_number}" for r in matches[:10]
+                    )
+                    raise ValueError(
+                        f"机房「{name}」下没有房间号 {room_number}。该名称下的房间：{cand}"
+                    )
+                return by_number[0]
             if len(matches) == 1:
-                return matches[0].id
-            if len(matches) > 1:
-                cand = "、".join(r.name for r in matches[:10])
-                raise ValueError(
-                    f"机房名称「{name}」匹配到多个机房：{cand}，请指明完整名称"
-                )
+                return matches[0]
+            cand = "、".join(f"{r.name}/{r.room_number}" for r in matches[:10])
+            raise ValueError(
+                f"机房名称「{name}」匹配到多个房间：{cand}。"
+                "请指明房间号（room_number）或机房 ID"
+            )
+
+        for token in tokens:
+            picked = _pick(Room.query.filter(Room.name.ilike(token)).all())
+            if picked is not None:
+                return picked.id
+        for token in tokens:
+            picked = _pick(Room.query.filter(Room.name.ilike(f"%{token}%")).all())
+            if picked is not None:
+                return picked.id
         all_rooms = [r.name for r in Room.query.order_by(Room.id).all()]
         room_list = "、".join(all_rooms[:20]) + ("…" if len(all_rooms) > 20 else "")
         raise ValueError(f"机房不存在: {name}。可选机房：{room_list or '（系统中暂无机房）'}")

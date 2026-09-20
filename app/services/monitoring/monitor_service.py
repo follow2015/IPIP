@@ -546,11 +546,13 @@ class MonitorService:
 
         pool_size = current_app.config.get("MONITOR_BATCH_POOL_SIZE", 10)
         with _BATCH_EXECUTORS_LOCK:
-            if not hasattr(self, "_batch_executor") or self._batch_executor is None:
-                self._batch_executor = ThreadPoolExecutor(
+            ex = getattr(self, "_batch_executor", None)
+            if ex is None or getattr(ex, "_shutdown", False):
+                ex = ThreadPoolExecutor(
                     max_workers=pool_size, thread_name_prefix="monitor-batch"
                 )
-                _register_batch_executor(self._batch_executor)
+                self._batch_executor = ex
+                _register_batch_executor(ex)
         results = list(self._batch_executor.map(_check_one, targets))
         return {"results": results, "skipped": skipped}
 
@@ -569,6 +571,9 @@ class MonitorService:
         adapter, cred = selected
         if not hasattr(adapter, "collect_metrics"):
             return {}
+        from extensions import db
+
+        db.session.commit()
         try:
             from app.services.monitoring.metric_collector import MetricCollector
 

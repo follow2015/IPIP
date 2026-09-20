@@ -365,6 +365,98 @@ class DeviceConnectionService:
         return total
 
 
+    @staticmethod
+    def release_peer_occupations(session, device_id: int) -> Dict[str, int]:
+        """释放"被删设备在**别的设备**端口上留下的占用"，返回释放计数。
+
+        为什么需要它（2026-09-18 真库实测）
+        ----------------------------------
+        ``network_ports.usage_status`` 的占用是**扫描派生**的
+        （``derive_usage_status(link_status, port_name)``：物理口 up ⇒ ``occupied``）。
+        实测 213 条 ``occupied`` **全部** ``link_status='up'`` —— 没有一条来自
+        "建连接时手工占用"。问题在于扫描**只对有 SSH 管理权限的设备有效**：
+        删掉一台设备后，它在对端交换机上留下的 ``occupied`` **永远不会**被
+        下一次扫描纠正（那台交换机没有 SSH 权限，扫不动）。
+        ⇒ 对端占用只能**显式释放**，这就是本方法存在的唯一理由。
+
+        为什么不能靠"删连接时顺带释放"
+        ------------------------------
+        ``delete_device_connections()`` 确实会释放端口，但它释放的是**被删设备
+        自己那一端**（``find_occupied_ports_by_device_orm``），而"自己那一端"的
+        端口行**随后就会被删掉**，释放毫无意义；真正会残留的是**对端**。
+        另外删除链路此前是**直调 Repository** 的，连这个释放都没走到
+        （该 Repository 的 docstring 自己写着"调用方须先释放端口"）。
+
+        覆盖三种形态（判据统一为：**只释放不属于被删设备的那一端**）
+        ------------------------------------------------------------
+        ① D2N，被删设备是 ``device_id`` 侧（服务器）→ 释放 ``switch_port_id``；
+        ② D2N，被删设备是 ``switch_device_id`` 侧（交换机）→ 释放对端
+           ``device_nics_port_id``；
+        ③ N2N：N2N 是对称的，"local/peer"只表示存储方向 ⇒ 按
+           ``local_device_id``/``peer_device_id`` **逐列判断**哪一端不属于被删设备。
+
+        ⚠️ 刻意不用 ``n2n_repo.find_by_device()``：它按"查询视角"翻转
+        local/peer（``to_dict(perspective_device_id=...)``），拿它判方向会
+        把"自己的端口"当成"对端端口"——而这里恰恰**依赖方向正确**。
+        自环连接（两端都是被删设备）两端都不释放：那两行端口随后即被删除。
+
+        Args:
+            session: 调用方的事务会话（本方法只 flush，不 commit）
+            device_id: 即将被删除的设备 ID
+
+        Returns:
+            ``{"released_network_ports": n, "released_nics_ports": m}``
+        """
+        from sqlalchemy import or_
+
+        from app.models.device_connection import DeviceConnection
+        from app.models.network_connection import NetworkConnection
+        from app.persistence.device_nics_port_repository import DeviceNicsPortRepository
+        from app.persistence.switch_port_repository import NetworkPortRepository
+
+        net_port_ids: set = set()
+        nics_port_ids: set = set()
+
+        for conn in session.query(DeviceConnection).filter(
+            DeviceConnection.device_id == device_id
+        ).all():
+            if conn.switch_device_id != device_id and conn.switch_port_id:
+                net_port_ids.add(conn.switch_port_id)
+
+        for conn in session.query(DeviceConnection).filter(
+            DeviceConnection.switch_device_id == device_id
+        ).all():
+            if conn.device_id != device_id and conn.device_nics_port_id:
+                nics_port_ids.add(conn.device_nics_port_id)
+
+        for conn in session.query(NetworkConnection).filter(
+            or_(
+                NetworkConnection.local_device_id == device_id,
+                NetworkConnection.peer_device_id == device_id,
+            )
+        ).all():
+            if conn.local_device_id != device_id and conn.local_port_id:
+                net_port_ids.add(conn.local_port_id)
+            if conn.peer_device_id != device_id and conn.peer_port_id:
+                net_port_ids.add(conn.peer_port_id)
+
+        port_repo = NetworkPortRepository(session)
+        nics_repo = DeviceNicsPortRepository(session)
+        for pid in net_port_ids:
+            port_repo.release_port_and_set_link_down(pid)
+        for pid in nics_port_ids:
+            nics_repo.release_port(pid)
+
+        if net_port_ids or nics_port_ids:
+            logger.info(
+                "删除设备 %d：已释放对端占用 network_ports=%d nics_port=%d",
+                device_id, len(net_port_ids), len(nics_port_ids),
+            )
+        return {
+            "released_network_ports": len(net_port_ids),
+            "released_nics_ports": len(nics_port_ids),
+        }
+
     def _occupy_network_port(self, port_id: int) -> None:
         """占用网络端口（仅更新 usage_status，跳过 disabled 端口）
 

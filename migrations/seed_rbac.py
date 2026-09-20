@@ -45,10 +45,13 @@ PERMISSIONS = {
     "room:create": ("创建机房", "room", "创建新机房"),
     "room:update": ("更新机房", "room", "修改机房信息"),
     "room:delete": ("删除机房", "room", "删除机房"),
+    "room:layout_config": ("配置机房布局", "room", "配置机房通道与平面图占位标记"),
+    "room:force_delete": ("强制删除机房", "room", "跳过依赖检查，级联物理删除机房及其全部机柜与设备"),
     "cabinet:view": ("查看机柜", "cabinet", "查看机柜信息"),
     "cabinet:create": ("创建机柜", "cabinet", "创建新机柜"),
     "cabinet:update": ("更新机柜", "cabinet", "修改机柜信息"),
-    "cabinet:delete": ("删除机柜", "cabinet", "删除机柜"),
+    "cabinet:delete": ("删除机柜", "cabinet", "删除机柜（仅空机柜）"),
+    "cabinet:force_delete": ("强制删除机柜", "cabinet", "跳过依赖检查，物理删除机柜及其柜内设备与关联数据"),
     "device:view": ("查看设备", "device", "查看设备信息"),
     "device:create": ("创建设备", "device", "创建新设备"),
     "device:update": ("更新设备", "device", "修改设备信息"),
@@ -119,8 +122,10 @@ ROLES = {
 
 ROLE_PERMISSIONS = {
     "admin": [
-        "room:view", "room:create", "room:update", "room:delete",
+        "room:view", "room:create", "room:update", "room:delete", "room:layout_config",
+        "room:force_delete",
         "cabinet:view", "cabinet:create", "cabinet:update", "cabinet:delete",
+        "cabinet:force_delete",
         "device:view", "device:create", "device:update", "device:delete",
         "customer:view", "customer:create", "customer:update", "customer:delete", "customer:terminate",
         "user:view", "user:create", "user:update", "user:delete",

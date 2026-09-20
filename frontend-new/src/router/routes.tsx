@@ -15,6 +15,7 @@ const Login = React.lazy(() => import('@/pages/Login'));
 const Dashboard = React.lazy(() => import('@/pages/Dashboard'));
 const Rooms = React.lazy(() => import('@/pages/Rooms'));
 const RoomDetail = React.lazy(() => import('@/pages/Rooms/RoomDetail'));
+const RoomOverview = React.lazy(() => import('@/pages/Rooms/RoomOverview'));
 const Cabinets = React.lazy(() => import('@/pages/Cabinets'));
 const CabinetDetail = React.lazy(() => import('@/pages/Cabinets/CabinetDetail'));
 const Devices = React.lazy(() => import('@/pages/Devices'));
@@ -98,6 +99,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard', element: withSuspense(Dashboard) },
       { path: 'rooms', element: withSuspense(Rooms) },
+      { path: 'rooms/overview', element: withSuspense(RoomOverview) },
       { path: 'rooms/:id', element: withSuspense(RoomDetail) },
       { path: 'cabinets', element: withSuspense(Cabinets) },
       { path: 'cabinets/:id', element: withSuspense(CabinetDetail) },

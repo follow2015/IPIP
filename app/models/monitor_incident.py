@@ -57,7 +57,14 @@ class MonitorIncident(BaseModel):
         db.BigInteger,
         db.ForeignKey("devices.id", ondelete="SET NULL"),
         nullable=True,
-        comment="根因设备ID（设备删除后置空）",
+        comment="根因设备ID（设备删除时**保留事件行**、只把本列置空，"
+        "见 device_service._delete_monitor_related）",
+    )
+    root_device_name = db.Column(
+        db.String(100),
+        nullable=True,
+        comment="根因设备名快照：设备删除前置空 root_device_id 前先写入，"
+        "使事件在设备行已物理删除后仍能自证是哪台设备（迁移 0015）",
     )
     alert_count = db.Column(
         db.Integer,
@@ -110,6 +117,7 @@ class MonitorIncident(BaseModel):
             "status": self.status,
             "reason_code": self.reason_code,
             "root_device_id": self.root_device_id,
+            "root_device_name": self.root_device_name,
             "alert_count": self.alert_count,
             "device_count": self.device_count,
             "first_alert_at": self.first_alert_at.isoformat() if self.first_alert_at else None,
