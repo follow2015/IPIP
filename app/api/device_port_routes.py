@@ -302,7 +302,8 @@ def put_port_sync_enabled(device_id: int):
         from app.exceptions.validation import ValidationError
         raise ValidationError("port_sync_enabled 必须为 bool 或 null")
 
-    device = db.session.query(Device).filter_by(id=device_id).first()
+    from app.persistence.device_repository import DeviceRepository
+    device = DeviceRepository().find_by_id(device_id)
     if not device:
         from app.exceptions.business import BusinessLogicError
         raise BusinessLogicError("设备不存在", status_code=404)

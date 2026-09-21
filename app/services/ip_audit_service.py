@@ -277,11 +277,7 @@ class IPAuditService:
         ids = {cid for cid in customer_ids if cid is not None}
         if not ids:
             return {}
-        repo = CustomerRepository()
-        model = repo.model_class
-        rows = repo.session.query(model.id, model.customer_name).filter(
-            model.id.in_(ids),
-        ).all()
+        rows = CustomerRepository().find_by_ids(ids)
         return {r.id: r.customer_name for r in rows}
 
     def _to_dto(self, row: Dict[str, Any]) -> Dict[str, Any]:

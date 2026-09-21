@@ -93,11 +93,14 @@ class VLANService:
         Returns:
             Optional[int]: 推导出的room_id，无法推导时返回None
         """
-        from app.models.device import Device
-        device = self.repo.session.query(Device).filter_by(id=device_id).first()
+        from app.persistence.device_repository import DeviceRepository
+        device = DeviceRepository(self.repo.session).find_by_id(device_id)
         if device and device.cabinet_id:
-            from app.models.cabinet import Cabinet
-            cabinet = self.repo.session.query(Cabinet).filter_by(id=device.cabinet_id).first()
+            from app.persistence.cabinet_repository import CabinetRepository
+
+            cabinet = CabinetRepository(session=self.repo.session).find_by_id(
+                device.cabinet_id
+            )
             if cabinet and cabinet.room_id:
                 return cabinet.room_id
         return None

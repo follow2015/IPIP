@@ -51,6 +51,26 @@ class DeviceMetricTimeseriesRepository:
         self.session.flush()
         return len(rows)
 
+    def list_samples_since(self, since: datetime) -> List[tuple]:
+        """取某时刻之后的**全部**指标样本（B-44 收敛：基线重算的唯一用点）。
+
+        返回 ``[(device_id, metric_key, index_key, value, collected_at), ...]``：
+        基线重算要按 (device, metric, index) 全量分组后再算分桶统计，逐行拉实体
+        反而是浪费（这是唯一需要"跨设备全量样本"的调用点，跑在 CLI 重算路径上）。
+        刻意**不设 limit**（与原实现一致）：截断样本会让基线统计静默失真。
+        """
+        return (
+            self.session.query(
+                DeviceMetricTimeseries.device_id,
+                DeviceMetricTimeseries.metric_key,
+                DeviceMetricTimeseries.index_key,
+                DeviceMetricTimeseries.value,
+                DeviceMetricTimeseries.collected_at,
+            )
+            .filter(DeviceMetricTimeseries.collected_at >= since)
+            .all()
+        )
+
     def list_by_metric(
         self,
         device_id: int,

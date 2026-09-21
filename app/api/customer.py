@@ -358,6 +358,7 @@ def get_customer_assets(customer_id):
 @doc(summary="导出客户资源Excel", tags=["客户"], parameters=[{"name": "customer_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "ApiResponse", 404: "ApiError", 500: "ApiError"})
 @login_required
 @permission_required("customer:view")
+@rate_limit_api
 def export_customer_assets(customer_id):
     """导出客户资源统计 Excel（5 个 Sheet：概览/机柜/设备/网段/端口）
 

@@ -20,6 +20,15 @@ class VirtualRoomRepository(SQLAlchemyRepository):
     def __init__(self, session=None):
         super().__init__(VirtualRoom, session or db.session)
 
+    def exists_by_id(self, virtual_room_id: int) -> bool:
+        """虚拟机房是否存在（B-44 收敛：扫描调度的配置校验）。"""
+        return (
+            self.session.query(VirtualRoom)
+            .filter_by(id=virtual_room_id)
+            .first()
+            is not None
+        )
+
     def find_with_members(self, virtual_room_id: int) -> Optional[VirtualRoom]:
         """查询虚拟机房详情（含成员列表 + 预加载防 N+1）
 
@@ -46,6 +55,19 @@ class VirtualRoomRepository(SQLAlchemyRepository):
         rows = (
             self.session.query(VirtualRoomMember.device_id)
             .filter(VirtualRoomMember.virtual_room_id == virtual_room_id)
+            .all()
+        )
+        return [r[0] for r in rows]
+
+    def list_virtual_room_ids_by_device_ids(self, device_ids) -> List[int]:
+        """取设备集合所属的虚拟机房 ID（去重；B-44 部署计划批：二层域扩展）。"""
+        ids = tuple(device_ids)
+        if not ids:
+            return []
+        rows = (
+            self.session.query(VirtualRoomMember.virtual_room_id)
+            .filter(VirtualRoomMember.device_id.in_(ids))
+            .distinct()
             .all()
         )
         return [r[0] for r in rows]

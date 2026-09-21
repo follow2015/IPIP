@@ -240,7 +240,9 @@ class RbacService:
 
     def get_user_roles(self, user_id: int) -> List[Dict[str, Any]]:
         """获取用户的角色列表。"""
-        user = self.role_repository.session.query(User).get(user_id)
+        from app.persistence.user_repository import UserRepository
+
+        user = UserRepository(session=self.role_repository.session).get_by_id(user_id)
         if not user:
             return []
         return [r.to_dict() for r in user.roles]
@@ -253,7 +255,9 @@ class RbacService:
         Raises:
             ValidationError: 角色 ID 不存在
         """
-        user = self.role_repository.session.query(User).get(user_id)
+        from app.persistence.user_repository import UserRepository
+
+        user = UserRepository(session=self.role_repository.session).get_by_id(user_id)
         if not user:
             return None
 

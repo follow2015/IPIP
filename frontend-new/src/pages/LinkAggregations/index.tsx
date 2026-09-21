@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/utils/confirm';
 import { Button, Tag, Card } from 'antd';
 import DataTable from '@/components/DataTable';
+import { serverPagination } from '@/components/DataTable/serverPagination';
 import { StatusTag } from '@/components/StatusTag';
 import { LAG_STATUS_MAP } from '@/types/enums';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -199,17 +200,15 @@ function LinkAggregations() {
           rowKey="id"
           loading={isLoading}
           size="small"
-          pagination={{
+          pagination={serverPagination({
             current: table.page,
             pageSize: table.perPage,
             total: lagData?.total ?? 0,
-            showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
             onChange: (p, ps) => {
               table.setPage(p);
               table.setPerPage(ps);
             }
-          }}
+          })}
           scroll={{ x: 'max-content' }}
           showCard={false}
           searchable={false}

@@ -22,7 +22,6 @@
 from typing import Dict, List, Optional, Tuple
 
 from app.models.device_nics_port import DeviceNicsPort
-from app.models.device_connection import DeviceConnection
 
 
 NETWORK_DEVICE_TYPES: frozenset = frozenset({'network'})
@@ -120,14 +119,9 @@ class PortMatchingEngine:
         Returns:
             True = 已占用
         """
-        return (
-            DeviceConnection.query
-            .filter(
-                DeviceConnection.device_nics_port_id == port_id,
-                DeviceConnection.status == "active",
-            )
-            .first()
-        ) is not None
+        from app.persistence.device_connection_repository import DeviceConnectionRepository
+
+        return DeviceConnectionRepository().exists_active_for_nics_port(port_id)
 
 
     @staticmethod
@@ -198,30 +192,20 @@ class PortMatchingEngine:
         Returns:
             DeviceNicsPort 实例列表
         """
-        query = DeviceNicsPort.query.filter(
-            DeviceNicsPort.device_id == device_id,
-            DeviceNicsPort.port_status == "free",
-        )
-        if port_type:
-            query = query.filter(DeviceNicsPort.port_type == port_type)
-        if port_speed:
-            query = query.filter(DeviceNicsPort.port_speed == port_speed)
+        from app.persistence.device_nics_port_repository import DeviceNicsPortRepository
 
-        candidate_ports = query.all()
+        candidate_ports = DeviceNicsPortRepository().list_free_ports(
+            device_id, port_type=port_type, port_speed=port_speed,
+        )
         if not candidate_ports:
             return []
 
         candidate_ids = [p.id for p in candidate_ports]
-        occupied_ids = {
-            row[0]
-            for row in DeviceConnection.query
-            .with_entities(DeviceConnection.device_nics_port_id)
-            .filter(
-                DeviceConnection.device_nics_port_id.in_(candidate_ids),
-                DeviceConnection.status == "active",
-            )
-            .all()
-        }
+        from app.persistence.device_connection_repository import DeviceConnectionRepository
+
+        occupied_ids = set(
+            DeviceConnectionRepository().list_active_nics_port_ids(candidate_ids)
+        )
 
         return [p for p in candidate_ports if p.id not in occupied_ids]
 

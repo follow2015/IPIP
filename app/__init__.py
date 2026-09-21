@@ -29,7 +29,29 @@ _METRICS_NOTICE = (
     "# process_* / python_gc_* / python_info 为本进程指标，按 instance 区分，\n"
     "# 可正常聚合。\n"
     "# window=\"day\" 的日期边界按服务器本地时区计算。\n"
+    "# ipip_monitor_round_* 为监控采集节奏（同为 Redis 跨进程聚合值，查询口径同上）：\n"
+    "# rounds_per_minute 明显高于配置的采集频率 ⇒ 存在多实例并发导致的采集放大；\n"
+    "# writers > 1 或 same_second_total > 0 是同一现象的直接证据。\n"
 )
+
+
+def _monitor_rounds_text() -> str:
+    """监控轮次节奏指标的 exposition 文本（旁路，失败不影响 /metrics 其余内容）。
+
+    背景：锁只保证互斥、不保证限速 ⇒ 多实例各自成频、采集被放大 N 倍，而配置值
+    看着正常。本段让"实际轮次/分钟"当场可见（见 `code_review/采样节奏真值核查-20260921.md`）。
+    """
+    try:
+        from app.services.monitoring.round_metrics import snapshot as _rounds_snapshot
+
+        snapshot = _rounds_snapshot()
+        raw = snapshot.get("raw") or ""
+        if not raw:
+            return ""
+        return "# monitor_rounds_source=%s\n%s" % (snapshot.get("metrics_source"), raw)
+    except Exception:  # noqa: BLE001  指标渲染失败不得让健康抓取端点 500
+        logger.warning("监控轮次指标渲染失败（已忽略）")
+        return ""
 
 
 def create_app(config_name: str = None) -> Flask:
@@ -298,7 +320,8 @@ def register_blueprints(app: Flask):
             snapshot = get_metrics()
             head = "# pid=%s source=%s\n" % (snapshot.get("pid"),
                                              snapshot.get("metrics_source"))
-            body = _METRICS_NOTICE + head + (snapshot.get("raw") or "")
+            body = (_METRICS_NOTICE + head + (snapshot.get("raw") or "")
+                    + _monitor_rounds_text())
             return Response(body, mimetype="text/plain; version=0.0.4")
 
     @app.route("/<path:filename>")

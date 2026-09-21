@@ -69,22 +69,25 @@ def resolve_customer(query: Any) -> Dict[str, Any]:
         return {"status": "missing", "customer": None, "candidates": [],
                 "message": "客户参数为空"}
 
-    base = Customer.query
+    from app.persistence.customer_repository import CustomerRepository
+
+    cust_repo = CustomerRepository()
 
     if q.isdigit():
-        c = base.filter(Customer.id == int(q)).first()
+        c = cust_repo.find_by_id(int(q))
         if c:
             return {"status": "ok", "customer": _customer_brief(c), "candidates": [],
                     "message": ""}
 
-    c = base.filter(Customer.customer_name == q).first()
+    c = cust_repo.find_by_customer_name(q)
     if c:
         return {"status": "ok", "customer": _customer_brief(c), "candidates": [],
                 "message": ""}
 
     like = f"%{_escape_like(q)}%"
-    fuzzy = (base.filter(Customer.customer_name.ilike(like, escape=_LIKE_ESCAPE_CHAR))
-             .order_by(Customer.id).limit(_MAX_CANDIDATES).all())
+    fuzzy = cust_repo.search_by_name_contains(
+        like, limit=_MAX_CANDIDATES, escape=_LIKE_ESCAPE_CHAR,
+    )
     candidates = [{"id": c.id, "name": c.customer_name} for c in fuzzy]
     if len(candidates) == 1:
         return {"status": "ok", "customer": _customer_brief(fuzzy[0]),
@@ -100,15 +103,10 @@ def resolve_customer(query: Any) -> Dict[str, Any]:
 def list_customer_devices(customer_id: int,
                           limit: int = _MAX_CUSTOMER_DEVICES) -> List[Dict[str, Any]]:
     """客户的设备清单摘要（按 id 升序，超限截断由调用方提示）。"""
-    from app.models.device import Device
+    from app.persistence.device_repository import DeviceRepository
 
-    rows = (
-        Device.query
-        .filter(Device.customer_id == customer_id)
-        .filter(Device.deleted_at.is_(None))
-        .order_by(Device.id)
-        .limit(limit + 1)
-        .all()
+    rows = DeviceRepository().find_by_customer_id_ordered(
+        customer_id, limit=limit + 1,
     )
     return [_device_brief(d) for d in rows[:limit]]
 
@@ -147,32 +145,23 @@ def resolve_device(query: Any, device_types: Optional[List[str]] = None) -> Dict
          "device": {...}|None, "candidates": [{id,name,...}...], "message": str}
     """
     from sqlalchemy import or_
-    from app.models.device import Device
+    from app.persistence.device_repository import DeviceRepository
 
     q = _clean_query(query)
     if not q:
         return {"status": "missing", "device": None, "candidates": [],
                 "message": "设备参数为空"}
 
-    base = Device.query.filter(Device.deleted_at.is_(None))
-    if device_types:
-        base = base.filter(Device.device_type.in_(device_types))
+    dev_repo = DeviceRepository()
 
     if q.isdigit():
-        d = base.filter(Device.id == int(q)).first()
-        if d:
+        d = dev_repo.find_by_id(int(q))
+        if d and (not device_types or d.device_type in device_types):
             return {"status": "ok", "device": _device_brief(d), "candidates": [],
                     "message": ""}
 
-    exact = (
-        base.filter(or_(
-            Device.device_name == q,
-            Device.hostname == q,
-            Device.management_ip == q,
-        ))
-        .order_by(Device.id)
-        .limit(_MAX_CANDIDATES)
-        .all()
+    exact = dev_repo.search_exact_identity(
+        q, device_types=device_types, limit=_MAX_CANDIDATES,
     )
     if len(exact) == 1:
         return {"status": "ok", "device": _device_brief(exact[0]), "candidates": [],
@@ -183,14 +172,9 @@ def resolve_device(query: Any, device_types: Optional[List[str]] = None) -> Dict
                 "message": f"「{q}」匹配多台设备（不同主机/端口命中），请从候选确认"}
 
     like = f"%{_escape_like(q)}%"
-    fuzzy = (
-        base.filter(or_(
-            Device.device_name.ilike(like, escape=_LIKE_ESCAPE_CHAR),
-            Device.hostname.ilike(like, escape=_LIKE_ESCAPE_CHAR),
-        ))
-        .order_by(Device.id)
-        .limit(_MAX_CANDIDATES)
-        .all()
+    fuzzy = dev_repo.search_name_contains(
+        like, device_types=device_types, limit=_MAX_CANDIDATES,
+        escape=_LIKE_ESCAPE_CHAR,
     )
     if len(fuzzy) == 1:
         return {"status": "ok", "device": _device_brief(fuzzy[0]), "candidates": [],

@@ -34,9 +34,10 @@ def get_user_permissions(user_id: int) -> set:
     Returns:
         set[str]: 权限码集合；用户不存在返回空集。
     """
-    from app.models.user import User
+    from app.persistence.user_repository import UserRepository
+
     try:
-        user = User.query.get(user_id)
+        user = UserRepository().find_by_id(user_id)
     except Exception:  # noqa: BLE001
         return set()
     if not user:

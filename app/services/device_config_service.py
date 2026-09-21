@@ -95,18 +95,14 @@ class DeviceConfigService:
                 采集内容为空或 SSH 失败
         """
         from app.infra import SSHManager
-        from app.models.device import Device
         from app.persistence.switch_repo import SwitchRepository
         from app.services.ai.command_safety import get_backup_command
         from app.services.ai.circuit_breaker import get_circuit_breaker, AICircuitOpenError
         from app.services.device_op_lock import device_op_lock, DeviceOperationConflict
-        from extensions import db
 
-        device = (
-            db.session.query(Device)
-            .filter(Device.id == device_id, Device.deleted_at.is_(None))
-            .first()
-        )
+        from app.persistence.device_repository import DeviceRepository
+
+        device = DeviceRepository().find_by_id(device_id)
         if not device:
             raise ValidationError("设备不存在")
 

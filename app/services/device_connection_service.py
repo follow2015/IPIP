@@ -407,34 +407,27 @@ class DeviceConnectionService:
         Returns:
             ``{"released_network_ports": n, "released_nics_ports": m}``
         """
-        from sqlalchemy import or_
-
-        from app.models.device_connection import DeviceConnection
-        from app.models.network_connection import NetworkConnection
         from app.persistence.device_nics_port_repository import DeviceNicsPortRepository
         from app.persistence.switch_port_repository import NetworkPortRepository
 
         net_port_ids: set = set()
         nics_port_ids: set = set()
 
-        for conn in session.query(DeviceConnection).filter(
-            DeviceConnection.device_id == device_id
-        ).all():
+        from app.persistence.device_connection_repository import DeviceConnectionRepository
+        from app.persistence.network_connection_repository import NetworkConnectionRepository
+
+        dc_repo = DeviceConnectionRepository(session=session)
+        nc_repo = NetworkConnectionRepository(session=session)
+
+        for conn in dc_repo.list_by_device_side(device_id):
             if conn.switch_device_id != device_id and conn.switch_port_id:
                 net_port_ids.add(conn.switch_port_id)
 
-        for conn in session.query(DeviceConnection).filter(
-            DeviceConnection.switch_device_id == device_id
-        ).all():
+        for conn in dc_repo.list_by_switch_device_ids([device_id]):
             if conn.device_id != device_id and conn.device_nics_port_id:
                 nics_port_ids.add(conn.device_nics_port_id)
 
-        for conn in session.query(NetworkConnection).filter(
-            or_(
-                NetworkConnection.local_device_id == device_id,
-                NetworkConnection.peer_device_id == device_id,
-            )
-        ).all():
+        for conn in nc_repo.list_by_device_ids([device_id], any_side=True):
             if conn.local_device_id != device_id and conn.local_port_id:
                 net_port_ids.add(conn.local_port_id)
             if conn.peer_device_id != device_id and conn.peer_port_id:

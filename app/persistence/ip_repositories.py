@@ -16,6 +16,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 
 from app.persistence.base import BaseRepository
+from app.core.pagination_limits import ensure_offset_within_limit
 from app.models.ip_model import IPManager
 from app.models.switch_route import IPNetwork, SwitchRoute
 from app.models.switch_credentials import SwitchCredentials, IPSwitchInfo
@@ -35,6 +36,95 @@ class IPManagerRepository(BaseRepository):
 
     def __init__(self, session=None):
         super().__init__(IPManager, session or db.session)
+
+    def list_unbound_by_ips(self, ips) -> List[IPManager]:
+        """取地址集合内**未分配给客户**且非 UNUSED 的 IP 行。
+
+        B-44 收敛（删除设备时的 IP 释放）：``customer_id IS NULL`` 是"池内
+        未分配"口径 —— 已分配给客户的 IP **不得**被设备删除顺手置回 UNUSED
+        （那会凭空制造可用地址）；``status != UNUSED`` 排除已是空闲的行。
+        """
+        return (
+            self.session.query(IPManager)
+            .filter(
+                IPManager.ip_address.in_(tuple(ips)),
+                IPManager.customer_id.is_(None),
+                IPManager.status != int(IPStatus.UNUSED),
+            )
+            .all()
+        )
+
+    def count_by_status_in_ip_range(
+        self, first_ip_int: int, last_ip_int: int,
+        customer_id: int, room_id: int,
+    ) -> List[tuple]:
+        """按状态统计某网段内该客户在该机房的 IP 数（去重 ip_address）。
+
+        B-44 收敛（customer_service 资产报告的 IP 状态分布）：返回
+        ``[(status, count), ...]`` —— 调用方只要统计行，行本身无意义。
+        """
+        rows = (
+            self.session.query(
+                IPManager.status,
+                func.count(func.distinct(IPManager.ip_address)).label("count"),
+            )
+            .filter(
+                IPManager.ip_int >= first_ip_int,
+                IPManager.ip_int <= last_ip_int,
+                IPManager.customer_id == customer_id,
+                IPManager.room_id == room_id,
+            )
+            .group_by(IPManager.status)
+            .all()
+        )
+        return [(r[0], r[1]) for r in rows]
+
+    def list_by_ip_room_pairs(self, ip_addrs, room_ids) -> List[IPManager]:
+        """按 (ip_address IN, room_id IN) 取 IP 行（B-44 收敛：封禁一致性对账）。
+
+        ⚠️ 双 IN 是**刻意的笛卡尔收缩**（原实现即如此）：调用方按
+        ``(ip_address, room_id)`` 二元组建映射，行多取了也只是被丢掉。
+        """
+        return (
+            self.session.query(IPManager)
+            .filter(
+                IPManager.ip_address.in_(tuple(ip_addrs)),
+                IPManager.room_id.in_(tuple(room_ids)),
+            )
+            .all()
+        )
+
+    def list_pending_status(self, room_id: Optional[int] = None) -> List[IPManager]:
+        """取处于**过渡态**（PENDING_BAN / PENDING_UNBAN）的 IP 行。
+
+        B-44 收敛（pending 超时对账：进程在阶段 1 commit 后、阶段 3 完成前
+        崩溃时会留下过渡态行）。``room_id`` 传 None = 全机房范围（原实现即如此）。
+        """
+        query = self.session.query(IPManager).filter(
+            IPManager.status.in_((IPStatus.PENDING_BAN, IPStatus.PENDING_UNBAN))
+        )
+        if room_id is not None:
+            query = query.filter(IPManager.room_id == room_id)
+        return query.all()
+
+    def list_by_room_ids_and_status(self, room_ids, statuses) -> List[IPManager]:
+        """取机房集合内指定状态的 IP（排除 ``ip_int IS NULL`` 的行）。
+
+        B-44 部署计划批：容量统计只认 UNUSED/INACTIVE；``ip_int`` 为 NULL 的行
+        无法参与排序/网段换算，原实现显式 ``isnot(None)``，此处保留。
+        """
+        ids = tuple(room_ids)
+        if not ids:
+            return []
+        return (
+            self.session.query(IPManager)
+            .filter(
+                IPManager.room_id.in_(ids),
+                IPManager.status.in_([int(s) for s in statuses]),
+                IPManager.ip_int.isnot(None),
+            )
+            .all()
+        )
 
     def get_by_ip_room(self, ip: str, room_id: int) -> Optional[IPManager]:
         """根据 IP + 机房ID 查询记录
@@ -412,7 +502,9 @@ class IPManagerRepository(BaseRepository):
     def _paginate(self, query, page: int, page_size: int):
         """通用分页：返回 (items, total_count, total_pages)"""
         total = query.count()
-        items = query.offset((page - 1) * page_size).limit(page_size).all()
+        offset = (page - 1) * page_size
+        ensure_offset_within_limit(offset)
+        items = query.offset(offset).limit(page_size).all()
         total_pages = (total + page_size - 1) // page_size if page_size else 0
         return items, total, total_pages
 
@@ -1157,7 +1249,9 @@ class IPManagerRepository(BaseRepository):
 
         total = query.count()
         total_pages = max(1, (total + page_size - 1) // page_size)
-        items = query.order_by(IPManager.ip_address).offset((page - 1) * page_size).limit(page_size).all()
+        offset = (page - 1) * page_size
+        ensure_offset_within_limit(offset)
+        items = query.order_by(IPManager.ip_address).offset(offset).limit(page_size).all()
 
         return {
             "data": items,
@@ -1380,6 +1474,15 @@ class IPSwitchInfoRepository(BaseRepository):
         return self._bulk_upsert(rows, ["mac_address", "switch_id", "port", "room_id"])
 
 
+    def delete_by_switch(self, switch_id: int) -> int:
+        """清空该交换机的 IP-交换机关联行（B-44 收敛：设备彻底删除的清理面）。"""
+        return (
+            self.session.query(IPSwitchInfo)
+            .filter_by(switch_id=switch_id)
+            .delete()
+        )
+
+
 class IPNetworkRepository(BaseRepository):
     """IPNetwork 数据访问层
 
@@ -1388,6 +1491,17 @@ class IPNetworkRepository(BaseRepository):
 
     def __init__(self, session=None):
         super().__init__(IPNetwork, session or db.session)
+
+    def list_by_room_ids(self, room_ids) -> List[IPNetwork]:
+        """取机房集合的全部网段（B-44 部署计划批：IP 容量统计的入口）。"""
+        ids = tuple(room_ids)
+        if not ids:
+            return []
+        return (
+            self.session.query(IPNetwork)
+            .filter(IPNetwork.room_id.in_(ids))
+            .all()
+        )
 
     def get_by_switch(self, switch_id: int, room_id: int) -> List[IPNetwork]:
         """查询指定交换机的所有路由
@@ -1400,6 +1514,34 @@ class IPNetworkRepository(BaseRepository):
             List[IPNetwork]: 路由记录列表
         """
         return self.find_all({"switch_id": switch_id, "room_id": room_id})
+
+    def find_longest_prefix_match_route(
+        self, room_id: int, ip_int: int,
+    ) -> Optional["SwitchRoute"]:
+        """取命中该 IP 的**最长前缀**路由（排除黑洞；B-44 扫尾批：封禁定位）。
+
+        ⚠️ 保留**原生 SQL**：``destination_int + POW(2, 32 - prefix) - 1``
+        的范围算术引用了表列，ORM filter 表达不了（原注释即如此），勿"顺手"
+        改写成 Python 侧过滤 —— 那会丢掉 ``ORDER BY prefix DESC LIMIT 1``
+        的数据库端裁剪。
+        """
+        row = self.session.execute(
+            text(
+                "SELECT id FROM switch_routes "
+                "WHERE room_id = :room_id "
+                "  AND route_type != :blackhole_type "
+                "  AND destination_int <= :ip_int "
+                "  AND :ip_int <= destination_int + POW(2, 32 - destination_prefix) - 1 "
+                "ORDER BY destination_prefix DESC LIMIT 1"
+            ),
+            {
+                "ip_int": ip_int, "room_id": room_id,
+                "blackhole_type": int(RouteNotes.BLACKHOLE),
+            },
+        ).first()
+        if row is None:
+            return None
+        return self.session.get(SwitchRoute, row[0])
 
     def get_blackhole_for_ip(
         self, ip_address: str, switch_id: int,
@@ -1623,11 +1765,30 @@ class IPNetworkRepository(BaseRepository):
         ).all()
 
 
+    def delete_routes_by_switch(self, switch_id: int) -> int:
+        """清空该交换机的全部路由行（B-44 收敛：设备彻底删除的清理面）。"""
+        return (
+            self.session.query(SwitchRoute)
+            .filter_by(switch_id=switch_id)
+            .delete()
+        )
+
+
 class IPBanRecordRepository(BaseRepository):
     """IPBanRecord 数据访问层
 
     提供封禁记录的查询、活跃封禁检测等方法。
     """
+
+    def delete_by_switch(self, switch_id: int) -> int:
+        """清空该交换机的封禁记录行（B-44 收敛：设备彻底删除的清理面）。"""
+        from app.models.ip_model import IPBanRecord
+
+        return (
+            self.session.query(IPBanRecord)
+            .filter_by(switch_id=switch_id)
+            .delete()
+        )
 
     def __init__(self, session=None):
         from app.models.ip_model import IPBanRecord

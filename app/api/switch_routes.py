@@ -89,8 +89,8 @@ def _notify_async_result(user_id, action_type, label, *, success, error="", devi
         device_label = ""
         if device_id:
             try:
-                from app.models.device import Device
-                dev = Device.query.get(device_id)
+                from app.persistence.device_repository import DeviceRepository
+                dev = DeviceRepository().find_by_id(device_id)
                 if dev and dev.management_ip:
                     device_label = dev.management_ip
                 else:

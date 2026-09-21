@@ -244,13 +244,14 @@ class ScanSchedulerService:
         return room_ids, vr_ids
 
     def _validate_scan_units(self, room_ids, vr_ids):
-        from app.models.room import Room
-        from app.models.virtual_room import VirtualRoom
+        from app.persistence.room_repository import RoomRepository
+        from app.persistence.virtual_room_repository import VirtualRoomRepository
+
         for rid in room_ids:
-            if not Room.query.filter_by(id=rid, deleted_at=None).first():
+            if not RoomRepository().exists_alive(rid):
                 logger.warning("配置的物理机房 ID=%s 不存在或已删除", rid)
         for vid in vr_ids:
-            if not VirtualRoom.query.filter_by(id=vid).first():
+            if not VirtualRoomRepository().exists_by_id(vid):
                 logger.warning("配置的虚拟机房 ID=%s 不存在", vid)
 
 

@@ -7,6 +7,8 @@
 """
 from app.utils.logging import get_logger
 import smtplib
+import socket
+import threading
 import html
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -23,6 +25,8 @@ SEVERITY_LABEL = {
     "warning": "警告",
     "critical": "严重",
 }
+
+_DEADLINE_MULTIPLIER = 3
 
 
 def get_mail_config_from_db() -> dict:
@@ -148,7 +152,7 @@ class EmailChannel(PersonalChannel):
 </body></html>"""
 
     def _send_smtp(self, msg: MIMEMultipart, cfg: dict) -> None:
-        """通过 SMTP 发送邮件
+        """通过 SMTP 发送邮件（B-41：整段会话受总 deadline 保护）
 
         支持三种连接模式：
         - SSL 直连（use_ssl=True）：端口 465，适用于腾讯企业邮等
@@ -157,6 +161,17 @@ class EmailChannel(PersonalChannel):
 
         使用上下文管理器确保连接在异常时也能正确关闭。
         """
+        self._send_smtp_with_deadline(msg, cfg)
+
+    @staticmethod
+    def _send_smtp_with_deadline(msg: MIMEMultipart, cfg: dict) -> None:
+        """SMTP 会话 + 总 deadline watchdog（B-41）。
+
+        `timeout` 参数只约束**单次 socket 操作**；watchdog 在总墙钟超过
+        `3×timeout` 后强制关闭 socket，把"慢而不死"服务器拖出的 7×timeout
+        会话压回 deadline。被中断的会话表现为 SMTPServerDisconnected
+        （SMTPException 子类）→ 调用方的**瞬时**分支 → B-39 重试。
+        """
         timeout = cfg.get("timeout", 10)
 
         if cfg.get("use_ssl"):
@@ -164,14 +179,48 @@ class EmailChannel(PersonalChannel):
         else:
             smtp_ctx = smtplib.SMTP(cfg["server"], cfg["port"], timeout=timeout)
 
-        with smtp_ctx as server:
-            if not cfg.get("use_ssl"):
-                server.ehlo()
-                if cfg.get("use_tls"):
-                    server.starttls()
+        watchdog = threading.Timer(
+            timeout * _DEADLINE_MULTIPLIER, _abort_smtp, args=(smtp_ctx,)
+        )
+        watchdog.daemon = True  # ⚠️ Timer 默认非 daemon：不设的话解释器退出会被它拖住最多一个 deadline
+        watchdog.start()
+        try:
+            with smtp_ctx as server:
+                if not cfg.get("use_ssl"):
                     server.ehlo()
+                    if cfg.get("use_tls"):
+                        server.starttls()
+                        server.ehlo()
 
-            if cfg.get("username") and cfg.get("password"):
-                server.login(cfg["username"], cfg["password"])
+                if cfg.get("username") and cfg.get("password"):
+                    server.login(cfg["username"], cfg["password"])
 
-            server.send_message(msg)
+                server.send_message(msg)
+        finally:
+            watchdog.cancel()  # 正常完成（或已异常退出）就撤销；到点竞态见 _abort_smtp 注释
+
+
+def _abort_smtp(smtp: smtplib.SMTP) -> None:
+    """watchdog 到点回调：强制关闭当前 socket，解开阻塞中的读。
+
+    两个承重细节：
+    ① **必须在触发时读 `smtp.sock`**——`starttls()` 会把 `sock` 替换为新的
+       SSLSocket（旧对象被 detach 成 fd=-1，关它等于 no-op）；构造 watchdog
+       时抓 socket 的话，TLS 路径下完全失效。
+    ② **先 shutdown(SHUT_RDWR) 再 close**——Linux 下只 close() 不保证唤醒
+       另一线程里阻塞中的 recv()（fd 已从任务侧解除关联但读仍挂在内核对象上），
+       shutdown 才会立刻以 EOF/错误返回 ⇒ smtplib 抛 SMTPServerDisconnected。
+    正常完成与 watchdog 到点之间的竞态是良性的：会话已成功时多关一个
+    即将关闭的 socket，无副作用（与"响应恰在自然超时后到达"的既有竞态同构）。
+    """
+    sock = getattr(smtp, "sock", None)
+    if sock is None:
+        return
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+    try:
+        sock.close()
+    except OSError:
+        pass

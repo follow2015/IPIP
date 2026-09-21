@@ -23,9 +23,15 @@ import re
 from typing import Any, Dict, List, Optional
 
 from extensions import db
-from sqlalchemy.orm import joinedload
 
 from app.utils.logging import get_logger
+
+from app.persistence.cabinet_repository import CabinetRepository
+from app.persistence.device_repository import DeviceRepository
+from app.persistence.ip_repositories import IPManagerRepository, IPNetworkRepository
+from app.persistence.room_repository import RoomRepository
+from app.persistence.switch_port_repository import NetworkPortRepository
+from app.persistence.virtual_room_repository import VirtualRoomRepository
 
 logger = get_logger(__name__)
 
@@ -145,15 +151,11 @@ def _cabinet_existing_devices(cabinet) -> List[Dict[str, Any]]:
 def _room_u_capacity(room_id: int, u_height: int) -> tuple:
     """机房 U 位容量：[(cabinet, fits, existing_devices), ...]，按编号排序。"""
     from app.core.enums import CabinetStatus
-    from app.models.cabinet import Cabinet
 
-    cabinets = (
-        Cabinet.query.filter(
-            Cabinet.room_id == room_id,
-            Cabinet.status.in_([int(CabinetStatus.AVAILABLE), int(CabinetStatus.IN_USE)]),
-        )
-        .order_by(Cabinet.cabinet_number)
-        .all()
+    from app.persistence.cabinet_repository import CabinetRepository
+
+    cabinets = CabinetRepository().list_by_room_and_status(
+        room_id, [CabinetStatus.AVAILABLE, CabinetStatus.IN_USE]
     )
     out = []
     for cab in cabinets:
@@ -191,34 +193,21 @@ def _collect_room_ports(room_id: int, speed_mbps: int, visible_switch_ids=None) 
          "virtual": int, "below": {label: cnt}, "unknown_speed": {label: cnt},
          "switches": {...}}
     """
-    from app.models.device import Device
-    from app.models.network_port import NetworkPort
     from app.core.enums import CabinetStatus
-    from app.models.cabinet import Cabinet
+
+    from app.persistence.cabinet_repository import CabinetRepository
 
     cabinet_room = {
         c.id: c.room_id
-        for c in Cabinet.query.filter(
-            Cabinet.room_id == room_id,
-            Cabinet.status.in_([int(CabinetStatus.AVAILABLE), int(CabinetStatus.IN_USE)]),
-        ).all()
+        for c in CabinetRepository().list_by_room_and_status(
+            room_id, [CabinetStatus.AVAILABLE, CabinetStatus.IN_USE]
+        )
     }
     cab_ids = list(cabinet_room.keys())
 
-    rows = (
-        NetworkPort.query
-        .join(Device, NetworkPort.device_id == Device.id)
-        .filter(
-            Device.device_type == "network",
-            Device.device_subtype == "switch",
-            Device.deleted_at.is_(None),
-            Device.cabinet_id.in_(cab_ids),          # 机房过滤下推：只取本机房机柜上的端口
-            NetworkPort.usage_status == "free",
-            NetworkPort.lag_group_id.is_(None),
-        )
-        .options(joinedload(NetworkPort.device))      # 消除循环里逐端口懒加载 device 的 N+1
-        .all()
-    )
+    from app.persistence.switch_port_repository import NetworkPortRepository
+
+    rows = NetworkPortRepository().list_free_switch_ports_in_cabinets(cab_ids)
 
     access: list = []
     core: list = []
@@ -286,7 +275,6 @@ def _switch_distribution(ports: Dict[str, Any]) -> List[Dict[str, Any]]:
     只报总数会让用户无法判断布线可行性（端口可能集中在某台远机柜交换机上），
     因此 Top 维度必须落到交换机。
     """
-    from app.models.cabinet import Cabinet
 
     counter: Dict[int, Dict[str, Any]] = {}
     for port, sw in list(ports["access"]) + list(ports["core"]):
@@ -309,7 +297,7 @@ def _switch_distribution(ports: Dict[str, Any]) -> List[Dict[str, Any]]:
     if cab_ids:
         numbers = {
             c.id: c.cabinet_number
-            for c in Cabinet.query.filter(Cabinet.id.in_(list(cab_ids))).all()
+            for c in CabinetRepository().find_by_ids(list(cab_ids))
         }
     for item in counter.values():
         item["cabinet_number"] = numbers.get(item["cabinet_id"])
@@ -360,42 +348,22 @@ def _l2_room_ids(room_id: int, visible_switch_ids=None) -> Dict[str, Any]:
         {"room_ids": set, "room_names": [...], "virtual_room_names": [...],
          "scope": "virtual_room" | "room"}
     """
-    from app.models.cabinet import Cabinet
-    from app.models.device import Device
-    from app.models.room import Room
-    from app.models.virtual_room import VirtualRoomMember
-    from app.persistence.virtual_room_repository import VirtualRoomRepository
 
     fallback = {
         "room_ids": {room_id}, "room_names": [], "virtual_room_names": [],
         "scope": "room",
     }
-    cab_ids = [
-        r[0] for r in db.session.query(Cabinet.id).filter(
-            Cabinet.room_id == room_id
-        ).all()
-    ]
+    cab_ids = [c.id for c in CabinetRepository().find_by_room_id(room_id)]
     if not cab_ids:
         return fallback
-    switch_ids = [
-        r[0] for r in db.session.query(Device.id).filter(
-            Device.cabinet_id.in_(cab_ids),
-            Device.device_type == "network",
-            Device.device_subtype == "switch",
-            Device.deleted_at.is_(None),
-        ).all()
-    ]
+    switch_ids = DeviceRepository().list_switch_ids_by_cabinet_ids(cab_ids)
     if visible_switch_ids is not None:
         visible = set(visible_switch_ids)
         switch_ids = [sid for sid in switch_ids if sid in visible]
     if not switch_ids:
         return fallback
 
-    vr_ids = [
-        r[0] for r in db.session.query(VirtualRoomMember.virtual_room_id)
-        .filter(VirtualRoomMember.device_id.in_(switch_ids))
-        .distinct().all()
-    ]
+    vr_ids = VirtualRoomRepository().list_virtual_room_ids_by_device_ids(switch_ids)
     if not vr_ids:
         return fallback  # 本机房交换机未加入任何虚拟机房 → 保守按本机房计
 
@@ -409,21 +377,17 @@ def _l2_room_ids(room_id: int, visible_switch_ids=None) -> Dict[str, Any]:
             vr_names.append(vr.name)
 
     if visible_switch_ids is not None:
-        visible_rooms = {
-            row[0] for row in (
-                db.session.query(Cabinet.room_id)
-                .join(Device, Device.cabinet_id == Cabinet.id)
-                .filter(Device.id.in_(sorted(set(visible_switch_ids))))
-                .distinct().all()
+        visible_rooms = set(
+            CabinetRepository().list_room_ids_by_device_ids(
+                sorted(set(visible_switch_ids))
             )
-            if row[0] is not None
-        }
+        )
         room_ids &= visible_rooms
 
     names = [
-        r[1] for r in db.session.query(Room.id, Room.name)
-        .filter(Room.id.in_(sorted(room_ids)))
-        .order_by(Room.id).all()
+        r.name for r in sorted(
+            RoomRepository().find_by_ids(sorted(room_ids)), key=lambda r: r.id
+        )
     ]
     return {
         "room_ids": room_ids,
@@ -451,16 +415,14 @@ def _collect_ip_candidates(room_ids, primary_room_id=None, visible_switch_ids=No
     import bisect
 
     from app.core.enums import IPStatus
-    from app.models.ip_model import IPManager, ip_to_int
-    from app.models.room import Room
-    from app.models.switch_route import IPNetwork
+    from app.models.ip_model import ip_to_int
 
     room_ids = sorted(set(int(r) for r in room_ids if r is not None))
     if not room_ids:
         return [], {"usable": 0, "registered": 0,
                     "usable_local": 0, "registered_local": 0}
 
-    subnets = IPNetwork.query.filter(IPNetwork.room_id.in_(room_ids)).all()
+    subnets = IPNetworkRepository().list_by_room_ids(room_ids)
     if visible_switch_ids is not None:
         visible = set(visible_switch_ids)
         subnets = [s for s in subnets if s.switch_id in visible]
@@ -469,18 +431,8 @@ def _collect_ip_candidates(room_ids, primary_room_id=None, visible_switch_ids=No
                     "usable_local": 0, "registered_local": 0}
 
     wanted_status = (int(IPStatus.UNUSED), int(IPStatus.INACTIVE))
-    rows = (
-        IPManager.query
-        .filter(
-            IPManager.room_id.in_(room_ids),
-            IPManager.status.in_(wanted_status),
-            IPManager.ip_int.isnot(None),
-        )
-        .all()
-    )
-    room_names = {
-        r.id: r.name for r in Room.query.filter(Room.id.in_(room_ids)).all()
-    }
+    rows = IPManagerRepository().list_by_room_ids_and_status(room_ids, wanted_status)
+    room_names = {r.id: r.name for r in RoomRepository().find_by_ids(room_ids)}
     rows.sort(key=lambda r: r.ip_int)
     ints = [r.ip_int for r in rows]
 
@@ -616,7 +568,6 @@ def _ip_reference(primary_room_id: int, l2: Dict[str, Any],
 def _uplink_info(switch_ids: List[int]) -> List[Dict[str, Any]]:
     """批内交换机的上行出口信息（容量未登记 → 上层据此 warning）。"""
     from app.models.device import Device
-    from app.models.network_port import NetworkPort
 
     out = []
     for sid in switch_ids:
@@ -626,7 +577,7 @@ def _uplink_info(switch_ids: List[int]) -> List[Dict[str, Any]]:
         if ext and ext.uplink_port_ids:
             uplink_ports = [
                 p.port_name
-                for p in NetworkPort.query.filter(NetworkPort.id.in_(list(ext.uplink_port_ids))).all()
+                for p in NetworkPortRepository().find_by_ids(list(ext.uplink_port_ids))
             ]
         out.append({
             "switch_id": sid,
@@ -911,14 +862,14 @@ def build_plan(
     u_height = max(1, int(u_height or 2))
     power_per_unit = max(1, int(power_per_unit or 750))
 
-    from app.models.room import Room
 
     if room_id is not None:
-        rooms = Room.query.filter_by(id=room_id).all()
+        room = RoomRepository().find_by_id(room_id)
+        rooms = [room] if room else []
         if not rooms:
             raise DeploymentPlanError(f"机房不存在: {room_id}")
     else:
-        rooms = Room.query.order_by(Room.id).all()
+        rooms = RoomRepository().list_all_ordered_by_id()
         if not rooms:
             raise DeploymentPlanError("系统中无机房数据")
 

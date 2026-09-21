@@ -11,6 +11,7 @@ from app.utils.time_utils import now_utc_naive
 from sqlalchemy import not_, exists
 
 from app.persistence.base import BaseRepository
+from app.core.pagination_limits import ensure_offset_within_limit
 from app.models.notification import Notification, NotificationReceipt
 from extensions import db
 
@@ -39,6 +40,32 @@ class NotificationRepository(BaseRepository):
             Notification.created_at < cutoff,
             not_(exists(subq)),
         ).delete(synchronize_session=False)
+
+    def find_recent_receipts_with_notification_id(
+        self, cutoff, limit: int,
+    ) -> List[Tuple[NotificationReceipt, int]]:
+        """查询近期通知的回执（含通知 id），供启动回补扫描待重投任务（B-42①）
+
+        原 ``recover_pending_deliveries`` 里的裸 ``db.session.query`` 收敛至此。
+        多实体 join 用不了 ``_base_query()``（它只建单模型查询）；若 Notification
+        将来开启软删除，软删过滤的**唯一修正面在本仓储目录**（B-42 的核心动机：
+        把分叉从"app 全域"压缩到"persistence 一个目录"）。
+
+        Args:
+            cutoff: datetime，只看 created_at 晚于它的通知
+            limit: 行数上限
+
+        Returns:
+            List[Tuple[NotificationReceipt, int]]: (回执, 通知 id)，通知 id 倒序
+        """
+        return (
+            self.session.query(NotificationReceipt, Notification.id)
+            .join(Notification, Notification.id == NotificationReceipt.notification_id)
+            .filter(Notification.created_at >= cutoff)
+            .order_by(Notification.id.desc())
+            .limit(limit)
+            .all()
+        )
 
 
 class NotificationReceiptRepository(BaseRepository):
@@ -97,7 +124,9 @@ class NotificationReceiptRepository(BaseRepository):
             Notification.created_at.desc(),
         )
         total = query.count()
-        items = query.offset((page - 1) * per_page).limit(per_page).all()
+        offset = (page - 1) * per_page
+        ensure_offset_within_limit(offset)
+        items = query.offset(offset).limit(per_page).all()
         return items, total
 
     def mark_read(self, user_id: int) -> int:
@@ -166,6 +195,29 @@ class NotificationReceiptRepository(BaseRepository):
         return self.session.query(NotificationReceipt).filter_by(
             user_id=user_id, notification_id=notification_id,
         ).first()
+
+    def find_by_notification_and_users(
+        self, notification_id: int, user_ids: List[int],
+    ) -> List[NotificationReceipt]:
+        """批量查询一条通知下指定用户的回执（投递 worker 的预取入口，B-42①）
+
+        走 ``_base_query()`` 而非裸 ``self.session.query``：与 find_by_id(s) 一致地
+        享受软删除过滤 —— B-42 的教训是"仓储与裸 query 语义分叉"（前者过滤软删、
+        后者不过滤），新增方法必须站在过滤的一侧。
+
+        Args:
+            notification_id: 通知 ID
+            user_ids: 用户 ID 列表（可能为空）
+
+        Returns:
+            List[NotificationReceipt]（同键多行时顺序不确定，调用方按 user_id 建索引用）
+        """
+        if not user_ids:
+            return []
+        return self._base_query().filter(
+            NotificationReceipt.notification_id == notification_id,
+            NotificationReceipt.user_id.in_(user_ids),
+        ).all()
 
     def delete_read_acked_before(self, cutoff) -> int:
         """删除早于 cutoff 的已读且已确认回执

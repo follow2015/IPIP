@@ -5,11 +5,17 @@
 ;   python run_monitor_service.py
 ;
 ; 说明：
-; - 本服务通过 Redis 锁 monitor:lock:<loop> 与 in-Flask worker 互斥（见
-;   app/services/monitoring/standalone_service.py），因此即便与其它实例
-;   并存也不会双跑，但会浪费资源——生产仍应由本 unit 独占。
+; - 本服务是**唯一**的采集者：web / celery 单元均已声明
+;   Environment=MONITOR_WORKER_IN_PROCESS=false（见各单元内注释）。
+; - 与任何仍在跑的 in-Flask worker 之间有两重协调（见 standalone_service.py）：
+;   ① Redis 锁 monitor:lock:<loop> —— 保证**互斥**（不会同时跑）；
+;   ② 最小间隔闸门 monitor:rate:<loop> —— 保证**频率**（同 loop 全部实例共享
+;      一个 interval 配额）。只靠①时聚合频率会被实例数放大（实测 60 s → 18.9 s）。
 ; - MONITOR_ENABLED 由 unit 自身控制：不需要此服务时执行
 ;   systemctl disable --now ipip-monitor.service，而不是靠环境变量跳过。
+;   ⚠️ 但只有在 web/celery 里把 MONITOR_WORKER_IN_PROCESS 打开的前提下，
+;      停掉本服务才仍然有人采集 —— 否则会变成"没人采"。见 ipip.target 门禁
+;      （tests/test_monitor_inprocess_deploy_gate.py）。
 
 [Unit]
 Description=IPIP device monitor collector

@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Tabs, Tag, Space } from 'antd';
 import DataTable from '@/components/DataTable';
+import { serverPagination } from '@/components/DataTable/serverPagination';
 import { UserOutlined, LockOutlined, HistoryOutlined, SaveOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/auth';
 import {
@@ -342,17 +343,15 @@ function ProfilePage() {
                   dataSource={loginLogsData?.items ?? []}
                   loading={logsLoading}
                   rowKey="id"
-                  pagination={{
-                    total: loginLogsData?.total ?? 0,
-                    pageSize: logPageSize,
+                  pagination={serverPagination({
                     current: logPage,
-                    showTotal: (t) => `共 ${t} 条`,
-                    showSizeChanger: true,
+                    pageSize: logPageSize,
+                    total: loginLogsData?.total ?? 0,
                     onChange: (p, ps) => {
                       setLogPage(p);
                       setLogPageSize(ps);
                     }
-                  }}
+                  })}
                   size="small"
                   scroll={{ x: 'max-content' }}
                   showCard={false}

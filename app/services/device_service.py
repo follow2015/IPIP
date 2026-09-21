@@ -163,14 +163,13 @@ class DeviceService:
         """
         if not brand:
             return
-        from app.models.monitor_vendor_brand import MonitorVendorBrand
-        q = self.session.query(MonitorVendorBrand).filter(
-            MonitorVendorBrand.enterprise_no == str(brand),
-            MonitorVendorBrand.enabled.is_(True),
+        from app.persistence.monitor_vendor_brand_repository import (
+            MonitorVendorBrandRepository,
         )
-        if device_type:
-            q = q.filter(MonitorVendorBrand.device_type == device_type)
-        if q.first() is None:
+
+        if not MonitorVendorBrandRepository(self.session).exists_enabled(
+            str(brand), device_type,
+        ):
             raise ValidationError(
                 f"厂商标识 {brand!r} 不在厂商品牌库中"
                 + (f"（device_type={device_type}）" if device_type else "")
@@ -296,6 +295,46 @@ class DeviceService:
             page=page,
             page_size=page_size,
             has_ssh=has_ssh,
+        )
+
+    def list_devices_keyset(
+        self,
+        cabinet_id: int = None,
+        customer_id: int = None,
+        device_id: int = None,
+        room_id: int = None,
+        parent_device_id: int = None,
+        is_chassis: int = None,
+        device_type: str = None,
+        device_subtype: str = None,
+        has_ssh: bool = None,
+        after_name: str = None,
+        after_id: int = None,
+        limit: int = 5000,
+    ) -> List[Any]:
+        """按 ``(device_name, id)`` 游标取一页设备（全量遍历用，不做 COUNT / OFFSET）。
+
+        面向"必须遍历全表"的场景（如导出）：翻页代价与页号无关，且遍历期间有并发写入
+        也不会漏行/重复行。列表类接口仍走 :meth:`get_all_devices`（需要 total 供 UI 显示
+        总页数）。游标语义与注意事项见
+        :meth:`app.persistence.device_repository.DeviceRepository.list_devices_keyset`。
+
+        Returns:
+            ORM 设备对象列表（升序）；导出等调用方自行序列化，以便从末条安全取游标值。
+        """
+        return self.device_repository.list_devices_keyset(
+            cabinet_id=cabinet_id,
+            customer_id=customer_id,
+            device_id=device_id,
+            room_id=room_id,
+            parent_device_id=parent_device_id,
+            is_chassis=is_chassis,
+            device_type=device_type,
+            device_subtype=device_subtype,
+            has_ssh=has_ssh,
+            after_name=after_name,
+            after_id=after_id,
+            limit=limit,
         )
 
     def search_devices(
@@ -739,7 +778,11 @@ class DeviceService:
 
         session = self.session
 
-        child_exts = session.query(DeviceServerExt).filter_by(parent_device_id=device_id).all()
+        from app.persistence.device_server_ext_repository import (
+            DeviceServerExtRepository,
+        )
+
+        child_exts = DeviceServerExtRepository(session).list_by_parent_device(device_id)
         children = [ext.device for ext in child_exts if ext.device and ext.device.deleted_at is None]
         if children:
             self._save_children_location_to_chassis_config(device_id, children)
@@ -820,29 +863,25 @@ class DeviceService:
         """
         from app.core.enums import IPStatus
         from app.models.device import Device
-        from app.models.ip_model import IPManager
-        from app.models.switch_credentials import SwitchPortIP
 
-        device = session.query(Device).filter(Device.id == device_id).first()
+        device = DeviceRepository(session).find_by_id_including_deleted(device_id)
         raw_ips = set()
         if device and device.management_ip:
             raw_ips.add(device.management_ip)
-        for (ip,) in session.query(SwitchPortIP.ip_address).filter(
-            SwitchPortIP.device_id == device_id
-        ).all():
-            if ip:
-                raw_ips.add(ip)
+        from app.persistence.switch_port_repository import NetworkPortRepository
+
+        raw_ips.update(
+            ip for ip in NetworkPortRepository(session).list_switch_port_ips(device_id) if ip
+        )
 
         ips = {str(ip).split("/")[0].strip() for ip in raw_ips if str(ip).strip()}
         ips.discard("")
         if not ips:
             return 0
 
-        rows = session.query(IPManager).filter(
-            IPManager.ip_address.in_(sorted(ips)),
-            IPManager.customer_id.is_(None),
-            IPManager.status != int(IPStatus.UNUSED),
-        ).all()
+        from app.persistence.ip_repositories import IPManagerRepository
+
+        rows = IPManagerRepository(session).list_unbound_by_ips(sorted(ips))
 
         for ip in sorted(ips):
             matched = [r for r in rows if str(r.ip_address) == ip]
@@ -876,18 +915,23 @@ class DeviceService:
         注意：DeviceHardware / DeviceServerExt 依赖 Device relationship 的
         cascade="all, delete-orphan" 自动清理，无需手动删除。
         """
-        from app.models.switch_credentials import (
-            SwitchCredentials, SwitchStatusCache, SwitchPortIP, IPSwitchInfo,
+        from app.persistence.switch_port_repository import NetworkPortRepository
+        from app.persistence.ip_repositories import (
+            IPBanRecordRepository,
+            IPNetworkRepository,
+            IPSwitchInfoRepository,
         )
-        from app.models.switch_route import SwitchRoute
-        from app.models.ip_model import IPBanRecord
+        from app.persistence.switch_ext_repository import SwitchExtRepository
+        from app.persistence.switch_status_cache_repository import (
+            SwitchStatusCacheRepository,
+        )
 
-        session.query(SwitchPortIP).filter_by(device_id=device_id).delete()
-        session.query(IPSwitchInfo).filter_by(switch_id=device_id).delete()
-        session.query(SwitchStatusCache).filter_by(device_id=device_id).delete()
-        session.query(SwitchCredentials).filter_by(device_id=device_id).delete()
-        session.query(SwitchRoute).filter_by(switch_id=device_id).delete()
-        session.query(IPBanRecord).filter_by(switch_id=device_id).delete()
+        NetworkPortRepository(session).delete_switch_port_ips(device_id)
+        IPSwitchInfoRepository(session).delete_by_switch(device_id)
+        SwitchStatusCacheRepository(session).delete_by_device(device_id)
+        SwitchExtRepository(session).delete_by_device(device_id)
+        IPNetworkRepository(session).delete_routes_by_switch(device_id)
+        IPBanRecordRepository(session).delete_by_switch(device_id)
 
     @staticmethod
     def _delete_monitor_related(session, device_id: int, purge: bool = False) -> int:
@@ -926,17 +970,27 @@ class DeviceService:
         按 device_id 逐行 DELETE 要跨全部分区、把删除事务拖长，与分区设计相悖。
         台账与理由见门禁的 ``SOFT_REF_ACCEPTED``。
         """
-        from app.models.device_monitor_status import DeviceMonitorStatus
-        from app.models.device_metric_alert_state import DeviceMetricAlertState
-        from app.models.monitor_alert_outbox import MonitorAlertOutbox
-        from app.models.monitor_credential import DeviceMonitorCredential
-        from app.models.device_monitor_timeseries_hourly import DeviceMonitorTimeseriesHourly
+        from app.persistence.device_metric_alert_state_repository import (
+            DeviceMetricAlertStateRepository,
+        )
+        from app.persistence.device_monitor_status_repository import (
+            DeviceMonitorStatusRepository,
+        )
+        from app.persistence.monitor_alert_outbox_repository import (
+            MonitorAlertOutboxRepository,
+        )
+        from app.persistence.monitor_credential_repository import (
+            MonitorCredentialRepository,
+        )
+        from app.persistence.monitor_timeseries_repository import (
+            MonitorTimeseriesRepository,
+        )
 
-        session.query(DeviceMonitorStatus).filter_by(device_id=device_id).delete()
-        session.query(DeviceMetricAlertState).filter_by(device_id=device_id).delete()
-        session.query(MonitorAlertOutbox).filter_by(device_id=device_id).delete()
-        session.query(DeviceMonitorCredential).filter_by(device_id=device_id).delete()
-        session.query(DeviceMonitorTimeseriesHourly).filter_by(device_id=device_id).delete()
+        DeviceMonitorStatusRepository(session).delete_by_device(device_id)
+        DeviceMetricAlertStateRepository(session).delete_by_device(device_id)
+        MonitorAlertOutboxRepository(session).delete_by_device(device_id)
+        MonitorCredentialRepository(session).delete_device_links(device_id)
+        MonitorTimeseriesRepository(session).delete_hourly_by_device(device_id)
 
         if purge:
             return DeviceService._dispose_monitor_trace(session, device_id)
@@ -955,52 +1009,22 @@ class DeviceService:
           名字用同一个快照值，无需另查其他设备。
         """
         from app.models.device import Device
-        from app.models.monitor_incident import MonitorIncident
-        from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
-        from app.models.ai_diagnosis_session import AIDiagnosisSession
 
-        device = session.query(Device).filter(Device.id == device_id).first()
+        device = DeviceRepository(session).find_by_id_including_deleted(device_id)
         name = getattr(device, "device_name", None) if device else None
 
-        n1 = session.query(MonitorIncident).filter(
-            MonitorIncident.root_device_id == device_id,
-        ).update(
-            {
-                MonitorIncident.root_device_name: name,
-                MonitorIncident.root_device_id: None,
-            },
-            synchronize_session=False,
+        from app.persistence.ai_diagnosis_session_repository import (
+            AIDiagnosisSessionRepository,
+        )
+        from app.persistence.monitor_incident_repository import IncidentRepository
+        from app.persistence.monitor_suppressed_alert_log_repository import (
+            SuppressedAlertLogRepository,
         )
 
-        n2 = session.query(MonitorSuppressedAlertLog).filter(
-            MonitorSuppressedAlertLog.device_id == device_id,
-        ).update(
-            {
-                MonitorSuppressedAlertLog.device_name: name,
-                MonitorSuppressedAlertLog.device_id: None,
-            },
-            synchronize_session=False,
-        )
-
-        n3 = session.query(MonitorSuppressedAlertLog).filter(
-            MonitorSuppressedAlertLog.upstream_device_id == device_id,
-        ).update(
-            {
-                MonitorSuppressedAlertLog.upstream_device_name: name,
-                MonitorSuppressedAlertLog.upstream_device_id: None,
-            },
-            synchronize_session=False,
-        )
-
-        n4 = session.query(AIDiagnosisSession).filter(
-            AIDiagnosisSession.device_id == device_id,
-        ).update(
-            {
-                AIDiagnosisSession.device_name: name,
-                AIDiagnosisSession.device_id: None,
-            },
-            synchronize_session=False,
-        )
+        n1 = IncidentRepository(session).snapshot_root_trace(device_id, name)
+        n2 = SuppressedAlertLogRepository(session).snapshot_device_trace(device_id, name)
+        n3 = SuppressedAlertLogRepository(session).snapshot_upstream_trace(device_id, name)
+        n4 = AIDiagnosisSessionRepository(session).snapshot_device_trace(device_id, name)
 
         session.flush()
         return sum(n or 0 for n in (n1, n2, n3, n4))
@@ -1027,10 +1051,8 @@ class DeviceService:
         from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
         from app.models.ai_diagnosis_session import AIDiagnosisSession
 
-        id_name = dict(
-            session.query(Device.id, Device.device_name)
-            .filter(Device.id.in_(device_ids))
-            .all()
+        id_name = DeviceRepository(session).find_id_name_map(
+            device_ids, include_deleted=True,
         )
         rows = [{"_device_id": did, "_device_name": id_name.get(did)} for did in device_ids]
 
@@ -1316,11 +1338,13 @@ class DeviceService:
             if device.device_type != "network":
                 non_network += 1
                 continue
-            ext = (
-                self.device_repository.session.query(DeviceSwitchExt)
-                .filter_by(device_id=did)
-                .first()
+            from app.persistence.device_switch_ext_repository import (
+                DeviceSwitchExtRepository,
             )
+
+            ext = DeviceSwitchExtRepository(
+                session=self.device_repository.session
+            ).find_by_device_id(did)
             if ext is None:
                 ext = DeviceSwitchExt(device_id=did)
                 self.device_repository.session.add(ext)
@@ -1874,23 +1898,36 @@ class DeviceService:
         if overwrite:
             old_nodes = self.device_repository.find_child_devices(chassis.id)
             for old_node in old_nodes:
-                from app.models.device_hardware import DeviceHardware
-                from app.models.device_server_ext import DeviceServerExt
-                from app.persistence.device_nics_port_repository import DeviceNicsPortRepository
-                from app.persistence.device_storage_repository import DeviceStorageRepository
+                from app.persistence.device_hardware_repository import (
+                    DeviceHardwareRepository,
+                )
+                from app.persistence.device_nics_port_repository import (
+                    DeviceNicsPortRepository,
+                )
+                from app.persistence.device_server_ext_repository import (
+                    DeviceServerExtRepository,
+                )
+                from app.persistence.device_storage_repository import (
+                    DeviceStorageRepository,
+                )
+
                 DeviceNicsPortRepository(self.session).delete_device_ports(old_node.id)
                 DeviceStorageRepository(self.session).delete_by_device(old_node.id)
-                self.session.query(DeviceHardware).filter_by(device_id=old_node.id).delete()
-                self.session.query(DeviceServerExt).filter_by(device_id=old_node.id).delete()
+                DeviceHardwareRepository(self.session).delete_by_device(old_node.id)
+                DeviceServerExtRepository(self.session).delete_by_device(old_node.id)
                 self.session.delete(old_node)
             self.session.flush()
             existing_positions = set()
         else:
-            existing_positions = set(
-                ext.node_position
-                for ext in self.session.query(DeviceServerExt).filter_by(parent_device_id=chassis.id).all()
-                if ext.node_position
+            from app.persistence.device_server_ext_repository import (
+                DeviceServerExtRepository,
             )
+
+            existing_positions = {
+                pos
+                for pos in DeviceServerExtRepository(self.session).list_node_positions(chassis.id)
+                if pos
+            }
 
         if hw_fields:
             hw_fields = dict(hw_fields)  # 避免原地修改调用方的数据
@@ -2038,10 +2075,10 @@ class DeviceService:
         now = now_utc_naive()
         nic_num = 1
 
+        from app.persistence.device_nics_port_repository import DeviceNicsPortRepository
+
         existing_keys = set(
-            self.session.query(DeviceNicsPort.nic_number, DeviceNicsPort.port_number)
-            .filter(DeviceNicsPort.device_id == device_id)
-            .all()
+            DeviceNicsPortRepository(self.session).list_port_keys(device_id)
         )
 
         for item in ports:
@@ -2132,8 +2169,6 @@ class DeviceService:
         这些信息在设备恢复或审计查询时可以使用。
         """
         from app.models.device_hardware import DeviceHardware
-        from app.models.device_nics_port import DeviceNicsPort
-        from app.models.device_storage import DeviceStorage
 
         location_snapshot = {
             "cabinet_id": device.cabinet_id,
@@ -2151,7 +2186,9 @@ class DeviceService:
             location_snapshot["node_row"] = se.node_row
             location_snapshot["node_col"] = se.node_col
 
-        nics_ports = self.session.query(DeviceNicsPort).filter_by(device_id=device.id).all()
+        from app.persistence.device_nics_port_repository import DeviceNicsPortRepository
+
+        nics_ports = DeviceNicsPortRepository(self.session).find_ports_by_device_orm(device.id)
         nics_snapshot = []
         for np in nics_ports:
             nics_snapshot.append({
@@ -2166,7 +2203,9 @@ class DeviceService:
                 "template_id": np.template_id,
             })
 
-        storages = self.session.query(DeviceStorage).filter_by(device_id=device.id).all()
+        from app.persistence.device_storage_repository import DeviceStorageRepository
+
+        storages = DeviceStorageRepository(self.session).find_by_device(device.id)
         storage_snapshot = []
         for st in storages:
             storage_snapshot.append({
@@ -2221,8 +2260,8 @@ class DeviceService:
         """
         from app.models.device import Device
         from app.models.device_hardware import DeviceHardware
-        from app.models.device_nics_port import DeviceNicsPort
-        from app.models.device_storage import DeviceStorage
+        from app.persistence.device_nics_port_repository import DeviceNicsPortRepository
+        from app.persistence.device_storage_repository import DeviceStorageRepository
 
         children_snapshot = []
         for child in children:
@@ -2253,7 +2292,7 @@ class DeviceService:
                         "port_status": p.port_status, "template_id": p.template_id,
                         "description": p.description,
                     }
-                    for p in self.session.query(DeviceNicsPort).filter_by(device_id=child.id).all()
+                    for p in DeviceNicsPortRepository(self.session).find_ports_by_device_orm(child.id)
                 ],
                 "storage": [
                     {
@@ -2263,7 +2302,7 @@ class DeviceService:
                         "slot_number": s.slot_number, "template_id": s.template_id,
                         "serial_number": s.serial_number,
                     }
-                    for s in self.session.query(DeviceStorage).filter_by(device_id=child.id).all()
+                    for s in DeviceStorageRepository(self.session).find_by_device(child.id)
                 ],
             }
             children_snapshot.append(snapshot)
@@ -2354,8 +2393,9 @@ class DeviceService:
             raise ValidationError("子节点设备只能恢复到原机箱，不能指定其他机柜")
 
         if cabinet_id is not None:
-            from app.models.cabinet import Cabinet
-            if session.query(Cabinet.id).filter(Cabinet.id == cabinet_id).first() is None:
+            from app.persistence.cabinet_repository import CabinetRepository
+
+            if not CabinetRepository(session).exists_by_id(cabinet_id):
                 raise ValidationError(f"机柜不存在 (ID: {cabinet_id})，无法恢复")
             target_cabinet_id = cabinet_id
             if u_position is not None:
@@ -2378,8 +2418,9 @@ class DeviceService:
         location_conflict = False
         conflict_devices = []
         if cabinet_id is None and target_cabinet_id and target_u_position:
-            from app.models.cabinet import Cabinet
-            cabinet = session.query(Cabinet).filter(Cabinet.id == target_cabinet_id).first()
+            from app.persistence.cabinet_repository import CabinetRepository
+
+            cabinet = CabinetRepository(session).find_by_id(target_cabinet_id)
             if cabinet is None:
                 raise ValidationError(
                     f"原机柜已不存在 (ID: {target_cabinet_id})，无法恢复到原位置，"
@@ -2474,13 +2515,18 @@ class DeviceService:
                 if hardware and hardware.device_config:
                     from app.models.device_nics_port import DeviceNicsPort
                     from app.models.device_storage import DeviceStorage
+                    from app.persistence.device_nics_port_repository import (
+                        DeviceNicsPortRepository,
+                    )
+                    from app.persistence.device_storage_repository import (
+                        DeviceStorageRepository,
+                    )
 
                     nics_snap = hardware.device_config.get("deleted_nics_snapshot", [])
                     for ns in nics_snap:
-                        existing = self.session.query(DeviceNicsPort).filter_by(
-                            device_id=device_id, nic_number=ns.get("nic_number"),
-                            port_number=ns.get("port_number")
-                        ).first()
+                        existing = DeviceNicsPortRepository(self.session).find_port_by_nic_port_orm(
+                            device_id, ns.get("nic_number"), ns.get("port_number"),
+                        )
                         if not existing:
                             nic_port = DeviceNicsPort(
                                 device_id=device_id,
@@ -2499,9 +2545,9 @@ class DeviceService:
                     for ss in storage_snap:
                         existing = None
                         if ss.get("serial_number"):
-                            existing = self.session.query(DeviceStorage).filter_by(
-                                serial_number=ss["serial_number"]
-                            ).first()
+                            existing = DeviceStorageRepository(self.session).serial_number_exists(
+                                ss["serial_number"]
+                            )
                         if not existing:
                             storage = DeviceStorage(
                                 device_id=device_id,
@@ -2574,7 +2620,7 @@ class DeviceService:
         from app.models.device import Device
 
         session = self.session
-        device = session.query(Device).filter(Device.id == device_id).first()
+        device = self.device_repository.find_by_id_including_deleted(device_id)
         if not device:
             raise ValidationError("设备不存在")
         if device.deleted_at is None:
@@ -2691,7 +2737,7 @@ class DeviceService:
         try:
             with self.session.begin_nested():
                 for did in device_ids:
-                    device = session.query(Device).filter(Device.id == did).first()
+                    device = self.device_repository.find_by_id_including_deleted(did)
                     if not device:
                         results["failed"].append({"device_id": did, "error": "设备不存在"})
                         continue
@@ -2775,15 +2821,10 @@ class DeviceService:
 
             child = None
             if snap_device_id:
-                child = session.query(Device).filter(
-                    Device.id == snap_device_id
-                ).first()
+                child = self.device_repository.find_by_id_including_deleted(snap_device_id)
 
             if not child and snap_device_name:
-                child = session.query(Device).filter(
-                    Device.device_name == snap_device_name,
-                    Device.deleted_at.isnot(None),  # 只匹配已软删除的
-                ).first()
+                child = self.device_repository.find_deleted_by_device_name(snap_device_name)
 
             if child:
                 child.deleted_at = None

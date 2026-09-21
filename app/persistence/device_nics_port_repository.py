@@ -24,6 +24,37 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         super().__init__(DeviceNicsPort, session)
 
 
+    def list_port_keys(self, device_id: int) -> List[tuple]:
+        """取该设备已有端口的 ``(nic_number, port_number)`` 键列表（B-44 扫尾批）。
+
+        调用方用它做"已存在则跳过"的去重集合（``set(...)``）。
+        """
+        return (
+            self.session.query(DeviceNicsPort.nic_number, DeviceNicsPort.port_number)
+            .filter(DeviceNicsPort.device_id == device_id)
+            .all()
+        )
+
+    def list_free_ports(
+        self, device_id: int,
+        port_type: Optional[str] = None, port_speed: Optional[int] = None,
+    ) -> List[DeviceNicsPort]:
+        """取该设备的**空闲**端口候选（可选按类型/速率收窄；B-44 扫尾批）。
+
+        返回**实体**（调用方随后按占用集过滤并返回实体列表）。
+        ``port_status == "free"`` 是候选口径；类型/速率传 None = 不过滤
+        （与原实现的条件拼接一致）。
+        """
+        query = self.session.query(DeviceNicsPort).filter(
+            DeviceNicsPort.device_id == device_id,
+            DeviceNicsPort.port_status == "free",
+        )
+        if port_type:
+            query = query.filter(DeviceNicsPort.port_type == port_type)
+        if port_speed:
+            query = query.filter(DeviceNicsPort.port_speed == port_speed)
+        return query.all()
+
     def find_by_id(self, port_id: int) -> Optional[Dict[str, Any]]:
         """根据端口ID查找,含关联设备信息
         

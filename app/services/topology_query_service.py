@@ -514,15 +514,11 @@ def load_topology_index(visible_ids: Optional[Set[int]] = None) -> TopologyIndex
         TopologyIndex：已按可见域裁剪的图索引。
     """
     from app.models.device import Device
-    from app.models.device_connection import DeviceConnection
-    from app.models.network_connection import NetworkConnection
-    from sqlalchemy.orm import joinedload
 
-    query = (
-        Device.query
-        .filter(Device.device_type.in_(["network", "server"]))
-        .filter(Device.deleted_at.is_(None))
-        .options(joinedload(Device.switch_ext), joinedload(Device.customer))
+    from app.persistence.device_repository import DeviceRepository
+
+    query = DeviceRepository().topology_device_query(
+        ["network", "server"], with_customer=True, alive_only=True
     )
     if visible_ids is not None:
         if not visible_ids:
@@ -560,14 +556,10 @@ def load_topology_index(visible_ids: Optional[Set[int]] = None) -> TopologyIndex
     if not network_ids:
         return TopologyIndex(devices, [], [], switch_ext, customers)
 
-    d2n_rows = (
-        DeviceConnection.query
-        .filter(DeviceConnection.switch_device_id.in_(network_ids))
-        .options(
-            joinedload(DeviceConnection.nics_port),
-            joinedload(DeviceConnection.switch_port),
-        )
-        .all()
+    from app.persistence.device_connection_repository import DeviceConnectionRepository
+
+    d2n_rows = DeviceConnectionRepository().list_by_switch_device_ids(
+        network_ids, with_ports=True
     )
     d2n_edges: List[Dict[str, Any]] = []
     for c in d2n_rows:
@@ -584,17 +576,12 @@ def load_topology_index(visible_ids: Optional[Set[int]] = None) -> TopologyIndex
             "conn_id": c.id,
         })
 
-    n2n_rows = (
-        NetworkConnection.query
-        .filter(
-            NetworkConnection.local_device_id.in_(network_ids),
-            NetworkConnection.peer_device_id.in_(network_ids),
-        )
-        .options(
-            joinedload(NetworkConnection.local_port),
-            joinedload(NetworkConnection.peer_port),
-        )
-        .all()
+    from app.persistence.network_connection_repository import (
+        NetworkConnectionRepository,
+    )
+
+    n2n_rows = NetworkConnectionRepository().list_by_device_ids(
+        network_ids, with_ports=True, any_side=False
     )
     n2n_edges: List[Dict[str, Any]] = []
     for c in n2n_rows:

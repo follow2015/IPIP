@@ -68,7 +68,13 @@ class SwitchInfoService:
                 switch.device.brand = info.brand
 
             from app.models.switch_credentials import SwitchStatusCache
-            cache = SwitchStatusCache.query.filter_by(device_id=device_id).first()
+            from app.persistence.switch_status_cache_repository import (
+                SwitchStatusCacheRepository,
+            )
+
+            cache = SwitchStatusCacheRepository(
+                session=self.sw_repo.session
+            ).find_by_device(device_id)
             if not cache:
                 cache = SwitchStatusCache(device_id=device_id)
                 self.sw_repo.session.add(cache)
@@ -257,7 +263,6 @@ class SwitchInfoService:
         若记录已存在则跳过，保留已有的 member_ports 缓存。
         同时清理设备上已不存在的 Vlanif/Eth-Trunk 对应的残留记录。
         """
-        from app.models.vlan import VLAN
         from app.models.link_aggregation import LinkAggregationGroup
         from sqlalchemy import delete as sa_delete
 
@@ -279,10 +284,13 @@ class SwitchInfoService:
 
             elif re.match(r"^(?:eth-trunk|bridge-aggregation|port-channel)\d+$", port_name, re.IGNORECASE):
                 scanned_lag_names.add(port_name)
-                existing = session.query(LinkAggregationGroup).filter(
-                    LinkAggregationGroup.device_id == device_id,
-                    LinkAggregationGroup.lag_name == port_name,
-                ).first()
+                from app.persistence.link_aggregation_repository import (
+                    LinkAggregationRepository,
+                )
+
+                existing = LinkAggregationRepository(
+                    session=session
+                ).find_by_device_and_name(device_id, port_name)
                 if not existing:
                     session.add(LinkAggregationGroup(
                         device_id=device_id,
@@ -294,10 +302,11 @@ class SwitchInfoService:
 
         if scanned_vlan_ids:
             from app.models.vlan_port_member import VLANPortMember
-            stale_vlans = session.query(VLAN).filter(
-                VLAN.device_id == device_id,
-                VLAN.vlan_id.notin_(scanned_vlan_ids),
-            ).all()
+            from app.persistence.vlan_repository import VLANRepository
+
+            stale_vlans = VLANRepository(
+                session=session
+            ).list_by_device_excluding_vlan_ids(device_id, scanned_vlan_ids)
 
             for vlan in stale_vlans:
                 logger.debug(

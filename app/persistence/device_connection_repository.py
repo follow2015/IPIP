@@ -9,6 +9,7 @@
 from app.utils.logging import get_logger
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -36,6 +37,52 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             joinedload(DeviceConnection.nics_port),
         ]
 
+
+    def list_by_device_side(self, device_id: int) -> List[DeviceConnection]:
+        """取该设备作为 **device 侧**的 D2N 连接（B-44 扫尾批：端口释放①）。
+
+        ⚠️ 与 `list_by_device_ids`（**任一侧**命中，拓扑收敛用）不同：
+        本方法只要 ``device_id == X`` 的行 —— 端口释放流程把"device 侧"与
+        "switch 侧"分开处理（①②③ 步骤），任一侧口径会混入对端行。
+        """
+        return (
+            self.session.query(DeviceConnection)
+            .filter(DeviceConnection.device_id == device_id)
+            .all()
+        )
+
+    def exists_active_for_nics_port(self, nics_port_id: int) -> bool:
+        """该网卡口是否存在 **active** 的 D2N 连接（B-44 扫尾批：占用判定）。
+
+        只判存在；``status == "active"`` 是占用口径（历史/已断开连接不占用）。
+        """
+        return (
+            self.session.query(DeviceConnection)
+            .filter(
+                DeviceConnection.device_nics_port_id == nics_port_id,
+                DeviceConnection.status == "active",
+            )
+            .first()
+            is not None
+        )
+
+    def list_active_nics_port_ids(self, nics_port_ids) -> List[int]:
+        """取集合内被 **active** 连接占用的网卡口 ID（B-44 扫尾批：候选过滤）。
+
+        空 ``nics_port_ids`` 会生成恒假 ``IN`` ⇒ 返回空列表（无占用）。
+        """
+        ids = tuple(nics_port_ids)
+        if not ids:
+            return []
+        rows = (
+            self.session.query(DeviceConnection.device_nics_port_id)
+            .filter(
+                DeviceConnection.device_nics_port_id.in_(ids),
+                DeviceConnection.status == "active",
+            )
+            .all()
+        )
+        return [r[0] for r in rows]
 
     def find_by_id(self, connection_id: int) -> Optional[Dict[str, Any]]:
         """根据连接 ID 查找"""
@@ -75,6 +122,59 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return [c.to_dict() for c in conns]
         except SQLAlchemyError as e:
             raise QueryExecutionError("查找设备连接失败", original_error=e)
+
+    def list_by_device_ids(self, device_ids) -> List[DeviceConnection]:
+        """按设备 ID 集合取 D2N 连接（**任一侧**命中），返回 ORM 实体。
+
+        B-44 拓扑批 2/2：`topology_service` 原先直用 ``DeviceConnection.query``。
+        与 `list_by_switch_device_ids` 的区别：本方法两端**任意一侧**在集合里即命中
+        （画"这些设备相关的接线"），后者只认 ``switch_device_id`` 侧。
+        调用方要用 ``c.device_id`` / ``c.switch_device_id`` 属性建邻接表，故返回**实体**
+        （本仓储另有返回 dict 的展示用方法，勿混用）。
+        空集合返回 ``[]``。
+        """
+        ids = tuple(device_ids)
+        if not ids:
+            return []
+        try:
+            return (
+                self.session.query(DeviceConnection)
+                .filter(
+                    or_(
+                        DeviceConnection.device_id.in_(ids),
+                        DeviceConnection.switch_device_id.in_(ids),
+                    )
+                )
+                .all()
+            )
+        except SQLAlchemyError as e:
+            raise QueryExecutionError("按设备集合查询D2N连接失败", original_error=e)
+
+    def list_by_switch_device_ids(
+        self, switch_device_ids, *, with_ports: bool = False,
+    ) -> List[DeviceConnection]:
+        """按**交换机侧**设备 ID 集合取 D2N 连接，返回 ORM 实体。
+
+        Args:
+            switch_device_ids: 交换机设备 ID 集合/列表（对应 `switch_device_id` 列）
+            with_ports: 是否预加载两端端口（画边要端口信息 ⇒ True；只算邻接表 ⇒ False）
+        空集合返回 ``[]``。
+        """
+        ids = tuple(switch_device_ids)
+        if not ids:
+            return []
+        query = self.session.query(DeviceConnection).filter(
+            DeviceConnection.switch_device_id.in_(ids)
+        )
+        if with_ports:
+            query = query.options(
+                joinedload(DeviceConnection.nics_port),
+                joinedload(DeviceConnection.switch_port),
+            )
+        try:
+            return query.all()
+        except SQLAlchemyError as e:
+            raise QueryExecutionError("按交换机集合查询D2N连接失败", original_error=e)
 
     def find_by_switch_and_port(
         self, switch_device_id: int, switch_port_id: int

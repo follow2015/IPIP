@@ -12,6 +12,7 @@ from sqlalchemy.orm import joinedload
 
 from app.models.vlan import VLAN
 from app.persistence.base import SQLAlchemyRepository
+from app.core.pagination_limits import ensure_offset_within_limit
 
 logger = get_logger(__name__)
 
@@ -88,9 +89,11 @@ class VLANRepository(SQLAlchemyRepository):
             query = query.filter(VLAN.room_id == room_id)
 
         total_count = query.count()
+        offset = (page - 1) * per_page
+        ensure_offset_within_limit(offset)
         data_list = (
             query.order_by(VLAN.device_id, VLAN.vlan_id)
-            .offset((page - 1) * per_page)
+            .offset(offset)
             .limit(per_page)
             .all()
         )
@@ -101,6 +104,22 @@ class VLANRepository(SQLAlchemyRepository):
             "page": page,
             "per_page": per_page,
         }
+
+    def list_by_device_excluding_vlan_ids(self, device_id: int, vlan_ids) -> List[VLAN]:
+        """取设备上 ``vlan_id`` **不在**给定集合的 VLAN 行（B-44 扫尾批：残留清理）。
+
+        ⚠️ 调用方约定：``vlan_ids`` 为空 set 时**不得调用**本方法（空集合的
+        ``NOT IN`` 语义 = 全部命中 = 会把该设备所有 VLAN 判为残留删除）——
+        "空集合跳过清理"的防误删设计留在调用方（原实现即如此）。
+        """
+        return (
+            self.session.query(VLAN)
+            .filter(
+                VLAN.device_id == device_id,
+                VLAN.vlan_id.notin_(tuple(vlan_ids)),
+            )
+            .all()
+        )
 
     def delete_by_device_id(self, device_id: int) -> int:
         """删除指定设备的所有 VLAN

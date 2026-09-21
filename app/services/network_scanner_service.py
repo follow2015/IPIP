@@ -152,19 +152,21 @@ def _resolve_uplink_port_name(uplink_port_ids, uplink_device_id=None) -> str | N
 
     first_port_id = uplink_port_ids[0]
 
-    conn = NetworkConnection.query.filter(
-        or_(
-            NetworkConnection.local_port_id == first_port_id,
-            NetworkConnection.peer_port_id == first_port_id,
-        )
-    ).first()
+    from app.persistence.network_connection_repository import (
+        NetworkConnectionRepository,
+    )
+
+    conns = NetworkConnectionRepository().find_by_port_ids_orm([first_port_id])
+    conn = conns[0] if conns else None
     if conn:
         if conn.local_port_id == first_port_id:
             return conn.peer_port.port_name if conn.peer_port else None
         else:
             return conn.local_port.port_name if conn.local_port else None
 
-    port = NetworkPort.query.get(first_port_id)
+    from app.persistence.switch_port_repository import NetworkPortRepository
+
+    port = NetworkPortRepository().find_by_id_orm(first_port_id)
     return port.port_name if port else None
 
 

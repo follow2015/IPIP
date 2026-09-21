@@ -117,15 +117,18 @@ def _resolve_room_id(args: Dict[str, Any]) -> Any:
                 "请指明房间号（room_number）或机房 ID"
             )
 
+        from app.persistence.room_repository import RoomRepository
+
+        room_repo = RoomRepository()
         for token in tokens:
-            picked = _pick(Room.query.filter(Room.name.ilike(token)).all())
+            picked = _pick(room_repo.find_by_name_like(token))
             if picked is not None:
                 return picked.id
         for token in tokens:
-            picked = _pick(Room.query.filter(Room.name.ilike(f"%{token}%")).all())
+            picked = _pick(room_repo.find_by_name_like(f"%{token}%"))
             if picked is not None:
                 return picked.id
-        all_rooms = [r.name for r in Room.query.order_by(Room.id).all()]
+        all_rooms = [r.name for r in sorted(room_repo.find_all(), key=lambda r: r.id)]
         room_list = "、".join(all_rooms[:20]) + ("…" if len(all_rooms) > 20 else "")
         raise ValueError(f"机房不存在: {name}。可选机房：{room_list or '（系统中暂无机房）'}")
     return None

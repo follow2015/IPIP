@@ -15,6 +15,7 @@ from app.models.device import Device
 from app.models.device_hardware import DeviceHardware
 from app.models.monitor_alert_outbox import MonitorAlertOutbox
 from app.persistence.base import SQLAlchemyRepository
+from app.core.pagination_limits import ensure_offset_within_limit
 
 
 def _backoff_seconds(attempts: int) -> int:
@@ -75,6 +76,43 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         self.session.add(row)
         self.session.flush()
         return row
+
+    def exists_recent_open(
+        self, device_id: int, alert_type: str, cutoff,
+    ) -> bool:
+        """该设备是否**近期**存在同类型的**未关闭**告警（B-44 收敛：上游告警在效判断）。
+
+        用于告警依赖抑制：上游设备在 ``cutoff`` 之后产生过同类未关闭告警时，
+        下游告警被抑制。四条件缺一不可（原始实现即如此）：
+        设备 / 类型 / ``closed_at IS NULL`` / ``created_at >= cutoff``。
+
+        只取 ``id`` 列并 ``limit(1)``：存在性判断不需要整行；不返回条数
+        （调用方只要 True/False）。
+        """
+        return (
+            self.session.query(MonitorAlertOutbox.id)
+            .filter(
+                MonitorAlertOutbox.device_id == device_id,
+                MonitorAlertOutbox.alert_type == alert_type,
+                MonitorAlertOutbox.closed_at.is_(None),
+                MonitorAlertOutbox.created_at >= cutoff,
+            )
+            .limit(1)
+            .first()
+            is not None
+        )
+
+    def delete_by_device(self, device_id: int) -> int:
+        """清空该设备的告警发件箱行（B-44 收敛：设备彻底删除的清理面）。
+
+        发件箱是**投递队列**而非留痕 —— 设备删后无人消费，留着只会让
+        投递 worker 反复空转（与留痕三表的"保留"决策刻意相反）。
+        """
+        return (
+            self.session.query(MonitorAlertOutbox)
+            .filter_by(device_id=device_id)
+            .delete()
+        )
 
     def find_pending(self, limit: int = 100) -> List[MonitorAlertOutbox]:
         """按 id 升序取最多 limit 条待发行（先进先出）。
@@ -220,12 +258,14 @@ class MonitorAlertOutboxRepository(SQLAlchemyRepository):
         page = page or 1
         per_page = per_page or 20
         total = q.count()
+        offset = (page - 1) * per_page
+        ensure_offset_within_limit(offset)
         rows = (
             q.order_by(
                 MonitorAlertOutbox.created_at.desc(),
                 MonitorAlertOutbox.id.desc(),
             )
-            .offset((page - 1) * per_page)
+            .offset(offset)
             .limit(per_page)
             .all()
         )

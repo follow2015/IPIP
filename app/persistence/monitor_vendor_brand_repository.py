@@ -44,6 +44,22 @@ class MonitorVendorBrandRepository:
             .all()
         )
 
+    def exists_enabled(
+        self, enterprise_no: str, device_type=None,
+    ) -> bool:
+        """企业标识是否在**启用**的品牌库中（可选按设备类型联合命中）。
+
+        B-44 收敛（设备表单校验）：只判存在；``device_type`` 传 None = 不联合
+        过滤（原实现的条件拼接一致）。
+        """
+        query = self.session.query(MonitorVendorBrand).filter(
+            MonitorVendorBrand.enterprise_no == enterprise_no,
+            MonitorVendorBrand.enabled.is_(True),
+        )
+        if device_type:
+            query = query.filter(MonitorVendorBrand.device_type == device_type)
+        return query.first() is not None
+
     def find_by_enterprise_no(self, enterprise_no: str) -> Optional[MonitorVendorBrand]:
         """按 enterprise 号查启用品牌；不存在返回 None。
 

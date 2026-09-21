@@ -9,12 +9,8 @@ from app.utils.logging import get_logger
 from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional, Set
 
-from sqlalchemy import or_
-from sqlalchemy.orm import joinedload
 from app.models.device import Device
 from app.models.device_switch_ext import DeviceSwitchExt
-from app.models.device_connection import DeviceConnection
-from app.models.network_connection import NetworkConnection
 
 logger = get_logger(__name__)
 
@@ -34,29 +30,16 @@ class TopologyService:
         使用 outerjoin(DeviceSwitchExt) 确保没有 switch_ext 记录的网络设备
         （如路由器、防火墙）也能出现在拓扑中。
         """
-        from app.models.cabinet import Cabinet
-        return (
-            Device.query
-            .filter(Device.device_type == "network")
-            .outerjoin(DeviceSwitchExt, DeviceSwitchExt.device_id == Device.id)
-            .options(
-                joinedload(Device.switch_ext),
-                joinedload(Device.cabinet).joinedload(Cabinet.room),
-            )
-        )
+        from app.persistence.device_repository import DeviceRepository
+
+        return DeviceRepository().topology_switch_query()
 
     @staticmethod
     def _device_query_base():
         """设备基础查询：预加载 cabinet + room，消灭 N+1"""
-        from app.models.cabinet import Cabinet
-        return (
-            Device.query
-            .filter(Device.device_type.in_(["network", "server"]))
-            .options(
-                joinedload(Device.switch_ext),
-                joinedload(Device.cabinet).joinedload(Cabinet.room),
-            )
-        )
+        from app.persistence.device_repository import DeviceRepository
+
+        return DeviceRepository().topology_device_query(["network", "server"])
 
 
     @staticmethod
@@ -100,11 +83,12 @@ class TopologyService:
         Returns:
             设备 ID 集合，虚拟机房不存在时返回 None
         """
-        from app.models.virtual_room import VirtualRoom
-        vr = VirtualRoom.query.get(virtual_room_id)
-        if vr is None:
+        from app.persistence.virtual_room_repository import VirtualRoomRepository
+
+        repo = VirtualRoomRepository()
+        if repo.find_by_id(virtual_room_id) is None:
             return None
-        return {m.device_id for m in vr.members.all()}
+        return set(repo.get_member_device_ids(virtual_room_id))
 
     def build_network_topology(
         self,
@@ -146,19 +130,12 @@ class TopologyService:
 
         switch_ids: Set[int] = {s.id for s in switches}
 
-        n2n_conns = (
-            NetworkConnection.query
-            .filter(
-                or_(
-                    NetworkConnection.local_device_id.in_(switch_ids),
-                    NetworkConnection.peer_device_id.in_(switch_ids),
-                )
-            )
-            .options(
-                joinedload(NetworkConnection.local_port),
-                joinedload(NetworkConnection.peer_port),
-            )
-            .all()
+        from app.persistence.network_connection_repository import (
+            NetworkConnectionRepository,
+        )
+
+        n2n_conns = NetworkConnectionRepository().list_by_device_ids(
+            switch_ids, with_ports=True
         )
 
         nodes = [self._serialize_node(s) for s in switches]
@@ -256,31 +233,19 @@ class TopologyService:
 
         device_ids: Set[int] = {d.id for d in devices}
 
-        n2n_conns = (
-            NetworkConnection.query
-            .filter(
-                or_(
-                    NetworkConnection.local_device_id.in_(device_ids),
-                    NetworkConnection.peer_device_id.in_(device_ids),
-                )
-            )
-            .options(
-                joinedload(NetworkConnection.local_port),
-                joinedload(NetworkConnection.peer_port),
-            )
-            .all()
+        from app.persistence.network_connection_repository import (
+            NetworkConnectionRepository,
         )
 
-        d2n_conns = (
-            DeviceConnection.query
-            .filter(
-                or_(
-                    DeviceConnection.device_id.in_(device_ids),
-                    DeviceConnection.switch_device_id.in_(device_ids),
-                )
-            )
-            .all()
+        n2n_conns = NetworkConnectionRepository().list_by_device_ids(
+            device_ids, with_ports=True
         )
+
+        from app.persistence.device_connection_repository import (
+            DeviceConnectionRepository,
+        )
+
+        d2n_conns = DeviceConnectionRepository().list_by_device_ids(device_ids)
 
         nodes = [self._serialize_node(d) for d in devices]
 
@@ -329,39 +294,26 @@ class TopologyService:
 
     def _build_star_topology(self, switch_device_id: int) -> Dict[str, Any]:
         """以某交换机为中心的星形拓扑（joinedload 预加载，合并二次查询）"""
-        from app.models.cabinet import Cabinet
+        from app.persistence.device_repository import DeviceRepository
 
-        switch = (
-            Device.query
-            .filter(Device.id == switch_device_id, Device.device_type == "network")
-            .options(
-                joinedload(Device.switch_ext),
-                joinedload(Device.cabinet).joinedload(Cabinet.room),
-            )
-            .first()
-        )
+        switch = DeviceRepository().find_switch_with_topology(switch_device_id)
         if not switch:
             return {"nodes": [], "edges": [], "stats": self._empty_stats()}
 
-        d2n_conns = (
-            DeviceConnection.query
-            .filter(DeviceConnection.switch_device_id == switch_device_id)
-            .all()
+        from app.persistence.device_connection_repository import (
+            DeviceConnectionRepository,
         )
 
-        n2n_conns = (
-            NetworkConnection.query
-            .filter(
-                or_(
-                    NetworkConnection.local_device_id == switch_device_id,
-                    NetworkConnection.peer_device_id == switch_device_id,
-                )
-            )
-            .options(
-                joinedload(NetworkConnection.local_port),
-                joinedload(NetworkConnection.peer_port),
-            )
-            .all()
+        d2n_conns = DeviceConnectionRepository().list_by_switch_device_ids(
+            [switch_device_id]
+        )
+
+        from app.persistence.network_connection_repository import (
+            NetworkConnectionRepository,
+        )
+
+        n2n_conns = NetworkConnectionRepository().list_by_device_ids(
+            [switch_device_id], with_ports=True
         )
 
         peer_ids: Set[int] = (
@@ -370,15 +322,9 @@ class TopologyService:
             | {c.peer_device_id for c in n2n_conns}
         ) - {switch_device_id}
 
-        peers = (
-            Device.query
-            .options(
-                joinedload(Device.switch_ext),
-                joinedload(Device.cabinet).joinedload(Cabinet.room),
-            )
-            .filter(Device.id.in_(peer_ids))
-            .all()
-        ) if peer_ids else []
+        from app.persistence.device_repository import DeviceRepository
+
+        peers = DeviceRepository().list_by_ids_with_topology(peer_ids)
 
         all_devices = [switch] + peers
         nodes = [self._serialize_node(d) for d in all_devices]
@@ -449,15 +395,12 @@ class TopologyService:
 
         switch_ids: Set[int] = {s.id for s in switches}
 
-        n2n_conns = (
-            NetworkConnection.query
-            .filter(
-                or_(
-                    NetworkConnection.local_device_id.in_(switch_ids),
-                    NetworkConnection.peer_device_id.in_(switch_ids),
-                )
-            )
-            .all()
+        from app.persistence.network_connection_repository import (
+            NetworkConnectionRepository,
+        )
+
+        n2n_conns = NetworkConnectionRepository().list_by_device_ids(
+            switch_ids, with_ports=False
         )
 
         adjacency: Dict[int, Set[int]] = defaultdict(set)

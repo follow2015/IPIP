@@ -45,6 +45,8 @@ ALLOWED_IMPORT_EXT = {".csv", ".xlsx"}
 _MAX_XLSX_ENTRIES = 5000
 _MAX_XLSX_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
 
+MAX_EXPORT_ROWS = 200_000
+
 
 class FileTooLargeError(InvalidFormatError):
     """上传文件超过大小上限。"""
@@ -190,6 +192,27 @@ class EmptyExportError(InvalidOperationError):
         self.status_code = 404
 
 
+class ExportTooLargeError(InvalidOperationError):
+    """单次导出结果集超过 ``MAX_EXPORT_ROWS``（路由层统一转 413）。
+
+    由**取数侧**在累计到上限时立即抛出，而不是等结果集物化完再判断——后者
+    内存已经炸了。调用方（各导出路由）应捕获本异常并回一条可操作的提示。
+    """
+
+    def __init__(self, rows: int, max_rows: int = MAX_EXPORT_ROWS):
+        super().__init__(
+            operation="export",
+            reason=f"结果集超过单次导出上限（检测到 {rows} 行，上限 {max_rows} 行）",
+            message=(
+                f"导出数据量过大（检测到 {rows} 行，单次上限 {max_rows} 行），"
+                "请收窄筛选条件（如按机柜 / 客户 / 机房）后分批导出"
+            ),
+        )
+        self.status_code = 413
+        self.rows = rows
+        self.max_rows = max_rows
+
+
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 
@@ -209,25 +232,35 @@ def escape_export_df(df: pd.DataFrame) -> pd.DataFrame:
     return df.map(_escape_formula_cell)
 
 
-def export_to_excel(rows: list, sheet_name: str) -> BytesIO:
+def export_to_excel(rows: list, sheet_name: str, max_rows: Optional[int] = None) -> BytesIO:
     """将记录列表统一导出为 Excel 字节流（设备/机柜/客户共用）。
 
-    统一职责：空数据检查 + DataFrame 构造 + ExcelWriter 拼装，使三个实体的
+    统一职责：空数据检查 + 行数上限检查 + DataFrame 构造 + ExcelWriter 拼装，使三个实体的
     导出构造路径一致；数据获取（含是否需要分页）由调用方决定——
     大数据量的设备走分页循环，机柜/客户量小直接全量取，分页是数据量驱动而非风格差异。
+
+    本函数里的上限是**兜底**：调用方（尤其分页取数循环）应在取数过程中就熔断，
+    否则结果集已经先物化进内存了，这里再拦为时已晚。
 
     Args:
         rows: 已序列化为 dict 的记录列表（如 get_all_*_list 返回 List[Dict]）
         sheet_name: Excel 工作表名
+        max_rows: 单次导出允许的最大行数；None 时取当前 ``MAX_EXPORT_ROWS``
+            （运行期读取，便于统一调参与测试）
 
     Returns:
         可被 flask.send_file 直接消费的 BytesIO 缓冲
 
     Raises:
         EmptyExportError: rows 为空时
+        ExportTooLargeError: rows 超过 max_rows 时（路由→413）
     """
     if not rows:
         raise EmptyExportError()
+    if max_rows is None:
+        max_rows = MAX_EXPORT_ROWS
+    if len(rows) > max_rows:
+        raise ExportTooLargeError(len(rows), max_rows)
     df = escape_export_df(pd.DataFrame(rows))
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:

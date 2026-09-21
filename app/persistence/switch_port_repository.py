@@ -7,10 +7,11 @@
 """
 from app.utils.logging import get_logger
 from datetime import timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 from app.utils.time_utils import now_utc_naive
 
 from sqlalchemy import update, delete
+from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.models.network_port import NetworkPort
@@ -55,6 +56,105 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return port.to_dict(include_relations=True) if port else None
         except SQLAlchemyError as e:
             raise QueryExecutionError("查找端口(加锁)失败", original_error=e)
+
+    def list_by_customer(self, customer_id: int) -> List[NetworkPort]:
+        """取分配给某客户的全部端口**实体**（B-44 扫尾批：客户资产报告 ×2）。
+
+        `joinedload(device/connection)`：两个调用点的循环都要读
+        ``p.device.device_name`` / ``p.connection.device`` —— 原实现无预加载
+        （逐行懒加载 N+1），属**同结果的顺带优化**。
+        """
+        return (
+            self.session.query(NetworkPort)
+            .options(
+                joinedload(NetworkPort.device),
+                joinedload(NetworkPort.connection),
+            )
+            .filter(NetworkPort.customer_id == customer_id)
+            .all()
+        )
+
+    def list_entities_by_device(self, device_id: int) -> List[NetworkPort]:
+        """取该设备的端口**实体**（B-44 收敛：端口同步的差量写入）。
+
+        ⚠️ 与 `find_ports_by_device`（返回 dict，供展示层）**刻意分开**：
+        端口同步要按四元组比对后**改属性/删行**（`port.port_name = ...`、
+        `session.delete(p)`），dict 没法承载 ORM 变更跟踪 —— 混用会把
+        "更新端口名"变成静默无操作。
+        """
+        return (
+            self.session.query(NetworkPort)
+            .filter(NetworkPort.device_id == device_id)
+            .all()
+        )
+
+    def list_by_port_names(self, device_id: int, port_names: Sequence[str]) -> List[NetworkPort]:
+        """取该设备下**名称命中候选列表**的端口实体（B-44 收敛：拓扑端口名解析）。
+
+        调用方要判"候选名命中几个端口"（0=无、1=唯一、>1=歧义），故必须返回
+        **列表**且是**实体**（随后拿 ``.id`` 建连），不能退化成 ``.first()``
+        或 dict —— 前者会让"歧义"静默变成"随便挑一个"，后者拿不到 ORM 身份。
+
+        ``port_names`` 为空时生成恒假的 ``IN`` 条件 ⇒ 返回空列表（调用方据此判"无候选"）。
+        """
+        return (
+            self.session.query(NetworkPort)
+            .filter(
+                NetworkPort.device_id == device_id,
+                NetworkPort.port_name.in_(tuple(port_names)),
+            )
+            .all()
+        )
+
+    def list_free_switch_ports_in_cabinets(self, cabinet_ids) -> List[NetworkPort]:
+        """取机柜集合内网络交换机的**空闲**端口（实体，预加载 device）。
+
+        B-44 部署计划批：可用端口池。过滤条件与原实现**逐条一致**，勿增删：
+        交换机（network + switch 子类型）、未软删、机柜在本集合内、
+        ``usage_status == "free"``、不属于任何 LAG（``lag_group_id IS NULL``）；
+        ``joinedload(device)`` 消除循环里逐端口懒加载的 N+1。
+        空集合返回 ``[]``（调用方据此跳过整段统计）。
+        """
+        ids = tuple(cabinet_ids)
+        if not ids:
+            return []
+        from app.models.device import Device
+
+        try:
+            return (
+                self.session.query(NetworkPort)
+                .join(Device, NetworkPort.device_id == Device.id)
+                .filter(
+                    Device.device_type == "network",
+                    Device.device_subtype == "switch",
+                    Device.deleted_at.is_(None),
+                    Device.cabinet_id.in_(ids),
+                    NetworkPort.usage_status == "free",
+                    NetworkPort.lag_group_id.is_(None),
+                )
+                .options(joinedload(NetworkPort.device))
+                .all()
+            )
+        except SQLAlchemyError as e:
+            raise QueryExecutionError("查询机柜内空闲交换机端口失败", original_error=e)
+
+    def find_port_by_name_orm(
+        self, device_id: int, port_name: str,
+    ) -> Optional[NetworkPort]:
+        """按 设备 + 端口名 取端口**实体**（B-44 扫尾批：端口信息缓存更新）。
+
+        ⚠️ 与 `find_port_by_name`（返回 dict，展示用）**刻意分开**：调用方要
+        **改** ``row.raw_info`` 后写回，dict 版本改了也不落库 —— 混用会让
+        "更新端口信息缓存"变成静默无操作。
+        """
+        return (
+            self.session.query(NetworkPort)
+            .filter(
+                NetworkPort.device_id == device_id,
+                NetworkPort.port_name == port_name,
+            )
+            .first()
+        )
 
     def find_ports_by_device(self, device_id: int) -> List[Dict[str, Any]]:
         """获取指定设备的全部端口列表"""
@@ -484,6 +584,27 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         self.session.flush()
         logger.info("设备 %d 端口增量更新完成: %d 条记录", device_id, len(port_rows))
 
+
+    def list_switch_port_ips(self, device_id: int) -> List[str]:
+        """取该设备全部端口 IP（B-44 收敛：删除设备时的 IP 释放入口）。"""
+        from app.models.switch_credentials import SwitchPortIP
+
+        return [
+            r[0]
+            for r in self.session.query(SwitchPortIP.ip_address)
+            .filter(SwitchPortIP.device_id == device_id)
+            .all()
+        ]
+
+    def delete_switch_port_ips(self, device_id: int) -> int:
+        """清空该设备的端口 IP 行（B-44 收敛：设备彻底删除的清理面）。"""
+        from app.models.switch_credentials import SwitchPortIP
+
+        return (
+            self.session.query(SwitchPortIP)
+            .filter_by(device_id=device_id)
+            .delete()
+        )
 
     def find_port_ips_by_device_and_names(self, device_id: int, port_names: List[str]) -> List:
         """查询指定设备+端口名列表的 SwitchPortIP 记录

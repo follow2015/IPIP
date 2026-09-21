@@ -10,6 +10,7 @@ from app.models.switch_route import IPNetwork
 from app.models.device import Device
 from app.models.customer import Customer
 from app.persistence.base import BaseRepository
+from app.core.pagination_limits import ensure_offset_within_limit
 from extensions import db
 
 logger = get_logger(__name__)
@@ -88,6 +89,7 @@ class NetworkRepository(BaseRepository):
         page_size = filters.get("page_size", 20)
         total = query.count()
         offset = (page - 1) * page_size
+        ensure_offset_within_limit(offset)
         networks = query.order_by(IPNetwork.network).offset(offset).limit(page_size).all()
 
         from app.models.switch_route import SwitchRoute

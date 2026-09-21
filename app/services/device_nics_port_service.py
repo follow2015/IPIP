@@ -165,13 +165,7 @@ class DeviceNicsPortService:
                         skipped += 1
                         continue
 
-                    existing_keys = set(
-                        self.repo.session.query(
-                            DeviceNicsPort.nic_number, DeviceNicsPort.port_number
-                        )
-                        .filter(DeviceNicsPort.device_id == device_id)
-                        .all()
-                    )
+                    existing_keys = set(self.repo.list_port_keys(device_id))
 
                     objs = []
                     for p in ports_template:

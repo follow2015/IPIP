@@ -51,18 +51,14 @@ def _get_interconnect_ports(sw_id: int) -> set[str]:
         set[str]: 互联端口名集合
     """
     try:
-        from app.models.network_connection import NetworkConnection
-        from app.models.network_port import NetworkPort
         from app.utils.port_name_utils import normalize_port
-        from extensions import db
 
         ports = set()
-        conns = NetworkConnection.query.filter(
-            db.or_(
-                NetworkConnection.local_port.has(NetworkPort.device_id == sw_id),
-                NetworkConnection.peer_port.has(NetworkPort.device_id == sw_id),
-            )
-        ).all()
+        from app.persistence.network_connection_repository import (
+            NetworkConnectionRepository,
+        )
+
+        conns = NetworkConnectionRepository().list_by_device_via_ports(sw_id)
         for conn in conns:
             if conn.local_port and conn.local_port.device_id == sw_id:
                 ports.add(normalize_port(conn.local_port.port_name))

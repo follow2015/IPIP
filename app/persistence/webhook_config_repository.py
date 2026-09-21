@@ -15,6 +15,14 @@ class WebhookConfigRepository(BaseRepository):
     def __init__(self, session=None):
         super().__init__(WebhookConfig, session=session)
 
+    def list_enabled_by_channel(self, channel: str) -> List[WebhookConfig]:
+        """取某渠道**启用**的 webhook 配置（B-44 扫尾批：投递入口）。"""
+        return (
+            self.session.query(WebhookConfig)
+            .filter_by(channel=channel, enabled=True)
+            .all()
+        )
+
     def find_all_ordered(self) -> List[WebhookConfig]:
         """按创建时间倒序列出所有配置。"""
         return (

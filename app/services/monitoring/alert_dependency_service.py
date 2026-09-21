@@ -56,13 +56,11 @@ class DependencyDecision(TypedDict):
 
 def _load_active_rules() -> List[dict]:
     """从 DB 加载启用的手动依赖规则"""
-    from app.models.monitor_alert_dependency_rule import MonitorAlertDependencyRule
-    from extensions import db
-    all_rules = (
-        db.session.query(MonitorAlertDependencyRule)
-        .filter_by(enabled=True)
-        .all()
+    from app.persistence.monitor_alert_dependency_rule_repository import (
+        MonitorAlertDependencyRuleRepository,
     )
+
+    all_rules = MonitorAlertDependencyRuleRepository().list_enabled()
     return [
         {
             "id": r.id,
@@ -134,22 +132,15 @@ def _upstream_has_active_alert(upstream_device_id: int, alert_type: str) -> bool
     """
     from datetime import timedelta
 
-    from app.models.monitor_alert_outbox import MonitorAlertOutbox
+    from app.persistence.monitor_alert_outbox_repository import (
+        MonitorAlertOutboxRepository,
+    )
     from app.utils.time_utils import now_utc_naive
-    from extensions import db
 
     cutoff = now_utc_naive() - timedelta(seconds=_upstream_alert_max_age_seconds())
-    q = (
-        db.session.query(MonitorAlertOutbox.id)
-        .filter(
-            MonitorAlertOutbox.device_id == upstream_device_id,
-            MonitorAlertOutbox.alert_type == alert_type,
-            MonitorAlertOutbox.closed_at.is_(None),
-            MonitorAlertOutbox.created_at >= cutoff,
-        )
-        .limit(1)
+    return MonitorAlertOutboxRepository().exists_recent_open(
+        upstream_device_id, alert_type, cutoff,
     )
-    return q.first() is not None
 
 
 

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DatePicker, Select, Space, Card, Tag, Button } from 'antd';
 import DataTable from '@/components/DataTable';
+import { serverPagination } from '@/components/DataTable/serverPagination';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAllLoginLogs, type LoginLogQueryParams, type LoginLog } from '@/services/user';
@@ -146,17 +147,15 @@ function LoginLogs() {
         dataSource={data?.items ?? []}
         loading={isLoading}
         rowKey="id"
-        pagination={{
-          total: data?.total ?? 0,
-          pageSize,
+        pagination={serverPagination({
           current: page,
-          showTotal: (t) => `共 ${t} 条`,
-          showSizeChanger: true,
+          pageSize,
+          total: data?.total ?? 0,
           onChange: (p, ps) => {
             setPage(p);
             setPageSize(ps);
           }
-        }}
+        })}
         size="small"
         scroll={{ x: 'max-content' }}
         showCard={false}

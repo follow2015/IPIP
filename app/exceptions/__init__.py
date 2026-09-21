@@ -18,6 +18,7 @@ from .business import (
     IPNotBannedException,
     NoCoreSwitch,
     BanCommandFailed,
+    PaginationLimitExceeded,
     ServiceError,
     UserNotFoundError,
 )
@@ -72,6 +73,7 @@ __all__ = [
     "IPNotBannedException",
     "NoCoreSwitch",
     "BanCommandFailed",
+    "PaginationLimitExceeded",
     "ServiceError",
 
     "DataAccessError",

@@ -28,6 +28,10 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         super().__init__(Room, session)
 
 
+    def list_all_ordered_by_id(self) -> List[Room]:
+        """全部机房，按 ID 升序（B-44 部署计划批：逐机房出报告的**稳定顺序**）。"""
+        return self.session.query(Room).order_by(Room.id).all()
+
     def find_by_room_name(self, room_name: str) -> Optional[Room]:
         """根据机房名称查找机房（不过滤状态，供内部使用）
 
@@ -39,6 +43,37 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         except SQLAlchemyError as e:
             logger.error(f"根据机房名称查找机房失败 (room_name={room_name}): {e}")
             raise QueryExecutionError("查找机房失败", original_error=e)
+
+    def find_by_name_like(self, pattern: str) -> List[Room]:
+        """按名称 ilike 匹配机房（B-44 收敛：AI 机房名解析的模糊匹配）
+
+        ``pattern`` 由调用方构造（是否含 ``%`` 通配符决定"精确大小写不敏感"还是
+        "contains"语义）—— 与调用方的两处既有用法一一对应，故不在仓储内再包一层。
+
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
+        try:
+            return self._base_query().filter(Room.name.ilike(pattern)).all()
+        except SQLAlchemyError as e:
+            logger.error(f"模糊匹配机房失败 (pattern={pattern}): {e}")
+            raise QueryExecutionError("查找机房失败", original_error=e)
+
+    def exists_alive(self, room_id: int) -> bool:
+        """机房是否存在（B-44 收敛：扫描调度的配置校验）。
+
+        ⚠️ **修正了一处潜伏错误**：原实现写 ``filter_by(id, deleted_at=None)``，
+        但 ``rooms`` 表**没有 deleted_at 列** —— 该行一旦真实执行即抛
+        ``InvalidRequestError``（此前从未触达：配置了 room_ids 的部署才会走到）。
+        迁移时按"存在即有效"修正；Room 的退役语义走 ``status`` 列，
+        如需排除退役机房应显式按 status 过滤（勿再引用不存在的列）。
+        """
+        return (
+            self.session.query(Room)
+            .filter_by(id=room_id)
+            .first()
+            is not None
+        )
 
     def check_room_name_exists(self, room_name: str, exclude_id: Optional[int] = None) -> bool:
         """检查机房名称是否已存在（排除已软删除的机房）

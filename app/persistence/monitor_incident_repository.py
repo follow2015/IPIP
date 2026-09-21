@@ -4,7 +4,7 @@
 项目 C5 约束：DB 访问必须走 Repository 层，禁止在 Service 内裸写 query。
 """
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from app.utils.time_utils import now_utc_naive
 
 
@@ -13,6 +13,7 @@ from app.models.monitor_incident import MonitorIncident
 from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
 from extensions import db
 from sqlalchemy import or_
+from app.core.pagination_limits import ensure_offset_within_limit
 
 _LIKE_ESCAPE = "\\"
 
@@ -185,6 +186,77 @@ class IncidentRepository:
         inc.closed_at = now_utc_naive()
         self.session.flush()
 
+    def set_diagnosis_backfill(
+        self, incident_id: int, session_id: int, summary: Optional[str],
+    ) -> int:
+        """把诊断结论回填到事件行（B-44 收敛；诊断会话完成时调用）。
+
+        ⚠️ 刻意用 **Core UPDATE 而非改 ORM 对象**：事件行的 ``last_alert_at``
+        等字段被聚合器高频写入，把行加载进会话后回写会与聚合器的并发更新
+        互相覆盖（原实现即如此，注释保留）。`synchronize_session=False`：
+        本会话不需要这些行的最新内存态。
+
+        Returns:
+            int: 更新行数（0 = 事件已被删/不存在）
+        """
+        return (
+            self.session.query(MonitorIncident)
+            .filter(MonitorIncident.id == incident_id)
+            .update(
+                {
+                    "ai_diagnosis_session_id": session_id,
+                    "ai_diagnosis_summary": summary,
+                },
+                synchronize_session=False,
+            )
+        )
+
+    def snapshot_root_trace(self, device_id: int, device_name) -> int:
+        """把根因设备引用置空并写设备名快照（B-44 收敛：设备彻底删的留痕处置）。
+
+        ⚠️ **Core UPDATE 而非改 ORM 对象**，且快照与置空**必须同一语句**：
+        只置空不写快照 = "行还在、却不知是哪台设备"的孤儿留痕（迁移 0015
+        的 ``*_device_name`` 列就是为这个自证而生）。
+        ``synchronize_session=False``：本会话不需要这些行的内存态。
+        """
+        return (
+            self.session.query(MonitorIncident)
+            .filter(MonitorIncident.root_device_id == device_id)
+            .update(
+                {
+                    MonitorIncident.root_device_name: device_name,
+                    MonitorIncident.root_device_id: None,
+                },
+                synchronize_session=False,
+            )
+        )
+
+    def list_by_root_device(
+        self, root_device_id: int, since, limit: Optional[int] = None,
+        newest_first: bool = False,
+    ) -> List[MonitorIncident]:
+        """取该设备作为**根因**的事件（B-44 收敛；时间窗 + 可选限条）
+
+        两个调用点的排序方向与限条不同（AI 时间线**时间升序、不限条**；
+        事件上下文**最近优先 + limit**），故分别用 ``newest_first`` / ``limit``
+        显式表达（``limit=None`` = 不限，保持原语义）。
+        """
+        order = (
+            MonitorIncident.first_alert_at.desc() if newest_first
+            else MonitorIncident.first_alert_at.asc()
+        )
+        query = (
+            self.session.query(MonitorIncident)
+            .filter(
+                MonitorIncident.root_device_id == root_device_id,
+                MonitorIncident.first_alert_at >= since,
+            )
+            .order_by(order)
+        )
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
+
 
     def _device_name_predicate(self, device_name: str):
         """构造"设备名快照命中"的 SQL 条件（三个快照列的并集）。"""
@@ -232,6 +304,7 @@ class IncidentRepository:
         offset: int = 0,
     ) -> list:
         """列出事件（按末次告警时间倒序），支持状态 + 设备名快照过滤。"""
+        ensure_offset_within_limit(offset)
         return (
             self._filtered_query(status, device_name)
             .order_by(MonitorIncident.last_alert_at.desc())

@@ -13,9 +13,14 @@
 - 轮询循环分组（snmp / bmc）、协议→设备类型映射：由 `protocol_registry` 单一数据源驱动。
 - 多进程协调：复用 `monitor_worker` 的 Redis 锁 `monitor:lock:<loop>`，与（若仍启用的）
   in-Flask worker 互斥，避免双跑；Redis 不可用时降级为「本进程直接跑」并告警。
+  ⚠️ 锁只管互斥、不管**频率**：光靠锁时聚合频率 = interval ÷ 实例数（实测 60 s
+  → 18.9 s）。故两条路径都走同一个**最小间隔闸门** `monitor:rate:<loop>`
+  （`_acquire_lock` 内，见 `_rate_limit_allow`），同 loop 的全部实例共享一个配额。
 - 适配器仍为同步接口（SNMP 内部 asyncio.run，IPMI requests）：经
   `run_in_executor` 移出主事件循环线程执行，既不被阻塞、又让 SNMP 的 asyncio.run
   在 worker 线程内安全自起 loop（主循环线程无运行中的 loop）。
+- 一轮结束后与 in-Flask worker **同口径**做「监控中断检测」（见 `_check_interrupted`）：
+  独立服务是唯一采集者时，这项检查若只留在 in-Flask 路径，就等于告警静默失效。
 
 与「主 app 保持 Flask」决策兼容：本服务只是多起一个进程，主 Flask 应用无需改动。
 """
@@ -37,10 +42,12 @@ from app.services.monitoring.credential_service import MonitorCredentialService
 from app.services.monitoring.monitor_service import MonitorService
 from app.services.monitoring.monitor_worker import (
     _acquire_lock,
+    _check_monitor_interrupted,
     _LockWatchdog,
     _parse_whitelist,
     _redis_client,
     _resolve_loop_interval,
+    _resolve_rate_limit_enabled,
 )
 from app.utils.concurrency.redis_lock import release_owner_lock
 from app.services.monitoring.protocol_registry import (
@@ -172,6 +179,29 @@ class StandaloneMonitorService:
             logger.error("监控探测上下文异常 device_id=%s", device_id, exc_info=True)
 
 
+    def _check_interrupted(self, target_ids: List[int], loop_name: str) -> None:
+        """本轮结束后检测「监控中断」：启用监控却长时间没被探测到的设备。
+
+        复用 in-Flask worker 的**同一实现**（`monitor_worker._check_monitor_interrupted`），
+        故口径完全一致：阈值 `MONITOR_INTERRUPTED_THRESHOLD_SECS`（默认 3×interval）、
+        「从未被探测」不算中断（P0-5，避免批量启用时的告警风暴）、仅在状态变化时入箱。
+
+        ⚠️ 为什么必须在这里调用：该检测**原先只在 in-Flask 的 `_run_one_round` 里**
+        被调用。独立采集服务是推荐部署形态下的唯一采集者，若不在同一轮结束时补上，
+        「监控中断」告警就会静默失效（前端那张状态标签永远不会亮）。成本上并不新增
+        负担：检查原本就按轮次跑，且今天多 worker 并存时每 interval 会跑 N 次。
+
+        异常一律吞掉 + 告警：中断检测失败**不得**影响本轮探测结果的落库与告警。
+        """
+        try:
+            with self.app.app_context():
+                _check_monitor_interrupted(self.app, self.service, target_ids, loop_name)
+        except Exception:
+            logger.error(
+                "监控中断检测异常（本轮探测结果不受影响） loop=%s", loop_name, exc_info=True
+            )
+
+
     def run_round_sync(self, loop_name: str) -> int:
         """同步执行一轮探测（同 loop 下全部目标设备串行）。返回探测数量。"""
         target_ids = self.collect_target_ids(loop_name)
@@ -183,6 +213,7 @@ class StandaloneMonitorService:
     def _try_acquire_lock(self, loop_name: str) -> bool:
         if not self.use_redis_lock:
             return True
+        rate_limit = _resolve_rate_limit_enabled(self.app)
         try:
             if self._redis is None:
                 self._redis = _redis_client(self.app)
@@ -190,7 +221,9 @@ class StandaloneMonitorService:
                 f"MONITOR_INTERVAL_{loop_name.upper()}",
                 DEFAULT_LOOP_INTERVALS.get(loop_name, 60),
             )
-            return _acquire_lock(self._redis, loop_name, interval)
+            return _acquire_lock(
+                self._redis, loop_name, interval, rate_limit=rate_limit
+            )
         except Exception:
             degrade_mode = self.app.config.get("MONITOR_REDIS_DOWN_MODE", "skip")
             if degrade_mode == "execute":
@@ -220,7 +253,9 @@ class StandaloneMonitorService:
     async def _run_async_round(self, loop_name: str) -> int:
         """异步执行一轮探测（run_in_executor 并发）。返回本轮探测的设备数。"""
         if not self._try_acquire_lock(loop_name):
-            logger.info("本轮监控锁被其他进程持有，跳过 loop=%s", loop_name)
+            logger.info(
+                "本轮监控跳过（锁被他进程持有，或未到最小间隔）loop=%s", loop_name
+            )
             return 0
         try:
             watchdog_on = self.use_redis_lock and self._redis is not None
@@ -244,7 +279,14 @@ class StandaloneMonitorService:
                         await loop.run_in_executor(self._executor, self.check_one, did)
 
                 await asyncio.gather(*(run_one(d) for d in target_ids))
+                self._check_interrupted(target_ids, loop_name)
                 logger.info("监控一轮完成 loop=%s 设备数=%d", loop_name, len(target_ids))
+                try:
+                    from app.services.monitoring.round_metrics import record_round
+
+                    record_round(loop_name)
+                except Exception:  # noqa: BLE001
+                    logger.debug("监控轮次指标写入失败（已忽略） loop=%s", loop_name)
                 return len(target_ids)
         finally:
             self._release_lock(loop_name)

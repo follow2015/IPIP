@@ -59,20 +59,15 @@ class PermissionManager:
             return cached_result
 
         try:
-            from app.models.rbac import Role, Permission, RolePermission
-            from extensions import db
+            from app.persistence.rbac_repository import RoleRepository
 
-            role_obj = Role.query.filter_by(name=normalized_role).first()
+            repo = RoleRepository()
+            role_obj = repo.find_by_name(normalized_role)
             if not role_obj:
                 result = False
             else:
-                perm_codes = (
-                    db.session.query(Permission.code)
-                    .join(RolePermission, RolePermission.permission_id == Permission.id)
-                    .filter(RolePermission.role_id == role_obj.id)
-                    .all()
-                )
-                result = permission in {code for (code,) in perm_codes}
+                perm_codes = repo.list_permission_codes(role_obj.id)
+                result = permission in set(perm_codes)
         except Exception as e:
             logger.critical("RBAC 权限查询异常，拒绝访问(fail-close): %s", e, exc_info=True)
             result = False
@@ -101,20 +96,14 @@ class PermissionManager:
             return cached_permissions
 
         try:
-            from app.models.rbac import Role, Permission, RolePermission
-            from extensions import db
+            from app.persistence.rbac_repository import RoleRepository
 
-            role_obj = Role.query.filter_by(name=normalized_role).first()
+            repo = RoleRepository()
+            role_obj = repo.find_by_name(normalized_role)
             if not role_obj:
                 permissions = []
             else:
-                perm_codes = (
-                    db.session.query(Permission.code)
-                    .join(RolePermission, RolePermission.permission_id == Permission.id)
-                    .filter(RolePermission.role_id == role_obj.id)
-                    .all()
-                )
-                permissions = [code for (code,) in perm_codes]
+                permissions = repo.list_permission_codes(role_obj.id)
         except Exception as e:
             logger.critical("RBAC 角色权限查询异常，返回空权限(fail-close): %s", e, exc_info=True)
             permissions = []

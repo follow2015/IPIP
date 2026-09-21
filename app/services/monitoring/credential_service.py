@@ -282,30 +282,21 @@ class MonitorCredentialService:
         旧协议的模板组对新协议无意义，保留会导致监控数据页展示旧协议指标。
         用户可在新协议下手动重新绑定模板组。
         """
-        from app.models.device import Device
-        from app.models.monitor_credential import DeviceMonitorCredential, MonitorCredential
-        other_links = (
-            self._repo.session.query(DeviceMonitorCredential, MonitorCredential)
-            .join(MonitorCredential, MonitorCredential.id == DeviceMonitorCredential.credential_id)
-            .filter(
-                DeviceMonitorCredential.device_id == device_id,
-                MonitorCredential.protocol != keep_protocol,
-                MonitorCredential.enabled.is_(True),
-            )
-            .all()
-        )
+        other_links = self._repo.list_other_protocol_links(device_id, keep_protocol)
         if not other_links:
             return
         for link, cred in other_links:
             self._repo.unlink(cred.id, device_id)
-        self._repo.session.query(Device).filter(Device.id == device_id).update(
-            {Device.metric_template_group_id: None}, synchronize_session=False
+        from app.persistence.device_repository import DeviceRepository
+
+        DeviceRepository(session=self._repo.session).clear_metric_template_group(device_id)
+        from app.persistence.device_metric_latest_repository import (
+            DeviceMetricLatestRepository,
         )
-        from app.models.device_metric_latest import DeviceMetricLatest
-        self._repo.session.query(DeviceMetricLatest).filter(
-            DeviceMetricLatest.device_id == device_id
-        ).delete(synchronize_session=False)
-        self._repo.session.flush()
+
+        DeviceMetricLatestRepository(
+            session=self._repo.session
+        ).delete_by_device(device_id)
 
     def delete(self, device_id: int, protocol: str) -> None:
         cred = self._repo.find_enabled(device_id, protocol)

@@ -18,6 +18,10 @@
   线程加载的 ORM 对象），探测结束 finally: db.session.remove()。
 - 每把轮询循环各持一把 Redis 锁（monitor:lock:<loop>），TTL = 轮询间隔安全上限，
   正常一轮结束显式释放，进程崩溃时依赖 TTL 过期兜底。
+- ⚠️ 锁只保证**互斥**，不保证**限速**：抢不到锁的实例照样按自己的 interval 起轮
+  ⇒ 聚合频率 = interval ÷ 实例数（gunicorn 多 worker / celery / 独立采集服务并存时
+  实测 60 s 被打成 ≈18.9 s）。故另有最小间隔闸门 `monitor:rate:<loop>`
+  （见 `_rate_limit_allow`），同 loop 的全部实例共享一个 interval 配额。
 - 优雅退出：threading.Event 作 stop 信号；create_app 里注册 atexit 置位并 join 全部线程。
 """
 import threading
@@ -60,13 +64,104 @@ def _lock_ttl(interval: int) -> int:
     return max(int(interval) * 2, 600)
 
 
-def _acquire_lock(r, loop_name: str, interval: int) -> bool:
-    """尝试用 SET NX EX 抢占轮询锁。
+_RATE_LIMIT_LUA = """
+local t = redis.call('TIME')
+local now_ms = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
+local last = redis.call('GET', KEYS[1])
+if last then
+    local last_ms = tonumber(last)
+    if last_ms and (now_ms - last_ms) < tonumber(ARGV[1]) then
+        return 0
+    end
+end
+redis.call('SET', KEYS[1], tostring(now_ms), 'EX', tonumber(ARGV[2]))
+return 1
+"""
+
+
+def _rate_limit_allow(r, loop_name: str, interval: int) -> bool:
+    """最小间隔闸门：距上次放行不足 `interval` 则本轮跳过（不碰锁）。
+
+    Returns:
+        True = 可以继续去抢锁；False = 本轮被限速（已记入 `record_skip`）。
+
+    **降级（fail-open）**：Redis 执行不了脚本时放行。闸门只是限速语义，锁才是互斥
+    权威 —— 反过来（fail-closed）会把一次 Redis 能力缺失演变成"全网监控静默停摆"，
+    与 ○7 修过的故障同型。`MONITOR_RATE_LIMIT_ENABLED=false` 可整体关掉本闸门。
+
+    ⚠️ 重启语义（有意取舍）：判据以 Redis 里的上次轮次为准 ⇒ 重启后首轮最多等一个
+    interval。需要立刻探测就删 `monitor:rate:<loop>`，或临时关掉闸门开关。
+    """
+    try:
+        allowed = r.eval(
+            _RATE_LIMIT_LUA, 1, f"monitor:rate:{loop_name}",
+            str(max(int(interval), 1) * 1000), str(_lock_ttl(interval)),
+        )
+    except Exception:
+        logger.debug(
+            "监控最小间隔闸门不可用（本轮放行） loop=%s", loop_name, exc_info=True
+        )
+        return True
+
+    if allowed:
+        return True
+
+    try:
+        from app.services.monitoring.round_metrics import record_skip
+
+        record_skip(loop_name)
+    except Exception:  # noqa: BLE001  指标写失败不得影响采集
+        logger.debug("监控跳过计数写入失败（已忽略） loop=%s", loop_name)
+    return False
+
+
+def _resolve_rate_limit_enabled(app) -> bool:
+    """解析「最小间隔闸门」开关（热重载，默认开启）。
+
+    读取顺序与 `_resolve_loop_interval` 保持一致：动态配置（Redis/DB 双写，可在线
+    改，经 `MonitorDynamicConfig.get`）→ `app.config` → 默认 True。任一步失败都
+    降级到下一级，**不得抛错**（它在轮询循环里被调用）。
+
+    默认必须是**开**：关掉即回到"聚合频率 = interval ÷ 实例数"的放大状态，而配置值
+    看起来完全正常、没有任何报错。
+    """
+    cfg_key = "MONITOR_RATE_LIMIT_ENABLED"
+    try:
+        with app.app_context():
+            from app.services.monitoring.dynamic_config import MonitorDynamicConfig
+
+            val = MonitorDynamicConfig.get(cfg_key)
+        if val is not None:
+            return bool(val)
+    except Exception:
+        logger.debug("最小间隔闸门开关读取失败（回退配置默认值）", exc_info=True)
+    try:
+        return bool(app.config.get(cfg_key, True))
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _acquire_lock(r, loop_name: str, interval: int, rate_limit: bool = True) -> bool:
+    """尝试抢轮询锁：先过**最小间隔闸门**，再 SET NX EX 抢占。
+
+    Args:
+        rate_limit: 是否启用最小间隔闸门（默认 True）。显式传 False 用于现场排障
+            或需要无视节奏立刻跑一轮的场合；调用方通常经
+            `_resolve_rate_limit_enabled(app)` 解析配置后传入。
+
+    闸门与锁解决的是**两件不同的事**，缺一不可：
+      - 闸门（`monitor:rate:<loop>`）保证**频率**：距上次放行不足 interval 就跳过，
+        使聚合频率与实例数无关；
+      - 锁（`monitor:lock:<loop>`）保证**互斥**：同一时刻只有一个实例在采。
+    只有锁时聚合频率 = interval ÷ 实例数（实测 60 s → 18.9 s），这正是缺陷所在。
 
     成功（key 不存在，写入本进程 owner token，TTL=安全上限）返回 True；
-    失败（锁已被其他进程持有）返回 False。锁在每轮成功结束后由 release_owner_lock
-    显式释放，TTL 仅作为进程崩溃时的兜底（防止锁永不过期导致监控停摆）。
+    失败（未到最小间隔 / 锁已被其他进程持有）返回 False。锁在每轮成功结束后由
+    release_owner_lock 显式释放，TTL 仅作为进程崩溃时的兜底（防止锁永不过期导致
+    监控停摆）。
     """
+    if rate_limit and not _rate_limit_allow(r, loop_name, interval):
+        return False
     return bool(
         r.set(f"monitor:lock:{loop_name}", owner_token(),
               nx=True, ex=_lock_ttl(interval))
@@ -245,15 +340,10 @@ def _resolve_port_sync_enabled(device_id: int) -> bool:
     Returns:
         bool: 是否启用端口同步
     """
-    from extensions import db
-    from app.models.device_switch_ext import DeviceSwitchExt
+    from app.persistence.device_switch_ext_repository import DeviceSwitchExtRepository
     from app.services.monitoring.dynamic_config import MonitorDynamicConfig
 
-    ext = (
-        db.session.query(DeviceSwitchExt)
-        .filter_by(device_id=device_id)
-        .first()
-    )
+    ext = DeviceSwitchExtRepository().find_by_device_id(device_id)
     if ext is not None and ext.port_sync_enabled is not None:
         return bool(ext.port_sync_enabled)
 
@@ -305,13 +395,10 @@ def _try_sync_non_managed_ports(device) -> None:
         if device_type != "network":
             return
 
-        from app.models.switch_credentials import SwitchCredentials
-        from extensions import db
-        switch_cred = (
-            db.session.query(SwitchCredentials)
-            .filter_by(device_id=device.id)
-            .first()
-        )
+        from app.persistence.switch_ext_repository import SwitchExtRepository
+        from extensions import db  # 下面的 commit 需要（函数内导入 = 可测性支点）
+
+        switch_cred = SwitchExtRepository().get_by_device_id(device.id)
         has_ssh = bool(switch_cred and switch_cred.has_ssh)
 
         if not _resolve_port_sync_enabled(device.id):
@@ -603,8 +690,9 @@ def _resolve_loop_interval(app, loop_name: str, current: int) -> int:
 def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) -> None:
     """单个轮询循环（daemon 线程入口）。
 
-    每轮：动态读取 MONITOR_INTERVAL_<LOOP>（热重载）→ 抢 Redis 锁（TTL 随 interval
-    同步）→ 抢到则跑一轮 → stop_event.wait(interval)（可被 set 提前唤醒）。
+    每轮：动态读取 MONITOR_INTERVAL_<LOOP>（热重载）→ 过最小间隔闸门（同 loop 的
+    全部实例共享一个 interval 配额）→ 抢 Redis 锁（TTL 随 interval 同步）→ 抢到则
+    跑一轮 → stop_event.wait(interval)（可被 set 提前唤醒）。
     复用单一 ThreadPoolExecutor（与 standalone_service 一致），避免每轮新建销毁池。
     """
     monitor_service = _build_monitor_service()
@@ -617,7 +705,10 @@ def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) 
         while not stop_event.is_set():
             try:
                 interval = _resolve_loop_interval(app, loop_name, interval)
-                if _acquire_lock(r, loop_name, interval):
+                if _acquire_lock(
+                    r, loop_name, interval,
+                    rate_limit=_resolve_rate_limit_enabled(app),
+                ):
                     try:
                         with _LockWatchdog(r, loop_name, interval):
                             stats = _run_one_round(
@@ -631,6 +722,12 @@ def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) 
                                 "监控轮询一轮有失败 loop=%s checked=%d failed=%d total=%d",
                                 loop_name, stats["checked"], stats["failed"], stats["total"],
                             )
+                        try:
+                            from app.services.monitoring.round_metrics import record_round
+
+                            record_round(loop_name)
+                        except Exception:  # noqa: BLE001
+                            logger.debug("监控轮次指标写入失败（已忽略） loop=%s", loop_name)
                     except Exception:
                         logger.error("监控轮询一轮异常（已吞掉，继续循环） loop=%s", loop_name, exc_info=True)
                     finally:
@@ -655,7 +752,7 @@ def start_monitor_worker(app) -> tuple[list[threading.Thread], threading.Event]:
     """启动全部轮询循环（由协议注册表 worker_loops() 驱动），返回 (threads, stop_event)。
 
     每个 worker_loop 启动一个 daemon 线程；轮询间隔按 loop 名解析
-    `MONITOR_INTERVAL_<LOOP.upper()>`（回退默认值 snmp=60 / bmc=300）。
+    `MONITOR_INTERVAL_<LOOP.upper()>`（回退默认值 snmp=60 / bmc=60；单一真源 `protocol_registry.DEFAULT_LOOP_INTERVALS`）。
     优雅退出由调用方（create_app）注册 atexit 置位 stop_event 并 join 全部线程。
 
     新增协议只要注册表声明新的 worker_loop，此处自动多起一个线程，无需散点改动。

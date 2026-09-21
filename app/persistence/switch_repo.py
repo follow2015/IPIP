@@ -17,6 +17,7 @@ from sqlalchemy.orm import joinedload, contains_eager
 from app.exceptions.data_access import QueryExecutionError
 
 from app.persistence.base import BaseRepository
+from app.core.pagination_limits import ensure_offset_within_limit
 from app.models.switch_credentials import SwitchCredentials, SwitchPortIP
 from app.models.network_port import NetworkPort
 from app.models.device import Device
@@ -284,6 +285,7 @@ class SwitchRepository(BaseRepository):
 
         total = query.count()
         offset = (page - 1) * page_size
+        ensure_offset_within_limit(offset)
         items = query.offset(offset).limit(page_size).all()
 
         device_ids_on_page = [item.id for item in items]

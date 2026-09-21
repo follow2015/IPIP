@@ -13,7 +13,6 @@ from typing import Any, Dict, List, Optional
 from app.models.ai_diagnosis_session import AIDiagnosisSession
 from app.utils.logging import get_logger
 from extensions import db
-from sqlalchemy import or_
 
 logger = get_logger(__name__)
 
@@ -38,14 +37,10 @@ def _device_name_of(device_id: Optional[int]) -> Optional[str]:
     """
     if not device_id:
         return None
-    from app.models.device import Device
+    from app.persistence.device_repository import DeviceRepository
 
-    name = (
-        db.session.query(Device.device_name)
-        .filter(Device.id == device_id)
-        .scalar()
-    )
-    return name or None
+    device = DeviceRepository().find_by_id(device_id)
+    return getattr(device, "device_name", None) or None
 
 
 class DiagnosisSessionService:
@@ -149,19 +144,13 @@ class DiagnosisSessionService:
         if not incident_id:
             return
         try:
-            from app.models.monitor_incident import MonitorIncident
-
             summary = self._extract_summary(session.final_answer_json)
             if summary and session.status != "completed":
                 summary = f"[{session.status}] {summary}"
-            db.session.query(MonitorIncident).filter(
-                MonitorIncident.id == incident_id
-            ).update(
-                {
-                    "ai_diagnosis_session_id": session.id,
-                    "ai_diagnosis_summary": summary,
-                },
-                synchronize_session=False,
+            from app.persistence.monitor_incident_repository import IncidentRepository
+
+            IncidentRepository().set_diagnosis_backfill(
+                incident_id, session.id, summary,
             )
             db.session.flush()
         except Exception:  # noqa: BLE001 - 旁路：写回失败不阻断会话结束
@@ -248,20 +237,14 @@ class DiagnosisSessionService:
                 logger.warning("数据域解析失败，按无限制处理 user_id=%s", user_id)
                 visible = None
 
-        query = db.session.query(AIDiagnosisSession)
-        if visible is not None:
-            query = query.filter(
-                or_(
-                    AIDiagnosisSession.device_id.in_(list(visible)),
-                    AIDiagnosisSession.device_id.is_(None),
-                )
-            )
-        if device_id:
-            if visible is not None and device_id not in visible:
-                return None
-            query = query.filter_by(device_id=device_id)
+        if device_id and visible is not None and device_id not in visible:
+            return None
 
-        rows = query.order_by(AIDiagnosisSession.created_at.desc()).limit(limit).all()
+        from app.persistence.ai_diagnosis_session_repository import (
+            AIDiagnosisSessionRepository,
+        )
+
+        rows = AIDiagnosisSessionRepository().list_for_user(visible, device_id, limit)
         return [r.to_dict() for r in rows]
 
     def list_rollback_failures(self, limit: int = 50) -> List[Dict[str, Any]]:
@@ -270,24 +253,20 @@ class DiagnosisSessionService:
         Phase 4.4：设备滞留"已变更未回滚"的中间态是最危险的状态，
         不能让运维误以为已恢复，故需持续告警（路由层原为直接拼查询）。
         """
-        rows = (
-            db.session.query(AIDiagnosisSession)
-            .filter_by(rollback_failed=True)
-            .order_by(AIDiagnosisSession.created_at.desc())
-            .limit(limit)
-            .all()
+        from app.persistence.ai_diagnosis_session_repository import (
+            AIDiagnosisSessionRepository,
         )
+
+        rows = AIDiagnosisSessionRepository().list_rollback_failed(limit)
         return [r.to_dict() for r in rows]
 
     def get_history_by_device(
         self, device_id: int, limit: int = 10
     ) -> List[Dict[str, Any]]:
         """查某设备的历史诊断会话（"这台设备上次同样故障怎么修的"）。"""
-        rows = (
-            db.session.query(AIDiagnosisSession)
-            .filter_by(device_id=device_id)
-            .order_by(AIDiagnosisSession.created_at.desc())
-            .limit(limit)
-            .all()
+        from app.persistence.ai_diagnosis_session_repository import (
+            AIDiagnosisSessionRepository,
         )
+
+        rows = AIDiagnosisSessionRepository().list_by_device(device_id, limit)
         return [r.to_dict() for r in rows]

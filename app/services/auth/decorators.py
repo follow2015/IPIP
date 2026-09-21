@@ -161,10 +161,10 @@ def permission_required(*permissions):
         @login_required
         def decorated_function(*args, **kwargs):
             from app.api.base import APIResponse, ErrorCode
-            from app.models.user import User
+            from app.persistence.user_repository import UserRepository
 
             user_id = g.current_user.get("user_id")
-            user = User.query.get(user_id)
+            user = UserRepository().find_by_id(user_id)
 
             if not user:
                 return APIResponse.error("用户不存在", ErrorCode.AUTHENTICATION_ERROR, 401)
@@ -203,10 +203,10 @@ def sse_permission_required(*permissions):
         @wraps(f)
         @sse_login_required
         def decorated_function(*args, **kwargs):
-            from app.models.user import User
+            from app.persistence.user_repository import UserRepository
 
             user_id = g.current_user.get("user_id")
-            user = User.query.get(user_id)
+            user = UserRepository().find_by_id(user_id)
 
             if not user:
                 return _sse_error_response("用户不存在", 401)
@@ -237,10 +237,10 @@ def role_required(*roles):
         @login_required
         def decorated_function(*args, **kwargs):
             from app.api.base import APIResponse, ErrorCode
-            from app.models.user import User
+            from app.persistence.user_repository import UserRepository
 
             user_id = g.current_user.get("user_id")
-            user = User.query.get(user_id)
+            user = UserRepository().find_by_id(user_id)
 
             if not user:
                 return APIResponse.error("用户不存在", ErrorCode.AUTHENTICATION_ERROR, 401)

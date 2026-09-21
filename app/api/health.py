@@ -56,6 +56,17 @@ def health_check():
     except Exception:  # noqa: BLE001  心跳视图失败不应让健康检查端点 500
         current_app.logger.warning("健康检查心跳视图生成失败（已忽略）")
 
+    try:
+        from app.services.monitoring.round_metrics import snapshot as _rounds_snapshot
+
+        _rounds = _rounds_snapshot()
+        status["monitor_rounds"] = {
+            "source": _rounds.get("metrics_source"),
+            "loops": _rounds.get("loops") or {},
+        }
+    except Exception:  # noqa: BLE001  节奏视图失败不应让健康检查端点 500
+        current_app.logger.warning("健康检查采集节奏视图生成失败（已忽略）")
+
     http_status = 200 if status["overall_status"] == "healthy" else 503
 
     return APIResponse.success(data=status, message="健康检查完成", status_code=http_status)

@@ -12,6 +12,7 @@ from app.utils.time_utils import now_utc_naive
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.models.user_log import UserLog
+from app.core.pagination_limits import ensure_offset_within_limit
 from extensions import db
 from flask import g
 
@@ -186,6 +187,7 @@ class UserLogRepository:
             total_pages = max(1, (total_count + page_size - 1) // page_size)
             page        = max(1, min(page, total_pages))
             offset      = (page - 1) * page_size
+            ensure_offset_within_limit(offset)
             data        = query.limit(page_size).offset(offset).all()
 
             return {

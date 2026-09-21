@@ -35,6 +35,16 @@ import time
 
 logger = get_logger(__name__)
 
+from app.persistence.notification_repository import (
+    NotificationReceiptRepository,
+    NotificationRepository,
+)
+from app.persistence.user_repository import UserRepository
+
+_notification_repo = NotificationRepository()
+_user_repo = UserRepository()
+_receipt_repo = NotificationReceiptRepository()
+
 _delivery_queue: "queue.Queue[dict]" = queue.Queue(maxsize=1000)
 _COOLDOWN_SECONDS = 300  # 同 type+source+channel 5 分钟内只投递一次，inbox 不受影响
 
@@ -165,26 +175,23 @@ def _prefetch_targets(notification, raw_user_ids) -> tuple[list, dict, dict]:
     A-P1-2：替代「每用户 2 次查询」（500 人广播 = 1000 次 DB 往返）。
     ⚠️ notify() 主流程早有同族修法（`notification_service.py` 的 "n1"：
     "批量加载用户（一次 IN 查询）替代逐用户 find_by_id 的 N+1"），但只覆盖了**创建侧**、
-    漏了**投递侧**，本处补齐。
+    漏了**投递侧**，本处补齐。B-42①：数据访问统一走仓储（与 notify 同源），
+    不再裸 `Model.query` —— 消除"仓储过滤软删除、裸 query 不过滤"的语义分叉。
 
     ⚠️ 已知边界（**未分块**）：`user_ids` 直接进 `IN`。广播可达数千用户，大 IN 会受
     MySQL `max_allowed_packet` / `range_optimizer_max_mem_size` 与 SQLite 绑定变量上限影响。
     不改的理由：创建侧对同一批 `user_ids` 早就是同样的未分块 `IN`，此处不引入新形态。
     """
-    from app.models.notification import NotificationReceipt
-    from app.models.user import User
-
     user_ids = raw_user_ids or []
     users_by_id: dict = {}
     receipts_by_user: dict = {}
     if not user_ids:
         return user_ids, users_by_id, receipts_by_user
 
-    users_by_id = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
-    for receipt in NotificationReceipt.query.filter(
-        NotificationReceipt.notification_id == notification.id,
-        NotificationReceipt.user_id.in_(user_ids),
-    ).all():
+    users_by_id = {u.id: u for u in _user_repo.find_by_ids(user_ids)}
+    for receipt in _receipt_repo.find_by_notification_and_users(
+        notification.id, user_ids,
+    ):
         receipts_by_user.setdefault(receipt.user_id, receipt)
     return user_ids, users_by_id, receipts_by_user
 
@@ -217,13 +224,12 @@ def _commit_without_expire(session) -> None:
 
 def _process_one(app, task: dict) -> None:
     """处理一条投递任务"""
-    from app.models.notification import Notification
     from app.services.notification_service import NotificationService
     from extensions import db
 
     try:
         with app.app_context():
-            notification = Notification.query.get(task["notification_id"])
+            notification = _notification_repo.find_by_id(task["notification_id"])
             if not notification:
                 return
 
@@ -378,20 +384,13 @@ def recover_pending_deliveries(app, lookback_hours: int = _RECOVER_LOOKBACK_HOUR
     """
     from datetime import timedelta
 
-    from app.models.notification import Notification, NotificationReceipt
     from app.utils.time_utils import now_utc_naive
-    from extensions import db
 
     try:
         with app.app_context():
             cutoff = now_utc_naive() - timedelta(hours=lookback_hours)
-            rows = (
-                db.session.query(NotificationReceipt, Notification.id)
-                .join(Notification, Notification.id == NotificationReceipt.notification_id)
-                .filter(Notification.created_at >= cutoff)
-                .order_by(Notification.id.desc())
-                .limit(max_tasks * 5)
-                .all()
+            rows = _notification_repo.find_recent_receipts_with_notification_id(
+                cutoff, limit=max_tasks * 5,
             )
             by_notification: dict = {}
             for receipt, nid in rows:

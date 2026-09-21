@@ -161,6 +161,14 @@ class Config:
     MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
     MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "ip_management")
 
+    _CH_URL = os.getenv("CLICKHOUSE_URL", "").strip()
+    CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "127.0.0.1")
+    CLICKHOUSE_PORT = _env_num("CLICKHOUSE_PORT", 8123)
+    CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "default")
+    CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "")
+    CLICKHOUSE_DB = os.getenv("CLICKHOUSE_DB", "ipip_monitor")
+    CLICKHOUSE_HTTP_URL = _CH_URL or f"http://{CLICKHOUSE_HOST}:{CLICKHOUSE_PORT}"
+
     AI_PROVIDER = os.getenv("AI_PROVIDER", "openai")  # openai/anthropic/custom
     AI_API_KEY = os.getenv("AI_API_KEY", "")
     AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1")
@@ -373,6 +381,10 @@ class Config:
     MONITOR_INCIDENT_CHANGE_WINDOW = _env_num("MONITOR_INCIDENT_CHANGE_WINDOW", 300)  # L3 变更回溯窗秒
 
     MONITOR_WORKER_IN_PROCESS = os.getenv("MONITOR_WORKER_IN_PROCESS", "true").lower() == "true"
+
+    MONITOR_RATE_LIMIT_ENABLED = os.getenv(
+        "MONITOR_RATE_LIMIT_ENABLED", "true"
+    ).lower() == "true"
 
     MONITOR_OUTBOX_LOCK_ENABLED = os.getenv("MONITOR_OUTBOX_LOCK_ENABLED", "true").lower() == "true"
 

@@ -134,7 +134,9 @@ class BaseWebhookChannel(BroadcastChannel):
         Returns:
             bool: 是否至少有一条配置投递成功。
         """
-        configs = WebhookConfig.query.filter_by(channel=self.channel_type, enabled=True).all()
+        from app.persistence.webhook_config_repository import WebhookConfigRepository
+
+        configs = WebhookConfigRepository().list_enabled_by_channel(self.channel_type)
         if not configs:
             return False
 

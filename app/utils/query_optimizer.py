@@ -16,6 +16,8 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Query, Session
 
+from app.core.pagination_limits import ensure_offset_within_limit
+
 logger = get_logger(__name__)
 
 
@@ -147,6 +149,7 @@ class QueryOptimizer:
             Tuple[List[Any], int]: (数据列表, 总数)
         """
         offset = (page - 1) * page_size
+        ensure_offset_within_limit(offset)
         
         count_query = query.statement.with_only_columns([query.statement.c.id]).alias()
         total_count = query.session.execute(

@@ -12,7 +12,7 @@ Task 0.4：复用 BaseService.session，提供 save_turn / list_recent。
 from typing import List
 
 from app.models.ai_conversation import AIConversation
-from app.services.base import BaseService
+from app.persistence.base_service import BaseService
 
 _MAX_CONTENT_LENGTH = 10000
 _MAX_SCENARIO_LENGTH = 50

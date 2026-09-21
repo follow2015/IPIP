@@ -26,6 +26,7 @@ from app.utils.idempotency import idempotent, upload_file_idempotency_key
 from app.utils.time_utils import now_utc_naive
 from app.utils.transactional import transactional
 from app.services import device_import_service
+from app.services import import_export_service
 from app.services.switch_events import emit_resource_change_global
 
 logger = get_logger(__name__)
@@ -130,6 +131,9 @@ def export_devices():
         return APIResponse.error(message="导出功能依赖未安装，请联系管理员", status_code=500)
     except device_import_service.EmptyExportError:
         return APIResponse.error(message="没有可导出的设备数据", status_code=404)
+    except import_export_service.ExportTooLargeError as e:
+        logger.warning("导出设备数据超限: %s", str(e))
+        return APIResponse.error(message=e.message, status_code=e.status_code)
     except Exception as e:
         logger.error("导出设备数据失败: %s", str(e))
         return APIResponse.error(message="操作失败", status_code=500)

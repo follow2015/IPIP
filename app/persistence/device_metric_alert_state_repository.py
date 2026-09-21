@@ -101,6 +101,14 @@ class DeviceMetricAlertStateRepository:
             .all()
         )
 
+    def delete_by_device(self, device_id: int) -> int:
+        """清空该设备的指标告警态行（B-44 收敛：设备彻底删除的清理面）。"""
+        return (
+            self.session.query(DeviceMetricAlertState)
+            .filter_by(device_id=device_id)
+            .delete()
+        )
+
     def is_monitor_interrupted(self, device_id: int) -> bool:
         return device_id in self.interrupted_device_ids()
 

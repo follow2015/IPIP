@@ -40,6 +40,20 @@ requests==2.34.2
 textfsm==2.1.0
 reportlab==4.5.1  # 客户终止存档 PDF 生成（惰性 import，决策见 docs/CUSTOMER_TERMINATED_PLAN.md §4.4.1）
 PyYAML==6.0.3  # 配置/种子与脚本（如 import_zabbix_templates.py）
+
+# ── 时序存储：ClickHouse 客户端（>300 台切 CH 时的接入层）──────────────
+# 决策与论证见 code_review/ClickHouse时序存储落地设计-20260920.md §4.1 / §4.9（v1.4 改判）。
+# 为什么不用现有 requests 手写 TSV：原选型给 requests 的唯一硬理由是"零新依赖"，该约束
+# 解除后，手写序列化（\N NULL、\t \n \\ 转义、Decimal/DateTime64 时区、NaN/Inf、数组字面量）
+# 只剩正确性负债 —— 转义错一次即整批拒写或静默串列。本库自带 FORMAT Native 列式序列化，
+# 走 HTTP :8123（仍不开 native TCP :9000），并协商 LZ4/ZSTD 压缩。
+# 传递依赖由 pip 解析（urllib3 / certifi / lz4）；Python>=3.14 的 zstd 走标准库（PEP 784），
+# 故**不需要** zstandard。⚠️ 本包是平台相关 wheel（内含预编译 C 加速扩展），离线部署机
+# 需按平台预热（pip download --only-binary=:all:）。⚠️ 元数据 Requires-Python = >=3.10,<3.15
+# ⇒ 升到 3.15 时 pip 安装会直接失败，升级 Python 前须先确认上游放宽上界。
+# 精确 pin 同其它运行时依赖；升级需同步验证测试（含 code_review/ch_client_roundtrip_probe.py）。
+clickhouse-connect==1.8.0
+
 # ── AI 长任务异步底座（Celery worker 独立进程）────────────────────
 # broker 与 result backend 均复用既有 Redis（db 1 / db 2 分离），不引入新中间件。
 celery==5.6.3

@@ -162,10 +162,10 @@ class RemedialExecutor:
 
             config_hash = hashlib.sha256(raw_config.encode("utf-8")).hexdigest()
 
-            existing = (
-                db.session.query(DeviceConfigBackup)
-                .filter_by(device_id=device_id, config_hash=config_hash)
-                .first()
+            from app.persistence.device_config_backup_repository import DeviceConfigBackupRepository
+
+            existing = DeviceConfigBackupRepository().find_one(
+                filters={"device_id": device_id, "config_hash": config_hash},
             )
             if existing:
                 return existing.id

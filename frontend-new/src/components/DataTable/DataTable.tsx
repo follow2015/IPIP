@@ -5,6 +5,7 @@ import type { TableProps, TablePaginationConfig, CheckboxProps } from 'antd';
 import type { UseTableReturn } from '@/hooks/useTable';
 import SearchInput from '@/components/SearchInput';
 import { useResponsive } from '@/hooks/useResponsive';
+import { formatLimitHint, isBeyondOffsetLimit } from './serverPagination';
 
 type CheckboxChangeEvent = Parameters<NonNullable<CheckboxProps['onChange']>>[0];
 
@@ -100,9 +101,12 @@ function DataTable<T extends object>({
       : pagination !== false
         ? pagination?.onChange
         : undefined);
+  const beyondOffsetLimit = isBeyondOffsetLimit(resolvedTotal);
   const basePagination: TablePaginationConfig = showAsCard
     ? { simple: true, showSizeChanger: false, showQuickJumper: false }
-    : { showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 条` };
+    : beyondOffsetLimit
+      ? { showSizeChanger: true, showQuickJumper: false, showTotal: formatLimitHint }
+      : { showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 条` };
   const paginationConfig: false | TablePaginationConfig =
     pagination === false
       ? false

@@ -16,8 +16,6 @@ from app.utils.time_utils import now_utc_naive
 from app.core.enums import ChannelType, PERSONAL_CHANNELS, SeverityLevel
 from app.models.notification import Notification, NotificationReceipt
 from app.models.user import User
-from app.core.enums import UserStatus
-from app.models.rbac import Role, UserRole
 from app.persistence.notification_repository import NotificationRepository, NotificationReceiptRepository
 from app.persistence.user_repository import UserRepository
 from app.services.channels.base import PersonalChannel, BroadcastChannel
@@ -391,32 +389,21 @@ class NotificationService:
 
     def _resolve_targets(self, target_type: str, target_id) -> list[int]:
         """将 target_type/target_id 解析为 user_id 列表。"""
-        session = self._user_repo.session
         if target_type == "user":
             if target_id is None:
                 logger.warning("通知目标 target_type=user 但 target_id 为空，跳过投递")
                 return []
             return [int(target_id)]
         elif target_type == "role":
-            role = session.query(Role).filter_by(name=str(target_id)).first()
-            if not role and str(target_id).isdigit():
-                role = session.query(Role).get(int(target_id))
+            role = self._user_repo.find_role_by_name_or_id(target_id)
             if not role:
                 logger.warning(
                     "通知目标角色不存在: target_type=role target_id=%s", target_id
                 )
                 return []
-            user_ids = [
-                ur.user_id
-                for ur in session.query(UserRole).filter_by(role_id=role.id).all()
-            ]
-            active = session.query(User.id).filter(
-                User.id.in_(user_ids), User.status == UserStatus.ACTIVE
-            ).all()
-            return [row[0] for row in active]
+            return self._user_repo.list_active_ids_for_role(role.id)
         elif target_type == "broadcast":
-            active = session.query(User.id).filter_by(status=UserStatus.ACTIVE).all()
-            return [row[0] for row in active]
+            return self._user_repo.list_all_active_ids()
         else:
             logger.warning("未知 target_type: %s", target_type)
             return []

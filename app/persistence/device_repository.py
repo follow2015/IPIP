@@ -8,17 +8,18 @@ import random
 import re
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 from app.utils.time_utils import now_utc_naive
 
-from sqlalchemy import case, distinct, func, or_
+from sqlalchemy import and_, case, distinct, func, or_
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import Query, joinedload
 
 from app.models.device import Device
 from app.core.enums import DeviceStatus
 from app.persistence.base import SQLAlchemyRepository, QueryOptimizationMixin
 from app.exceptions.data_access import QueryExecutionError
+from app.core.pagination_limits import ensure_offset_within_limit
 from app.utils.query_optimizer import monitor_query_performance
 from extensions import db
 
@@ -41,18 +42,207 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def __init__(self, session=None):
         super().__init__(Device, session)
 
-    def find_ids_by_responsible_person(self, user_id: int) -> List[int]:
+    def find_ids_by_responsible_person(
+        self, user_id: int, alive_only: bool = False,
+    ) -> List[int]:
         """查询指定用户负责的设备 ID 列表（供告警历史「我负责的」过滤）。
 
         由 ``monitor_routes.list_alerts`` 的 scope=mine 分支调用，
         避免在 API 路由层直接操作 db.session（项目约束：数据库必须走 Repository 层）。
+
+        ⚠️ ``alive_only`` 是**两个调用点的口径分歧**（B-44 收敛时发现，勿合并）：
+        · ``False``（默认，告警历史）：**含**已软删设备 —— 历史记录的作用域按
+          "当时谁负责"还原，设备删了也要能看到它那条历史；
+        · ``True``（monitor_service 的 alert 看板 scope=mine）：**排除**已软删设备
+          —— 看板是"当前"视图，已删设备不该出现。
+        合并成一个口径必然改错其中一处的可见内容。
         """
+        query = self.session.query(Device.id).filter(
+            Device.responsible_person == user_id
+        )
+        if alive_only:
+            query = query.filter(Device.deleted_at.is_(None))
+        return [r.id for r in query.all()]
+
+    def find_by_management_ip(self, ip_address: str) -> Optional[Device]:
+        """按 ``management_ip`` 查设备（软删除除外；B-44 收敛：SNMP Trap 源 IP 解析）。
+
+        走 `_base_query()`：Trap 处理必须忽略已软删设备（原实现显式带
+        ``deleted_at IS NULL``，换仓储后由基查询统一保证）。
+        """
+        return (
+            self._base_query()
+            .filter(Device.management_ip == ip_address)
+            .first()
+        )
+
+    def list_switch_ids_by_cabinet_ids(self, cabinet_ids) -> List[int]:
+        """取机柜集合内的交换机设备 ID（排除软删；B-44 部署计划批）。
+
+        ⚠️ "交换机" = ``device_type == "network"`` **且**
+        ``device_subtype == "switch"``（两个条件都要 —— 只认 type 会把
+        路由器/防火墙也算成交换机，二层域会被拖大）。
+        """
+        ids = tuple(cabinet_ids)
+        if not ids:
+            return []
         rows = (
-            self.session.query(Device.id)
-            .filter(Device.responsible_person == user_id)
+            self._base_query()
+            .filter(
+                Device.cabinet_id.in_(ids),
+                Device.device_type == "network",
+                Device.device_subtype == "switch",
+            )
             .all()
         )
-        return [r.id for r in rows]
+        return [d.id for d in rows]
+
+    def list_by_management_ip(self, ip_address: str) -> List[Device]:
+        """按 `management_ip` 取**全部**匹配设备（软删除除外；B-44 拓扑批收敛）。
+
+        ⚠️ 与 `find_by_management_ip` **刻意不同**：那个返 `.first()`（Trap 解析"认一台"），
+        这个返**列表** —— 拓扑对端解析要判"**命中多台即歧义**"（拿列表长度说话），
+        退化成 `.first()` 会把歧义静默变成"随便挑一台画进拓扑"。
+        """
+        return (
+            self._base_query()
+            .filter(Device.management_ip == ip_address)
+            .all()
+        )
+
+    def list_by_name(self, name: str) -> List[Device]:
+        """按 `device_name` **或** `hostname` 精确等于 ``name`` 取全部设备（软删除除外）。
+
+        ⚠️ **单个名字**，不是候选列表 —— 拓扑对端解析是"候选名**逐个**试、首个唯一命中
+        即返回"，把候选列表一次性塞进 ``IN`` 会把"名1 命中 A、名2 命中 B"从
+        "返回 A"变成"判为歧义"（**语义改变**）。候选循环与歧义策略属业务逻辑，
+        留在 service；仓储只答"这个名字命中哪几台"。
+
+        返回**列表**：调用方要判"命中多台即歧义"（拿长度说话），退化成 `.first()`
+        会把歧义静默变成"随便挑一台画进拓扑"。排除软删由 `_base_query()` 统一保证
+        （B-43 口径：已删设备不得被画进拓扑）。
+        """
+        return (
+            self._base_query()
+            .filter(
+                or_(
+                    Device.device_name == name,
+                    Device.hostname == name,
+                )
+            )
+            .all()
+        )
+
+
+    def topology_switch_query(self) -> Query:
+        """拓扑用「网络设备」查询构造器（预加载 switch_ext + cabinet.room）。
+
+        · `outerjoin(DeviceSwitchExt)`：**LEFT** —— 没有 switch_ext 记录的网络设备
+          （路由器/防火墙）也必须出现在拓扑里（改成 inner join 会静默丢节点）。
+        · ⚠️ **不过滤软删**（与原实现逐字一致）：本构造器不调用 `_base_query()`。
+          是否应排除已软删设备属**口径拍板**（同域 `topology_query_service` 显式
+          `deleted_at.is_(None)`，两处口径不一致，已登记待办 —— 不在本批暗改）。
+        """
+        from app.models.cabinet import Cabinet
+        from app.models.device_switch_ext import DeviceSwitchExt
+
+        return (
+            self.session.query(Device)
+            .filter(Device.device_type == "network")
+            .outerjoin(DeviceSwitchExt, DeviceSwitchExt.device_id == Device.id)
+            .options(
+                joinedload(Device.switch_ext),
+                joinedload(Device.cabinet).joinedload(Cabinet.room),
+            )
+        )
+
+    def topology_device_query(
+        self, device_types: Sequence[str], *,
+        with_customer: bool = False, alive_only: bool = False,
+    ) -> Query:
+        """拓扑用「设备」查询构造器（预加载 switch_ext + cabinet.room[/customer]）。
+
+        Args:
+            device_types: 参与拓扑的设备类型（调用方传，勿在仓储里写死）
+            with_customer: 是否额外预加载 `customer`（拓扑索引页要客户名，按需）
+            alive_only: 是否排除已软删设备。**默认 False = 保持原实现语义**
+                （`topology_service` 的两处调用点原本不过滤）；索引页调用点传 True
+                （它原本就显式 `deleted_at.is_(None)`）。⚠️ 两个调用点口径不同，
+                故做成开关而不是统一 —— 统一会静默改变其中一处的可见设备集。
+        """
+        from app.models.cabinet import Cabinet
+
+        query = (
+            self.session.query(Device)
+            .filter(Device.device_type.in_(list(device_types)))
+            .options(
+                joinedload(Device.switch_ext),
+                joinedload(Device.cabinet).joinedload(Cabinet.room),
+            )
+        )
+        if with_customer:
+            query = query.options(joinedload(Device.customer))
+        if alive_only:
+            query = query.filter(Device.deleted_at.is_(None))
+        return query
+
+    def find_switch_with_topology(self, device_id: int) -> Optional[Device]:
+        """按 ID 取**网络设备**并预加载拓扑所需关联（星形拓扑的中心交换机）。
+
+        ⚠️ 带 `Device.device_type == "network"` 条件：传非网络设备返回 None
+        （调用方据此返回空拓扑），**不是**普通 `find_by_id` 的别名。
+        不预加载 customer（星形拓扑不展示客户名，按需再加）。
+        """
+        from app.models.cabinet import Cabinet
+
+        return (
+            self.session.query(Device)
+            .filter(Device.id == device_id, Device.device_type == "network")
+            .options(
+                joinedload(Device.switch_ext),
+                joinedload(Device.cabinet).joinedload(Cabinet.room),
+            )
+            .first()
+        )
+
+    def list_by_ids_with_topology(self, device_ids: Sequence[int]) -> List[Device]:
+        """按 ID 列表批量取设备并预加载拓扑关联（**替代二次查询**）。
+
+        空列表返回 `[]`（调用方用 `if peer_ids else []` 保护过，语义一致）。
+        不过滤软删（与原实现一致，见 `topology_switch_query` 的口径说明）。
+        """
+        if not device_ids:
+            return []
+        from app.models.cabinet import Cabinet
+
+        return (
+            self.session.query(Device)
+            .options(
+                joinedload(Device.switch_ext),
+                joinedload(Device.cabinet).joinedload(Cabinet.room),
+            )
+            .filter(Device.id.in_(tuple(device_ids)))
+            .all()
+        )
+
+    def clear_metric_template_group(self, device_id: int) -> int:
+        """把设备的模板组绑定置空（B-44 收敛：监控协议切换时清理）。
+
+        协议切换后旧协议的模板组对新协议无意义，保留会让监控数据页展示旧协议指标。
+        走 `_base_query()` ⇒ 已软删设备**不被这条旁路写入**（update 的命中语义
+        必须与其余设备查询一致，否则"已删行仍被改"又是一处分叉 —— B-43 同款）。
+
+        Returns:
+            int: 受影响行数（0 = 设备不存在或已软删）
+        """
+        return (
+            self._base_query()
+            .filter(Device.id == device_id)
+            .update(
+                {Device.metric_template_group_id: None},
+                synchronize_session=False,
+            )
+        )
 
     def find_ids_by_room_ids(self, room_ids: List[int]) -> List[int]:
         """查询位于指定机房列表内的设备 ID（供 data_scope_service room 模式使用）。"""
@@ -113,6 +303,34 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             from flask import abort
             abort(404)
         return device
+
+    def find_id_name_map(self, device_ids: list, include_deleted: bool = False) -> dict:
+        """批量取 id → device_name 映射（B-43：替代 device_service 的裸 query 快照）
+
+        只 SELECT 两列（不 joinedload）——原调用点就是"名字快照"用途，
+        换成 find_by_ids 会额外加载三张关联表，对批量路径是明显放大。
+
+        ``include_deleted``：**口径必须由调用方显式声明**。告警留痕快照
+        （永久删除链路，设备必已软删）要 ``True`` 才能取到名字，否则快照写 None。
+        """
+        if not device_ids:
+            return {}
+        query = self.session.query(Device.id, Device.device_name)
+        if not include_deleted:
+            query = self._base_query().with_entities(Device.id, Device.device_name)
+        return dict(query.filter(Device.id.in_(device_ids)).all())
+
+    def find_deleted_by_device_name(self, device_name: str) -> Optional[Device]:
+        """按名称查找**已软删除**的设备（B-43：机箱节点恢复场景）
+
+        恢复逻辑要先确认"这个名字的原子节点确实在回收站里"，故必须
+        **只匹配已删**（含活设备的匹配会让恢复逻辑误改未删除设备）。
+        """
+        return (
+            self.session.query(Device)
+            .filter(Device.device_name == device_name, Device.deleted_at.isnot(None))
+            .first()
+        )
 
     def find_by_id_including_deleted(self, device_id: int) -> Optional[Device]:
         """查询设备（含已软删除），用于回收站恢复场景"""
@@ -238,6 +456,96 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
         except SQLAlchemyError as e:
             raise QueryExecutionError("查找设备失败", original_error=e)
+
+    def find_by_customer_id_ordered(
+        self, customer_id: int, limit: Optional[int] = None,
+        device_ids: Optional[List[int]] = None,
+    ) -> List[Device]:
+        """按客户取设备（id 升序，可选 limit / 数据域过滤；B-44 收敛）
+
+        ⚠️ 与 `find_by_customer_id` 的区别：**不过滤 SCRAPPED 状态** —— 两处调用点
+        （AI 客户实体解析、AI「客户设备能力」）的口径是"客户名下有哪些设备"，
+        含报废设备；且 `device_ids` 为数据域白名单（``None`` = 不限）。
+        """
+        query = self._base_query().filter(Device.customer_id == customer_id)
+        if device_ids is not None:
+            query = query.filter(Device.id.in_(device_ids))
+        query = query.order_by(Device.id)
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
+
+    def count_by_customer_id(
+        self, customer_id: int, device_ids: Optional[List[int]] = None,
+    ) -> int:
+        """统计某客户名下设备数（可选数据域过滤）——与上面的取数**同口径**。"""
+        query = self._base_query().filter(Device.customer_id == customer_id)
+        if device_ids is not None:
+            query = query.filter(Device.id.in_(device_ids))
+        return query.count()
+
+    def search_exact_identity(
+        self, query_text: str, device_types: Optional[List[str]] = None, limit: int = 10,
+    ) -> List[Device]:
+        """**精确**命中任一身份字段（device_name / hostname / management_ip），AI 实体解析用
+
+        返回 0 条 = 未命中、1 条 = 命中、>1 条 = 由调用方按"歧义"处理（原逻辑如此）。
+        """
+        query = self._base_query().filter(or_(
+            Device.device_name == query_text,
+            Device.hostname == query_text,
+            Device.management_ip == query_text,
+        ))
+        if device_types:
+            query = query.filter(Device.device_type.in_(device_types))
+        return query.order_by(Device.id).limit(limit).all()
+
+    def search_name_contains(
+        self, like_pattern: str, device_types: Optional[List[str]] = None,
+        limit: int = 10, escape: str = "\\",
+    ) -> List[Device]:
+        """**模糊**命中 device_name / hostname（ilike + 显式转义），AI 实体解析候选用
+
+        ``like_pattern`` 由调用方构造（含 ``%``；用户输入须先 `_escape_like` 转义，
+        防 ``%``/``_`` 被当通配符导致候选溢出）。
+        """
+        query = self._base_query().filter(or_(
+            Device.device_name.ilike(like_pattern, escape=escape),
+            Device.hostname.ilike(like_pattern, escape=escape),
+        ))
+        if device_types:
+            query = query.filter(Device.device_type.in_(device_types))
+        return query.order_by(Device.id).limit(limit).all()
+
+    def find_peers_in_cabinets(
+        self, cabinet_ids: List[int], exclude_device_id: int, limit: int,
+    ) -> List[Device]:
+        """取这些机柜内的其它设备（根因分析的 peer 集合，B-44 收敛）
+
+        与 `find_by_cabinet_id` 的区别（不可合并）：**不过滤 SCRAPPED 状态**
+        （根因分析要看"当时在场的设备"，报废设备也可能是故障源），但**过滤软删除**
+        （`_base_query`；已软删设备不得作为 peer —— B-43 曾就地加过显式过滤，
+        本方法把该口径收进仓储一处）。
+
+        Args:
+            cabinet_ids: 机柜 id 列表（空则返回 []）
+            exclude_device_id: 排除的设备（通常是告警设备自身）
+            limit: 行数上限（根因分析只取前 N 台，防候选爆炸）
+        """
+        if not cabinet_ids:
+            return []
+        try:
+            return (
+                self._base_query()
+                .filter(
+                    Device.cabinet_id.in_(cabinet_ids),
+                    Device.id != exclude_device_id,
+                )
+                .limit(limit)
+                .all()
+            )
+        except SQLAlchemyError as e:
+            raise QueryExecutionError("查找同机柜设备失败", original_error=e)
 
     def find_by_customer_id(self, customer_id: int) -> List[Device]:
         try:
@@ -418,6 +726,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
             page = max(1, min(page, total_pages or 1))
             offset = (page - 1) * page_size
+            ensure_offset_within_limit(offset)
 
             devices = (
                 filtered_query
@@ -436,6 +745,81 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             }
         except SQLAlchemyError as e:
             raise QueryExecutionError("获取设备列表失败", original_error=e)
+
+    def list_devices_keyset(
+        self,
+        cabinet_id: int = None,
+        customer_id: int = None,
+        device_id: int = None,
+        room_id: int = None,
+        parent_device_id: int = None,
+        is_chassis: int = None,
+        device_type: str = None,
+        device_subtype: str = None,
+        include_scrapped: bool = False,
+        has_ssh: bool = None,
+        after_name: str = None,
+        after_id: int = None,
+        limit: int = 5000,
+    ) -> List[Device]:
+        """按 ``(device_name, id)`` keyset 游标取一页设备（全量遍历场景，如导出）。
+
+        与 :meth:`get_all_devices` 的两点本质差别：
+
+        - **不执行 COUNT、不使用 OFFSET**。``OFFSET`` 翻到第 k 页要先扫描并丢弃
+          ``(k-1) * limit`` 行，全量遍历的累计代价是 O(n²/limit)；keyset 每页都是
+          索引范围扫描（需 ``(device_name, id)`` 联合索引），累计 O(n)。
+        - 游标是"上一页最后一条的 ``(device_name, id)``"而非页码 —— 遍历期间即使
+          有并发插入/删除也不会漏行或重复行（``OFFSET`` 的经典问题）。
+
+        游标语义：只返回**严格大于** ``(after_name, after_id)`` 的行。
+        ``device_name`` 非唯一，必须带 ``id`` 打破并列；``device_name`` 建表时为
+        NOT NULL（``app/models/device.py``），因此不存在 NULL 参与比较导致**静默丢行**
+        的风险 —— 若将来该列放宽为可空，本方法必须改用 ``COALESCE`` 或改走纯 id 游标。
+
+        Args:
+            after_name / after_id: 上一页最后一条的游标值；首次取传 None
+            limit: 单页行数
+            其余参数与 :meth:`get_all_devices` 同义
+
+        Returns:
+            按 ``(device_name, id)`` 升序排列的 ORM 设备对象（调用方负责序列化）
+        """
+        try:
+            filtered_query = self._apply_device_filters(
+                self._base_query().options(joinedload(Device.switch_credential)),
+                cabinet_id=cabinet_id,
+                customer_id=customer_id,
+                device_id=device_id,
+                room_id=room_id,
+                parent_device_id=parent_device_id,
+                is_chassis=is_chassis,
+                device_type=device_type,
+                device_subtype=device_subtype,
+                include_scrapped=include_scrapped,
+                has_ssh=has_ssh,
+            )
+
+            if after_name is not None:
+                cursor_id = after_id if after_id is not None else 0
+                filtered_query = filtered_query.filter(
+                    or_(
+                        Device.device_name > after_name,
+                        and_(
+                            Device.device_name == after_name,
+                            Device.id > cursor_id,
+                        ),
+                    )
+                )
+
+            return (
+                filtered_query
+                .order_by(Device.device_name, Device.id)
+                .limit(limit)
+                .all()
+            )
+        except SQLAlchemyError as e:
+            raise QueryExecutionError("按游标获取设备列表失败", original_error=e)
 
     @monitor_query_performance
     def search_devices(
@@ -978,6 +1362,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
             page = max(1, min(page, total_pages or 1))
             offset = (page - 1) * page_size
+            ensure_offset_within_limit(offset)
 
             devices = (
                 query

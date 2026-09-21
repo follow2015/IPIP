@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuditLogs } from '@/services/audit';
 import { get } from '@/services/api-client';
 import type { AuditLog, User } from '@/types/models';
+import { serverPagination } from '@/components/DataTable/serverPagination';
 import { formatDateTime } from '@/utils/format';
 
 const { RangePicker } = DatePicker;
@@ -207,17 +208,15 @@ export default function AuditLogTable({
         loading={isLoading}
         size="middle"
         scroll={{ x: 'max-content' }}
-        pagination={{
+        pagination={serverPagination({
           current: page,
           pageSize,
           total,
-          showSizeChanger: true,
-          showTotal: (t) => `共 ${t} 条`,
           onChange: (p, ps) => {
             setPage(p);
             setPageSize(ps);
           }
-        }}
+        })}
       />
 
       <Modal

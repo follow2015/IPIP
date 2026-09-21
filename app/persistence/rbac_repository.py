@@ -23,6 +23,30 @@ class RoleRepository(BaseRepository):
         """按名称查找角色。"""
         return self._base_query().filter_by(name=name).first()
 
+    def list_permission_codes(self, role_id: int) -> List[str]:
+        """取某角色的**全部权限码**（经 ``role_permissions`` 关联表 join）。
+
+        B-44 auth 批收敛：`permission_manager` 原先直接
+        ``db.session.query(Permission.code).join(RolePermission...)``，现收进本仓储 ——
+        与 `find_by_name` 一起构成"角色 → 权限码"的读取入口。
+
+        ⚠️ 两点口径（与原实现逐字一致，勿"顺手优化"）：
+        · **只取 `Permission.code` 一列**（调用方要的是码集合/码列表，行本身无意义）；
+        · **不加 `order_by`**：一个调用点建集合、另一个直接返回列表，顺序无业务含义；
+          将来若需要稳定顺序（如接口快照比对）再显式加。
+
+        注意本方法**不按 `Role.status` 过滤**、也不过滤 `Permission` 的任何状态位 ——
+        与 `find_by_name` 一样只做"取数"，"停用角色是否仍授权"属权限语义，
+        由调用方（或后续专项）决定，不在仓储里暗改。
+        """
+        rows = (
+            self.session.query(Permission.code)
+            .join(RolePermission, RolePermission.permission_id == Permission.id)
+            .filter(RolePermission.role_id == role_id)
+            .all()
+        )
+        return [code for (code,) in rows]
+
     def find_active_roles_by_user(self, user_id: int) -> List[Role]:
         """查询用户的所有启用角色（status == 0），供 data_scope_service 使用。"""
         return (

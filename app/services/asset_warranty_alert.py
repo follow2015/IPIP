@@ -218,28 +218,10 @@ def _load_asset_rows() -> list[AssetRow]:
     - DeviceAsset.offline_date IS NULL：已下线/报废设备的到期无意义；
     - Device.status != SCRAPPED：报废设备不提醒（见 DeviceStatus 注释）。
     """
-    from app.core.enums import DeviceStatus
-    from app.models.device import Device
-    from app.models.device_asset import DeviceAsset
-    from extensions import db
 
-    rows = (
-        db.session.query(
-            DeviceAsset.device_id,
-            Device.device_name,
-            DeviceAsset.warranty_end,
-            DeviceAsset.lifecycle_years,
-            DeviceAsset.online_date,
-            DeviceAsset.offline_date,
-        )
-        .join(Device, Device.id == DeviceAsset.device_id)
-        .filter(
-            Device.deleted_at.is_(None),
-            Device.status != DeviceStatus.SCRAPPED,
-            DeviceAsset.offline_date.is_(None),
-        )
-        .all()
-    )
+    from app.persistence.device_asset_repository import DeviceAssetRepository
+
+    rows = DeviceAssetRepository().list_warranty_rows()
     return [AssetRow(*row) for row in rows]
 
 

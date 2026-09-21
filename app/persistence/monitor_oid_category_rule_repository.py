@@ -20,6 +20,20 @@ class MonitorOidCategoryRuleRepository:
         """查询全部 OID 分类规则。"""
         return self.session.query(MonitorOidCategoryRule).all()
 
+    def list_enabled_prefixes(self) -> List[str]:
+        """查询**全部启用**规则的 ``prefix`` 列（B-44 收敛）。
+
+        ⚠️ 刻意**不分 vendor/device_type**、只取 ``prefix`` 一列（原始实现即如此）：
+        调用方 `_filter_noise_oids` 只问"该父 OID 有没有任何规则保护"，
+        按 vendor 收窄会漏判、拉整行是浪费。
+        """
+        rows = (
+            self.session.query(MonitorOidCategoryRule.prefix)
+            .filter_by(enabled=1)
+            .all()
+        )
+        return [r[0] for r in rows]
+
     def find_by_id(self, rule_id: int) -> Optional[MonitorOidCategoryRule]:
         """按 ID 查询；不存在返回 None。"""
         return self.session.get(MonitorOidCategoryRule, rule_id)

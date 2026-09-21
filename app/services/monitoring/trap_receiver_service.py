@@ -66,14 +66,9 @@ class TrapIngressService:
     @staticmethod
     def resolve_device(source_ip: str):
         """源 IP → Device（软删除除外）。复用 management_ip 同步口径。"""
-        from app.models.device import Device
+        from app.persistence.device_repository import DeviceRepository
 
-        return (
-            Device.query.filter(
-                Device.management_ip == source_ip,
-                Device.deleted_at.is_(None),
-            ).first()
-        )
+        return DeviceRepository().find_by_management_ip(source_ip)
 
 
     def handle_trap(

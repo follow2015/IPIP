@@ -255,19 +255,12 @@ class ScanRedis:
 
         conn_map: dict = {}
         if all_port_ids:
-            from app.models.network_connection import NetworkConnection
-            from sqlalchemy import or_
-            from sqlalchemy.orm import joinedload
-            port_id_set = set(all_port_ids)
-            conns = NetworkConnection.query.filter(
-                or_(
-                    NetworkConnection.local_port_id.in_(port_id_set),
-                    NetworkConnection.peer_port_id.in_(port_id_set),
-                )
-            ).options(
-                joinedload(NetworkConnection.local_port),
-                joinedload(NetworkConnection.peer_port),
-            ).all()
+            from app.persistence.network_connection_repository import (
+                NetworkConnectionRepository,
+            )
+
+            port_id_set = set(all_port_ids)  # 后续过滤 conn 两端是否在集合内仍要用
+            conns = NetworkConnectionRepository().find_by_port_ids_orm(port_id_set)
             for conn in conns:
                 if conn.local_port_id in port_id_set:
                     conn_map[conn.local_port_id] = conn.peer_port.port_name if conn.peer_port else None

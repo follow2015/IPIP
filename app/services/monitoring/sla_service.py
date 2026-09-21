@@ -120,10 +120,8 @@ def compute_achievement(
             "window_end": iso,
         }
     """
-    from app.models.device_monitor_timeseries_hourly import DeviceMonitorTimeseriesHourly
     from app.persistence.monitor_sla_target_repository import MonitorSlaTargetRepository
     from app.exceptions.business import BusinessLogicError
-    from extensions import db
 
     repo = MonitorSlaTargetRepository()
     target = repo.find_by_id(target_id)
@@ -135,23 +133,18 @@ def compute_achievement(
     start_dt = start or (end_dt - timedelta(days=target.window_days))
 
     device_ids = target.target_device_ids or []
-    rows = (
-        db.session.query(DeviceMonitorTimeseriesHourly.avg_value)
-        .filter(
-            DeviceMonitorTimeseriesHourly.device_id.in_(device_ids),
-            DeviceMonitorTimeseriesHourly.metric == "reachable",
-            DeviceMonitorTimeseriesHourly.hour_bucket >= start_dt,
-            DeviceMonitorTimeseriesHourly.hour_bucket < end_dt,
-        )
-        .all()
+    from app.persistence.monitor_timeseries_repository import MonitorTimeseriesRepository
+
+    values = MonitorTimeseriesRepository().list_hourly_avg_values(
+        device_ids, "reachable", start_dt, end_dt,
     )
 
-    sample_count = len(rows)
+    sample_count = len(values)
     if sample_count == 0:
         actual_ratio = None
         met_sla = False
     else:
-        actual_ratio = sum(r[0] for r in rows) / sample_count
+        actual_ratio = sum(values) / sample_count
         met_sla = actual_ratio >= target.target_ratio
 
     return {

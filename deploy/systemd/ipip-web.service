@@ -49,6 +49,19 @@ WorkingDirectory=${PROJECT_ROOT}
 ;    且所有 unit 共用该文件，会把 monitor/gateway 的身份也串成 web）。
 Environment=HEARTBEAT_SERVICE_NAME=web
 
+; ── 采集职责：本进程**不采**（由 ipip-monitor.service 独占）────────────
+; ⚠️ 必须显式关掉。MONITOR_WORKER_IN_PROCESS 代码默认是 true，而本单元跑的是
+;    `gunicorn --workers ${GUNICORN_WORKERS}`（默认 4）⇒ **每个 worker 各起一套**
+;    轮询线程。Redis 锁只保证互斥、不保证限速，抢不到锁的 worker 照样按自己的
+;    interval 起轮，于是聚合采集频率 = interval ÷ 实例数（独立实测：配置 60 s，
+;    库里有效周期 18.9 s，并出现单循环在数学上不可能的「间隔 < 5 s」）。
+;    详见 code_review/采样节奏真值核查-20260921.md。
+; ⚠️ 不要改在 /etc/ipip/ipip.env 里（systemd 中 EnvironmentFile 会覆盖 unit 内的
+;    Environment=）—— 若该文件里写了 true，本行会被静默废掉。
+;    运行期兜底：monitor_worker 的最小间隔闸门（monitor:rate:<loop>），
+;    正常情况下 `ipip_monitor_round_skipped_total` 不应持续增长。
+Environment=MONITOR_WORKER_IN_PROCESS=false
+
 ExecStart=${VENV_BIN}/gunicorn \
   --bind 0.0.0.0:${FLASK_PORT} \
   --workers ${GUNICORN_WORKERS} \

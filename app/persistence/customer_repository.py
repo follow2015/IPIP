@@ -70,6 +70,34 @@ class CustomerRepository(SQLAlchemyRepository):
             "updated_at": r.updated_at.isoformat() if r.updated_at else None,
         }
     
+    def search_by_name_contains(
+        self, like_pattern: str, limit: int, escape: str = "\\",
+    ) -> List[Customer]:
+        """按客户名模糊匹配（ilike + 显式转义），AI 客户实体解析候选用（B-44 收敛）
+
+        ``like_pattern`` 由调用方构造（含 ``%``；用户输入须先转义，防通配符溢出）。
+        """
+        return (
+            self._base_query()
+            .filter(Customer.customer_name.ilike(like_pattern, escape=escape))
+            .order_by(Customer.id)
+            .limit(limit)
+            .all()
+        )
+
+    def find_by_id_for_update(self, customer_id: int) -> Optional[Customer]:
+        """按 ID 取客户并**加行锁**（FOR UPDATE；B-44 收敛：终止/释放流程）。
+
+        语义（与原实现一致）：并发下只有一个事务能读到非 TERMINATED 的行
+        并进入释放分支，其余排队 —— **不能**去掉 with_for_update。
+        """
+        return (
+            self.session.query(Customer)
+            .filter_by(id=customer_id)
+            .with_for_update()
+            .first()
+        )
+
     def find_by_customer_name(self, customer_name: str) -> Optional[Customer]:
         """根据客户名称查找客户
         

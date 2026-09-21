@@ -3,7 +3,7 @@
 
 项目 C5 约束：DB 访问必须走 Repository 层，禁止在 Service 内裸写 query。
 """
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, List, Optional
 
 from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
 from extensions import db
@@ -115,4 +115,46 @@ class SuppressedAlertLogRepository:
             .filter(MonitorSuppressedAlertLog.incident_id == incident_id)
             .distinct()
             .count()
+        )
+
+    def snapshot_device_trace(self, device_id: int, device_name) -> int:
+        """被抑制设备侧：写设备名快照并置空引用（B-44 收敛：留痕处置）。"""
+        return (
+            self.session.query(MonitorSuppressedAlertLog)
+            .filter(MonitorSuppressedAlertLog.device_id == device_id)
+            .update(
+                {
+                    MonitorSuppressedAlertLog.device_name: device_name,
+                    MonitorSuppressedAlertLog.device_id: None,
+                },
+                synchronize_session=False,
+            )
+        )
+
+    def snapshot_upstream_trace(self, device_id: int, device_name) -> int:
+        """上游设备侧：同上（⚠️ ``upstream_device_id`` **无外键**，DB 不会
+        处置它 —— 只能应用层做，漏了就是静默孤儿引用）。"""
+        return (
+            self.session.query(MonitorSuppressedAlertLog)
+            .filter(MonitorSuppressedAlertLog.upstream_device_id == device_id)
+            .update(
+                {
+                    MonitorSuppressedAlertLog.upstream_device_name: device_name,
+                    MonitorSuppressedAlertLog.upstream_device_id: None,
+                },
+                synchronize_session=False,
+            )
+        )
+
+    def list_by_incident(self, incident_id: int, limit: int) -> List[MonitorSuppressedAlertLog]:
+        """取某事件下被抑制的告警留痕（最近优先，B-44 收敛）
+
+        供 AI 事件上下文的「L2 连坐面」使用：只取最近 ``limit`` 条。
+        """
+        return (
+            self.session.query(MonitorSuppressedAlertLog)
+            .filter(MonitorSuppressedAlertLog.incident_id == incident_id)
+            .order_by(MonitorSuppressedAlertLog.created_at.desc())
+            .limit(limit)
+            .all()
         )

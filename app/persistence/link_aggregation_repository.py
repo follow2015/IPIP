@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 
 from app.models.link_aggregation import LinkAggregationGroup
 from app.persistence.base import SQLAlchemyRepository
+from app.core.pagination_limits import ensure_offset_within_limit
 
 logger = get_logger(__name__)
 
@@ -129,9 +130,11 @@ class LinkAggregationRepository(SQLAlchemyRepository):
             query = query.filter(LinkAggregationGroup.device_id == device_id)
 
         total_count = query.count()
+        offset = (page - 1) * per_page
+        ensure_offset_within_limit(offset)
         rows = (
             query.order_by(Device.device_name, LinkAggregationGroup.lag_name)
-            .offset((page - 1) * per_page)
+            .offset(offset)
             .limit(per_page)
             .all()
         )

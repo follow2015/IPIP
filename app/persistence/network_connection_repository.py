@@ -7,7 +7,7 @@
 from app.utils.logging import get_logger
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 
@@ -174,6 +174,102 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
             )
         except SQLAlchemyError as e:
             raise QueryExecutionError("查找已有N2N连接(ORM)失败", original_error=e)
+
+    def list_by_device_via_ports(self, device_id: int) -> List[NetworkConnection]:
+        """取该设备经**任一端端口**参与的全部 N2N 连接（B-44 扫尾批：MAC 表比对）。
+
+        端口归属判定走关系 ``has`` 子查询（local 或 peer 端口属于该设备）；
+        ``joinedload`` 两端端口 —— 调用方随后要读 ``conn.local_port.port_name``
+        等属性，懒加载会 N+1（原实现无预加载，属同结果的顺带优化）。
+        """
+        from app.models.network_port import NetworkPort
+
+        return (
+            self.session.query(NetworkConnection)
+            .filter(
+                or_(
+                    NetworkConnection.local_port.has(
+                        NetworkPort.device_id == device_id
+                    ),
+                    NetworkConnection.peer_port.has(
+                        NetworkPort.device_id == device_id
+                    ),
+                )
+            )
+            .options(
+                joinedload(NetworkConnection.local_port),
+                joinedload(NetworkConnection.peer_port),
+            )
+            .all()
+        )
+
+    def find_pair_connection_orm(self, local_port_id: int, peer_port_id: int) -> Optional[NetworkConnection]:
+        """查找**这一对**端口之间已存在的 N2N 连接（含反向），返回 ORM 对象。
+
+        B-44 拓扑批新增：`topology_discovery_service._find_connection` 的"连接已存在"
+        判定入口 —— 错误信息里要带上 ``#{连接id}``，故需实体而非 bool。
+
+        ⚠️ **与 `find_existing_by_ports_orm` 语义不同，勿互相替代**：
+        · 本方法 = "**这一对**端口之间（A→B 或 B→A）是否有连接" —— 用于判"链路已存在"；
+        · `find_existing_by_ports_orm` = "**任一**端口是否出现在**任何**连接里"
+          —— 用于"旧端口释放"（换口场景：本端换了但旧口仍挂着别的链路也要处理）。
+        把后者当前者用，会把"本端口与**第三方**端口之间的连接"误报成"链路已存在"
+        （拓扑发现直接漏建连）；反之用前者替后者，则换口时旧端口的残留链路不会被处理。
+        """
+        try:
+            return (
+                self.session.query(NetworkConnection)
+                .filter(
+                    or_(
+                        (NetworkConnection.local_port_id == local_port_id)
+                        & (NetworkConnection.peer_port_id == peer_port_id),
+                        (NetworkConnection.local_port_id == peer_port_id)
+                        & (NetworkConnection.peer_port_id == local_port_id),
+                    )
+                )
+                .first()
+            )
+        except SQLAlchemyError as e:
+            raise QueryExecutionError("查找端口对之间的N2N连接失败", original_error=e)
+
+    def list_by_device_ids(
+        self, device_ids, *, with_ports: bool = False, any_side: bool = True,
+    ) -> List[NetworkConnection]:
+        """按设备 ID 集合取 N2N 连接（B-44 拓扑批 2/2）。
+
+        Args:
+            device_ids: 设备 ID 集合/列表
+            with_ports: 是否预加载两端端口（拓扑画边要端口名 ⇒ True；只算邻接表 ⇒ False）
+            any_side: ``True`` = **任一侧**命中（local 或 peer 在集合里，拓扑收敛用）；
+                ``False`` = **两侧都要**在集合里（"集合内部的连线"，索引页用）。
+                两者结果集不同（前者含跨出集合的边），**不可互相替代**。
+
+        空 `device_ids` 返回 `[]`（调用方据此也常提前 return，语义一致）。
+        不过滤软删：`NetworkConnection` 未开启 `__soft_delete__`，无此列。
+        """
+        if not device_ids:
+            return []
+        ids = tuple(device_ids)
+        if any_side:
+            condition = or_(
+                NetworkConnection.local_device_id.in_(ids),
+                NetworkConnection.peer_device_id.in_(ids),
+            )
+        else:
+            condition = and_(
+                NetworkConnection.local_device_id.in_(ids),
+                NetworkConnection.peer_device_id.in_(ids),
+            )
+        query = self.session.query(NetworkConnection).filter(condition)
+        if with_ports:
+            query = query.options(
+                joinedload(NetworkConnection.local_port),
+                joinedload(NetworkConnection.peer_port),
+            )
+        try:
+            return query.all()
+        except SQLAlchemyError as e:
+            raise QueryExecutionError("按设备集合查询N2N连接失败", original_error=e)
 
     def exists_by_ports(self, local_port_id: int, peer_port_id: int) -> bool:
         """检查两个端口之间是否已存在连接"""

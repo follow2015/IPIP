@@ -54,15 +54,10 @@ def _resolve_system_user_id() -> Optional[int]:
         pass
 
     try:
-        from app.models.user import User
+        from app.persistence.user_repository import UserRepository
 
         with db.session.no_autoflush:
-            user = (
-                db.session.query(User)
-                .filter(User.is_active.is_(True))
-                .order_by(User.id.asc())
-                .first()
-            )
+            user = UserRepository().find_first_active()
         return user.id if user else None
     except Exception:  # noqa: BLE001
         logger.warning("ai.incident_diag.system_user_failed", exc_info=True)

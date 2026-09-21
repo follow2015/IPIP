@@ -468,7 +468,8 @@ def parse_and_import_devices(df: pd.DataFrame) -> dict:
                 if parent_name in name_to_id:
                     device_data["parent_device_id"] = name_to_id[parent_name]
                 else:
-                    existing = Device.query.filter_by(device_name=str(parent_name)).first()
+                    from app.persistence.device_repository import DeviceRepository
+                    existing = DeviceRepository().find_by_device_name(str(parent_name))
                     if existing and existing.is_chassis:
                         device_data["parent_device_id"] = existing.id
                     else:
@@ -535,29 +536,47 @@ def export_devices_to_excel(cabinet_id=None, customer_id=None) -> BytesIO:
 
     Raises:
         EmptyExportError: 没有任何可导出的设备数据时
+        ExportTooLargeError: 累计行数超过 ``MAX_EXPORT_ROWS`` 时（在取数阶段熔断）
     """
     all_devices = []
-    page = 1
     page_size = 5000
+    max_rows = import_export_service.MAX_EXPORT_ROWS
+    after_name = None
+    after_id = None
     while True:
-        result = device_service.get_all_devices(
+        batch = device_service.list_devices_keyset(
             cabinet_id=cabinet_id,
             customer_id=customer_id,
-            page=page,
-            page_size=page_size
+            after_name=after_name,
+            after_id=after_id,
+            limit=page_size,
         )
-        devices = result.get("devices", [])
-        if not devices:
+        if not batch:
             break
-        all_devices.extend(devices)
-        if len(devices) < page_size:
+        if len(all_devices) + len(batch) > max_rows:
+            raise import_export_service.ExportTooLargeError(
+                len(all_devices) + len(batch)
+            )
+        all_devices.extend(batch)
+        if len(batch) < page_size:
             break
-        page += 1
+        last = batch[-1]
+        cursor = (last.device_name, last.id)
+        if after_name is not None and cursor <= (after_name, after_id):
+            raise InvalidOperationError(
+                operation="export_devices",
+                reason=(
+                    f"keyset 游标未前进（{(after_name, after_id)} -> {cursor}），"
+                    "导出遍历会无限循环，已中止"
+                ),
+            )
+        after_name, after_id = cursor
 
     if not all_devices:
         raise EmptyExportError("没有可导出的设备数据")
 
     device_dicts = [d.to_dict() if hasattr(d, "to_dict") else d for d in all_devices]
 
-    from app.services import import_export_service
-    return import_export_service.export_to_excel(device_dicts, "设备数据")
+    return import_export_service.export_to_excel(
+        device_dicts, "设备数据", max_rows=max_rows
+    )

@@ -17,13 +17,10 @@ LLDP/CDP 拓扑发现服务（P2-1）
 import re
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import or_
 
 from app.adapters.adapter_factory import get_adapter
 from app.exceptions.business import DeviceNotSupported
-from app.models.device import Device
 from app.models.network_connection import NetworkConnection
-from app.models.network_port import NetworkPort
 from app.models.switch_credentials import SwitchCredentials
 from app.utils.logging import get_logger
 
@@ -112,7 +109,9 @@ class TopologyDiscoveryService:
             {"device_id", "source": "lldp"|"cdp", "suggestions": [...],
              "raw_count": int, "error": None|str}
         """
-        cred = SwitchCredentials.query.filter_by(device_id=device_id).first()
+        from app.persistence.switch_ext_repository import SwitchExtRepository
+
+        cred = SwitchExtRepository().get_by_device_id(device_id)
         if cred is None:
             return {"device_id": device_id, "source": None,
                     "suggestions": [], "error": "该设备没有交换机凭据记录"}
@@ -184,12 +183,14 @@ class TopologyDiscoveryService:
                               f"≠ 源设备 {device_id}）"})
                 continue
 
-            occupied = NetworkConnection.query.filter(
-                or_(
-                    NetworkConnection.local_port_id.in_((local_port_id, peer_port_id)),
-                    NetworkConnection.peer_port_id.in_((local_port_id, peer_port_id)),
-                )
-            ).first()
+            from app.persistence.network_connection_repository import (
+                NetworkConnectionRepository,
+            )
+
+            _conns = NetworkConnectionRepository().find_by_port_ids_orm(
+                [local_port_id, peer_port_id]
+            )
+            occupied = _conns[0] if _conns else None
             if occupied:
                 skipped.append({"item": item,
                                 "reason": "端口已被其它连接占用（拒绝改写既有连接）"})
@@ -274,12 +275,14 @@ class TopologyDiscoveryService:
             item["match_status"] = STATUS_EXISTING
             item["reason"] = f"连接已存在（N2N #{existing.id}）"
             return item
-        occupied = NetworkConnection.query.filter(
-            or_(
-                NetworkConnection.local_port_id.in_((local_port_id, peer_port_id)),
-                NetworkConnection.peer_port_id.in_((local_port_id, peer_port_id)),
-            )
-        ).first()
+        from app.persistence.network_connection_repository import (
+            NetworkConnectionRepository,
+        )
+
+        _conns = NetworkConnectionRepository().find_by_port_ids_orm(
+            [local_port_id, peer_port_id]
+        )
+        occupied = _conns[0] if _conns else None
         if occupied:
             item["match_status"] = STATUS_PORT_OCCUPIED
             item["reason"] = f"端口已被连接 #{occupied.id} 占用"
@@ -295,10 +298,9 @@ class TopologyDiscoveryService:
         if not port_name:
             return None, None
         candidates = _port_candidates(port_name)
-        ports = NetworkPort.query.filter(
-            NetworkPort.device_id == device_id,
-            NetworkPort.port_name.in_(candidates),
-        ).all()
+        from app.persistence.switch_port_repository import NetworkPortRepository
+
+        ports = NetworkPortRepository().list_by_port_names(device_id, candidates)
         if len(ports) == 1:
             return ports[0].id, None
         if len(ports) > 1:
@@ -313,8 +315,10 @@ class TopologyDiscoveryService:
         Returns:
             (device_id|None, 原因|None)
         """
+        from app.persistence.device_repository import DeviceRepository
+
         if mgmt_ip:
-            by_ip = Device.query.filter(Device.management_ip == mgmt_ip).all()
+            by_ip = DeviceRepository().list_by_management_ip(mgmt_ip)
             if len(by_ip) == 1:
                 return by_ip[0].id, None
             if len(by_ip) > 1:
@@ -322,9 +326,7 @@ class TopologyDiscoveryService:
                 return None, f"管理 IP {mgmt_ip} 命中多台设备 #{ids}"
 
         for name in _normalize_sysname_candidates(sysname):
-            by_name = Device.query.filter(
-                or_(Device.device_name == name, Device.hostname == name),
-            ).all()
+            by_name = DeviceRepository().list_by_name(name)
             if len(by_name) == 1:
                 return by_name[0].id, None
             if len(by_name) > 1:
@@ -335,11 +337,10 @@ class TopologyDiscoveryService:
     @staticmethod
     def _find_connection(local_port_id: int, peer_port_id: int):
         """两端端口（含反向）的既有 N2N 连接"""
-        return NetworkConnection.query.filter(
-            or_(
-                (NetworkConnection.local_port_id == local_port_id)
-                & (NetworkConnection.peer_port_id == peer_port_id),
-                (NetworkConnection.local_port_id == peer_port_id)
-                & (NetworkConnection.peer_port_id == local_port_id),
-            )
-        ).first()
+        from app.persistence.network_connection_repository import (
+            NetworkConnectionRepository,
+        )
+
+        return NetworkConnectionRepository().find_pair_connection_orm(
+            local_port_id, peer_port_id
+        )

@@ -60,34 +60,32 @@ class RootCauseAnalyzer:
         if device is None:
             return {"fault_domain": "unknown", "related_anomalies": [], "scope": "设备不存在"}
 
+        from app.persistence.cabinet_repository import CabinetRepository
+        from app.persistence.device_repository import DeviceRepository
+
+        device_repo = DeviceRepository()
         cabinet_id = device.cabinet_id
         levels: Dict[str, Dict[int, Device]] = {}
         if cabinet_id:
             levels["same_cabinet"] = {
                 d.id: d
-                for d in db.session.query(Device)
-                .filter(Device.cabinet_id == cabinet_id, Device.id != device_id)
-                .limit(MAX_PEER_DEVICES)
-                .all()
+                for d in device_repo.find_peers_in_cabinets(
+                    [cabinet_id], device_id, MAX_PEER_DEVICES,
+                )
             }
 
         room_id = self._resolve_room_id(cabinet_id)
         if room_id:
-            from app.models.cabinet import Cabinet
-
             peer_cabinet_ids = [
-                row[0]
-                for row in db.session.query(Cabinet.id)
-                .filter(Cabinet.room_id == room_id, Cabinet.id != cabinet_id)
-                .all()
+                c.id for c in CabinetRepository().find_by_room_id(room_id)
+                if c.id != cabinet_id
             ]
             if peer_cabinet_ids:
                 levels["same_room"] = {
                     d.id: d
-                    for d in db.session.query(Device)
-                    .filter(Device.cabinet_id.in_(peer_cabinet_ids))
-                    .limit(MAX_PEER_DEVICES)
-                    .all()
+                    for d in device_repo.find_peers_in_cabinets(
+                        peer_cabinet_ids, device_id, MAX_PEER_DEVICES,
+                    )
                 }
 
         try:
@@ -95,13 +93,13 @@ class RootCauseAnalyzer:
         except Exception:  # noqa: BLE001
             uplink_id = None
         if uplink_id:
-            from app.models.device_switch_ext import DeviceSwitchExt
+            from app.persistence.device_switch_ext_repository import (
+                DeviceSwitchExtRepository,
+            )
 
             levels["same_uplink"] = {
                 ext.device_id: ext.device
-                for ext in db.session.query(DeviceSwitchExt)
-                .filter_by(uplink_device_id=uplink_id)
-                .all()
+                for ext in DeviceSwitchExtRepository().list_by_uplink_device_id(uplink_id)
                 if ext.device is not None and ext.device_id != device_id
             }
 
@@ -154,11 +152,11 @@ class RootCauseAnalyzer:
         self, device_id: int, metric_key: str
     ) -> Optional[Dict[str, Any]]:
         """检查单设备某指标是否异常（基线偏离）。"""
-        latest = (
-            db.session.query(DeviceMetricLatest)
-            .filter_by(device_id=device_id, metric_key=metric_key)
-            .first()
+        from app.persistence.device_metric_latest_repository import (
+            DeviceMetricLatestRepository,
         )
+
+        latest = DeviceMetricLatestRepository().find_one(device_id, metric_key)
         if latest is None or latest.value is None:
             return None
         try:

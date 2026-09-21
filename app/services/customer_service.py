@@ -191,12 +191,7 @@ class CustomerService:
         from app.persistence.component_template_repository import ComponentTemplateRepository
         from app.persistence.customer_termination_archive_repository import CustomerTerminationArchiveRepository
 
-        customer = (
-            db.session.query(Customer)
-            .filter_by(id=customer_id)
-            .with_for_update()
-            .first()
-        )
+        customer = self.customer_repository.find_by_id_for_update(customer_id)
         if customer is None:
             raise RecordNotFoundError(f"客户不存在: {customer_id}")
         if customer.customer_status == CustomerStatus.TERMINATED.value:
@@ -257,11 +252,15 @@ class CustomerService:
         """
         from sqlalchemy.orm import Session
         from extensions import db as _db
-        from app.models.customer_termination_archive import CustomerTerminationArchive
+        from app.persistence.customer_termination_archive_repository import (
+            CustomerTerminationArchiveRepository,
+        )
 
         independent_session: Session = Session(bind=_db.engine, expire_on_commit=False)
         try:
-            archive = independent_session.query(CustomerTerminationArchive).filter_by(id=archive_id).first()
+            archive = CustomerTerminationArchiveRepository(
+                session=independent_session
+            ).find_by_id_with_blob(archive_id)
             if not archive:
                 logger.warning("终止存档 PDF 生成失败：archive_id=%s 不存在", archive_id)
                 return
@@ -617,8 +616,7 @@ class CustomerService:
             Dict: 按机房分组的资源数据
         """
         try:
-            from sqlalchemy import func as sa_func
-
+            
             data = self.customer_repository.get_customer_switch_ports_data(customer_id)
 
             result = data["result"]
@@ -823,27 +821,18 @@ class CustomerService:
                     first_ip_int = int(network_obj.network_address) + 1
                     last_ip_int = int(network_obj.broadcast_address) - 1
 
-                    from app.models.ip_model import IPManager
-                    status_rows = (
-                        self.customer_repository.session.query(
-                            IPManager.status,
-                            sa_func.count(sa_func.distinct(IPManager.ip_address)).label("count"),
-                        )
-                        .filter(
-                            IPManager.ip_int >= first_ip_int,
-                            IPManager.ip_int <= last_ip_int,
-                            IPManager.customer_id == customer_id,
-                            IPManager.room_id == room_id,
-                        )
-                        .group_by(IPManager.status)
-                        .all()
+                    from app.persistence.ip_repositories import IPManagerRepository
+
+                    status_rows = IPManagerRepository(
+                        session=self.customer_repository.session
+                    ).count_by_status_in_ip_range(
+                        first_ip_int, last_ip_int, customer_id, room_id,
                     )
 
                     ip_status = {"online": 0, "offline": 0, "banned": 0, "unused": 0}
                     total_counted = 0
-                    for status_row in status_rows:
-                        status_code = status_row.status
-                        count = status_row.count or 0
+                    for status_code, count in status_rows:
+                        count = count or 0
                         if status_code in status_map:
                             status_name = status_map[status_code]
                             ip_status[status_name] = count
@@ -1022,8 +1011,8 @@ class CustomerService:
             "partial_ips": len(assets["networks"]["partial_ips"]),
         }
 
-        from app.models.network_port import NetworkPort
         from app.persistence.device_repository import DeviceRepository
+
         device_detail_rows = []
         for d in DeviceRepository().find_by_customer_id(customer_id):
             d_dict = d.to_dict()
@@ -1050,7 +1039,9 @@ class CustomerService:
         assets["devices"]["detail_rows"] = device_detail_rows
 
         port_rows = []
-        for p in NetworkPort.query.filter_by(customer_id=customer_id).all():
+        from app.persistence.switch_port_repository import NetworkPortRepository
+
+        for p in NetworkPortRepository().list_by_customer(customer_id):
             port_rows.append({
                 "switch_name": p.device.device_name if p.device else "",
                 "port_name": p.port_name or "",
@@ -1077,7 +1068,6 @@ class CustomerService:
         """
         import pandas as pd
         from io import BytesIO
-        from app.models.network_port import NetworkPort
         from app.persistence.device_repository import DeviceRepository
 
         assets = self.get_customer_assets(customer_id)
@@ -1200,7 +1190,9 @@ class CustomerService:
             return LINK_STATUS_LABELS.get(s, raw or "未知")
 
         port_rows = []
-        ports = NetworkPort.query.filter_by(customer_id=customer_id).all()
+        from app.persistence.switch_port_repository import NetworkPortRepository
+
+        ports = NetworkPortRepository().list_by_customer(customer_id)
         for p in ports:
             peer_device = p.connection.device if p.connection else None
             port_rows.append({

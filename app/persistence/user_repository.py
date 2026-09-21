@@ -18,6 +18,7 @@ from app.models.rbac import Role, UserRole
 from app.persistence.base import SQLAlchemyRepository, QueryOptimizationMixin
 from app.core.enums import UserStatus
 from app.exceptions.data_access import QueryExecutionError, RecordNotFoundError
+from app.core.pagination_limits import ensure_offset_within_limit
 from app.utils.query_optimizer import monitor_query_performance
 
 logger = get_logger(__name__)
@@ -83,9 +84,93 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.logger.error(f"根据角色查找用户失败 (role={role_name}): {e}")
             raise QueryExecutionError("查找用户失败", original_error=e)
 
+    def exists_active_with_role(self, role_name: str) -> bool:
+        """是否存在拥有该角色的**活跃**用户（B-44 收敛：告警兜底角色可用性判断）。
+
+        与 `find_by_role` 的关系：同一条 join（User→UserRole→Role）与同一活跃口径
+        （``status == UserStatus.ACTIVE``），但**只判存在**（``first() is not None``）
+        —— 原调用点是"兜底角色有没有人能收告警"的热路径（带 5 分钟进程内缓存），
+        拉整行没有必要。
+
+        ⚠️ **刻意不包 `QueryExecutionError`**（与 `find_by_role` 不同）：原调用点
+        不捕获 DB 异常、由上层告警流程决定处置，换仓储不得改变异常类型。
+        """
+        return (
+            self.session.query(User)
+            .join(UserRole, UserRole.user_id == User.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .filter(Role.name == role_name, User.status == UserStatus.ACTIVE)
+            .first()
+            is not None
+        )
+
+    def get_by_id(self, user_id: int) -> Optional[User]:
+        """按主键取用户（B-44 收敛：rbac 的用户-角色管理）。
+
+        ``Session.get`` 与原 ``query(...).get()`` 同语义（主键直取、
+        走 identity map）；User 无软删列，与``find_by_id``无口径分歧。
+        """
+        return self.session.get(User, user_id)
+
+    def find_role_by_name_or_id(self, target_id) -> Optional[Role]:
+        """按角色名取角色；名字未命中且 target_id 是数字时按 ID 回退。
+
+        B-44 收敛（通知收件人解析）：`ops_alert_bridge` 传角色名（"admin"），
+        `escalation_service` 传数字 role_id（前端 InputNumber）—— name=str(id)
+        几乎必然查不到，会造成升级通知 0 收件人且静默不重试，故保留 name
+        miss 后按 id 回退的两段语义（与原实现一致，勿"统一"成单一匹配）。
+        """
+        role = self.session.query(Role).filter_by(name=str(target_id)).first()
+        if not role and str(target_id).isdigit():
+            role = self.session.get(Role, int(target_id))
+        return role
+
+    def list_active_ids_for_role(self, role_id: int) -> List[int]:
+        """取某角色下全部**活跃**用户的 ID（UserRole join User，B-44 收敛）。
+
+        原实现是两次查询（UserRole 取 user_id 集合 → User 按 IN + ACTIVE 过滤），
+        合并为一条 join —— 结果集等价（同角色、同活跃口径），少一次往返。
+        """
+        rows = (
+            self.session.query(User.id)
+            .join(UserRole, UserRole.user_id == User.id)
+            .filter(UserRole.role_id == role_id, User.status == UserStatus.ACTIVE)
+            .all()
+        )
+        return [r[0] for r in rows]
+
+    def list_all_active_ids(self) -> List[int]:
+        """取全部**活跃**用户 ID（B-44 收敛：broadcast 通知的全员投递）。"""
+        rows = (
+            self.session.query(User.id)
+            .filter(User.status == UserStatus.ACTIVE)
+            .all()
+        )
+        return [r[0] for r in rows]
+
     def find_admins(self) -> List[User]:
         """查找所有激活的管理员用户"""
         return self.find_by_role("admin", active_only=True)
+
+    def find_first_active(self) -> Optional[User]:
+        """取第一个激活用户（B-44 收敛；AI 诊断的"系统用户"占位）
+
+        ⚠️ 过滤条件用 ``status == UserStatus.ACTIVE``，**不能**写
+        ``User.is_active.is_(True)`` —— `is_active` 是模型上的 `@property`
+        （不是 hybrid_property）：类上访问返回 property 对象，``.is_()`` 立即抛
+        AttributeError（原实现因此恒返回 None、被外层 except 吞掉，见
+        `tests/services/test_ai_system_user_resolution.py`）。
+        """
+        try:
+            return (
+                self.session.query(User)
+                .filter(User.status == UserStatus.ACTIVE)
+                .order_by(User.id.asc())
+                .first()
+            )
+        except SQLAlchemyError as e:
+            self.logger.error(f"查找首个激活用户失败: {e}")
+            raise QueryExecutionError("查找用户失败", original_error=e)
 
     def count_admins(self) -> int:
         """统计激活的管理员用户数量"""
@@ -179,6 +264,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             total_pages = max(1, (total_count + page_size - 1) // page_size)
             page = max(1, min(page, total_pages))
             offset = (page - 1) * page_size
+            ensure_offset_within_limit(offset)
             data = query.limit(page_size).offset(offset).all()
 
             return {
@@ -214,6 +300,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             total_pages = max(1, (total_count + page_size - 1) // page_size)
             page = max(1, min(page, total_pages))
             offset = (page - 1) * page_size
+            ensure_offset_within_limit(offset)
             data = query.limit(page_size).offset(offset).all()
 
             return {

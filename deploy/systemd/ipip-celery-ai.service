@@ -30,6 +30,11 @@ EnvironmentFile=/etc/ipip/ipip.env
 ; 的优先级（与 deploy/supervisord.conf:59 的做法一致）。
 Environment=AI_ASYNC_ENABLED=1
 Environment=PYTHONUNBUFFERED=1
+; ── 采集职责：本进程**不采**（由 ipip-monitor.service 独占）────────────
+; celery worker 首次执行 task 时会 `create_app()`（app/celery_app.py 的
+; `_get_flask_app()`），不关掉同样会起一套 in-Flask 轮询线程 —— 与 web 的多
+; worker 叠加后，聚合采集频率成倍高于配置值（锁只互斥、不限速）。
+Environment=MONITOR_WORKER_IN_PROCESS=false
 WorkingDirectory=${PROJECT_ROOT}
 
 ExecStart=${VENV_BIN}/celery -A app.celery_app.celery worker \

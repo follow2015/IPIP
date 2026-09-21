@@ -123,6 +123,9 @@ def export_cabinets():
         output = import_export_service.export_to_excel(cabinets, "机柜数据")
     except import_export_service.EmptyExportError:
         return APIResponse.error(message="没有可导出的机柜数据", status_code=404)
+    except import_export_service.ExportTooLargeError as e:
+        logger.warning("导出机柜数据超限: %s", str(e))
+        return APIResponse.error(message=e.message, status_code=e.status_code)
     except Exception as e:
         logger.error("导出机柜数据失败: %s", str(e))
         return APIResponse.error(message="操作失败", status_code=500)

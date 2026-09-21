@@ -20,6 +20,11 @@ class SwitchExtRepository:
     与 devices 表 1:1 关联。
     """
 
+    def __init__(self, session=None):
+        from extensions import db
+
+        self.session = session or db.session
+
     def get_by_device_id(self, device_id: int) -> SwitchCredentials | None:
         """根据 device_id 查询扩展信息
 
@@ -32,6 +37,14 @@ class SwitchExtRepository:
         return SwitchCredentials.query.filter_by(device_id=device_id).first()
 
     get_by_switch_id = get_by_device_id
+
+    def delete_by_device(self, device_id: int) -> int:
+        """清空该设备的凭据行（B-44 收敛：设备彻底删除的清理面）。"""
+        return (
+            self.session.query(SwitchCredentials)
+            .filter_by(device_id=device_id)
+            .delete()
+        )
 
     def upsert(self, device_id: int, **fields) -> SwitchCredentials:
         """创建或更新扩展信息

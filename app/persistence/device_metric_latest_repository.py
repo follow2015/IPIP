@@ -34,6 +34,18 @@ class DeviceMetricLatestRepository:
             .all()
         )
 
+    def find_one(self, device_id: int, metric_key: str) -> Optional[DeviceMetricLatest]:
+        """取某设备某指标的当前值行（根因分析的 latest 快照，B-44 收敛）
+
+        与 `find_by_device` 的区别：按 `metric_key` 精确定位单行
+        （根因分析只关心"这个指标现在是多少"）。
+        """
+        return (
+            self.session.query(DeviceMetricLatest)
+            .filter_by(device_id=device_id, metric_key=metric_key)
+            .first()
+        )
+
     @staticmethod
     def _is_deadlock(exc: OperationalError) -> bool:
         orig = getattr(exc, "orig", None)

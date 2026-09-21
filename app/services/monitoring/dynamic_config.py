@@ -99,6 +99,12 @@ _WHITELIST: Dict[str, _Entry] = {
         "MONITOR_OUTBOX_INTERVAL", "int", 5,
         "告警发件箱轮询间隔（秒）", True, 1, 3600, "outbox_interval",
     ),
+    "MONITOR_RATE_LIMIT_ENABLED": _Entry(
+        "MONITOR_RATE_LIMIT_ENABLED", "bool", True,
+        "轮询最小间隔闸门（限速器）：同 loop 多实例共享一个 interval 配额，"
+        "防止采集频率被实例数放大（关闭仅用于现场排障）",
+        True, camel="rate_limit_enabled",
+    ),
     "MONITOR_NON_MANAGED_PORT_SYNC": _Entry(
         "MONITOR_NON_MANAGED_PORT_SYNC", "bool", False,
         "非网管网络设备端口自动同步（默认关闭，开启后按 IF-MIB/Zabbix 全量替换端口表）",

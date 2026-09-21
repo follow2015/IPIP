@@ -1253,8 +1253,7 @@ class MonitorService:
         if cached is not None and cached[1] > time.monotonic():
             return cached[0]
 
-        from app.models.user import User
-        from app.models.rbac import Role, UserRole
+        from app.persistence.user_repository import UserRepository
 
         with _ROLE_ACTIVE_USER_CACHE_LOCK:
             cached = _ROLE_ACTIVE_USER_CACHE.get(role_name)
@@ -1262,14 +1261,7 @@ class MonitorService:
                 return cached[0]
 
             session = (status_repo or self.status_repo).session
-            result = (
-                session.query(User)
-                .join(UserRole, UserRole.user_id == User.id)
-                .join(Role, Role.id == UserRole.role_id)
-                .filter(Role.name == role_name, User.status == 0)
-                .first()
-                is not None
-            )
+            result = UserRepository(session=session).exists_active_with_role(role_name)
             _ROLE_ACTIVE_USER_CACHE[role_name] = (result, time.monotonic() + _ROLE_ACTIVE_USER_TTL)
             return result
 
@@ -1481,13 +1473,11 @@ def list_alerts(params: dict) -> dict:
     if params.get("scope") == "mine":
         user_id = params.get("user_id")
         if user_id is not None:
-            from app.models.device import Device
-            device_ids = [
-                d.id for d in
-                alert_repo.session.query(Device.id)
-                .filter(Device.responsible_person == user_id, Device.deleted_at.is_(None))
-                .all()
-            ]
+            from app.persistence.device_repository import DeviceRepository
+
+            device_ids = DeviceRepository(
+                session=alert_repo.session
+            ).find_ids_by_responsible_person(user_id, alive_only=True)
 
     total, items = alert_repo.list_with_device(
         alert_type=params.get("alert_type"),

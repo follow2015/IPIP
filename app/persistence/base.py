@@ -16,6 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, Query, joinedload, selectinload
 
 from app.models.base import BaseModel
+from app.core.pagination_limits import ensure_offset_within_limit
 from app.exceptions.data_access import (
     DataAccessError,
     QueryExecutionError,
@@ -360,6 +361,7 @@ class BaseRepository:
                 query = self._apply_ordering(query, order_by)
             
             offset = (page - 1) * page_size
+            ensure_offset_within_limit(offset)
             data = query.limit(page_size).offset(offset).all()
             
             return {
@@ -681,6 +683,7 @@ class SQLAlchemyRepository(BaseRepository, abstract=True):
                 total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 0
                 page = 1 if total_pages == 0 else max(1, min(page, total_pages))
                 offset = (page - 1) * page_size
+                ensure_offset_within_limit(offset)
                 id_rows = (
                     query.with_entities(sa_distinct(pk_col))
                     .order_by(pk_col)
@@ -699,6 +702,7 @@ class SQLAlchemyRepository(BaseRepository, abstract=True):
                 total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 0
                 page = 1 if total_pages == 0 else max(1, min(page, total_pages))
                 offset = (page - 1) * page_size
+                ensure_offset_within_limit(offset)
                 data = query.limit(page_size).offset(offset).all()
             
             return {
@@ -837,6 +841,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             if relationships:
                 query = self._apply_eager_loading(query, relationships)
             
+            ensure_offset_within_limit(offset)
             data = query.offset(offset).limit(page_size).all()
             
             return {

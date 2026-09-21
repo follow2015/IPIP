@@ -378,9 +378,6 @@ def diag_timeline(args: Dict[str, Any]) -> dict:
 
     from app.utils.time_utils import now_utc_naive
 
-    from extensions import db
-    from app.models.device_monitor_probe_events import DeviceMonitorProbeEvents
-    from app.models.monitor_incident import MonitorIncident
     from app.services.ai.diagnosis_session_service import DiagnosisSessionService
 
     device_id = _coerce_int(args.get("device_id"))
@@ -391,13 +388,9 @@ def diag_timeline(args: Dict[str, Any]) -> dict:
 
     events: list = []
 
-    incidents = (
-        db.session.query(MonitorIncident)
-        .filter(MonitorIncident.root_device_id == device_id,
-                MonitorIncident.first_alert_at >= since)
-        .order_by(MonitorIncident.first_alert_at.asc())
-        .all()
-    )
+    from app.persistence.monitor_incident_repository import IncidentRepository
+
+    incidents = IncidentRepository().list_by_root_device(device_id, since)
     for inc in incidents:
         events.append({
             "ts": inc.first_alert_at.isoformat() if inc.first_alert_at else None,
@@ -407,14 +400,9 @@ def diag_timeline(args: Dict[str, Any]) -> dict:
             "status": inc.status,
         })
 
-    probes = (
-        db.session.query(DeviceMonitorProbeEvents)
-        .filter(DeviceMonitorProbeEvents.device_id == device_id,
-                DeviceMonitorProbeEvents.probed_at >= since,
-                DeviceMonitorProbeEvents.is_alert.is_(True))
-        .order_by(DeviceMonitorProbeEvents.probed_at.asc())
-        .all()
-    )
+    from app.persistence.monitor_timeseries_repository import MonitorTimeseriesRepository
+
+    probes = MonitorTimeseriesRepository().list_alert_events(device_id, from_=since)
     for p in probes:
         events.append({
             "ts": p.probed_at.isoformat() if p.probed_at else None,

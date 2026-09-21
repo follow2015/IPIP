@@ -356,3 +356,34 @@ class ServiceError(BusinessLogicError):
             details=details,
             status_code=status_code,
         )
+
+
+class PaginationLimitExceeded(BusinessLogicError):
+    """深分页超限异常（P0-3c 深度封顶）。
+
+    当分页请求的 ``offset`` 超过 ``app.core.pagination_limits.MAX_OFFSET`` 时抛出。
+    由 ``ensure_offset_within_limit()`` 在仓储层各分页点统一触发。
+
+    为什么单独一个异常类、而不是复用 ``InvalidOperationError``：前端需要能
+    **编程识别**这一情形并降级提示（把「共 N 条」位置换成"结果过多，请用筛选缩小
+    范围"）。靠 ``message`` 文案匹配既脆又不可本地化；专用 ``code`` 是稳定契约。
+    ``code`` 用 ``UPPER_SNAKE`` 字面量，与本模块既有惯例（``USER_NOT_FOUND`` /
+    ``INVALID_OPERATION`` / …）一致。
+    """
+
+    def __init__(self, offset: int, max_offset: int):
+        """初始化分页超限异常。
+
+        Args:
+            offset: 请求的偏移量（实际会发给数据库的那个）
+            max_offset: 允许的最大偏移量（= ``MAX_OFFSET``）
+        """
+        super().__init__(
+            message=(
+                f"结果过多，请使用筛选条件缩小范围"
+                f"（单次翻页最多到第 {max_offset} 条）"
+            ),
+            code="PAGINATION_LIMIT_EXCEEDED",
+            details={"max_offset": max_offset, "requested_offset": offset},
+            status_code=400,
+        )

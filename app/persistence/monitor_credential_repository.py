@@ -279,6 +279,43 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
             .first()
         )
 
+    def list_other_protocol_links(
+        self, device_id: int, keep_protocol: str,
+    ) -> List[tuple]:
+        """取该设备**其它协议**的启用凭据关联（B-44 收敛：协议切换时的清理）。
+
+        返回 ``[(DeviceMonitorCredential, MonitorCredential), ...]`` —— 调用方要
+        拿 ``cred.id`` 逐个解除关联，故返回关联行 + 凭据两元组（join 而非两次查）。
+
+        条件（原实现即如此，勿"顺手放宽"）：关联属于该设备、凭据协议 ``!= keep_protocol``、
+        凭据 ``enabled`` 为真。停用凭据不在清理范围（不占用协议）。
+        """
+        return (
+            self.session.query(DeviceMonitorCredential, MonitorCredential)
+            .join(
+                MonitorCredential,
+                MonitorCredential.id == DeviceMonitorCredential.credential_id,
+            )
+            .filter(
+                DeviceMonitorCredential.device_id == device_id,
+                MonitorCredential.protocol != keep_protocol,
+                MonitorCredential.enabled.is_(True),
+            )
+            .all()
+        )
+
+    def delete_device_links(self, device_id: int) -> int:
+        """解除该设备的全部凭据关联（B-44 收敛：设备彻底删除的清理面）。
+
+        ⚠️ 只删**关联行**（多对多中间表），不删 MonitorCredential 本身 ——
+        凭据可被多设备共享（原注释即如此，勿"顺手"把凭据也删了）。
+        """
+        return (
+            self.session.query(DeviceMonitorCredential)
+            .filter_by(device_id=device_id)
+            .delete()
+        )
+
     def find_enabled(self, device_id: int, protocol: str) -> Optional[MonitorCredential]:
         return (
             self.session.query(MonitorCredential)

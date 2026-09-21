@@ -107,6 +107,28 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         self.session.flush()
         return row
 
+    def list_alert_events(
+        self, device_id: int, from_: Optional[Any] = None,
+        limit: Optional[int] = None,
+    ) -> List[DeviceMonitorProbeEvents]:
+        """取该设备**触发告警**的探测事件（时间升序；B-44 收敛：AI 时间线用）。
+
+        与 `list_events` 的区别：① 只要 ``is_alert`` 的行（不可达/恢复）；
+        ② 返回**实体**而非 dict（调用方要读 ``reachable`` / ``error`` /
+        ``latency_ms`` 等属性拼事件流）；③ ``limit=None`` = 不限条
+        （AI 时间线按窗口取全量，与原实现一致）。
+        """
+        query = self.session.query(DeviceMonitorProbeEvents).filter(
+            DeviceMonitorProbeEvents.device_id == device_id,
+            DeviceMonitorProbeEvents.is_alert.is_(True),
+        )
+        if from_ is not None:
+            query = query.filter(DeviceMonitorProbeEvents.probed_at >= from_)
+        query = query.order_by(DeviceMonitorProbeEvents.probed_at.asc())
+        if limit is not None:
+            query = query.limit(int(limit))
+        return query.all()
+
     def list_events(
         self,
         device_id: int,
@@ -195,6 +217,43 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
             "avg_jitter_ms": round(sum(jitters) / len(jitters), 2) if jitters else None,
             "quality_samples": len(losses),
         }
+
+    def list_hourly_avg_values(
+        self, device_ids: List[int], metric: str, start, end,
+    ) -> List[float]:
+        """取一组设备某指标在 ``[start, end)`` 内的**逐小时均值**（B-44 收敛：SLA 达成度）。
+
+        只取 ``avg_value`` 一列：SLA 要的是"样本序列的均值"，行本身无意义
+        （原实现取整行后只读 ``row[0]``）。
+
+        ⚠️ 空 ``device_ids`` 会生成恒假的 ``IN`` 条件 ⇒ 返回空列表（0 样本）。
+        调用方据此把达成度判为 None/不达标 —— 语义与原始实现一致，勿改成
+        "空集合返回全量"。
+        """
+        rows = (
+            self.session.query(DeviceMonitorTimeseriesHourly.avg_value)
+            .filter(
+                DeviceMonitorTimeseriesHourly.device_id.in_(device_ids),
+                DeviceMonitorTimeseriesHourly.metric == metric,
+                DeviceMonitorTimeseriesHourly.hour_bucket >= start,
+                DeviceMonitorTimeseriesHourly.hour_bucket < end,
+            )
+            .all()
+        )
+        return [r[0] for r in rows]
+
+    def delete_hourly_by_device(self, device_id: int) -> int:
+        """清空该设备的逐小时聚合行（B-44 收敛：设备彻底删除的清理面）。
+
+        ⚠️ 分区明细表（probe_events / metric_timeseries）**不在本方法范围**：
+        它们是 RANGE(时间) 分区表，回收走 drop_expired_*_partitions 按天 DROP
+        分区，逐行 DELETE 会跨全部分区拖长事务（原注释即如此，勿"补全"）。
+        """
+        return (
+            self.session.query(DeviceMonitorTimeseriesHourly)
+            .filter_by(device_id=device_id)
+            .delete()
+        )
 
     def aggregate_events(
         self,

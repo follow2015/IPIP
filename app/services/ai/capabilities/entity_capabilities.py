@@ -60,20 +60,17 @@ def customer_search(args: Dict[str, Any]) -> dict:
     if not ok:
         return {"supported": False, "hint": reason}
 
-    from app.models.device import Device
+    from app.persistence.device_repository import DeviceRepository
     from app.services.ai.entity_lookup import _MAX_CUSTOMER_DEVICES
 
-    dev_query = Device.query.filter(Device.customer_id == customer["id"])
-    if visible is not None:
-        if not visible:
-            return {"supported": False, "hint": "当前数据域无可访问设备"}
-        dev_query = dev_query.filter(Device.id.in_(visible))
-    total = dev_query.filter(Device.deleted_at.is_(None)).count()
-    device_rows = (
-        dev_query.filter(Device.deleted_at.is_(None))
-        .order_by(Device.id)
-        .limit(_MAX_CUSTOMER_DEVICES)
-        .all()
+    if visible is not None and not visible:
+        return {"supported": False, "hint": "当前数据域无可访问设备"}
+    scope_ids = None if visible is None else list(visible)
+
+    dev_repo = DeviceRepository()
+    total = dev_repo.count_by_customer_id(customer["id"], device_ids=scope_ids)
+    device_rows = dev_repo.find_by_customer_id_ordered(
+        customer["id"], limit=_MAX_CUSTOMER_DEVICES, device_ids=scope_ids,
     )
     from app.services.ai.entity_lookup import _device_brief
     devices = [_device_brief(d) for d in device_rows]

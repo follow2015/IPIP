@@ -5,6 +5,7 @@ import { useNetworkList, useDeleteNetwork, useUpdateNetworkCustomer } from '@/se
 import { useAllocatableCustomerOptions } from '@/services/customer';
 import type { IPNetwork } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
+import { serverPagination } from '@/components/DataTable/serverPagination';
 
 function NetworkList() {
   const confirm = useConfirm();
@@ -104,12 +105,12 @@ function NetworkList() {
       rowKey="id"
       loading={isLoading}
       size="small"
-      pagination={{
-        total: data?.total ?? 0,
-        pageSize: data?.per_page ?? 20,
+      pagination={serverPagination({
+        showSizeChanger: false,
         current: data?.page ?? 1,
-        showTotal: (t) => `共 ${t} 条`
-      }}
+        pageSize: data?.per_page ?? 20,
+        total: data?.total ?? 0
+      })}
       scroll={{ x: 'max-content' }}
     />
   );

@@ -455,11 +455,11 @@ class SyncCoordinator:
         self, device_id: int, port: str, extra: dict,
     ) -> None:
         """仅当端口已存在于 network_ports 表时，更新其 port_info 缓存"""
-        from app.persistence.switch_port_repository import NetworkPort
-        row = self.switch_repo.session.query(NetworkPort).filter(
-            NetworkPort.device_id == device_id,
-            NetworkPort.port_name == port,
-        ).first()
+        from app.persistence.switch_port_repository import NetworkPortRepository
+
+        row = NetworkPortRepository(session=self.switch_repo.session).find_port_by_name_orm(
+            device_id, port
+        )
         if row:
             existing = row.raw_info
             if isinstance(existing, str):

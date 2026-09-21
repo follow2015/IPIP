@@ -293,12 +293,7 @@ class CabinetService:
             cabinet_id: 机柜ID
             customer_id: 新的客户ID（可为 None，表示清除客户）
         """
-        from app.models.device import Device
-
-        self.cabinet_repository.session.query(Device).filter(
-            Device.cabinet_id == cabinet_id,
-            Device.deleted_at.is_(None),
-        ).update({Device.customer_id: customer_id}, synchronize_session="fetch")
+        self.cabinet_repository.assign_customer_within_cabinet(cabinet_id, customer_id)
 
         logger.info(
             "机柜 %s 客户变更为 %s，已同步更新机柜下设备的客户ID",
@@ -425,9 +420,7 @@ class CabinetService:
             if result.get(key):
                 counts[value] = result[key]
 
-        deleted = session.query(Cabinet).filter(Cabinet.id == cabinet_id).delete(
-            synchronize_session=False
-        )
+        deleted = CabinetRepository(session).delete_by_id_force(cabinet_id)
         counts["cabinets"] = deleted or 0
 
         session.flush()

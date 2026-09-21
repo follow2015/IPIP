@@ -12,6 +12,7 @@ import {
   Input
 } from 'antd';
 import DataTable from '@/components/DataTable';
+import { serverPagination } from '@/components/DataTable/serverPagination';
 import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -225,13 +226,13 @@ export default function MonitorIncidents() {
         columns={columns}
         dataSource={items}
         loading={isLoading}
-        pagination={{
+        pagination={serverPagination({
           current: params.page,
           pageSize: params.per_page,
           total: total,
-          showSizeChanger: true,
+          showTotal: false,
           onChange: (page, per_page) => setParams((p) => ({ ...p, page, per_page }))
-        }}
+        })}
         onRow={(row) => ({ onClick: () => setSelectedId(row.id) })}
         mobileCardMode
         cardRender={renderIncidentCard}

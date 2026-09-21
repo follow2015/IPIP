@@ -17,7 +17,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.models.device_metric_baseline import DeviceMetricBaseline
-from app.models.device_metric_timeseries import DeviceMetricTimeseries
 from app.utils.logging import get_logger
 from extensions import db
 
@@ -65,17 +64,11 @@ class BaselineService:
         now = now_utc_naive()
         since = now - timedelta(days=window_days)
 
-        rows = (
-            db.session.query(
-                DeviceMetricTimeseries.device_id,
-                DeviceMetricTimeseries.metric_key,
-                DeviceMetricTimeseries.index_key,
-                DeviceMetricTimeseries.value,
-                DeviceMetricTimeseries.collected_at,
-            )
-            .filter(DeviceMetricTimeseries.collected_at >= since)
-            .all()
+        from app.persistence.device_metric_timeseries_repository import (
+            DeviceMetricTimeseriesRepository,
         )
+
+        rows = DeviceMetricTimeseriesRepository().list_samples_since(since)
 
         grouped: Dict[Tuple, List[Tuple[str, datetime]]] = {}
         for device_id, metric_key, index_key, value, collected_at in rows:
@@ -153,9 +146,11 @@ class BaselineService:
 
     def _delete_baselines(self, device_id: int, metric_key: str, index_key: str) -> None:
         """删除某 device/metric/index 的所有旧基线（重算前清理）。"""
-        db.session.query(DeviceMetricBaseline).filter_by(
-            device_id=device_id, metric_key=metric_key, index_key=index_key,
-        ).delete(synchronize_session=False)
+        from app.persistence.device_metric_baseline_repository import (
+            DeviceMetricBaselineRepository,
+        )
+
+        DeviceMetricBaselineRepository().delete_scope(device_id, metric_key, index_key)
 
     def get_baseline(
         self,
@@ -173,25 +168,16 @@ class BaselineService:
             {"mean", "stddev", "sample_count", "baseline_status"} 或 None。
         """
         at = at or now_utc_naive()
+        from app.persistence.device_metric_baseline_repository import (
+            DeviceMetricBaselineRepository,
+        )
+
+        repo = DeviceMetricBaselineRepository()
         h = at.hour
         dow = at.weekday()
-        row = (
-            db.session.query(DeviceMetricBaseline)
-            .filter_by(
-                device_id=device_id, metric_key=metric_key,
-                index_key=index_key, hour_of_day=h, day_of_week=dow,
-            )
-            .first()
-        )
+        row = repo.find_bucket(device_id, metric_key, index_key, h, dow)
         if row is None:
-            row = (
-                db.session.query(DeviceMetricBaseline)
-                .filter_by(
-                    device_id=device_id, metric_key=metric_key,
-                    index_key=index_key, hour_of_day=-1, day_of_week=-1,
-                )
-                .first()
-            )
+            row = repo.find_bucket(device_id, metric_key, index_key, -1, -1)
         if row is None:
             return None
         return {

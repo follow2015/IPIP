@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload, subqueryload
 
 from app.exceptions.data_access import QueryExecutionError
+from app.core.pagination_limits import ensure_offset_within_limit
 from app.models.cabinet import Cabinet
 from app.core.enums import CabinetStatus
 from app.persistence.base import QueryOptimizationMixin, SQLAlchemyRepository
@@ -36,6 +37,44 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
     def __init__(self, session=None):
         super().__init__(Cabinet, session)
+
+    def list_by_room_and_status(self, room_id: int, statuses) -> List[Cabinet]:
+        """按机房与状态集合取机柜，按 ``cabinet_number`` 排序（B-44 部署计划批）。
+
+        两处调用点共用：一处要"排序后的机柜清单"（U 位容量），一处只要
+        ``{id: room_id}`` 映射（排序对映射无意义，保留无害）。
+        ``statuses`` 传枚举成员（仓储内统一 ``int()``，与原实现等价）。
+        """
+        return (
+            self.session.query(Cabinet)
+            .filter(
+                Cabinet.room_id == room_id,
+                Cabinet.status.in_([int(s) for s in statuses]),
+            )
+            .order_by(Cabinet.cabinet_number)
+            .all()
+        )
+
+    def list_room_ids_by_device_ids(self, device_ids) -> List[int]:
+        """按设备 ID 集合取其所在机柜的 ``room_id``（去重、剔除 NULL）。
+
+        B-44 部署计划批：数据域裁剪用（可见交换机 ⇒ 它们覆盖的机房）。
+        原实现在 Python 侧剔除 ``None``；本方法在 SQL 侧 DISTINCT 后仍可能
+        含 NULL（机柜列可空），故此处统一剔除，返回纯 ``List[int]``。
+        """
+        ids = tuple(device_ids)
+        if not ids:
+            return []
+        from app.models.device import Device
+
+        rows = (
+            self.session.query(Cabinet.room_id)
+            .join(Device, Device.cabinet_id == Cabinet.id)
+            .filter(Device.id.in_(ids))
+            .distinct()
+            .all()
+        )
+        return [r[0] for r in rows if r[0] is not None]
 
     def clear_customer(self, customer_id: int) -> int:
         """批量解绑客户名下所有机柜（customer_id 置 NULL）。
@@ -69,6 +108,56 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         except SQLAlchemyError as e:
             self.logger.error(f"根据ID查找机柜失败 (ID={entity_id}): {e}")
             raise QueryExecutionError(f"查找机柜失败", original_error=e)
+
+    def find_device_ids_in_cabinet(self, cabinet_id: int) -> list:
+        """柜内全部设备 ID（B-46 收敛：机柜强删第 0 步）。
+
+        ⚠️ **含回收站中的软删设备**：强删语义就是"一台不留"（原注释即如此）——
+        故**刻意不走** ``_base_query()``。
+        """
+        from app.models.device import Device
+
+        return [
+            r[0]
+            for r in self.session.query(Device.id)
+            .filter(Device.cabinet_id == cabinet_id)
+            .all()
+        ]
+
+    def assign_customer_within_cabinet(self, cabinet_id: int, customer_id: int) -> None:
+        """把机柜内**在架**设备的客户归属改为指定客户（B-44 收敛）。
+
+        ⚠️ ``synchronize_session="fetch"``：update 值是普通列赋值，fetch 模式
+        保证会话内已加载对象同步失效（原实现即如此，勿降级为 False 而不评估）。
+        只动 ``deleted_at IS NULL`` 的在架设备 —— 已删设备的归属是历史事实。
+        """
+        from app.models.device import Device  # 局部 import：与本文件既有风格一致
+
+        self.session.query(Device).filter(
+            Device.cabinet_id == cabinet_id,
+            Device.deleted_at.is_(None),
+        ).update({Device.customer_id: customer_id}, synchronize_session="fetch")
+
+    def delete_by_id_force(self, cabinet_id: int) -> int:
+        """物理删除机柜本体（B-44 收敛：机柜强删路径）。
+
+        ⚠️ 调用方约定：指向 cabinets 的外键只有 devices.cabinet_id，且
+        **设备已删净**才会走到这里（原注释即如此）—— 本方法不做级联检查。
+        """
+        return (
+            self.session.query(Cabinet)
+            .filter(Cabinet.id == cabinet_id)
+            .delete(synchronize_session=False)
+        )
+
+    def exists_by_id(self, cabinet_id: int) -> bool:
+        """机柜是否存在（只取 id 列；B-44 收敛：恢复设备时的存在性校验）。"""
+        return (
+            self.session.query(Cabinet.id)
+            .filter(Cabinet.id == cabinet_id)
+            .first()
+            is not None
+        )
 
     def find_by_cabinet_number(self, cabinet_number: str) -> Optional[Cabinet]:
         """根据机柜编号查找机柜。"""
@@ -211,6 +300,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
             total_count = query.count()
             offset = (page - 1) * page_size
+            ensure_offset_within_limit(offset)
             data = query.order_by(Cabinet.cabinet_number).offset(offset).limit(page_size).all()
 
             return {

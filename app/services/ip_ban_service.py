@@ -18,7 +18,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
 
-from sqlalchemy import text
 
 from app.adapters.adapter_factory import get_adapter
 from app.core.enums import IPStatus, RouteNotes
@@ -466,23 +465,7 @@ class IPBanService:
         if ip_int_val is None:
             return None
 
-        row = self.session.execute(text("""
-            SELECT id FROM switch_routes
-            WHERE room_id = :room_id
-              AND route_type != :blackhole_type
-              AND destination_int <= :ip_int
-              AND :ip_int <= destination_int + POW(2, 32 - destination_prefix) - 1
-            ORDER BY destination_prefix DESC
-            LIMIT 1
-        """), {
-            "ip_int": ip_int_val, "room_id": room_id,
-            "blackhole_type": int(RouteNotes.BLACKHOLE),
-        }).first()
-
-        if row is None:
-            return None
-
-        return self.session.query(SwitchRoute).get(row[0])
+        return self.ip_net_repo.find_longest_prefix_match_route(room_id, ip_int_val)
 
     def _detect_ban_mode_from_record(
         self, ip_address: str, room_id: int,
@@ -1158,10 +1141,9 @@ def check_ban_consistency(room_id: int = None) -> dict:
         ip_addrs = [p[0] for p in ip_room_pairs]
         room_ids = list({p[1] for p in ip_room_pairs})
         ip_records_map = {}
-        for rec in repo.session.query(IPManager).filter(
-            IPManager.ip_address.in_(ip_addrs),
-            IPManager.room_id.in_(room_ids),
-        ).all():
+        for rec in IPManagerRepository(session=repo.session).list_by_ip_room_pairs(
+            ip_addrs, room_ids,
+        ):
             ip_records_map[(rec.ip_address, rec.room_id)] = rec
 
         for rec in batch:
@@ -1191,13 +1173,7 @@ def check_ban_consistency(room_id: int = None) -> dict:
     except Exception:
         logger.warning("检查封禁pending超时失败", exc_info=True)
 
-    pending_query = repo.session.query(IPManager).filter(
-        IPManager.status.in_((IPStatus.PENDING_BAN, IPStatus.PENDING_UNBAN))
-    )
-    if room_id is not None:
-        pending_query = pending_query.filter(IPManager.room_id == room_id)
-
-    for ip_record in pending_query.all():
+    for ip_record in IPManagerRepository(session=repo.session).list_pending_status(room_id):
         redis_key = f"ipm:ban_pending:{ip_record.room_id}:{ip_record.ip_address}"
         redis_pending = False
         try:

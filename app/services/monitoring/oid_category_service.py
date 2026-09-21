@@ -94,10 +94,7 @@ def _load_rule_prefixes() -> list[str]:
     """
     from app.persistence.monitor_oid_category_rule_repository import MonitorOidCategoryRuleRepository
     rule_repo = MonitorOidCategoryRuleRepository()
-    from extensions import db
-    from app.models.monitor_oid_category_rule import MonitorOidCategoryRule
-    rows = db.session.query(MonitorOidCategoryRule.prefix).filter_by(enabled=1).all()
-    return [r[0] for r in rows]
+    return rule_repo.list_enabled_prefixes()
 
 
 def _match_oid(oid: str, prefix: str) -> bool:

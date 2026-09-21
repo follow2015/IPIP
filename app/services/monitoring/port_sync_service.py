@@ -115,11 +115,7 @@ class PortSyncService:
         session = self.port_repo.session
         now = now_utc_naive()
 
-        existing_ports = (
-            session.query(NetworkPort)
-            .filter(NetworkPort.device_id == device_id)
-            .all()
-        )
+        existing_ports = self.port_repo.list_entities_by_device(device_id)
         existing_by_key: dict[tuple, NetworkPort] = {}
         for p in existing_ports:
             key = (p.port_type, p.slot, p.card, p.port_number)

@@ -64,16 +64,11 @@ def _l3_change(root_device_id: Optional[int], at) -> Optional[Dict[str, Any]]:
 
 def _suppressed(incident_id: int, visible: Optional[set]) -> List[Dict[str, Any]]:
     """取该事件下被依赖抑制的告警（L2 连坐面）。"""
-    from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
-    from extensions import db
-
-    q = (
-        db.session.query(MonitorSuppressedAlertLog)
-        .filter(MonitorSuppressedAlertLog.incident_id == incident_id)
-        .order_by(MonitorSuppressedAlertLog.created_at.desc())
-        .limit(MAX_SUPPRESSED)
-        .all()
+    from app.persistence.monitor_suppressed_alert_log_repository import (
+        SuppressedAlertLogRepository,
     )
+
+    q = SuppressedAlertLogRepository().list_by_incident(incident_id, MAX_SUPPRESSED)
     out: List[Dict[str, Any]] = []
     for row in q:
         if visible is not None:
@@ -92,23 +87,14 @@ def _suppressed(incident_id: int, visible: Optional[set]) -> List[Dict[str, Any]
 
 def _diagnosis_state(incident_id: int) -> Dict[str, Any]:
     """该事件是否已有诊断会话（供 Round 1 直接复用，避免重复诊断）。"""
-    from app.models.ai_diagnosis_session import AIDiagnosisSession
-    from extensions import db
+    from app.persistence.ai_diagnosis_session_repository import (
+        AIDiagnosisSessionRepository,
+    )
 
     try:
-        running = (
-            db.session.query(AIDiagnosisSession.id)
-            .filter(AIDiagnosisSession.incident_id == incident_id,
-                    AIDiagnosisSession.status == "running")
-            .count()
-        )
-        latest = (
-            db.session.query(AIDiagnosisSession)
-            .filter(AIDiagnosisSession.incident_id == incident_id,
-                    AIDiagnosisSession.status.in_(("completed", "incomplete")))
-            .order_by(AIDiagnosisSession.id.desc())
-            .first()
-        )
+        repo = AIDiagnosisSessionRepository()
+        running = repo.count_running(incident_id)
+        latest = repo.latest_finished(incident_id)
     except Exception:  # noqa: BLE001 - 迁移未执行时该列不存在，降级为无诊断记录
         logger.warning("ai.incident_ctx.diagnosis_lookup_failed incident=%s",
                        incident_id, exc_info=True)
@@ -149,16 +135,10 @@ def collect_incident_contexts(
         每项含 incident 本体字段 + suppressed（L2 连坐）+ change（L3 复算）
         + diagnosis（已有诊断状态）。
     """
-    from app.models.monitor_incident import MonitorIncident
-    from extensions import db
+    from app.persistence.monitor_incident_repository import IncidentRepository
 
-    incidents = (
-        db.session.query(MonitorIncident)
-        .filter(MonitorIncident.root_device_id == device_id,
-                MonitorIncident.first_alert_at >= since)
-        .order_by(MonitorIncident.first_alert_at.desc())
-        .limit(limit)
-        .all()
+    incidents = IncidentRepository().list_by_root_device(
+        device_id, since, limit, newest_first=True,
     )
 
     out: List[Dict[str, Any]] = []

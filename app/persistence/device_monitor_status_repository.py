@@ -12,6 +12,7 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 from app.models.device import Device
 from app.models.device_monitor_status import DeviceMonitorStatus
 from app.persistence.base import SQLAlchemyRepository
+from app.core.pagination_limits import ensure_offset_within_limit
 
 
 class DeviceMonitorStatusRepository(SQLAlchemyRepository):
@@ -67,6 +68,14 @@ class DeviceMonitorStatusRepository(SQLAlchemyRepository):
             .all()
         )
         return {r.device_id: r for r in rows}
+
+    def delete_by_device(self, device_id: int) -> int:
+        """清空该设备的监控状态行（B-44 收敛：设备彻底删除的清理面）。"""
+        return (
+            self.session.query(DeviceMonitorStatus)
+            .filter_by(device_id=device_id)
+            .delete()
+        )
 
     def mark_stale(self, device_id: int) -> None:
         """使设备的状态快照失效：删除该行，迫使下一轮探测覆盖。
@@ -327,12 +336,14 @@ class DeviceMonitorStatusRepository(SQLAlchemyRepository):
             q = q.filter(DeviceMonitorStatus.device_id.in_(device_ids))
 
         total = q.count()
+        offset = (page - 1) * per_page
+        ensure_offset_within_limit(offset)
         rows = (
             q.order_by(
                 DeviceMonitorStatus.monitor_enabled.desc(),
                 DeviceMonitorStatus.last_checked_at.desc(),
             )
-            .offset((page - 1) * per_page)
+            .offset(offset)
             .limit(per_page)
             .all()
         )
