@@ -227,6 +227,7 @@ def ip_allocate_suggest(args: Dict[str, Any]) -> dict:
     limit = _coerce_int(args.get("limit"), default=20) or 20
     from app.core.enums import IPStatus
     from app.persistence.ip_repositories import IPManagerRepository
+
     ips = IPManagerRepository().find_unused_inactive_ips_by_rooms(
         [room_id], [int(IPStatus.UNUSED), int(IPStatus.INACTIVE)]
     )
@@ -246,24 +247,11 @@ def ip_reconcile_check(args: Dict[str, Any]) -> dict:
     room_id = _coerce_int(args.get("room_id"))
     if room_id is None:
         raise ValueError("room_id 必填")
-    from sqlalchemy import text
-
-    from app.core.enums import IPStatus
     from app.persistence.ip_repositories import IPManagerRepository
 
     repo = IPManagerRepository()
-    active_no_loc = repo.session.execute(text(
-        "SELECT COUNT(*) FROM ip_addresses ia "
-        "LEFT JOIN ip_switch_info si "
-        "  ON si.ip_address = ia.ip_address AND si.room_id = ia.room_id "
-        "WHERE ia.room_id = :rid AND ia.status = :active AND si.id IS NULL"
-    ), {"rid": room_id, "active": int(IPStatus.ACTIVE)}).scalar() or 0
-    banned_no_record = repo.session.execute(text(
-        "SELECT COUNT(*) FROM ip_addresses ia "
-        "LEFT JOIN ip_ban_records br "
-        "  ON br.ip_address = ia.ip_address AND br.room_id = ia.room_id "
-        "WHERE ia.room_id = :rid AND ia.status = :banned AND br.id IS NULL"
-    ), {"rid": room_id, "banned": int(IPStatus.BANNED)}).scalar() or 0
+    active_no_loc = repo.count_active_without_location(room_id)
+    banned_no_record = repo.count_banned_without_record(room_id)
     return {
         "room_id": room_id,
         "active_without_location": int(active_no_loc),

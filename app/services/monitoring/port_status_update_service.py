@@ -23,11 +23,12 @@
 """
 from __future__ import annotations
 from app.utils.time_utils import now_utc_naive
+from app.models.network_port import NetworkPort
+from app.models.device_metric_alert_state import DeviceMetricAlertState
 
 from app.utils.logging import get_logger
 from datetime import datetime
 
-from app.models.network_port import NetworkPort
 
 logger = get_logger(__name__)
 
@@ -104,11 +105,11 @@ class PortStatusUpdateService:
         if now is None:
             now = now_utc_naive()
 
-        existing_ports = (
-            self._session.query(NetworkPort)
-            .filter(NetworkPort.device_id == device_id)
-            .all()
-        )
+        from app.persistence.switch_port_repository import NetworkPortRepository
+
+        existing_ports = NetworkPortRepository(
+            session=self._session
+        ).list_entities_by_device(device_id)
         existing_by_name = {p.port_name: p for p in existing_ports}
 
         updated = 0
@@ -145,7 +146,7 @@ class PortStatusUpdateService:
         """
         try:
             from app.services.monitoring.metric_alert_service import MetricAlertService
-            from app.models.device_metric_alert_state import DeviceMetricAlertState
+
             svc = MetricAlertService(session=self._session)
             index = port_name
             value = f"{old_status}->{new_status}"
@@ -155,15 +156,13 @@ class PortStatusUpdateService:
                 device_id, "port_status_changed", severity,
                 "port_updown", index, value, breached=breached,
             )
-            state = (
-                self._session.query(DeviceMetricAlertState)
-                .filter_by(
-                    device_id=device_id,
-                    metric_key="port_updown",
-                    index_key=index,
-                )
-                .first()
+            from app.persistence.device_metric_alert_state_repository import (
+                DeviceMetricAlertStateRepository,
             )
+
+            state = DeviceMetricAlertStateRepository(
+                session=self._session
+            ).find_by_identity(device_id, "port_updown", index)
             if state is None:
                 state = DeviceMetricAlertState(
                     device_id=device_id,

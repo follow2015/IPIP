@@ -727,8 +727,6 @@ class RoomService:
         Returns:
             {表名: 删除行数}，供 API 回给前端展示、也便于测试断言"确实清干净了"。
         """
-        from sqlalchemy import text
-
         if not self.room_repository.find_by_id(room_id):
             raise ValidationError("机房不存在")
 
@@ -738,24 +736,18 @@ class RoomService:
         cabinet_ids_sql = "SELECT id FROM cabinets WHERE room_id = :rid"
         device_ids_sql = f"SELECT id FROM devices WHERE cabinet_id IN ({cabinet_ids_sql})"
 
+        from app.persistence.room_repository import RoomRepository
+
         def run(table: str, col: str, scope_sql: str, scope_param: str = "rid") -> None:
             if (table, col) not in _FORCE_DELETE_ALLOWED:
                 raise ValueError(f"force_delete: (表, 列) 不在白名单内：{(table, col)!r}")
-            result = session.execute(
-                text(f"DELETE FROM `{table}` WHERE `{col}` IN ({scope_sql})"),
-                {scope_param: room_id},
+            deleted = RoomRepository(session).execute_whitelisted_delete(
+                table, col, scope_sql, {scope_param: room_id},
             )
-            deleted = result.rowcount or 0
             if deleted:
                 counts[table] = counts.get(table, 0) + deleted
 
-        room_device_ids = [
-            row[0]
-            for row in session.execute(
-                text(f"SELECT id FROM devices WHERE cabinet_id IN ({cabinet_ids_sql})"),
-                {"rid": room_id},
-            ).fetchall()
-        ]
+        room_device_ids = RoomRepository(session).find_device_ids_in_room(room_id)
 
         from app.services.device_connection_service import DeviceConnectionService
 
@@ -780,10 +772,7 @@ class RoomService:
         for table, col in _FORCE_DELETE_ROOM_SCOPED:
             run(table, col, "SELECT :rid")
 
-        result = session.execute(
-            text("DELETE FROM `rooms` WHERE `id` = :rid"), {"rid": room_id}
-        )
-        counts["rooms"] = result.rowcount or 0
+        counts["rooms"] = RoomRepository(session).delete_room_itself(room_id)
 
         session.flush()
         logger.warning(

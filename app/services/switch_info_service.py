@@ -264,7 +264,6 @@ class SwitchInfoService:
         同时清理设备上已不存在的 Vlanif/Eth-Trunk 对应的残留记录。
         """
         from app.models.link_aggregation import LinkAggregationGroup
-        from sqlalchemy import delete as sa_delete
 
         session = self.sw_repo.session
         scanned_vlan_ids = set()
@@ -319,12 +318,13 @@ class SwitchInfoService:
             if del_count:
                 logger.debug("扫描同步: 清理残留 VLAN 记录 device_id=%d count=%d", device_id, del_count)
         if scanned_lag_names:
-            del_count = session.execute(
-                sa_delete(LinkAggregationGroup).where(
-                    LinkAggregationGroup.device_id == device_id,
-                    LinkAggregationGroup.lag_name.notin_(scanned_lag_names),
-                )
-            ).rowcount
+            from app.persistence.link_aggregation_repository import (
+                LinkAggregationRepository,
+            )
+
+            del_count = LinkAggregationRepository(
+                session=session
+            ).delete_by_device_excluding_names(device_id, scanned_lag_names)
             if del_count:
                 logger.debug("扫描同步: 清理残留 LAG 记录 device_id=%d count=%d", device_id, del_count)
 

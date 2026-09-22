@@ -242,6 +242,21 @@ def _night_window_id(now_ts: int) -> str | None:
     return None
 
 
+def voice_budget_key(provider: str, span: int, phone: str, now: int) -> str:
+    """语音预算的**分片窗口键**（B-32：单一真源，测试侧必须调它而不是复刻）。
+
+    抽出来有两条理由，都不是洁癖：
+
+    1. **原先测试侧复刻了一份**（`f"...:{int(time.time()) // 60}"`）—— 两侧各自现算，
+       跨分钟必然不匹配 ⇒ 低概率 flake（B-32）；
+    2. `now` 由**调用方传入** ⇒ 测试可以冻结时间，时间竞争归零（不是"概率变小"）。
+
+    ⚠️ 改键格式前先想清楚：旧键会在 TTL 内残留，改格式等于限流窗口**重置一次**
+    （期间可能多放行几个呼叫）。
+    """
+    return f"voice:budget:{provider}:{span}:{phone}:{now // span}"
+
+
 def _check_and_consume_budget(redis_client, phone: str, config: dict) -> bool:
     """被叫号码呼叫预算，按 provider 分档（全局单一预算在腾讯云侧必然超限）。
 
@@ -272,7 +287,7 @@ def _check_and_consume_budget(redis_client, phone: str, config: dict) -> bool:
     now = int(time.time())
 
     checks: list[tuple[str, int, int]] = [
-        (f"voice:budget:{provider}:{span}:{phone}:{now // span}", budget, span * 2)
+        (voice_budget_key(provider, span, phone, now), budget, span * 2)
         for span, budget in windows
     ]
 

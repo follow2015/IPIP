@@ -12,6 +12,7 @@ from marshmallow import Schema
 from app.utils.time_utils import now_utc_naive
 
 from app.services import CustomerService
+from app.services.import_export_service import ExportTooLargeError
 from app.persistence.customer_repository import CustomerRepository
 from app.core.enums import CustomerStatus
 from app.api.base import APIResponse
@@ -381,6 +382,8 @@ def export_customer_assets(customer_id):
             as_attachment=True,
             download_name=f"{customer_name}_资源统计_{now_utc_naive().strftime('%Y%m%d')}.xlsx",
         )
+    except ExportTooLargeError as e:
+        return APIResponse.error(message=e.message, status_code=e.status_code)
     except Exception as e:
         logger.error("导出客户资源Excel失败: %s", str(e))
         return APIResponse.error(message="导出失败", status_code=500)

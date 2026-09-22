@@ -1044,32 +1044,26 @@ class DeviceService:
         if not device_ids:
             return
 
-        from sqlalchemy import bindparam, update
 
         from app.models.device import Device
-        from app.models.monitor_incident import MonitorIncident
-        from app.models.monitor_suppressed_alert_log import MonitorSuppressedAlertLog
-        from app.models.ai_diagnosis_session import AIDiagnosisSession
 
         id_name = DeviceRepository(session).find_id_name_map(
             device_ids, include_deleted=True,
         )
         rows = [{"_device_id": did, "_device_name": id_name.get(did)} for did in device_ids]
 
-        targets = [
-            (MonitorIncident, "root_device_id", "root_device_name"),
-            (MonitorSuppressedAlertLog, "device_id", "device_name"),
-            (MonitorSuppressedAlertLog, "upstream_device_id", "upstream_device_name"),
-            (AIDiagnosisSession, "device_id", "device_name"),
-        ]
-        for model, ref_col, name_col in targets:
-            table = model.__table__
-            session.execute(
-                update(table)
-                .where(table.c[ref_col] == bindparam("_device_id"))
-                .values({name_col: bindparam("_device_name"), ref_col: None}),
-                rows,
-            )
+        from app.persistence.ai_diagnosis_session_repository import (
+            AIDiagnosisSessionRepository,
+        )
+        from app.persistence.monitor_incident_repository import IncidentRepository
+        from app.persistence.monitor_suppressed_alert_log_repository import (
+            SuppressedAlertLogRepository,
+        )
+
+        IncidentRepository(session).snapshot_root_trace_batch(rows)
+        SuppressedAlertLogRepository(session).snapshot_device_trace_batch(rows)
+        SuppressedAlertLogRepository(session).snapshot_upstream_trace_batch(rows)
+        AIDiagnosisSessionRepository(session).snapshot_device_trace_batch(rows)
         session.flush()
 
     def change_device_status(self, device_id: int, new_status: int) -> Optional[Device]:

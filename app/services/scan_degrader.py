@@ -99,37 +99,17 @@ class NoAuthL3Degrader:
         if not room_ids:
             return []
 
-        from app.models.switch_credentials import SwitchCredentials
-        from app.models.device import Device
-        from app.models.cabinet import Cabinet
-        from sqlalchemy import select
+        from app.persistence.switch_ext_repository import SwitchExtRepository
+        from app.persistence.ip_repositories import IPNetworkRepository
 
-        sw_row = db_session.execute(
-            select(SwitchCredentials.device_id)
-            .join(Device, SwitchCredentials.device_id == Device.id)
-            .join(Cabinet, Device.cabinet_id == Cabinet.id)
-            .where(
-                SwitchCredentials.ip == sw_ip,
-                Cabinet.room_id.in_(room_ids),
-            )
-        ).fetchone()
-        if not sw_row:
+        sw_id = SwitchExtRepository(db_session).find_switch_device_id_by_ip(
+            sw_ip, room_ids,
+        )
+        if sw_id is None:
             return []
-        sw_id = sw_row[0]
-        from app.core.enums import RouteNotes
-        rows = db_session.execute(
-            text("""SELECT ipn.network FROM ip_networks ipn
-            INNER JOIN switch_routes sr
-              ON sr.network_id = ipn.id
-              AND sr.switch_id = ipn.switch_id
-            WHERE ipn.switch_id = :sid
-              AND ipn.room_id IN :rids
-              AND sr.route_type = :rt
-              AND ipn.network NOT LIKE '%/32'""")
-            .bindparams(bindparam("rids", expanding=True)),
-            {"sid": sw_id, "rids": list(room_ids), "rt": int(RouteNotes.SUBNET)}
-        ).fetchall()
-        return [r[0] for r in rows]
+        return IPNetworkRepository(db_session).list_subnet_networks_for_switch(
+            sw_id, room_ids,
+        )
 
     @staticmethod
     def _get_ips_in_network(network: str, room_ids: list[int],
@@ -156,20 +136,11 @@ class NoAuthL3Degrader:
         from app.models.ip_model import ip_to_int
         start_int = ip_to_int(str(net.network_address))
         end_int = ip_to_int(str(net.broadcast_address))
-        rows = db_session.execute(
-            text("""SELECT im.ip_address, ii.mac_address, im.room_id
-            FROM ip_addresses im
-            LEFT JOIN ip_switch_info ii
-              ON ii.ip_address = im.ip_address AND ii.room_id = im.room_id
-            WHERE im.room_id IN :rids
-              AND im.ip_int BETWEEN :s AND :e""")
-            .bindparams(bindparam("rids", expanding=True)),
-            {
-                "rids": list(room_ids),
-                "s": start_int,
-                "e": end_int,
-            }
-        ).fetchall()
+        from app.persistence.ip_repositories import IPManagerRepository
+
+        rows = IPManagerRepository(db_session).list_ips_with_mac_in_range(
+            room_ids, start_int, end_int,
+        )
         return [(r[0], r[1], r[2]) for r in rows]
 
 
@@ -223,11 +194,11 @@ class NoAuthL2Degrader:
 
         updated = 0
         for mac in macs_on_port:
-            ip_row = db_session.execute(
-                text("SELECT ip_address, room_id FROM ip_switch_info WHERE mac_address = :mac AND room_id IN :rids")
-                .bindparams(bindparam("rids", expanding=True)),
-                {"mac": mac, "rids": list(room_ids)}
-            ).fetchone()
+            from app.persistence.ip_repositories import IPSwitchInfoRepository
+
+            ip_row = IPSwitchInfoRepository(db_session).find_first_by_mac(
+                mac, room_ids,
+            )
             if not ip_row:
                 continue
             ip, ip_room_id = ip_row[0], ip_row[1]
@@ -264,30 +235,19 @@ class NoAuthL2Degrader:
         if not room_ids:
             return []
 
-        from app.models.switch_credentials import SwitchCredentials
-        from app.models.device import Device
-        from app.models.cabinet import Cabinet
-        from sqlalchemy import select
+        from app.persistence.switch_ext_repository import SwitchExtRepository
+        from app.persistence.ip_repositories import IPNetworkRepository
 
-        sw_row = db_session.execute(
-            select(SwitchCredentials.device_id)
-            .join(Device, SwitchCredentials.device_id == Device.id)
-            .join(Cabinet, Device.cabinet_id == Cabinet.id)
-            .where(
-                SwitchCredentials.ip == sw_ip,
-                Cabinet.room_id.in_(room_ids),
-            )
-        ).fetchone()
-        if not sw_row:
+        sw_id = SwitchExtRepository(db_session).find_switch_device_id_by_ip(
+            sw_ip, room_ids,
+        )
+        if sw_id is None:
             return []
-        sw_id = sw_row[0]
-        rows = db_session.execute(
-            text("SELECT network FROM ip_networks WHERE switch_id=:sid AND room_id IN :rids AND network NOT LIKE '%/32'")
-            .bindparams(bindparam("rids", expanding=True)),
-            {"sid": sw_id, "rids": list(room_ids)}
-        ).fetchall()
+        rows = IPNetworkRepository(db_session).list_non_host_networks(
+            sw_id, room_ids,
+        )
         if rows:
-            return [r[0] for r in rows]
+            return rows
         return [str(ipaddress.ip_interface(f"{sw_ip}/24").network)]
 
 

@@ -57,7 +57,7 @@ def run_import(
 
     Returns:
         Flask Response：成功为 `APIResponse.success(...)`；
-        文件过大 413 / 幂等冲突 409 / 字段缺失或校验失败 400。
+        文件过大或行数超限 413 / 幂等冲突 409 / 字段缺失或校验失败 400。
     """
     try:
         outcome = import_export_service.run_batch_import(
@@ -71,6 +71,8 @@ def run_import(
         )
     except import_export_service.FileTooLargeError as e:
         return APIResponse.error(message=e.message, status_code=413)
+    except import_export_service.ImportTooLargeError as e:
+        return APIResponse.error(message=e.message, status_code=e.status_code)
     except import_export_service.IdempotencyConflictError as e:
         return APIResponse.error(e.message, error_code="IDEMPOTENCY_CONFLICT", status_code=409)
     except RequiredFieldError as e:

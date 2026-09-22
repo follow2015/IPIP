@@ -619,6 +619,8 @@ class MonitorService:
             cred = self.credential_service.get_decrypted(
                 device.id, MonitorProtocolCode.PING.value
             )
+            from extensions import db
+
             db.session.commit()  # 网络 I/O 前归还连接（同 collect_device_metrics 口径）
             raw = adapter.collect_metrics(device, cred, wanted)
             if not raw:

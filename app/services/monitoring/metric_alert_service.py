@@ -19,10 +19,12 @@ metric_key → alert_type 映射：
 """
 import json
 
-from sqlalchemy.dialects.mysql import insert as mysql_insert
 
 from app.core.enums import NotificationTypeCode
 from app.models.device_metric_alert_state import DeviceMetricAlertState
+from app.persistence.device_metric_alert_state_repository import (
+    DeviceMetricAlertStateRepository,
+)
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -58,11 +60,9 @@ class MetricAlertService:
         替代原先对每个 (device_id, metric_key, index) 单独一次 DB 查询（N+1），
         将 N×M 次查询降为 1 次。
         """
-        states = (
-            self._session.query(DeviceMetricAlertState)
-            .filter(DeviceMetricAlertState.device_id == device_id)
-            .all()
-        )
+        states = DeviceMetricAlertStateRepository(
+            session=self._session
+        ).list_by_device(device_id)
         state_map: dict = {}
         for s in states:
             state_map[(s.metric_key, s.index_key)] = s
@@ -137,66 +137,12 @@ class MetricAlertService:
 
     def _upsert_alert_state(self, device_id, metric_key, index, alert_type,
                             breached, severity, last_value) -> DeviceMetricAlertState:
-        """原子 upsert 一行告警态，返回持久化后的 ORM 对象。
-
-        用 ``INSERT ... ON DUPLICATE KEY UPDATE`` 替代裸 ``session.add``，避免
-        ``(device_id, metric_key, index_key)`` 重复时 IntegrityError 污染会话。
-        upsert 后从 DB 重新查回该行，确保拿到自增 id 与最新字段值。
-
-        dialect 兼容：MySQL 走原生 ``ON DUPLICATE KEY UPDATE``（生产）；
-        SQLite/其他 dialect（单测）走 ``query + add/update`` fallback——单测用
-        SQLite 无法编译 MySQL 专属 DML。
-        """
-        dialect_name = self._session.get_bind().dialect.name
-        if dialect_name == "mysql":
-            stmt = mysql_insert(DeviceMetricAlertState).values(
-                device_id=device_id,
-                metric_key=metric_key,
-                index_key=index,
-                alert_type=alert_type,
-                breached=breached,
-                severity=severity,
-                last_value=last_value,
-            )
-            stmt = stmt.on_duplicate_key_update(
-                breached=stmt.inserted.breached,
-                severity=stmt.inserted.severity,
-                last_value=stmt.inserted.last_value,
-            )
-            self._session.execute(stmt)
-            self._session.flush()
-            return (
-                self._session.query(DeviceMetricAlertState)
-                .filter(
-                    DeviceMetricAlertState.device_id == device_id,
-                    DeviceMetricAlertState.metric_key == metric_key,
-                    DeviceMetricAlertState.index_key == index,
-                )
-                .one()
-            )
-
-        state = (
-            self._session.query(DeviceMetricAlertState)
-            .filter(
-                DeviceMetricAlertState.device_id == device_id,
-                DeviceMetricAlertState.metric_key == metric_key,
-                DeviceMetricAlertState.index_key == index,
-            )
-            .one_or_none()
+        return DeviceMetricAlertStateRepository(
+            session=self._session
+        ).upsert_alert_state(
+            device_id, metric_key, index, alert_type,
+            breached, severity, last_value,
         )
-        if state is None:
-            state = DeviceMetricAlertState(
-                device_id=device_id,
-                metric_key=metric_key,
-                index_key=index,
-                alert_type=alert_type,
-            )
-            self._session.add(state)
-        state.breached = breached
-        state.severity = severity
-        state.last_value = last_value
-        self._session.flush()
-        return state
 
     def _enqueue(self, device_id, alert_type, severity, metric_key, index, value, breached):
         """写一条待发告警/恢复行到 outbox（与告警态更新同一事务）。

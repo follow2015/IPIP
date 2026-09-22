@@ -12,7 +12,6 @@ import re
 
 from app.utils.ip_codec import ip_to_int
 
-from sqlalchemy import text
 
 from app.core.enums import RouteNotes
 from app.models.switch_route import _cidr_to_ints
@@ -196,21 +195,17 @@ class RouteSync:
             room_id: 机房ID
             db_session: 数据库 session
         """
-        rows = db_session.execute(text(
-            "SELECT id, network FROM ip_networks "
-            "WHERE switch_id=:sid AND room_id=:rid AND network LIKE '%/32'"
-        ), {"sid": sw_id, "rid": room_id}).fetchall()
+        from app.persistence.ip_repositories import IPNetworkRepository
 
-        to_delete = []
-        for row_id, network in rows:
-            if RouteSync._is_broadcast_host_route(network):
-                to_delete.append(row_id)
+        repo = IPNetworkRepository(session=db_session)
+        to_delete = [
+            row_id
+            for row_id, network in repo.list_host_route_ids(sw_id, room_id)
+            if RouteSync._is_broadcast_host_route(network)
+        ]
 
         if to_delete:
-            db_session.execute(
-                text("DELETE FROM ip_networks WHERE id = :id"),
-                [{"id": rid} for rid in to_delete]
-            )
+            repo.delete_networks_by_ids(to_delete)
             logger.info("清理广播地址路由", extra={"phase": "route_sync", "switch_id": sw_id, "deleted": len(to_delete)})
 
     @staticmethod
@@ -466,11 +461,11 @@ class RouteSync:
         Returns:
             set: 现有路由的五元组键集合
         """
-        rows = db_session.execute(
-            text("SELECT network, switch_id, port "
-                 "FROM ip_networks WHERE switch_id=:sid AND room_id=:rid"),
-            {"sid": sw_id, "rid": room_id}
-        ).fetchall()
+        from app.persistence.ip_repositories import IPNetworkRepository
+
+        rows = IPNetworkRepository(session=db_session).list_existing_network_keys(
+            sw_id, room_id,
+        )
         return {(r[0], r[1], r[2] or "") for r in rows}
 
     def _batch_upsert(self, records: list[dict], room_id: int, db_session) -> None:
@@ -495,16 +490,9 @@ class RouteSync:
                 "gateway":    r.get("gateway"),
                 "room_id":    r["room_id"],
             })
-        db_session.execute(text("""
-            INSERT INTO ip_networks
-                (network, switch_id, port, gateway, room_id, updated_at)
-            VALUES
-                (:ip_network, :switch_id, :port, :gateway, :room_id, NOW())
-            AS _new
-            ON DUPLICATE KEY UPDATE
-                gateway = _new.gateway,
-                updated_at = NOW()
-        """), net_rows)
+        from app.persistence.ip_repositories import IPNetworkRepository
+
+        IPNetworkRepository(session=db_session).upsert_networks(net_rows)
 
     def _batch_delete(self, keys_to_delete: set[tuple], sw_id: int, room_id: int, db_session) -> None:
         """批量删除已撤销的网段记录
@@ -528,24 +516,15 @@ class RouteSync:
             {"net": net, "sid": sw_id, "port": port, "rid": room_id}
             for net, _, port in keys_to_delete
         ]
-        db_session.execute(
-            text("UPDATE switch_routes sr "
-                 "INNER JOIN ip_networks ipn ON sr.network_id = ipn.id "
-                 "SET sr.network_id = NULL "
-                 "WHERE ipn.network=:net AND ipn.switch_id=:sid "
-                 "AND ipn.port=:port AND ipn.room_id=:rid"),
-            params_nullify
-        )
+        from app.persistence.ip_repositories import IPNetworkRepository
+
+        repo = IPNetworkRepository(session=db_session)
+        repo.nullify_route_links(params_nullify)
         params = [
             {"net": net, "sid": sw_id, "port": port, "rid": room_id}
             for net, _, port in keys_to_delete
         ]
-        db_session.execute(
-            text("DELETE FROM ip_networks "
-                 "WHERE network=:net AND switch_id=:sid "
-                 "AND port=:port AND room_id=:rid"),
-            params
-        )
+        repo.delete_network_keys(params)
 
     def _sync_switch_routes(self, ctx, route_records, db_session):
         """将采集到的路由表完整写入 switch_routes（增量替换）
@@ -558,11 +537,13 @@ class RouteSync:
             route_records: 已归一化的路由记录列表
             db_session: 数据库 session
         """
-        existing = db_session.execute(text("""
-            SELECT destination, nexthop, route_type FROM switch_routes
-            WHERE switch_id = :sid AND room_id = :rid
-        """), {"sid": ctx.sw_id, "rid": ctx.room_id}).fetchall()
-        existing_keys = {(r[0], r[1], r[2]) for r in existing}
+        from app.persistence.ip_repositories import IPNetworkRepository
+
+        repo = IPNetworkRepository(session=db_session)
+        existing_keys = {
+            (r[0], r[1], r[2])
+            for r in repo.list_switch_route_triples(ctx.sw_id, ctx.room_id)
+        }
 
         current_keys = set()
         upsert_rows = []
@@ -585,23 +566,7 @@ class RouteSync:
             })
 
         if upsert_rows:
-            db_session.execute(text("""
-                INSERT INTO switch_routes
-                    (switch_id, destination, nexthop, route_type, port, room_id,
-                     destination_int, destination_prefix, nexthop_int, updated_at)
-                VALUES
-                    (:switch_id, :destination, :nexthop, :route_type, :port, :room_id,
-                     :destination_int, :destination_prefix, :nexthop_int, NOW())
-                AS _new
-                ON DUPLICATE KEY UPDATE
-                    route_type = _new.route_type,
-                    port       = _new.port,
-                    destination_int = _new.destination_int,
-                    destination_prefix = _new.destination_prefix,
-                    nexthop_int = _new.nexthop_int,
-                    network_id = NULL,
-                    updated_at = NOW()
-            """), upsert_rows)
+            repo.upsert_switch_routes(upsert_rows)
 
         stale = existing_keys - current_keys
         if stale:
@@ -609,12 +574,7 @@ class RouteSync:
                 {"sid": ctx.sw_id, "rid": ctx.room_id, "dest": dest, "nh": nh, "rt": rt}
                 for dest, nh, rt in stale
             ]
-            db_session.execute(
-                text("DELETE FROM switch_routes "
-                     "WHERE switch_id=:sid AND room_id=:rid "
-                     "AND destination=:dest AND nexthop=:nh AND route_type=:rt"),
-                params
-            )
+            repo.delete_switch_route_keys(params)
 
 
 
@@ -649,64 +609,19 @@ class NexthopResolver:
         if not room_ids:
             return
 
-        from sqlalchemy import bindparam
-        dangling = db_session.execute(text("""
-            UPDATE switch_routes sr
-            LEFT JOIN ip_networks ipn ON sr.network_id = ipn.id
-            SET sr.network_id = NULL, sr.updated_at = NOW()
-            WHERE sr.room_id IN :room_ids
-              AND sr.network_id IS NOT NULL
-              AND ipn.id IS NULL
-        """).bindparams(bindparam("room_ids", expanding=True)), {"room_ids": list(room_ids)})
-        if dangling.rowcount:
+        from app.persistence.ip_repositories import IPNetworkRepository
+
+        repo = IPNetworkRepository(session=db_session)
+        dangling_fixed = repo.clear_dangling_network_ids(room_ids)
+        if dangling_fixed:
             logger.info("修复悬空 network_id",
                         extra={"phase": "nexthop_resolve", "scope": scope,
-                               "dangling_fixed": dangling.rowcount})
+                               "dangling_fixed": dangling_fixed})
 
         if len(room_ids) == 1:
-            result = db_session.execute(text("""
-                UPDATE switch_routes sr
-                INNER JOIN ip_networks ipn
-                  ON ipn.network_int = sr.destination_int
-                 AND ipn.prefix = sr.destination_prefix
-                 AND ipn.room_id = sr.room_id
-                 AND ipn.switch_id = sr.switch_id
-                SET sr.network_id = ipn.id, sr.updated_at = NOW()
-                WHERE sr.room_id = :rid AND sr.network_id IS NULL
-                  AND sr.destination_int IS NOT NULL
-            """), {"rid": room_ids[0]})
-            result2 = db_session.execute(text("""
-                UPDATE switch_routes sr
-                INNER JOIN ip_networks ipn
-                  ON ipn.network = sr.destination
-                 AND ipn.room_id = sr.room_id
-                 AND ipn.switch_id = sr.switch_id
-                SET sr.network_id = ipn.id, sr.updated_at = NOW()
-                WHERE sr.room_id = :rid AND sr.network_id IS NULL
-            """), {"rid": room_ids[0]})
-            updated = result.rowcount + result2.rowcount
+            updated = repo.backfill_network_ids_for_room(room_ids[0])
         else:
-            result = db_session.execute(text("""
-                UPDATE switch_routes sr
-                INNER JOIN ip_networks ipn
-                  ON ipn.network_int = sr.destination_int
-                 AND ipn.prefix = sr.destination_prefix
-                 AND ipn.room_id = sr.room_id
-                 AND ipn.switch_id = sr.switch_id
-                SET sr.network_id = ipn.id, sr.updated_at = NOW()
-                WHERE sr.room_id IN :room_ids AND sr.network_id IS NULL
-                  AND sr.destination_int IS NOT NULL
-            """).bindparams(bindparam("room_ids", expanding=True)), {"room_ids": list(room_ids)})
-            result2 = db_session.execute(text("""
-                UPDATE switch_routes sr
-                INNER JOIN ip_networks ipn
-                  ON ipn.network = sr.destination
-                 AND ipn.room_id = sr.room_id
-                 AND ipn.switch_id = sr.switch_id
-                SET sr.network_id = ipn.id, sr.updated_at = NOW()
-                WHERE sr.room_id IN :room_ids AND sr.network_id IS NULL
-            """).bindparams(bindparam("room_ids", expanding=True)), {"room_ids": list(room_ids)})
-            updated = result.rowcount + result2.rowcount
+            updated = repo.backfill_network_ids_for_rooms(room_ids)
         if updated:
             logger.info("switch_routes.network_id 回填",
                         extra={"phase": "nexthop_resolve", "scope": scope, "updated": updated})

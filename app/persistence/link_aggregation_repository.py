@@ -37,6 +37,26 @@ class LinkAggregationRepository(SQLAlchemyRepository):
         """按设备和聚合组名查询"""
         return self.find_one(filters={'device_id': device_id, 'lag_name': lag_name})
 
+    def list_active_by_device_ids(self, device_ids) -> List[LinkAggregationGroup]:
+        """取集合内设备的**启用** LAG 组（B-46 批 4：拓扑建图的 LAG 成员装载）。
+
+        ``status == LAGStatus.ACTIVE`` 是"启用"口径（原实现即如此，勿放宽：
+        停用的 LAG 参与拓扑会让成员端口算重）。
+        """
+        from app.core.enums import LAGStatus
+
+        ids = list(device_ids)
+        if not ids:
+            return []
+        return (
+            self.session.query(LinkAggregationGroup)
+            .filter(
+                LinkAggregationGroup.device_id.in_(ids),
+                LinkAggregationGroup.status == LAGStatus.ACTIVE,
+            )
+            .all()
+        )
+
     def find_all_with_device_info(self, room_id: int = None, device_id: int = None) -> List[Dict[str, Any]]:
         """查询所有聚合组，关联设备名称和机房
 
@@ -183,6 +203,24 @@ class LinkAggregationRepository(SQLAlchemyRepository):
             {"member_count": count}, synchronize_session=False,
         )
         return result > 0
+
+    def delete_by_device_excluding_names(self, device_id: int, lag_names) -> int:
+        """删除该设备上 ``lag_name`` **不在**给定集合的 LAG 行（B-46 批 5）。
+
+        ⚠️ 调用方约定：``lag_names`` 为空时**不得调用**（``NOT IN`` 空集 = 全删）。
+        Core DELETE（原实现即 ``sa_delete + notin_``）。
+        """
+        names = list(lag_names)
+        if not names:
+            return 0
+        from sqlalchemy import delete as sa_delete
+
+        return self.session.execute(
+            sa_delete(LinkAggregationGroup).where(
+                LinkAggregationGroup.device_id == device_id,
+                LinkAggregationGroup.lag_name.notin_(names),
+            )
+        ).rowcount
 
     def delete_by_device_id(self, device_id: int) -> int:
         """删除指定设备的所有链路聚合组

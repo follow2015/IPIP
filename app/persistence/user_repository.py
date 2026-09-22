@@ -51,6 +51,33 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.logger.error(f"根据邮箱查找用户失败 (email={email}): {e}")
             raise QueryExecutionError("查找用户失败", original_error=e)
 
+    def find_email_conflict(self, email: str, username: str) -> Optional[User]:
+        """查邮箱是否已被**其它账号**占用（排除同用户名的"自己"）。
+
+        B-44 盲区收口：原调用点是 ``ldap_identity_service._resolve_email`` 里的
+        ``self._db_session().query(User)`` —— 接收者为**调用表达式**，台账门禁的
+        字符级匹配结构上看不见（盘点 §4 的最后 1 处）。收进本仓储后该读回到
+        persistence 层，盲区**结构性消失**（而非被绕开）。
+
+        ⚠️ **不要"简化"成 `check_email_exists`**：后者按 **id** 排除，本方法按
+        **username** 排除。调用方在建号**之前**调用，新账号此时还没有 id，只能靠
+        用户名排除自己（口径与原实现 ``User.username != username`` 一致）。
+        ⚠️ ``users.email`` **无唯一约束** ⇒ 本查重是防重复邮箱的**唯一防线**
+        （非锦上添花），去掉它两个 LDAP 账号可共享同一邮箱。
+
+        返回冲突行（None = 无冲突）；DB 错照本仓储惯例抛 `QueryExecutionError`
+        —— 调用方按"不确定"处理（邮箱留空但不阻断登录，**该口径留在调用方**）。
+        """
+        try:
+            return (
+                self.session.query(User)
+                .filter(User.email == email, User.username != username)
+                .first()
+            )
+        except SQLAlchemyError as e:
+            self.logger.error(f"查询邮箱冲突失败 (email={email}): {e}")
+            raise QueryExecutionError("查询邮箱冲突失败", original_error=e)
+
     def find_by_openid(self, openid: str) -> Optional[User]:
         """根据微信OpenID查找用户"""
         try:

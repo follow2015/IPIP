@@ -654,6 +654,31 @@ class ProductionConfig(Config):
         if cls.DEBUG:
             raise ValueError("生产环境禁止启用 DEBUG 模式")
 
+        if getattr(cls, "METRICS_ENABLED", False):
+            _has_token = bool(getattr(cls, "METRICS_TOKEN", ""))
+            _has_allowlist = bool(getattr(cls, "METRICS_ALLOWED_IPS", None))
+            if not (_has_token or _has_allowlist):
+                raise ValueError(
+                    "生产环境 /metrics 默认开启且免鉴权 ⇒ 必须至少限制一项："
+                    "METRICS_TOKEN（抓取须带口令）或 METRICS_ALLOWED_IPS（来源白名单）；"
+                    "确实不需要该端点请设 METRICS_ENABLED=false（路由直接 404）"
+                )
+
+        if cls.SECRET_KEY and cls.SECRET_KEY == cls.JWT_SECRET_KEY:
+            raise ValueError(
+                "生产环境 SECRET_KEY 与 JWT_SECRET_KEY 不得相同："
+                "同一把密钥既用于会话签名又用于 JWT 签发，任一泄漏即两者同时失守"
+                "（请分别用 `openssl rand -hex 32` 生成）"
+            )
+
+        if getattr(cls, "LDAP_ENABLED", False) and not getattr(cls, "LDAP_CA_FILE", ""):
+            raise ValueError(
+                "生产环境启用 LDAP 时必须设置 LDAP_CA_FILE（企业 CA 证书 PEM 路径）："
+                "ldap3 强制关闭主机名校验，把信任锚收窄到自家 CA 才是有效补偿。"
+                "确需依赖系统信任库的部署请**显式**指向系统 CA bundle"
+                "（如 /etc/ssl/certs/ca-certificates.crt），而不是留空"
+            )
+
 
 config = {
     "development": DevelopmentConfig,

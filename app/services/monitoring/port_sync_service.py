@@ -23,7 +23,6 @@ from app.utils.time_utils import now_utc_naive
 from app.utils.logging import get_logger
 from datetime import datetime
 
-from sqlalchemy import delete as sa_delete
 
 from app.core.enums import DataSource
 from app.models.network_port import NetworkPort
@@ -216,10 +215,9 @@ class PortSyncService:
         if not port_ids:
             return
 
-        from app.models.vlan_port_member import VLANPortMember
-        session.execute(
-            sa_delete(VLANPortMember).where(VLANPortMember.port_id.in_(port_ids))
-        )
+        from app.persistence.vlan_repository import VLANPortMemberRepository
+
+        VLANPortMemberRepository(session=session).delete_by_port_ids(port_ids)
 
         for p in ports:
             p.lag_group_id = None

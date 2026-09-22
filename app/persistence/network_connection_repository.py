@@ -88,6 +88,25 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
         except SQLAlchemyError as e:
             raise QueryExecutionError("根据端口查找N2N连接失败", original_error=e)
 
+    def list_by_local_port_device_ids(self, device_ids) -> list[NetworkConnection]:
+        """取 **local 端口**所属设备在集合内的 N2N 连接（B-46 批 4：拓扑建边）。
+
+        ⚠️ 只按 ``local_port_id → NetworkPort.device_id`` 过滤（原实现即如此）：
+        拓扑建边随后**双向**用 local/peer 关系补对端（见图内逻辑），
+        这里若改成"任一端"会把同一条边算两次。
+        """
+        from app.models.network_port import NetworkPort
+
+        ids = list(device_ids)
+        if not ids:
+            return []
+        return (
+            self.session.query(NetworkConnection)
+            .join(NetworkPort, NetworkConnection.local_port_id == NetworkPort.id)
+            .filter(NetworkPort.device_id.in_(ids))
+            .all()
+        )
+
     def find_by_port_ids_orm(self, port_ids: list[int]) -> list[NetworkConnection]:
         """根据端口 ID 列表查找关联的 N2N 连接，返回 ORM 对象列表（含 joinedload 预加载）"""
         if not port_ids:

@@ -49,7 +49,13 @@ class AliyunVoiceProvider(VoiceProvider):
         if config.get("aliyun_caller_number"):
             request.called_show_number = config["aliyun_caller_number"]
 
-        response = client.single_call_by_tts(request)
+        try:
+            response = client.single_call_by_tts(request)
+        except Exception as exc:  # noqa: BLE001 - 分类后再抛，未知则原样透传
+            classified = self._classify_error(exc)
+            if classified is exc:      # 未知错误码：保持"交由 task 按瞬态处理"
+                raise
+            raise classified from exc
         call_id = response.body.call_id
         logger.info("阿里云语音呼叫已发起: receipt_id=%s call_id=%s", receipt_id, call_id)
         return call_id

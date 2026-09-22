@@ -15,7 +15,7 @@ from app.models.customer import Customer
 from app.core.enums import CustomerStatus
 from app.persistence.customer_repository import CustomerRepository
 from app.services.switch_events import emit_resource_change_global
-from app.services.import_export_service import escape_export_df
+from app.services.import_export_service import ensure_export_rows_within_limit, escape_export_df
 from app.utils.cache import cache_manager, cached
 from app.exceptions.business import BusinessLogicError
 from app.exceptions.data_access import RecordNotFoundError
@@ -1205,6 +1205,11 @@ class CustomerService:
             })
         df_ports = pd.DataFrame(port_rows) if port_rows else pd.DataFrame(
             columns=["交换机", "端口名", "端口类型", "端口速率", "链路状态", "对端设备"]
+        )
+
+        ensure_export_rows_within_limit(
+            len(df_overview) + len(df_cabinets) + len(df_devices)
+            + len(df_networks) + len(df_ports)
         )
 
         df_overview = escape_export_df(df_overview)

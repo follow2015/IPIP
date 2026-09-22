@@ -146,6 +146,35 @@ class SuppressedAlertLogRepository:
             )
         )
 
+    def snapshot_device_trace_batch(self, rows) -> None:
+        """批量处置**被抑制设备侧**留痕（Core 表更新 + executemany）。
+
+        理由同 ``IncidentRepository.snapshot_root_trace_batch``（WHERE 非主键 ⇒
+        不能用 ORM 实体批量 UPDATE）。
+        """
+        from sqlalchemy import bindparam, update
+
+        table = MonitorSuppressedAlertLog.__table__
+        self.session.execute(
+            update(table)
+            .where(table.c["device_id"] == bindparam("_device_id"))
+            .values(device_name=bindparam("_device_name"), device_id=None),
+            rows,
+        )
+
+    def snapshot_upstream_trace_batch(self, rows) -> None:
+        """批量处置**上游设备侧**留痕（``upstream_device_id`` **无外键**）。"""
+        from sqlalchemy import bindparam, update
+
+        table = MonitorSuppressedAlertLog.__table__
+        self.session.execute(
+            update(table)
+            .where(table.c["upstream_device_id"] == bindparam("_device_id"))
+            .values(upstream_device_name=bindparam("_device_name"),
+                    upstream_device_id=None),
+            rows,
+        )
+
     def list_by_incident(self, incident_id: int, limit: int) -> List[MonitorSuppressedAlertLog]:
         """取某事件下被抑制的告警留痕（最近优先，B-44 收敛）
 

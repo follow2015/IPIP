@@ -42,6 +42,21 @@ class AIDiagnosisSessionRepository:
             )
         )
 
+    def snapshot_device_trace_batch(self, rows) -> None:
+        """批量处置诊断会话的设备引用（Core 表更新 + executemany）。
+
+        理由同 ``IncidentRepository.snapshot_root_trace_batch``；会话保留（知识资产）。
+        """
+        from sqlalchemy import bindparam, update
+
+        table = AIDiagnosisSession.__table__
+        self.session.execute(
+            update(table)
+            .where(table.c["device_id"] == bindparam("_device_id"))
+            .values(device_name=bindparam("_device_name"), device_id=None),
+            rows,
+        )
+
     def count_running(self, incident_id: int) -> int:
         """统计该事件名下**进行中**的诊断会话数。
 

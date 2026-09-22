@@ -54,6 +54,73 @@ class IPManagerRepository(BaseRepository):
             .all()
         )
 
+    def list_ips_with_mac_in_range(
+        self, room_ids, start_int: int, end_int: int,
+    ) -> List[tuple]:
+        """网段内 ``(ip_address, mac_address, room_id)``（LEFT JOIN ip_switch_info）。
+
+        B-46 批 5（scan_degrader 降级定位）：MAC 可能缺失（LEFT JOIN ⇒ None），
+        调用方据此决定是否可定位 —— 写成 INNER JOIN 会静默丢掉无 MAC 的 IP。
+        """
+        ids = list(room_ids)
+        if not ids:
+            return []
+        return self.session.execute(
+            text("""SELECT im.ip_address, ii.mac_address, im.room_id
+            FROM ip_addresses im
+            LEFT JOIN ip_switch_info ii
+              ON ii.ip_address = im.ip_address AND ii.room_id = im.room_id
+            WHERE im.room_id IN :rids
+              AND im.ip_int BETWEEN :s AND :e""")
+            .bindparams(bindparam("rids", expanding=True)),
+            {"rids": ids, "s": start_int, "e": end_int},
+        ).fetchall()
+
+    def list_by_statuses_and_ips(self, room_id: int, statuses, ips) -> List[str]:
+        """该机房内状态命中且地址在给定集合内的 IP（B-46 批 5：探测筛选）。
+
+        以 500 一批由调用方分块（``IN :ips`` expanding 绑定，原实现即如此）。
+        """
+        if not ips:
+            return []
+        rows = self.session.execute(
+            text("""
+                SELECT ip_address FROM ip_addresses
+                WHERE room_id = :rid
+                  AND status IN :statuses
+                  AND ip_address IN :ips
+            """).bindparams(
+                bindparam("statuses", expanding=True),
+                bindparam("ips", expanding=True),
+            ),
+            {"rid": room_id, "statuses": [int(s) for s in statuses], "ips": list(ips)},
+        ).fetchall()
+        return [r[0] for r in rows]
+
+    def count_active_without_location(self, room_id: int) -> int:
+        """在线(ACTIVE)但无定位记录的 IP 数（B-46 批 5：一致性对账①）。"""
+        from app.core.enums import IPStatus
+
+        return self.session.execute(
+            text("SELECT COUNT(*) FROM ip_addresses ia "
+                 "LEFT JOIN ip_switch_info si "
+                 "  ON si.ip_address = ia.ip_address AND si.room_id = ia.room_id "
+                 "WHERE ia.room_id = :rid AND ia.status = :active AND si.id IS NULL"),
+            {"rid": room_id, "active": int(IPStatus.ACTIVE)},
+        ).scalar() or 0
+
+    def count_banned_without_record(self, room_id: int) -> int:
+        """封禁(BANNED)但无封禁单的 IP 数（B-46 批 5：一致性对账②）。"""
+        from app.core.enums import IPStatus
+
+        return self.session.execute(
+            text("SELECT COUNT(*) FROM ip_addresses ia "
+                 "LEFT JOIN ip_ban_records br "
+                 "  ON br.ip_address = ia.ip_address AND br.room_id = ia.room_id "
+                 "WHERE ia.room_id = :rid AND ia.status = :banned AND br.id IS NULL"),
+            {"rid": room_id, "banned": int(IPStatus.BANNED)},
+        ).scalar() or 0
+
     def count_by_status_in_ip_range(
         self, first_ip_int: int, last_ip_int: int,
         customer_id: int, room_id: int,
@@ -1474,6 +1541,66 @@ class IPSwitchInfoRepository(BaseRepository):
         return self._bulk_upsert(rows, ["mac_address", "switch_id", "port", "room_id"])
 
 
+    def find_first_by_mac(self, mac_address: str, room_ids) -> "tuple | None":
+        """按 MAC 在机房集合内取 ``(ip_address, room_id)`` 首行（B-46 批 5）。
+
+        返回**首行**（原实现 fetchone）：同一 MAC 可能多行（跨机房/NAT），
+        取首行是先到先得语义，勿"顺手"改成聚合。
+        """
+        ids = list(room_ids)
+        if not ids:
+            return None
+        return self.session.execute(
+            text("SELECT ip_address, room_id FROM ip_switch_info "
+                 "WHERE mac_address = :mac AND room_id IN :rids")
+            .bindparams(bindparam("rids", expanding=True)),
+            {"mac": mac_address, "rids": ids},
+        ).fetchone()
+
+    def list_missing_location_ips(
+        self, room_id: int, start_int: int, end_int: int,
+    ) -> List[str]:
+        """网段内"ip_addresses 有活跃/封禁记录但 ip_switch_info 无定位"的 IP。
+
+        B-46 批 5（ip_route_info 的补全阶段）：``isi.ip_address IS NULL`` 是
+        "缺定位"判据 —— 状态取 ACTIVE/BANNED（UNUSED 不需要定位）。
+        """
+        from app.core.enums import IPStatus
+
+        rows = self.session.execute(
+            text("""
+            SELECT ia.ip_address
+            FROM ip_addresses ia
+            LEFT JOIN ip_switch_info isi
+              ON isi.ip_address = ia.ip_address AND isi.room_id = ia.room_id
+            WHERE ia.room_id = :rid
+              AND ia.ip_int BETWEEN :s AND :e
+              AND ia.status IN (:active, :banned)
+              AND isi.ip_address IS NULL
+        """),
+            {"rid": room_id, "s": start_int, "e": end_int,
+             "active": int(IPStatus.ACTIVE), "banned": int(IPStatus.BANNED)},
+        ).fetchall()
+        return [r[0] for r in rows]
+
+    def insert_ignore_ips(self, rows) -> None:
+        """批量 ``INSERT IGNORE`` 补定位行（只写 switch_id，不写 port）。
+
+        ⚠️ 保留 ``INSERT IGNORE``：并发/重跑时同 (ip,room) 可能已存在，
+        IGNORE 让补全幂等（原实现即如此）。
+        """
+        self.session.execute(
+            text("""
+                INSERT IGNORE INTO ip_switch_info
+                    (ip_address, mac_address, switch_id, port, room_id, updated_at)
+                VALUES (
+                    :ip, NULL, :sid, NULL,
+                    :rid, NOW()
+                )
+            """),
+            rows,
+        )
+
     def delete_by_switch(self, switch_id: int) -> int:
         """清空该交换机的 IP-交换机关联行（B-44 收敛：设备彻底删除的清理面）。"""
         return (
@@ -1514,6 +1641,310 @@ class IPNetworkRepository(BaseRepository):
             List[IPNetwork]: 路由记录列表
         """
         return self.find_all({"switch_id": switch_id, "room_id": room_id})
+
+
+    def list_host_route_ids(self, switch_id: int, room_id: int) -> List[tuple]:
+        """该交换机在该机房的全部 /32 路由 (id, network)。"""
+        return self.session.execute(
+            text(
+                "SELECT id, network FROM ip_networks "
+                "WHERE switch_id=:sid AND room_id=:rid AND network LIKE '%/32'"
+            ),
+            {"sid": switch_id, "rid": room_id},
+        ).fetchall()
+
+    def delete_networks_by_ids(self, ids) -> None:
+        """按主键逐条删除 ip_networks（executemany）。
+
+        ⚠️ 保持**逐条**参数绑定（docstring：避免 tuple 参数绑定问题）——
+        不要改成拼接 OR 或 IN 列表。
+        """
+        self.session.execute(
+            text("DELETE FROM ip_networks WHERE id = :id"),
+            [{"id": i} for i in ids],
+        )
+
+    def list_existing_network_keys(self, switch_id: int, room_id: int) -> List[tuple]:
+        """该交换机在该机房的既有网段键 (network, switch_id, port)。"""
+        return self.session.execute(
+            text(
+                "SELECT network, switch_id, port "
+                "FROM ip_networks WHERE switch_id=:sid AND room_id=:rid"
+            ),
+            {"sid": switch_id, "rid": room_id},
+        ).fetchall()
+
+    def upsert_networks(self, net_rows) -> None:
+        """批量 upsert ip_networks（仅网段归属列；flags/nexthop/route_type 在 switch_routes）。
+
+        ``AS _new ... ON DUPLICATE KEY UPDATE gateway/updated_at``：MySQL 8 别名
+        语法 —— 只更新 gateway 与 updated_at（network/switch_id/port/room_id 是
+        冲突键，不更新，原实现即如此）。
+        """
+        self.session.execute(
+            text("""
+            INSERT INTO ip_networks
+                (network, switch_id, port, gateway, room_id, updated_at)
+            VALUES
+                (:ip_network, :switch_id, :port, :gateway, :room_id, NOW())
+            AS _new
+            ON DUPLICATE KEY UPDATE
+                gateway = _new.gateway,
+                updated_at = NOW()
+        """),
+            net_rows,
+        )
+
+    def nullify_route_links(self, params) -> None:
+        """删除网段前，先把引用它的 switch_routes.network_id 置 NULL。
+
+        ⚠️ docstring 语义（原实现）：**必须先置空再删**，否则悬空引用会让前端
+        nexthop/route_type 丢失；NexthopResolver 会在 Phase 4 重新回填。
+        executemany 逐条绑定（避免动态 OR 拼接导致 SQL 长度膨胀 / 参数上限溢出）。
+        """
+        self.session.execute(
+            text("UPDATE switch_routes sr "
+                 "INNER JOIN ip_networks ipn ON sr.network_id = ipn.id "
+                 "SET sr.network_id = NULL "
+                 "WHERE ipn.network=:net AND ipn.switch_id=:sid "
+                 "AND ipn.port=:port AND ipn.room_id=:rid"),
+            params,
+        )
+
+    def delete_network_keys(self, params) -> None:
+        """按 (network, switch_id, port, room_id) 四元组逐条删除 ip_networks。"""
+        self.session.execute(
+            text("DELETE FROM ip_networks "
+                 "WHERE network=:net AND switch_id=:sid "
+                 "AND port=:port AND room_id=:rid"),
+            params,
+        )
+
+    def list_switch_route_triples(self, switch_id: int, room_id: int) -> List[tuple]:
+        """该交换机在该机房的既有路由三元组 (destination, nexthop, route_type)。"""
+        return self.session.execute(
+            text("""
+            SELECT destination, nexthop, route_type FROM switch_routes
+            WHERE switch_id = :sid AND room_id = :rid
+        """),
+            {"sid": switch_id, "rid": room_id},
+        ).fetchall()
+
+    def upsert_switch_routes(self, rows) -> None:
+        """批量 upsert switch_routes（含整数化列 CR-ROUTE-INT）。
+
+        ``network_id = NULL``：路由详情变更后由 NexthopResolver 重新回填关联
+        （原实现即如此，勿"顺手"保留旧关联）。
+        """
+        self.session.execute(
+            text("""
+                INSERT INTO switch_routes
+                    (switch_id, destination, nexthop, route_type, port, room_id,
+                     destination_int, destination_prefix, nexthop_int, updated_at)
+                VALUES
+                    (:switch_id, :destination, :nexthop, :route_type, :port, :room_id,
+                     :destination_int, :destination_prefix, :nexthop_int, NOW())
+                AS _new
+                ON DUPLICATE KEY UPDATE
+                    route_type = _new.route_type,
+                    port       = _new.port,
+                    destination_int = _new.destination_int,
+                    destination_prefix = _new.destination_prefix,
+                    nexthop_int = _new.nexthop_int,
+                    network_id = NULL,
+                    updated_at = NOW()
+            """),
+            rows,
+        )
+
+    def delete_switch_route_keys(self, params) -> None:
+        """按 (switch_id, room_id, destination, nexthop, route_type) 逐条删除路由。"""
+        self.session.execute(
+            text("DELETE FROM switch_routes "
+                 "WHERE switch_id=:sid AND room_id=:rid "
+                 "AND destination=:dest AND nexthop=:nh AND route_type=:rt"),
+            params,
+        )
+
+    def clear_dangling_network_ids(self, room_ids) -> int:
+        """修复悬空 network_id（指向已删 ip_networks 的行）⇒ 置 NULL。
+
+        ⚠️ 必须**先修悬空**再回填：悬空行的 network_id 非 NULL 会躲过
+        ``network_id IS NULL`` 的回填条件，形成**永久悬空引用**（原注释即如此）。
+        Returns: 修复行数
+        """
+        result = self.session.execute(
+            text("""
+            UPDATE switch_routes sr
+            LEFT JOIN ip_networks ipn ON sr.network_id = ipn.id
+            SET sr.network_id = NULL, sr.updated_at = NOW()
+            WHERE sr.room_id IN :room_ids
+              AND sr.network_id IS NOT NULL
+              AND ipn.id IS NULL
+        """).bindparams(bindparam("room_ids", expanding=True)),
+            {"room_ids": list(room_ids)},
+        )
+        return result.rowcount or 0
+
+    _BACKFILL_SQL_INT = """
+        UPDATE switch_routes sr
+        INNER JOIN ip_networks ipn
+          ON ipn.network_int = sr.destination_int
+         AND ipn.prefix = sr.destination_prefix
+         AND ipn.room_id = sr.room_id
+         AND ipn.switch_id = sr.switch_id
+        SET sr.network_id = ipn.id, sr.updated_at = NOW()
+        WHERE {scope} AND sr.network_id IS NULL
+          AND sr.destination_int IS NOT NULL
+    """
+    _BACKFILL_SQL_STR = """
+        UPDATE switch_routes sr
+        INNER JOIN ip_networks ipn
+          ON ipn.network = sr.destination
+         AND ipn.room_id = sr.room_id
+         AND ipn.switch_id = sr.switch_id
+        SET sr.network_id = ipn.id, sr.updated_at = NOW()
+        WHERE {scope} AND sr.network_id IS NULL
+    """
+
+    def backfill_network_ids_for_room(self, room_id: int) -> int:
+        """单机房回填 network_id：① 整数化列精确匹配 → ② destination 字符串回退。
+
+        两步是**效率 + 兼容**的双设计（原实现即如此）：整数列命中绝大多数，
+        字符串回退兜住整数列缺失的历史行。Returns: 两步 rowcount 之和。
+        """
+        result = self.session.execute(
+            text(self._BACKFILL_SQL_INT.format(scope="sr.room_id = :rid")),
+            {"rid": room_id},
+        )
+        result2 = self.session.execute(
+            text(self._BACKFILL_SQL_STR.format(scope="sr.room_id = :rid")),
+            {"rid": room_id},
+        )
+        return (result.rowcount or 0) + (result2.rowcount or 0)
+
+    def backfill_network_ids_for_rooms(self, room_ids) -> int:
+        """多机房回填 network_id（同上两步；``IN :room_ids`` expanding 绑定）。"""
+        result = self.session.execute(
+            text(self._BACKFILL_SQL_INT.format(scope="sr.room_id IN :room_ids"))
+            .bindparams(bindparam("room_ids", expanding=True)),
+            {"room_ids": list(room_ids)},
+        )
+        result2 = self.session.execute(
+            text(self._BACKFILL_SQL_STR.format(scope="sr.room_id IN :room_ids"))
+            .bindparams(bindparam("room_ids", expanding=True)),
+            {"room_ids": list(room_ids)},
+        )
+        return (result.rowcount or 0) + (result2.rowcount or 0)
+
+    def list_gateway_rows_by_switch_ids(self, switch_ids) -> List[tuple]:
+        """取集合内交换机的 (switch_id, gateway, port)（gateway 非空）。
+
+        B-46 批 4（拓扑建图）：外部占位节点不参与采集，网关只能从 ip_networks
+        历史数据回填 —— "gateway 非空"由 SQL 端过滤（原实现即如此）。
+        """
+        ids = list(switch_ids)
+        if not ids:
+            return []
+        return (
+            self.session.query(
+                IPNetwork.switch_id, IPNetwork.gateway, IPNetwork.port,
+            )
+            .filter(
+                IPNetwork.switch_id.in_(ids),
+                IPNetwork.gateway.isnot(None),
+            )
+            .all()
+        )
+
+    def list_subnet_networks_for_switch(self, switch_id: int, room_ids) -> List[str]:
+        """该交换机在机房集合内的 **SUBNET(终端子网)** 路由网段（排除 /32）。
+
+        与 ``list_non_host_networks`` 的区别：本方法**要求**存在 SUBNET 类型的
+        switch_routes 关联（INNER JOIN + route_type 过滤）——"这条网段确实被
+        识别为终端子网"；后者只按非 /32 过滤。
+        """
+        from app.core.enums import RouteNotes
+
+        ids = list(room_ids)
+        if not ids:
+            return []
+        rows = self.session.execute(
+            text("""SELECT ipn.network FROM ip_networks ipn
+            INNER JOIN switch_routes sr
+              ON sr.network_id = ipn.id
+              AND sr.switch_id = ipn.switch_id
+            WHERE ipn.switch_id = :sid
+              AND ipn.room_id IN :rids
+              AND sr.route_type = :rt
+              AND ipn.network NOT LIKE '%/32'""")
+            .bindparams(bindparam("rids", expanding=True)),
+            {"sid": switch_id, "rids": ids, "rt": int(RouteNotes.SUBNET)},
+        ).fetchall()
+        return [r[0] for r in rows]
+
+    def list_non_host_networks(self, switch_id: int, room_ids) -> List[str]:
+        """该交换机在机房集合内的**非 /32** 网段（不要求 SUBNET 关联）。
+
+        兜底语义由调用方决定（查不到时用管理 IP 推算 /24，见 scan_degrader）。
+        """
+        ids = list(room_ids)
+        if not ids:
+            return []
+        rows = self.session.execute(
+            text("SELECT network FROM ip_networks WHERE switch_id=:sid "
+                 "AND room_id IN :rids AND network NOT LIKE '%/32'")
+            .bindparams(bindparam("rids", expanding=True)),
+            {"sid": switch_id, "rids": ids},
+        ).fetchall()
+        return [r[0] for r in rows]
+
+    def list_subnet_networks_by_rooms(self, room_ids) -> List[tuple]:
+        """机房集合内全部 SUBNET 网段 ``(network, switch_id, room_id)``（排除 /32）。
+
+        注意：不返回 port —— 路由表的 port 是 Vlanif，不是物理端口（原注释即如此）。
+        """
+        from app.core.enums import RouteNotes
+
+        ids = list(room_ids)
+        if not ids:
+            return []
+        return self.session.execute(
+            text("""
+                SELECT ipn.network, ipn.switch_id, ipn.room_id
+                FROM ip_networks ipn
+                INNER JOIN switch_routes sr
+                  ON sr.network_id = ipn.id AND sr.switch_id = ipn.switch_id
+                WHERE ipn.room_id IN :rids
+                  AND sr.route_type = :subnet
+                  AND ipn.network NOT LIKE '%/32'
+            """).bindparams(bindparam("rids", expanding=True)),
+            {"rids": ids, "subnet": int(RouteNotes.SUBNET)},
+        ).fetchall()
+
+    def list_probeable_networks(self, room_id: int) -> List[tuple]:
+        """该机房**可探测**网段（排除黑洞/下一跳，含无路由关联的行；排除 /32）。
+
+        ⚠️ ``sr.route_type IS NULL`` 必须放行（LEFT JOIN 无关联的网段仍可探测）——
+        写成 INNER JOIN 会静默丢掉这些网段（原实现即 LEFT JOIN + OR IS NULL）。
+        """
+        from app.core.enums import RouteNotes
+
+        return self.session.execute(
+            text("""
+            SELECT DISTINCT ipn.network FROM ip_networks ipn
+            LEFT JOIN switch_routes sr
+              ON sr.network_id = ipn.id AND sr.switch_id = ipn.switch_id
+            WHERE ipn.room_id = :rid
+              AND (sr.route_type NOT IN (:bh, :nh) OR sr.route_type IS NULL)
+              AND ipn.network NOT LIKE '%/32'
+        """),
+            {
+                "rid": room_id,
+                "bh": int(RouteNotes.BLACKHOLE),
+                "nh": int(RouteNotes.NEXTHOP),
+            },
+        ).fetchall()
 
     def find_longest_prefix_match_route(
         self, room_id: int, ip_int: int,

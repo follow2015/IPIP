@@ -77,10 +77,10 @@ TENCENT_TRANSIENT_CODES = {
 ALIYUN_STATUS_MAP = {
     "200000": ("delivered", False),    # 用户听完语音
     "200001": ("answered", False),     # 提前挂机（未听完，但已触达）
-    "200002": ("no_answer", True),     # 占线
+    "200002": ("failed:transient", True),   # 占线（可重试）
     "200003": ("no_answer", False),    # 收到呼叫未接听（人主动不接）
     "200004": ("failed:permanent:invalid_number", False),
-    "200005": ("no_answer", True),     # 无法接通（含公共号被标记骚扰拦截）
+    "200005": ("failed:transient", True),   # 无法接通（含公共号被标记骚扰拦截）
     "200006": ("failed:permanent:bad_tts", False),
     "200007": ("no_answer", False),    # 不在服务区
     "200008": ("answered", False),     # 获取按键超时

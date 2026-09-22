@@ -43,7 +43,13 @@ class TencentVoiceProvider(VoiceProvider):
         request.PlayTimes = int(config.get("play_times", 2))
         request.SessionContext = str(receipt_id)
 
-        response = client.SendTtsVoice(request)
+        try:
+            response = client.SendTtsVoice(request)
+        except Exception as exc:  # noqa: BLE001 - 分类后再抛，未知则原样透传
+            classified = self._classify_error(exc)
+            if classified is exc:
+                raise
+            raise classified from exc
         call_id = response.SendStatus.CallId
         logger.info("腾讯云语音呼叫已发起: receipt_id=%s call_id=%s", receipt_id, call_id)
         return call_id

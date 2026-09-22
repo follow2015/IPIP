@@ -210,9 +210,10 @@ class TrapdService:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1 << 20)
         self._sock.bind((self.listen_address, self.listen_port))
+        bound_port = self._sock.getsockname()[1]
         logger.info(
             "[trapd] SNMP Trap UDP 监听已启动: %s:%s communities=%s source_allowlist=%s",
-            self.listen_address, self.listen_port, len(self.communities),
+            self.listen_address, bound_port, len(self.communities),
             "已启用" if self.source_allowlist else "未启用",
         )
         if self.listen_address in _WILDCARD_ADDRESSES and self.source_allowlist is None:

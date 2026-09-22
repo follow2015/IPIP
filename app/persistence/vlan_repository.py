@@ -171,6 +171,21 @@ class VLANPortMemberRepository(SQLAlchemyRepository):
             synchronize_session=False,
         )
 
+    def delete_by_port_ids(self, port_ids) -> int:
+        """按端口集合清理 VLAN 成员关联（B-46 批 5：端口删除时的关系清理）。
+
+        Core DELETE（原实现即 ``sa_delete + in_``）；空集合返 0（不删）。
+        """
+        ids = [i for i in port_ids if i is not None]
+        if not ids:
+            return 0
+        from app.models.vlan_port_member import VLANPortMember
+        from sqlalchemy import delete as sa_delete
+
+        return self.session.execute(
+            sa_delete(VLANPortMember).where(VLANPortMember.port_id.in_(ids))
+        ).rowcount
+
     def delete_by_port_id(self, port_id: int) -> int:
         """删除指定端口的所有 VLAN 成员关系
 

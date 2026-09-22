@@ -23,6 +23,7 @@ from app.core.enums import UserStatus
 from app.models.rbac import Role
 from app.models.user import User
 from app.persistence.rbac_repository import RoleRepository
+from app.persistence.user_repository import UserRepository
 from app.services.ldap_role_mapper import (
     GroupRoleMapError,
     parse_group_role_map,
@@ -45,6 +46,7 @@ class LdapIdentityService:
         self,
         *,
         role_repository: Any = None,
+        user_repository: Any = None,
         session: Any = None,
         config_obj: Any = None,
         password_manager: Any = None,
@@ -56,6 +58,9 @@ class LdapIdentityService:
         self._config = config_obj
         self.session = session
         self.role_repository = role_repository if role_repository is not None else RoleRepository(session=session)
+        self.user_repository = (
+            user_repository if user_repository is not None else UserRepository(session=session)
+        )
         self.password_manager = password_manager or default_password_manager
         self._group_map_cache: dict[str, str] | None = None
 
@@ -182,11 +187,7 @@ class LdapIdentityService:
             logger.warning("目录邮箱超长，忽略: username=%s", username)
             return None
         try:
-            taken = (
-                self._db_session().query(User)
-                .filter(User.email == value, User.username != username)
-                .first()
-            )
+            taken = self.user_repository.find_email_conflict(value, username)
         except Exception as exc:  # noqa: BLE001 - 查重失败时按「不确定」处理
             logger.warning("邮箱查重失败，忽略该邮箱: username=%s error=%s", username, exc)
             return None

@@ -101,6 +101,104 @@ class DeviceMetricAlertStateRepository:
             .all()
         )
 
+
+    def list_by_device(self, device_id: int) -> List[DeviceMetricAlertState]:
+        """取该设备全部告警态行（调用方构造 {(metric_key, index_key): state} 映射）。
+
+        P1-1 修复的批量预取入口：一次取全替代逐 (metric, index) 的 N+1。
+        """
+        return (
+            self.session.query(DeviceMetricAlertState)
+            .filter(DeviceMetricAlertState.device_id == device_id)
+            .all()
+        )
+
+    def find_by_identity(
+        self, device_id: int, metric_key: str, index_key: str,
+    ) -> Optional[DeviceMetricAlertState]:
+        """按 (device_id, metric_key, index_key) 取一行（可能不存在 ⇒ None）。
+
+        三元组是唯一键 ⇒ ``one_or_none`` 与 ``first`` 同结果（两种调用点共用本方法）。
+        """
+        return (
+            self.session.query(DeviceMetricAlertState)
+            .filter(
+                DeviceMetricAlertState.device_id == device_id,
+                DeviceMetricAlertState.metric_key == metric_key,
+                DeviceMetricAlertState.index_key == index_key,
+            )
+            .one_or_none()
+        )
+
+    def require_by_identity(
+        self, device_id: int, metric_key: str, index_key: str,
+    ) -> DeviceMetricAlertState:
+        """同上，但**必须命中**（``.one()`` 语义，缺行抛 NoResultFound）。
+
+        用途：MySQL ODKU upsert 后的回查 —— 刚写入的行必然存在，缺行说明
+        写入失败，应显式报错而非静默返回 None。
+        """
+        return (
+            self.session.query(DeviceMetricAlertState)
+            .filter(
+                DeviceMetricAlertState.device_id == device_id,
+                DeviceMetricAlertState.metric_key == metric_key,
+                DeviceMetricAlertState.index_key == index_key,
+            )
+            .one()
+        )
+
+    def upsert_alert_state(
+        self, device_id: int, metric_key: str, index_key: str, alert_type: str,
+        breached, severity, last_value,
+    ) -> DeviceMetricAlertState:
+        """原子 upsert 一行告警态，返回持久化后的 ORM 对象。
+
+        用 ``INSERT ... ON DUPLICATE KEY UPDATE`` 替代裸 ``session.add``，避免
+        ``(device_id, metric_key, index_key)`` 重复时 IntegrityError 污染会话。
+        upsert 后从 DB 重新查回该行，确保拿到自增 id 与最新字段值。
+
+        dialect 兼容：MySQL 走原生 ``ON DUPLICATE KEY UPDATE``（生产）；
+        SQLite/其他 dialect（单测）走 ``query + add/update`` fallback——单测用
+        SQLite 无法编译 MySQL 专属 DML。
+        """
+        from sqlalchemy.dialects.mysql import insert as mysql_insert
+
+        dialect_name = self.session.get_bind().dialect.name
+        if dialect_name == "mysql":
+            stmt = mysql_insert(DeviceMetricAlertState).values(
+                device_id=device_id,
+                metric_key=metric_key,
+                index_key=index_key,
+                alert_type=alert_type,
+                breached=breached,
+                severity=severity,
+                last_value=last_value,
+            )
+            stmt = stmt.on_duplicate_key_update(
+                breached=stmt.inserted.breached,
+                severity=stmt.inserted.severity,
+                last_value=stmt.inserted.last_value,
+            )
+            self.session.execute(stmt)
+            self.session.flush()
+            return self.require_by_identity(device_id, metric_key, index_key)
+
+        state = self.find_by_identity(device_id, metric_key, index_key)
+        if state is None:
+            state = DeviceMetricAlertState(
+                device_id=device_id,
+                metric_key=metric_key,
+                index_key=index_key,
+                alert_type=alert_type,
+            )
+            self.session.add(state)
+        state.breached = breached
+        state.severity = severity
+        state.last_value = last_value
+        self.session.flush()
+        return state
+
     def delete_by_device(self, device_id: int) -> int:
         """清空该设备的指标告警态行（B-44 收敛：设备彻底删除的清理面）。"""
         return (

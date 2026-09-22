@@ -7,6 +7,8 @@
 注意：Phase 3 重构后，原 sw_switch_ext 表已合并到 switch_credentials，
 本 Repository 直接操作 SwitchCredentials 模型。
 """
+from sqlalchemy import select
+
 from app.models.switch_credentials import SwitchCredentials
 from app.models.device import Device
 from app.models.cabinet import Cabinet
@@ -45,6 +47,29 @@ class SwitchExtRepository:
             .filter_by(device_id=device_id)
             .delete()
         )
+
+    def find_switch_device_id_by_ip(self, ip: str, room_ids) -> "int | None":
+        """按管理 IP 在该机房集合内反查交换机设备 ID（B-46 批 5）。
+
+        JOIN 链（SwitchCredentials → Device → Cabinet）为的是把"机房范围"落实在
+        **机柜**上（不可信设备可能同名 IP，跨机房必须隔开）。查不到返回 None。
+        """
+        from app.models.cabinet import Cabinet
+        from app.models.device import Device
+
+        ids = list(room_ids)
+        if not ids:
+            return None
+        row = self.session.execute(
+            select(SwitchCredentials.device_id)
+            .join(Device, SwitchCredentials.device_id == Device.id)
+            .join(Cabinet, Device.cabinet_id == Cabinet.id)
+            .where(
+                SwitchCredentials.ip == ip,
+                Cabinet.room_id.in_(ids),
+            )
+        ).fetchone()
+        return row[0] if row else None
 
     def upsert(self, device_id: int, **fields) -> SwitchCredentials:
         """创建或更新扩展信息

@@ -386,18 +386,10 @@ class CabinetService:
         if not self.cabinet_repository.find_by_id(cabinet_id):
             raise ValidationError("机柜不存在")
 
-        from sqlalchemy import text
-
         session = self.cabinet_repository.session
         counts: Dict[str, int] = {}
 
-        device_ids = [
-            row[0]
-            for row in session.execute(
-                text("SELECT id FROM devices WHERE cabinet_id = :cid"),
-                {"cid": cabinet_id},
-            ).fetchall()
-        ]
+        device_ids = CabinetRepository(session).find_device_ids_in_cabinet(cabinet_id)
         if device_ids:
             counts["devices"] = len(device_ids)
 

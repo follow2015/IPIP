@@ -231,6 +231,26 @@ class IncidentRepository:
             )
         )
 
+    def snapshot_root_trace_batch(self, rows) -> None:
+        """批量把根因设备引用置空并写快照（B-46 批 5：批量处置入口）。
+
+        ⚠️ 必须用 **Core 表更新**（``update(model.__table__)``）而非 ORM 实体：
+        ``update(Model)`` 的 executemany 走"ORM 按**主键**批量 UPDATE"路径，要求
+        每行参数携带主键值；我们的 WHERE 条件是 device_id（非主键），会直接抛
+        ``InvalidRequestError: No primary key value supplied``（2026-09-18 实测：
+        机房强删 500、整条链路回滚）。Core 表更新无此限制。
+        ``rows`` 每项形如 ``{"_device_id": int, "_device_name": str|None}``。
+        """
+        from sqlalchemy import bindparam, update
+
+        table = MonitorIncident.__table__
+        self.session.execute(
+            update(table)
+            .where(table.c["root_device_id"] == bindparam("_device_id"))
+            .values(root_device_name=bindparam("_device_name"), root_device_id=None),
+            rows,
+        )
+
     def list_by_root_device(
         self, root_device_id: int, since, limit: Optional[int] = None,
         newest_first: bool = False,

@@ -21,8 +21,6 @@ import time
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Set, Tuple
 
-from sqlalchemy import bindparam
-from sqlalchemy import text as sa_text
 
 from app.core.enums import IPStatus
 from app.persistence.ip_repositories import IPManagerRepository
@@ -643,19 +641,9 @@ def supplement_detect_room_ips(
     Returns:
         dict: {total, active_found, skipped}
     """
-    from app.core.enums import RouteNotes
-    networks = db_session.execute(sa_text("""
-        SELECT DISTINCT ipn.network FROM ip_networks ipn
-        LEFT JOIN switch_routes sr
-          ON sr.network_id = ipn.id AND sr.switch_id = ipn.switch_id
-        WHERE ipn.room_id = :rid
-          AND (sr.route_type NOT IN (:bh, :nh) OR sr.route_type IS NULL)
-          AND ipn.network NOT LIKE '%/32'
-    """), {
-        "rid": room_id,
-        "bh": int(RouteNotes.BLACKHOLE),
-        "nh": int(RouteNotes.NEXTHOP),
-    }).fetchall()
+    from app.persistence.ip_repositories import IPNetworkRepository
+
+    networks = IPNetworkRepository(db_session).list_probeable_networks(room_id)
 
     if not networks:
         return {"total": 0, "active_found": 0, "skipped": 0}
@@ -684,21 +672,12 @@ def supplement_detect_room_ips(
     probe_ips: set = set()
     for i in range(0, len(candidate_ips), 500):
         chunk = candidate_ips[i:i + 500]
-        rows = db_session.execute(
-            sa_text("""
-                SELECT ip_address FROM ip_addresses
-                WHERE room_id = :rid
-                  AND status IN (:unused, :inactive)
-                  AND ip_address IN :ips
-            """).bindparams(bindparam("ips", expanding=True)),
-            {
-                "rid": room_id,
-                "unused": int(IPStatus.UNUSED),
-                "inactive": int(IPStatus.INACTIVE),
-                "ips": chunk,
-            },
-        ).fetchall()
-        probe_ips.update(r[0] for r in rows)
+        from app.persistence.ip_repositories import IPManagerRepository
+
+        rows = IPManagerRepository(db_session).list_by_statuses_and_ips(
+            room_id, [IPStatus.UNUSED, IPStatus.INACTIVE], chunk,
+        )
+        probe_ips.update(rows)
 
     result = fast_supplement_detect(
         scope=f"r:{room_id}",

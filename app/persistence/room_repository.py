@@ -75,6 +75,58 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             is not None
         )
 
+    def find_device_ids_in_room(self, room_id: int) -> list:
+        """机房内全部设备 ID（B-46 收敛：机房强删第 0 步）。
+
+        ⚠️ **含已软删设备**：强删语义是"一台不留"（原 raw SQL 即无软删过滤）——
+        故**刻意不走** ``_base_query()``（那会过滤软删，导致静默漏删）。
+        调用方约定：必须在 ``devices`` 行被删之前调用（顺序错了取到空集）。
+        """
+        from app.models.cabinet import Cabinet
+        from app.models.device import Device
+
+        return [
+            r[0]
+            for r in self.session.query(Device.id)
+            .join(Cabinet, Cabinet.id == Device.cabinet_id)
+            .filter(Cabinet.room_id == room_id)
+            .all()
+        ]
+
+    def execute_whitelisted_delete(
+        self, table: str, col: str, scope_sql: str, params: dict,
+    ) -> int:
+        """机房强删的**受控批量 DELETE**（B-46 收敛；原为 service 内 raw SQL）。
+
+        ⚠️ 逃生舱语义，三重约束缺一不可：
+        ① ``(table, col)`` 必须已通过 service 层的 ``_FORCE_DELETE_ALLOWED``
+           白名单校验（本方法信任调用方，但再做标识符合法性兜底）；
+        ② ``table`` / ``col`` 仅允许标识符字符（防注入，正则兜底）；
+        ③ 保留 **MySQL 反引号**：表/列名来自白名单常量，反引号与原实现一致
+           （关键字列名如 ``row`` 需要它）。
+        """
+        import re as _re
+
+        if not _re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table) or not _re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", col
+        ):
+            raise ValueError(f"force_delete: 非法标识符 {(table, col)!r}")
+        from sqlalchemy import text
+
+        result = self.session.execute(
+            text(f"DELETE FROM `{table}` WHERE `{col}` IN ({scope_sql})"),
+            params,
+        )
+        return result.rowcount or 0
+
+    def delete_room_itself(self, room_id: int) -> int:
+        """删除机房本体行（B-46 收敛：机房强删第 5 步；物理删）。"""
+        return (
+            self.session.query(Room)
+            .filter(Room.id == room_id)
+            .delete(synchronize_session=False)
+        )
+
     def check_room_name_exists(self, room_name: str, exclude_id: Optional[int] = None) -> bool:
         """检查机房名称是否已存在（排除已软删除的机房）
 

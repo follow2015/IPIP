@@ -9,7 +9,6 @@ from __future__ import annotations
 from app.utils.logging import get_logger
 from collections import deque
 from dataclasses import dataclass, field
-from app.core.enums import LAGStatus
 
 logger = get_logger(__name__)
 
@@ -382,9 +381,10 @@ def build_topology_graph(scope: str, switch_metas: list, db_session) -> Topology
     Returns:
         TopologyGraph: 构建完成的拓扑图
     """
-    from app.models.network_connection import NetworkConnection
-    from app.models.network_port import NetworkPort
-    from app.models.link_aggregation import LinkAggregationGroup
+    from app.persistence.link_aggregation_repository import LinkAggregationRepository
+    from app.persistence.network_connection_repository import NetworkConnectionRepository
+    from app.persistence.device_repository import DeviceRepository
+    from app.persistence.ip_repositories import IPNetworkRepository
     from app.utils.port_name_utils import normalize_port as _np
 
     graph = TopologyGraph()
@@ -403,10 +403,9 @@ def build_topology_graph(scope: str, switch_metas: list, db_session) -> Topology
         ))
 
     if sw_ids:
-        lag_groups = db_session.query(LinkAggregationGroup).filter(
-            LinkAggregationGroup.device_id.in_(sw_ids),
-            LinkAggregationGroup.status == LAGStatus.ACTIVE,
-        ).all()
+        lag_groups = LinkAggregationRepository(
+            session=db_session
+        ).list_active_by_device_ids(sw_ids)
         for lag in lag_groups:
             node = graph.nodes.get(lag.device_id)
             if not node:
@@ -419,9 +418,9 @@ def build_topology_graph(scope: str, switch_metas: list, db_session) -> Topology
                 node.add_lag(_np(lag.lag_name), member_names)
 
     if sw_ids:
-        conns = db_session.query(NetworkConnection).join(
-            NetworkPort, NetworkConnection.local_port_id == NetworkPort.id
-        ).filter(NetworkPort.device_id.in_(sw_ids)).all()
+        conns = NetworkConnectionRepository(
+            session=db_session
+        ).list_by_local_port_device_ids(sw_ids)
 
         external_sw_ids = set()
         for conn in conns:
@@ -435,11 +434,9 @@ def build_topology_graph(scope: str, switch_metas: list, db_session) -> Topology
                 external_sw_ids.add(sw_b)
 
         if external_sw_ids:
-            from app.models.device import Device
-            external_devices = db_session.query(Device).filter(
-                Device.id.in_(external_sw_ids),
-                Device.deleted_at.is_(None),
-            ).all()
+            external_devices = DeviceRepository(
+                session=db_session
+            ).find_alive_by_ids(external_sw_ids)
             for dev in external_devices:
                 room_id = dev.cabinet.room_id if dev.cabinet else None
                 ext = dev.switch_ext if hasattr(dev, 'switch_ext') else None
@@ -456,14 +453,10 @@ def build_topology_graph(scope: str, switch_metas: list, db_session) -> Topology
                         extra={"phase": "topology_build", "scope": scope})
 
             if external_sw_ids:
-                from app.models.switch_route import IPNetwork
                 from app.utils.port_name_utils import is_vlan_interface
-                gw_rows = db_session.query(
-                    IPNetwork.switch_id, IPNetwork.gateway, IPNetwork.port
-                ).filter(
-                    IPNetwork.switch_id.in_(external_sw_ids),
-                    IPNetwork.gateway.isnot(None),
-                ).all()
+                gw_rows = IPNetworkRepository(
+                    session=db_session
+                ).list_gateway_rows_by_switch_ids(external_sw_ids)
                 backfill_count = 0
                 for sw_id, gateway, port in gw_rows:
                     if gateway and is_vlan_interface(port or ""):
@@ -475,10 +468,9 @@ def build_topology_graph(scope: str, switch_metas: list, db_session) -> Topology
                                 extra={"phase": "topology_build", "scope": scope})
 
             if external_sw_ids:
-                ext_lag_groups = db_session.query(LinkAggregationGroup).filter(
-                    LinkAggregationGroup.device_id.in_(external_sw_ids),
-                    LinkAggregationGroup.status == LAGStatus.ACTIVE,
-                ).all()
+                ext_lag_groups = LinkAggregationRepository(
+                    session=db_session
+                ).list_active_by_device_ids(external_sw_ids)
                 for lag in ext_lag_groups:
                     node = graph.nodes.get(lag.device_id)
                     if not node:

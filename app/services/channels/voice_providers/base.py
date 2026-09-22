@@ -51,9 +51,22 @@ class VoiceProvider(ABC):
         ...
 
     def supports_ack(self) -> bool:
-        """是否支持按键确认。默认 False，腾讯云覆写为 True。"""
+        """是否支持按键确认。
+
+        **能力查询钩子**（有合理默认 False，腾讯云覆写为 True）——
+        与 `is_config_ready` 不同：能力缺失有安全默认，**不**强制实现。
+        """
         return False
 
+    @abstractmethod
     def is_config_ready(self, config: dict) -> bool:
-        """provider 必需配置是否齐备。"""
-        raise NotImplementedError
+        """provider 必需配置是否齐备。
+
+        2026-09-22 由「具体方法 + ``raise NotImplementedError``」改为
+        ``@abstractmethod``：原形态**不在** ``__abstractmethods__`` 里，
+        新增 provider 忘了实现它时 ABC **拦不住**，要等 ``voice.py`` 调用
+        （``provider.is_config_ready(config)``）才在运行期炸；与另外 4 个契约
+        方法的失败时机（实例化即 ``TypeError``）不一致。统一为"缺实现就构造失败"。
+        判据：``tests/services/channels/voice_providers/test_provider_contract.py``
+        """
+        ...

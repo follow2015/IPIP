@@ -64,6 +64,17 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             query = query.filter(Device.deleted_at.is_(None))
         return [r.id for r in query.all()]
 
+    def find_alive_by_ids(self, device_ids) -> List[Device]:
+        """按 ID 集合取设备（**排除软删**；B-46 批 4：拓扑外部占位节点）。
+
+        走 ``_base_query()``：外部节点必须是存活设备（软删设备的连接边不该
+        进拓扑图 —— 原实现显式带 ``deleted_at IS NULL``）。
+        """
+        ids = list(device_ids)
+        if not ids:
+            return []
+        return self._base_query().filter(Device.id.in_(ids)).all()
+
     def find_by_management_ip(self, ip_address: str) -> Optional[Device]:
         """按 ``management_ip`` 查设备（软删除除外；B-44 收敛：SNMP Trap 源 IP 解析）。
 
@@ -134,19 +145,26 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         )
 
 
-    def topology_switch_query(self) -> Query:
+    def topology_switch_query(self, alive_only: bool = True) -> Query:
         """拓扑用「网络设备」查询构造器（预加载 switch_ext + cabinet.room）。
 
         · `outerjoin(DeviceSwitchExt)`：**LEFT** —— 没有 switch_ext 记录的网络设备
           （路由器/防火墙）也必须出现在拓扑里（改成 inner join 会静默丢节点）。
-        · ⚠️ **不过滤软删**（与原实现逐字一致）：本构造器不调用 `_base_query()`。
-          是否应排除已软删设备属**口径拍板**（同域 `topology_query_service` 显式
-          `deleted_at.is_(None)`，两处口径不一致，已登记待办 —— 不在本批暗改）。
+        · **默认排除已软删设备**（B-48 拍板，2026-09-22）：原实现不过滤，与同域
+          `topology_query_service` 的显式 `deleted_at IS NULL` 口径相反 —— 同一个
+          "拓扑"概念两个可见集不同。统一为**排除**，依据三条：
+          ① 设备删除会释放其端口/连接（见 `test_device_occupation_release`）⇒
+             把已删设备画进拓扑只会得到**孤立节点/悬空链路**；
+          ② 同域索引页本来就排除 ⇒ 统一方向应取"索引页口径"；
+          ③ "历史设备留痕"另有承担者（软删记录、审计日志、留痕快照列），
+             不需要靠拓扑图承担。
+        · `alive_only=False` 作为**逃生舱**保留（若将来要"历史拓扑"视图，显式传 False
+          并在调用点写明理由）。
         """
         from app.models.cabinet import Cabinet
         from app.models.device_switch_ext import DeviceSwitchExt
 
-        return (
+        query = (
             self.session.query(Device)
             .filter(Device.device_type == "network")
             .outerjoin(DeviceSwitchExt, DeviceSwitchExt.device_id == Device.id)
@@ -155,20 +173,25 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 joinedload(Device.cabinet).joinedload(Cabinet.room),
             )
         )
+        if alive_only:
+            query = query.filter(Device.deleted_at.is_(None))
+        return query
 
     def topology_device_query(
         self, device_types: Sequence[str], *,
-        with_customer: bool = False, alive_only: bool = False,
+        with_customer: bool = False, alive_only: bool = True,
     ) -> Query:
         """拓扑用「设备」查询构造器（预加载 switch_ext + cabinet.room[/customer]）。
 
         Args:
             device_types: 参与拓扑的设备类型（调用方传，勿在仓储里写死）
             with_customer: 是否额外预加载 `customer`（拓扑索引页要客户名，按需）
-            alive_only: 是否排除已软删设备。**默认 False = 保持原实现语义**
-                （`topology_service` 的两处调用点原本不过滤）；索引页调用点传 True
-                （它原本就显式 `deleted_at.is_(None)`）。⚠️ 两个调用点口径不同，
-                故做成开关而不是统一 —— 统一会静默改变其中一处的可见设备集。
+            alive_only: 是否排除已软删设备。**默认 True = 排除**（B-48 拍板，
+                2026-09-22）：原先两个调用点口径相反（`topology_service` 不过滤、
+                索引页显式排除），同一个"拓扑"概念两个可见集不同。统一为排除，
+                依据见 `topology_switch_query` 的同段说明（删除已释放端口/连接 ⇒
+                画出来是孤立节点；历史留痕另有承担者）。`alive_only=False` 作为
+                逃生舱保留给将来的"历史拓扑"视图。
         """
         from app.models.cabinet import Cabinet
 

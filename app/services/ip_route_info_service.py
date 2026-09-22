@@ -18,9 +18,7 @@ Phase 6a: 路由驱动的 IP switch_info 补填
 import ipaddress
 from app.utils.logging import get_logger
 
-from sqlalchemy import text, bindparam
 
-from app.core.enums import RouteNotes, IPStatus
 
 logger = get_logger(__name__)
 
@@ -87,18 +85,9 @@ class RouteIPInfoService:
         """
         if not room_ids:
             return []
-        rows = db_session.execute(
-            text("""
-                SELECT ipn.network, ipn.switch_id, ipn.room_id
-                FROM ip_networks ipn
-                INNER JOIN switch_routes sr
-                  ON sr.network_id = ipn.id AND sr.switch_id = ipn.switch_id
-                WHERE ipn.room_id IN :rids
-                  AND sr.route_type = :subnet
-                  AND ipn.network NOT LIKE '%/32'
-            """).bindparams(bindparam("rids", expanding=True)),
-            {"rids": list(room_ids), "subnet": int(RouteNotes.SUBNET)},
-        ).fetchall()
+        from app.persistence.ip_repositories import IPNetworkRepository
+
+        rows = IPNetworkRepository(db_session).list_subnet_networks_by_rooms(room_ids)
         return [(r[0], r[1], r[2]) for r in rows]
 
     def _fill_missing_ips(
@@ -124,22 +113,15 @@ class RouteIPInfoService:
         start_int = ip_to_int(str(net.network_address))
         end_int = ip_to_int(str(net.broadcast_address))
 
-        missing = db_session.execute(text("""
-            SELECT ia.ip_address
-            FROM ip_addresses ia
-            LEFT JOIN ip_switch_info isi
-              ON isi.ip_address = ia.ip_address AND isi.room_id = ia.room_id
-            WHERE ia.room_id = :rid
-              AND ia.ip_int BETWEEN :s AND :e
-              AND ia.status IN (:active, :banned)
-              AND isi.ip_address IS NULL
-        """), {"rid": room_id, "s": start_int, "e": end_int,
-               "active": int(IPStatus.ACTIVE), "banned": int(IPStatus.BANNED)}).fetchall()
+        from app.persistence.ip_repositories import IPSwitchInfoRepository
 
-        if not missing:
+        ip_info_repo = IPSwitchInfoRepository(db_session)
+        ip_list = ip_info_repo.list_missing_location_ips(
+            room_id, start_int, end_int,
+        )
+
+        if not ip_list:
             return 0
-
-        ip_list = [r[0] for r in missing]
         filled = 0
         for i in range(0, len(ip_list), self.BATCH_SIZE):
             batch = ip_list[i:i + self.BATCH_SIZE]
@@ -151,14 +133,7 @@ class RouteIPInfoService:
                 }
                 for ip in batch
             ]
-            db_session.execute(text("""
-                INSERT IGNORE INTO ip_switch_info
-                    (ip_address, mac_address, switch_id, port, room_id, updated_at)
-                VALUES (
-                    :ip, NULL, :sid, NULL,
-                    :rid, NOW()
-                )
-            """), rows)
+            ip_info_repo.insert_ignore_ips(rows)
             filled += len(batch)
 
         return filled
