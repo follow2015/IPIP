@@ -12,22 +12,27 @@
 #      安装或运行）；MySQL、Redis 低于基线 → 告警不阻断（本机不可测得，
 #      且低版本已实测可用）。做严格分级的目的是：把"悄无声息的环境偏差"
 #      变成安装阶段可见的决策点，而不是留到运行时才炸。
-#   2. 创建 Python venv 并安装 requirements.txt
-#      · 默认安装 **CPU 版 torch**（约 190MB，无 CUDA 依赖）
-#      · --gpu 安装 CUDA 版（体积约 2.6-3.5GB，耗时长，见下方用法说明）
-#   3. 前端依赖安装 + 构建（pnpm install && pnpm build → frontend-new/dist/）
+#   2-3. 【并行】Python venv + pip install ‖ 前端构建
+#      步骤 2：创建 venv 并安装 requirements.txt
+#        · 默认安装 **CPU 版 torch**（约 190MB，无 CUDA 依赖）
+#        · --gpu 安装 CUDA 版（体积约 2.6-3.5GB，耗时长，见下方用法说明）
+#      步骤 3：前端依赖安装 + 构建（pnpm install && pnpm build → frontend-new/dist/）
+#      两者无共享状态冲突（分别写 .venv/ 和 frontend-new/dist/），可安全并行
 #   4. 初始化 .env（若不存在则从 .env.example 拷贝，并自动生成
 #      SECRET_KEY / JWT_SECRET_KEY / SWITCH_SECRET_KEY 随机密钥）
-#   5. 创建数据库并导入 schema + 种子
-#   6. 配置监控维护 cron（02:00 预建分区 / 03:00 归档清理）
-#   7. 下载 RAG 本地模型到 **HF 标准缓存**（$HF_HOME/hub/models--BAAI--*/snapshots/main/）
-#      embedding（bge-small-zh-v1.5）≈92MB + reranker（bge-reranker-base）≈1100MB，
-#      默认走 ModelScope 镜像（实测约 5.7MB/s，hf-mirror 仅约 1MB/s）。
-#      写入 HF 缓存而非项目目录，是为了与本地开发环境（~/.cache/huggingface）保持
-#      同一套解析机制 —— 代码与 .env 都不需要改动。
-#      与代码的 HF_HUB_OFFLINE=1 策略配套：模型未预置则 RAG 检索不可用
-#      （reranker 缺失会降级为 RRF 排序，不影响基本检索）。
-#   8. 【可选】systemd 进程托管（--with-units）：调用 deploy/systemd/install-units.sh
+#   5-8. 【并行】DB 初始化 + 种子 + cron ‖ RAG 模型下载
+#      步骤 5：创建数据库并导入 schema
+#      步骤 6：导入种子数据
+#      步骤 7：配置监控维护 cron（02:00 预建分区 / 03:00 归档清理）
+#      步骤 8：下载 RAG 本地模型到 **HF 标准缓存**（$HF_HOME/hub/models--BAAI--*/snapshots/main/）
+#        embedding（bge-small-zh-v1.5）≈92MB + reranker（bge-reranker-base）≈1100MB，
+#        默认走 ModelScope 镜像（实测约 5.7MB/s，hf-mirror 仅约 1MB/s）。
+#        写入 HF 缓存而非项目目录，是为了与本地开发环境（~/.cache/huggingface）保持
+#        同一套解析机制 —— 代码与 .env 都不需要改动。
+#        与代码的 HF_HUB_OFFLINE=1 策略配套：模型未预置则 RAG 检索不可用
+#        （reranker 缺失会降级为 RRF 排序，不影响基本检索）。
+#        模型下载是 IO bound，与 DB 初始化无共享状态冲突，可安全并行
+#   9. 【可选】systemd 进程托管（--with-units）：调用 deploy/systemd/install-units.sh
 #      渲染并安装 9 个 unit。默认**不做**——接管进程属生产变更且需要 root。
 #
 # 用法:
@@ -55,6 +60,8 @@
 #           走默认单源安装。
 #
 # 幂等：可重复执行，已存在的步骤会跳过
+# 并行：步骤 2‖3（pip install ‖ 前端构建）、步骤 8‖5+6（模型下载 ‖ DB+seed+cron）
+#       后台步骤日志实时输出到终端，带 [frontend]/[models] 前缀与 [INSTALL] 区分
 # ============================================================
 set -euo pipefail
 
@@ -261,7 +268,22 @@ run_timed() {
   # 伪造成成功，导致后续步骤带着半成品环境继续跑（实测踩到：pip 安装失败却
   # 一路推进到第 5 步才炸，报错点离根因很远）。
   local rc=0
+  # 心跳：超过 10s 的步骤每 15s 输出一行进度，避免运维误判卡死
+  # （pip install 190MB torch 或 pnpm install 解析依赖树时可能数十秒无输出）
+  local _hb_epoch
+  _hb_epoch=$(date +%s)
+  (
+    sleep 10
+    while true; do
+      log "  … $name 进行中（$(($(date +%s) - _hb_epoch))s）"
+      sleep 15
+    done
+  ) &
+  local _hb_pid
+  _hb_pid=$!
   "$@" || rc=$?
+  kill "$_hb_pid" 2>/dev/null || true
+  wait "$_hb_pid" 2>/dev/null || true
   if [ "$rc" -eq 0 ]; then
     log "✔ $name 完成（耗时 $((SECONDS - started))s）"
   else
@@ -490,6 +512,59 @@ fi
 # C++ 编译工具链必须在装 Python 依赖之前就绪（chroma-hnswlib 只有 sdist，需本地编译）
 ensure_build_toolchain
 
+# ── 2+3. Python 依赖 ‖ 前端构建（并行）─────────────────────
+# 步骤 2（pip install）是全流程最慢的一步，步骤 3（前端构建）不依赖 venv，
+# 两者无共享状态冲突（分别写 .venv/ 和 frontend-new/dist/），可安全并行。
+# 步骤 2 必须在前台执行：它设置的 VENV_DIR/VENV_PY/PIP_INDEX_ARG 等变量
+# 后续步骤 4-10 都需要，放子 shell 会丢失。步骤 3 不设置后续变量，放后台安全。
+step_frontend_build() {
+  # 并行输出前缀：与步骤 2 的 [INSTALL] 区分，日志实时输出到终端
+  log()  { echo -e "${GREEN}[frontend]${NC} $*"; }
+  warn() { echo -e "${YELLOW}[frontend]${NC} $*"; }
+  err()  { echo -e "${RED}[frontend]${NC} $*" >&2; }
+  local FRONTEND_DIR="$PROJECT_ROOT/frontend-new"
+  log "=== [3/7] 前端构建（与 pip install 并行）==="
+  if [ "$SKIP_FRONTEND" -eq 1 ]; then
+    if [ -d "$FRONTEND_DIR/dist" ] && [ -f "$FRONTEND_DIR/dist/index.html" ]; then
+      log "跳过前端构建（--skip-frontend），使用已有 dist/"
+    else
+      err "frontend-new/dist 不存在，不能跳过前端构建。请去掉 --skip-frontend。"
+      return 1
+    fi
+  else
+    if [ ! -f "$FRONTEND_DIR/package.json" ]; then
+      err "frontend-new/package.json 不存在"
+      return 1
+    fi
+    cd "$FRONTEND_DIR"
+    select_npm_registry
+    log "安装前端依赖 (pnpm install)..."
+    # 实测教训：小包探测能过不代表大依赖树能撑住——官方 registry 在完整安装时
+    # 掉到 24 KiB/s 并丢失 rolldown 原生 binding 包导致构建失败。故首次尝试
+    # 失败后，一律用 npmmirror 重试一次再判定失败。
+    install_frontend_deps() {
+      pnpm install --frozen-lockfile --registry "$NPM_REGISTRY" 2>/dev/null \
+        || pnpm install --registry "$NPM_REGISTRY"
+    }
+    if ! install_frontend_deps; then
+      warn "前端依赖安装失败，改用 ${NPM_REGISTRY_MIRROR} 重试一次..."
+      NPM_REGISTRY="$NPM_REGISTRY_MIRROR"
+      install_frontend_deps \
+        || { err "前端依赖安装失败（官方与 npmmirror 均失败），请检查网络后手动执行 pnpm install"; return 1; }
+    fi
+    log "构建前端 (pnpm build)..."
+    pnpm build || { err "pnpm build 失败"; return 1; }
+    cd "$PROJECT_ROOT"
+    if [ ! -f "$FRONTEND_DIR/dist/index.html" ]; then
+      err "前端构建失败，frontend-new/dist/index.html 未生成"
+      return 1
+    fi
+    log "前端构建完成: frontend-new/dist/ ($(du -sh "$FRONTEND_DIR/dist" | cut -f1))"
+  fi
+}
+step_frontend_build &
+FRONTEND_BUILD_PID=$!
+
 # ── 2. Python 虚拟环境 ─────────────────────────────────────
 log "=== [2/7] 创建 Python venv 并安装依赖 ==="
 VENV_DIR="$PROJECT_ROOT/.venv"
@@ -673,42 +748,11 @@ else
 fi
 log "Python 依赖安装完成"
 
-# ── 3. 前端构建 ────────────────────────────────────────────
-log "=== [3/7] 前端构建 ==="
-FRONTEND_DIR="$PROJECT_ROOT/frontend-new"
-if [ "$SKIP_FRONTEND" -eq 1 ]; then
-  if [ -d "$FRONTEND_DIR/dist" ] && [ -f "$FRONTEND_DIR/dist/index.html" ]; then
-    log "跳过前端构建（--skip-frontend），使用已有 dist/"
-  else
-    die "frontend-new/dist 不存在，不能跳过前端构建。请去掉 --skip-frontend。"
-  fi
-else
-  if [ ! -f "$FRONTEND_DIR/package.json" ]; then
-    die "frontend-new/package.json 不存在"
-  fi
-  cd "$FRONTEND_DIR"
-  select_npm_registry
-  log "安装前端依赖 (pnpm install)..."
-  # 实测教训：小包探测能过不代表大依赖树能撑住——官方 registry 在完整安装时
-  # 掉到 24 KiB/s 并丢失 rolldown 原生 binding 包导致构建失败。故首次尝试
-  # 失败后，一律用 npmmirror 重试一次再判定失败。
-  install_frontend_deps() {
-    pnpm install --frozen-lockfile --registry "$NPM_REGISTRY" 2>/dev/null \
-      || pnpm install --registry "$NPM_REGISTRY"
-  }
-  if ! install_frontend_deps; then
-    warn "前端依赖安装失败，改用 ${NPM_REGISTRY_MIRROR} 重试一次..."
-    NPM_REGISTRY="$NPM_REGISTRY_MIRROR"
-    install_frontend_deps \
-      || die "前端依赖安装失败（官方与 npmmirror 均失败），请检查网络后手动执行 pnpm install"
-  fi
-  log "构建前端 (pnpm build)..."
-  pnpm build
-  cd "$PROJECT_ROOT"
-  if [ ! -f "$FRONTEND_DIR/dist/index.html" ]; then
-    die "前端构建失败，frontend-new/dist/index.html 未生成"
-  fi
-  log "前端构建完成: frontend-new/dist/ ($(du -sh "$FRONTEND_DIR/dist" | cut -f1))"
+# ── 3. 等待前端构建完成 ────────────────────────────────────
+# 步骤 3 已在步骤 2 之前以后台子 shell 启动，日志实时输出到终端（带 [frontend] 前缀）。
+wait "$FRONTEND_BUILD_PID"; RC_FRONTEND=$?
+if [ "$RC_FRONTEND" -ne 0 ]; then
+  die "前端构建失败（退出码 ${RC_FRONTEND}）"
 fi
 
 # ── 4. .env 初始化 ─────────────────────────────────────────
@@ -775,6 +819,52 @@ for k, v in dotenv_values(sys.argv[1]).items():
   return 0
 }
 load_env_file "$PROJECT_ROOT/.env"
+
+# ── 8a. RAG 模型下载后台启动（与 DB+seed+cron 并行）─────────
+# 模型下载（~1.2GB）是 IO bound，与 DB 初始化/种子/cron 无共享状态冲突，
+# 可安全并行。HF_HOME export 和 ENV_FILE 校正属主 shell 系统变更，留在前台；
+# 仅 download_models.py 放后台子 shell。
+export HF_HOME="${HF_HOME:-$PROJECT_ROOT/instance/huggingface}"
+log "HF 模型缓存: $HF_HOME"
+# ⚠️ 同步运行时环境文件：服务进程的 HF_HOME 来自 /etc/ipip/ipip.env
+# （EnvironmentFile）。该文件由 install-units.sh 首次渲染、之后「已存在不覆盖」，
+# 换目录重装时必残留旧路径 → 服务读不到模型、RAG 静默失效（实测踩到：
+# /root 迁往 /opt 后仍指旧路径）。这里只校正这一行，不碰运维其它自定义值。
+ENV_FILE="${ENV_FILE:-/etc/ipip/ipip.env}"
+if [ -f "$ENV_FILE" ]; then
+  if grep -q "^HF_HOME=" "$ENV_FILE"; then
+    OLD_HF="$(grep "^HF_HOME=" "$ENV_FILE" | head -1 | cut -d= -f2-)"
+    if [ "$OLD_HF" != "$HF_HOME" ]; then
+      sed -i "s|^HF_HOME=.*|HF_HOME=$HF_HOME|" "$ENV_FILE" \
+        && log "已校正 $ENV_FILE 的 HF_HOME: $OLD_HF → $HF_HOME"
+    fi
+  else
+    echo "HF_HOME=$HF_HOME" >> "$ENV_FILE" \
+      && log "已追加 $ENV_FILE 的 HF_HOME=$HF_HOME"
+  fi
+fi
+MODELS_DOWNLOAD_PID=""
+if [ "$SKIP_MODELS" -eq 1 ]; then
+  warn "已跳过本地模型下载（--skip-models）：RAG 向量检索将不可用，"
+  warn "  需要时执行：$VENV_PY scripts/download_models.py"
+else
+  log "=== [8] 下载 RAG 本地模型（后台并行，embedding≈92MB + reranker≈1100MB）==="
+  (
+    # 并行输出前缀：与 DB 初始化的 [INSTALL] 区分，日志实时输出到终端
+    log()  { echo -e "${GREEN}[models]${NC} $*"; }
+    warn() { echo -e "${YELLOW}[models]${NC} $*"; }
+    err()  { echo -e "${RED}[models]${NC} $*" >&2; }
+    # 默认写入 HF 标准缓存（$HF_HOME/hub/models--BAAI--*/snapshots/main/），
+    # 与本地开发环境同一套解析机制 → 代码与 .env 均无需改动。
+    # 下载体积较大但属必需步骤；失败只告警不中止安装，但会把影响范围说清楚。
+    run_timed "下载 RAG 本地模型" "$VENV_PY" "$PROJECT_ROOT/scripts/download_models.py" \
+      || warn "模型下载失败 → RAG 功能不可用。可稍后单独重跑（支持断点续传）：
+        $VENV_PY scripts/download_models.py                    # 全部（写入 HF 缓存）
+        $VENV_PY scripts/download_models.py --only embedding    # 只下必需的 92MB"
+  ) &
+  MODELS_DOWNLOAD_PID=$!
+  log "RAG 模型下载已在后台启动（PID $MODELS_DOWNLOAD_PID），与 DB 初始化并行"
+fi
 
 # ── 5. 数据库初始化 ────────────────────────────────────────
 if [ "$SKIP_DB" -eq 1 ]; then
@@ -951,43 +1041,18 @@ else
   warn "  0 3 * * * cd $PROJECT_ROOT && ./.venv/bin/flask --app wsgi:app monitor-archive"
 fi
 
-# ── 8. RAG 本地模型 ─────────────────────────────────────────
+# ── 8. 等待 RAG 模型下载完成 ────────────────────────────────
+# 模型下载已在步骤 5 之前以后台子 shell 启动，日志实时输出到终端（带 [models] 前缀）。
 # 为什么必须预置：app/services/ai/rag/{embedding,reranker}.py 都强制
 # HF_HUB_OFFLINE=1（避免 transformers 5.x 在无网环境加载时卡死），模型不在本地
 # 就会加载失败——embedding 失败则 RAG 检索整体不可用，reranker 失败则降级为 RRF。
 # 国内机房访问 huggingface.co 基本不可达，脚本默认走 ModelScope（实测约 5.7MB/s）。
-# 模型缓存位置（对 --skip-models 同样生效：运行期读取的就是这个目录）：
-export HF_HOME="${HF_HOME:-$PROJECT_ROOT/instance/huggingface}"
-log "HF 模型缓存: $HF_HOME"
-# ⚠️ 同步运行时环境文件：服务进程的 HF_HOME 来自 /etc/ipip/ipip.env
-# （EnvironmentFile）。该文件由 install-units.sh 首次渲染、之后「已存在不覆盖」，
-# 换目录重装时必残留旧路径 → 服务读不到模型、RAG 静默失效（实测踩到：
-# /root 迁往 /opt 后仍指旧路径）。这里只校正这一行，不碰运维其它自定义值。
-ENV_FILE="${ENV_FILE:-/etc/ipip/ipip.env}"
-if [ -f "$ENV_FILE" ]; then
-  if grep -q "^HF_HOME=" "$ENV_FILE"; then
-    OLD_HF="$(grep "^HF_HOME=" "$ENV_FILE" | head -1 | cut -d= -f2-)"
-    if [ "$OLD_HF" != "$HF_HOME" ]; then
-      sed -i "s|^HF_HOME=.*|HF_HOME=$HF_HOME|" "$ENV_FILE" \
-        && log "已校正 $ENV_FILE 的 HF_HOME: $OLD_HF → $HF_HOME"
-    fi
-  else
-    echo "HF_HOME=$HF_HOME" >> "$ENV_FILE" \
-      && log "已追加 $ENV_FILE 的 HF_HOME=$HF_HOME"
+if [ -n "$MODELS_DOWNLOAD_PID" ]; then
+  wait "$MODELS_DOWNLOAD_PID"; RC_MODELS=$?
+  if [ "$RC_MODELS" -ne 0 ]; then
+    warn "RAG 模型下载后台进程异常退出（退出码 ${RC_MODELS}），RAG 功能可能不可用"
+    warn "可稍后单独重跑：$VENV_PY scripts/download_models.py"
   fi
-fi
-if [ "$SKIP_MODELS" -eq 1 ]; then
-  warn "已跳过本地模型下载（--skip-models）：RAG 向量检索将不可用，"
-  warn "  需要时执行：$VENV_PY scripts/download_models.py"
-else
-  log "=== [8] 下载 RAG 本地模型（embedding≈92MB + reranker≈1100MB）==="
-  # 默认写入 HF 标准缓存（$HF_HOME/hub/models--BAAI--*/snapshots/main/），
-  # 与本地开发环境同一套解析机制 → 代码与 .env 均无需改动。
-  # 下载体积较大但属必需步骤；失败只告警不中止安装，但会把影响范围说清楚。
-  run_timed "下载 RAG 本地模型" "$VENV_PY" "$PROJECT_ROOT/scripts/download_models.py" \
-    || warn "模型下载失败 → RAG 功能不可用。可稍后单独重跑（支持断点续传）：
-      $VENV_PY scripts/download_models.py                    # 全部（写入 HF 缓存）
-      $VENV_PY scripts/download_models.py --only embedding    # 只下必需的 92MB"
 fi
 
 # ── 9. 【可选】systemd 进程托管（T2.1）──────────────────────
