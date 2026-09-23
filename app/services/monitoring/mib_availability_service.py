@@ -32,7 +32,7 @@
 把厂商 MIB 放进 ``app/services/monitoring/mibs/vendor/`` 即可 —— 目录由本模块
 自动创建并接入 pysnmp 搜索路径。**但必须是可以被 pysnmp 直接加载的模块**：
 
-⚠️ **实测（2026-09-20，pysnmp 7.1.27）**：pysnmp 的 ``DirMibSource`` **只认
+[WARN] **实测（2026-09-20，pysnmp 7.1.27）**：pysnmp 的 ``DirMibSource`` **只认
 ``{名字}.py[co]``**。把厂商官网下载的纯文本 MIB（``XXX-MIB.txt`` / ``XXX-MIB``）
 放进搜索路径后，``load_modules`` 依然抛::
 
@@ -251,7 +251,7 @@ def _get_builder():
 def mib_loadable(mib: str) -> bool:
     """该 MIB 能否在本地加载（结果缓存 —— 加载要读盘并解析，代价不低）。
 
-    ⚠️ ``ensure_vendor_mib_source()`` **必须在拿 ``_builder_lock`` 之前调用**。
+    [WARN] ``ensure_vendor_mib_source()`` **必须在拿 ``_builder_lock`` 之前调用**。
     它不是"顺手放外面"：该助手内部会调 ``_get_builder()``，而 ``_get_builder``
     同样要拿这把锁 —— 放在临界区里就是**自死锁**（实测：pytest 120s 超时，
     堆栈停在 ``_get_builder`` 的 ``with _builder_lock``）。

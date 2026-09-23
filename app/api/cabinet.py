@@ -316,7 +316,7 @@ def delete_cabinet(cabinet_id):
 def force_delete_cabinet(cabinet_id):
     """强制删除机柜：跳过依赖检查，物理删除柜内设备及其全部关联数据
 
-    ⚠️ **不可恢复**。会把柜内**全部**设备（含回收站中的软删设备）连同其硬件、
+    [WARN] **不可恢复**。会把柜内**全部**设备（含回收站中的软删设备）连同其硬件、
     端口、IP、凭据、监控历史、诊断会话一并物理删除。
 
     为什么是独立端点而不是 `DELETE /cabinets/{id}?force=true`：权限位不同
@@ -324,7 +324,7 @@ def force_delete_cabinet(cabinet_id):
     不必在函数体里手写条件检查——那种写法一旦漏掉就是越权，而这里漏掉是 403。
     （与 `app/api/room.py::force_delete_room` 同一决策）
 
-    ⚠️ 历史包袱：`DELETE /cabinets/{id}` 曾经接受 `force` 并落到 ORM 级联
+    [WARN] 历史包袱：`DELETE /cabinets/{id}` 曾经接受 `force` 并落到 ORM 级联
     （`Cabinet.devices` 的 `cascade="all, delete-orphan"`），**完全绕过设备清理链路**
     ⇒ 子表有行时撞外键整体回滚、子表无行时静默留残行。该开关已移除，
     现在"随设备一起销毁"**只有本端点这一条路径**。

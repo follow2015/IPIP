@@ -160,21 +160,12 @@ class PortStatusUpdateService:
                 DeviceMetricAlertStateRepository,
             )
 
-            state = DeviceMetricAlertStateRepository(
+            DeviceMetricAlertStateRepository(
                 session=self._session
-            ).find_by_identity(device_id, "port_updown", index)
-            if state is None:
-                state = DeviceMetricAlertState(
-                    device_id=device_id,
-                    metric_key="port_updown",
-                    index_key=index,
-                    alert_type="port_status_changed",
-                )
-                self._session.add(state)
-            state.breached = breached
-            state.severity = severity
-            state.last_value = value
-            self._session.flush()
+            ).upsert_alert_state(
+                device_id, "port_updown", index, "port_status_changed",
+                breached, severity, value,
+            )
         except Exception:  # noqa: BLE001 - 告警失败不阻断状态更新
             logger.warning(
                 "端口状态变化告警入箱失败 device_id=%s port=%s",

@@ -43,7 +43,7 @@ class DeviceMetricBaselineRepository:
     ) -> Optional[DeviceMetricBaseline]:
         """取某个时间桶的基线行。
 
-        ⚠️ "精确桶（当时刻的 hour/weekday）→ 降级桶（-1/-1）"的两段回退是
+        [WARN] "精确桶（当时刻的 hour/weekday）→ 降级桶（-1/-1）"的两段回退是
         **调用方**的业务语义（`BaselineService.get_baseline`），故此处只表达
         "取一个桶"，回退顺序留在 service（换仓储不改变回退行为）。
         """

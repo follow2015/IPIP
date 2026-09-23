@@ -77,7 +77,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def list_entities_by_device(self, device_id: int) -> List[NetworkPort]:
         """取该设备的端口**实体**（B-44 收敛：端口同步的差量写入）。
 
-        ⚠️ 与 `find_ports_by_device`（返回 dict，供展示层）**刻意分开**：
+        [WARN] 与 `find_ports_by_device`（返回 dict，供展示层）**刻意分开**：
         端口同步要按四元组比对后**改属性/删行**（`port.port_name = ...`、
         `session.delete(p)`），dict 没法承载 ORM 变更跟踪 —— 混用会把
         "更新端口名"变成静默无操作。
@@ -143,7 +143,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     ) -> Optional[NetworkPort]:
         """按 设备 + 端口名 取端口**实体**（B-44 扫尾批：端口信息缓存更新）。
 
-        ⚠️ 与 `find_port_by_name`（返回 dict，展示用）**刻意分开**：调用方要
+        [WARN] 与 `find_port_by_name`（返回 dict，展示用）**刻意分开**：调用方要
         **改** ``row.raw_info`` 后写回，dict 版本改了也不落库 —— 混用会让
         "更新端口信息缓存"变成静默无操作。
         """

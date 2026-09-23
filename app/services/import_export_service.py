@@ -284,7 +284,7 @@ def escape_export_df(df: pd.DataFrame) -> pd.DataFrame:
     入库数据可能含攻击者可控字符串（如设备名 "=HYPERLINK(...)"），
     管理员导出打开时会被 Excel 当公式执行。导出侧统一中和。
 
-    ⚠️ 本函数**已被 ``export_to_excel`` 弃用**（那条路径改走 write_only 流式写出，
+    [WARN] 本函数**已被 ``export_to_excel`` 弃用**（那条路径改走 write_only 流式写出，
     转义由 ``_prepare_export_cell`` 逐格完成，避免为了转义而多留一份 DataFrame 拷贝）。
     保留是因为**客户资源导出（5 Sheet）**仍在用：
     ``customer_service.generate_customer_assets_excel`` → ``escape_export_df``。
@@ -385,7 +385,7 @@ def ensure_export_rows_within_limit(row_count: int, max_rows: Optional[int] = No
     判断，新增入口时**极易漏加**，而"漏加"的表现是生产 OOM —— 功能测试看不见。
     判定点收敛到一处后，新增路径只需调它。
 
-    ⚠️ 上限值只在**与写出侧实现能力配对**时才是保护：上限保证"不会比上限更大"，
+    [WARN] 上限值只在**与写出侧实现能力配对**时才是保护：上限保证"不会比上限更大"，
     保证不了"上限本身扛得住"（普通模式 20 万行峰值 RSS 1,986 MB，见
     ``write_rows_to_sheet`` docstring）。
 
@@ -412,7 +412,7 @@ def export_to_excel(rows: list, sheet_name: str, max_rows: Optional[int] = None)
     本函数里的上限是**兜底**：调用方（尤其分页取数循环）应在取数过程中就熔断，
     否则结果集已经先物化进内存了，这里再拦为时已晚。
 
-    ⚠️ **写出侧必须保持流式（write_only）**。上限能保证"不会比上限更大"，保证不了
+    [WARN] **写出侧必须保持流式（write_only）**。上限能保证"不会比上限更大"，保证不了
     "上限本身扛得住"：普通模式下 20 万行的峰值 RSS 是 1,986 MB，比上限设成多少
     更致命。`tests/test_export_streaming.py::TestExportDoesNotMaterialiseFullFrame`
     钉住这一条——功能测试无法发现该回退，它只在生产 OOM。

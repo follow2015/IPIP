@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """交换机扩展信息仓库（DeviceSwitchExtRepository）
 
-⚠️ 与 `switch_ext_repository.SwitchExtRepository` **不是同一张表**：
+[WARN] 与 `switch_ext_repository.SwitchExtRepository` **不是同一张表**：
 后者管 `switch_credentials`（Phase 3 重构后合并了旧的 sw_switch_ext），
 本仓储管 `device_switch_ext`（角色/层级/上联设备等链路属性）。
 

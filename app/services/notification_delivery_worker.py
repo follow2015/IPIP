@@ -22,7 +22,7 @@ notify() 写入）减去 `receipt.channel_status`（已落库的投递结果）�
 一条慢通知只占 1 个池线程，其余线程继续投别的通知。并发安全性依据：
 ① 冷却判定是单条原子 `SET NX`；② 每任务自带 `app_context`（session 按上下文隔离）；
 ③ 跨进程竞态本来就存在（每个 gunicorn worker 一条线程），池只提高概率、不扩大类别。
-⚠️ **同一通知内的用户仍是串行**：voice 渠道在 `send` 内写调用方 session，
+[WARN] **同一通知内的用户仍是串行**：voice 渠道在 `send` 内写调用方 session，
 用户级并行有跨线程 ORM 危险——那是独立的一项，不在本改动内。
 """
 from concurrent.futures import ThreadPoolExecutor
@@ -173,12 +173,12 @@ def _prefetch_targets(notification, raw_user_ids) -> tuple[list, dict, dict]:
         ``(user_ids, users_by_id, receipts_by_user)``；``user_ids`` 已做 ``None`` 归一。
 
     A-P1-2：替代「每用户 2 次查询」（500 人广播 = 1000 次 DB 往返）。
-    ⚠️ notify() 主流程早有同族修法（`notification_service.py` 的 "n1"：
+    [WARN] notify() 主流程早有同族修法（`notification_service.py` 的 "n1"：
     "批量加载用户（一次 IN 查询）替代逐用户 find_by_id 的 N+1"），但只覆盖了**创建侧**、
     漏了**投递侧**，本处补齐。B-42①：数据访问统一走仓储（与 notify 同源），
     不再裸 `Model.query` —— 消除"仓储过滤软删除、裸 query 不过滤"的语义分叉。
 
-    ⚠️ 已知边界（**未分块**）：`user_ids` 直接进 `IN`。广播可达数千用户，大 IN 会受
+    [WARN] 已知边界（**未分块**）：`user_ids` 直接进 `IN`。广播可达数千用户，大 IN 会受
     MySQL `max_allowed_packet` / `range_optimizer_max_mem_size` 与 SQLite 绑定变量上限影响。
     不改的理由：创建侧对同一批 `user_ids` 早就是同样的未分块 `IN`，此处不引入新形态。
     """
@@ -199,7 +199,7 @@ def _prefetch_targets(notification, raw_user_ids) -> tuple[list, dict, dict]:
 def _commit_without_expire(session) -> None:
     """提交，但**不**让已加载对象过期（使逐用户提交不产生任何额外的重读 SELECT）。
 
-    ⚠️ 只包 **worker 自己这一次** commit，**不修改全局口径**：渠道内部的 commit
+    [WARN] 只包 **worker 自己这一次** commit，**不修改全局口径**：渠道内部的 commit
     （`VoiceChannel.send` 里的两次 `db.session.commit()`）仍走默认 ``expire_on_commit=True``，
     从而 worker 随后的 ``status.update(dict(receipt.channel_status or {}))`` 会**重读**
     数据库里的最新值 —— N5 的语音终态保护正是建立在这个"重读"上
@@ -419,7 +419,7 @@ def recover_pending_deliveries(app, lookback_hours: int = _RECOVER_LOOKBACK_HOUR
 def _get_pool_size(app) -> int:
     """投递并发数（B-40）：读配置并兜底。
 
-    ⚠️ 两条路径的越界语义**不同**（复审 M2 澄清，勿合并表述）：
+    [WARN] 两条路径的越界语义**不同**（复审 M2 澄清，勿合并表述）：
     · env 路径（生产）：`config._env_num(..., min_value=1)` 已把 0/负数/非法值
       **回退成默认 4**，根本到不了这里；
     · 程序化路径（测试/代码内直接改 app.config）：此处钳 `max(1, n)`、
@@ -475,7 +475,7 @@ def _run_task(app, task) -> None:
 def _handle_task(app, executor: ThreadPoolExecutor, task: dict) -> None:
     """单任务处理：先占在途额度（**阻塞点=背压点**），再提交池；退出期回退同步。
 
-    ⚠️ B-28 实测坑：解释器退出时 concurrent.futures 的 `_python_exit` 已把
+    [WARN] B-28 实测坑：解释器退出时 concurrent.futures 的 `_python_exit` 已把
     `_shutdown` 置真，此后 `submit()` 必抛 "cannot schedule new futures after
     shutdown"——不回退的话退出期反复 submit 会刷屏（曾 4.3 万行）并拖住退出。
     回退同步即保持旧版"退出前尽力而为"语义，任务也不丢（额度当场归还，

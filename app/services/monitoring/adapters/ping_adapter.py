@@ -163,7 +163,7 @@ def _ping_with_ports(ip: str, timeout: int, ports: tuple) -> tuple[bool, str | N
     说明：`detect_ip_status` 已内置「私网只 Ping / 公网默认端口」策略；
     这里在 Ping 不通时，用凭据配置的 `ports` 做补充探测，二者互补。
 
-    ⚠️ 首行是**兜底**：本函数是"真正发包"的公共入口（`probe` 的 fast 分支与
+    [WARN] 首行是**兜底**：本函数是"真正发包"的公共入口（`probe` 的 fast 分支与
     `_probe_quality` 的回落分支都会到此），故即使上游漏检也不发包。
     """
     reason = _invalid_target_reason(ip)

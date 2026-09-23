@@ -54,7 +54,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         由 ``monitor_routes.list_alerts`` 的 scope=mine 分支调用，
         避免在 API 路由层直接操作 db.session（项目约束：数据库必须走 Repository 层）。
 
-        ⚠️ ``alive_only`` 是**两个调用点的口径分歧**（B-44 收敛时发现，勿合并）：
+        [WARN] ``alive_only`` 是**两个调用点的口径分歧**（B-44 收敛时发现，勿合并）：
         · ``False``（默认，告警历史）：**含**已软删设备 —— 历史记录的作用域按
           "当时谁负责"还原，设备删了也要能看到它那条历史；
         · ``True``（monitor_service 的 alert 看板 scope=mine）：**排除**已软删设备
@@ -73,6 +73,12 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
         走 ``_base_query()``：外部节点必须是存活设备（软删设备的连接边不该
         进拓扑图 —— 原实现显式带 ``deleted_at IS NULL``）。
+
+        WP-9/9.2 裁定（2026-09-23 实证反测）：评审所称"cabinet/switch_ext
+        逐行延迟加载 N+1"**不成立**——两个 relationship 均为
+        ``lazy="selectin"``（查询后各一条批量 IN SELECT，常数次，见
+        app/models/device.py），无需仓储侧 joinedload。门禁
+        tests/test_wp9_batch_p2.py 守护该模型级配置。
         """
         ids = list(device_ids)
         if not ids:
@@ -94,7 +100,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def list_switch_ids_by_cabinet_ids(self, cabinet_ids) -> List[int]:
         """取机柜集合内的交换机设备 ID（排除软删；B-44 部署计划批）。
 
-        ⚠️ "交换机" = ``device_type == "network"`` **且**
+        [WARN] "交换机" = ``device_type == "network"`` **且**
         ``device_subtype == "switch"``（两个条件都要 —— 只认 type 会把
         路由器/防火墙也算成交换机，二层域会被拖大）。
         """
@@ -115,7 +121,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def list_by_management_ip(self, ip_address: str) -> List[Device]:
         """按 `management_ip` 取**全部**匹配设备（软删除除外；B-44 拓扑批收敛）。
 
-        ⚠️ 与 `find_by_management_ip` **刻意不同**：那个返 `.first()`（Trap 解析"认一台"），
+        [WARN] 与 `find_by_management_ip` **刻意不同**：那个返 `.first()`（Trap 解析"认一台"），
         这个返**列表** —— 拓扑对端解析要判"**命中多台即歧义**"（拿列表长度说话），
         退化成 `.first()` 会把歧义静默变成"随便挑一台画进拓扑"。
         """
@@ -128,7 +134,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def list_by_name(self, name: str) -> List[Device]:
         """按 `device_name` **或** `hostname` 精确等于 ``name`` 取全部设备（软删除除外）。
 
-        ⚠️ **单个名字**，不是候选列表 —— 拓扑对端解析是"候选名**逐个**试、首个唯一命中
+        [WARN] **单个名字**，不是候选列表 —— 拓扑对端解析是"候选名**逐个**试、首个唯一命中
         即返回"，把候选列表一次性塞进 ``IN`` 会把"名1 命中 A、名2 命中 B"从
         "返回 A"变成"判为歧义"（**语义改变**）。候选循环与歧义策略属业务逻辑，
         留在 service；仓储只答"这个名字命中哪几台"。
@@ -216,7 +222,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def find_switch_with_topology(self, device_id: int) -> Optional[Device]:
         """按 ID 取**网络设备**并预加载拓扑所需关联（星形拓扑的中心交换机）。
 
-        ⚠️ 带 `Device.device_type == "network"` 条件：传非网络设备返回 None
+        [WARN] 带 `Device.device_type == "network"` 条件：传非网络设备返回 None
         （调用方据此返回空拓扑），**不是**普通 `find_by_id` 的别名。
         不预加载 customer（星形拓扑不展示客户名，按需再加）。
         """
@@ -490,7 +496,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     ) -> List[Device]:
         """按客户取设备（id 升序，可选 limit / 数据域过滤；B-44 收敛）
 
-        ⚠️ 与 `find_by_customer_id` 的区别：**不过滤 SCRAPPED 状态** —— 两处调用点
+        [WARN] 与 `find_by_customer_id` 的区别：**不过滤 SCRAPPED 状态** —— 两处调用点
         （AI 客户实体解析、AI「客户设备能力」）的口径是"客户名下有哪些设备"，
         含报废设备；且 `device_ids` 为数据域白名单（``None`` = 不限）。
         """
@@ -795,7 +801,11 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
         - **不执行 COUNT、不使用 OFFSET**。``OFFSET`` 翻到第 k 页要先扫描并丢弃
           ``(k-1) * limit`` 行，全量遍历的累计代价是 O(n²/limit)；keyset 每页都是
-          索引范围扫描（需 ``(device_name, id)`` 联合索引），累计 O(n)。
+          索引范围扫描（InnoDB 二级索引叶节点隐含 PK，单列 ``idx_device_name``
+          即可支撑 ``(device_name, id)`` 有序扫描，实测 Covering index scan），
+          累计 O(n)。实际是否走该索引取决于优化器对 ``status`` 过滤的代价决策；
+          **重新 EXPLAIN 的触发条件 = 任一分页表 ≥ 10 万行**（WP-8/8.3 澄清，
+          2026-09-23；原"需联合索引"的说法不成立）。
         - 游标是"上一页最后一条的 ``(device_name, id)``"而非页码 —— 遍历期间即使
           有并发插入/删除也不会漏行或重复行（``OFFSET`` 的经典问题）。
 

@@ -307,7 +307,7 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
     def delete_device_links(self, device_id: int) -> int:
         """解除该设备的全部凭据关联（B-44 收敛：设备彻底删除的清理面）。
 
-        ⚠️ 只删**关联行**（多对多中间表），不删 MonitorCredential 本身 ——
+        [WARN] 只删**关联行**（多对多中间表），不删 MonitorCredential 本身 ——
         凭据可被多设备共享（原注释即如此，勿"顺手"把凭据也删了）。
         """
         return (

@@ -62,7 +62,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def exists_alive(self, room_id: int) -> bool:
         """机房是否存在（B-44 收敛：扫描调度的配置校验）。
 
-        ⚠️ **修正了一处潜伏错误**：原实现写 ``filter_by(id, deleted_at=None)``，
+        [WARN] **修正了一处潜伏错误**：原实现写 ``filter_by(id, deleted_at=None)``，
         但 ``rooms`` 表**没有 deleted_at 列** —— 该行一旦真实执行即抛
         ``InvalidRequestError``（此前从未触达：配置了 room_ids 的部署才会走到）。
         迁移时按"存在即有效"修正；Room 的退役语义走 ``status`` 列，
@@ -78,7 +78,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def find_device_ids_in_room(self, room_id: int) -> list:
         """机房内全部设备 ID（B-46 收敛：机房强删第 0 步）。
 
-        ⚠️ **含已软删设备**：强删语义是"一台不留"（原 raw SQL 即无软删过滤）——
+        [WARN] **含已软删设备**：强删语义是"一台不留"（原 raw SQL 即无软删过滤）——
         故**刻意不走** ``_base_query()``（那会过滤软删，导致静默漏删）。
         调用方约定：必须在 ``devices`` 行被删之前调用（顺序错了取到空集）。
         """
@@ -98,7 +98,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     ) -> int:
         """机房强删的**受控批量 DELETE**（B-46 收敛；原为 service 内 raw SQL）。
 
-        ⚠️ 逃生舱语义，三重约束缺一不可：
+        [WARN] 逃生舱语义，三重约束缺一不可：
         ① ``(table, col)`` 必须已通过 service 层的 ``_FORCE_DELETE_ALLOWED``
            白名单校验（本方法信任调用方，但再做标识符合法性兜底）；
         ② ``table`` / ``col`` 仅允许标识符字符（防注入，正则兜底）；

@@ -132,7 +132,7 @@ class SuppressedAlertLogRepository:
         )
 
     def snapshot_upstream_trace(self, device_id: int, device_name) -> int:
-        """上游设备侧：同上（⚠️ ``upstream_device_id`` **无外键**，DB 不会
+        """上游设备侧：同上（[WARN] ``upstream_device_id`` **无外键**，DB 不会
         处置它 —— 只能应用层做，漏了就是静默孤儿引用）。"""
         return (
             self.session.query(MonitorSuppressedAlertLog)

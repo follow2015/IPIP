@@ -182,7 +182,7 @@ class EmailChannel(PersonalChannel):
         watchdog = threading.Timer(
             timeout * _DEADLINE_MULTIPLIER, _abort_smtp, args=(smtp_ctx,)
         )
-        watchdog.daemon = True  # ⚠️ Timer 默认非 daemon：不设的话解释器退出会被它拖住最多一个 deadline
+        watchdog.daemon = True  # [WARN] Timer 默认非 daemon：不设的话解释器退出会被它拖住最多一个 deadline
         watchdog.start()
         try:
             with smtp_ctx as server:

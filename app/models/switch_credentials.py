@@ -182,6 +182,7 @@ class IPSwitchInfo(BaseModel):
     )
     vlan_id = db.Column(db.SmallInteger, comment="VLAN ID")
     room_id = db.Column(db.Integer, db.ForeignKey("rooms.id"), comment="机房ID")
+    source = db.Column(db.String(32), comment="写入来源(degraded_l2/l3[_24fallback]=降级/24兜底, NULL=普通扫描)")
 
     def __init__(self, **kwargs):
         """自动填充 ip_int"""

@@ -207,7 +207,7 @@ class LinkAggregationRepository(SQLAlchemyRepository):
     def delete_by_device_excluding_names(self, device_id: int, lag_names) -> int:
         """删除该设备上 ``lag_name`` **不在**给定集合的 LAG 行（B-46 批 5）。
 
-        ⚠️ 调用方约定：``lag_names`` 为空时**不得调用**（``NOT IN`` 空集 = 全删）。
+        [WARN] 调用方约定：``lag_names`` 为空时**不得调用**（``NOT IN`` 空集 = 全删）。
         Core DELETE（原实现即 ``sa_delete + notin_``）。
         """
         names = list(lag_names)

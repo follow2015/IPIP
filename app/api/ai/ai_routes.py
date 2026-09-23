@@ -61,13 +61,13 @@ def _check_device_access(device_id: int,
             False = fail-open 放行，适用查询/预览等只读路径；
             True = 拒绝并 403，适用 execute/rollback 等设备写路径——
             鉴权服务不可用不能成为绕过数据域、向真实设备下发变更的通道。
-            ⚠️ 门禁要求**每个调用点显式传参**（`tests/test_data_scope_fail_open_guard.py`）。
+            [WARN] 门禁要求**每个调用点显式传参**（`tests/test_data_scope_fail_open_guard.py`）。
 
     Returns:
         (True, "") 有权限
         (False, reason) 无权限/服务故障拒绝，reason 用于 403 响应
 
-    ⚠️ P0-1（2026-09-23）：这条 `except` 此前**永不可达**——旧实现的
+    [WARN] P0-1（2026-09-23）：这条 `except` 此前**永不可达**——旧实现的
     `get_visible_device_ids` 吞掉异常并 `return None`（= 无限制），异常传不到这里，
     于是"写路径 fail-closed"这层保护形同虚设（execute 在 scope 后端故障时照常 202
     入队）。现服务改为抛 `DataScopeUnavailableError`，本分支才真正生效；

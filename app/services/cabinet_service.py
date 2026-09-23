@@ -309,7 +309,7 @@ class CabinetService:
             - 「连柜内设备一起物理销毁」= `force_delete`（`DELETE /api/cabinets/<id>/force`，
               权限 `cabinet:force_delete`）
 
-            ⚠️ 历史包袱：这里曾有一个 `force=True` 开关，它会落到
+            [WARN] 历史包袱：这里曾有一个 `force=True` 开关，它会落到
             `CabinetRepository.delete` → `base.py` 的 `session.delete(entity)`，
             而 `Cabinet.devices` 关系带 `cascade="all, delete-orphan"`
             ⇒ **级联物理删 `devices` 行、完全绕过设备清理链路**
@@ -349,7 +349,7 @@ class CabinetService:
     def force_delete(self, cabinet_id: int) -> Dict[str, int]:
         """强制删除机柜：跳过依赖检查，物理删除机柜内全部设备及其关联数据。
 
-        ⚠️ **不可恢复**。与 `delete_cabinet()` 的分工见其 docstring。
+        [WARN] **不可恢复**。与 `delete_cabinet()` 的分工见其 docstring。
 
         **语义 = "机柜 = 一批设备的批量彻底删 + 删机柜本体"**（2026-09-18 拍板）
         ----------------------------------------------------------------------

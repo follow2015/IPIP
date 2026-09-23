@@ -136,7 +136,7 @@ def transaction_checkpoint(db_session, checkpoint_name: str = ""):
     - @transactional 包裹整个函数，适用于短事务（API handler）
     - transaction_checkpoint 在循环内部使用，适用于长流程（网络扫描流水线）
 
-    ⚠️ 互斥约束（双向）:
+    [WARN] 互斥约束（双向）:
     - transaction_checkpoint 禁止嵌套在 @transactional 内部使用（检测到会抛 RuntimeError）。
     - @transactional 同样禁止嵌套在 transaction_checkpoint 内部使用（检测到会抛 RuntimeError）。
     - 两者共用 g._transactional_depth 计数器实现双向互斥：

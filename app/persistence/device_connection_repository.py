@@ -41,7 +41,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def list_by_device_side(self, device_id: int) -> List[DeviceConnection]:
         """取该设备作为 **device 侧**的 D2N 连接（B-44 扫尾批：端口释放①）。
 
-        ⚠️ 与 `list_by_device_ids`（**任一侧**命中，拓扑收敛用）不同：
+        [WARN] 与 `list_by_device_ids`（**任一侧**命中，拓扑收敛用）不同：
         本方法只要 ``device_id == X`` 的行 —— 端口释放流程把"device 侧"与
         "switch 侧"分开处理（①②③ 步骤），任一侧口径会混入对端行。
         """

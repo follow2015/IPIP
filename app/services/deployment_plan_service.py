@@ -488,7 +488,7 @@ def _ip_view(candidates, ip_scope, needed: int, examples: int,
     needed 决定候选切片大小（容量模式下按最大可能台数取），
     required 是实际要落地的台数，决定 short 缺口。
 
-    ⚠️ 两个字段族的口径**刻意不同**，不要再"统一"它们：
+    [WARN] 两个字段族的口径**刻意不同**，不要再"统一"它们：
       · ``total_free`` / ``public_free`` / ``private_free`` / ``subnet_count``
         描述**整个候选池**，三数满足 ``total_free == public_free + private_free``，
         报告（``_ip_reference_lines``）正是这样并列展示的；

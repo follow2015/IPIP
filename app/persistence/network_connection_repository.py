@@ -91,7 +91,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
     def list_by_local_port_device_ids(self, device_ids) -> list[NetworkConnection]:
         """取 **local 端口**所属设备在集合内的 N2N 连接（B-46 批 4：拓扑建边）。
 
-        ⚠️ 只按 ``local_port_id → NetworkPort.device_id`` 过滤（原实现即如此）：
+        [WARN] 只按 ``local_port_id → NetworkPort.device_id`` 过滤（原实现即如此）：
         拓扑建边随后**双向**用 local/peer 关系补对端（见图内逻辑），
         这里若改成"任一端"会把同一条边算两次。
         """
@@ -228,7 +228,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
         B-44 拓扑批新增：`topology_discovery_service._find_connection` 的"连接已存在"
         判定入口 —— 错误信息里要带上 ``#{连接id}``，故需实体而非 bool。
 
-        ⚠️ **与 `find_existing_by_ports_orm` 语义不同，勿互相替代**：
+        [WARN] **与 `find_existing_by_ports_orm` 语义不同，勿互相替代**：
         · 本方法 = "**这一对**端口之间（A→B 或 B→A）是否有连接" —— 用于判"链路已存在"；
         · `find_existing_by_ports_orm` = "**任一**端口是否出现在**任何**连接里"
           —— 用于"旧端口释放"（换口场景：本端换了但旧口仍挂着别的链路也要处理）。

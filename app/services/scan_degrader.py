@@ -8,8 +8,6 @@ Phase 5：对无 SSH 权限的交换机后面的 IP 进行降级定位。
 import ipaddress
 from app.utils.logging import get_logger
 
-from sqlalchemy import text, bindparam
-
 from app.services.topology_graph import LocationResult
 from app.services.ip_arp_service import ArpSync
 
@@ -76,7 +74,8 @@ class NoAuthL3Degrader:
                     room_id=ip_room_id,
                     kind="degraded_l3", confidence="low",
                 )
-                ArpSync._apply_location(ip, mac or "", loc, db_session)
+                ArpSync._apply_location(ip, mac or "", loc, db_session,
+                                        source="degraded_l3")
 
         db_session.flush()
         logger.info(f"[L3Degrader] {no_auth_sw_ip} 降级完成: "
@@ -188,17 +187,25 @@ class NoAuthL2Degrader:
             return
 
         room_ids = _resolve_room_ids(scope, db_session)
-        target_networks = self._get_managed_networks(
+        target_networks, used_fallback = self._get_managed_networks(
             no_auth_l2_sw_ip, room_ids, db_session
         )
+        write_source = ("degraded_l2_24fallback" if used_fallback
+                        else "degraded_l2")
+        if used_fallback:
+            logger.warning(
+                "[L2Degrader] %s 无网段记录，/24 兜底生效（写入将标记 %s）",
+                no_auth_l2_sw_ip, write_source,
+            )
 
         updated = 0
-        for mac in macs_on_port:
-            from app.persistence.ip_repositories import IPSwitchInfoRepository
+        from app.persistence.ip_repositories import IPSwitchInfoRepository
 
-            ip_row = IPSwitchInfoRepository(db_session).find_first_by_mac(
-                mac, room_ids,
-            )
+        mac_rows = IPSwitchInfoRepository(db_session).find_by_macs(
+            macs_on_port, room_ids
+        )
+        for mac in macs_on_port:
+            ip_row = mac_rows.get(mac)
             if not ip_row:
                 continue
             ip, ip_room_id = ip_row[0], ip_row[1]
@@ -209,7 +216,7 @@ class NoAuthL2Degrader:
                 room_id=ip_room_id,
                 kind="degraded_l2", confidence="low",
             )
-            ArpSync._apply_location(ip, mac, loc, db_session)
+            ArpSync._apply_location(ip, mac, loc, db_session, source=write_source)
             updated += 1
 
         if updated:
@@ -219,10 +226,15 @@ class NoAuthL2Degrader:
                     f"updated={updated}")
 
     @staticmethod
-    def _get_managed_networks(sw_ip, room_ids: list[int], db_session) -> list[str]:
+    def _get_managed_networks(sw_ip, room_ids: list[int], db_session) -> tuple[list[str], bool]:
         """从 ip_networks 取该无权限 L2 交换机的归属网段
 
         L2 交换机通常没有自己的路由条目，若无记录则用管理 IP 推算 /24 网段。
+
+        [WARN] WP-6（P1-1）：上游仓储从 CursorResult 改为真 List[str] 后，
+        `if rows:` 对空列表不再恒真 ⇒ /24 兜底从"恒不执行"变成"会执行"
+        （静默行为放大）。兜底是否发生由返回值第二元显式报告，调用方据此
+        给降级写入打 `_24fallback` 来源标记（ip_switch_info.source，可回滚）。
 
         Args:
             sw_ip: 交换机管理IP
@@ -230,10 +242,10 @@ class NoAuthL2Degrader:
             db_session: 数据库 session
 
         Returns:
-            list[str]: 网段 CIDR 列表
+            tuple[list[str], bool]: (网段 CIDR 列表, 是否使用了 /24 兜底)
         """
         if not room_ids:
-            return []
+            return [], False
 
         from app.persistence.switch_ext_repository import SwitchExtRepository
         from app.persistence.ip_repositories import IPNetworkRepository
@@ -242,13 +254,13 @@ class NoAuthL2Degrader:
             sw_ip, room_ids,
         )
         if sw_id is None:
-            return []
+            return [], False
         rows = IPNetworkRepository(db_session).list_non_host_networks(
             sw_id, room_ids,
         )
         if rows:
-            return rows
-        return [str(ipaddress.ip_interface(f"{sw_ip}/24").network)]
+            return rows, False
+        return [str(ipaddress.ip_interface(f"{sw_ip}/24").network)], True
 
 
 def _ip_in_network(ip_str: str, net) -> bool:

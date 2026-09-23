@@ -137,7 +137,7 @@ class DeviceMonitorProbeEvents(db.Model):
         能长期潜伏的形态。提升成契约字段后，名字被 ``openapi.json`` →
         ``api-generated.ts`` 固定下来，写错会在 ``make check-openapi`` + ``tsc`` 变红。
 
-        ⚠️ 序列化有**两处**（本方法与
+        [WARN] 序列化有**两处**（本方法与
         ``monitor_timeseries_repository._row_to_dict``）。两处都必须带这三个字段，
         且都必须走 ``ping_quality_from_extra``（唯一的提取实现）——否则派生逻辑会分叉。
         """

@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from app.utils.time_utils import now_utc_naive
 
-from sqlalchemy import update, delete, text, func, bindparam
+from sqlalchemy import update, delete, text, func, bindparam, select
 from sqlalchemy.orm import joinedload
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 
@@ -149,7 +149,7 @@ class IPManagerRepository(BaseRepository):
     def list_by_ip_room_pairs(self, ip_addrs, room_ids) -> List[IPManager]:
         """按 (ip_address IN, room_id IN) 取 IP 行（B-44 收敛：封禁一致性对账）。
 
-        ⚠️ 双 IN 是**刻意的笛卡尔收缩**（原实现即如此）：调用方按
+        [WARN] 双 IN 是**刻意的笛卡尔收缩**（原实现即如此）：调用方按
         ``(ip_address, room_id)`` 二元组建映射，行多取了也只是被丢掉。
         """
         return (
@@ -1042,44 +1042,71 @@ class IPManagerRepository(BaseRepository):
             "DELETE FROM ip_addresses WHERE ip_address = :ip AND room_id != :rid"
         ), {"ip": ip, "rid": room_id})
 
+    def _upsert_ip_switch_info_row(self, values: dict, update_cols: list[str]) -> None:
+        """方言感知 UPSERT ip_switch_info（WP-6 重构：原 MySQL 专有 raw SQL → Core）
+
+        冲突键 = uk_isi_ip_room (ip_address, room_id)。
+        - MySQL：ON DUPLICATE KEY UPDATE（语义与原 raw SQL 逐列等价）
+        - SQLite（测试库）：ON CONFLICT ... DO UPDATE —— 使降级/来源标记
+          可在 sqlite 集成测试中真实执行（原 raw SQL 在测试库无法编译）
+
+        source 无条件以新值覆盖（**最近写入者语义**，含置 NULL）：普通扫描
+        覆盖降级行后标记消失，按标记回滚不会误删已被权威数据覆盖的行。
+        """
+        bind = self.session.get_bind()
+        if bind.dialect.name == "sqlite":
+            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+            stmt = sqlite_insert(IPSwitchInfo.__table__).values(**values)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[IPSwitchInfo.__table__.c.ip_address,
+                                IPSwitchInfo.__table__.c.room_id],
+                set_={c: getattr(stmt.excluded, c) for c in update_cols},
+            )
+        else:
+            stmt = mysql_insert(IPSwitchInfo.__table__).values(**values)
+            stmt = stmt.on_duplicate_key_update(
+                **{c: getattr(stmt.inserted, c) for c in update_cols})
+        self.session.execute(stmt)
+
     def upsert_ip_switch_info_with_port(self, ip: str, mac: str,
                                          switch_id: int, port: str,
-                                         room_id: int) -> None:
-        """UPSERT ip_switch_info（终端IP：有端口定位）"""
-        self.session.execute(text("""
-            INSERT INTO ip_switch_info
-                (ip_address, mac_address, switch_id, port, port_id, room_id, updated_at)
-            VALUES (
-                :ip, :mac, :sid, :port,
-                (SELECT id FROM network_ports
-                 WHERE device_id = :sid AND port_name = :port LIMIT 1),
-                :rid, NOW()
-            )
-            AS _new
-            ON DUPLICATE KEY UPDATE
-                mac_address = _new.mac_address,
-                switch_id   = _new.switch_id,
-                port        = _new.port,
-                port_id     = _new.port_id,
-                updated_at  = NOW()
-        """), {"ip": ip, "mac": mac, "sid": switch_id,
-               "port": port, "rid": room_id})
+                                         room_id: int,
+                                         source: "str | None" = None) -> None:
+        """UPSERT ip_switch_info（终端IP：有端口定位）
+
+        source：写入来源标记（WP-6）。None=普通扫描；降级路径传
+        degraded_l2/l3[_24fallback]。语义见 _upsert_ip_switch_info_row。
+        """
+        from app.models.network_port import NetworkPort
+        port_id_sq = (
+            select(NetworkPort.id)
+            .where(NetworkPort.device_id == switch_id,
+                   NetworkPort.port_name == port)
+            .limit(1).scalar_subquery()
+        )
+        values = {
+            "ip_address": ip, "mac_address": mac, "switch_id": switch_id,
+            "port": port, "port_id": port_id_sq, "room_id": room_id,
+            "source": source, "updated_at": func.now(),
+        }
+        self._upsert_ip_switch_info_row(
+            values,
+            ["mac_address", "switch_id", "port", "port_id", "source", "updated_at"],
+        )
 
     def upsert_ip_switch_info_no_port(self, ip: str, mac: str,
-                                       switch_id: int, room_id: int) -> None:
-        """UPSERT ip_switch_info（管理/网关IP：无端口）"""
-        self.session.execute(text("""
-            INSERT INTO ip_switch_info
-                (ip_address, mac_address, switch_id, port, room_id, updated_at)
-            VALUES (:ip, :mac, :sid, NULL, :rid, NOW())
-            AS _new
-            ON DUPLICATE KEY UPDATE
-                mac_address = _new.mac_address,
-                switch_id   = _new.switch_id,
-                port        = NULL,
-                port_id     = NULL,
-                updated_at  = NOW()
-        """), {"ip": ip, "mac": mac, "sid": switch_id, "rid": room_id})
+                                       switch_id: int, room_id: int,
+                                       source: "str | None" = None) -> None:
+        """UPSERT ip_switch_info（管理/网关IP：无端口）——source 语义见 with_port 版"""
+        values = {
+            "ip_address": ip, "mac_address": mac, "switch_id": switch_id,
+            "port": None, "port_id": None, "room_id": room_id,
+            "source": source, "updated_at": func.now(),
+        }
+        self._upsert_ip_switch_info_row(
+            values,
+            ["mac_address", "switch_id", "port", "port_id", "source", "updated_at"],
+        )
 
     def delete_ip_switch_info_by_ip(self, ip: str) -> None:
         """删除该IP的所有 ip_switch_info（无法定位时清理残留）"""
@@ -1557,6 +1584,31 @@ class IPSwitchInfoRepository(BaseRepository):
             {"mac": mac_address, "rids": ids},
         ).fetchone()
 
+    def find_by_macs(self, mac_addresses, room_ids) -> dict:
+        """按 MAC 集合在机房集合内批量取 ``{mac: (ip_address, room_id)}``（WP-9/9.1）。
+
+        消除 L2 降级循环的逐 MAC 反查 N+1：N 个 MAC 由 N 次 SELECT 降为 1 次。
+        **首行语义与 :meth:`find_first_by_mac` 一致**：同一 MAC 多行（跨机房/NAT）
+        先到先得取第一行；结果集中不存在的 MAC 即"无定位数据"（与原 `fetchone`
+        返回 None 同义）。
+        """
+        macs = [m for m in mac_addresses if m]
+        ids = list(room_ids)
+        if not macs or not ids:
+            return {}
+        rows = self.session.execute(
+            text("SELECT mac_address, ip_address, room_id FROM ip_switch_info "
+                 "WHERE mac_address IN :macs AND room_id IN :rids")
+            .bindparams(bindparam("macs", expanding=True),
+                        bindparam("rids", expanding=True)),
+            {"macs": macs, "rids": ids},
+        ).fetchall()
+        result: dict = {}
+        for mac, ip, rid in rows:
+            if mac not in result:  # 先到先得，同 find_first_by_mac 的"首行"语义
+                result[mac] = (ip, rid)
+        return result
+
     def list_missing_location_ips(
         self, room_id: int, start_int: int, end_int: int,
     ) -> List[str]:
@@ -1586,7 +1638,7 @@ class IPSwitchInfoRepository(BaseRepository):
     def insert_ignore_ips(self, rows) -> None:
         """批量 ``INSERT IGNORE`` 补定位行（只写 switch_id，不写 port）。
 
-        ⚠️ 保留 ``INSERT IGNORE``：并发/重跑时同 (ip,room) 可能已存在，
+        [WARN] 保留 ``INSERT IGNORE``：并发/重跑时同 (ip,room) 可能已存在，
         IGNORE 让补全幂等（原实现即如此）。
         """
         self.session.execute(
@@ -1656,7 +1708,7 @@ class IPNetworkRepository(BaseRepository):
     def delete_networks_by_ids(self, ids) -> None:
         """按主键逐条删除 ip_networks（executemany）。
 
-        ⚠️ 保持**逐条**参数绑定（docstring：避免 tuple 参数绑定问题）——
+        [WARN] 保持**逐条**参数绑定（docstring：避免 tuple 参数绑定问题）——
         不要改成拼接 OR 或 IN 列表。
         """
         self.session.execute(
@@ -1698,7 +1750,7 @@ class IPNetworkRepository(BaseRepository):
     def nullify_route_links(self, params) -> None:
         """删除网段前，先把引用它的 switch_routes.network_id 置 NULL。
 
-        ⚠️ docstring 语义（原实现）：**必须先置空再删**，否则悬空引用会让前端
+        [WARN] docstring 语义（原实现）：**必须先置空再删**，否则悬空引用会让前端
         nexthop/route_type 丢失；NexthopResolver 会在 Phase 4 重新回填。
         executemany 逐条绑定（避免动态 OR 拼接导致 SQL 长度膨胀 / 参数上限溢出）。
         """
@@ -1769,7 +1821,7 @@ class IPNetworkRepository(BaseRepository):
     def clear_dangling_network_ids(self, room_ids) -> int:
         """修复悬空 network_id（指向已删 ip_networks 的行）⇒ 置 NULL。
 
-        ⚠️ 必须**先修悬空**再回填：悬空行的 network_id 非 NULL 会躲过
+        [WARN] 必须**先修悬空**再回填：悬空行的 network_id 非 NULL 会躲过
         ``network_id IS NULL`` 的回填条件，形成**永久悬空引用**（原注释即如此）。
         Returns: 修复行数
         """
@@ -1925,7 +1977,7 @@ class IPNetworkRepository(BaseRepository):
     def list_probeable_networks(self, room_id: int) -> List[tuple]:
         """该机房**可探测**网段（排除黑洞/下一跳，含无路由关联的行；排除 /32）。
 
-        ⚠️ ``sr.route_type IS NULL`` 必须放行（LEFT JOIN 无关联的网段仍可探测）——
+        [WARN] ``sr.route_type IS NULL`` 必须放行（LEFT JOIN 无关联的网段仍可探测）——
         写成 INNER JOIN 会静默丢掉这些网段（原实现即 LEFT JOIN + OR IS NULL）。
         """
         from app.core.enums import RouteNotes
@@ -1951,7 +2003,7 @@ class IPNetworkRepository(BaseRepository):
     ) -> Optional["SwitchRoute"]:
         """取命中该 IP 的**最长前缀**路由（排除黑洞；B-44 扫尾批：封禁定位）。
 
-        ⚠️ 保留**原生 SQL**：``destination_int + POW(2, 32 - prefix) - 1``
+        [WARN] 保留**原生 SQL**：``destination_int + POW(2, 32 - prefix) - 1``
         的范围算术引用了表列，ORM filter 表达不了（原注释即如此），勿"顺手"
         改写成 Python 侧过滤 —— 那会丢掉 ``ORDER BY prefix DESC LIMIT 1``
         的数据库端裁剪。

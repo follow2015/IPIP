@@ -3,7 +3,7 @@
 
 签名校验 + IP 白名单 + 幂等 + 取消待重试 task。
 
-⚠️ 阿里云 HTTP 批量推送的响应超时为 700ms，故同步路径只做 Redis 幂等 +
+[WARN] 阿里云 HTTP 批量推送的响应超时为 700ms，故同步路径只做 Redis 幂等 +
 定位 + 单次 commit，revoke 一律异步化。
 """
 import ipaddress

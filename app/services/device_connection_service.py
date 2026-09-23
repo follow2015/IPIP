@@ -395,7 +395,7 @@ class DeviceConnectionService:
         ③ N2N：N2N 是对称的，"local/peer"只表示存储方向 ⇒ 按
            ``local_device_id``/``peer_device_id`` **逐列判断**哪一端不属于被删设备。
 
-        ⚠️ 刻意不用 ``n2n_repo.find_by_device()``：它按"查询视角"翻转
+        [WARN] 刻意不用 ``n2n_repo.find_by_device()``：它按"查询视角"翻转
         local/peer（``to_dict(perspective_device_id=...)``），拿它判方向会
         把"自己的端口"当成"对端端口"——而这里恰恰**依赖方向正确**。
         自环连接（两端都是被删设备）两端都不释放：那两行端口随后即被删除。

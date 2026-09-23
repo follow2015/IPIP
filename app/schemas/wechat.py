@@ -43,7 +43,7 @@ class WeChatQRCodeConfirmRequestSchema(Schema):
 class WeChatQRCodeAutoConfirmRequestSchema(Schema):
     """测试用自动确认（`POST /wechat/qrcode/auto-confirm`）。
 
-    ⚠️ 仅在 `development` / `testing` 环境可用（handler 内先判环境）；
+    [WARN] 仅在 `development` / `testing` 环境可用（handler 内先判环境）；
     `scene_id` 必填，`test_user_id` 可选。
     """
     class Meta:

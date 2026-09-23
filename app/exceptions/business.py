@@ -229,6 +229,32 @@ class ResourceConflictError(BusinessLogicError):
         )
 
 
+class LayoutMarkerVersionConflict(BusinessLogicError):
+    """占位标记乐观锁版本冲突（WP-7）
+
+    批量编辑端点的 CAS（UPDATE 谓词带期望版本）未命中时抛出：
+    标记在"读-改-写"窗口内被他人改过，继续写会静默覆盖（lost-update）。
+    API 层映射为 409 + ``ROOM_MARKER_VERSION_CONFLICT``（可编程识别），
+    ``conflicts`` 列出每个冲突标记的 (marker_id, expected, current)。
+    """
+
+    def __init__(self, conflicts):
+        """Args:
+            conflicts: [(marker_id, expected_version, current_version), ...]
+        """
+        self.conflicts = list(conflicts)
+        detail = "；".join(
+            f"标记#{mid} 期望版本 v{exp}，当前 v{cur}"
+            for mid, exp, cur in self.conflicts
+        )
+        super().__init__(
+            message=f"以下标记已被他人修改，请刷新布局后重试：{detail}",
+            code="LAYOUT_MARKER_VERSION_CONFLICT",
+            details={"conflicts": self.conflicts},
+            status_code=409,
+        )
+
+
 class BusinessRuleViolationError(BusinessLogicError):
     """业务规则违反异常
     

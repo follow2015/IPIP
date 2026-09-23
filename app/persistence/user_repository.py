@@ -59,10 +59,10 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         字符级匹配结构上看不见（盘点 §4 的最后 1 处）。收进本仓储后该读回到
         persistence 层，盲区**结构性消失**（而非被绕开）。
 
-        ⚠️ **不要"简化"成 `check_email_exists`**：后者按 **id** 排除，本方法按
+        [WARN] **不要"简化"成 `check_email_exists`**：后者按 **id** 排除，本方法按
         **username** 排除。调用方在建号**之前**调用，新账号此时还没有 id，只能靠
         用户名排除自己（口径与原实现 ``User.username != username`` 一致）。
-        ⚠️ ``users.email`` **无唯一约束** ⇒ 本查重是防重复邮箱的**唯一防线**
+        [WARN] ``users.email`` **无唯一约束** ⇒ 本查重是防重复邮箱的**唯一防线**
         （非锦上添花），去掉它两个 LDAP 账号可共享同一邮箱。
 
         返回冲突行（None = 无冲突）；DB 错照本仓储惯例抛 `QueryExecutionError`
@@ -119,7 +119,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         —— 原调用点是"兜底角色有没有人能收告警"的热路径（带 5 分钟进程内缓存），
         拉整行没有必要。
 
-        ⚠️ **刻意不包 `QueryExecutionError`**（与 `find_by_role` 不同）：原调用点
+        [WARN] **刻意不包 `QueryExecutionError`**（与 `find_by_role` 不同）：原调用点
         不捕获 DB 异常、由上层告警流程决定处置，换仓储不得改变异常类型。
         """
         return (
@@ -182,7 +182,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def find_first_active(self) -> Optional[User]:
         """取第一个激活用户（B-44 收敛；AI 诊断的"系统用户"占位）
 
-        ⚠️ 过滤条件用 ``status == UserStatus.ACTIVE``，**不能**写
+        [WARN] 过滤条件用 ``status == UserStatus.ACTIVE``，**不能**写
         ``User.is_active.is_(True)`` —— `is_active` 是模型上的 `@property`
         （不是 hybrid_property）：类上访问返回 property 对象，``.is_()`` 立即抛
         AttributeError（原实现因此恒返回 None、被外层 except 吞掉，见

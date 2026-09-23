@@ -858,7 +858,7 @@ class DeviceService:
           释放（真库 771 行有归属）；
         * ``status != UNUSED``：已经是 UNUSED 的不重复写。
 
-        ⚠️ 已知边界（有意保留、不静默处理）
+        [WARN] 已知边界（有意保留、不静默处理）
         ----------------------------------
         匹配用的是 **IP 字面量**（``switch_port_ips`` 没有 room_id，无法可靠限定机房）。
         真库实测池内同址重复仅 **1 组**（``10.0.1.2`` ×2，且两行 ``room_id`` 都是 NULL），
@@ -961,7 +961,7 @@ class DeviceService:
         - ``purge=True``（**彻底删**）：**先写设备名快照、再置空设备引用** —— 设备行
           即将被物理删除，置空后靠快照自证（迁移 0015 的 ``*_device_name`` 列）。
 
-        ⚠️ 为什么必须应用层显式处置，不能靠 DB ``ON DELETE SET NULL``：
+        [WARN] 为什么必须应用层显式处置，不能靠 DB ``ON DELETE SET NULL``：
         ① 软删走 UPDATE，**不触发任何 DB 级联**（而软删恰恰是"不置空"的分支）；
         ② 强删走裸 SQL，MySQL 会 SET NULL，但 CI 的 SQLite 默认不开
            ``PRAGMA foreign_keys`` ⇒ 同一语义两种库表现不同，产出的是假判据；

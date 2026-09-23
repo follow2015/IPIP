@@ -18,7 +18,7 @@
   线程加载的 ORM 对象），探测结束 finally: db.session.remove()。
 - 每把轮询循环各持一把 Redis 锁（monitor:lock:<loop>），TTL = 轮询间隔安全上限，
   正常一轮结束显式释放，进程崩溃时依赖 TTL 过期兜底。
-- ⚠️ 锁只保证**互斥**，不保证**限速**：抢不到锁的实例照样按自己的 interval 起轮
+- [WARN] 锁只保证**互斥**，不保证**限速**：抢不到锁的实例照样按自己的 interval 起轮
   ⇒ 聚合频率 = interval ÷ 实例数（gunicorn 多 worker / celery / 独立采集服务并存时
   实测 60 s 被打成 ≈18.9 s）。故另有最小间隔闸门 `monitor:rate:<loop>`
   （见 `_rate_limit_allow`），同 loop 的全部实例共享一个 interval 配额。
@@ -89,7 +89,7 @@ def _rate_limit_allow(r, loop_name: str, interval: int) -> bool:
     权威 —— 反过来（fail-closed）会把一次 Redis 能力缺失演变成"全网监控静默停摆"，
     与 ○7 修过的故障同型。`MONITOR_RATE_LIMIT_ENABLED=false` 可整体关掉本闸门。
 
-    ⚠️ 重启语义（有意取舍）：判据以 Redis 里的上次轮次为准 ⇒ 重启后首轮最多等一个
+    [WARN] 重启语义（有意取舍）：判据以 Redis 里的上次轮次为准 ⇒ 重启后首轮最多等一个
     interval。需要立刻探测就删 `monitor:rate:<loop>`，或临时关掉闸门开关。
     """
     try:

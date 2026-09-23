@@ -47,7 +47,7 @@ _ALLOWED_PARTITION_TABLES = frozenset({
 def _row_to_dict(r: DeviceMonitorProbeEvents) -> Dict[str, Any]:
     """历史明细单行序列化（``list_events`` 用；前端"最近探测明细"表直接吃这个）。
 
-    ⚠️ 这里是**第二处**序列化（另一处是 ``DeviceMonitorProbeEvents.to_dict``），
+    [WARN] 这里是**第二处**序列化（另一处是 ``DeviceMonitorProbeEvents.to_dict``），
     且两者**刻意不合并**：本函数把时间戳补 ``Z``（UTC 标记），``to_dict`` 不补 ——
     合并会改动已上线接口的时间语义（跨层时间统一仍在收敛中）。
     但 ping 质量的派生**必须共用** ``ping_quality_from_extra``：派生逻辑分叉 =
@@ -226,7 +226,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         只取 ``avg_value`` 一列：SLA 要的是"样本序列的均值"，行本身无意义
         （原实现取整行后只读 ``row[0]``）。
 
-        ⚠️ 空 ``device_ids`` 会生成恒假的 ``IN`` 条件 ⇒ 返回空列表（0 样本）。
+        [WARN] 空 ``device_ids`` 会生成恒假的 ``IN`` 条件 ⇒ 返回空列表（0 样本）。
         调用方据此把达成度判为 None/不达标 —— 语义与原始实现一致，勿改成
         "空集合返回全量"。
         """
@@ -245,7 +245,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
     def delete_hourly_by_device(self, device_id: int) -> int:
         """清空该设备的逐小时聚合行（B-44 收敛：设备彻底删除的清理面）。
 
-        ⚠️ 分区明细表（probe_events / metric_timeseries）**不在本方法范围**：
+        [WARN] 分区明细表（probe_events / metric_timeseries）**不在本方法范围**：
         它们是 RANGE(时间) 分区表，回收走 drop_expired_*_partitions 按天 DROP
         分区，逐行 DELETE 会跨全部分区拖长事务（原注释即如此，勿"补全"）。
         """

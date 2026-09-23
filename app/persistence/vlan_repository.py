@@ -108,7 +108,7 @@ class VLANRepository(SQLAlchemyRepository):
     def list_by_device_excluding_vlan_ids(self, device_id: int, vlan_ids) -> List[VLAN]:
         """取设备上 ``vlan_id`` **不在**给定集合的 VLAN 行（B-44 扫尾批：残留清理）。
 
-        ⚠️ 调用方约定：``vlan_ids`` 为空 set 时**不得调用**本方法（空集合的
+        [WARN] 调用方约定：``vlan_ids`` 为空 set 时**不得调用**本方法（空集合的
         ``NOT IN`` 语义 = 全部命中 = 会把该设备所有 VLAN 判为残留删除）——
         "空集合跳过清理"的防误删设计留在调用方（原实现即如此）。
         """

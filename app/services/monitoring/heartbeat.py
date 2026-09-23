@@ -39,7 +39,7 @@ def environment() -> str:
     （切分后段数 <4）会静默落到 "production" —— 开发环境的告警冷却因此与生产
     共用，排查时表现为"冷却时间早过了却没发通知"。
 
-    ⚠️ 刻意**不读** Flask 的 `config["ENV"]`（也不经 `_conf`）：该键由
+    [WARN] 刻意**不读** Flask 的 `config["ENV"]`（也不经 `_conf`）：该键由
     `FLASK_ENV` 派生，语义是"调试模式"而非部署环境名。线上实测（2026-09-11）：
     `.env` 里 `FLASK_ENV=development` 时，**请求上下文内**读到 development，
     而心跳**写入方**是无 app 上下文的守护线程（回落 `os.getenv("ENV")`）→ 同一

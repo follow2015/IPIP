@@ -30,7 +30,7 @@ class RoleRepository(BaseRepository):
         ``db.session.query(Permission.code).join(RolePermission...)``，现收进本仓储 ——
         与 `find_by_name` 一起构成"角色 → 权限码"的读取入口。
 
-        ⚠️ 两点口径（与原实现逐字一致，勿"顺手优化"）：
+        [WARN] 两点口径（与原实现逐字一致，勿"顺手优化"）：
         · **只取 `Permission.code` 一列**（调用方要的是码集合/码列表，行本身无意义）；
         · **不加 `order_by`**：一个调用点建集合、另一个直接返回列表，顺序无业务含义；
           将来若需要稳定顺序（如接口快照比对）再显式加。

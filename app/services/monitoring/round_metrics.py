@@ -23,7 +23,7 @@ Redis 结构（`loop` 为 snmp / bmc / zabbix / ping）：
     monitor:rounds:total:<loop>    INCR   累计轮次（counter 语义，不设 TTL）
     monitor:rounds:skipped:<loop>  INCR   累计被闸门拦下的轮次（同上）
 
-⚠️ 口径：**被拦的尝试不写 `ts` 列表**。它没有真的跑，若也进节奏序列，限速器会把
+[WARN] 口径：**被拦的尝试不写 `ts` 列表**。它没有真的跑，若也进节奏序列，限速器会把
 自己的拦截面当成节拍，反而把"轮次/分钟"读回放大值——那就把修复读成了故障。
 
 降级约定：Redis 不可用只记日志告警，**不影响监控业务**。本模块是所有监控路径

@@ -26,7 +26,7 @@ P0-1），收口方式：
 2. **未知 `role.data_scope`** ⇒ 空集（最小权限，**不再**回落无限制）；
 3. 故障**不写缓存**（避免把故障态固化 5 分钟）。
 
-⚠️ 反面教材：把 `get_visible_device_ids` 整体打桩成抛异常，测的是「调用方的
+[WARN] 反面教材：把 `get_visible_device_ids` 整体打桩成抛异常，测的是「调用方的
 except 分支写得对不对」，**绕过了本服务内部的吞异常点** ⇒ 全绿也证明不了根因已修。
 详见 `tests/test_data_scope_fault_contract.py` 的「注入深度」说明。
 """
@@ -151,7 +151,7 @@ def get_users_with_device_access(device_id: int) -> List[int]:
 
     按各用户的 data_scope 判定是否可见该设备，任一角色可见即命中。
 
-    返回 `[]` 表示「**无人有权接收**」。⚠️ 调用方**不得**把 `[]` 归一成 `None`：
+    返回 `[]` 表示「**无人有权接收**」。[WARN] 调用方**不得**把 `[]` 归一成 `None`：
     网关口径（`realtime_gateway/redis_bus.py`）里 `None` = 全局广播 ⇒ 归一即
     「无权限者」静默升级为「跨数据域全量投递」（见 `alert_ingress` 的固化用例）。
     """

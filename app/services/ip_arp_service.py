@@ -252,23 +252,31 @@ class ArpSync:
         return sw_id in self._valid_switch_ids
 
     @staticmethod
-    def _apply_location(ip: str, mac: str, loc: LocationResult, db_session) -> None:
+    def _apply_location(ip: str, mac: str, loc: LocationResult, db_session,
+                        source: "str | None" = None) -> None:
         """原子化写入：ip_addresses + ip_switch_info + 清理旧记录
 
         所有路径（管理IP/网关IP/终端IP/unresolved）统一走此方法，
         消除旧版"先写后纠"的多阶段中间状态。
 
-        写入规则：
-        - 清理跨房间残留（ip_switch_info + ip_addresses）
-        - UPSERT ip_addresses（房间已确定，一次写入）
-        - confidence not in (low, none) 且有 sw_id → UPSERT ip_switch_info
+        写入判据（WP-5/P1-1 裁定：以 **sw_id 有无** 分流，与实现一致；
+        confidence 只随定位结果产生、不是本函数的分流条件）：
+        - 有 sw_id → UPSERT ip_switch_info（不论 confidence 高低——
+          arp_fallback / mac_index_fallback 是真实观测，删除即丢数据；
+          覆盖既有绑定的代价已被"低成本覆盖 vs 丢信息"权衡接受，见下方裁定）
           - 有 port：终端IP，写入 switch_id + port
           - 无 port：管理/网关IP，写入 switch_id（覆盖旧记录，port=NULL）
-        - confidence in (low, none) → 删除该IP的所有 ip_switch_info（含同房间旧记录），
+        - 无 sw_id（真正无法定位）→ 删除该IP的所有 ip_switch_info（含同房间旧记录），
           避免旧的错误定位数据残留
 
-        room_id 使用定位到的交换机所在机房（loc.room_id），
-        确保终端IP归属到实际连接的交换机和机房。
+        Args:
+            ip: 目标 IP
+            mac: MAC 地址
+            loc: 定位结果（判据 = loc.sw_id 有无）
+            db_session: 数据库 session
+            source: 写入来源标记（WP-6）。None=普通扫描；降级路径传
+                degraded_l2/l3[_24fallback]，写入 ip_switch_info.source，
+                可按标记回滚（语义=最近一次写入者）。
         """
         final_room_id = loc.room_id
 
@@ -280,8 +288,10 @@ class ArpSync:
 
         if loc.sw_id:
             if loc.port:
-                ip_repo.upsert_ip_switch_info_with_port(ip, mac, loc.sw_id, loc.port, final_room_id)
+                ip_repo.upsert_ip_switch_info_with_port(
+                    ip, mac, loc.sw_id, loc.port, final_room_id, source=source)
             else:
-                ip_repo.upsert_ip_switch_info_no_port(ip, mac, loc.sw_id, final_room_id)
+                ip_repo.upsert_ip_switch_info_no_port(
+                    ip, mac, loc.sw_id, final_room_id, source=source)
         else:
             ip_repo.delete_ip_switch_info_by_ip(ip)

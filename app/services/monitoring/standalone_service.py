@@ -13,7 +13,7 @@
 - 轮询循环分组（snmp / bmc）、协议→设备类型映射：由 `protocol_registry` 单一数据源驱动。
 - 多进程协调：复用 `monitor_worker` 的 Redis 锁 `monitor:lock:<loop>`，与（若仍启用的）
   in-Flask worker 互斥，避免双跑；Redis 不可用时降级为「本进程直接跑」并告警。
-  ⚠️ 锁只管互斥、不管**频率**：光靠锁时聚合频率 = interval ÷ 实例数（实测 60 s
+  [WARN] 锁只管互斥、不管**频率**：光靠锁时聚合频率 = interval ÷ 实例数（实测 60 s
   → 18.9 s）。故两条路径都走同一个**最小间隔闸门** `monitor:rate:<loop>`
   （`_acquire_lock` 内，见 `_rate_limit_allow`），同 loop 的全部实例共享一个配额。
 - 适配器仍为同步接口（SNMP 内部 asyncio.run，IPMI requests）：经
@@ -186,7 +186,7 @@ class StandaloneMonitorService:
         故口径完全一致：阈值 `MONITOR_INTERRUPTED_THRESHOLD_SECS`（默认 3×interval）、
         「从未被探测」不算中断（P0-5，避免批量启用时的告警风暴）、仅在状态变化时入箱。
 
-        ⚠️ 为什么必须在这里调用：该检测**原先只在 in-Flask 的 `_run_one_round` 里**
+        [WARN] 为什么必须在这里调用：该检测**原先只在 in-Flask 的 `_run_one_round` 里**
         被调用。独立采集服务是推荐部署形态下的唯一采集者，若不在同一轮结束时补上，
         「监控中断」告警就会静默失效（前端那张状态标签永远不会亮）。成本上并不新增
         负担：检查原本就按轮次跑，且今天多 worker 并存时每 interval 会跑 N 次。

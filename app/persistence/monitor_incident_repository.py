@@ -191,7 +191,7 @@ class IncidentRepository:
     ) -> int:
         """把诊断结论回填到事件行（B-44 收敛；诊断会话完成时调用）。
 
-        ⚠️ 刻意用 **Core UPDATE 而非改 ORM 对象**：事件行的 ``last_alert_at``
+        [WARN] 刻意用 **Core UPDATE 而非改 ORM 对象**：事件行的 ``last_alert_at``
         等字段被聚合器高频写入，把行加载进会话后回写会与聚合器的并发更新
         互相覆盖（原实现即如此，注释保留）。`synchronize_session=False`：
         本会话不需要这些行的最新内存态。
@@ -214,7 +214,7 @@ class IncidentRepository:
     def snapshot_root_trace(self, device_id: int, device_name) -> int:
         """把根因设备引用置空并写设备名快照（B-44 收敛：设备彻底删的留痕处置）。
 
-        ⚠️ **Core UPDATE 而非改 ORM 对象**，且快照与置空**必须同一语句**：
+        [WARN] **Core UPDATE 而非改 ORM 对象**，且快照与置空**必须同一语句**：
         只置空不写快照 = "行还在、却不知是哪台设备"的孤儿留痕（迁移 0015
         的 ``*_device_name`` 列就是为这个自证而生）。
         ``synchronize_session=False``：本会话不需要这些行的内存态。
@@ -234,7 +234,7 @@ class IncidentRepository:
     def snapshot_root_trace_batch(self, rows) -> None:
         """批量把根因设备引用置空并写快照（B-46 批 5：批量处置入口）。
 
-        ⚠️ 必须用 **Core 表更新**（``update(model.__table__)``）而非 ORM 实体：
+        [WARN] 必须用 **Core 表更新**（``update(model.__table__)``）而非 ORM 实体：
         ``update(Model)`` 的 executemany 走"ORM 按**主键**批量 UPDATE"路径，要求
         每行参数携带主键值；我们的 WHERE 条件是 device_id（非主键），会直接抛
         ``InvalidRequestError: No primary key value supplied``（2026-09-18 实测：

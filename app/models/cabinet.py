@@ -151,7 +151,7 @@ class Cabinet(BaseModel):
     def update_usage(self) -> None:
         """重新计算并同步 used_u / used_power 冗余字段。
 
-        ⚠️ 本方法不提交事务，调用方负责 db.session.commit()，
+        [WARN] 本方法不提交事务，调用方负责 db.session.commit()，
         以便融入外层事务，避免意外提交。
         原代码在此处直接 db.session.commit()，导致无法与上层事务合并。
         """

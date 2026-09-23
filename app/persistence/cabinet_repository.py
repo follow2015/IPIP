@@ -112,7 +112,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def find_device_ids_in_cabinet(self, cabinet_id: int) -> list:
         """柜内全部设备 ID（B-46 收敛：机柜强删第 0 步）。
 
-        ⚠️ **含回收站中的软删设备**：强删语义就是"一台不留"（原注释即如此）——
+        [WARN] **含回收站中的软删设备**：强删语义就是"一台不留"（原注释即如此）——
         故**刻意不走** ``_base_query()``。
         """
         from app.models.device import Device
@@ -127,7 +127,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def assign_customer_within_cabinet(self, cabinet_id: int, customer_id: int) -> None:
         """把机柜内**在架**设备的客户归属改为指定客户（B-44 收敛）。
 
-        ⚠️ ``synchronize_session="fetch"``：update 值是普通列赋值，fetch 模式
+        [WARN] ``synchronize_session="fetch"``：update 值是普通列赋值，fetch 模式
         保证会话内已加载对象同步失效（原实现即如此，勿降级为 False 而不评估）。
         只动 ``deleted_at IS NULL`` 的在架设备 —— 已删设备的归属是历史事实。
         """
@@ -141,7 +141,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     def delete_by_id_force(self, cabinet_id: int) -> int:
         """物理删除机柜本体（B-44 收敛：机柜强删路径）。
 
-        ⚠️ 调用方约定：指向 cabinets 的外键只有 devices.cabinet_id，且
+        [WARN] 调用方约定：指向 cabinets 的外键只有 devices.cabinet_id，且
         **设备已删净**才会走到这里（原注释即如此）—— 本方法不做级联检查。
         """
         return (

@@ -61,7 +61,7 @@ class MonitorSuppressedAlertLog(BaseModel):
         db.BigInteger,
         nullable=True,
         comment="命中的上游设备ID（根因侧，用于归属事件；"
-        "⚠️ 无外键，DB 不会置空 —— 设备删除时由应用层显式处置）",
+        "[WARN] 无外键，DB 不会置空 —— 设备删除时由应用层显式处置）",
     )
     upstream_device_name = db.Column(
         db.String(100),

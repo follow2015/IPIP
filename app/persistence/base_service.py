@@ -2,7 +2,7 @@
 """
 通用 CRUD 服务基类（原 app/services/base.py，B-44 收官批迁入仓储层）
 
-⚠️ 本模块的 8 处 ``session.query(self.model_class)`` 是**仓储层的通用实现**
+[WARN] 本模块的 8 处 ``session.query(self.model_class)`` 是**仓储层的通用实现**
 （generic CRUD over model_class），此前放错在 services 目录被门禁计入台账 ——
 物理迁移后查询位于 app/persistence/**，台账口径自然归零。
 """

@@ -280,7 +280,7 @@ class Device(BaseModel):
     def status_name(self) -> str:
         """获取状态名称（中文）
 
-        ⚠️ 这是**后端展示字段**，仅用于日志、Excel/JSON 导出（面向中文用户的文件）。
+        [WARN] 这是**后端展示字段**，仅用于日志、Excel/JSON 导出（面向中文用户的文件）。
         前端**禁止消费**：应改用 `status`（枚举 code）+ 前端枚举表翻译
         （`getDeviceStatusMeta()`），否则英文界面会直接露出中文。
         """

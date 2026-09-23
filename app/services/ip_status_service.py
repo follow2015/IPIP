@@ -51,7 +51,7 @@ _PING_RTT_RE = re.compile(
 def _ping_cmd(ip: str, count: int, interval_ms: int, timeout: float) -> list:
     """构造连续采样 ping 命令（平台参数差异见下）。
 
-    ⚠️ `-W` 的单位在三家实现里**不一致**，这是本函数唯一需要按平台分支的地方：
+    [WARN] `-W` 的单位在三家实现里**不一致**，这是本函数唯一需要按平台分支的地方：
       · Windows：`-w` 毫秒；
       · Darwin (macOS)：`-W` **毫秒**；
       · Linux (iputils)：`-W` **秒**（故向上取整，至少 1 秒）。

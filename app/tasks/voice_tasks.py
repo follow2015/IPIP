@@ -70,7 +70,7 @@ def send_voice_call(self, receipt_id: int) -> dict:
     6. 短轮询 channel_status 等待回调
     7. 超时抛 TransientVoiceError 触发重试
 
-    ⚠️ soft_time_limit(45s) 必须大于轮询窗口。call_timeout 硬上限 30
+    [WARN] soft_time_limit(45s) 必须大于轮询窗口。call_timeout 硬上限 30
     （= 45 - make_call 余量），否则轮询循环先撞软超时。
     SoftTimeLimitExceeded 已在 autoretry_for 中，防撞限时任务死亡且状态卡在 calling。
     """
@@ -251,7 +251,7 @@ def voice_budget_key(provider: str, span: int, phone: str, now: int) -> str:
        跨分钟必然不匹配 ⇒ 低概率 flake（B-32）；
     2. `now` 由**调用方传入** ⇒ 测试可以冻结时间，时间竞争归零（不是"概率变小"）。
 
-    ⚠️ 改键格式前先想清楚：旧键会在 TTL 内残留，改格式等于限流窗口**重置一次**
+    [WARN] 改键格式前先想清楚：旧键会在 TTL 内残留，改格式等于限流窗口**重置一次**
     （期间可能多放行几个呼叫）。
     """
     return f"voice:budget:{provider}:{span}:{phone}:{now // span}"

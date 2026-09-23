@@ -3,7 +3,7 @@
 
 Task 0.4：复用 BaseService.session，提供 save_turn / list_recent。
 
-⚠️ 当前状态：预留未接线。各 AI service 尚未调用 save_turn，表内无数据。
+[WARN] 当前状态：预留未接线。各 AI service 尚未调用 save_turn，表内无数据。
 
 保留原因：对话历史是《智能运维诊断闭环 · 完整工程方案》中"多轮追问/上下文延续"
 与诊断准确率复盘的基础设施。该方案另规划了 ai_diagnosis_session 表承载

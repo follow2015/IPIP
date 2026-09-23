@@ -106,7 +106,7 @@ def _publish_device_event(device_id: int, event_dict: dict) -> None:
     seq 由发布侧分配（Redis INCR 原子，多 gunicorn worker 安全），
     网关副本只消费不分配——这是网关多副本部署的硬性前提。
 
-    ⚠️ 顺序硬约束：必须先落 ring 再 PUBLISH。若先 publish，客户端可能在
+    [WARN] 顺序硬约束：必须先落 ring 再 PUBLISH。若先 publish，客户端可能在
     publish 之后、ring 写入完成之前断线重连，该事件既不在 ring
     （LRANGE 读不到）、也未建立实时订阅，导致永久丢失。
 

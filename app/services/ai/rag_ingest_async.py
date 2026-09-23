@@ -191,7 +191,7 @@ def ingest_async(docs_dir: str, user_id: Optional[int] = None) -> str:
 def get_progress(task_id: str) -> Generator[str, None, None]:
     """SSE 进度生成器。
 
-    ⚠️ P0-7：本生成器为 Flask 同步生成器，跑在 gunicorn sync worker
+    [WARN] P0-7：本生成器为 Flask 同步生成器，跑在 gunicorn sync worker
     （--timeout 120）上时，长任务必然触发 worker 心跳超时被强杀。
     生产部署的进度订阅已迁至 ASGI 网关（realtime_gateway/ai_task_stream.py，
     路由 /sse/ai-task/{task_id}，前端 services/ai.ts 已切换）。本实现保留为
