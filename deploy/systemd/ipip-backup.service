@@ -39,7 +39,7 @@ Environment=GNUPGHOME=/run/ipip-backup-gnupg
 ;   <备份目录>/secrets.env.gpg，使整机损毁后 switch_credentials 密文仍可解。
 ;   口令取自 /etc/ipip/ipip.env 的 GPG_PASSPHRASE，**不随产物分发**，须离线另存。
 ;   ⚠️ 口令缺失/为空时整次备份失败（有意为之：不给"以为备了"的假象），故本单元
-;   依赖该变量存在 —— 升级既有部署请先补写，见 docs/运维手册-备份与恢复.md。
+;   依赖该变量存在 —— 升级既有部署请先补写，见 docs/ops/运维手册-备份与恢复.md。
 ; --prune：备份后按日7/周4/月3清理过期备份（见 scripts/backup_system.py）
 ExecStart=${VENV_BIN}/python ${PROJECT_ROOT}/scripts/backup_system.py \
   --output-dir ${BACKUP_DIR} \

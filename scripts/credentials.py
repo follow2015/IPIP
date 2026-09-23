@@ -310,7 +310,7 @@ def cmd_reset_secret_keys(args) -> int:
     ok("已重置应用密钥：SECRET_KEY、JWT_SECRET_KEY")
     print("  影响: 所有用户需重新登录；签发中的 JWT 立即失效。")
     print("  ⚠️ 未改动 SWITCH_SECRET_KEY —— 它加密设备凭据，更换需先做密文迁移")
-    print("      （见 docs/运维手册-密钥与环境变量.md 第四节）")
+    print("      （见 docs/ops/运维手册-密钥与环境变量.md 第四节）")
     print("  需重启服务后生效：systemctl restart 'ipip-*'")
     print("=" * 68)
     record_credential("reset-secret-keys",

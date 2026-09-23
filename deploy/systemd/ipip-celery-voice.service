@@ -3,7 +3,7 @@
 ;
 ; 语音时延敏感（单次呼叫 + 等回调窗口），与 AI 长任务物理隔离，
 ; 避免 prefork 池被占满时排队。并发 4 足够覆盖低频告警场景。
-; 队列拆分决策见 docs/adr-003-进程托管形态.md。
+; 队列拆分决策见 docs/adr/adr-003-进程托管形态.md。
 
 [Unit]
 Description=IPIP celery worker (queue: voice)

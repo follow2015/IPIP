@@ -1,6 +1,6 @@
 # systemd 托管部署说明（IPIP）
 
-**决策依据**：`docs/adr-003-进程托管形态.md`
+**决策依据**：`docs/adr/adr-003-进程托管形态.md`
 **适用场景**：裸 Linux 服务器（CentOS 7+ / Ubuntu 16.04+，含 systemd）
 
 ---
@@ -133,7 +133,7 @@ sudo systemctl enable ipip.target
 
 ### 7. 启用备份定时器（可选但推荐）
 
-备份与恢复脚本的用法见 `docs/运维手册-备份与恢复.md`，此处只负责调度：
+备份与恢复脚本的用法见 `docs/ops/运维手册-备份与恢复.md`，此处只负责调度：
 
 ```bash
 sudo systemctl enable --now ipip-backup.timer
