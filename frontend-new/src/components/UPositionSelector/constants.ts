@@ -2,10 +2,18 @@ import type { RackDeviceType, NodeStatus } from './types';
 
 export const ROW_GAP = 2;
 
+export type RackTypeLabelKey =
+  | 'uposition.type.server'
+  | 'uposition.type.switch'
+  | 'uposition.type.storage'
+  | 'uposition.type.multinode'
+  | 'uposition.type.pdu'
+  | 'uposition.type.kvm';
+
 export const TYPE_CONFIG: Record<
   RackDeviceType,
   {
-    label: string;
+    labelKey: RackTypeLabelKey;
     bg: string;
     border: string;
     accent: string;
@@ -14,7 +22,7 @@ export const TYPE_CONFIG: Record<
   }
 > = {
   server: {
-    label: '服务器',
+    labelKey: 'uposition.type.server',
     bg: '#E6F1FB',
     border: '#B5D4F4',
     accent: '#378ADD',
@@ -22,7 +30,7 @@ export const TYPE_CONFIG: Record<
     subText: '#185FA5'
   },
   switch: {
-    label: '网络设备',
+    labelKey: 'uposition.type.switch',
     bg: '#EAF3DE',
     border: '#C0DD97',
     accent: '#639922',
@@ -30,7 +38,7 @@ export const TYPE_CONFIG: Record<
     subText: '#3B6D11'
   },
   storage: {
-    label: '存储',
+    labelKey: 'uposition.type.storage',
     bg: '#FAEEDA',
     border: '#FAC775',
     accent: '#BA7517',
@@ -38,7 +46,7 @@ export const TYPE_CONFIG: Record<
     subText: '#854F0B'
   },
   multinode: {
-    label: '多节点服务器',
+    labelKey: 'uposition.type.multinode',
     bg: '#E1F5EE',
     border: '#9FE1CB',
     accent: '#0F6E56',
@@ -46,7 +54,7 @@ export const TYPE_CONFIG: Record<
     subText: '#085041'
   },
   pdu: {
-    label: 'PDU 电源',
+    labelKey: 'uposition.type.pdu',
     bg: '#EEEDFE',
     border: '#CECBF6',
     accent: '#534AB7',
@@ -54,7 +62,7 @@ export const TYPE_CONFIG: Record<
     subText: '#3C3489'
   },
   kvm: {
-    label: 'KVM 控制台',
+    labelKey: 'uposition.type.kvm',
     bg: '#FBEAF0',
     border: '#F4C0D1',
     accent: '#993556',

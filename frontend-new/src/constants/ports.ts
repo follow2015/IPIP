@@ -7,13 +7,20 @@
  * 并让常量与运行时逻辑解耦（纯数据，无 React 依赖）。
  */
 
-export const PORT_TYPE_TEMPLATES = [
-  { label: 'GE（千兆）', value: 'GE', speed: '1G', prefix: 'GE' },
-  { label: '10GE（万兆）', value: '10GE', speed: '10G', prefix: '10GE' },
-  { label: '40GE', value: '40GE', speed: '40G', prefix: '40GE' },
-  { label: '100GE', value: '100GE', speed: '100G', prefix: '100GE' },
-  { label: '200GE', value: '200GE', speed: '200G', prefix: '200GE' },
-  { label: '400GE', value: '400GE', speed: '400G', prefix: '400GE' },
-  { label: '800GE', value: '800GE', speed: '800G', prefix: '800GE' },
-  { label: '自定义', value: 'custom', speed: '', prefix: '' }
+export type PortTemplateLabelKey = 'port.template.ge' | 'port.template.ge10' | 'port.template.custom';
+
+export const PORT_TYPE_TEMPLATES: {
+  labelKey?: PortTemplateLabelKey;
+  value: string;
+  speed: string;
+  prefix: string;
+}[] = [
+  { labelKey: 'port.template.ge', value: 'GE', speed: '1G', prefix: 'GE' },
+  { labelKey: 'port.template.ge10', value: '10GE', speed: '10G', prefix: '10GE' },
+  { value: '40GE', speed: '40G', prefix: '40GE' },
+  { value: '100GE', speed: '100G', prefix: '100GE' },
+  { value: '200GE', speed: '200G', prefix: '200GE' },
+  { value: '400GE', speed: '400G', prefix: '400GE' },
+  { value: '800GE', speed: '800G', prefix: '800GE' },
+  { labelKey: 'port.template.custom', value: 'custom', speed: '', prefix: '' }
 ];

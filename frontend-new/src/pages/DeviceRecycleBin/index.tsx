@@ -21,7 +21,10 @@ import { useRoomOptions } from '@/services/room';
 import { useCabinetOptions } from '@/services/cabinet';
 import { useTable } from '@/hooks/useTable';
 import type { Device } from '@/types/models';
-import { DEVICE_TYPE_MAP, DeviceType } from '@/types/enums';
+import { DeviceType } from '@/types/enums';
+import { getDeviceTypeMeta, getDeviceTypeOptions, type DeviceT } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 const { Text } = Typography;
 
@@ -49,43 +52,38 @@ interface BatchResult {
 }
 
 
-const deviceTypeOptions = Object.entries(DEVICE_TYPE_MAP).map(([value, { label }]) => ({
-  value,
-  label
-}));
-
-
 function buildColumns(handlers: {
   confirm: ConfirmFn;
   onRestore: (r: Device) => void;
   onPermanentDelete: (r: Device) => void;
+  t: { d: DeviceT; c: TFunction<'common'> };
 }): any[] {
-  const { confirm } = handlers;
+  const { confirm, t } = handlers;
   return [
     {
-      title: '设备名称',
+      title: t.d('field.name'),
       dataIndex: 'device_name',
       key: 'device_name',
       width: 180
     },
     {
-      title: '设备类型',
+      title: t.d('basic.field.deviceType'),
       dataIndex: 'device_type',
       key: 'device_type',
       width: 100,
       render: (val: string) => {
-        const entry = DEVICE_TYPE_MAP[val as DeviceType];
+        const entry = getDeviceTypeMeta(val as DeviceType, t.d);
         return <Tag>{entry?.label || val}</Tag>;
       }
     },
     {
-      title: '管理IP',
+      title: t.d('field.managementIp'),
       dataIndex: 'management_ip',
       key: 'management_ip',
       width: 140
     },
     {
-      title: '原机柜',
+      title: t.d('recycleBin.column.originalCabinet'),
       key: 'original_cabinet',
       width: 120,
       render: (_: unknown, record: Device) => {
@@ -94,7 +92,7 @@ function buildColumns(handlers: {
       }
     },
     {
-      title: '原U位',
+      title: t.d('recycleBin.column.originalUPosition'),
       key: 'original_u_position',
       width: 100,
       render: (_: unknown, record: Device) => {
@@ -106,20 +104,20 @@ function buildColumns(handlers: {
       }
     },
     {
-      title: '删除时间',
+      title: t.d('recycleBin.column.deletedAt'),
       dataIndex: 'deleted_at',
       key: 'deleted_at',
       width: 180,
       render: (val: string) => formatDateTime(val)
     },
     {
-      title: '操作',
+      title: t.c('field.actions'),
       key: 'action',
       width: 160,
       render: (_: unknown, record: Device) => (
         <Space size="small">
           <Button type="link" icon={<UndoOutlined />} onClick={() => handlers.onRestore(record)}>
-            恢复
+            {t.d('recycleBin.action.restore')}
           </Button>
           <Button
             type="link"
@@ -127,16 +125,16 @@ function buildColumns(handlers: {
             icon={<DeleteOutlined />}
             onClick={() =>
               confirm({
-                title: '永久删除',
-                content: '此操作不可恢复，确定要永久删除该设备吗？',
-                okText: '确定',
-                cancelText: '取消',
+                title: t.d('recycleBin.confirm.permanentDeleteTitle'),
+                content: t.d('recycleBin.confirm.permanentDeleteContent'),
+                okText: t.c('action.ok'),
+                cancelText: t.c('action.cancel'),
                 okButtonProps: { danger: true },
                 onOk: () => handlers.onPermanentDelete(record)
               })
             }
           >
-            永久删除
+            {t.d('recycleBin.action.permanentDelete')}
           </Button>
         </Space>
       )
@@ -150,6 +148,9 @@ const RECYCLE_BIN_FILTER_RESETS = {
 };
 
 export default function DeviceRecycleBin() {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
+  const { t: tNetwork } = useTranslation('network');
   const confirm = useConfirm();
   const table = useTable({ filterResets: RECYCLE_BIN_FILTER_RESETS });
   const msg = useMessage();
@@ -214,7 +215,7 @@ export default function DeviceRecycleBin() {
     if (!restoringDevice) return;
     const isChildNode = !!restoringDevice.deleted_location_snapshot?.parent_device_id;
     if (locationConflict && !restoreCabinetId && !isChildNode) {
-      msg.warning('原U位有冲突，请选择目标机柜（可不填U位，系统将自动分配）');
+      msg.warning(t('recycleBin.message.conflictSelectCabinet'));
       return;
     }
     restoreMutation.mutate(
@@ -227,33 +228,34 @@ export default function DeviceRecycleBin() {
         onSuccess: (res) => {
           const result = (res?.data ?? res) as unknown as RestoreResult;
           if (result?.restored) {
-            const parts = ['设备恢复成功'];
+            const parts = [t('recycleBin.message.restoreSuccess')];
             if (result.auto_assigned_u_position) {
-              parts.push(`，自动分配至 ${result.auto_assigned_u_position}U`);
+              parts.push(t('recycleBin.message.autoAssigned', { u: result.auto_assigned_u_position }));
             }
             if (result.children_restored) {
-              parts.push(`，已重建 ${result.children_restored} 个子节点`);
+              parts.push(
+                t('recycleBin.message.childrenRestored', { count: result.children_restored })
+              );
             }
             msg.success(parts.join(''));
             restoreModal.close();
           } else if (result?.location_conflict) {
             setLocationConflict(true);
             const conflicts = result.conflict_devices || [];
+            const devices = conflicts.map((d) => d.name).join(', ');
             if (isChildNode) {
               setConflictMsg(
-                `原节点位置已被占用（冲突设备：${conflicts.map((d) => d.name).join(', ')}），请先删除或移走冲突节点后再恢复`
+                t('recycleBin.message.nodePositionOccupied', { devices })
               );
             } else {
-              setConflictMsg(
-                `原U位已被占用（冲突设备：${conflicts.map((d) => d.name).join(', ')}），请选择目标机柜`
-              );
+              setConflictMsg(t('recycleBin.message.uPositionOccupied', { devices }));
             }
           }
         },
-        onError: () => msg.error('恢复失败')
+        onError: () => msg.error(t('recycleBin.message.restoreFailed'))
       }
     );
-  }, [restoringDevice, restoreCabinetId, restoreUPosition, locationConflict, restoreMutation, msg]);
+  }, [restoringDevice, restoreCabinetId, restoreUPosition, locationConflict, restoreMutation, msg, t]);
 
   const handleBatchRestore = useCallback(() => {
     setBatchRestoreCabinetId(undefined);
@@ -271,60 +273,67 @@ export default function DeviceRecycleBin() {
       {
         onSuccess: (res) => {
           const result = (res?.data ?? res) as unknown as BatchResult;
-          msg.success(`成功恢复 ${result?.success?.length || 0} 个设备`);
+          msg.success(
+            t('recycleBin.message.batchRestoreSuccess', { count: result?.success?.length || 0 })
+          );
           batch.clear();
           batchRestoreModal.close();
         },
-        onError: () => msg.error('批量恢复失败')
+        onError: () => msg.error(t('recycleBin.message.batchRestoreFailed'))
       }
     );
-  }, [batch, batchRestoreCabinetId, batchRestoreUPosition, batchRestoreMutation, msg]);
+  }, [batch, batchRestoreCabinetId, batchRestoreUPosition, batchRestoreMutation, msg, t]);
 
   const handlePermanentDelete = useCallback(
     (record: Device) => {
       permanentDeleteMutation.mutate(record.id, {
-        onSuccess: () => msg.success('设备已永久删除'),
-        onError: () => msg.error('永久删除失败')
+        onSuccess: () => msg.success(t('recycleBin.message.permanentDeleted')),
+        onError: () => msg.error(t('recycleBin.message.permanentDeleteFailed'))
       });
     },
-    [permanentDeleteMutation, msg]
+    [permanentDeleteMutation, msg, t]
   );
 
   const handleBatchPermanentDelete = useCallback(() => {
     confirm({
-      title: '批量永久删除',
+      title: t('recycleBin.confirm.batchPermanentDeleteTitle'),
       icon: <ExclamationCircleOutlined />,
       content: (
         <div>
-          <Text type="danger">此操作不可恢复！</Text>
+          <Text type="danger">{t('recycleBin.confirm.irreversible')}</Text>
           <br />
-          确定要永久删除选中的 {batch.count} 个设备吗？
+          {t('recycleBin.confirm.batchPermanentDeleteContent', { count: batch.count })}
         </div>
       ),
-      okText: '确定永久删除',
+      okText: t('recycleBin.confirm.batchPermanentDeleteOk'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: tCommon('action.cancel'),
       onOk: () => {
         batchPermanentDeleteMutation.mutate(batch.selectedKeys.map(Number), {
           onSuccess: (res) => {
             const result = res as unknown as BatchResult;
-            msg.success(`成功永久删除 ${result?.success?.length || 0} 个设备`);
+            msg.success(
+              t('recycleBin.message.batchPermanentDeleteSuccess', {
+                count: result?.success?.length || 0
+              })
+            );
             batch.clear();
           },
-          onError: () => msg.error('批量永久删除失败')
+          onError: () => msg.error(t('recycleBin.message.batchPermanentDeleteFailed'))
         });
       }
     });
-  }, [confirm, batch, batchPermanentDeleteMutation, msg]);
+  }, [confirm, batch, batchPermanentDeleteMutation, msg, t, tCommon]);
 
   const columns = useMemo(
     () =>
       buildColumns({
         confirm,
         onRestore: handleRestore,
-        onPermanentDelete: handlePermanentDelete
+        onPermanentDelete: handlePermanentDelete,
+        t: { d: t, c: tCommon }
       }),
-    [confirm, handleRestore, handlePermanentDelete]
+    [confirm, handleRestore, handlePermanentDelete, t, tCommon]
   );
 
   const toolbar = (
@@ -332,29 +341,29 @@ export default function DeviceRecycleBin() {
       filters={[
         {
           key: 'date_range',
-          label: '删除日期',
+          label: t('recycleBin.filter.deletedDate'),
           type: 'rangePicker',
-          placeholders: ['删除开始', '删除结束']
+          placeholders: [t('recycleBin.filter.deletedStart'), t('recycleBin.filter.deletedEnd')]
         },
         {
           key: 'room_id',
-          label: '机房',
+          label: tNetwork('networkList.field.room'),
           type: 'select',
           options: roomOptions.data ?? [],
           width: 140
         },
         {
           key: 'cabinet_id',
-          label: '机柜',
+          label: t('field.cabinet'),
           type: 'select',
           options: cabinetOptions.data ?? [],
           width: 140
         },
         {
           key: 'device_type',
-          label: '设备类型',
+          label: t('basic.field.deviceType'),
           type: 'select',
-          options: deviceTypeOptions,
+          options: getDeviceTypeOptions(t),
           width: 120
         }
       ]}
@@ -363,13 +372,13 @@ export default function DeviceRecycleBin() {
   );
 
   const batchToolbar = (
-    <BatchActionBar count={batch.count} unit="台设备" onClear={batch.clear}>
+    <BatchActionBar count={batch.count} unit={t('batch.unit')} onClear={batch.clear}>
       <Button
         icon={<UndoOutlined />}
         onClick={handleBatchRestore}
         loading={batchRestoreMutation.isPending}
       >
-        批量恢复
+        {t('recycleBin.action.batchRestore')}
       </Button>
       <Button
         danger
@@ -377,7 +386,7 @@ export default function DeviceRecycleBin() {
         onClick={handleBatchPermanentDelete}
         loading={batchPermanentDeleteMutation.isPending}
       >
-        批量永久删除
+        {t('recycleBin.action.batchPermanentDelete')}
       </Button>
     </BatchActionBar>
   );
@@ -394,18 +403,18 @@ export default function DeviceRecycleBin() {
         tableProps={table}
         total={listData?.total || 0}
         searchable
-        searchPlaceholder="搜索IP地址"
+        searchPlaceholder={tNetwork('audit.searchPlaceholder')}
         rowSelection={batch.rowSelection}
       />
 
       {/* 恢复弹窗 */}
       <Modal
-        title="恢复设备"
+        title={t('recycleBin.modal.restoreTitle')}
         open={restoreModal.isOpen}
         onOk={doRestore}
         onCancel={() => restoreModal.close()}
         confirmLoading={restoreMutation.isPending}
-        okText="确认恢复"
+        okText={t('recycleBin.modal.confirmRestore')}
       >
         {restoringDevice &&
           (() => {
@@ -413,15 +422,15 @@ export default function DeviceRecycleBin() {
             return (
               <div>
                 <p>
-                  <strong>设备名称：</strong>
+                  <strong>{t('recycleBin.modal.deviceName')}</strong>
                   {restoringDevice.device_name}
                 </p>
                 {isChildNode && (
                   <Alert
                     type="info"
                     showIcon
-                    title="子节点设备只能恢复到原机箱"
-                    description="子节点将恢复到删除前所属的机箱，无需选择机柜"
+                    title={t('recycleBin.modal.childNodeOnlyTitle')}
+                    description={t('recycleBin.modal.childNodeOnlyDesc')}
                     style={{ marginBottom: 16 }}
                   />
                 )}
@@ -429,7 +438,7 @@ export default function DeviceRecycleBin() {
                   <Alert
                     type="error"
                     showIcon
-                    title="原U位已被占用"
+                    title={t('recycleBin.modal.uPositionOccupiedTitle')}
                     description={conflictMsg}
                     style={{ marginBottom: 16 }}
                   />
@@ -438,7 +447,7 @@ export default function DeviceRecycleBin() {
                   <Alert
                     type="error"
                     showIcon
-                    title="原节点位置已被占用"
+                    title={t('recycleBin.modal.nodePositionOccupiedTitle')}
                     description={conflictMsg}
                     style={{ marginBottom: 16 }}
                   />
@@ -447,15 +456,18 @@ export default function DeviceRecycleBin() {
                   <Alert
                     type="info"
                     showIcon
-                    title="将恢复到原位置"
-                    description={`机柜：${(() => {
-                      const loc = restoringDevice.deleted_location_snapshot;
-                      return loc?.cabinet_number || restoringDevice.cabinet_number || '-';
-                    })()}，U位：${(() => {
-                      const loc = restoringDevice.deleted_location_snapshot;
-                      const uPos = loc?.u_position ?? restoringDevice.u_position;
-                      return uPos != null ? `${uPos}U` : '-';
-                    })()}`}
+                    title={t('recycleBin.modal.restoreToOriginalTitle')}
+                    description={t('recycleBin.modal.restoreToOriginalDesc', {
+                      cabinet: (() => {
+                        const loc = restoringDevice.deleted_location_snapshot;
+                        return loc?.cabinet_number || restoringDevice.cabinet_number || '-';
+                      })(),
+                      u: (() => {
+                        const loc = restoringDevice.deleted_location_snapshot;
+                        const uPos = loc?.u_position ?? restoringDevice.u_position;
+                        return uPos != null ? String(uPos) : '-';
+                      })()
+                    })}
                     style={{ marginBottom: 16 }}
                   />
                 ) : null}
@@ -463,15 +475,15 @@ export default function DeviceRecycleBin() {
                   <Alert
                     type="info"
                     showIcon
-                    title="U位将自动分配"
-                    description="未填写U位时，系统将自动在所选机柜中寻找可用U位"
+                    title={t('recycleBin.modal.uAutoAssignTitle')}
+                    description={t('recycleBin.modal.uAutoAssignDesc')}
                     style={{ marginBottom: 16 }}
                   />
                 ) : null}
                 {!isChildNode && (
                   <>
                     <Select
-                      placeholder="选择目标机柜（不选则恢复到原位置）"
+                      placeholder={t('recycleBin.modal.selectTargetCabinet')}
                       allowClear
                       style={{ width: '100%', marginBottom: 8 }}
                       options={cabinetOptions.data}
@@ -481,8 +493,8 @@ export default function DeviceRecycleBin() {
                     <Input
                       placeholder={
                         restoreCabinetId
-                          ? 'U位起始位置（不填则自动分配）'
-                          : 'U位起始位置（不填则使用原U位）'
+                          ? t('recycleBin.modal.uStartAuto')
+                          : t('recycleBin.modal.uStartOriginal')
                       }
                       type="number"
                       value={restoreUPosition}
@@ -499,30 +511,33 @@ export default function DeviceRecycleBin() {
 
       {/* 批量恢复弹窗 */}
       <Modal
-        title="批量恢复"
+        title={t('recycleBin.modal.batchRestoreTitle')}
         open={batchRestoreModal.isOpen}
         onOk={doBatchRestore}
         onCancel={() => batchRestoreModal.close()}
         confirmLoading={batchRestoreMutation.isPending}
-        okText="确认恢复"
+        okText={t('recycleBin.modal.confirmRestore')}
       >
-        <p>
-          将恢复选中的 <strong>{batch.count}</strong> 个设备
-        </p>
+        <p>{t('recycleBin.modal.batchRestoreCount', { count: batch.count })}</p>
         {!batchRestoreCabinetId ? (
-          <Alert type="info" showIcon title="将恢复到原位置" style={{ marginBottom: 16 }} />
+          <Alert
+            type="info"
+            showIcon
+            title={t('recycleBin.modal.restoreToOriginalTitle')}
+            style={{ marginBottom: 16 }}
+          />
         ) : null}
         {batchRestoreCabinetId && !batchRestoreUPosition ? (
           <Alert
             type="info"
             showIcon
-            title="U位将自动分配"
-            description="未填写起始U位时，系统将自动在所选机柜中依次分配可用U位"
+            title={t('recycleBin.modal.uAutoAssignTitle')}
+            description={t('recycleBin.modal.uAutoAssignBatchDesc')}
             style={{ marginBottom: 16 }}
           />
         ) : null}
         <Select
-          placeholder="选择目标机柜（不选则恢复到原位置）"
+          placeholder={t('recycleBin.modal.selectTargetCabinet')}
           allowClear
           style={{ width: '100%', marginBottom: 8 }}
           options={cabinetOptions.data}
@@ -532,8 +547,8 @@ export default function DeviceRecycleBin() {
         <Input
           placeholder={
             batchRestoreCabinetId
-              ? 'U位起始位置（不填则自动分配）'
-              : 'U位起始位置（不填则使用原U位）'
+              ? t('recycleBin.modal.uStartAuto')
+              : t('recycleBin.modal.uStartOriginal')
           }
           type="number"
           value={batchRestoreUPosition}

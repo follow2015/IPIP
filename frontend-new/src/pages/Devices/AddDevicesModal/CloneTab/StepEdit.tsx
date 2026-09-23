@@ -1,5 +1,6 @@
 import { Button, Space, Table, Alert } from 'antd';
 import { ThunderboltOutlined, AimOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { DeviceBatchRow } from '../shared';
 import type { BatchColumns } from '../batchColumns';
 
@@ -27,53 +28,60 @@ const StepEdit: React.FC<StepEditProps> = ({
   availableUCount,
   cloneChassisId,
   cloneAvailablePositions
-}) => (
-  <div>
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-      <Space>
-        {!isNodeTemplate && (
-          <Button
-            size="small"
-            icon={<AimOutlined />}
-            disabled={!effectiveCabinetId}
-            onClick={handleAutoAssignU}
-          >
-            自动分配U位
+}) => {
+  const { t } = useTranslation('device');
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+        <Space>
+          {!isNodeTemplate && (
+            <Button
+              size="small"
+              icon={<AimOutlined />}
+              disabled={!effectiveCabinetId}
+              onClick={handleAutoAssignU}
+            >
+              {t('form.location.uPosition.autoAssignTooltip')}
+            </Button>
+          )}
+          <Button size="small" icon={<ThunderboltOutlined />} onClick={handleRegenerateNames}>
+            {t('addModal.action.regenerateNames')}
           </Button>
-        )}
-        <Button size="small" icon={<ThunderboltOutlined />} onClick={handleRegenerateNames}>
-          重生成名称
-        </Button>
-      </Space>
-      <Space>
-        <span style={{ color: '#8c8c8c', fontSize: 12 }}>共 {diffRows.length} 台</span>
-        {!isNodeTemplate && availableUPositions != null && (
-          <span style={{ color: '#8c8c8c', fontSize: 12 }}>可用U位：{availableUCount} 个</span>
-        )}
-        {isNodeTemplate && cloneChassisId && (
+        </Space>
+        <Space>
           <span style={{ color: '#8c8c8c', fontSize: 12 }}>
-            机箱空余：{cloneAvailablePositions.length} 个
+            {t('addModal.clone.totalCount', { count: diffRows.length })}
           </span>
-        )}
-      </Space>
-    </div>
-    <Table
-      columns={diffColumns}
-      dataSource={diffRows}
-      rowKey="key"
-      size="small"
-      pagination={false}
-      scroll={{ y: 300 }}
-    />
-    {!isNodeTemplate && !effectiveCabinetId && (
-      <Alert
-        type="info"
-        title="未选择机柜时 U 位不会保存，可在上一步选择目标机柜。"
-        showIcon
-        style={{ marginTop: 12 }}
+          {!isNodeTemplate && availableUPositions != null && (
+            <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+              {t('form.location.availableUPositions', { count: availableUCount })}
+            </span>
+          )}
+          {isNodeTemplate && cloneChassisId && (
+            <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+              {t('addModal.clone.chassisVacant', { count: cloneAvailablePositions.length })}
+            </span>
+          )}
+        </Space>
+      </div>
+      <Table
+        columns={diffColumns}
+        dataSource={diffRows}
+        rowKey="key"
+        size="small"
+        pagination={false}
+        scroll={{ y: 300 }}
       />
-    )}
-  </div>
-);
+      {!isNodeTemplate && !effectiveCabinetId && (
+        <Alert
+          type="info"
+          title={t('addModal.clone.noCabinetHint')}
+          showIcon
+          style={{ marginTop: 12 }}
+        />
+      )}
+    </div>
+  );
+};
 
 export default StepEdit;

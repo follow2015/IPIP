@@ -112,6 +112,7 @@ class RemedialExecutor:
 
                 if session_id:
                     self.sessions.mark_remedial_executed(session_id)
+                db.session.commit()
 
                 return {
                     "success": True,
@@ -174,11 +175,12 @@ class RemedialExecutor:
                 device_id=device_id,
                 config_content=raw_config,
                 config_hash=config_hash,
-                backup_type="pre_remedial",
+                backup_type="pre_change",
                 file_size=len(raw_config.encode("utf-8")),
             )
             db.session.add(backup)
             db.session.flush()
+            db.session.commit()
             logger.info("remedial backup running-config device=%s backup_id=%s",
                         device_id, backup.id)
             return backup.id
@@ -208,6 +210,7 @@ class RemedialExecutor:
                          device_id, rollback_key, e, exc_info=True)
             if session_id:
                 self.sessions.mark_rollback_failed(session_id)
+                db.session.commit()
 
     def execute_rollback(
         self, device_id: int, rollback_key: str, params: Dict[str, Any],
@@ -238,6 +241,7 @@ class RemedialExecutor:
                     logger.error("manual rollback FAILED device=%s: %s", device_id, e, exc_info=True)
                     if session_id:
                         self.sessions.mark_rollback_failed(session_id)
+                        db.session.commit()
                     raise RemedialExecutionError(f"回滚失败：{e}") from e
         except DeviceOperationConflict as e:
             raise RemedialExecutionError(f"设备繁忙：{e}") from e

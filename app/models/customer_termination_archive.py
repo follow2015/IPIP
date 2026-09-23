@@ -6,7 +6,7 @@
 - pdf_blob 在事务提交后由 on_commit 回调回填（失败则保留 None，可由
   POST /termination-archive/rebuild 凭 summary_json 重建）
 
-详见 docs/CUSTOMER_TERMINATED_PLAN.md §4.4.4。
+详见 docs/_archive/CUSTOMER_TERMINATED_PLAN.md §4.4.4。
 """
 from sqlalchemy import Column, Integer, String, JSON, LargeBinary, ForeignKey, Index, DateTime
 from sqlalchemy.orm import relationship

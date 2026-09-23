@@ -28,6 +28,7 @@ import { Pie, Column } from '@ant-design/charts';
 import dayjs, { Dayjs } from 'dayjs';
 import { useAlertStatistics, type MonitorAlertStatisticsQuery } from '@/services/monitor';
 import { formatDateTime } from '@/utils/format';
+import { useTranslation } from 'react-i18next';
 
 const { RangePicker } = DatePicker;
 const { useToken } = theme;
@@ -45,6 +46,9 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function MonitorReportsPage() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
+  const { t: td } = useTranslation('device');
   const { token } = useToken();
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [severity, setSeverity] = useState<string | undefined>(undefined);
@@ -66,10 +70,10 @@ export default function MonitorReportsPage() {
   const mttrSeconds = data?.mttr_seconds;
   const mttrDisplay = useMemo(() => {
     if (mttrSeconds == null) return '-';
-    if (mttrSeconds < 60) return `${mttrSeconds.toFixed(0)} 秒`;
-    if (mttrSeconds < 3600) return `${(mttrSeconds / 60).toFixed(1)} 分钟`;
-    return `${(mttrSeconds / 3600).toFixed(2)} 小时`;
-  }, [mttrSeconds]);
+    if (mttrSeconds < 60) return t('report.mttr.seconds', { value: mttrSeconds.toFixed(0) });
+    if (mttrSeconds < 3600) return t('report.mttr.minutes', { value: (mttrSeconds / 60).toFixed(1) });
+    return t('report.mttr.hours', { value: (mttrSeconds / 3600).toFixed(2) });
+  }, [mttrSeconds, t]);
 
   const severityPieData = useMemo(
     () =>
@@ -102,25 +106,25 @@ export default function MonitorReportsPage() {
 
   const topDeviceColumns = [
     {
-      title: '排名',
+      title: t('report.column.rank'),
       key: 'rank',
       render: (_: unknown, __: unknown, idx: number) => idx + 1,
       width: 60
     },
     {
-      title: '设备 ID',
+      title: t('thresholdOverride.column.deviceId'),
       dataIndex: 'device_id',
       key: 'device_id',
       render: (v: number | null) => v ?? '-'
     },
     {
-      title: '设备名称',
+      title: td('field.name'),
       dataIndex: 'device_name',
       key: 'device_name',
       render: (v: string | null) => v ?? '-'
     },
     {
-      title: '告警数',
+      title: t('column.alertCount'),
       dataIndex: 'count',
       key: 'count',
       render: (v: number) => <Tag color="red">{v}</Tag>
@@ -129,14 +133,14 @@ export default function MonitorReportsPage() {
 
   const topTypeColumns = [
     {
-      title: '排名',
+      title: t('report.column.rank'),
       key: 'rank',
       render: (_: unknown, __: unknown, idx: number) => idx + 1,
       width: 60
     },
-    { title: '告警类型', dataIndex: 'alert_type', key: 'alert_type' },
+    { title: t('column.alertType'), dataIndex: 'alert_type', key: 'alert_type' },
     {
-      title: '告警数',
+      title: t('column.alertCount'),
       dataIndex: 'count',
       key: 'count',
       render: (v: number) => <Tag color="blue">{v}</Tag>
@@ -145,7 +149,7 @@ export default function MonitorReportsPage() {
 
   const pieConfig = (data: { name: string; value: number; color?: string }[], empty: boolean) => ({
     appendPadding: [8, 8, 8, 8] as [number, number, number, number],
-    data: empty ? [{ name: '暂无数据', value: 1, color: token.colorBgContainer }] : data,
+    data: empty ? [{ name: tc('message.noData'), value: 1, color: token.colorBgContainer }] : data,
     angleField: 'value',
     colorField: 'name',
     color: empty ? [token.colorBgContainer] : data.map((d) => d.color ?? token.colorPrimary),
@@ -165,26 +169,26 @@ export default function MonitorReportsPage() {
     height: 280,
     color: token.colorPrimary,
     label: { position: 'top' as const, style: { fill: token.colorTextSecondary, fontSize: 10 } },
-    tooltip: { title: 'time', items: [{ field: 'count', name: '告警数' }] },
+    tooltip: { title: 'time', items: [{ field: 'count', name: t('column.alertCount') }] },
     axis: {
       x: { labelAutoRotate: true, labelAutoEllipsis: true },
-      y: { title: '告警数' }
+      y: { title: t('column.alertCount') }
     },
     animation: { appear: { duration: 600, easing: 'easeQuadOut' } }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Card title="告警统计报表" size="small">
+      <Card title={t('report.title')} size="small">
         <Space wrap>
           <RangePicker
             showTime
             value={range}
             onChange={(v) => setRange(v as [Dayjs, Dayjs] | null)}
-            placeholder={['开始时间', '结束时间']}
+            placeholder={[t('report.range.startTime'), t('report.range.endTime')]}
           />
           <Select
-            placeholder="告警级别"
+            placeholder={t('report.filter.severity')}
             allowClear
             style={{ width: 140 }}
             value={severity}
@@ -197,8 +201,8 @@ export default function MonitorReportsPage() {
           />
           <Segmented
             options={[
-              { label: '按小时', value: 'hour' },
-              { label: '按日', value: 'day' }
+              { label: t('report.bucket.hour'), value: 'hour' },
+              { label: t('report.bucket.day'), value: 'day' }
             ]}
             value={bucket}
             onChange={(v) => setBucket(v as 'hour' | 'day')}
@@ -210,7 +214,7 @@ export default function MonitorReportsPage() {
         <Col xs={24} sm={12} md={6} lg={4}>
           <Card size="small" loading={isLoading}>
             <Statistic
-              title="总告警数"
+              title={t('report.stat.total')}
               value={summary?.total ?? 0}
               valueStyle={{
                 color: token.colorText,
@@ -223,7 +227,7 @@ export default function MonitorReportsPage() {
         <Col xs={24} sm={12} md={6} lg={4}>
           <Card size="small" loading={isLoading}>
             <Statistic
-              title="活跃告警"
+              title={t('stat.activeAlerts')}
               value={summary?.active ?? 0}
               valueStyle={{
                 color: token.colorWarning,
@@ -236,7 +240,7 @@ export default function MonitorReportsPage() {
         <Col xs={24} sm={12} md={6} lg={4}>
           <Card size="small" loading={isLoading}>
             <Statistic
-              title="已确认"
+              title={t('alerts.acknowledged')}
               value={summary?.acknowledged ?? 0}
               valueStyle={{
                 color: token.colorSuccess,
@@ -249,7 +253,7 @@ export default function MonitorReportsPage() {
         <Col xs={24} sm={12} md={6} lg={4}>
           <Card size="small" loading={isLoading}>
             <Statistic
-              title="已关闭"
+              title={t('report.stat.closed')}
               value={summary?.closed ?? 0}
               valueStyle={{
                 color: token.colorTextSecondary,
@@ -275,7 +279,7 @@ export default function MonitorReportsPage() {
         <Col xs={24} sm={12} md={6} lg={4}>
           <Card size="small" loading={isLoading}>
             <Statistic
-              title="确认率 / 关闭率"
+              title={t('report.stat.ackCloseRate')}
               value={`${((data?.ack_rate ?? 0) * 100).toFixed(1)}% / ${((data?.close_rate ?? 0) * 100).toFixed(1)}%`}
               valueStyle={{
                 color: token.colorText,
@@ -290,14 +294,14 @@ export default function MonitorReportsPage() {
       <Row gutter={16}>
         <Col xs={24} md={8}>
           <Card
-            title="按级别分布"
+            title={t('noc.bySeverity')}
             size="small"
             loading={isLoading}
             variant="borderless"
             style={{ height: '100%' }}
           >
             {severityPieData.length === 0 ? (
-              <Empty description="暂无数据" style={{ padding: '48px 0' }} />
+              <Empty description={tc('message.noData')} style={{ padding: '48px 0' }} />
             ) : (
               <Pie {...pieConfig(severityPieData, false)} height={260} />
             )}
@@ -305,14 +309,14 @@ export default function MonitorReportsPage() {
         </Col>
         <Col xs={24} md={8}>
           <Card
-            title="按状态分布"
+            title={t('report.chart.byStatus')}
             size="small"
             loading={isLoading}
             variant="borderless"
             style={{ height: '100%' }}
           >
             {statusPieData.length === 0 ? (
-              <Empty description="暂无数据" style={{ padding: '48px 0' }} />
+              <Empty description={tc('message.noData')} style={{ padding: '48px 0' }} />
             ) : (
               <Pie {...pieConfig(statusPieData, false)} height={260} />
             )}
@@ -320,14 +324,14 @@ export default function MonitorReportsPage() {
         </Col>
         <Col xs={24} md={8}>
           <Card
-            title="按类型分布"
+            title={t('noc.byType')}
             size="small"
             loading={isLoading}
             variant="borderless"
             style={{ height: '100%' }}
           >
             {typePieData.length === 0 ? (
-              <Empty description="暂无数据" style={{ padding: '48px 0' }} />
+              <Empty description={tc('message.noData')} style={{ padding: '48px 0' }} />
             ) : (
               <Pie {...pieConfig(typePieData, false)} height={260} />
             )}
@@ -336,12 +340,12 @@ export default function MonitorReportsPage() {
       </Row>
 
       <Card
-        title={`告警密度时序（${bucket === 'hour' ? '按小时' : '按日'}）`}
+        title={bucket === 'hour' ? t('report.chart.densityHour') : t('report.chart.densityDay')}
         size="small"
         loading={isLoading}
       >
         {densityData.length === 0 ? (
-          <Empty description="暂无数据" style={{ padding: '48px 0' }} />
+          <Empty description={tc('message.noData')} style={{ padding: '48px 0' }} />
         ) : (
           <Column {...densityConfig} />
         )}
@@ -349,27 +353,27 @@ export default function MonitorReportsPage() {
 
       <Row gutter={16}>
         <Col xs={24} md={12}>
-          <Card title="Top 10 告警设备" size="small" loading={isLoading}>
+          <Card title={t('report.chart.topDevices', { count: 10 })} size="small" loading={isLoading}>
             <Table
               columns={topDeviceColumns}
               dataSource={data?.top_devices ?? []}
               rowKey={(_, idx) => String(idx)}
               pagination={false}
               size="small"
-              locale={{ emptyText: <Empty description="暂无数据" /> }}
+              locale={{ emptyText: <Empty description={tc('message.noData')} /> }}
               scroll={{ x: 'max-content' }}
             />
           </Card>
         </Col>
         <Col xs={24} md={12}>
-          <Card title="Top 10 告警类型" size="small" loading={isLoading}>
+          <Card title={t('report.chart.topTypes', { count: 10 })} size="small" loading={isLoading}>
             <Table
               columns={topTypeColumns}
               dataSource={data?.top_types ?? []}
               rowKey={(_, idx) => String(idx)}
               pagination={false}
               size="small"
-              locale={{ emptyText: <Empty description="暂无数据" /> }}
+              locale={{ emptyText: <Empty description={tc('message.noData')} /> }}
               scroll={{ x: 'max-content' }}
             />
           </Card>

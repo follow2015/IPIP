@@ -1100,6 +1100,17 @@ export function useDeviceMetricAlerts(deviceId: number) {
   });
 }
 
+export type MonitorStatusCode =
+  | 'no_credential'
+  | 'not_probed'
+  | 'credential_error'
+  | 'unreachable'
+  | 'normal'
+  | 'normal_no_group'
+  | 'no_data'
+  | 'no_data_template'
+  | 'breached';
+
 export interface DeviceMetricDashboardItem {
   metric_key: string;
   metric_name: string;
@@ -1132,6 +1143,7 @@ export interface DeviceMetricDashboardData {
     | 'breached'
     | 'normal';
   status_reason: string | null;
+  monitor_status_code?: MonitorStatusCode | null;
   reachable: boolean | null;
   last_error: string | null;
   last_checked_at: string | null;

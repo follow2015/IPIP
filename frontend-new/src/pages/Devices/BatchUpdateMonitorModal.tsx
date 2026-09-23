@@ -19,10 +19,11 @@ import {
   useBatchUpdatePortSyncEnabled
 } from '@/services/monitor';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 import { MONITOR_PROTOCOL_OPTIONS } from '@/types/enums';
 import MonitorCredentialForm from '@/components/MonitorCredentialForm';
 import type { Device } from '@/types/models';
-import { DEVICE_SUBTYPE_LABELS } from '@/types/enums';
+import { getDeviceSubtypeLabel } from '@/types/statusMeta';
 
 interface BatchUpdateMonitorModalProps {
   open: boolean;
@@ -31,6 +32,8 @@ interface BatchUpdateMonitorModalProps {
 }
 
 function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorModalProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const [form] = Form.useForm();
   const [protocol, setProtocol] = useState<string>('snmp');
   const batchToggle = useBatchToggleDeviceMonitor();
@@ -41,7 +44,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
 
   const firstDevice = devices[0];
   const subtypeLabel = firstDevice?.device_subtype
-    ? (DEVICE_SUBTYPE_LABELS[firstDevice.device_subtype as keyof typeof DEVICE_SUBTYPE_LABELS] ??
+    ? (getDeviceSubtypeLabel(firstDevice.device_subtype, t) ??
       firstDevice.device_subtype)
     : (firstDevice?.device_type ?? '');
 
@@ -70,10 +73,15 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           enabled: values.monitor_enabled
         });
         message.success(
-          `监控已${values.monitor_enabled ? '启用' : '暂停'}：更新 ${result.updated} 台，跳过 ${result.skipped} 台`
+          t(
+            values.monitor_enabled
+              ? 'batchMonitor.message.toggleResult.enabled'
+              : 'batchMonitor.message.toggleResult.paused',
+            { updated: result.updated, skipped: result.skipped }
+          )
         );
       } catch (err) {
-        message.error(err instanceof Error ? err.message : '批量监控启停失败');
+        message.error(err instanceof Error ? err.message : t('batchMonitor.message.toggleFailed'));
         return;
       }
     }
@@ -111,9 +119,12 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           name: (values.credential_name as string) || undefined,
           device_ids: deviceIds
         });
-        message.success(`已为 ${deviceIds.length} 台设备配置 ${p.toUpperCase()} 凭据`);
+        message.success(t('batchMonitor.message.credentialConfigured', {
+          count: deviceIds.length,
+          protocol: p.toUpperCase()
+        }));
       } catch (err) {
-        message.error(err instanceof Error ? err.message : '批量配置凭据失败');
+        message.error(err instanceof Error ? err.message : t('batchMonitor.message.credentialFailed'));
         return;
       }
     }
@@ -127,11 +138,11 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
         });
         message.success(
           groupId
-            ? `已为 ${result.updated} 台设备绑定指标模板组`
-            : `已清除 ${result.updated} 台设备的指标模板组关联`
+            ? t('batchMonitor.message.groupBound', { count: result.updated })
+            : t('batchMonitor.message.groupCleared', { count: result.updated })
         );
       } catch (err) {
-        message.error(err instanceof Error ? err.message : '批量更新指标模板组失败');
+        message.error(err instanceof Error ? err.message : t('batchMonitor.message.groupFailed'));
         return;
       }
     }
@@ -144,24 +155,34 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           deviceIds,
           portSyncEnabled
         });
-        const modeLabel = mode === 'on' ? '强制开启' : mode === 'off' ? '强制关闭' : '跟随全局';
-        const parts: string[] = [`已${modeLabel} ${result.updated} 台网络设备的端口同步开关`];
+        const parts: string[] = [
+          t(
+            mode === 'on'
+              ? 'batchMonitor.message.portSyncDone.forceOn'
+              : mode === 'off'
+                ? 'batchMonitor.message.portSyncDone.forceOff'
+                : 'batchMonitor.message.portSyncDone.follow',
+            { count: result.updated }
+          )
+        ];
         if (result.with_credential > 0) {
-          parts.push(`${result.with_credential} 台有监控凭据可立即生效`);
+          parts.push(t('batchMonitor.message.withCredential', { count: result.with_credential }));
         }
         if (result.without_credential > 0) {
-          parts.push(`${result.without_credential} 台需配置 SNMP/Zabbix 凭据后才能同步`);
+          parts.push(
+            t('batchMonitor.message.withoutCredential', { count: result.without_credential })
+          );
         }
         if (result.non_network > 0) {
-          parts.push(`跳过 ${result.non_network} 台非网络设备`);
+          parts.push(t('batchMonitor.message.skipNonNetwork', { count: result.non_network }));
         }
         if (result.without_credential > 0) {
-          message.warning(parts.join('，'));
+          message.warning(parts.join(t('batchMonitor.separator')));
         } else {
-          message.success(parts.join('，'));
+          message.success(parts.join(t('batchMonitor.separator')));
         }
       } catch (err) {
-        message.error(err instanceof Error ? err.message : '批量更新端口同步开关失败');
+        message.error(err instanceof Error ? err.message : t('batchMonitor.message.portSyncFailed'));
         return;
       }
     }
@@ -177,7 +198,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
 
   return (
     <Modal
-      title={`批量修改监控（${devices.length} 台 · ${subtypeLabel}）`}
+      title={t('batchMonitor.title', { count: devices.length, subtype: subtypeLabel })}
       open={open}
       onOk={handleSubmit}
       onCancel={handleCancel}
@@ -205,9 +226,9 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
         }}
       >
         {/* 监控开关 */}
-        <Divider plain>监控开关</Divider>
-        <Form.Item name="monitor_enabled" label="监控状态" valuePropName="checked">
-          <Switch checkedChildren="启用" unCheckedChildren="暂停" />
+        <Divider plain>{t('batchMonitor.monitorSwitch')}</Divider>
+        <Form.Item name="monitor_enabled" label={t('batchMonitor.monitorStatus')} valuePropName="checked">
+          <Switch checkedChildren={tCommon('action.enable')} unCheckedChildren={t('batchMonitor.paused')} />
         </Form.Item>
         <Alert
           type={watchMonitorEnabled ? 'success' : 'warning'}
@@ -215,15 +236,15 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           style={{ marginBottom: 16 }}
           message={
             watchMonitorEnabled
-              ? '启用后，监控 Worker 将在下一轮探测中纳入这些设备'
-              : '暂停后，这些设备将不会被监控 Worker 探测，直到重新启用'
+              ? t('batchMonitor.enableHint')
+              : t('batchMonitor.pauseHint')
           }
         />
 
         {/* 凭据配置 */}
-        <Divider plain>监控凭据</Divider>
-        <Form.Item name="configure_credential" label="配置凭据" valuePropName="checked">
-          <Switch checkedChildren="配置" unCheckedChildren="跳过" />
+        <Divider plain>{t('batchMonitor.credentialTitle')}</Divider>
+        <Form.Item name="configure_credential" label={t('batchMonitor.configCredential')} valuePropName="checked">
+          <Switch checkedChildren={t('batchMonitor.config')} unCheckedChildren={t('batchMonitor.skip')} />
         </Form.Item>
 
         {watchConfigureCredential && (
@@ -232,9 +253,9 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
               type="info"
               showIcon
               style={{ marginBottom: 12 }}
-              message="将为所有选中设备配置相同的监控凭据（共享凭据模式）"
+              message={t('batchMonitor.credentialHint')}
             />
-            <Form.Item label="协议" name="protocol">
+            <Form.Item label={t('credential.protocol')} name="protocol">
               <Select
                 options={MONITOR_PROTOCOL_OPTIONS}
                 onChange={(v) => {
@@ -244,8 +265,8 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
               />
             </Form.Item>
 
-            <Form.Item label="凭据名称（可选）" name="credential_name">
-              <Input placeholder="如：机房A SNMP只读团体字" />
+            <Form.Item label={t('batchMonitor.credentialNameOptional')} name="credential_name">
+              <Input placeholder={t('credential.nameHint')} />
             </Form.Item>
 
             <MonitorCredentialForm protocol={protocol} mode="create" form={form} />
@@ -253,13 +274,13 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
         )}
 
         {!watchConfigureCredential && (
-          <Alert type="info" showIcon message="跳过凭据配置，仅修改监控开关状态" />
+          <Alert type="info" showIcon message={t('batchMonitor.skipCredentialHint')} />
         )}
 
         {/* 指标模板组 */}
-        <Divider plain>指标模板组</Divider>
-        <Form.Item name="configure_group" label="配置指标模板组" valuePropName="checked">
-          <Switch checkedChildren="配置" unCheckedChildren="跳过" />
+        <Divider plain>{t('credential.templateGroupTitle')}</Divider>
+        <Form.Item name="configure_group" label={t('batchMonitor.configGroup')} valuePropName="checked">
+          <Switch checkedChildren={t('batchMonitor.config')} unCheckedChildren={t('batchMonitor.skip')} />
         </Form.Item>
 
         {watchConfigureGroup && (
@@ -268,16 +289,16 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
               type="info"
               showIcon
               style={{ marginBottom: 12 }}
-              message="为所有选中设备绑定统一的指标模板组；不选择模板组则保持自动匹配规则"
+              message={t('batchMonitor.groupHint')}
             />
             <Form.Item
-              label="指标模板组"
+              label={t('credential.templateGroupTitle')}
               name="metric_template_group_id"
-              extra="留空清除已绑定关系（回到按设备类型 + 厂商 + 协议自动匹配）；未开启本开关则不做任何改动"
+              extra={t('batchMonitor.groupClearHint')}
             >
               <Select
                 allowClear
-                placeholder="选择指标模板组（留空 = 解除绑定）"
+                placeholder={t('credential.selectTemplateGroup')}
                 loading={groupsLoading}
                 options={candidateGroups.map((g) => ({
                   value: g.id,
@@ -288,9 +309,13 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
                 showSearch
                 notFoundContent={
                   <Space direction="vertical" size={2} style={{ padding: 8 }}>
-                    <span>没有匹配 {firstDevice?.device_type ?? '当前类型'} 的指标模板组</span>
+                    <span>
+                    {t('credential.noMatchedGroup', {
+                      type: firstDevice?.device_type ?? t('credential.currentType')
+                    })}
+                  </span>
                     <span style={{ fontSize: 12, color: '#999' }}>
-                      可在「监控中心 → 指标模板」中创建
+                      {t('credential.createInMonitorCenter')}
                     </span>
                   </Space>
                 }
@@ -302,9 +327,9 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
         {/* 端口同步开关（仅网络设备显示） */}
         {hasNetworkDevice && (
           <>
-            <Divider plain>端口同步开关</Divider>
-            <Form.Item name="configure_port_sync" label="配置端口同步" valuePropName="checked">
-              <Switch checkedChildren="配置" unCheckedChildren="跳过" />
+            <Divider plain>{t('batchMonitor.portSyncTitle')}</Divider>
+            <Form.Item name="configure_port_sync" label={t('batchMonitor.configPortSync')} valuePropName="checked">
+              <Switch checkedChildren={t('batchMonitor.config')} unCheckedChildren={t('batchMonitor.skip')} />
             </Form.Item>
 
             {watchConfigurePortSync && (
@@ -315,20 +340,20 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
                   style={{ marginBottom: 12 }}
                   message={
                     nonNetworkCount > 0
-                      ? `批量设置网络设备的端口自动同步开关（选中含 ${nonNetworkCount} 台非网络设备将自动跳过）。非网管设备走全量替换，网管设备仅更新端口状态。需先配置 SNMP 或 Zabbix 监控凭据后才能生效。`
-                      : '批量设置网络设备的端口自动同步开关。非网管设备走全量替换，网管设备仅更新端口状态。需先配置 SNMP 或 Zabbix 监控凭据后才能生效。'
+                      ? t('batchMonitor.portSyncHintWithSkip', { count: nonNetworkCount })
+                      : t('batchMonitor.portSyncHint')
                   }
                 />
                 <Form.Item
-                  label="同步模式"
+                  label={t('batchMonitor.syncMode')}
                   name="port_sync_mode"
-                  extra="跟随全局=使用运行配置中心的默认开关；强制开/关=覆盖全局设置，仅对这些设备生效"
+                  extra={t('batchMonitor.syncModeHint')}
                 >
                   <Radio.Group
                     options={[
-                      { label: '跟随全局', value: 'global' },
-                      { label: '强制开启', value: 'on' },
-                      { label: '强制关闭', value: 'off' }
+                      { label: t('batchMonitor.modeFollow'), value: 'global' },
+                      { label: t('batchMonitor.modeForceOn'), value: 'on' },
+                      { label: t('batchMonitor.modeForceOff'), value: 'off' }
                     ]}
                   />
                 </Form.Item>
@@ -336,7 +361,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
             )}
 
             {!watchConfigurePortSync && (
-              <Alert type="info" showIcon message="跳过端口同步开关配置，保持各设备当前设置" />
+              <Alert type="info" showIcon message={t('batchMonitor.skipPortSyncHint')} />
             )}
           </>
         )}

@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useConfirm } from '@/utils/confirm';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 export interface ConfirmActionOptions {
   title: ReactNode;
@@ -15,6 +16,7 @@ export interface ConfirmActionOptions {
 }
 
 export function useConfirmAction() {
+  const { t } = useTranslation();
   const confirm = useConfirm();
   const message = useMessage();
   return useCallback(
@@ -30,11 +32,13 @@ export function useConfirmAction() {
             if (opts.successMessage !== undefined) message.success(opts.successMessage);
             opts.afterConfirm?.();
           } catch (err) {
-            message.error(opts.errorMessage ?? (err instanceof Error ? err.message : '操作失败'));
+            message.error(
+              opts.errorMessage ?? (err instanceof Error ? err.message : t('message.operationFailed'))
+            );
           }
         }
       });
     },
-    [confirm, message]
+    [confirm, message, t]
   );
 }

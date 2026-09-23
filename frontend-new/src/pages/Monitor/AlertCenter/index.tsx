@@ -11,6 +11,7 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { Tabs } from 'antd';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 const MonitorAlerts = lazy(() => import('@/pages/Monitor/Alerts'));
 const MonitorReports = lazy(() => import('@/pages/Monitor/Reports'));
@@ -21,6 +22,7 @@ const DEFAULT_TAB: AlertTabKey = 'list';
 const VALID_TABS: AlertTabKey[] = ['list', 'reports', 'noc'];
 
 export default function AlertCenter() {
+  const { t } = useTranslation('monitor');
   const [params, setParams] = useSearchParams();
   const raw = params.get('tab');
   const activeKey: AlertTabKey = VALID_TABS.includes(raw as AlertTabKey)
@@ -58,7 +60,7 @@ export default function AlertCenter() {
       items={[
         {
           key: 'list',
-          label: '告警列表',
+          label: t('tab.alertList'),
           children: (
             <Suspense fallback={null}>
               <MonitorAlerts />
@@ -67,7 +69,7 @@ export default function AlertCenter() {
         },
         {
           key: 'reports',
-          label: '统计报表',
+          label: t('tab.reports'),
           children: (
             <Suspense fallback={null}>
               <MonitorReports />
@@ -76,7 +78,7 @@ export default function AlertCenter() {
         },
         {
           key: 'noc',
-          label: 'NOC 大屏',
+          label: t('tab.noc'),
           children: (
             <Suspense fallback={null}>
               <MonitorNocScreen />

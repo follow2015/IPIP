@@ -1,13 +1,9 @@
-/**
- * 根组件
- * - ConfigProvider（Ant Design 主题 + 中文 locale）
- * - QueryClientProvider（TanStack Query 全局配置）
- * - AppRouter（路由）
- */
 import { useMemo, useEffect } from 'react';
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
 import { App as AntApp, ConfigProvider, theme, message } from 'antd';
-import zhCN from 'antd/locale/zh_CN';
+import { useTranslation } from 'react-i18next';
+import i18next, { ANTD_LOCALE } from '@/i18n';
+import type { AppLanguage } from '@/i18n/config';
 import AppRouter from '@/router';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { useAuthInit } from '@/hooks/useAuthInit';
@@ -16,7 +12,7 @@ import { useUIStore } from '@/stores/ui';
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
-  return '请求失败，请稍后重试';
+  return i18next.t('message.requestFailed');
 }
 
 const queryCache = new QueryCache({
@@ -50,6 +46,7 @@ function App() {
   useAuthInit();
 
   const themeMode = useUIStore((s) => s.theme);
+  const { i18n } = useTranslation();
 
   const themeConfig = useMemo(
     () => ({
@@ -62,13 +59,16 @@ function App() {
     [themeMode]
   );
 
+  const currentLang = (i18n.resolvedLanguage || i18n.language) as AppLanguage;
+  const antdLocale = ANTD_LOCALE[currentLang] ?? ANTD_LOCALE['zh-CN'];
+
   useEffect(() => {
     ConfigProvider.config({ theme: themeConfig });
   }, [themeConfig]);
 
   return (
     <ErrorBoundary>
-      <ConfigProvider theme={themeConfig} locale={zhCN}>
+      <ConfigProvider theme={themeConfig} locale={antdLocale}>
         <AntApp>
           <QueryClientProvider client={queryClient}>
             <AppRouter />

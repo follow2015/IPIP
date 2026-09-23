@@ -35,14 +35,20 @@ def _device_in_scope(user_id: int, device_id: int) -> bool:
     注意：此处刻意 fail-closed。即便改为 fail-open 放行，签出的票据也不会带
     dev claim，网关设备路由依旧 403——可用性同样受损却额外打开了越权口子，
     故服务异常时直接拒绝签发，让故障显式暴露在换票阶段。
+
+    ⚠️ P0-1（2026-09-23）：这条 `except` 此前**不可达** ——
+    `get_visible_device_ids` 内部把异常吞掉并 `return None`（= 无限制），
+    于是本函数直接 `return device_id in visible` 之前就把它当成"无限制"放行了。
+    现服务改为抛 `DataScopeUnavailableError`，本分支才真正生效。
     """
     try:
         from app.services.monitoring.data_scope_service import get_visible_device_ids
 
         visible = get_visible_device_ids(user_id)
     except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "SSE 票据数据域校验失败，拒绝签发 user_id=%s: %s", user_id, exc
+        logger.error(
+            "SSE 票据数据域校验失败，拒绝签发（fail-closed）user_id=%s: %s",
+            user_id, exc, exc_info=True,
         )
         return False
 

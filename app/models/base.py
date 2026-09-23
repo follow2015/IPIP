@@ -37,7 +37,7 @@ def TINYINT(unsigned: bool = False):
     """MySQL TINYINT 列类型（跨方言安全）。
 
     - MySQL：渲染为 TINYINT [UNSIGNED]，与生产库真实 DDL 对齐
-      （docs/2026-09-04-Schema差异评估与修改计划.md §1.3）。
+      （docs/plan/2026-09-04-Schema差异评估与修改计划.md §1.3）。
     - sqlite（测试内存库 create_all）：退化为 SmallInteger，
       因 sqlite 方言编译器不识别 mysql.TINYINT。
     """

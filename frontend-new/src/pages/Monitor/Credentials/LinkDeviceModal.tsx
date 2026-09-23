@@ -8,6 +8,7 @@ import { Modal, Select, Space, Typography } from 'antd';
 import { useLinkExistingCredential, useLinkedDevices, type LinkedDevice } from '@/services/monitor';
 import { searchDevicesForLink } from '@/services/device';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
@@ -34,6 +35,7 @@ export default function LinkDeviceModal({
 }: LinkDeviceModalProps) {
   const linkExisting = useLinkExistingCredential();
   const msg = useMessage();
+  const { t } = useTranslation('monitor');
   const { data: linkedDevices = [] } = useLinkedDevices(selectedCredId);
   const [linkDeviceIds, setLinkDeviceIds] = useState<number[]>([]);
   const [deviceOptions, setDeviceOptions] = useState<DeviceOption[]>([]);
@@ -64,7 +66,7 @@ export default function LinkDeviceModal({
 
   const handleConfirmLink = async () => {
     if (linkDeviceIds.length === 0) {
-      msg.warning('请选择至少一台设备');
+      msg.warning(t('credential.message.selectDeviceRequired'));
       return;
     }
     try {
@@ -72,16 +74,16 @@ export default function LinkDeviceModal({
         credentialId: selectedCredId!,
         device_ids: linkDeviceIds
       });
-      msg.success(`已关联 ${linkDeviceIds.length} 台设备`);
+      msg.success(t('credential.message.linkedDevices', { count: linkDeviceIds.length }));
       onClose();
     } catch (err) {
-      msg.error(err instanceof Error ? err.message : '关联失败');
+      msg.error(err instanceof Error ? err.message : t('credential.message.linkFailed'));
     }
   };
 
   return (
     <Modal
-      title="关联设备到共享凭据"
+      title={t('credential.linkTitle')}
       open={open}
       onCancel={onClose}
       onOk={handleConfirmLink}
@@ -91,14 +93,13 @@ export default function LinkDeviceModal({
     >
       <Space orientation="vertical" style={{ width: '100%' }} size="middle">
         <Text type="secondary">
-          选择要关联到「{selectedCredName || selectedCredProtocol}
-          」的设备，已关联的设备不会出现在列表中。
+          {t('credential.linkHint', { name: selectedCredName || selectedCredProtocol })}
         </Text>
         <Select
           mode="multiple"
           showSearch
           style={{ width: '100%' }}
-          placeholder="搜索设备名称或 IP"
+          placeholder={t('credential.searchDevicePlaceholder')}
           filterOption={false}
           onSearch={searchDevices}
           loading={deviceSearchLoading}
@@ -112,7 +113,9 @@ export default function LinkDeviceModal({
             }))}
         />
         {linkDeviceIds.length > 0 && (
-          <Text type="secondary">已选 {linkDeviceIds.length} 台设备</Text>
+          <Text type="secondary">
+            {t('credential.selectedDevices', { count: linkDeviceIds.length })}
+          </Text>
         )}
       </Space>
     </Modal>

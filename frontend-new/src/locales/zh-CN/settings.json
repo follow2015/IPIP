@@ -1,0 +1,585 @@
+{
+  "saveConfig": "保存配置",
+  "saveFailed": "保存失败，请重试",
+  "testRequestFailed": "测试请求失败",
+  "mail": {
+    "title": "邮件服务器配置",
+    "editTitle": "编辑邮件服务器配置",
+    "createTitle": "配置邮件服务器",
+    "tagConfigured": "已配置",
+    "tagEditing": "编辑中",
+    "takeEffectHint": "配置保存后即时生效，无需重启服务。",
+    "descriptions": {
+      "server": "SMTP 服务器"
+    },
+    "action": {
+      "sendTest": "发送测试邮件",
+      "send": "发送",
+      "deleteConfirmTitle": "确认删除邮件配置？",
+      "deleteConfirmContent": "删除后邮件通知将不可用，需要重新配置。"
+    },
+    "field": {
+      "server": "SMTP 服务器地址",
+      "serverPlaceholder": "如：smtp.exmail.qq.com",
+      "port": "端口",
+      "encryption": "加密方式",
+      "encryptionTooltip": "STARTTLS：端口 587，先明文连接再升级加密（Gmail/SendGrid）；SSL：端口 465，全程加密（腾讯企业邮/阿里企业邮）",
+      "timeout": "超时（秒）",
+      "timeoutView": "超时",
+      "timeoutValue": "{{seconds}} 秒",
+      "username": "用户名",
+      "usernamePlaceholder": "如：alert@yourcompany.com",
+      "password": "密码/授权码",
+      "passwordView": "密码",
+      "passwordUnset": "未设置",
+      "passwordSetHint": "(已设置，留空则保持原值)",
+      "passwordPlaceholder": "SMTP 认证密码或授权码",
+      "passwordKeepPlaceholder": "留空保持原密码",
+      "sender": "发件人地址"
+    },
+    "section": {
+      "connection": "服务器连接",
+      "auth": "认证信息",
+      "providerPresets": "常见服务商快捷配置"
+    },
+    "encryption": {
+      "tls": "STARTTLS",
+      "ssl": "SSL",
+      "none": "无加密",
+      "tlsWithPort": "STARTTLS (587)",
+      "sslWithPort": "SSL (465)",
+      "noneWithPort": "无加密 (25)"
+    },
+    "validation": {
+      "serverRequired": "请输入 SMTP 服务器地址",
+      "portRequired": "请输入端口号",
+      "encryptionRequired": "请选择加密方式",
+      "usernameRequired": "请输入 SMTP 认证用户名",
+      "passwordRequired": "请输入 SMTP 认证密码",
+      "senderRequired": "请输入发件人地址",
+      "emailInvalid": "请输入有效的邮箱地址",
+      "recipientRequired": "请输入收件人邮箱地址"
+    },
+    "test": {
+      "modalTitle": "发送测试邮件",
+      "recipient": "收件人邮箱",
+      "recipientPlaceholder": "请输入收件人邮箱地址",
+      "hint": "将使用当前已保存的 SMTP 配置发送测试邮件到上方地址。"
+    },
+    "message": {
+      "saved": "邮件配置已保存",
+      "deleted": "邮件配置已删除",
+      "deleteFailed": "删除失败，请重试"
+    },
+    "provider": {
+      "tencentExmail": "腾讯企业邮",
+      "aliyunExmail": "阿里企业邮",
+      "qq": "QQ 邮箱",
+      "netease163": "163 邮箱",
+      "gmail": "Gmail",
+      "sendgrid": "SendGrid"
+    }
+  },
+  "voice": {
+    "title": "语音通知配置",
+    "tagReady": "就绪",
+    "tagNotReady": "未就绪",
+    "masterSwitch": "启用语音通知",
+    "masterSwitchHint": "总开关关闭时，即使个别用户开启了语音偏好也不会外呼",
+    "listSeparator": "、",
+    "callbackUrlHint": "服务商回调地址：https://<你的域名>/api/notification/voice/callback（免登，需加入网关白名单）",
+    "section": {
+      "provider": "服务商",
+      "common": "通用参数",
+      "callbackSecurity": "回调安全",
+      "testCall": "测试呼叫"
+    },
+    "alert": {
+      "notReady": "配置未就绪，缺少：{{fields}}",
+      "requiredFields": "必填项",
+      "disabledHint": "语音通知未启用，请开启总开关并补全服务商配置",
+      "tencentNoVolumeSpeed": "腾讯云 VMS 不支持音量 / 语速参数"
+    },
+    "field": {
+      "accessKeyId": "AccessKey ID",
+      "accessKeyIdPlaceholder": "LTAI...",
+      "accessKeySecret": "AccessKey Secret",
+      "callerNumber": "主叫号码（选填）",
+      "callerNumberTooltip": "留空 = 公共模式（公共号池外呼，无需报备）；填写真实报备号码 = 专属模式。公共模式必须留空，误填未报备号码会导致呼叫失败",
+      "callerNumberPlaceholder": "公共模式请留空",
+      "ttsCode": "语音模板 ID（TtsCode）",
+      "ttsCodePlaceholder": "TTS_xxxxxx",
+      "ttsParam": "模板变量（JSON）",
+      "ttsParamTooltip": "模板变量映射，JSON 对象。运行时会叠加动态变量 title（告警标题）与 level（级别）",
+      "secretId": "SecretId",
+      "secretIdPlaceholder": "AKID...",
+      "secretKey": "SecretKey",
+      "sdkAppId": "VoiceSdkAppid",
+      "sdkAppIdTooltip": "语音应用 SDKAppID，腾讯云必填",
+      "sdkAppIdPlaceholder": "140xxxxxxx",
+      "templateId": "语音模板 ID（TemplateId）",
+      "templateIdPlaceholder": "模板 ID",
+      "configuredPlaceholder": "已配置则显示 ****",
+      "playTimes": "播放次数",
+      "playTimesTooltip": "同一通语音重复播放次数（1~3）",
+      "volume": "音量",
+      "volumeTooltip": "音量 0~100，腾讯云不支持",
+      "speed": "语速",
+      "speedTooltip": "语速 -500~500，腾讯云不支持",
+      "callTimeout": "呼叫超时（秒）",
+      "callTimeoutTooltip": "呼叫超时秒数（10~30）。硬上限 30 秒，为后台任务软超时预留余量",
+      "verifyMode": "回调校验模式",
+      "callbackToken": "回调 Token",
+      "voiceTemplateId": "语音模板 ID"
+    },
+    "validation": {
+      "invalidJson": "必须是合法 JSON"
+    },
+    "providerOption": {
+      "aliyun": "阿里云（SingleCallByTts）",
+      "tencent": "腾讯云（SendTtsVoice）"
+    },
+    "verifyModeOption": {
+      "ipOnly": "仅 IP 白名单（推荐）",
+      "ipOnlyTooltip": "仅校验回调来源 IP 白名单。两家官方语音回调均不携带自定义签名头，推荐先用此模式验证连通性",
+      "signatureAndIp": "签名 + IP 白名单",
+      "signatureAndIpTooltip": "签名 + IP 双重校验。需厂商支持自定义签名头，否则回调会被 100% 拒收",
+      "off": "关闭校验（不推荐）"
+    },
+    "test": {
+      "hint": "向当前管理员账号的手机号发起一次测试呼叫（需先在个人资料中设置手机号）。测试会使用上方表单当前值，包括尚未保存的修改。",
+      "submit": "发起测试呼叫"
+    },
+    "message": {
+      "saved": "语音配置已保存",
+      "testStarted": "测试呼叫已发起，请留意手机",
+      "testFailed": "测试呼叫失败",
+      "testFailedCheckConfig": "测试呼叫失败，请检查配置"
+    }
+  },
+  "webhook": {
+    "title": "Webhook 渠道配置",
+    "action": {
+      "create": "新增配置",
+      "test": "测试",
+      "deleteConfirmTitle": "确认删除此配置？"
+    },
+    "modalTitle": {
+      "create": "新增 Webhook 配置",
+      "edit": "编辑 Webhook 配置"
+    },
+    "column": {
+      "channel": "渠道",
+      "severity": "适用严重程度",
+      "severityAll": "全部"
+    },
+    "field": {
+      "name": "配置名称",
+      "namePlaceholder": "如：运维群机器人",
+      "channel": "渠道类型",
+      "url": "Webhook URL",
+      "urlPlaceholder": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=***",
+      "secret": "签名密钥（可选）",
+      "secretPlaceholder": "飞书群机器人签名密钥",
+      "types": "适用通知类型（空=全部）",
+      "typesPlaceholder": "选择通知类型",
+      "severities": "适用严重程度（空=全部）",
+      "severitiesPlaceholder": "选择严重程度"
+    },
+    "validation": {
+      "nameRequired": "请输入配置名称",
+      "channelRequired": "请选择渠道类型",
+      "urlRequired": "请输入 Webhook URL",
+      "urlInvalid": "请输入有效的 URL"
+    }
+  },
+  "notification": {
+    "preferences": {
+      "title": "通知偏好设置",
+      "sectionChannels": "投递渠道",
+      "sectionTypes": "订阅类型",
+      "sectionQuietHours": "免打扰时段",
+      "inbox": "站内信",
+      "inboxHint": "站内信通知默认开启，无法调整",
+      "email": "邮件通知",
+      "emailHint": "接收邮件推送（需在个人资料中设置邮箱地址）",
+      "voice": "语音通知",
+      "voiceHint": "语音电话呼叫（需管理员启用语音渠道，并在个人资料中设置手机号； 默认关闭）",
+      "voiceQuietHoursAlert": "免打扰时段内，语音通知仍会呼出（深夜告警叫醒场景）。若不希望夜间接到电话，请关闭语音通知。",
+      "typesPlaceholder": "不选择则接收全部类型通知",
+      "typesHint": "选择要接收的通知类别。不选择则接收全部类型；严重（critical）级别通知始终穿透，不受此过滤影响。",
+      "quietHours": "免打扰时段",
+      "quietHoursSwitch": "启用免打扰",
+      "quietHoursHint": "开启后，在设定时段内仅接收严重（critical）级别通知",
+      "timeRangePlaceholderStart": "开始时间",
+      "timeRangePlaceholderEnd": "结束时间",
+      "action": {
+        "save": "保存偏好"
+      },
+      "message": {
+        "saved": "通知偏好已保存"
+      }
+    },
+    "bell": {
+      "title": "消息通知",
+      "expand": "展开",
+      "collapse": "收起",
+      "empty": "暂无通知",
+      "clearRead": "清除已读",
+      "markAllRead": "全部已读",
+      "deleteReadConfirmTitle": "确认清除所有已读消息？",
+      "deleteReadConfirmContent": "未读消息将保留",
+      "time": {
+        "justNow": "刚刚",
+        "minutesAgo": "{{count}} 分钟前",
+        "minutesAgo_one": "{{count}} 分钟前",
+        "minutesAgo_other": "{{count}} 分钟前",
+        "hoursAgo": "{{count}} 小时前",
+        "hoursAgo_one": "{{count}} 小时前",
+        "hoursAgo_other": "{{count}} 小时前",
+        "daysAgo": "{{count}} 天前",
+        "daysAgo_one": "{{count}} 天前",
+        "daysAgo_other": "{{count}} 天前"
+      },
+      "browserNotification": {
+        "title": "[{{severity}}] 监控告警",
+        "body": "{{alertType}}（设备 #{{deviceId}}）",
+        "defaultAlertType": "告警"
+      }
+    }
+  },
+  "audit": {
+    "column": {
+      "operator": "操作人",
+      "action": "操作",
+      "resource": "资源",
+      "resourceId": "资源ID",
+      "clientIp": "客户端IP"
+    },
+    "filter": {
+      "actionType": "操作类型",
+      "resourceType": "资源类型"
+    },
+    "loadFailed": "加载审计日志失败",
+    "detailTitle": "审计记录详情",
+    "detailRawTitle": "详情（detail）",
+    "userFallback": "用户 #{{id}}",
+    "actionType": {
+      "create": "创建",
+      "update": "更新",
+      "delete": "删除",
+      "login": "登录",
+      "logout": "登出",
+      "import": "导入",
+      "export": "导出"
+    },
+    "resourceType": {
+      "device": "设备",
+      "cabinet": "机柜",
+      "room": "机房",
+      "ip": "IP",
+      "network": "网段",
+      "switch": "交换机",
+      "customer": "客户",
+      "user": "用户",
+      "vlan": "VLAN",
+      "role": "角色"
+    }
+  },
+  "loginLog": {
+    "column": {
+      "loginTime": "登录时间",
+      "userFullName": "用户姓名",
+      "username": "用户名",
+      "ipAddress": "IP地址",
+      "loginType": "登录类型",
+      "userAgent": "设备/浏览器"
+    },
+    "filter": {
+      "user": "用户：",
+      "allUsers": "全部用户",
+      "time": "时间："
+    }
+  },
+  "license": {
+    "pageTitle": "开源软件授权",
+    "introPart1": "本页面说明两件事：本项目的自身授权条款，以及本项目所依赖的第三方开源组件及其许可证。依赖与版本依据后端 ",
+    "introPart2": " 与前端 ",
+    "introPart3": " 的实际声明生成。",
+    "selfTitle": "本项目授权",
+    "selfFullText": "完整文本",
+    "selfSummary": "本项目（ipip）源代码以 Apache-2.0 许可证发布。",
+    "selfTermsPart1": "该许可证允许自由使用、修改、分发与商业化，并附带明确的专利授权与署名义务，适合后续商业化或接受捐赠的场景。您可自由将其用于商业用途，但须保留版权声明并附上许可证副本；若修改文件须显著标注变更。完整条款见仓库根目录 ",
+    "selfTermsPart2": " 文件。",
+    "backendDepsTitle": "第三方依赖（后端 / Python）",
+    "frontendDepsTitle": "第三方依赖（前端 / Node.js）",
+    "footerNote": "开发期构建工具（Vite、TypeScript、ESLint、Vitest 等）未在此列出；如需完整 SBOM，请参考各依赖清单文件。",
+    "column": {
+      "component": "组件",
+      "version": "版本",
+      "license": "许可证",
+      "usage": "用途"
+    },
+    "dep": {
+      "flask": "Web 框架（应用工厂、路由、中间件）",
+      "flaskSqlalchemy": "ORM 集成",
+      "sqlalchemy": "SQL 工具包与 ORM",
+      "pyjwt": "JWT 签发与校验",
+      "werkzeug": "WSGI 工具库",
+      "marshmallow": "请求/响应数据序列化与校验",
+      "apispec": "OpenAPI 规范生成",
+      "bcrypt": "密码哈希",
+      "cryptography": "敏感配置加密",
+      "flaskCors": "跨域资源共享支持",
+      "pymysql": "MySQL 驱动",
+      "redis": "缓存 / 告警 outbox / 实时网关",
+      "netmiko": "网络设备 SSH/Telnet 自动化",
+      "pysnmp": "SNMP 设备指标采集",
+      "pyghmi": "BMC/IPMI 管理",
+      "pandas": "Excel 导入导出数据处理",
+      "openpyxl": "Excel 文件读写",
+      "reportlab": "客户终止存档 PDF 生成",
+      "textfsm": "网络设备回显文本解析",
+      "pyyaml": "配置文件 / 种子数据解析",
+      "requests": "HTTP 客户端（Webhook 投递）",
+      "qrcode": "二维码生成",
+      "psutil": "主机资源指标采集",
+      "click": "Flask CLI 命令",
+      "uvicorn": "实时网关 ASGI 服务器",
+      "starlette": "实时网关 Web 框架",
+      "react": "UI 视图层框架",
+      "reactDom": "React DOM 渲染",
+      "reactRouterDom": "前端路由",
+      "antd": "企业级 UI 组件库",
+      "antDesignIcons": "图标资源",
+      "antDesignCharts": "图表可视化",
+      "antvG6": "拓扑图渲染",
+      "tanstackQuery": "服务端状态管理",
+      "axios": "HTTP 请求客户端",
+      "zustand": "轻量状态管理",
+      "dayjs": "日期时间处理",
+      "ipaddrJs": "IP 地址解析与计算"
+    }
+  },
+  "componentTemplate": {
+    "category": {
+      "cpu": "CPU",
+      "memory": "内存",
+      "disk": "硬盘",
+      "nic": "网卡",
+      "gpu": "显卡"
+    },
+    "spec": {
+      "separator": " / ",
+      "cores": "{{value}}核",
+      "freq": "{{value}}GHz",
+      "capacity": "{{value}}GB",
+      "speed": "{{value}}MHz",
+      "ports": "{{value}}口",
+      "tflops": "{{value}}TFLOPS"
+    },
+    "column": {
+      "customerOwner": "客户归属",
+      "brand": "品牌",
+      "model": "型号",
+      "specSummary": "规格摘要",
+      "enabled": "启用",
+      "sortOrder": "排序"
+    },
+    "shared": "通用",
+    "yes": "是",
+    "no": "否",
+    "addTemplate": "新增模板",
+    "filterCustomer": "筛选客户",
+    "modal": {
+      "createTitle": "新增配件模板",
+      "editTitle": "编辑配件模板"
+    },
+    "field": {
+      "category": "类别"
+    },
+    "placeholder": {
+      "customerOwner": "通用（不选客户）"
+    },
+    "validation": {
+      "brandRequired": "请输入品牌",
+      "modelRequired": "请输入型号"
+    },
+    "deleteConfirmTitle": "确定要删除「{{name}}」吗？"
+  },
+  "rbac": {
+    "tab": {
+      "roles": "角色管理",
+      "permissions": "权限列表"
+    }
+  },
+  "user": {
+    "label": "用户",
+    "modal": {
+      "createTitle": "新增用户",
+      "editTitle": "编辑用户"
+    },
+    "action": {
+      "add": "新增用户",
+      "resetPassword": "重置密码",
+      "confirmReset": "确定重置",
+      "copiedAndClose": "已复制并关闭",
+      "loginLogs": "登录记录"
+    },
+    "field": {
+      "fullName": "姓名",
+      "realNamePlaceholder": "真实姓名",
+      "email": "邮箱",
+      "department": "部门",
+      "contactPhone": "联系电话",
+      "confirmPassword": "确认密码",
+      "passwordAgain": "再次输入密码",
+      "passwordTips": "至少8位，需包含大写字母、小写字母、数字和特殊字符",
+      "passwordKeepHint": "留空则不修改"
+    },
+    "validation": {
+      "emailRequired": "请输入邮箱",
+      "passwordMinLength": "密码至少8位",
+      "confirmPasswordRequired": "请确认密码",
+      "passwordMismatch": "两次密码不一致"
+    },
+    "resetPasswordConfirm": "确定要重置用户「{{username}}」的密码吗？系统将随机生成新密码。",
+    "newPasswordLabel": "用户「{{username}}」的新密码：",
+    "passwordKeepSafeHint": "请妥善保管此密码，关闭后无法再次查看。",
+    "message": {
+      "resetPasswordSuccess": "密码重置成功",
+      "passwordReset": "密码已重置",
+      "resetFailed": "重置失败",
+      "statusUpdated": "状态已更新"
+    }
+  },
+  "profile": {
+    "tab": {
+      "profile": "个人信息",
+      "password": "修改密码"
+    },
+    "action": {
+      "editProfile": "编辑信息"
+    },
+    "field": {
+      "oldPassword": "原密码",
+      "newPassword": "新密码",
+      "confirmPassword": "确认新密码"
+    },
+    "validation": {
+      "oldPasswordRequired": "请输入原密码",
+      "newPasswordRequired": "请输入新密码"
+    },
+    "column": {
+      "loginTime": "登录时间",
+      "loginType": "登录类型",
+      "userAgent": "设备/浏览器"
+    },
+    "noRoles": "无角色",
+    "message": {
+      "profileUpdated": "个人信息更新成功",
+      "profileUpdateFailed": "更新失败",
+      "passwordChanged": "密码修改成功，请重新登录",
+      "passwordChangeFailed": "密码修改失败"
+    }
+  },
+  "role": {
+    "label": "角色",
+    "modal": {
+      "createTitle": "新增角色",
+      "editTitle": "编辑角色"
+    },
+    "action": {
+      "add": "新增角色"
+    },
+    "field": {
+      "name": "角色名",
+      "displayName": "显示名",
+      "permissionCount": "权限数",
+      "userCount": "用户数"
+    },
+    "placeholder": {
+      "name": "如 admin",
+      "displayName": "如 管理员"
+    },
+    "validation": {
+      "nameRequired": "请输入角色名",
+      "displayNameRequired": "请输入显示名"
+    },
+    "deleteConfirmContent": "确定要删除角色「{{name}}」吗？",
+    "assignTitle": "{{username}} - 分配角色",
+    "selectPlaceholder": "选择角色",
+    "status": {
+      "normal": "正常",
+      "disabled": "禁用"
+    },
+    "message": {
+      "updated": "角色更新成功",
+      "updateFailed": "角色更新失败"
+    }
+  },
+  "permission": {
+    "label": "权限",
+    "field": {
+      "code": "权限编码",
+      "name": "权限名称",
+      "category": "分类"
+    },
+    "uncategorized": "未分类",
+    "assignTitle": "权限分配 - {{name}}",
+    "loading": "加载权限中...",
+    "message": {
+      "updated": "权限更新成功",
+      "updateFailed": "权限更新失败"
+    }
+  },
+  "componentSpec": {
+    "cpu": {
+      "coresPerCpu": "核数/颗",
+      "tdp": "功耗 (W)",
+      "architecture": "架构",
+      "baseFreq": "基础频率 (GHz)",
+      "boostFreq": "Boost 频率 (GHz)"
+    },
+    "memory": {
+      "capacity": "单条容量 (GB)",
+      "speed": "速率 (MHz)",
+      "type": "类型",
+      "formFactor": "规格",
+      "ecc": "ECC"
+    },
+    "disk": {
+      "storageType": "存储类型",
+      "capacity": "容量 (GB)",
+      "interfaceType": "接口类型",
+      "formFactor": "规格",
+      "tbw": "TBW"
+    },
+    "nic": {
+      "portCount": "端口数",
+      "portType": "端口类型",
+      "portSpeed": "端口速率",
+      "formFactor": "板型",
+      "portTypeOption": {
+        "rj45": "RJ45 (电口)",
+        "sfp": "SFP (1G光口)",
+        "sfpPlus": "SFP+ (10G光口)",
+        "sfp28": "SFP28 (25G光口)",
+        "qsfpPlus": "QSFP+ (40G光口)",
+        "qsfp28": "QSFP28 (100G光口)",
+        "qsfp56": "QSFP56 (200G光口)",
+        "qsfpdd": "QSFP-DD (400G光口)"
+      }
+    },
+    "gpu": {
+      "vram": "显存容量 (GB)",
+      "memoryType": "显存类型",
+      "cudaCores": "CUDA核心数/计算单元",
+      "tdp": "功耗 (W)",
+      "interface": "接口类型",
+      "fp32": "FP32 算力 (TFLOPS)"
+    },
+    "yes": "是",
+    "no": "否"
+  }
+}

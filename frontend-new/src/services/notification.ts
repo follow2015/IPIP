@@ -7,6 +7,8 @@
  * refetchInterval 仅作为 SSE 不可用时的兜底（60s 间隔，远低于原 15s）。
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { get, post, put, del } from './api-client';
 import { queryKeys } from './query-keys';
 
@@ -234,9 +236,9 @@ async function deleteWebhookConfig(id: number): Promise<void> {
   await del(`/webhook-configs/${id}`);
 }
 
-async function testWebhookConfig(id: number): Promise<TestWebhookResult> {
+async function testWebhookConfig(id: number, t: TFunction<'common'>): Promise<TestWebhookResult> {
   const res = await post<TestWebhookResult>(`/webhook-configs/${id}/test`, {});
-  return res.data ?? { success: false, message: '测试失败' };
+  return res.data ?? { success: false, message: t('message.testFailed') };
 }
 
 export function useWebhookConfigs(enabled = true) {
@@ -279,7 +281,8 @@ export function useDeleteWebhookConfig() {
 }
 
 export function useTestWebhookConfig() {
+  const { t } = useTranslation('common');
   return useMutation({
-    mutationFn: (id: number) => testWebhookConfig(id)
+    mutationFn: (id: number) => testWebhookConfig(id, t)
   });
 }

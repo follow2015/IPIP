@@ -26,9 +26,12 @@ import {
   CloseCircleOutlined
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useBatchPortAction, type BatchPortActionRequest } from '@/services/switch';
 import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useMessage } from '@/hooks/useMessage';
+import { extractErrorMessage } from '@/utils/portStatus';
 
 interface BatchPortActionsProps {
   switchId: number;
@@ -39,9 +42,33 @@ interface BatchPortActionsProps {
   onBatchLocalUpdate?: (portNames: string[], updates: Record<string, unknown>) => Promise<void>;
 }
 
+type BatchActionKey =
+  | 'enable_port'
+  | 'disable_port'
+  | 'set_port_vlan'
+  | 'update_port_info'
+  | 'assign_customer'
+  | 'add_port_to_trunk'
+  | 'remove_port_from_channel'
+  | 'clear_port_config'
+  | 'set_port_speed'
+  | 'cancel_port_speed';
+
+type BatchActionLabelKey =
+  | 'switch.batch.enable'
+  | 'switch.batch.disable'
+  | 'switch.batch.setVlan'
+  | 'switch.batch.updateInfo'
+  | 'switch.batch.assignCustomer'
+  | 'switch.batch.addToTrunk'
+  | 'switch.batch.removeFromChannel'
+  | 'switch.batch.clearConfig'
+  | 'switch.batch.setSpeed'
+  | 'switch.batch.cancelSpeed';
+
 interface BatchActionDef {
-  key: string;
-  label: string;
+  key: BatchActionKey;
+  labelKey: BatchActionLabelKey;
   icon: React.ReactNode;
   needParams: boolean;
   sshOnly: boolean;
@@ -51,75 +78,92 @@ interface BatchActionDef {
 const BATCH_ACTIONS: BatchActionDef[] = [
   {
     key: 'enable_port',
-    label: '批量启用',
+    labelKey: 'switch.batch.enable',
     icon: <CheckCircleOutlined />,
     needParams: false,
     sshOnly: false
   },
   {
     key: 'disable_port',
-    label: '批量禁用',
+    labelKey: 'switch.batch.disable',
     icon: <StopOutlined />,
     needParams: false,
     sshOnly: false
   },
   {
     key: 'set_port_vlan',
-    label: '批量配置VLAN',
+    labelKey: 'switch.batch.setVlan',
     icon: <ApartmentOutlined />,
     needParams: true,
     sshOnly: false
   },
   {
     key: 'update_port_info',
-    label: '批量修改描述',
+    labelKey: 'switch.batch.updateInfo',
     icon: <EditOutlined />,
     needParams: true,
     sshOnly: false
   },
   {
     key: 'assign_customer',
-    label: '批量分配客户',
+    labelKey: 'switch.batch.assignCustomer',
     icon: <TeamOutlined />,
     needParams: true,
     sshOnly: false
   },
   {
     key: 'add_port_to_trunk',
-    label: '批量加入链路聚合',
+    labelKey: 'switch.batch.addToTrunk',
     icon: <ApartmentOutlined />,
     needParams: true,
     sshOnly: true
   },
   {
     key: 'remove_port_from_channel',
-    label: '批量退出链路聚合',
+    labelKey: 'switch.batch.removeFromChannel',
     icon: <DisconnectOutlined />,
     needParams: false,
     sshOnly: true
   },
   {
     key: 'clear_port_config',
-    label: '批量恢复默认',
+    labelKey: 'switch.batch.clearConfig',
     icon: <UndoOutlined />,
     needParams: false,
     sshOnly: true
   },
   {
     key: 'set_port_speed',
-    label: '批量限速',
+    labelKey: 'switch.batch.setSpeed',
     icon: <ThunderboltOutlined />,
     needParams: true,
     sshOnly: true
   },
   {
     key: 'cancel_port_speed',
-    label: '批量取消限速',
+    labelKey: 'switch.batch.cancelSpeed',
     icon: <CloseCircleOutlined />,
     needParams: true,
     sshOnly: true
   }
 ];
+
+const buildMenuItems = (
+  actions: BatchActionDef[],
+  td: TFunction<'device'>
+): MenuProps['items'] =>
+  actions.map((action) => ({
+    key: action.key,
+    label: action.disabled ? (
+      <Tooltip title={td('switch.batch.sshOnlyTip')}>
+        <span style={{ color: 'rgba(0,0,0,0.25)' }}>{td(action.labelKey)}</span>
+      </Tooltip>
+    ) : (
+      td(action.labelKey)
+    ),
+    icon: action.icon,
+    disabled: action.disabled
+  }));
 
 export default function BatchPortActions({
   switchId,
@@ -129,6 +173,8 @@ export default function BatchPortActions({
   hasSsh = true,
   onBatchLocalUpdate
 }: BatchPortActionsProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
   const message = useMessage();
   const batchAction = useBatchPortAction();
@@ -162,11 +208,11 @@ export default function BatchPortActions({
       { switchId, data },
       {
         onSuccess: () => {
-          message.info('批量操作已提交，完成后将通过消息通知您');
+          message.info(td('switch.batch.submitted'));
           onClearSelection();
         },
         onError: (err) => {
-          message.error('批量操作提交失败：' + String(err));
+          message.error(td('switch.batch.submitFailed', { error: extractErrorMessage(err, tc) }));
         }
       }
     );
@@ -180,18 +226,25 @@ export default function BatchPortActions({
       onClearSelection();
       onRefresh?.();
     } catch (err) {
-      message.error('批量操作失败：' + (err instanceof Error ? err.message : String(err)));
+      message.error(td('switch.batch.failed', { error: extractErrorMessage(err, tc) }));
     } finally {
       setLocalLoading(false);
     }
   };
 
-  const handleSimpleAction = (actionKey: string) => {
-    const actionLabel = BATCH_ACTIONS.find((a) => a.key === actionKey)?.label;
+  const handleSimpleAction = (actionKey: BatchActionKey) => {
+    const actionDef = BATCH_ACTIONS.find((a) => a.key === actionKey);
+    const actionLabel = actionDef ? td(actionDef.labelKey) : actionKey;
+    const confirmContent = td('switch.batch.confirmContent', {
+      count: selectedPorts.length,
+      action: actionLabel
+    });
     if (hasSsh) {
       confirm({
-        title: '确认批量操作',
-        content: `确定要对 ${selectedPorts.length} 个端口执行"${actionLabel}"吗？`,
+        title: td('switch.batch.confirmTitle'),
+        content: confirmContent,
+        okText: tc('action.ok'),
+        cancelText: tc('action.cancel'),
         onOk: () => submitBatchAction(actionKey)
       });
     } else {
@@ -202,8 +255,10 @@ export default function BatchPortActions({
         updates.usage_status = 'disabled';
       }
       confirm({
-        title: '确认批量操作',
-        content: `确定要对 ${selectedPorts.length} 个端口执行"${actionLabel}"吗？`,
+        title: td('switch.batch.confirmTitle'),
+        content: confirmContent,
+        okText: tc('action.ok'),
+        cancelText: tc('action.cancel'),
         onOk: () => submitLocalBatchAction(updates)
       });
     }
@@ -273,7 +328,7 @@ export default function BatchPortActions({
         params.outbound = values.outbound;
       }
       if (Object.keys(params).length === 0) {
-        message.warning('请至少填写一个大于 0 的限速值（入向/出向）');
+        message.warning(td('switch.batch.warning.speedRequired'));
         return;
       }
       submitBatchAction('set_port_speed', params);
@@ -287,7 +342,7 @@ export default function BatchPortActions({
       const cancelInbound = values.cancel_inbound ?? false;
       const cancelOutbound = values.cancel_outbound ?? false;
       if (!cancelInbound && !cancelOutbound) {
-        message.warning('请至少勾选一个要取消的方向（入向/出向）');
+        message.warning(td('switch.batch.warning.directionRequired'));
         return;
       }
       const params: Record<string, unknown> = {
@@ -329,18 +384,7 @@ export default function BatchPortActions({
     }
   };
 
-  const menuItems: MenuProps['items'] = availableActions.map((action) => ({
-    key: action.key,
-    label: action.disabled ? (
-      <Tooltip title="需SSH连接设备，非网管设备不支持">
-        <span style={{ color: 'rgba(0,0,0,0.25)' }}>{action.label}</span>
-      </Tooltip>
-    ) : (
-      action.label
-    ),
-    icon: action.icon,
-    disabled: action.disabled
-  }));
+  const menuItems = buildMenuItems(availableActions, td);
 
   if (selectedPorts.length === 0) return null;
 
@@ -355,15 +399,16 @@ export default function BatchPortActions({
         message={
           <Space>
             <span>
-              已选择 <strong>{selectedPorts.length}</strong> 个端口
+              {tc('batch.selectedPrefix')} <strong>{selectedPorts.length}</strong>{' '}
+              {td('switch.batch.portUnit', { count: selectedPorts.length })}
             </span>
             <Dropdown menu={{ items: menuItems, onClick: handleMenuClick }} trigger={['click']}>
               <Button size="small" type="primary" loading={isOperating}>
-                批量操作
+                {td('switch.batch.action')}
               </Button>
             </Dropdown>
             <Button size="small" type="link" onClick={onClearSelection}>
-              取消选择
+              {tc('batch.clear')}
             </Button>
           </Space>
         }
@@ -371,7 +416,7 @@ export default function BatchPortActions({
 
       {/* VLAN 配置弹窗 */}
       <Modal
-        title="批量配置VLAN"
+        title={td('switch.batch.modal.setVlanTitle')}
         open={vlanModal.isOpen}
         onOk={handleVlanOk}
         onCancel={() => {
@@ -383,14 +428,19 @@ export default function BatchPortActions({
         <Form form={vlanForm} layout="vertical" initialValues={{ mode: 'access' }}>
           <Form.Item
             name="vlan_id"
-            label="VLAN ID"
-            rules={[{ required: true, message: '请输入VLAN ID' }]}
+            label={td('switch.batch.form.vlanId')}
+            rules={[{ required: true, message: td('switch.batch.form.vlanIdRequired') }]}
           >
-            <InputNumber min={1} max={4094} placeholder="如 100" style={{ width: '100%' }} />
+            <InputNumber
+              min={1}
+              max={4094}
+              placeholder={td('switch.batch.form.vlanIdPlaceholder')}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           {hasSsh && (
             <>
-              <Form.Item name="mode" label="模式">
+              <Form.Item name="mode" label={td('switch.batch.form.mode')}>
                 <Select
                   options={[
                     { value: 'access', label: 'Access' },
@@ -401,8 +451,11 @@ export default function BatchPortActions({
               <Form.Item noStyle shouldUpdate={(prev, cur) => prev.mode !== cur.mode}>
                 {({ getFieldValue }) =>
                   getFieldValue('mode') === 'trunk' ? (
-                    <Form.Item name="allowed_vlans" label="允许的VLAN（如 200-210,300）">
-                      <Input placeholder="如 200-210,300" />
+                    <Form.Item
+                      name="allowed_vlans"
+                      label={td('switch.batch.form.allowedVlans')}
+                    >
+                      <Input placeholder={td('switch.batch.form.allowedVlansPlaceholder')} />
                     </Form.Item>
                   ) : null
                 }
@@ -414,7 +467,7 @@ export default function BatchPortActions({
 
       {/* 描述修改弹窗 */}
       <Modal
-        title="批量修改端口描述"
+        title={td('switch.batch.modal.descTitle')}
         open={descModal.isOpen}
         onOk={handleDescOk}
         onCancel={() => {
@@ -424,8 +477,11 @@ export default function BatchPortActions({
         destroyOnHidden
       >
         <Form form={descForm} layout="vertical">
-          <Form.Item name="description" label="端口描述">
-            <Input.TextArea rows={3} placeholder="输入新的端口描述（留空则清除描述）" />
+          <Form.Item name="description" label={td('switch.batch.form.description')}>
+            <Input.TextArea
+              rows={3}
+              placeholder={td('switch.batch.form.descriptionPlaceholder')}
+            />
           </Form.Item>
         </Form>
       </Modal>
@@ -433,7 +489,7 @@ export default function BatchPortActions({
       {/* 链路聚合弹窗（仅 SSH 模式） */}
       {hasSsh && (
         <Modal
-          title="批量加入链路聚合"
+          title={td('switch.batch.modal.trunkTitle')}
           open={trunkModal.isOpen}
           onOk={handleTrunkOk}
           onCancel={() => {
@@ -445,10 +501,15 @@ export default function BatchPortActions({
           <Form form={trunkForm} layout="vertical">
             <Form.Item
               name="channel_id"
-              label="Eth-Trunk ID"
-              rules={[{ required: true, message: '请输入Eth-Trunk ID' }]}
+              label={td('switch.batch.form.trunkId')}
+              rules={[{ required: true, message: td('switch.batch.form.trunkIdRequired') }]}
             >
-              <InputNumber min={1} max={512} placeholder="如 10" style={{ width: '100%' }} />
+              <InputNumber
+                min={1}
+                max={512}
+                placeholder={td('switch.batch.form.trunkIdPlaceholder')}
+                style={{ width: '100%' }}
+              />
             </Form.Item>
           </Form>
         </Modal>
@@ -456,7 +517,7 @@ export default function BatchPortActions({
 
       {/* 客户分配弹窗 */}
       <Modal
-        title="批量分配客户"
+        title={td('switch.batch.modal.customerTitle')}
         open={customerModal.isOpen}
         onOk={handleCustomerOk}
         onCancel={() => {
@@ -466,11 +527,11 @@ export default function BatchPortActions({
         destroyOnHidden
       >
         <Form form={customerForm} layout="vertical">
-          <Form.Item name="customer_id" label="选择客户">
+          <Form.Item name="customer_id" label={td('switch.batch.form.customer')}>
             <Select
               allowClear
               showSearch
-              placeholder="选择要分配的客户（留空则清除客户）"
+              placeholder={td('switch.batch.form.customerPlaceholder')}
               options={customerOptions ?? []}
               filterOption={(input, option) =>
                 (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
@@ -483,7 +544,7 @@ export default function BatchPortActions({
       {/* 批量限速弹窗（仅 SSH 模式） */}
       {hasSsh && (
         <Modal
-          title="批量限速"
+          title={td('switch.batch.modal.speedTitle')}
           open={speedModal.isOpen}
           onOk={handleSpeedOk}
           onCancel={() => {
@@ -496,14 +557,32 @@ export default function BatchPortActions({
             type="info"
             showIcon
             style={{ marginBottom: 12 }}
-            message="限速策略按「方向 + 限速值」共享：相同限速值的端口复用同一份策略，不在设备上重复生成。"
+            message={td('switch.batch.alert.speedPolicy')}
           />
           <Form form={speedForm} layout="vertical">
-            <Form.Item name="inbound" label="入向限速 (Mbps)" extra="上行限速，留空表示不设置">
-              <InputNumber min={1} max={1000000} placeholder="如 1000" style={{ width: '100%' }} />
+            <Form.Item
+              name="inbound"
+              label={td('switch.batch.form.inbound')}
+              extra={td('switch.batch.form.inboundExtra')}
+            >
+              <InputNumber
+                min={1}
+                max={1000000}
+                placeholder={td('switch.batch.form.inboundPlaceholder')}
+                style={{ width: '100%' }}
+              />
             </Form.Item>
-            <Form.Item name="outbound" label="出向限速 (Mbps)" extra="下行限速，留空表示不设置">
-              <InputNumber min={1} max={1000000} placeholder="如 1200" style={{ width: '100%' }} />
+            <Form.Item
+              name="outbound"
+              label={td('switch.batch.form.outbound')}
+              extra={td('switch.batch.form.outboundExtra')}
+            >
+              <InputNumber
+                min={1}
+                max={1000000}
+                placeholder={td('switch.batch.form.outboundPlaceholder')}
+                style={{ width: '100%' }}
+              />
             </Form.Item>
           </Form>
         </Modal>
@@ -512,7 +591,7 @@ export default function BatchPortActions({
       {/* 批量取消限速弹窗（仅 SSH 模式） */}
       {hasSsh && (
         <Modal
-          title="批量取消限速"
+          title={td('switch.batch.modal.cancelSpeedTitle')}
           open={cancelSpeedModal.isOpen}
           onOk={handleCancelSpeedOk}
           onCancel={() => {
@@ -525,7 +604,7 @@ export default function BatchPortActions({
             type="info"
             showIcon
             style={{ marginBottom: 12 }}
-            message="取消限速会按方向逐端口撤销交换机上已应用的限速策略引用（华为CE需带策略名撤销）。未应用限速的端口会自动跳过。"
+            message={td('switch.batch.alert.cancelSpeedTip')}
           />
           <Form
             form={cancelSpeedForm}
@@ -533,10 +612,10 @@ export default function BatchPortActions({
             initialValues={{ cancel_inbound: true, cancel_outbound: true }}
           >
             <Form.Item name="cancel_inbound" valuePropName="checked">
-              <Checkbox>取消入向限速（上行）</Checkbox>
+              <Checkbox>{td('switch.batch.form.cancelInbound')}</Checkbox>
             </Form.Item>
             <Form.Item name="cancel_outbound" valuePropName="checked">
-              <Checkbox>取消出向限速（下行）</Checkbox>
+              <Checkbox>{td('switch.batch.form.cancelOutbound')}</Checkbox>
             </Form.Item>
           </Form>
         </Modal>

@@ -17,13 +17,16 @@ import {
   useLoginLogs
 } from '@/services/user';
 import type { LoginLog } from '@/services/user';
-import { LOGIN_TYPE_MAP } from '@/types/enums';
+import { getLoginTypeMeta } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '@/utils/format';
 import { useMessage } from '@/hooks/useMessage';
 
-const PASSWORD_TIPS = '至少8位，需包含大写字母、小写字母、数字和特殊字符';
-
 function ProfilePage() {
+  const { t } = useTranslation('settings');
+  const { t: tDevice } = useTranslation('device');
+  const { t: tAuth } = useTranslation('auth');
+  const { t: tCommon } = useTranslation('common');
   const message = useMessage();
   const authUser = useAuthStore((s) => s.user);
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -70,12 +73,12 @@ function ProfilePage() {
         const token = useAuthStore.getState().token ?? '';
         const permissions = useAuthStore.getState().permissions;
         setAuth(result.data, token, permissions);
-        message.success('个人信息更新成功');
+        message.success(t('profile.message.profileUpdated'));
         setProfileEditing(false);
         refetchProfile();
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '更新失败';
+      const msg = err instanceof Error ? err.message : t('profile.message.profileUpdateFailed');
       message.error(msg);
     }
   };
@@ -83,7 +86,7 @@ function ProfilePage() {
   const handleChangePassword = async () => {
     const values = await passwordForm.validateFields();
     if (values.new_password !== values.confirm_password) {
-      message.error('两次输入的新密码不一致');
+      message.error(t('user.validation.passwordMismatch'));
       return;
     }
     try {
@@ -91,41 +94,41 @@ function ProfilePage() {
         old_password: values.old_password,
         new_password: values.new_password
       });
-      message.success('密码修改成功，请重新登录');
+      message.success(t('profile.message.passwordChanged'));
       passwordForm.resetFields();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '密码修改失败';
+      const msg = err instanceof Error ? err.message : t('profile.message.passwordChangeFailed');
       message.error(msg);
     }
   };
 
   const logColumns = [
     {
-      title: '登录时间',
+      title: t('profile.column.loginTime'),
       dataIndex: 'login_time',
       key: 'login_time',
       width: 180,
       render: (v: string) => formatDateTime(v)
     },
     {
-      title: 'IP地址',
+      title: tDevice('port.column.ipAddress'),
       dataIndex: 'login_ip',
       key: 'login_ip',
       width: 140,
       render: (v: string | null) => v || '-'
     },
     {
-      title: '登录类型',
+      title: t('profile.column.loginType'),
       dataIndex: 'login_type',
       key: 'login_type',
       width: 100,
       render: (v: string) => {
-        const m = LOGIN_TYPE_MAP[v];
-        return <Tag color={m?.color ?? 'default'}>{(m?.label ?? v) || 'Web'}</Tag>;
+        const m = getLoginTypeMeta(v, tDevice);
+        return <Tag color={m?.color ?? 'default'}>{(m?.label ?? v) || tDevice('loginType.WEB')}</Tag>;
       }
     },
     {
-      title: '设备/浏览器',
+      title: t('profile.column.userAgent'),
       dataIndex: 'user_agent',
       key: 'user_agent',
       render: (v: string | null) => v || '-',
@@ -140,11 +143,15 @@ function ProfilePage() {
       </Tag>
     ))
   ) : (
-    <Tag>无角色</Tag>
+    <Tag>{t('profile.noRoles')}</Tag>
   );
 
   const statusDisplay =
-    userData?.status === 0 ? <Tag color="success">正常</Tag> : <Tag color="error">禁用</Tag>;
+    userData?.status === 0 ? (
+      <Tag color="success">{t('role.status.normal')}</Tag>
+    ) : (
+      <Tag color="error">{t('role.status.disabled')}</Tag>
+    );
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -155,7 +162,7 @@ function ProfilePage() {
             key: 'profile',
             label: (
               <span>
-                <UserOutlined /> 个人信息
+                <UserOutlined /> {t('profile.tab.profile')}
               </span>
             ),
             children: (
@@ -163,30 +170,30 @@ function ProfilePage() {
                 <Form form={profileForm} layout="vertical" disabled={!profileEditing}>
                   <Form.Item
                     name="username"
-                    label="用户名"
-                    rules={[{ required: true, message: '请输入用户名' }]}
+                    label={tAuth('field.username')}
+                    rules={[{ required: true, message: tAuth('validation.usernameRequired') }]}
                   >
-                    <Input placeholder="用户名" />
+                    <Input placeholder={tAuth('field.username')} />
                   </Form.Item>
 
-                  <Form.Item name="name" label="姓名">
-                    <Input placeholder="真实姓名" />
+                  <Form.Item name="name" label={t('user.field.fullName')}>
+                    <Input placeholder={t('user.field.realNamePlaceholder')} />
                   </Form.Item>
 
                   <Form.Item
                     name="email"
-                    label="邮箱"
-                    rules={[{ type: 'email', message: '请输入有效的邮箱地址' }]}
+                    label={t('user.field.email')}
+                    rules={[{ type: 'email', message: t('mail.validation.emailInvalid') }]}
                   >
-                    <Input placeholder="邮箱" />
+                    <Input placeholder={t('user.field.email')} />
                   </Form.Item>
 
-                  <Form.Item name="contact_phone" label="手机号码">
-                    <Input placeholder="手机号码" />
+                  <Form.Item name="contact_phone" label={t('user.field.contactPhone')}>
+                    <Input placeholder={t('user.field.contactPhone')} />
                   </Form.Item>
 
                   {/* 只读字段：部门 */}
-                  <Form.Item label="部门">
+                  <Form.Item label={t('user.field.department')}>
                     <Input
                       value={userData?.department || '-'}
                       disabled
@@ -195,7 +202,7 @@ function ProfilePage() {
                   </Form.Item>
 
                   {/* 只读字段：角色 */}
-                  <Form.Item label="角色">
+                  <Form.Item label={t('role.label')}>
                     <div
                       style={{
                         minHeight: 32,
@@ -212,7 +219,7 @@ function ProfilePage() {
                   </Form.Item>
 
                   {/* 只读字段：状态 */}
-                  <Form.Item label="状态">
+                  <Form.Item label={tCommon('field.status')}>
                     <div
                       style={{
                         minHeight: 32,
@@ -228,7 +235,7 @@ function ProfilePage() {
                   </Form.Item>
 
                   {/* 只读字段：更新时间 */}
-                  <Form.Item label="更新时间">
+                  <Form.Item label={tCommon('field.updatedAt')}>
                     <Input
                       value={formatDateTime(userData?.updated_at)}
                       disabled
@@ -246,7 +253,7 @@ function ProfilePage() {
                           profileForm.resetFields();
                         }}
                       >
-                        取消
+                        {tCommon('action.cancel')}
                       </Button>
                       <Button
                         type="primary"
@@ -254,12 +261,12 @@ function ProfilePage() {
                         loading={updateProfile.isPending}
                         onClick={handleSaveProfile}
                       >
-                        保存
+                        {tCommon('action.save')}
                       </Button>
                     </Space>
                   ) : (
                     <Button type="primary" onClick={() => setProfileEditing(true)}>
-                      编辑信息
+                      {t('profile.action.editProfile')}
                     </Button>
                   )}
                 </div>
@@ -270,7 +277,7 @@ function ProfilePage() {
             key: 'password',
             label: (
               <span>
-                <LockOutlined /> 修改密码
+                <LockOutlined /> {t('profile.tab.password')}
               </span>
             ),
             children: (
@@ -278,41 +285,43 @@ function ProfilePage() {
                 <Form form={passwordForm} layout="vertical" style={{ maxWidth: 480 }}>
                   <Form.Item
                     name="old_password"
-                    label="原密码"
-                    rules={[{ required: true, message: '请输入原密码' }]}
+                    label={t('profile.field.oldPassword')}
+                    rules={[{ required: true, message: t('profile.validation.oldPasswordRequired') }]}
                   >
-                    <Input.Password placeholder="请输入原密码" />
+                    <Input.Password placeholder={t('profile.validation.oldPasswordRequired')} />
                   </Form.Item>
 
                   <Form.Item
                     name="new_password"
-                    label="新密码"
+                    label={t('profile.field.newPassword')}
                     rules={[
-                      { required: true, message: '请输入新密码' },
-                      { min: 8, message: '密码至少8位' }
+                      { required: true, message: t('profile.validation.newPasswordRequired') },
+                      { min: 8, message: t('user.validation.passwordMinLength') }
                     ]}
-                    extra={PASSWORD_TIPS}
+                    extra={t('user.field.passwordTips')}
                   >
-                    <Input.Password placeholder="请输入新密码" />
+                    <Input.Password placeholder={t('profile.validation.newPasswordRequired')} />
                   </Form.Item>
 
                   <Form.Item
                     name="confirm_password"
-                    label="确认新密码"
+                    label={t('profile.field.confirmPassword')}
                     dependencies={['new_password']}
                     rules={[
-                      { required: true, message: '请确认新密码' },
+                      { required: true, message: t('user.validation.confirmPasswordRequired') },
                       ({ getFieldValue }) => ({
                         validator(_, value) {
                           if (!value || getFieldValue('new_password') === value) {
                             return Promise.resolve();
                           }
-                          return Promise.reject(new Error('两次密码不一致'));
+                          return Promise.reject(
+                            new Error(t('user.validation.passwordMismatch'))
+                          );
                         }
                       })
                     ]}
                   >
-                    <Input.Password placeholder="再次输入新密码" />
+                    <Input.Password placeholder={t('user.field.passwordAgain')} />
                   </Form.Item>
 
                   <Form.Item>
@@ -322,7 +331,7 @@ function ProfilePage() {
                       loading={changePassword.isPending}
                       onClick={handleChangePassword}
                     >
-                      修改密码
+                      {t('profile.tab.password')}
                     </Button>
                   </Form.Item>
                 </Form>
@@ -333,7 +342,7 @@ function ProfilePage() {
             key: 'login-logs',
             label: (
               <span>
-                <HistoryOutlined /> 登录记录
+                <HistoryOutlined /> {t('user.action.loginLogs')}
               </span>
             ),
             children: (
@@ -347,6 +356,8 @@ function ProfilePage() {
                     current: logPage,
                     pageSize: logPageSize,
                     total: loginLogsData?.total ?? 0,
+                    showTotal: (total) => tCommon('pagination.total', { count: total }),
+                    showSizeChanger: true,
                     onChange: (p, ps) => {
                       setLogPage(p);
                       setLogPageSize(ps);

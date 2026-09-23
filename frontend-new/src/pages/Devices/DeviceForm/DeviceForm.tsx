@@ -20,18 +20,16 @@ import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useUserOptions } from '@/services/user';
 import { useUpdateSwitch } from '@/services/switch';
 import { usePortLinks } from '@/services/device-connection';
+import { useTranslation } from 'react-i18next';
 import { useComponentTemplates } from '@/services/component-template';
 import HardwareConfigFields, { buildStorageSummary } from '@/components/HardwareConfigFields';
 import NicConfigFields from '@/components/NicConfigFields';
+import { DeviceType, DeviceSubtype, DEVICE_SUBTYPE_MAP, DeviceStatusCode } from '@/types/enums';
 import {
-  DeviceType,
-  DeviceSubtype,
-  DEVICE_SUBTYPE_MAP,
-  DEVICE_SUBTYPE_LABELS,
-  DEVICE_TYPE_MAP,
-  DeviceStatusCode,
-  DEVICE_STATUS_MAP
-} from '@/types/enums';
+  getDeviceStatusOptions,
+  getDeviceSubtypeOptions,
+  getDeviceTypeOptions
+} from '@/types/statusMeta';
 import type { Device, DeviceNicPort } from '@/types/models';
 
 import {
@@ -85,6 +83,8 @@ function DeviceForm({
   const { data: roomOptions } = useRoomOptions();
   const { data: customerOptions } = useAllocatableCustomerOptions();
   const { data: userOptions } = useUserOptions();
+  const { t: tDevice } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
 
   const customerId = Form.useWatch('customer_id', form);
 
@@ -152,10 +152,7 @@ function DeviceForm({
   }>({ valid: true, preview: '', items: [], errors: [] });
 
   const subtypeOptions = deviceType
-    ? (DEVICE_SUBTYPE_MAP[deviceType as DeviceType] ?? []).map((st) => ({
-        label: DEVICE_SUBTYPE_LABELS[st],
-        value: st
-      }))
+    ? getDeviceSubtypeOptions(DEVICE_SUBTYPE_MAP[deviceType as DeviceType] ?? [], tDevice)
     : [];
 
   const serverCfg = getCategoryConfig(deviceType as DeviceType);
@@ -219,11 +216,15 @@ function DeviceForm({
         const currentNodeCount = allNodes.filter((n) => n.parent_device_id === chassis.id).length;
         const maxNodes = chassis.total_nodes ?? '∞';
         return {
-          label: `${chassis.device_name} (${currentNodeCount}/${maxNodes}节点)`,
+          label: tDevice('form.nodeAssoc.chassis.option', {
+            name: chassis.device_name,
+            used: currentNodeCount,
+            max: maxNodes
+          }),
           value: chassis.id
         };
       });
-  }, [chassisData, allChassisNodesData, editRecord]);
+  }, [chassisData, allChassisNodesData, editRecord, tDevice]);
 
   const availablePositions = useMemo(() => {
     if (!selectedChassisId) return [];
@@ -278,7 +279,7 @@ function DeviceForm({
 
   const handleAutoAssignUPosition = useCallback(() => {
     if (!selectedCabinetId) {
-      message.warning('请先选择机柜');
+      message.warning(tDevice('form.hint.selectCabinetFirst'));
       return;
     }
     const heightU = form.getFieldValue('height_u') ?? 1;
@@ -293,14 +294,21 @@ function DeviceForm({
       {
         onSuccess: (res) => {
           form.setFieldValue('u_position', res.u_position);
-          message.success(`已分配U${res.u_position}~U${res.u_position + heightU - 1}`);
+          message.success(
+            tDevice('form.location.uPosition.assigned', {
+              start: res.u_position,
+              end: res.u_position + heightU - 1
+            })
+          );
         },
         onError: (err) => {
-          message.warning(err instanceof Error ? err.message : '分配失败：无可用 U 位');
+          message.warning(
+            err instanceof Error ? err.message : tDevice('form.location.uPosition.allocateFailed')
+          );
         }
       }
     );
-  }, [selectedCabinetId, form, message, isEdit, editRecord, allocateUMutation]);
+  }, [selectedCabinetId, form, message, isEdit, editRecord, allocateUMutation, tDevice]);
 
   useEffect(() => {
     if (prevDeviceType.current !== undefined && prevDeviceType.current !== deviceType) {
@@ -337,8 +345,11 @@ function DeviceForm({
       .replace('{row}', String(Math.ceil(watchedNodePosition / (chassis.node_cols || 1))))
       .replace('{col}', String(((watchedNodePosition - 1) % (chassis.node_cols || 1)) + 1));
     form.setFieldValue('device_name', newName);
-    form.setFieldValue('notes', `${chassis.device_name} 节点 ${watchedNodePosition}`);
-  }, [showNodeAssoc, selectedChassisId, watchedNodePosition, chassisData, form]);
+    form.setFieldValue(
+      'notes',
+      tDevice('node.notesTemplate', { name: chassis.device_name, position: watchedNodePosition })
+    );
+  }, [showNodeAssoc, selectedChassisId, watchedNodePosition, chassisData, form, tDevice]);
 
   useEffect(() => {
     if (open) {
@@ -484,17 +495,16 @@ function DeviceForm({
       setGenerateNodes(checked);
       if (checked) {
         confirm({
-          title: '生成子节点',
-          content:
-            '勾选后，保存时将自动创建所有子节点（包括已经存在的子节点），并使用下方输入的硬件配置统一设置所有子节点。确定？',
-          okText: '确定',
-          cancelText: '取消',
+          title: tDevice('form.chassis.generateNodes.confirmTitle'),
+          content: tDevice('form.chassis.generateNodes.confirmContent'),
+          okText: tCommon('action.ok'),
+          cancelText: tCommon('action.cancel'),
           onOk: () => {},
           onCancel: () => setGenerateNodes(false)
         });
       }
     },
-    [confirm]
+    [confirm, tDevice, tCommon]
   );
 
   const currentDeviceId = editRecord?.id;
@@ -530,19 +540,12 @@ function DeviceForm({
     onClose
   });
 
-  const typeOptions = Object.entries(DEVICE_TYPE_MAP).map(([key, val]) => ({
-    label: val.label,
-    value: key
-  }));
-
-  const statusOptions = Object.entries(DEVICE_STATUS_MAP).map(([key, val]) => ({
-    label: val.label,
-    value: Number(key)
-  }));
+  const typeOptions = getDeviceTypeOptions(tDevice);
+  const statusOptions = getDeviceStatusOptions(tDevice);
 
   return (
     <Modal
-      title={isEdit ? '编辑设备' : '新增设备'}
+      title={isEdit ? tDevice('form.title.edit') : tDevice('batch.addDevice')}
       open={open}
       onOk={handleSubmit}
       onCancel={onClose}
@@ -615,8 +618,8 @@ function DeviceForm({
         {/* 备注：设备级字段，不属于资产信息，单独渲染 */}
         <Row gutter={16}>
           <Col span={24}>
-            <Form.Item name="notes" label="备注">
-              <Input.TextArea rows={2} placeholder="备注信息" />
+            <Form.Item name="notes" label={tCommon('field.remarks')}>
+              <Input.TextArea rows={2} placeholder={tDevice('form.basicInfo.notes.placeholder')} />
             </Form.Item>
           </Col>
         </Row>

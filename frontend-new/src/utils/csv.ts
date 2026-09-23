@@ -6,6 +6,7 @@
  */
 import { useCallback } from 'react';
 import { message } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 interface ExportCSVOptions {
   filename?: string;
@@ -31,6 +32,7 @@ export function exportCSV(
 }
 
 export function useExportCSV() {
+  const { t } = useTranslation('common');
   return useCallback(
     <T extends Record<string, unknown>>(
       data: T[],
@@ -38,14 +40,14 @@ export function useExportCSV() {
       filename?: string,
     ) => {
       if (!data.length) {
-        message.warning('无数据可导出');
+        message.warning(t('message.noDataToExport'));
         return;
       }
       const headers = columns.map((c) => c.title);
       const rows = data.map((item) => columns.map((c) => String(item[c.key] ?? '')));
       exportCSV(headers, rows, { filename });
     },
-    [],
+    [t],
   );
 }
 

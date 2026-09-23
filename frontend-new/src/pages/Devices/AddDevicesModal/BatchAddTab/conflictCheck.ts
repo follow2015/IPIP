@@ -6,12 +6,9 @@
  */
 
 import type { DeviceBatchRow } from '../shared';
+import type { DeviceT } from '@/types/statusMeta';
 
-/**
- * 前端本地 U 位冲突预检查：同一批次内 U 位区间不能重叠（节点模式跳过，由调用方控制）。
- * @returns 冲突描述字符串；无冲突返回 null
- */
-export function checkUConflict(rowsToCheck: DeviceBatchRow[]): string | null {
+export function checkUConflict(rowsToCheck: DeviceBatchRow[], t: DeviceT): string | null {
   const withU = rowsToCheck.filter((r) => r.u_position != null);
   const sorted = [...withU].sort((a, b) => (a.u_position ?? 0) - (b.u_position ?? 0));
   for (let i = 0; i < sorted.length - 1; i++) {
@@ -19,7 +16,13 @@ export function checkUConflict(rowsToCheck: DeviceBatchRow[]): string | null {
     const b = sorted[i + 1];
     const aEnd = (a.u_position ?? 0) + (a.height_u ?? 1);
     if ((b.u_position ?? 0) < aEnd) {
-      return `U位冲突：「${a.device_name}」(U${a.u_position}, 高${a.height_u ?? 1}U) 与「${b.device_name}」(U${b.u_position}) 重叠`;
+      return t('addModal.conflict.u', {
+        nameA: a.device_name,
+        uA: a.u_position,
+        heightA: a.height_u ?? 1,
+        nameB: b.device_name,
+        uB: b.u_position
+      });
     }
   }
   return null;
@@ -29,13 +32,21 @@ export function checkUConflict(rowsToCheck: DeviceBatchRow[]): string | null {
  * 节点模式：检查同批次内行号+列号是否重复。
  * @returns 冲突描述字符串；无冲突返回 null
  */
-export function checkNodePositionConflict(rowsToCheck: DeviceBatchRow[]): string | null {
+export function checkNodePositionConflict(
+  rowsToCheck: DeviceBatchRow[],
+  t: DeviceT
+): string | null {
   const seen = new Map<string, string>();
   for (const r of rowsToCheck) {
     if (r.node_row == null || r.node_col == null) continue;
     const key = `${r.node_row}-${r.node_col}`;
     if (seen.has(key)) {
-      return `节点位置冲突：「${seen.get(key)}」与「${r.device_name}」都填了 行${r.node_row}列${r.node_col}`;
+      return t('addModal.conflict.nodePosition', {
+        nameA: seen.get(key),
+        nameB: r.device_name,
+        row: r.node_row,
+        col: r.node_col
+      });
     }
     seen.set(key, r.device_name);
   }

@@ -26,6 +26,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { ensureUtc } from '@/utils/format';
 import { useMonitorAlerts, useAlertStatistics } from '@/services/monitor';
+import { useTranslation } from 'react-i18next';
+import { getSeverityLabel } from '@/types/statusMeta';
+import type { TFunction } from 'i18next';
 
 const T = {
   bg: '#f5f7fa',
@@ -45,10 +48,9 @@ const SEV_COLOR: Record<string, string> = {
   critical: '#ff4d4f'
 };
 const SEV_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
-const SEV_LABEL: Record<string, string> = { critical: '严重', warning: '警告', info: '提示' };
 
-const REFRESH_OPTIONS = [
-  { label: '关闭', value: 0 },
+const getRefreshOptions = (t: TFunction<'monitor'>) => [
+  { label: t('noc.refreshOff'), value: 0 },
   { label: '10s', value: 10 },
   { label: '15s', value: 15 },
   { label: '30s', value: 30 },
@@ -59,6 +61,9 @@ const FONT_NUM = "'Fira Code', 'Courier New', monospace";
 const FONT_TXT = "'Fira Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 export default function MonitorNocScreenPage() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
+  const { t: td } = useTranslation('device');
   const location = useLocation();
   const navigate = useNavigate();
   const isFullscreenRoute = location.pathname === '/monitor/noc-screen/fullscreen';
@@ -104,15 +109,18 @@ export default function MonitorNocScreenPage() {
   const severityPieData = useMemo(
     () =>
       (stats?.by_severity ?? []).map((x) => ({
-        name: SEV_LABEL[x.severity ?? ''] ?? x.severity ?? '未知',
+        name: getSeverityLabel(x.severity ?? '', td) ?? x.severity ?? tc('field.unknown'),
         value: x.count ?? 0
       })),
-    [stats]
+    [stats, td, tc]
   );
   const typePieData = useMemo(
     () =>
-      (stats?.by_type ?? []).map((x) => ({ name: x.alert_type ?? '未知', value: x.count ?? 0 })),
-    [stats]
+      (stats?.by_type ?? []).map((x) => ({
+        name: x.alert_type ?? tc('field.unknown'),
+        value: x.count ?? 0
+      })),
+    [stats, tc]
   );
   const densityData = useMemo(
     () =>
@@ -135,7 +143,7 @@ export default function MonitorNocScreenPage() {
     data: { name: string; value: number }[],
     colorMap: Record<string, string>
   ) => ({
-    data: data.length === 0 ? [{ name: '暂无', value: 1 }] : data,
+    data: data.length === 0 ? [{ name: tc('message.noData'), value: 1 }] : data,
     angleField: 'value',
     colorField: 'name',
     color: data.length === 0 ? [T.border] : data.map((d) => colorMap[d.name] ?? T.accent),
@@ -181,7 +189,10 @@ export default function MonitorNocScreenPage() {
     color: T.accent,
     axis: {
       x: { labelAutoRotate: true, label: { style: { fill: T.textSecondary, fontSize: 10 } } },
-      y: { title: '告警数', label: { style: { fill: T.textSecondary, fontSize: 10 } } }
+      y: {
+        title: t('noc.alertCountAxis'),
+        label: { style: { fill: T.textSecondary, fontSize: 10 } }
+      }
     },
     animation: { appear: { duration: 400 } }
   };
@@ -216,7 +227,7 @@ export default function MonitorNocScreenPage() {
       >
         <Space size="large" align="center">
           {isFullscreenRoute && (
-            <Tooltip title="返回告警中心">
+            <Tooltip title={t('noc.backToAlerts')}>
               <Button
                 size="small"
                 type="text"
@@ -227,14 +238,10 @@ export default function MonitorNocScreenPage() {
             </Tooltip>
           )}
           <span style={{ fontSize: 22, fontWeight: 700, color: T.accent, letterSpacing: 1 }}>
-            NOC 监控大屏
+            {t('noc.title')}
           </span>
           <span style={{ fontSize: 13, color: T.textTertiary }}>
-            活跃告警{' '}
-            <span style={{ color: T.textPrimary, fontWeight: 600, fontFamily: FONT_NUM }}>
-              {sortedAlerts.length}
-            </span>{' '}
-            条
+            {t('noc.activeAlertCount', { count: sortedAlerts.length })}
           </span>
         </Space>
         <Space size="middle" align="center">
@@ -250,11 +257,11 @@ export default function MonitorNocScreenPage() {
           </span>
           <Segmented
             size="small"
-            options={REFRESH_OPTIONS}
+            options={getRefreshOptions(t)}
             value={refreshSec}
             onChange={(v) => setRefreshSec(v as number)}
           />
-          <Tooltip title={isFullscreenRoute ? '退出全屏' : '全屏'}>
+          <Tooltip title={isFullscreenRoute ? t('noc.exitFullscreen') : t('noc.fullscreen')}>
             <Button
               size="small"
               type="text"
@@ -263,7 +270,7 @@ export default function MonitorNocScreenPage() {
               style={{ color: T.textSecondary }}
             />
           </Tooltip>
-          <Tooltip title="刷新">
+          <Tooltip title={tc('action.refresh')}>
             <Button
               size="small"
               type="text"
@@ -288,10 +295,10 @@ export default function MonitorNocScreenPage() {
         }}
       >
         {[
-          { title: '活跃告警总数', value: sortedAlerts.length, color: T.accent },
-          { title: '严重告警', value: criticalCount, color: SEV_COLOR.critical },
-          { title: '警告告警', value: warningCount, color: SEV_COLOR.warning },
-          { title: '提示告警', value: infoCount, color: SEV_COLOR.info }
+          { title: t('noc.kpi.total'), value: sortedAlerts.length, color: T.accent },
+          { title: t('noc.kpi.critical'), value: criticalCount, color: SEV_COLOR.critical },
+          { title: t('noc.kpi.warning'), value: warningCount, color: SEV_COLOR.warning },
+          { title: t('noc.kpi.info'), value: infoCount, color: SEV_COLOR.info }
         ].map((m) => (
           <div
             key={m.title}
@@ -357,11 +364,11 @@ export default function MonitorNocScreenPage() {
                 borderRadius: 2
               }}
             />
-            活跃告警墙（按级别排序，critical 置顶）
+            {t('noc.wallTitle')}
           </div>
           {sortedAlerts.length === 0 ? (
             <Empty
-              description={<span style={{ color: T.textTertiary }}>暂无活跃告警</span>}
+              description={<span style={{ color: T.textTertiary }}>{t('noc.noActiveAlerts')}</span>}
               style={{ padding: '60px 0' }}
             />
           ) : (
@@ -398,7 +405,7 @@ export default function MonitorNocScreenPage() {
                       color={sevColor}
                       style={{ margin: 0, width: 'fit-content', fontSize: 11, fontWeight: 600 }}
                     >
-                      {SEV_LABEL[sev] ?? sev}
+                      {getSeverityLabel(sev, td) ?? sev}
                     </Tag>
                     <span style={{ fontSize: 11, color: T.textTertiary, fontFamily: FONT_NUM }}>
                       #{a.id}
@@ -436,11 +443,15 @@ export default function MonitorNocScreenPage() {
         {/* 双饼图 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ ...cardBase, padding: 12 }}>
-            <div style={{ fontSize: 12, color: T.textTertiary, marginBottom: 8 }}>按级别分布</div>
+            <div style={{ fontSize: 12, color: T.textTertiary, marginBottom: 8 }}>
+              {t('noc.bySeverity')}
+            </div>
             <Pie {...severityConfig} height={200} />
           </div>
           <div style={{ ...cardBase, padding: 12 }}>
-            <div style={{ fontSize: 12, color: T.textTertiary, marginBottom: 8 }}>按类型分布</div>
+            <div style={{ fontSize: 12, color: T.textTertiary, marginBottom: 8 }}>
+              {t('noc.byType')}
+            </div>
             <Pie {...typeConfig} height={200} />
           </div>
         </div>
@@ -468,13 +479,13 @@ export default function MonitorNocScreenPage() {
               borderRadius: 2
             }}
           />
-          告警密度时序（按小时）
+          {t('noc.densityTitle')}
         </div>
         {densityData.length === 0 ? (
-          <Empty
-            description={<span style={{ color: T.textTertiary }}>暂无数据</span>}
-            style={{ padding: '40px 0' }}
-          />
+            <Empty
+              description={<span style={{ color: T.textTertiary }}>{tc('message.noData')}</span>}
+              style={{ padding: '40px 0' }}
+            />
         ) : (
           <Column {...densityConfig} />
         )}

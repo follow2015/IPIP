@@ -4,6 +4,7 @@
  * 从 ConnectionTab.tsx 拆出。复用父级 editForm 实例（父级负责提交与校验），
  * 根据 editRecord.link_type 条件渲染 N2N 专属字段（VLAN / 带宽 / LAG / 描述）。
  */
+import { useTranslation } from 'react-i18next';
 import { Form, Modal, Select, Input, Row, Col } from 'antd';
 import type { FormInstance, SelectProps } from 'antd';
 import type { DeviceConnection } from '@/types/models';
@@ -30,24 +31,37 @@ export default function ConnectionEditModal({
   vlanOptions,
   lagOptions
 }: ConnectionEditModalProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const isN2N = editRecord?.link_type === 'network_to_network';
 
   return (
-    <Modal title="编辑连接" open={open} onOk={onOk} onCancel={onCancel} width={600} destroyOnHidden>
+    <Modal
+      title={t('connection.editTitle')}
+      open={open}
+      onOk={onOk}
+      onCancel={onCancel}
+      width={600}
+      destroyOnHidden
+    >
       <Form form={form} layout="vertical">
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item name="connection_type" label="连接类型">
-              <Select placeholder="请选择" options={connectionTypeOptions} allowClear />
+            <Form.Item name="connection_type" label={t('connection.column.connectionType')}>
+              <Select
+                placeholder={tCommon('message.selectRequired')}
+                options={connectionTypeOptions}
+                allowClear
+              />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="status" label="状态">
+            <Form.Item name="status" label={tCommon('field.status')}>
               <Select
-                placeholder="请选择"
+                placeholder={tCommon('message.selectRequired')}
                 options={[
-                  { label: '活跃', value: 'active' },
-                  { label: '不活跃', value: 'inactive' }
+                  { label: t('connectionStatus.ACTIVE'), value: 'active' },
+                  { label: t('connectionStatus.INACTIVE'), value: 'inactive' }
                 ]}
               />
             </Form.Item>
@@ -56,9 +70,9 @@ export default function ConnectionEditModal({
         {isN2N && (
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item name="vlan_id" label="VLAN">
+              <Form.Item name="vlan_id" label={t('connection.column.vlan')}>
                 <Select
-                  placeholder="选择 VLAN"
+                  placeholder={t('connection.form.selectVlan')}
                   options={vlanOptions}
                   allowClear
                   showSearch
@@ -67,8 +81,8 @@ export default function ConnectionEditModal({
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="bandwidth" label="带宽">
-                <Input placeholder="如 10G" />
+              <Form.Item name="bandwidth" label={t('connection.column.bandwidth')}>
+                <Input placeholder={t('connection.form.bandwidthHint')} />
               </Form.Item>
             </Col>
           </Row>
@@ -76,9 +90,9 @@ export default function ConnectionEditModal({
         {isN2N && (
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item name="lag_group_id" label="LAG 组">
+              <Form.Item name="lag_group_id" label={t('connection.column.lagGroup')}>
                 <Select
-                  placeholder="选择 LAG 组"
+                  placeholder={t('connection.form.selectLagGroup')}
                   options={lagOptions}
                   allowClear
                   showSearch
@@ -87,13 +101,13 @@ export default function ConnectionEditModal({
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="description" label="描述">
+              <Form.Item name="description" label={tCommon('field.description')}>
                 <Input.TextArea rows={1} />
               </Form.Item>
             </Col>
           </Row>
         )}
-        <Form.Item name="notes" label="备注">
+        <Form.Item name="notes" label={tCommon('field.remarks')}>
           <Input.TextArea rows={2} />
         </Form.Item>
       </Form>

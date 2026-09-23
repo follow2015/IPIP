@@ -8,7 +8,8 @@ import {
   WarningFilled
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { CABINET_STATUS_MAP } from '@/types/enums';
+import { getCabinetStatusMeta } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { Cabinet } from '@/types/models';
 import CabinetNode from './CabinetNode';
 import ChannelLayer from './ChannelLayer';
@@ -19,7 +20,7 @@ import {
   StatusLegend,
   UnpositionedCabinetList
 } from './RoomLayoutParts';
-import { DEFAULT_STATUS, MARKER_TYPE_LABEL } from './palette';
+import { DEFAULT_STATUS, MARKER_TYPE_LABEL_KEYS } from './palette';
 import {
   cellLeft,
   cellTop,
@@ -46,8 +47,13 @@ const COL_HEADER_HEIGHT = 24;
 
 type DensityKey = 'compact' | 'standard' | 'large';
 
+type DensityLabelKey =
+  | 'roomLayout.density.compact'
+  | 'roomLayout.density.standard'
+  | 'roomLayout.density.large';
+
 interface DensityConfig {
-  label: string;
+  labelKey: DensityLabelKey;
   cellWidth: number;
   cellHeight: number;
   gap: number;
@@ -55,15 +61,12 @@ interface DensityConfig {
 }
 
 const DENSITY_CONFIG: Record<DensityKey, DensityConfig> = {
-  compact: { label: '紧凑', cellWidth: 88, cellHeight: 72, gap: 6, showCustomer: false },
-  standard: { label: '标准', cellWidth: 120, cellHeight: 96, gap: 8, showCustomer: true },
-  large: { label: '大图', cellWidth: 156, cellHeight: 124, gap: 10, showCustomer: true }
+  compact: { labelKey: 'roomLayout.density.compact', cellWidth: 88, cellHeight: 72, gap: 6, showCustomer: false },
+  standard: { labelKey: 'roomLayout.density.standard', cellWidth: 120, cellHeight: 96, gap: 8, showCustomer: true },
+  large: { labelKey: 'roomLayout.density.large', cellWidth: 156, cellHeight: 124, gap: 10, showCustomer: true }
 };
 
-const DENSITY_OPTIONS = (Object.keys(DENSITY_CONFIG) as DensityKey[]).map((key) => ({
-  label: DENSITY_CONFIG[key].label,
-  value: key
-}));
+const DENSITY_KEYS = Object.keys(DENSITY_CONFIG) as DensityKey[];
 
 function extractCabinetPrefix(cabinetNumber: string): string {
   const match = cabinetNumber.match(/^[A-Za-z]+/);
@@ -82,6 +85,9 @@ function RoomLayout({
 }: RoomLayoutProps) {
   const navigate = useNavigate();
   const { token } = theme.useToken();
+  const { t } = useTranslation('asset');
+  const { t: tDevice } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
 
   const [density, setDensity] = useState<DensityKey>('standard');
   const [keyword, setKeyword] = useState('');
@@ -164,7 +170,10 @@ function RoomLayout({
       if (!occupiedCells.has(key)) continue;
       const entry = map.get(key) ?? { cabinetNumbers: [], markerNames: [] };
       entry.markerNames.push(
-        marker.label || MARKER_TYPE_LABEL[marker.marker_type] || marker.marker_type
+        marker.label ||
+        (MARKER_TYPE_LABEL_KEYS[marker.marker_type]
+          ? t(MARKER_TYPE_LABEL_KEYS[marker.marker_type])
+          : marker.marker_type)
       );
       map.set(key, entry);
     }
@@ -296,7 +305,7 @@ function RoomLayout({
   const layoutHeight = COL_HEADER_HEIGHT + gap + gridHeight(rows, cellHeight, gap);
 
   if (cabinets.length === 0 && markers.length === 0) {
-    return <Empty description="该机房暂无机柜与占位标记" />;
+    return <Empty description={t('roomLayout.empty.noCabinetOrMarker')} />;
   }
 
   /*
@@ -320,32 +329,43 @@ function RoomLayout({
           allowClear
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          placeholder="搜索机柜编号或客户"
+          placeholder={t('roomLayout.searchPlaceholder')}
           prefix={<SearchOutlined style={{ color: token.colorTextTertiary }} />}
           style={{ width: 220 }}
-          aria-label="搜索机柜编号或客户"
+          aria-label={t('roomLayout.searchPlaceholder')}
         />
         {matchedIds ? (
           <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
-            匹配 {matchedIds.size} 个
+            {t('roomLayout.matched', { count: matchedIds.size })}
           </span>
         ) : null}
         <Segmented
           value={density}
           onChange={(value) => setDensity(value as DensityKey)}
-          options={DENSITY_OPTIONS}
+          options={DENSITY_KEYS.map((key) => ({
+            label: t(DENSITY_CONFIG[key].labelKey),
+            value: key
+          }))}
         />
         <Space.Compact>
           <Button
             icon={<ZoomOutOutlined />}
             onClick={() => zoomAtCenter(1 / 1.2)}
-            aria-label="缩小"
+            aria-label={t('roomLayout.zoom.out')}
           />
-          <Button icon={<ZoomInOutlined />} onClick={() => zoomAtCenter(1.2)} aria-label="放大" />
-          <Button icon={<ExpandOutlined />} onClick={resetView} aria-label="复位缩放" />
+          <Button
+            icon={<ZoomInOutlined />}
+            onClick={() => zoomAtCenter(1.2)}
+            aria-label={t('roomLayout.zoom.in')}
+          />
+          <Button
+            icon={<ExpandOutlined />}
+            onClick={resetView}
+            aria-label={t('roomLayout.zoom.reset')}
+          />
         </Space.Compact>
         <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
-          缩放 {Math.round(scale * 100)}%
+          {t('roomLayout.zoom.level', { pct: Math.round(scale * 100) })}
         </span>
       </div>
 
@@ -369,25 +389,30 @@ function RoomLayout({
             {selectedCabinet.cabinet_number}
           </strong>
           <span>
-            状态：
-            {CABINET_STATUS_MAP[
-              (selectedCabinet.status ?? DEFAULT_STATUS) as keyof typeof CABINET_STATUS_MAP
-            ]?.label ?? ''}
+            {t('roomLayout.tooltip.status', {
+              value:
+                getCabinetStatusMeta(selectedCabinet.status ?? DEFAULT_STATUS, tDevice)?.label ?? ''
+            })}
           </span>
-          <span>U位：{selectedCabinet.u_usage_rate ?? 0}%</span>
-          <span>设备：{selectedCabinet.device_count ?? 0}台</span>
+          <span>{t('roomLayout.uUsage', { pct: selectedCabinet.u_usage_rate ?? 0 })}</span>
+          <span>{t('roomLayout.devices', { count: selectedCabinet.device_count ?? 0 })}</span>
           <span>
             {isPositioned(selectedCabinet)
-              ? `位置：第${selectedCabinet.row}行 第${selectedCabinet.col}列`
-              : '位置：未定位'}
+              ? t('roomLayout.tooltip.position', {
+                  value: t('roomLayout.position', {
+                    row: selectedCabinet.row,
+                    col: selectedCabinet.col
+                  })
+                })
+              : t('roomLayout.tooltip.position', { value: t('roomLayout.positionUnset') })}
           </span>
           <Button type="link" size="small" onClick={() => handleOpen(selectedCabinet.id)}>
-            查看详情
+            {t('roomLayout.action.viewDetail')}
           </Button>
           <Button type="text" size="small" onClick={() => setSelectedId(null)}>
-            取消选中
+            {t('roomLayout.action.clearSelection')}
           </Button>
-          {readOnly ? <span>（只读模式，不可跳转）</span> : null}
+          {readOnly ? <span>{t('roomLayout.readOnlyHint')}</span> : null}
         </div>
       ) : null}
 
@@ -451,7 +476,9 @@ function RoomLayout({
                       fontWeight: 500
                     }}
                   >
-                    {colLabels[i] ? `${colLabels[i]}(${minCol + i})` : `列${minCol + i}`}
+                    {colLabels[i]
+                      ? `${colLabels[i]}(${minCol + i})`
+                      : t('roomLayout.colHeader', { index: minCol + i })}
                   </div>
                 ))}
               </div>
@@ -557,19 +584,26 @@ function RoomLayout({
                   const reasons: string[] = [];
                   if (info.cabinetNumbers.length > 1) {
                     reasons.push(
-                      `该位置有 ${info.cabinetNumbers.length} 台机柜：${info.cabinetNumbers.join('、')}`
+                      t('roomLayout.conflict.cellCabinets', {
+                        count: info.cabinetNumbers.length,
+                        list: info.cabinetNumbers.join(t('roomLayout.conflict.listSeparator'))
+                      })
                     );
                   }
                   if (info.markerNames.length > 0) {
-                    reasons.push(`该位置还标有占位设施：${info.markerNames.join('、')}`);
+                    reasons.push(
+                      t('roomLayout.conflict.cellMarkers', {
+                        list: info.markerNames.join(t('roomLayout.conflict.listSeparator'))
+                      })
+                    );
                   }
                   return (
                     <Tooltip
                       key={`conflict-${key}`}
                       title={
-                        <div
-                          style={{ fontSize: 12 }}
-                        >{`${reasons.join('；')}。请核实并修正。`}</div>
+                        <div style={{ fontSize: 12 }}>{`${reasons.join(
+                          t('roomLayout.conflict.separator')
+                        )}${t('roomLayout.conflict.verify')}`}</div>
                       }
                     >
                       <WarningFilled
@@ -591,7 +625,7 @@ function RoomLayout({
           </div>
         </div>
       ) : (
-        <Empty description="暂无机柜位置信息，请在机柜表单中设置行号和列号" />
+        <Empty description={t('roomLayout.empty.noPosition')} />
       )}
 
       {/*

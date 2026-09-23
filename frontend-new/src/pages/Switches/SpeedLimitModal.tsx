@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal, Form, InputNumber } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 export interface SpeedLimitValues {
   inbound: number;
@@ -21,6 +22,7 @@ export function SpeedLimitModal({
   maxSpeed,
   onSubmit
 }: SpeedLimitModalProps) {
+  const { t } = useTranslation('device');
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export function SpeedLimitModal({
 
   return (
     <Modal
-      title={`设置端口限速 — ${portName}`}
+      title={t('switch.speed.title', { name: portName })}
       open={open}
       onOk={handleOk}
       onCancel={onClose}
@@ -55,39 +57,43 @@ export function SpeedLimitModal({
           lineHeight: 1.8
         }}
       >
-        <div>使用 QoS 策略限速（traffic-policy / qos policy）</div>
+        <div>{t('switch.speed.infoPolicy')}</div>
         <div>
-          <b>上行（inbound）</b>：流量进入交换机端口的方向，即用户上传方向
+          <b>{t('switch.speed.inboundLabel')}</b>
+          {t('switch.speed.inboundDesc')}
         </div>
         <div>
-          <b>下行（outbound）</b>：流量离开交换机端口的方向，即用户下载方向
+          <b>{t('switch.speed.outboundLabel')}</b>
+          {t('switch.speed.outboundDesc')}
         </div>
         <div>
-          输入 <b>0</b> 表示取消该方向限速，端口速率上限：{maxSpeed} Mbps
+          {t('switch.speed.zeroPrefix')}
+          <b>0</b>
+          {t('switch.speed.zeroSuffix', { max: maxSpeed })}
         </div>
       </div>
       <Form form={form} layout="vertical">
         <Form.Item
           name="inbound"
-          label="上行限速 (Mbps)"
-          rules={[{ required: true, message: '请输入上行限速' }]}
+          label={t('switch.speed.inbound')}
+          rules={[{ required: true, message: t('switch.speed.inboundRequired') }]}
         >
           <InputNumber
             min={0}
             max={maxSpeed}
-            placeholder={`0-${maxSpeed}，0 取消限速`}
+            placeholder={t('switch.speed.rangePlaceholder', { max: maxSpeed })}
             style={{ width: '100%' }}
           />
         </Form.Item>
         <Form.Item
           name="outbound"
-          label="下行限速 (Mbps)"
-          rules={[{ required: true, message: '请输入下行限速' }]}
+          label={t('switch.speed.outbound')}
+          rules={[{ required: true, message: t('switch.speed.outboundRequired') }]}
         >
           <InputNumber
             min={0}
             max={maxSpeed}
-            placeholder={`0-${maxSpeed}，0 取消限速`}
+            placeholder={t('switch.speed.rangePlaceholder', { max: maxSpeed })}
             style={{ width: '100%' }}
           />
         </Form.Item>

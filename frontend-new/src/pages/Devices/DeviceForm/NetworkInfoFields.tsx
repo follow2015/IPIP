@@ -5,6 +5,7 @@
  * 不持有 form 实例，可独立复用与测试。
  */
 import { Form, Input, Divider, Row, Col, Switch } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { parseIPAddressString, type ParsedIPEntry } from '@/utils/ip';
 
 interface NetworkInfoFieldsProps {
@@ -12,26 +13,27 @@ interface NetworkInfoFieldsProps {
 }
 
 export default function NetworkInfoFields({ isNetwork }: NetworkInfoFieldsProps) {
+  const { t } = useTranslation('device');
   return (
     <>
       {/* ── 网络信息区块 ── */}
-      <Divider plain>网络信息</Divider>
+      <Divider plain>{t('form.section.network')}</Divider>
       <Row gutter={16}>
         <Col xs={24} md={8}>
-          <Form.Item name="management_ip" label="管理IP">
-            <Input placeholder="管理IP地址" />
+          <Form.Item name="management_ip" label={t('field.managementIp')}>
+            <Input placeholder={t('form.network.managementIp.placeholder')} />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name="mac_address" label="MAC地址">
-            <Input placeholder="MAC地址" />
+          <Form.Item name="mac_address" label={t('form.network.macAddress.label')}>
+            <Input placeholder={t('form.network.macAddress.placeholder')} />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
           <Form.Item
             name="ip_address"
-            label="业务IP"
-            tooltip="支持多种格式：单个IP、逗号分隔、CIDR、子网掩码、范围"
+            label={t('basic.field.businessIp')}
+            tooltip={t('form.network.businessIp.tooltip')}
             rules={[
               {
                 validator: (_: unknown, value: string) => {
@@ -40,7 +42,11 @@ export default function NetworkInfoFields({ isNetwork }: NetworkInfoFieldsProps)
                   const invalid = entries.filter((e: ParsedIPEntry) => !e.valid);
                   if (invalid.length > 0) {
                     return Promise.reject(
-                      new Error(`格式错误: ${invalid.map((e: ParsedIPEntry) => e.raw).join(', ')}`)
+                      new Error(
+                        t('form.network.businessIp.formatError', {
+                          list: invalid.map((e: ParsedIPEntry) => e.raw).join(', ')
+                        })
+                      )
                     );
                   }
                   return Promise.resolve();
@@ -59,8 +65,15 @@ export default function NetworkInfoFields({ isNetwork }: NetworkInfoFieldsProps)
       {isNetwork && (
         <Row gutter={16}>
           <Col xs={24} md={8}>
-            <Form.Item name={['switch_config', 'has_ssh']} label="管理权限" valuePropName="checked">
-              <Switch checkedChildren="开" unCheckedChildren="关" />
+            <Form.Item
+              name={['switch_config', 'has_ssh']}
+              label={t('form.network.managementAccess.label')}
+              valuePropName="checked"
+            >
+              <Switch
+                checkedChildren={t('form.network.managementAccess.on')}
+                unCheckedChildren={t('form.network.managementAccess.off')}
+              />
             </Form.Item>
           </Col>
         </Row>

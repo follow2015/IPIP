@@ -12,7 +12,8 @@ import { PlusOutlined, AimOutlined, ThunderboltOutlined } from '@ant-design/icon
 import HardwareConfigFields from '@/components/HardwareConfigFields';
 import NicConfigFields from '@/components/NicConfigFields';
 import BatchResultModal from '../../BatchResultModal';
-import { TYPE_OPTIONS } from '../shared';
+import { getTypeOptions } from '../shared';
+import { useTranslation } from 'react-i18next';
 import { useBatchAddTab } from './useBatchAddTab';
 import BatchDeviceTable from './BatchDeviceTable';
 import ChassisConfigPanel from './ChassisConfigPanel';
@@ -24,6 +25,8 @@ interface BatchAddTabProps {
 }
 
 const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const tab = useBatchAddTab(active);
   const {
     form,
@@ -73,30 +76,38 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
         <Space size="middle" wrap style={{ marginBottom: 16 }}>
           <Form.Item
             name="device_type"
-            label="设备主类型"
-            rules={[{ required: true, message: '请选择' }]}
+            label={t('form.basicInfo.mainType.label')}
+            rules={[{ required: true, message: tCommon('message.selectRequired') }]}
             style={{ marginBottom: 0, minWidth: 160 }}
           >
-            <Select placeholder="请选择" options={TYPE_OPTIONS} />
+            <Select placeholder={tCommon('message.selectRequired')} options={getTypeOptions(t)} />
           </Form.Item>
           <Form.Item
             name="device_subtype"
-            label="设备子类型"
+            label={t('basic.field.deviceSubtype')}
             style={{ marginBottom: 0, minWidth: 160 }}
           >
             <Select
-              placeholder="请选择"
+              placeholder={tCommon('message.selectRequired')}
               options={subtypeOptions}
               allowClear
               disabled={!deviceType}
             />
           </Form.Item>
-          <Form.Item name="room_id" label="所属机房" style={{ marginBottom: 0, minWidth: 180 }}>
-            <Select placeholder="请选择机房" options={roomOptions} allowClear />
+          <Form.Item
+            name="room_id"
+            label={t('basic.field.room')}
+            style={{ marginBottom: 0, minWidth: 180 }}
+          >
+            <Select placeholder={t('form.select.room')} options={roomOptions} allowClear />
           </Form.Item>
-          <Form.Item name="cabinet_id" label="所属机柜" style={{ marginBottom: 0, minWidth: 180 }}>
+          <Form.Item
+            name="cabinet_id"
+            label={t('form.location.cabinet.label')}
+            style={{ marginBottom: 0, minWidth: 180 }}
+          >
             <Select
-              placeholder={selectedRoomId ? '请选择机柜' : '请先选择机房'}
+              placeholder={selectedRoomId ? t('form.select.cabinet') : t('form.hint.selectRoomFirst')}
               options={cabinetOptions}
               allowClear
               disabled={!selectedRoomId}
@@ -106,13 +117,16 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
             <span
               style={{ color: '#8c8c8c', fontSize: 12, alignSelf: 'flex-end', paddingBottom: 4 }}
             >
-              可用U位：{availableUCount} 个
+              {t('form.location.availableUPositions', { count: availableUCount })}
             </span>
           )}
           {isNodeMode && (
-            <Form.Item label="所属机箱" style={{ marginBottom: 0, minWidth: 220 }}>
+            <Form.Item
+              label={t('form.nodeAssoc.chassis.label')}
+              style={{ marginBottom: 0, minWidth: 220 }}
+            >
               <Select
-                placeholder="请选择机箱"
+                placeholder={t('form.select.chassis')}
                 options={chassisOptions}
                 allowClear
                 value={selectedChassisId}
@@ -124,7 +138,7 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
             <span
               style={{ color: '#8c8c8c', fontSize: 12, alignSelf: 'flex-end', paddingBottom: 4 }}
             >
-              空余位置：{freeNodeSlots} 个
+              {t('form.nodeAssoc.vacantCount', { count: freeNodeSlots })}
             </span>
           )}
         </Space>
@@ -132,7 +146,7 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
         {/* ── 硬件配置区域（独立服务器 + 子节点） ── */}
         {isServerType && !isChassisMode && (
           <Card
-            title="硬件配置（统一设置）"
+            title={t('addModal.section.hardware')}
             size="small"
             style={{ marginBottom: 12 }}
             styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
@@ -144,7 +158,7 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
         {/* ── 网卡配置区域（独立服务器 + 子节点） ── */}
         {isServerType && !isChassisMode && (
           <Card
-            title="网卡配置"
+            title={t('node.field.nic')}
             size="small"
             style={{ marginBottom: 12 }}
             styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
@@ -161,12 +175,12 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
           <div style={{ marginBottom: 12 }}>
             <Form.Item
               name="has_ssh"
-              label="管理权限"
+              label={t('form.network.managementAccess.label')}
               valuePropName="checked"
               initialValue={false}
               style={{ marginBottom: 8 }}
             >
-              <Checkbox>网管型（有SSH管理权限）</Checkbox>
+              <Checkbox>{t('addModal.managedSwitch')}</Checkbox>
             </Form.Item>
           </div>
         )}
@@ -186,7 +200,7 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
             style={{ width: 56 }}
           />
           <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={handleAddRow}>
-            添加行
+            {t('addModal.row.add')}
           </Button>
           {!isNodeMode && (
             <InputNumber
@@ -196,10 +210,12 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
               value={uGap}
               onChange={(v) => setUGap(v ?? 0)}
               style={{ width: 56 }}
-              placeholder="间隔"
+              placeholder={t('form.location.deviceGap.placeholder')}
             />
           )}
-          {!isNodeMode && <span style={{ color: '#8c8c8c', fontSize: 12 }}>U位间隔</span>}
+          {!isNodeMode && (
+            <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('addModal.uGap')}</span>
+          )}
           {!isNodeMode && (
             <InputNumber
               size="small"
@@ -212,7 +228,7 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
           )}
           {!isNodeMode && (
             <Button size="small" onClick={handleBatchSetHeightU}>
-              设置U高
+              {t('addModal.action.setHeightU')}
             </Button>
           )}
           {!isNodeMode && (
@@ -222,17 +238,17 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
               disabled={!selectedCabinetId}
               onClick={handleAutoAssignU}
             >
-              自动分配U位
+              {t('form.location.uPosition.autoAssignTooltip')}
             </Button>
           )}
           {!isNodeMode && (
             <Button size="small" icon={<ThunderboltOutlined />} onClick={handleRegenerateNames}>
-              重生成名称
+              {t('addModal.action.regenerateNames')}
             </Button>
           )}
         </Space>
         <span style={{ color: '#8c8c8c', fontSize: 12, lineHeight: '24px' }}>
-          共 {rows.length} 行
+          {t('addModal.row.count', { count: rows.length })}
         </span>
       </div>
 
@@ -247,12 +263,17 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
       />
 
       {rows.length > 0 && !deviceType && (
-        <Alert type="warning" title="请先选择设备主类型" showIcon style={{ marginTop: 12 }} />
+        <Alert
+          type="warning"
+          title={t('addModal.hint.selectDeviceTypeFirst')}
+          showIcon
+          style={{ marginTop: 12 }}
+        />
       )}
       {rows.length > 0 && deviceType && !selectedCabinetId && (
         <Alert
           type="info"
-          title="未选择机柜时 U 位信息不会保存，如需指定位置请先选择机房和机柜。"
+          title={t('addModal.hint.noCabinetUPosition')}
           showIcon
           style={{ marginTop: 12 }}
         />
@@ -260,14 +281,14 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
 
       <div style={{ marginTop: 16, textAlign: 'right' }}>
         <Space>
-          <Button onClick={() => onClose()}>取消</Button>
+          <Button onClick={() => onClose()}>{tCommon('action.cancel')}</Button>
           <Button
             type="primary"
             loading={batchCreate.isPending}
             disabled={!deviceType}
             onClick={handleSubmit}
           >
-            批量创建（{rows.length} 台）
+            {t('addModal.submitBatch', { count: rows.length })}
           </Button>
         </Space>
       </div>
@@ -275,7 +296,7 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
       <BatchResultModal
         open={batchCreate.resultOpen}
         result={batchCreate.result}
-        title="批量添加结果"
+        title={t('addModal.resultTitle')}
         onClose={handleResultClose}
         onRetry={handleRetry}
       />

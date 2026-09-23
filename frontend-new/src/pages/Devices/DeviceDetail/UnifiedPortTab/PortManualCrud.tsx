@@ -20,12 +20,13 @@ import {
 } from '@/services/network-port';
 import { useMessage } from '@/hooks/useMessage';
 import { useConfirm } from '@/utils/confirm';
+import { useTranslation } from 'react-i18next';
 import { buildManualColumns } from './columns';
 import { PortTable } from './PortTable';
 import { PortStats } from './PortStats';
 import { PortBatchAddModal } from './PortBatchAddModal';
 import { PortEditModal } from './PortEditModal';
-import { USAGE_STATUS_FILTER_OPTIONS } from './constants';
+import { getUsageStatusFilterOptions } from './constants';
 
 interface PortManualCrudProps {
   deviceId: number;
@@ -58,6 +59,8 @@ export function PortManualCrud({
   renderBatchActions,
   hasSnmpCredential = false
 }: PortManualCrudProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const message = useMessage();
   const addModal = useDisclosure();
@@ -78,26 +81,28 @@ export function PortManualCrud({
     (checked: boolean) => {
       setPortSync.mutate(checked, {
         onSuccess: () => {
-          message.success(checked ? '已开启端口自动同步' : '已关闭端口自动同步');
+          message.success(
+            checked ? t('port.message.syncEnabled') : t('port.message.syncDisabled')
+          );
         },
         onError: () => {
-          message.error('开关设置失败');
+          message.error(t('port.message.toggleFailed'));
         }
       });
     },
-    [setPortSync, message]
+    [setPortSync, message, t]
   );
 
   const handleResetToGlobal = useCallback(() => {
     setPortSync.mutate(null, {
       onSuccess: () => {
-        message.success('已重置为跟随全局开关');
+        message.success(t('port.message.resetToGlobal'));
       },
       onError: () => {
-        message.error('重置失败');
+        message.error(t('asset.message.resetFailed'));
       }
     });
-  }, [setPortSync, message]);
+  }, [setPortSync, message, t]);
 
   const handleEdit = useCallback((port: SwitchPort) => {
     setEditingPort(port);
@@ -107,32 +112,36 @@ export function PortManualCrud({
   const handleDelete = useCallback(
     (port: SwitchPort) => {
       confirm({
-        title: '确认删除端口',
-        content: `确定要删除端口「${port.port_name}」吗？`,
+        title: t('port.confirm.deleteTitle'),
+        content: t('port.confirm.deleteContent', { name: port.port_name }),
         okButtonProps: { danger: true },
         onOk: async () => {
           await deletePort.mutateAsync(port.id);
-          message.success('端口已删除');
+          message.success(t('port.message.deleted'));
         }
       });
     },
-    [confirm, deletePort, message]
+    [confirm, deletePort, message, t]
   );
 
   const handleToggleUsageStatus = useCallback(
     (port: SwitchPort) => {
-      const newStatus = port.usage_status === 'disabled' ? 'free' : 'disabled';
-      const actionText = newStatus === 'disabled' ? '禁用' : '启用';
+      const disabling = port.usage_status !== 'disabled';
       confirm({
-        title: `确认${actionText}端口`,
-        content: `确定要${actionText}端口「${port.port_name}」吗？`,
+        title: disabling ? t('port.confirm.disableTitle') : t('port.confirm.enableTitle'),
+        content: disabling
+          ? t('port.confirm.disableContent', { name: port.port_name })
+          : t('port.confirm.enableContent', { name: port.port_name }),
         onOk: async () => {
-          await updateUsageStatus.mutateAsync({ portId: port.id, usageStatus: newStatus });
-          message.success(`${actionText}成功`);
+          await updateUsageStatus.mutateAsync({
+            portId: port.id,
+            usageStatus: disabling ? 'disabled' : 'free'
+          });
+          message.success(disabling ? t('port.message.disabled') : t('port.message.enabled'));
         }
       });
     },
-    [confirm, updateUsageStatus, message]
+    [confirm, updateUsageStatus, message, t]
   );
 
   const handleBatchLocalUpdate = useCallback(
@@ -143,22 +152,25 @@ export function PortManualCrud({
       );
       const failed = results.filter((r) => r.status === 'rejected').length;
       if (failed > 0) {
-        message.warning(`批量操作完成，${failed} 个端口更新失败`);
+        message.warning(t('port.message.batchUpdatePartialFailed', { count: failed }));
       } else {
-        message.success(`已更新 ${portsToUpdate.length} 个端口`);
+        message.success(t('port.message.batchUpdated', { count: portsToUpdate.length }));
       }
     },
-    [sortedPorts, updatePort, message]
+    [sortedPorts, updatePort, message, t]
   );
+
+  const usageStatusOptions = useMemo(() => getUsageStatusFilterOptions(t), [t]);
 
   const columns = useMemo(
     () =>
       buildManualColumns({
         onToggleUsageStatus: handleToggleUsageStatus,
         onEdit: handleEdit,
-        onDelete: handleDelete
+        onDelete: handleDelete,
+        t: { d: t, c: tCommon }
       }),
-    [handleToggleUsageStatus, handleEdit, handleDelete]
+    [handleToggleUsageStatus, handleEdit, handleDelete, t, tCommon]
   );
 
   return (
@@ -185,9 +197,9 @@ export function PortManualCrud({
           filters={[
             {
               key: 'usage_status',
-              label: '占用状态筛选',
+              label: t('port.filter.usageStatus'),
               type: 'select',
-              options: USAGE_STATUS_FILTER_OPTIONS,
+              options: usageStatusOptions,
               width: 160
             }
           ]}
@@ -198,10 +210,12 @@ export function PortManualCrud({
               <Tooltip
                 title={
                   !hasSnmpCredential
-                    ? '请先添加 SNMP 或 Zabbix 监控凭据后才能开启端口自动同步'
+                    ? t('port.tooltip.needCredential')
                     : deviceOverride === null
-                      ? `跟随全局开关（当前：${globalEnabled ? '开' : '关'}），点击切换为设备级强制开关`
-                      : '设备级开关已强制设置，点击"跟随全局"可恢复'
+                      ? t('port.tooltip.followGlobal', {
+                          state: globalEnabled ? t('port.state.on') : t('port.state.off')
+                        })
+                      : t('port.tooltip.deviceOverride', { follow: t('batchMonitor.modeFollow') })
                 }
               >
                 <span>
@@ -209,8 +223,8 @@ export function PortManualCrud({
                     checked={effectiveEnabled}
                     onChange={handleTogglePortSync}
                     disabled={!hasSnmpCredential || setPortSync.isPending}
-                    checkedChildren="同步"
-                    unCheckedChildren="不同步"
+                    checkedChildren={t('port.switch.sync')}
+                    unCheckedChildren={t('port.switch.notSync')}
                     size="small"
                   />
                 </span>
@@ -222,11 +236,11 @@ export function PortManualCrud({
                   onClick={handleResetToGlobal}
                   disabled={setPortSync.isPending}
                 >
-                  跟随全局
+                  {t('batchMonitor.modeFollow')}
                 </Button>
               )}
               <Button type="primary" icon={<PlusOutlined />} onClick={() => addModal.open()}>
-                新增端口
+                {t('port.action.add')}
               </Button>
             </Space>
           }
@@ -239,8 +253,8 @@ export function PortManualCrud({
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          message="如果有监控凭据，建议先添加 SNMP 或 Zabbix 监控凭据来自动获取端口"
-          description="添加监控凭据后，可开启上方「端口同步」开关，系统将在监控轮询时自动同步端口。未添加凭据时开关不可开启。"
+          message={t('port.alert.credentialTip')}
+          description={t('port.alert.credentialTipDesc')}
         />
       )}
 

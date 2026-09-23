@@ -15,8 +15,7 @@
  * - useDeviceMetricAlerts（活跃指标告警，grouped=false 时按默认分组展示）
  * - useDeviceTrafficPorts（Zabbix 端口列表 + configured 标记）
  */
-import { Card, Tag, Empty, Spin, Alert, Row, Col, Space, Typography } from 'antd';
-import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
+import { Card, Table, Tag, Empty, Spin, Alert, Row, Col, Space, Typography } from 'antd';
 import {
   FireOutlined,
   SwapOutlined,
@@ -34,15 +33,41 @@ import {
   useDeviceMetricAlerts,
   useDeviceMetricDashboard,
   useDeviceTrafficPorts,
-  type DeviceMetricDashboardItem
+  type DeviceMetricDashboardItem,
+  type MonitorStatusCode
 } from '@/services/monitor';
 import { ErrorBoundary } from '@/components/ErrorBoundary/ErrorBoundary';
 import TrafficChart from '@/components/Monitor/TrafficChart';
 import { formatDateTime } from '@/utils/format';
+import { useTranslation } from 'react-i18next';
+
+type MetricGroupLabelKey =
+  | 'group.temperature'
+  | 'group.portStatus'
+  | 'group.ifInErrors'
+  | 'group.ifOutErrors'
+  | 'group.ifInDiscards'
+  | 'group.ifOutDiscards'
+  | 'group.ifUtilization'
+  | 'group.cpuUsage'
+  | 'group.memoryUsage'
+  | 'group.sysUptime'
+  | 'group.fanSpeed'
+  | 'group.zabbixCpuUsage'
+  | 'group.zabbixMemoryUsage'
+  | 'group.zabbixTemperature'
+  | 'group.zabbixSysUptime'
+  | 'group.zabbixIfInErrors'
+  | 'group.zabbixIfOutErrors'
+  | 'group.zabbixIfInDiscards'
+  | 'group.zabbixIfOutDiscards'
+  | 'group.raidFailure'
+  | 'group.diskFailure'
+  | 'group.monitorInterrupted';
 
 interface MetricGroupDef {
   key: string;
-  label: string;
+  labelKey: MetricGroupLabelKey;
   icon: React.ReactNode;
   protocols?: string[];
 }
@@ -50,87 +75,87 @@ interface MetricGroupDef {
 const METRIC_GROUPS: MetricGroupDef[] = [
   {
     key: 'temperature',
-    label: '温度',
+    labelKey: 'group.temperature',
     icon: <FireOutlined />,
     protocols: ['snmp', 'ipmi', 'zabbix']
   },
-  { key: 'port_updown', label: '端口状态', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_status', label: '端口状态', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_in_errors', label: '入错包', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_out_errors', label: '出错包', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_in_discards', label: '入丢包', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_out_discards', label: '出丢包', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_utilization', label: '端口利用率', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'cpu_usage', label: 'CPU 利用率', icon: <ApiOutlined />, protocols: ['snmp', 'zabbix'] },
+  { key: 'port_updown', labelKey: 'group.portStatus', icon: <SwapOutlined />, protocols: ['snmp'] },
+  { key: 'if_status', labelKey: 'group.portStatus', icon: <SwapOutlined />, protocols: ['snmp'] },
+  { key: 'if_in_errors', labelKey: 'group.ifInErrors', icon: <SwapOutlined />, protocols: ['snmp'] },
+  { key: 'if_out_errors', labelKey: 'group.ifOutErrors', icon: <SwapOutlined />, protocols: ['snmp'] },
+  { key: 'if_in_discards', labelKey: 'group.ifInDiscards', icon: <SwapOutlined />, protocols: ['snmp'] },
+  { key: 'if_out_discards', labelKey: 'group.ifOutDiscards', icon: <SwapOutlined />, protocols: ['snmp'] },
+  { key: 'if_utilization', labelKey: 'group.ifUtilization', icon: <SwapOutlined />, protocols: ['snmp'] },
+  { key: 'cpu_usage', labelKey: 'group.cpuUsage', icon: <ApiOutlined />, protocols: ['snmp', 'zabbix'] },
   {
     key: 'memory_usage',
-    label: '内存利用率',
+    labelKey: 'group.memoryUsage',
     icon: <DatabaseOutlined />,
     protocols: ['snmp', 'zabbix']
   },
   {
     key: 'sys_uptime',
-    label: '系统运行时间',
+    labelKey: 'group.sysUptime',
     icon: <CheckCircleOutlined />,
     protocols: ['snmp', 'zabbix']
   },
   {
     key: 'fan_speed',
-    label: '风扇转速',
+    labelKey: 'group.fanSpeed',
     icon: <ApiOutlined />,
     protocols: ['snmp', 'ipmi', 'zabbix']
   },
   {
     key: 'zabbix_cpu_usage',
-    label: 'CPU 利用率(Zabbix)',
+    labelKey: 'group.zabbixCpuUsage',
     icon: <ApiOutlined />,
     protocols: ['zabbix']
   },
   {
     key: 'zabbix_memory_usage',
-    label: '内存利用率(Zabbix)',
+    labelKey: 'group.zabbixMemoryUsage',
     icon: <DatabaseOutlined />,
     protocols: ['zabbix']
   },
   {
     key: 'zabbix_temperature',
-    label: '温度(Zabbix)',
+    labelKey: 'group.zabbixTemperature',
     icon: <FireOutlined />,
     protocols: ['zabbix']
   },
   {
     key: 'zabbix_sys_uptime',
-    label: '系统运行时间(Zabbix)',
+    labelKey: 'group.zabbixSysUptime',
     icon: <CheckCircleOutlined />,
     protocols: ['zabbix']
   },
   {
     key: 'zabbix_if_in_errors',
-    label: '入错包(Zabbix)',
+    labelKey: 'group.zabbixIfInErrors',
     icon: <SwapOutlined />,
     protocols: ['zabbix']
   },
   {
     key: 'zabbix_if_out_errors',
-    label: '出错包(Zabbix)',
+    labelKey: 'group.zabbixIfOutErrors',
     icon: <SwapOutlined />,
     protocols: ['zabbix']
   },
   {
     key: 'zabbix_if_in_discards',
-    label: '入丢包(Zabbix)',
+    labelKey: 'group.zabbixIfInDiscards',
     icon: <SwapOutlined />,
     protocols: ['zabbix']
   },
   {
     key: 'zabbix_if_out_discards',
-    label: '出丢包(Zabbix)',
+    labelKey: 'group.zabbixIfOutDiscards',
     icon: <SwapOutlined />,
     protocols: ['zabbix']
   },
-  { key: 'raid_failure', label: 'RAID', icon: <DatabaseOutlined />, protocols: ['ipmi'] },
-  { key: 'disk_failure', label: '磁盘', icon: <HddOutlined />, protocols: ['ipmi'] },
-  { key: 'monitor_interrupted', label: '监控中断', icon: <DisconnectOutlined /> }
+  { key: 'raid_failure', labelKey: 'group.raidFailure', icon: <DatabaseOutlined />, protocols: ['ipmi'] },
+  { key: 'disk_failure', labelKey: 'group.diskFailure', icon: <HddOutlined />, protocols: ['ipmi'] },
+  { key: 'monitor_interrupted', labelKey: 'group.monitorInterrupted', icon: <DisconnectOutlined /> }
 ];
 
 const SEVERITY_COLOR: Record<string, string> = {
@@ -142,43 +167,76 @@ const SEVERITY_COLOR: Record<string, string> = {
   ok: 'green'
 };
 
-const SEVERITY_LABEL: Record<string, string> = {
-  crit: '严重',
-  critical: '严重',
-  warn: '警告',
-  warning: '警告',
-  info: '信息',
-  ok: '正常'
+type MetricTagKey =
+  | 'metric.severity.critical'
+  | 'metric.severity.warning'
+  | 'metric.severity.info'
+  | 'metric.status.normal'
+  | 'metric.column.alert';
+
+const SEVERITY_LABEL_KEY: Record<string, MetricTagKey> = {
+  crit: 'metric.severity.critical',
+  critical: 'metric.severity.critical',
+  warn: 'metric.severity.warning',
+  warning: 'metric.severity.warning',
+  info: 'metric.severity.info',
+  ok: 'metric.status.normal'
 };
+
+type MetricOverallKey =
+  | 'overall.noCredential'
+  | 'overall.notProbed'
+  | 'overall.unreachable'
+  | 'overall.credentialError'
+  | 'overall.noData'
+  | 'overall.breached'
+  | 'overall.normal';
 
 const OVERALL_STATUS_META: Record<
   string,
-  { text: string; type: 'error' | 'warning' | 'info' | 'success'; icon: React.ReactNode }
+  { textKey: MetricOverallKey; type: 'error' | 'warning' | 'info' | 'success'; icon: React.ReactNode }
 > = {
-  no_credential: { text: '本机尚未关联监控凭据', type: 'warning', icon: <LockOutlined /> },
-  not_probed: { text: '已配置凭据，等待首次探测', type: 'info', icon: <ClockCircleOutlined /> },
+  no_credential: { textKey: 'overall.noCredential', type: 'warning', icon: <LockOutlined /> },
+  not_probed: { textKey: 'overall.notProbed', type: 'info', icon: <ClockCircleOutlined /> },
   unreachable: {
-    text: '设备当前不可达，暂无指标数据',
+    textKey: 'overall.unreachable',
     type: 'error',
     icon: <CloseCircleOutlined />
   },
   credential_error: {
-    text: '监控凭据或配置异常，指标无法采集',
+    textKey: 'overall.credentialError',
     type: 'warning',
     icon: <WarningOutlined />
   },
-  no_data: { text: '尚未采集到指标数据', type: 'info', icon: <ClockCircleOutlined /> },
-  breached: { text: '存在超阈值指标，请关注', type: 'warning', icon: <WarningOutlined /> },
-  normal: { text: '指标采集正常', type: 'success', icon: <CheckCircleOutlined /> }
+  no_data: { textKey: 'overall.noData', type: 'info', icon: <ClockCircleOutlined /> },
+  breached: { textKey: 'overall.breached', type: 'warning', icon: <WarningOutlined /> },
+  normal: { textKey: 'overall.normal', type: 'success', icon: <CheckCircleOutlined /> }
 };
 
 const STATUS_ONLY_OVERALL = new Set(['unreachable', 'credential_error', 'no_data', 'not_probed']);
+
+const MONITOR_STATUS_CODES: readonly MonitorStatusCode[] = [
+  'no_credential',
+  'not_probed',
+  'credential_error',
+  'unreachable',
+  'normal',
+  'normal_no_group',
+  'no_data',
+  'no_data_template',
+  'breached'
+];
+
+function isMonitorStatusCode(value: unknown): value is MonitorStatusCode {
+  return MONITOR_STATUS_CODES.includes(value as MonitorStatusCode);
+}
 
 interface MetricsTabProps {
   deviceId: number;
 }
 
 export default function MetricsTab({ deviceId }: MetricsTabProps) {
+  const { t } = useTranslation('device');
   const { data: dashboard, isLoading: dashboardLoading } = useDeviceMetricDashboard(deviceId);
   const { data: alertData, isLoading: alertsLoading } = useDeviceMetricAlerts(deviceId);
   const { data: trafficPortsData, isLoading: trafficPortsLoading } =
@@ -194,14 +252,14 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
 
   if (!dashboard?.has_credential) {
     return (
-      <Card size="small" title="监控数据">
+      <Card size="small" title={t('metric.title')}>
         <Empty
           image={<LockOutlined style={{ fontSize: 40, color: '#bbb' }} />}
           description={
             <Space direction="vertical" size={4} style={{ alignItems: 'center' }}>
-              <Typography.Text strong>需要关联凭据</Typography.Text>
+              <Typography.Text strong>{t('metric.needCredential')}</Typography.Text>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                请到「监控凭据」Tab 关联至少一种监控凭据（SNMP / IPMI / Zabbix）后查看监控数据
+                {t('metric.needCredentialHint')}
               </Typography.Text>
             </Space>
           }
@@ -215,7 +273,10 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
   const metricStatus = dashboard?.metric_status ?? [];
   const overall = dashboard?.overall_status ?? 'no_data';
   const overallMeta = OVERALL_STATUS_META[overall] ?? OVERALL_STATUS_META.no_data;
-  const statusReason = dashboard?.status_reason ?? overallMeta.text;
+  const statusCode = dashboard?.monitor_status_code;
+  const statusReason = isMonitorStatusCode(statusCode)
+    ? t(`monitorStatus.${statusCode}`)
+    : (dashboard?.status_reason ?? t(`metric.${overallMeta.textKey}`));
 
   const items = alertData?.items ?? [];
   const groupedAlerts = new Map<string, typeof items>();
@@ -236,14 +297,14 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
   const isStatusOnly = STATUS_ONLY_OVERALL.has(overall);
 
   return (
-    <Card size="small" title="监控数据">
+    <Card size="small" title={t('metric.title')}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* ── 上半部分：Zabbix 端口流量（仅关联 Zabbix 凭据时显示） ── */}
         {showTraffic && (
           <ErrorBoundary
             fallback={() => (
-              <Card size="small" title="端口流量">
-                <div>流量图加载失败，请刷新重试</div>
+              <Card size="small" title={t('metric.trafficTitle')}>
+                <div>{t('metric.trafficLoadFailed')}</div>
               </Card>
             )}
           >
@@ -254,10 +315,10 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
         {/* ── 下半部分：监控指标信息 ── */}
         <div>
           <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Typography.Text strong>监控指标</Typography.Text>
+            <Typography.Text strong>{t('metric.sectionTitle')}</Typography.Text>
             {dashboard?.template_group && (
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                指标模板组：{dashboard.template_group.name}
+                {t('metric.templateGroup', { name: dashboard.template_group.name })}
               </Typography.Text>
             )}
           </Space>
@@ -282,17 +343,17 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                   </Typography.Text>
                   {overall === 'unreachable' && dashboard?.last_error && (
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      错误详情：{dashboard.last_error}
+                      {t('metric.lastError', { error: dashboard.last_error })}
                     </Typography.Text>
                   )}
                   {overall === 'credential_error' && dashboard?.last_error && (
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      错误详情：{dashboard.last_error}
+                      {t('metric.lastError', { error: dashboard.last_error })}
                     </Typography.Text>
                   )}
                   {dashboard?.last_checked_at && (
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      最近探测：{formatDateTime(dashboard.last_checked_at)}
+                      {t('metric.lastChecked', { time: formatDateTime(dashboard.last_checked_at) })}
                     </Typography.Text>
                   )}
                 </Space>
@@ -306,48 +367,46 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                 style={{ background: '#fafafa', borderColor: '#d9d9d9' }}
                 styles={{ body: { padding: 0 } }}
               >
-                <DataTable<DeviceMetricDashboardItem>
+                <Table<DeviceMetricDashboardItem>
                   dataSource={metricStatus}
                   rowKey="metric_key"
                   size="small"
                   pagination={false}
-                  showCard={false}
-                  searchable={false}
                   columns={[
                     {
-                      title: '指标',
+                      title: t('metric.column.name'),
                       dataIndex: 'metric_name',
                       render: (v: string, r) => r.metric_name || r.metric_key
                     },
                     {
-                      title: '来源',
+                      title: t('metric.column.source'),
                       dataIndex: 'source',
                       width: 90,
                       render: (v: string | null) => (v ? v.toUpperCase() : '—')
                     },
                     {
-                      title: '当前值',
+                      title: t('metric.column.value'),
                       dataIndex: 'value',
                       width: 110,
                       render: (v: string | null) => v ?? '—'
                     },
                     {
-                      title: '状态',
+                      title: t('metric.column.status'),
                       key: 'status',
                       width: 100,
                       render: (_: unknown, r: DeviceMetricDashboardItem) =>
                         r.breached ? (
                           <Tag color={SEVERITY_COLOR[r.severity ?? ''] ?? 'orange'}>
-                            {SEVERITY_LABEL[r.severity ?? ''] ?? '告警'}
+                            {t(SEVERITY_LABEL_KEY[r.severity ?? ''] ?? 'metric.column.alert')}
                           </Tag>
                         ) : r.value != null ? (
-                          <Tag color="green">正常</Tag>
+                          <Tag color="green">{t('metric.status.normal')}</Tag>
                         ) : (
-                          <Tag color="default">无数据</Tag>
+                          <Tag color="default">{t('metric.status.noData')}</Tag>
                         )
                     },
                     {
-                      title: '采集时间',
+                      title: t('metric.column.collectedAt'),
                       dataIndex: 'collected_at',
                       width: 160,
                       render: (v: string | null) => (v ? formatDateTime(v) : '—')
@@ -357,7 +416,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                 />
               </Card>
             ) : (
-              <Empty description="该模板组暂未包含任何指标" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              <Empty description={t('metric.emptyGroup')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
             )
           ) : /* 未命中模板组 → 优先用 latest 数值表格；无 latest 时回退默认分组 + 告警卡片 */
           metricStatus.length > 0 ? (
@@ -366,48 +425,46 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
               style={{ background: '#fafafa', borderColor: '#d9d9d9' }}
               styles={{ body: { padding: 0 } }}
             >
-              <DataTable<DeviceMetricDashboardItem>
+              <Table<DeviceMetricDashboardItem>
                 dataSource={metricStatus}
                 rowKey="metric_key"
                 size="small"
                 pagination={false}
-                showCard={false}
-                searchable={false}
                 columns={[
                   {
-                    title: '指标',
+                    title: t('metric.column.name'),
                     dataIndex: 'metric_name',
                     render: (v: string, r) => r.metric_name || r.metric_key
                   },
                   {
-                    title: '来源',
+                    title: t('metric.column.source'),
                     dataIndex: 'source',
                     width: 90,
                     render: (v: string | null) => (v ? v.toUpperCase() : '—')
                   },
                   {
-                    title: '当前值',
+                    title: t('metric.column.value'),
                     dataIndex: 'value',
                     width: 110,
                     render: (v: string | null) => v ?? '—'
                   },
                   {
-                    title: '状态',
+                    title: t('metric.column.status'),
                     key: 'status',
                     width: 100,
                     render: (_: unknown, r: DeviceMetricDashboardItem) =>
                       r.breached ? (
                         <Tag color={SEVERITY_COLOR[r.severity ?? ''] ?? 'orange'}>
-                          {SEVERITY_LABEL[r.severity ?? ''] ?? '告警'}
+                          {t(SEVERITY_LABEL_KEY[r.severity ?? ''] ?? 'metric.column.alert')}
                         </Tag>
                       ) : r.value != null ? (
-                        <Tag color="green">正常</Tag>
+                        <Tag color="green">{t('metric.status.normal')}</Tag>
                       ) : (
-                        <Tag color="default">无数据</Tag>
+                        <Tag color="default">{t('metric.status.noData')}</Tag>
                       )
                   },
                   {
-                    title: '采集时间',
+                    title: t('metric.column.collectedAt'),
                     dataIndex: 'collected_at',
                     width: 160,
                     render: (v: string | null) => (v ? formatDateTime(v) : '—')
@@ -422,7 +479,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                 <Alert
                   type="warning"
                   showIcon
-                  message={`${items.length} 条活跃指标告警`}
+                  message={t('metric.activeAlertCount', { count: items.length })}
                   style={{ marginBottom: 12 }}
                 />
               )}
@@ -439,13 +496,13 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                         title={
                           <span>
                             {group.icon}
-                            <span style={{ marginLeft: 8 }}>{group.label}</span>
+                            <span style={{ marginLeft: 8 }}>{t(`metric.${group.labelKey}`)}</span>
                             {hasAlert && (
                               <Tag
                                 color={SEVERITY_COLOR[groupItems[0]?.severity ?? ''] ?? 'orange'}
                                 style={{ marginLeft: 8 }}
                               >
-                                {groupItems.length} 告警
+                                {t('metric.groupAlertCount', { count: groupItems.length })}
                               </Tag>
                             )}
                           </span>
@@ -454,39 +511,37 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                       >
                         {group.key === 'monitor_interrupted' ? (
                           hasAlert ? (
-                            <Tag color="orange">监控中断</Tag>
+                            <Tag color="orange">{t('metric.status.interrupted')}</Tag>
                           ) : notProbedYet ? (
-                            <Tag color="default">等待探测</Tag>
+                            <Tag color="default">{t('metric.status.waitingProbe')}</Tag>
                           ) : (
-                            <Tag color="green">正常</Tag>
+                            <Tag color="green">{t('metric.status.normal')}</Tag>
                           )
                         ) : groupItems.length > 0 ? (
-                          <DataTable
+                          <Table
                             dataSource={groupItems}
                             rowKey="id"
                             size="small"
                             pagination={false}
-                            showCard={false}
-                            searchable={false}
                             columns={[
                               {
-                                title: '实例',
+                                title: t('metric.column.instance'),
                                 dataIndex: 'index_key',
                                 render: (v: string) => v || '—',
                                 ellipsis: true
                               },
                               {
-                                title: '级别',
+                                title: t('metric.column.severity'),
                                 dataIndex: 'severity',
                                 width: 70,
                                 render: (sev: string | null) => (
                                   <Tag color={SEVERITY_COLOR[sev ?? ''] ?? 'default'}>
-                                    {SEVERITY_LABEL[sev ?? ''] ?? sev ?? '—'}
+                                    {SEVERITY_LABEL_KEY[sev ?? ''] ? t(SEVERITY_LABEL_KEY[sev ?? '']) : sev ?? '—'}
                                   </Tag>
                                 )
                               },
                               {
-                                title: '当前值',
+                                title: t('metric.column.value'),
                                 dataIndex: 'last_value',
                                 width: 80,
                                 render: (v: string | null) => v ?? '—'
@@ -495,9 +550,9 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                             scroll={{ x: 'max-content' }}
                           />
                         ) : notProbedYet ? (
-                          <Tag color="default">等待探测</Tag>
+                          <Tag color="default">{t('metric.status.waitingProbe')}</Tag>
                         ) : (
-                          <Tag color="green">正常</Tag>
+                          <Tag color="green">{t('metric.status.normal')}</Tag>
                         )}
                       </Card>
                     </Col>
@@ -513,57 +568,53 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
           <div>
             <Space style={{ marginBottom: 8 }}>
               <WarningOutlined style={{ color: '#fa8c16' }} />
-              <Typography.Text strong>活跃告警明细</Typography.Text>
-              <Tag color="orange">{items.length} 条</Tag>
+              <Typography.Text strong>{t('metric.activeAlertDetail')}</Typography.Text>
+              <Tag color="orange">{t('metric.itemCount', { count: items.length })}</Tag>
             </Space>
             <Card
               size="small"
               style={{ background: '#fff7e6', borderColor: '#ffd591' }}
               styles={{ body: { padding: 0 } }}
             >
-              <DataTable
+              <Table
                 dataSource={items}
                 rowKey="id"
                 size="small"
-                pagination={
-                  items.length > 10 ? { ...DENSE_PAGINATION, pageSize: 10, size: 'small' } : false
-                }
-                showCard={false}
-                searchable={false}
+                pagination={items.length > 10 ? { pageSize: 10, size: 'small' } : false}
                 columns={[
                   {
-                    title: '指标',
+                    title: t('metric.column.name'),
                     dataIndex: 'metric_key',
                     width: 100,
                     render: (key: string) => {
                       const meta = METRIC_GROUPS.find((g) => g.key === key);
-                      return meta?.label ?? key;
+                      return meta ? t(`metric.${meta.labelKey}`) : key;
                     }
                   },
                   {
-                    title: '实例',
+                    title: t('metric.column.instance'),
                     dataIndex: 'index_key',
                     width: 160,
                     render: (v: string) => v || '—',
                     ellipsis: true
                   },
                   {
-                    title: '级别',
+                    title: t('metric.column.severity'),
                     dataIndex: 'severity',
                     width: 70,
                     render: (sev: string | null) => (
                       <Tag color={SEVERITY_COLOR[sev ?? ''] ?? 'default'}>
-                        {SEVERITY_LABEL[sev ?? ''] ?? sev ?? '—'}
+                        {SEVERITY_LABEL_KEY[sev ?? ''] ? t(SEVERITY_LABEL_KEY[sev ?? '']) : sev ?? '—'}
                       </Tag>
                     )
                   },
                   {
-                    title: '当前值',
+                    title: t('metric.column.value'),
                     dataIndex: 'last_value',
                     render: (v: string | null) => v ?? '—'
                   },
                   {
-                    title: '更新时间',
+                    title: t('metric.column.updatedAt'),
                     dataIndex: 'updated_at',
                     width: 160,
                     render: (v: string | null) => (v ? formatDateTime(v) : '—')

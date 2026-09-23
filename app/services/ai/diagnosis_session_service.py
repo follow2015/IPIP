@@ -234,7 +234,10 @@ class DiagnosisSessionService:
                 from app.services.monitoring.data_scope_service import get_visible_device_ids
                 visible = get_visible_device_ids(user_id)
             except Exception:  # noqa: BLE001
-                logger.warning("数据域解析失败，按无限制处理 user_id=%s", user_id)
+                logger.error(
+                    "数据域解析失败，按无限制处理（显式 fail-open，device_id 过滤本次失效）"
+                    " user_id=%s", user_id, exc_info=True,
+                )
                 visible = None
 
         if device_id and visible is not None and device_id not in visible:

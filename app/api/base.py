@@ -11,6 +11,7 @@ from flask import jsonify, request
 from marshmallow import Schema
 from marshmallow import ValidationError as MarshmallowValidationError
 
+from app.core.error_i18n import resolve_error_i18n
 from app.exceptions.base import PresetResponseError
 from app.exceptions.validation import ValidationError
 from app.exceptions.handlers import handle_api_exception
@@ -62,20 +63,33 @@ class APIResponse:
             error_code: 错误代码（如 "10001"）
             status_code: HTTP状态码
             details: 错误详情（可选）
+
+        Note:
+            命中 app/core/error_i18n.py 映射表时会额外输出 i18n_key 与 params，
+            前端 api-client 据此把 message 翻成当前语言；未命中则行为与改造前完全一致
+            （message 仍是中文原文，前端原样展示）。
         """
-        
+
         response = {
             'success': False,
             'message': message,
             'timestamp': _now_iso()
         }
-        
+
+        try:
+            resolved = resolve_error_i18n(message)
+        except Exception as exc:  # 映射表出问题绝不能影响错误响应本身
+            logger.warning('error_i18n 解析失败: %s', exc)
+            resolved = None
+        if resolved:
+            response['i18n_key'], response['params'] = resolved
+
         if error_code:
             response['error_code'] = error_code
-            
+
         if details:
             response['details'] = details
-            
+
         return jsonify(response), status_code
     
     @staticmethod

@@ -1,0 +1,176 @@
+{
+  "action": {
+    "add": "Add",
+    "create": "Create",
+    "edit": "Edit",
+    "delete": "Delete",
+    "batchDelete": "Batch Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "confirm": "Confirm",
+    "search": "Search",
+    "reset": "Reset",
+    "refresh": "Refresh",
+    "back": "Back",
+    "close": "Close",
+    "view": "View",
+    "detail": "Details",
+    "enable": "Enable",
+    "disable": "Disable",
+    "copy": "Copy",
+    "retry": "Retry",
+    "copyId": "Click to copy ID"
+  },
+  "field": {
+    "name": "Name",
+    "type": "Type",
+    "status": "Status",
+    "actions": "Actions",
+    "description": "Description",
+    "remarks": "Remarks",
+    "time": "Time",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At",
+    "source": "Source",
+    "level": "Level",
+    "severity": "Severity",
+    "purpose": "Purpose",
+    "customer": "Customer",
+    "unknown": "Unknown"
+  },
+  "message": {
+    "createSuccess": "Created successfully",
+    "updateSuccess": "Updated successfully",
+    "deleteSuccess": "Deleted successfully",
+    "operationFailed": "Operation failed",
+    "deleteFailed": "Delete failed",
+    "requestFailed": "Request failed, please try again later",
+    "noData": "No data",
+    "noDataToExport": "No data to export",
+    "testFailed": "Test failed",
+    "loading": "Loading",
+    "selectRequired": "Please select",
+    "idCopied": "ID copied",
+    "copyFailedManual": "Copy failed, please copy manually",
+    "copyUnsupported": "Auto-copy is not supported in this environment"
+  },
+  "confirm": {
+    "deleteTitle": "Confirm Delete",
+    "deleteContent": "This action cannot be undone. Delete anyway?",
+    "deleteNamed": "Delete {{label}} \"{{name}}\"?"
+  },
+  "validation": {
+    "required": "This field is required",
+    "inputRequiredField": "Please enter {{field}}",
+    "invalidIp": "Please enter a valid IP address",
+    "invalidMac": "Please enter a valid MAC address (format: XX:XX:XX:XX:XX:XX)",
+    "invalidEmail": "Please enter a valid email address",
+    "invalidPhone": "Please enter a valid mobile number"
+  },
+  "unit": {
+    "item": "item"
+  },
+  "batch": {
+    "selectedPrefix": "",
+    "selectedSuffix": " selected",
+    "clear": "Clear selection"
+  },
+  "pagination": {
+    "total": "Total {{count}}",
+    "selectAllOnPage": "Select all on this page ({{count}})",
+    "offsetLimitHint": "Too many results; narrow the range with filters"
+  },
+  "range": {
+    "startDate": "Start Date",
+    "endDate": "End Date"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  },
+  "clipboard": {
+    "copied": "Copied",
+    "failed": "Copy failed"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "notFound": "Sorry, the page you visited does not exist",
+    "backHome": "Back to home",
+    "noPermission": "Sorry, you do not have permission to access this page",
+    "verifyingAuth": "Verifying login status..."
+  },
+  "language": {
+    "switchTo": "Switch language"
+  },
+  "app": {
+    "name": "IPIP Management System"
+  },
+  "menu": {
+    "dashboard": "Dashboard",
+    "asset": "Asset Management",
+    "rooms": "Data Centers",
+    "cabinets": "Cabinets",
+    "devices": "Devices",
+    "deviceRecycleBin": "Device Recycle Bin",
+    "customers": "Customers",
+    "componentTemplates": "Component Templates",
+    "vendorBrands": "Vendor Brands",
+    "networkGroup": "Network Management",
+    "ip": "IP Management",
+    "ipAudit": "IP Allocation Audit",
+    "switches": "Network Devices",
+    "network": "Network Segments",
+    "vlans": "VLAN Management",
+    "linkAggregations": "Link Aggregation",
+    "topology": "Topology",
+    "virtualRooms": "Virtual Data Centers",
+    "monitor": "Monitoring",
+    "monitorOverview": "Overview",
+    "monitorAlerts": "Alerts",
+    "monitorIncidents": "Incidents",
+    "monitorHistory": "History",
+    "monitorCredentials": "Credentials",
+    "monitorSettings": "Runtime Config",
+    "monitorAlertRules": "Alert Rules",
+    "monitorThresholds": "Thresholds & Targets",
+    "monitorOidTools": "OID Toolbox",
+    "ai": "AI Assistant",
+    "aiNlq": "Smart Query",
+    "aiSkills": "Skills",
+    "aiConfig": "AI Config",
+    "aiMonitor": "Runtime Monitor",
+    "aiAudit": "Audit Logs",
+    "aiRag": "Knowledge Base",
+    "aiDiagnosis": "AI Diagnosis",
+    "system": "System",
+    "users": "Users",
+    "rbac": "Roles",
+    "loginLogs": "Logs",
+    "auditLogs": "Audit Logs",
+    "notificationPreferences": "Notification Preferences",
+    "webhookConfigs": "Webhook Config",
+    "mailSettings": "Mail Settings",
+    "voiceSettings": "Voice Settings",
+    "importExport": "Import / Export",
+    "licenses": "Licenses"
+  },
+  "theme": {
+    "switchDark": "Switch to dark mode",
+    "switchLight": "Switch to light mode"
+  },
+  "user": {
+    "profile": "User Center",
+    "notLoggedIn": "Not signed in"
+  },
+  "export": {
+    "assetStats": "Asset Statistics",
+    "terminationArchive": "Termination Archive"
+  },
+  "version": {
+    "label": "Version v{{version}}",
+    "backend": "Backend version v{{version}}"
+  }
+}

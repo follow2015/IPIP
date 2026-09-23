@@ -44,10 +44,13 @@ import { usePermission } from '@/hooks/usePermission';
 import { useMessage } from '@/hooks/useMessage';
 import { useConfirm } from '@/utils/confirm';
 import { ConfirmButton } from '@/components/ConfirmButton';
+import { useTranslation } from 'react-i18next';
 
 const { Paragraph, Text } = Typography;
 
 export default function RAGPage() {
+  const { t } = useTranslation('ai');
+  const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
   const [status, setStatus] = useState<RagStatus | null>(null);
   const [docs, setDocs] = useState<RagDoc[]>([]);
@@ -69,20 +72,20 @@ export default function RAGPage() {
       const s = await getRagStatus();
       setStatus(s);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '加载状态失败');
+      message.error(err instanceof Error ? err.message : t('rag.message.loadStatusFailed'));
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, [message, t]);
 
   const fetchDocs = useCallback(async () => {
     try {
       const res = await listRagDocs(100, 0);
       setDocs(res.docs);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '加载文档列表失败');
+      message.error(err instanceof Error ? err.message : t('rag.message.loadDocsFailed'));
     }
-  }, [message]);
+  }, [message, t]);
 
   useEffect(() => {
     fetchStatus();
@@ -99,7 +102,7 @@ export default function RAGPage() {
       setIngestTotal(0);
       try {
         const { task_id } = await ragIngest({ docs_dir: docsDir });
-        message.info(`入库任务已提交：${task_id}`);
+        message.info(t('rag.message.ingestSubmitted', { taskId: task_id }));
         sseCancelRef.current?.cancel();
         const cancel = subscribeRagIngestProgress(
           task_id,
@@ -110,37 +113,43 @@ export default function RAGPage() {
             } else if (ev.type === 'done') {
               const count = Number(ev.result);
               if (Number.isFinite(count) && ev.result !== null && ev.result !== '') {
-                message.success(`入库完成，共 ${count} 篇文档`);
+                message.success(t('rag.message.ingestDone', { count }));
               } else {
-                message.error(`入库失败：${String(ev.result ?? '未知错误')}`);
+                message.error(
+                  t('rag.message.ingestFailed', {
+                    reason: String(ev.result ?? t('error.unknown'))
+                  })
+                );
               }
               setIngesting(false);
               fetchStatus();
               fetchDocs();
             } else if (ev.type === 'error') {
-              message.error(`入库失败：${ev.message ?? '未知错误'}`);
+              message.error(
+                t('rag.message.ingestFailed', { reason: ev.message ?? t('error.unknown') })
+              );
               setIngesting(false);
             }
           },
           () => {
-            message.error('SSE 连接中断');
+            message.error(t('rag.message.sseDisconnected'));
             setIngesting(false);
           }
         );
         sseCancelRef.current = cancel;
       } catch (err) {
         setIngesting(false);
-        message.error(err instanceof Error ? err.message : '提交入库失败');
+        message.error(err instanceof Error ? err.message : t('rag.message.ingestSubmitFailed'));
         throw err;
       }
     },
-    [message, fetchStatus, fetchDocs]
+    [message, fetchStatus, fetchDocs, t]
   );
 
   const handleIngest = async (docsDir: string) => {
     const dir = (docsDir ?? '').trim() || '.';
     if (dir.startsWith('/') || /^[A-Za-z]:[\\/]/.test(dir)) {
-      message.warning("请填相对路径（相对 AI_DOCS_ROOT）；'.' 或留空表示根目录本身");
+      message.warning(t('rag.validation.relativePath'));
       return;
     }
     await startIngestTask(dir);
@@ -149,26 +158,26 @@ export default function RAGPage() {
   const handleRebuild = () => {
     const dir = ingestForm.getFieldValue('docs_dir')?.trim() || '.';
     if (dir.startsWith('/') || /^[A-Za-z]:[\\/]/.test(dir)) {
-      message.warning("请填相对路径（相对 AI_DOCS_ROOT）；'.' 或留空表示根目录本身");
+      message.warning(t('rag.validation.relativePath'));
       return;
     }
     confirm({
-      title: '确认重建知识库',
+      title: t('rag.rebuild.title'),
       icon: <ExclamationCircleOutlined />,
-      content: '将清空全部文档与索引，并自动重新全量入库，不可恢复。' + `重跑目录：${dir}`,
+      content: t('rag.rebuild.content', { dir }),
       okType: 'danger',
-      okText: '清空并重建',
+      okText: t('rag.rebuild.okText'),
       onOk: async () => {
         setIngesting(true);
         setIngestProgress(0);
         setIngestTotal(0);
         try {
           await resetRagStore();
-          message.success('知识库已清空，正在重新入库');
+          message.success(t('rag.message.storeClearedReingesting'));
           await startIngestTask(dir);
         } catch (err) {
           setIngesting(false);
-          message.error(err instanceof Error ? err.message : '重建失败');
+          message.error(err instanceof Error ? err.message : t('rag.message.rebuildFailed'));
         }
       }
     });
@@ -176,19 +185,19 @@ export default function RAGPage() {
 
   const handleReset = () => {
     confirm({
-      title: '确认清空知识库',
+      title: t('rag.reset.title'),
       icon: <ExclamationCircleOutlined />,
-      content: '将删除所有文档与索引，不可恢复。下次入库会自动重建。',
+      content: t('rag.reset.content'),
       okType: 'danger',
-      okText: '清空',
+      okText: t('rag.reset.okText'),
       onOk: async () => {
         try {
           await resetRagStore();
-          message.success('知识库已清空');
+          message.success(t('rag.message.storeCleared'));
           fetchStatus();
           fetchDocs();
         } catch (err) {
-          message.error(err instanceof Error ? err.message : '清空失败');
+          message.error(err instanceof Error ? err.message : t('rag.message.resetFailed'));
         }
       }
     });
@@ -196,7 +205,7 @@ export default function RAGPage() {
 
   const handleAsk = async () => {
     if (!question.trim()) {
-      message.warning('请输入问题');
+      message.warning(t('validation.enterQuestion'));
       return;
     }
     setAsking(true);
@@ -205,7 +214,7 @@ export default function RAGPage() {
       const result = await ragQa(question);
       setQaResult(result);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '问答失败');
+      message.error(err instanceof Error ? err.message : t('rag.message.qaFailed'));
     } finally {
       setAsking(false);
     }
@@ -222,7 +231,7 @@ export default function RAGPage() {
           label: (
             <Space size={6}>
               <QuestionCircleOutlined />
-              <span>知识问答</span>
+              <span>{t('rag.tab.qa')}</span>
             </Space>
           ),
           children: (
@@ -231,13 +240,13 @@ export default function RAGPage() {
                 <Input
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
-                  placeholder="输入问题，基于知识库检索回答"
+                  placeholder={t('rag.placeholder.question')}
                   maxLength={2000}
                   onPressEnter={handleAsk}
                   disabled={asking}
                 />
                 <Button type="primary" icon={<SendOutlined />} onClick={handleAsk} loading={asking}>
-                  提问
+                  {t('rag.action.ask')}
                 </Button>
               </Space.Compact>
 
@@ -245,20 +254,20 @@ export default function RAGPage() {
                 <Alert
                   type="warning"
                   showIcon
-                  message="本地检索模式（无 LLM 参与）"
-                  description="当前结果仅来自本地知识库检索，未经过 LLM 模型生成：AI 未配置或模型服务不可用。以下为命中的原文片段，请自行判读。"
+                  message={t('rag.degraded.title')}
+                  description={t('rag.degraded.description')}
                   style={{ marginBottom: 16 }}
                 />
               )}
 
               {qaResult && (
-                <Card type="inner" title="回答">
+                <Card type="inner" title={t('rag.answer.title')}>
                   <Paragraph style={{ whiteSpace: 'pre-wrap' }}>{qaResult.answer}</Paragraph>
                   {qaResult.references.length > 0 && (
                     <>
                       <Divider />
                       <Paragraph type="secondary">
-                        命中片段（{qaResult.references.length}）：
+                        {t('rag.answer.hitFragments', { count: qaResult.references.length })}
                       </Paragraph>
                       <List
                         size="small"
@@ -288,7 +297,7 @@ export default function RAGPage() {
           label: (
             <Space size={6}>
               <DatabaseOutlined />
-              <span>知识库管理</span>
+              <span>{t('rag.tab.manage')}</span>
             </Space>
           ),
           children: (
@@ -304,25 +313,25 @@ export default function RAGPage() {
                     }}
                     loading={loading}
                   >
-                    刷新
+                    {tc('action.refresh')}
                   </Button>
                 }
               >
                 <Row gutter={16} style={{ marginBottom: 24 }}>
                   <Col xs={12} md={6}>
                     <Statistic
-                      title="知识库状态"
+                      title={t('rag.stat.status')}
                       valueRender={() =>
                         status?.available ? (
-                          <Tag color="green">可用</Tag>
+                          <Tag color="green">{t('rag.status.available')}</Tag>
                         ) : (
-                          <Tag color="red">不可用</Tag>
+                          <Tag color="red">{t('rag.status.unavailable')}</Tag>
                         )
                       }
                     />
                   </Col>
                   <Col xs={12} md={6}>
-                    <Statistic title="文档总数" value={status?.doc_count ?? 0} />
+                    <Statistic title={t('rag.stat.docCount')} value={status?.doc_count ?? 0} />
                   </Col>
                 </Row>
 
@@ -330,12 +339,19 @@ export default function RAGPage() {
                 {/* 显式展示文档根目录：docs_dir 是相对它的子目录。此前默认值填
                     "docs" 被拼成 <root>/docs/docs，反复报「目录不存在」。 */}
                 <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                  文档根目录：<Text code>{status?.docs_root || '加载中…'}</Text>
-                  。下方填<Text strong>相对</Text>路径：
-                  <Text code>.</Text> 或留空 = 根目录本身；填
-                  <Text code>monitoring</Text> ={' '}
-                  <Text code>{`${status?.docs_root || '<根目录>'}/monitoring`}</Text>
-                  。根目录由 .env 的 <Text code>AI_DOCS_ROOT</Text> 决定，改动需重启后端。
+                  {t('rag.docsRoot.rootLabel')}
+                  <Text code>{status?.docs_root || tc('message.loading')}</Text>
+                  {t('rag.docsRoot.relativeIntro')}
+                  <Text strong>{t('rag.docsRoot.relativeWord')}</Text>
+                  {t('rag.docsRoot.pathLabel')}
+                  <Text code>.</Text>
+                  {t('rag.docsRoot.dotHint')}
+                  <Text code>monitoring</Text>
+                  {t('rag.docsRoot.equals')}
+                  <Text code>{`${status?.docs_root || t('rag.docsRoot.rootPlaceholder')}/monitoring`}</Text>
+                  {t('rag.docsRoot.envNote')}
+                  <Text code>AI_DOCS_ROOT</Text>
+                  {t('rag.docsRoot.restartNote')}
                 </Paragraph>
                 <Form
                   form={ingestForm}
@@ -345,7 +361,7 @@ export default function RAGPage() {
                   <Form.Item name="docs_dir" initialValue="." style={{ flex: 1 }}>
                     <Input
                       prefix={<InboxOutlined />}
-                      placeholder="子目录（相对 AI_DOCS_ROOT；'.' 或留空表示根目录）"
+                      placeholder={t('rag.placeholder.subDir')}
                       disabled={ingesting}
                     />
                   </Form.Item>
@@ -358,7 +374,7 @@ export default function RAGPage() {
                         icon={<InboxOutlined />}
                         disabled={!canAdmin}
                       >
-                        入库
+                        {t('rag.action.ingest')}
                       </Button>
                       <Button
                         icon={<SyncOutlined />}
@@ -366,7 +382,7 @@ export default function RAGPage() {
                         loading={ingesting}
                         disabled={!canAdmin}
                       >
-                        重建索引
+                        {t('rag.action.rebuildIndex')}
                       </Button>
                     </Space>
                   </Form.Item>
@@ -380,7 +396,10 @@ export default function RAGPage() {
                 )}
                 {ingesting && (
                   <Paragraph type="secondary" style={{ marginTop: 8 }}>
-                    正在入库 {ingestProgress}/{ingestTotal}...
+                    {t('rag.progress.ingesting', {
+                      current: ingestProgress,
+                      total: ingestTotal
+                    })}
                   </Paragraph>
                 )}
 
@@ -391,16 +410,16 @@ export default function RAGPage() {
                   onClick={handleReset}
                   disabled={ingesting || !canAdmin}
                 >
-                  清空知识库
+                  {t('rag.action.reset')}
                 </Button>
               </Card>
 
               {/* 文档列表 */}
               <Card
-                title="文档列表"
+                title={t('rag.docs.title')}
                 extra={
                   <Button size="small" onClick={fetchDocs}>
-                    刷新
+                    {tc('action.refresh')}
                   </Button>
                 }
               >
@@ -410,20 +429,20 @@ export default function RAGPage() {
                   pagination={{ pageSize: 10 }}
                   columns={[
                     {
-                      title: '文档 ID',
+                      title: t('rag.docs.column.docId'),
                       dataIndex: 'doc_id',
                       key: 'doc_id',
                       width: 200,
                       ellipsis: true
                     },
                     {
-                      title: '内容预览',
+                      title: t('rag.docs.column.preview'),
                       dataIndex: 'preview',
                       key: 'preview',
                       ellipsis: true
                     },
                     {
-                      title: '操作',
+                      title: tc('field.actions'),
                       key: 'action',
                       width: 80,
                       render: (_, record) => (
@@ -431,9 +450,9 @@ export default function RAGPage() {
                           type="link"
                           size="small"
                           icon={<DeleteOutlined />}
-                          title="确认删除"
-                          content={`删除文档 ${record.doc_id}？`}
-                          successMessage="已删除"
+                          title={tc('confirm.deleteTitle')}
+                          content={t('rag.docs.confirmDelete', { docId: record.doc_id })}
+                          successMessage={t('rag.docs.deleteSuccess')}
                           onConfirm={async () => {
                             await deleteRagDoc(record.doc_id);
                           }}
@@ -443,7 +462,7 @@ export default function RAGPage() {
                           }}
                           disabled={!canAdmin}
                         >
-                          删除
+                          {tc('action.delete')}
                         </ConfirmButton>
                       )
                     }

@@ -1,7 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { Tooltip } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { NODE_STATUS_COLOR } from './constants';
 import type { DeviceNode } from './types';
+
+function stripNodePrefix(label: string): string {
+  return label.replace(/^(Node|节点)\s*/i, '');
+}
 
 interface NodeGridProps {
   nodes: DeviceNode[];
@@ -20,6 +25,7 @@ const NodeGrid: React.FC<NodeGridProps> = ({
   onNodeDragStart,
   onNodeDrop
 }) => {
+  const { t } = useTranslation('asset');
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const grid: (DeviceNode | null)[][] = useMemo(() => {
@@ -107,8 +113,14 @@ const NodeGrid: React.FC<NodeGridProps> = ({
                 {node.ip && <div>IP: {node.ip}</div>}
                 {node.ipmiAddress && <div>IPMI: {node.ipmiAddress}</div>}
                 <div style={{ marginTop: 2 }}>
-                  状态:{' '}
-                  {node.status === 'active' ? '在线' : node.status === 'fault' ? '故障' : '离线'}
+                  {t('uposition.node.status', {
+                    value:
+                      node.status === 'active'
+                        ? t('uposition.node.online')
+                        : node.status === 'fault'
+                          ? t('uposition.node.fault')
+                          : t('uposition.node.offline')
+                  })}
                 </div>
               </div>
             }
@@ -175,7 +187,7 @@ const NodeGrid: React.FC<NodeGridProps> = ({
                   lineHeight: 1
                 }}
               >
-                {node.label.replace(/^(Node|节点)\s*/i, '')}
+                {stripNodePrefix(node.label)}
               </span>
             </div>
           </Tooltip>

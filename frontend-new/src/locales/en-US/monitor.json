@@ -1,0 +1,1184 @@
+{
+  "traffic": {
+    "title": "Port Traffic",
+    "selectPortPlaceholder": "Select port",
+    "fetch": "Get Traffic Chart",
+    "selectPortFirst": "Please select a port first",
+    "emptyHint": "Please select a port and click \"{{action}}\"",
+    "noData": "Zabbix has no traffic data for this port",
+    "range": {
+      "h1": "1 hour",
+      "h6": "6 hours",
+      "h24": "24 hours"
+    },
+    "direction": {
+      "rx": "Inbound",
+      "tx": "Outbound"
+    },
+    "tooltip": {
+      "direction": "Direction",
+      "value": "Traffic ({{unit}})"
+    },
+    "error": {
+      "credential": "Failed to decrypt the Zabbix credential, please check the credential configuration",
+      "fetch": "Failed to fetch the Zabbix port list, please check the network or the Zabbix service",
+      "noCredential": "No Zabbix credential configured for this device, port traffic cannot be fetched"
+    }
+  },
+  "alertPopover": {
+    "title": "Metric Alert Details",
+    "count": "{{count}} alerts",
+    "normal": "Normal",
+    "empty": "No active alerts",
+    "column": {
+      "metric": "Metric",
+      "instance": "Instance",
+      "severity": "Severity",
+      "value": "Current Value"
+    },
+    "metric": {
+      "temperature": "Temperature",
+      "portUpdown": "Port Status",
+      "diskFailure": "Disk Failure",
+      "raidFailure": "RAID Failure",
+      "monitorInterrupted": "Monitoring Interrupted"
+    }
+  },
+  "column": {
+    "device": "Device",
+    "managementIp": "Management IP",
+    "protocol": "Protocol",
+    "alertType": "Alert Type",
+    "metricInstance": "Metric Instance",
+    "deliveryStatus": "Delivery Status",
+    "attempts": "Retries",
+    "alertTime": "Alert Time",
+    "lastError": "Last Error",
+    "alertCount": "Alerts",
+    "firstAt": "First",
+    "lastAt": "Latest",
+    "sampleIds": "Sample Alert ID",
+    "probedAt": "Probe Time",
+    "latency": "Latency (ms)",
+    "consecutiveFailures": "Consecutive Failures",
+    "alert": "Alert",
+    "error": "Error",
+    "metricKey": "Metric Key",
+    "instance": "Instance",
+    "currentValue": "Current Value",
+    "collectedAt": "Collected At",
+    "connectivity": "Connectivity",
+    "metricAlert": "Metric Alerts",
+    "failureCount": "Failures",
+    "lastCheck": "Last Check",
+    "content": "Content",
+    "yes": "Yes"
+  },
+  "filter": {
+    "all": "All"
+  },
+  "status": {
+    "reachable": "Reachable",
+    "unreachable": "Unreachable",
+    "connected": "Connected",
+    "flapping": "Flapping",
+    "flappingOngoing": "Flapping",
+    "neverReachable": "Never Reachable",
+    "blindspot": "Alert Blind Spot",
+    "blindspotShort": "Blind Spot",
+    "blindspotTooltip": "Alert triggered but no recipient configured",
+    "probePaused": "Probing paused",
+    "probeNormal": "Probing normally"
+  },
+  "export": {
+    "csv": "Export CSV",
+    "failed": "Export failed"
+  },
+  "alerts": {
+    "title": "Alert History",
+    "aggregationTitle": "Alert Aggregation (Storm Groups)",
+    "empty": "No alert records",
+    "deletedDevice": "Deleted device",
+    "acknowledged": "Acknowledged",
+    "viewTrend": "View history trend",
+    "deliveryStatus": {
+      "pending": "Pending",
+      "sent": "Delivered",
+      "failed": "Failed"
+    },
+    "filter": {
+      "scopeAll": "All visible",
+      "scopeMine": "Assigned to me",
+      "metricKey": "Metric key (metric_key)",
+      "indexKey": "Instance key (index_key)"
+    },
+    "view": {
+      "list": "List view",
+      "aggregation": "Aggregated view"
+    },
+    "batch": {
+      "ack": "Batch Acknowledge",
+      "retry": "Batch Retry",
+      "close": "Batch Close"
+    },
+    "message": {
+      "batchAck_one": "Acknowledged {{count}} alert",
+      "batchAck_other": "Acknowledged {{count}} alerts",
+      "batchAckFailed": "Batch acknowledge failed",
+      "batchRetry_one": "Retried {{count}} alert",
+      "batchRetry_other": "Retried {{count}} alerts",
+      "batchRetryFailed": "Batch retry failed",
+      "batchClose_one": "Closed {{count}} alert",
+      "batchClose_other": "Closed {{count}} alerts",
+      "batchCloseFailed": "Batch close failed",
+      "notFoundSuffix_one": ", {{count}} not found",
+      "notFoundSuffix_other": ", {{count}} not found",
+      "skipSuffix_one": ", {{count}} skipped (not in failed state)",
+      "skipSuffix_other": ", {{count}} skipped (not in failed state)",
+      "closed": "Alert closed",
+      "closeFailed": "Failed to close",
+      "retryQueued": "Re-queued for delivery",
+      "retryNotNeeded": "This alert is not in failed state, no retry needed",
+      "retryFailed": "Retry request failed",
+      "acknowledgedDone": "Alert acknowledged",
+      "ackFailed": "Acknowledge request failed"
+    },
+    "ackModal": {
+      "title": "Acknowledge Alert",
+      "prompt": "Acknowledge alert #{{id}} ({{type}})",
+      "acknowledgedBy": " · already acknowledged by {{user}}",
+      "notePlaceholder": "Acknowledgement note (optional)"
+    },
+    "detail": {
+      "title": "Alert Details",
+      "id": "Alert ID",
+      "deviceDeleted": "Deleted",
+      "noIp": "No IP",
+      "dedupKey": "Dedup Key",
+      "sentAt": "Sent At",
+      "attempts": "Attempts",
+      "ackSection": "Acknowledgement",
+      "ackBy": "Acknowledged By",
+      "ackAt": "Acknowledged At",
+      "ackNote": "Acknowledgement Note",
+      "notAcknowledged": "Not acknowledged",
+      "payloadSection": "Alert Payload"
+    }
+  },
+  "history": {
+    "selectDevice": "Select a monitored device",
+    "noDevice": "No monitored devices available",
+    "timeRange": "Time Range",
+    "pleaseSelectDevice": "Please select a monitored device to view its history trend",
+    "protocolAll": "All protocols",
+    "range": {
+      "h1": "1 hour",
+      "h24": "24 hours",
+      "d7": "7 days",
+      "d30": "30 days"
+    },
+    "stat": {
+      "uptime": "Uptime",
+      "probes": "Probes",
+      "downEpisodes": "Down Episodes",
+      "avgLatency": "Avg Latency",
+      "maxLatency": "Max Latency",
+      "p95Latency": "P95 Latency"
+    },
+    "chart": {
+      "trendTitle": "Latency Trend and Reachability (Dual Axis)",
+      "latencyAxis": "Latency (ms)",
+      "reachAxis": "Reachability",
+      "noLatencyData": "No latency data"
+    },
+    "latest": {
+      "title": "Current Metric Values",
+      "breached": "Breached"
+    },
+    "trend": {
+      "title": "Metric Trend",
+      "selectMetric": "Select metric",
+      "valueAxis": "Value",
+      "indexName": "Index",
+      "valueName": "Value",
+      "noData": "No data for this metric in the selected time range",
+      "pleaseSelect": "Please select a metric to view its trend"
+    },
+    "recentProbes": "Recent Probe Details",
+    "cardSummary": "Latency {{latency}} · Consecutive failures {{failures}}",
+    "axis": {
+      "lossPct": "Packet loss (%)",
+      "jitterMs": "Jitter (ms)"
+    },
+    "col": {
+      "lossPct": "Packet loss",
+      "jitterMs": "Jitter (ms)",
+      "samples": "Samples"
+    },
+    "tooltip": {
+      "lossSuffix": " · loss {{pct}}%",
+      "jitterSuffix": " · jitter {{ms}} ms"
+    },
+    "card": {
+      "avgLoss": "Average packet loss",
+      "maxLoss": "Max packet loss",
+      "avgJitter": "Average jitter",
+      "samples": "Quality samples",
+      "pingTrend": "Ping quality trend (loss / jitter)"
+    },
+    "empty": {
+      "loss": "No packet loss data",
+      "jitter": "No jitter data"
+    }
+  },
+  "stat": {
+    "devices": "Monitored Devices",
+    "availability": "Availability",
+    "activeAlerts": "Active Alerts",
+    "health": "Health Score",
+    "notificationSettings": "Notification Settings",
+    "unitDevice_one": "device",
+    "unitDevice_other": "devices",
+    "unitAlert_one": "alert",
+    "unitAlert_other": "alerts"
+  },
+  "chart": {
+    "count": "Count",
+    "protocolTotal": "Protocols",
+    "deviceTotal": "Devices",
+    "protocolDistribution": "Protocol Distribution",
+    "statusDistribution": "Status Distribution",
+    "deviceTypeDistribution": "Device Type Distribution"
+  },
+  "dashboard": {
+    "status": {
+      "normal": "Normal",
+      "warning": "Warning",
+      "critical": "Critical"
+    },
+    "systemStatus": "System Status",
+    "perf": {
+      "disk": "Disk"
+    },
+    "recentActivity": "Recent Activity",
+    "noActivity": "No activity records",
+    "utilization": {
+      "title": "Resource Utilization",
+      "cabinet": "Cabinet Utilization",
+      "ip": "IP Utilization",
+      "deviceOnline": "Device Online Rate"
+    },
+    "chart": {
+      "deviceStatus": "Device Status Distribution",
+      "cabinetStatus": "Cabinet Status Distribution",
+      "ipStatus": "IP Status Distribution"
+    },
+    "ip": {
+      "publicActive": "Public - Active",
+      "publicInactive": "Public - Inactive",
+      "publicBlocked": "Public - Blocked",
+      "publicUnused": "Public - Unused",
+      "privateActive": "Private - Active",
+      "privateInactive": "Private - Inactive",
+      "privateBlocked": "Private - Blocked",
+      "privateUnused": "Private - Unused"
+    },
+    "metric": {
+      "roomTotal": "Data Centers",
+      "cabinetTotal": "Cabinets",
+      "customerTotal": "Customers",
+      "publicIp": "Public IP",
+      "privateIp": "Private IP"
+    },
+    "subtitle": {
+      "active": "{{count}} active",
+      "available": "{{count}} available",
+      "online": "{{count}} online",
+      "segments": "{{count}} network segments",
+      "onlineRatio": "{{online}} / {{total}} online"
+    }
+  },
+  "trend": {
+    "title": "Alert Trend",
+    "presetToday": "Today",
+    "presetLast7": "Last 7 days",
+    "presetLast30": "Last 30 days",
+    "empty": "No alerts in the selected time range",
+    "tooltip_one": "{{day}}: {{count}} alert",
+    "tooltip_other": "{{day}}: {{count}} alerts",
+    "total_one": "Total: {{count}} alert",
+    "total_other": "Total: {{count}} alerts"
+  },
+  "recent": {
+    "title": "Recent Alerts",
+    "viewAll": "View All",
+    "handled": "Handled",
+    "empty": "No recent alerts"
+  },
+  "interpret": {
+    "run": "AI Analysis",
+    "failed": "AI analysis failed"
+  },
+  "deviceStatus": {
+    "title": "Device Monitoring Status",
+    "searchPlaceholder": "Search device name / IP / BMC",
+    "filter": {
+      "connectivity": "Connectivity Issue",
+      "metricAlerting": "Metric Alerting",
+      "interrupted": "Monitoring Interrupted"
+    },
+    "batch": {
+      "probe": "Batch Probe",
+      "enableMonitor": "Batch Enable Monitoring",
+      "pauseMonitor": "Batch Pause Monitoring"
+    },
+    "probe": {
+      "action": "Probe",
+      "success": "Probe succeeded, latency {{value}} ms",
+      "failure": "Probe failed: {{error}}",
+      "unknownError": "Unknown error",
+      "coolingDown": "This device is in probe cooldown, please try again later",
+      "requestFailed": "Probe request failed",
+      "probing_one": "Probing {{count}} device...",
+      "probing_other": "Probing {{count}} devices...",
+      "complete": "Probe finished: {{reachable}} reachable, {{unreachable}} unreachable",
+      "completeWithSkipped": "Probe finished: {{reachable}} reachable, {{unreachable}} unreachable, {{skipped}} skipped (cooldown / not found)",
+      "batchFailed": "Batch probe request failed",
+      "toggling": {
+        "enabled_one": "Enabling monitoring for {{count}} device...",
+        "enabled_other": "Enabling monitoring for {{count}} devices...",
+        "disabled_one": "Pausing monitoring for {{count}} device...",
+        "disabled_other": "Pausing monitoring for {{count}} devices..."
+      },
+      "toggleDone": {
+        "enabled_one": "Enabled monitoring for {{count}} device, skipped {{skipped}}",
+        "enabled_other": "Enabled monitoring for {{count}} devices, skipped {{skipped}}",
+        "disabled_one": "Paused monitoring for {{count}} device, skipped {{skipped}}",
+        "disabled_other": "Paused monitoring for {{count}} devices, skipped {{skipped}}"
+      },
+      "batchToggleFailed": {
+        "enabled": "Failed to enable monitoring in batch",
+        "disabled": "Failed to pause monitoring in batch"
+      },
+      "toggleSingle": {
+        "enabled": "Monitoring resumed for this device",
+        "disabled": "Monitoring paused for this device"
+      }
+    }
+  },
+  "noc": {
+    "title": "NOC Monitoring Dashboard",
+    "backToAlerts": "Back to Alert Center",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit Fullscreen",
+    "refreshOff": "Off",
+    "activeAlertCount_one": "{{count}} active alert",
+    "activeAlertCount_other": "{{count}} active alerts",
+    "kpi": {
+      "total": "Total Active Alerts",
+      "critical": "Critical Alerts",
+      "warning": "Warning Alerts",
+      "info": "Info Alerts"
+    },
+    "wallTitle": "Active Alert Wall (sorted by severity, critical first)",
+    "noActiveAlerts": "No active alerts",
+    "bySeverity": "By Severity",
+    "byType": "By Type",
+    "densityTitle": "Alert Density Timeline (hourly)",
+    "alertCountAxis": "Alerts"
+  },
+  "settings": {
+    "hint": "Editable parameters take effect on the Worker immediately after saving (hot reload), no restart needed. Parameters marked \"Requires restart\" need a service restart.",
+    "group": {
+      "probe": "Probe Parameters",
+      "interval": "Polling Intervals",
+      "alert": "Alert Rules",
+      "advanced": "Advanced",
+      "scan": "Auto Scan"
+    },
+    "field": {
+      "consecutiveFailuresThreshold": "Consecutive Failure Threshold",
+      "timeoutSeconds": "Probe Timeout (s)",
+      "threadPoolSize": "Thread Pool Size",
+      "intervalSnmp": "SNMP Polling Interval (s)",
+      "intervalBmc": "BMC Polling Interval (s)",
+      "intervalZabbix": "Zabbix Polling Interval (s)",
+      "outboxInterval": "Alert Outbox Interval (s)",
+      "realertIntervalMinutes": "Re-alert Interval (min)",
+      "fallbackRole": "Fallback Role",
+      "blindspotRole": "Blind Spot Escalation Group",
+      "workerInProcess": "In-process Worker",
+      "scanAutoEnabled": "Auto Scan Master Switch",
+      "scanAutoInterval": "Scan Interval (s)",
+      "scanAutoRoomIds": "Physical Room Scope",
+      "scanAutoVrIds": "Virtual Room Scope",
+      "scanAutoCleanupInterval": "Staleness Cleanup Interval (s)",
+      "scanAutoGracePeriod": "INACTIVE Degradation Grace Period (s)"
+    },
+    "loadFailed": "Unable to load the monitoring runtime configuration",
+    "needRestart": "Requires restart",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "unsaved": "Unsaved",
+    "selectRoomPlaceholder": "Select rooms (leave empty to disable auto scan)",
+    "save": "Save Changes",
+    "message": {
+      "saved_one": "Saved {{count}} configuration item, Worker will hot-reload",
+      "saved_other": "Saved {{count}} configuration items, Worker will hot-reload",
+      "savedRestartSuffix": " (some require a restart)",
+      "saveFailed": "Failed to save"
+    }
+  },
+  "metricTemplate": {
+    "title": "Monitoring Metric Templates",
+    "empty": "No metric templates yet",
+    "searchPlaceholder": "Search metric / display name / category / OID / description",
+    "vendorAll": "All Vendors",
+    "action": {
+      "create": "Add Metric"
+    },
+    "status": {
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "stat": {
+      "total": "Total Templates"
+    },
+    "alert": {
+      "message": "Metric templates and thresholds are prerequisites for alerts to take effect",
+      "description": "A device must have monitoring enabled and a credential bound first, then the matching metric template on this page must be enabled with a threshold configured before abnormal collected values can trigger alerts. Creating a template without enabling it, or enabling it without a threshold, will not produce any alert."
+    },
+    "column": {
+      "metric": "Metric",
+      "category": "Category",
+      "threshold": "Threshold"
+    },
+    "field": {
+      "metricKey": "Metric Key",
+      "displayName": "Display Name",
+      "categoryKey": "Category",
+      "vendor": "Vendor",
+      "vendorKey": "Vendor",
+      "pollInterval": "Polling Interval (s)",
+      "oidSymbol": "OID Symbol",
+      "numericOid": "Numeric OID",
+      "indexKind": "Index Dimension",
+      "warn": "Warning Threshold (warn)",
+      "crit": "Critical Threshold (crit)",
+      "expected": "Expected Value (expected)",
+      "thresholdJson": "Threshold JSON",
+      "severityDefault": "Default Alert Level",
+      "unit": "Unit",
+      "runbookUrl": "Runbook URL",
+      "runbookTitle": "Runbook Title"
+    },
+    "severity": {
+      "warn": "Alert (warn)",
+      "crit": "Critical (crit)"
+    },
+    "metricType": {
+      "gauge": "Instantaneous Value",
+      "counter": "Cumulative Counter",
+      "state": "State",
+      "event": "Event"
+    },
+    "metricTypeOption": {
+      "gauge": "Instantaneous Value (gauge)",
+      "counter": "Cumulative Counter (counter)",
+      "state": "State (state)",
+      "event": "Event (event)"
+    },
+    "threshold": {
+      "notConfigured": "Not Configured",
+      "warnAt": "Alert ≥ {{value}}",
+      "critAt": "Critical ≥ {{value}}",
+      "expected": "Expected = {{value}}"
+    },
+    "modal": {
+      "createTitle": "Add Metric Template",
+      "editTitle": "Edit Metric Template"
+    },
+    "tooltip": {
+      "metricKey": "Technical identifier aligned with the category of the OID category rule",
+      "displayName": "Display name, preferred in tables; falls back to metric_key when empty",
+      "category": "Links to the OID category rule; auto-filled on MIB scan import",
+      "vendor": "Vendor constraint (e.g. Huawei / H3C / Dell); when declared, only devices of the same vendor match; leave empty for all vendors",
+      "oidSymbol": "MIB symbol name, e.g. ifOperStatus",
+      "numericOid": "Full numeric OID, complementary to oid_symbol; populated by MIB scan import",
+      "zabbixItemKey": "Zabbix item key, e.g. system.cpu.util / vm.memory.size[pavailable]",
+      "warn": "Reaching this value triggers an alert",
+      "crit": "Reaching this value triggers a critical alert",
+      "expected": "Alert when the actual value differs from this value",
+      "thresholdJson": "Threshold for event type, free-form JSON",
+      "severityDefault": "Alert level used as fallback when no threshold is configured",
+      "runbookUrl": "Runbook link shown in alert details when an alert fires (internal wiki, etc.)"
+    },
+    "placeholder": {
+      "metricKey": "e.g. if_status / temperature / disk_failure",
+      "displayName": "e.g. Port Status / Temperature / Disk Failure",
+      "category": "e.g. if_status / temperature",
+      "vendor": "e.g. Dell / Huawei (leave empty for all vendors)",
+      "oidSymbol": "e.g. ifOperStatus / entPhySensorValue",
+      "numericOid": "e.g. 1.3.6.1.2.1.2.2.1.7",
+      "zabbixItemKey": "e.g. system.cpu.util / vm.memory.size[pavailable]",
+      "indexKind": "e.g. ifIndex (port)",
+      "mib": "e.g. IF-MIB",
+      "warn": "e.g. 60",
+      "crit": "e.g. 70",
+      "expected": "e.g. up / 1",
+      "severityDefault": "Select a default level",
+      "unit": "e.g. Celsius / Mbps",
+      "description": "Metric meaning, collection target, etc.",
+      "runbookUrl": "e.g. https://wiki.internal/runbook/temp-high",
+      "runbookTitle": "e.g. Handling procedure for high temperature"
+    },
+    "validation": {
+      "metricKeyRequired": "Please enter a metric key",
+      "zabbixItemKeyRequired": "Item key is required when source=zabbix"
+    },
+    "message": {
+      "saved": "Metric template saved",
+      "updated": "Metric template updated",
+      "saveFailed": "Failed to save, please check your input",
+      "deleted": "Metric template deleted",
+      "deleteFailed": "Failed to delete, please retry",
+      "actionFailed": "Operation failed, please retry",
+      "invalidThresholdJson": "Invalid threshold JSON, please check"
+    },
+    "confirm": {
+      "deleteTitle": "Delete this metric template?",
+      "deleteContent": "This cannot be undone; the related metric alert rules will become invalid as well."
+    },
+    "batch": {
+      "unit": "templates",
+      "enable": "Batch Enable",
+      "disable": "Batch Disable",
+      "confirm": {
+        "deleteTitle_one": "Delete the selected {{count}} metric template?",
+        "deleteTitle_other": "Delete the selected {{count}} metric templates?",
+        "enableTitle_one": "Enable the selected {{count}} metric template?",
+        "enableTitle_other": "Enable the selected {{count}} metric templates?",
+        "disableTitle_one": "Disable the selected {{count}} metric template?",
+        "disableTitle_other": "Disable the selected {{count}} metric templates?",
+        "enableContent": "Once enabled, the corresponding metrics will resume collection and alert evaluation.",
+        "disableContent": "Once disabled, the corresponding metrics will stop being collected; existing alerts are not affected."
+      },
+      "message": {
+        "deleted_one": "Deleted {{count}} metric template",
+        "deleted_other": "Deleted {{count}} metric templates",
+        "deleteFailed": "Batch delete failed, please retry",
+        "enabled_one": "Enabled {{count}} metric template",
+        "enabled_other": "Enabled {{count}} metric templates",
+        "disabled_one": "Disabled {{count}} metric template",
+        "disabled_other": "Disabled {{count}} metric templates",
+        "toggleFailed": "Batch operation failed, please retry"
+      }
+    },
+    "group": {
+      "title": "Metric Template Groups",
+      "empty": "No metric template groups yet — click \"{{action}}\" in the top-right corner to create one",
+      "vendorUnlimited": "Unlimited",
+      "action": {
+        "create": "Add Template Group",
+        "manage": "Manage Templates",
+        "addSelected": "Add Selected Templates to Group ({{count}})",
+        "remove": "Remove"
+      },
+      "status": {
+        "disabled": "Disabled"
+      },
+      "column": {
+        "templateCount": "Templates",
+        "vendorConstraint": "Vendor Constraint"
+      },
+      "modal": {
+        "createTitle": "Add Metric Template Group",
+        "editTitle": "Edit Metric Template Group",
+        "manageTitle": "Manage Template Group \"{{name}}\""
+      },
+      "field": {
+        "name": "Group Name",
+        "source": "Collection Protocol",
+        "vendorConstraintOptional": "Vendor Constraint (optional)",
+        "displayOrder": "Sort Weight (smaller sorts first)"
+      },
+      "extra": {
+        "vendorConstraint": "Once a vendor is declared, only templates of the same vendor can be added to this group; leave empty for no vendor restriction"
+      },
+      "placeholder": {
+        "name": "e.g. H3C Network Device Standard Metric Set",
+        "vendor": "Select a vendor (leave empty for unrestricted)",
+        "description": "Optional"
+      },
+      "validation": {
+        "nameRequired": "Please enter a group name",
+        "sourceRequired": "Please select a collection protocol"
+      },
+      "candidateTitle": "Templates Available to Add (compatibility filtered)",
+      "candidateHint": "Only templates with matching device type, protocol and vendor (when declared by the group) can be added",
+      "candidateEmpty": "No template passes the compatibility check",
+      "memberTitle": "Templates Already in Group ({{count}})",
+      "memberEmpty": "This group has no templates yet; select templates above to add them",
+      "confirm": {
+        "deleteTitle": "Delete this template group?",
+        "deleteContent": "After deletion, devices fall back to the auto-matched template group.",
+        "removeTitle": "Remove this template from the group?"
+      },
+      "message": {
+        "created": "Template group created",
+        "updated": "Template group updated",
+        "deleted": "Template group deleted",
+        "saveFailed": "Failed to save the template group",
+        "deleteFailed": "Failed to delete the template group",
+        "allAlreadyInGroup": "All selected templates are already in the group",
+        "added_one": "Added {{count}} template to the group",
+        "added_other": "Added {{count}} templates to the group",
+        "addFailed": "Failed to add to the group",
+        "removed": "Removed from the group",
+        "removeFailed": "Failed to remove"
+      }
+    },
+    "oidAudit": {
+      "notCollected": "Not collected",
+      "unresolved": "{{count}} metric templates cannot resolve OIDs and will never collect data",
+      "allResolved": "All {{count}} metric templates have resolvable OIDs",
+      "reaudit": "Re-audit",
+      "unresolvedIntro": "These templates cannot resolve numeric OIDs, so the collector sends no requests to devices ⇒",
+      "unresolvedStrong": "no data will ever be collected, and no error will be reported.",
+      "missingMibPrefix": "Missing MIB",
+      "missingMibSuffix": ", affecting {{count}} entries:",
+      "moreItems": " and {{count}} more",
+      "uncompiledMibs": "The vendor MIB directory already contains {{list}} (source files exist but have no compiled .py ⇒ compile them first; pysnmp does not compile text MIBs automatically).",
+      "fixHintPrefix": "Fix: put the vendor MIB files into",
+      "fixHintSuffix": " (mind vendor redistribution licenses and download them from the vendor site), then compile them into .py files pysnmp can load; or fill in numeric OIDs for the template.",
+      "allCovered": "The local MIB tree and the built-in fallback table already cover every template; the collector uses the same resolver.",
+      "listSeparator": ", "
+    }
+  },
+  "oid": {
+    "tab": {
+      "rules": "Category Rules",
+      "recommend": "Recommended Config"
+    },
+    "deviceType": {
+      "all": "All Applicable",
+      "network": "network (Network Device)",
+      "server": "server (Server)",
+      "other": "other (Other)"
+    },
+    "vendor": {
+      "generic": "Generic"
+    },
+    "rule": {
+      "title": "OID Category Rules",
+      "empty": "No category rules yet",
+      "action": {
+        "create": "Add Rule"
+      },
+      "modal": {
+        "createTitle": "Add Rule",
+        "editTitle": "Edit Rule"
+      },
+      "field": {
+        "oidPrefix": "OID Prefix",
+        "label": "Label",
+        "priority": "Priority"
+      },
+      "validation": {
+        "prefixRequired": "Please enter an OID prefix",
+        "categoryRequired": "Please enter a category"
+      },
+      "placeholder": {
+        "label": "Temperature probe",
+        "vendor": "Select a vendor or leave empty for generic"
+      },
+      "confirm": {
+        "deleteContent": "Delete this category rule? This action cannot be undone."
+      },
+      "message": {
+        "saveFailed": "Failed to save"
+      }
+    },
+    "recommend": {
+      "title": "Device Type Recommended Config",
+      "column": {
+        "categories": "Recommended Categories"
+      },
+      "modal": {
+        "editTitle": "Edit Recommended Config: {{type}}"
+      },
+      "hint": "Select the categories that the \"Select Recommended\" button will auto-check when probing this device type"
+    }
+  },
+  "credential": {
+    "title": "Shared Credentials",
+    "searchPlaceholder": "Search credential name",
+    "searchDevicePlaceholder": "Search device name or IP",
+    "empty": "No shared credentials",
+    "action": {
+      "create": "New Credential"
+    },
+    "column": {
+      "linkedDevices": "Linked Devices"
+    },
+    "status": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "unlinked": "No Links"
+    },
+    "summary": {
+      "total_one": "Total {{count}} credential",
+      "total_other": "Total {{count}} credentials",
+      "linked_one": "Linked to {{count}} device",
+      "linked_other": "Linked to {{count}} devices",
+      "disabled_one": "{{count}} disabled",
+      "disabled_other": "{{count}} disabled"
+    },
+    "tooltip": {
+      "editSecret": "Edit secret (affects all linked devices)",
+      "deleteLinked": "Unlink all devices first",
+      "deleteShared": "Delete shared credential"
+    },
+    "confirm": {
+      "deleteTitle": "Delete this shared credential?",
+      "deleteLinkedContent_one": "Still linked to {{count}} device, cannot delete",
+      "deleteLinkedContent_other": "Still linked to {{count}} devices, cannot delete",
+      "batchDeleteTitle": "Delete selected credentials?",
+      "batchDeleteContent": "Only credentials without linked devices are deleted; linked ones are skipped.",
+      "unlinkTitle": "Confirm Unlink",
+      "unlinkContent": "Unlink this device from this credential?"
+    },
+    "batch": {
+      "selected_one": "Selected {{count}} item",
+      "selected_other": "Selected {{count}} items"
+    },
+    "detail": {
+      "selectHint": "Select a shared credential on the left to view details",
+      "id": "Credential ID"
+    },
+    "selectedDevices_one": "Selected {{count}} device",
+    "selectedDevices_other": "Selected {{count}} devices",
+    "linkTitle": "Link Devices to Shared Credential",
+    "linkHint": "Select devices to link to \"{{name}}\"; devices already linked are not listed.",
+    "createTitle": "New Shared Credential",
+    "editSecretTitle": "Edit Credential Secret",
+    "alert": {
+      "affectDevices_one": "This operation affects {{count}} linked device",
+      "affectDevices_other": "This operation affects {{count}} linked devices",
+      "secretEditHint": "Leave secret fields blank to keep them unchanged; after submitting, all linked devices will be probed again with the new credential."
+    },
+    "message": {
+      "renamed": "Name updated",
+      "renameFailed": "Failed to rename",
+      "deleted": "Credential deleted",
+      "allLinked": "All selected credentials have linked devices and cannot be deleted",
+      "deleteItemFailed": "Failed to delete credential #{{id}}: {{reason}}",
+      "batchDeleted_one": "Deleted {{count}} credential",
+      "batchDeleted_other": "Deleted {{count}} credentials",
+      "batchDeletedSkipped_one": "Deleted {{count}} credential, skipped {{skipped}} (has linked devices)",
+      "batchDeletedSkipped_other": "Deleted {{count}} credentials, skipped {{skipped}} (have linked devices)",
+      "batchDeletedFailed_one": "Deleted {{count}} credential, {{failed}} failed",
+      "batchDeletedFailed_other": "Deleted {{count}} credentials, {{failed}} failed",
+      "batchDeletedSkippedFailed_one": "Deleted {{count}} credential, skipped {{skipped}} (has linked devices), {{failed}} failed",
+      "batchDeletedSkippedFailed_other": "Deleted {{count}} credentials, skipped {{skipped}} (have linked devices), {{failed}} failed",
+      "batchDeleteFailed": "Failed to batch delete",
+      "created": "Credential created",
+      "createFailed": "Failed to create",
+      "updated": "Credential updated",
+      "secretUpdatedMigrated": "Secret updated (a dedicated credential row was created)",
+      "unlinked": "Link removed",
+      "selectDeviceRequired": "Select at least one device",
+      "linkedDevices_one": "Linked {{count}} device",
+      "linkedDevices_other": "Linked {{count}} devices",
+      "linkFailed": "Failed to link",
+      "linkedEmpty": "No linked devices"
+    }
+  },
+  "escalation": {
+    "title": "Escalation Policies",
+    "empty": "No escalation policies",
+    "action": {
+      "create": "New Policy"
+    },
+    "column": {
+      "match": "Match Conditions",
+      "mode": "Escalation Mode"
+    },
+    "matchAllTypes": "All types",
+    "matchAllSeverities": "All severities",
+    "mode": {
+      "multiStep": "Multi-step chain ({{count}} steps)",
+      "singleStep": "Single stage {{minutes}}min",
+      "role": "Role #{{id}}",
+      "repeat": "Repeat every {{minutes}}min"
+    },
+    "section": {
+      "multiStepTitle": "Multi-step Escalation Chain (optional)",
+      "multiStepHint": "Steps escalate progressively in order; leave it empty to use the single-stage mode below.",
+      "singleStepTitle": "Single-stage Mode (applies when no multi-step chain)"
+    },
+    "step": {
+      "label": "Step {{index}}",
+      "waitMinutesPlaceholder": "Wait minutes",
+      "escalateSeverityPlaceholder": "Escalation severity",
+      "roleIdPlaceholder": "Role ID",
+      "webhookPlaceholder": "Webhook URL (optional)",
+      "empty": "No multi-step chain configured",
+      "add": "Add Escalation Step"
+    },
+    "field": {
+      "name": "Policy Name",
+      "alertType": "Match Alert Type",
+      "severity": "Match Severity",
+      "waitMinutes": "Wait Minutes Before Escalation",
+      "escalateSeverity": "Escalated Severity",
+      "escalateToRoleId": "Escalation Notify Role ID",
+      "webhookUrl": "Escalation Webhook URL (optional)",
+      "repeatMinutes": "Repeat Interval in Minutes (0 = once only)",
+      "repeatMinutesExtra": "When set to N, unacknowledged alerts escalate again every N minutes"
+    },
+    "placeholder": {
+      "name": "e.g. Escalate after 30 minutes unacknowledged",
+      "waitMinutes": "e.g. 30",
+      "escalateSeverity": "Do not escalate severity",
+      "roleId": "e.g. 5 (Ops Lead)"
+    },
+    "validation": {
+      "nameRequired": "Please enter a name",
+      "waitMinutesRequired": "Please enter wait minutes"
+    },
+    "modal": {
+      "createTitle": "New Escalation Policy",
+      "editTitle": "Edit Escalation Policy"
+    },
+    "confirm": {
+      "deleteContent": "Delete this escalation policy? This action cannot be undone."
+    },
+    "message": {
+      "created": "Policy created",
+      "updated": "Policy updated",
+      "deleted": "Policy deleted"
+    }
+  },
+  "thresholdOverride": {
+    "title": "Device-level Threshold Overrides",
+    "empty": "No threshold overrides",
+    "action": {
+      "create": "New Override"
+    },
+    "column": {
+      "deviceId": "Device ID"
+    },
+    "field": {
+      "deviceId": "Device ID",
+      "metricKey": "Metric Key",
+      "metricType": "Metric Type"
+    },
+    "tooltip": {
+      "metricType": "Determines the threshold field structure. Loaded from the linked template when editing; can be adjusted manually"
+    },
+    "placeholder": {
+      "metricKey": "e.g. temperature / disk_failure",
+      "note": "e.g. High-temperature room, thresholds raised"
+    },
+    "validation": {
+      "deviceIdRequired": "Please enter the device ID",
+      "metricKeyRequired": "Please enter the metric key"
+    },
+    "modal": {
+      "createTitle": "New Threshold Override",
+      "editTitle": "Edit Threshold Override"
+    },
+    "confirm": {
+      "deleteContent": "Delete this threshold override? It falls back to the global template afterwards."
+    },
+    "message": {
+      "created": "Threshold override created",
+      "updated": "Threshold override updated",
+      "deleted": "Threshold override deleted",
+      "thresholdRequired": "Configure at least one threshold field"
+    }
+  },
+  "tab": {
+    "alertList": "Alert List",
+    "reports": "Reports",
+    "noc": "NOC Dashboard",
+    "silence": "Silence Rules",
+    "dependency": "Dependency Suppression",
+    "escalation": "Escalation Policies",
+    "mib": "MIB Discovery",
+    "oidRules": "OID Rules",
+    "templates": "Metric Templates",
+    "overrides": "Device Overrides",
+    "sla": "SLA/SLO"
+  },
+  "crud": {
+    "created": "Created",
+    "updated": "Updated",
+    "deleted": "Deleted",
+    "deleteFailed": "Delete failed"
+  },
+  "placeholder": {
+    "alertTypesOptional": "Select alert types (leave empty = all)"
+  },
+  "sla": {
+    "title": "SLA Targets",
+    "achievementTitle": "SLA Achievement Report",
+    "achievementEmpty": "No enabled SLA targets",
+    "empty": "No SLA targets",
+    "action": {
+      "create": "New Target"
+    },
+    "alert": {
+      "title": "SLA/SLO Monitoring",
+      "description": "Define availability SLA targets for devices or device groups. Actual achievement is computed from hourly probe aggregation (the reachable metric in device_monitor_timeseries_hourly)."
+    },
+    "column": {
+      "targetDevices": "Target Devices",
+      "targetRatio": "Availability Target",
+      "window": "Evaluation Window"
+    },
+    "stat": {
+      "actualRatio": "Actual Availability",
+      "targetAt": "Target {{pct}}%",
+      "sampleSummary": "Samples: {{count}} | Window: {{start}} ~ {{end}}"
+    },
+    "windowDays_one": "{{count}} day",
+    "windowDays_other": "{{count}} days",
+    "field": {
+      "name": "Target Name",
+      "targetDeviceIds": "Target device IDs (comma separated)",
+      "targetRatio": "Availability target (0~1, e.g. 0.99 = 99%)",
+      "windowDays": "Evaluation window (days)"
+    },
+    "validation": {
+      "deviceIdsRequired": "Please enter at least one device ID",
+      "targetRatioRequired": "Please enter the availability target",
+      "windowDaysRequired": "Please enter the evaluation window"
+    },
+    "placeholder": {
+      "name": "e.g. Monthly availability SLA for core devices",
+      "deviceIds": "e.g. 1,2,3",
+      "description": "e.g. Monthly availability ≥ 99%"
+    },
+    "modal": {
+      "createTitle": "New SLA Target",
+      "editTitle": "Edit SLA Target"
+    },
+    "confirm": {
+      "deleteContent": "Delete this SLA target? This action cannot be undone."
+    }
+  },
+  "incident": {
+    "title": "Incident Center",
+    "detailTitle": "Incident Detail",
+    "column": {
+      "title": "Incident Title",
+      "deviceCount": "Affected Devices",
+      "reasonCode": "Correlation Reason",
+      "firstAlertAt": "First Alert",
+      "lastAlertAt": "Last Alert",
+      "id": "ID",
+      "upstreamDevice": "Upstream Device"
+    },
+    "filter": {
+      "status": "Filter by status"
+    },
+    "status": {
+      "active": "Active",
+      "closed": "Closed"
+    },
+    "reason": {
+      "L1_rule": "Rule aggregation",
+      "L2_topology": "Topology aggregation",
+      "L2_manual_rule": "Manual rule aggregation",
+      "L3_change": "Change correlation"
+    },
+    "cardSummary": "{{alerts}} alerts · {{devices}} devices affected",
+    "cardTime": "First {{first}} · Last {{last}}",
+    "detail": {
+      "rootDevice": "Root Cause Device",
+      "relatedAlerts": "Related Alerts ({{count}})",
+      "suppressedDevices": "Suppressed Downstream Devices ({{count}})"
+    }
+  },
+  "mib": {
+    "title": "Automatic MIB Discovery",
+    "oidListTitle": "OID List",
+    "empty": "No OIDs found",
+    "emptyHint": "Select a device and click \"{{action}}\" to discover the OIDs supported by the device",
+    "alert": {
+      "message": "Run a MIB walk against the device to discover collectable OIDs",
+      "description": "Select the OIDs you care about, fill in metric_key, and import them as metric templates in one click. No manual OID typing, no MIB files needed."
+    },
+    "action": {
+      "scan": "Start Discovery",
+      "recommend": "Select Recommended",
+      "clear": "Clear Selection",
+      "saveAsRule": "Save as Rule",
+      "import_one": "Import {{count}} metric template",
+      "import_other": "Import {{count}} metric templates"
+    },
+    "stat": {
+      "deviceIp": "Device IP",
+      "oidCount": "OIDs Discovered",
+      "typeDistribution": "Type Distribution"
+    },
+    "count": {
+      "selected": "{{count}} selected",
+      "recommendCategory": "{{count}} recommended categories"
+    },
+    "column": {
+      "category": "Category",
+      "sampleValue": "Sampled Value"
+    },
+    "placeholder": {
+      "searchDevice": "Search device name / IP",
+      "selectDevice": "Select device",
+      "filterOid": "Filter OID / sampled value",
+      "filterType": "Filter by type"
+    },
+    "metricTypeOption": {
+      "gauge": "gauge (Instantaneous)",
+      "counter": "counter (Cumulative)",
+      "state": "state (State)",
+      "event": "event (Event)"
+    },
+    "message": {
+      "selectDeviceFirst": "Please select a device first",
+      "selectOidFirst": "Please select the OIDs to import first",
+      "scanning": "Discovering... A MIB walk takes about 10-40s, please wait...",
+      "scanDone": "Discovery finished in {{seconds}}s",
+      "scanFailed": "Discovery failed",
+      "noRecommend": "No recommended metrics matched in the current results",
+      "recommendSelected_one": "Selected {{count}} recommended metric and pinned it to the top",
+      "recommendSelected_other": "Selected {{count}} recommended metrics and pinned them to the top",
+      "ruleSaved": "Saved \"{{name}}\" as the category rule for this device",
+      "saveRuleFailed": "Failed to save the rule",
+      "imported_one": "Imported {{count}} metric template",
+      "imported_other": "Imported {{count}} metric templates",
+      "autoFilledNote_one": "({{count}} metric_key inferred automatically)",
+      "autoFilledNote_other": "({{count}} metric_keys inferred automatically)",
+      "importFailed": "Import failed"
+    }
+  },
+  "report": {
+    "title": "Alert Statistics Report",
+    "filter": {
+      "severity": "Alert Severity"
+    },
+    "range": {
+      "startTime": "Start Time",
+      "endTime": "End Time"
+    },
+    "bucket": {
+      "hour": "By Hour",
+      "day": "By Day"
+    },
+    "stat": {
+      "total": "Total Alerts",
+      "closed": "Closed",
+      "ackCloseRate": "Ack Rate / Close Rate"
+    },
+    "mttr": {
+      "seconds": "{{value}} sec",
+      "minutes": "{{value}} min",
+      "hours": "{{value}} hr"
+    },
+    "column": {
+      "rank": "Rank"
+    },
+    "chart": {
+      "byStatus": "By Status",
+      "densityHour": "Alert Density Timeline (By Hour)",
+      "densityDay": "Alert Density Timeline (By Day)",
+      "topDevices": "Top {{count}} Alert Devices",
+      "topTypes": "Top {{count}} Alert Types"
+    }
+  },
+  "silence": {
+    "title": "Silence Rules",
+    "empty": "No silence rules",
+    "action": {
+      "create": "New Rule"
+    },
+    "alert": {
+      "title": "Automatic Silencing in Maintenance Mode",
+      "description": "When a device status is \"Maintenance\", the system automatically skips alert generation for it (both connectivity and metric alerts are silenced), while still collecting metric data for post-maintenance comparison. No need to create a silence rule manually here."
+    },
+    "column": {
+      "deviceScope": "Device Scope",
+      "window": "Silence Window",
+      "reason": "Reason",
+      "createdBy": "Created By"
+    },
+    "allDevices": "All Devices",
+    "field": {
+      "name": "Rule Name",
+      "window": "Silence Time Window",
+      "deviceIds": "Device IDs to silence (comma separated, empty = all devices)",
+      "alertTypes": "Alert types to silence (empty = all types)",
+      "reason": "Silence Reason"
+    },
+    "validation": {
+      "windowRequired": "Please select the silence time window",
+      "windowPickerRequired": "Please select the time window"
+    },
+    "placeholder": {
+      "name": "e.g. Core switch maintenance window",
+      "deviceIds": "e.g. 1,2,3 (leave empty for all devices)",
+      "reason": "e.g. Planned maintenance"
+    },
+    "modal": {
+      "createTitle": "New Silence Rule",
+      "editTitle": "Edit Silence Rule"
+    },
+    "confirm": {
+      "deleteContent": "Delete this silence rule? This action cannot be undone."
+    }
+  },
+  "dependency": {
+    "title": "Alert Dependency Suppression Rules",
+    "empty": "No dependency suppression rules",
+    "action": {
+      "create": "New Rule"
+    },
+    "alert": {
+      "title": "Automatic Topology Suppression + Manual Rules",
+      "description": "The system automatically suppresses downstream alerts based on the device parent-child topology (DeviceServerExt.parent_device_id): when a parent device has an active alert, alerts of the same type on its child devices are suppressed automatically. Rules on this page manually override or supplement that inference (e.g. dependencies among network devices)."
+    },
+    "column": {
+      "upstreamDeviceId": "Upstream Device ID",
+      "downstreamDeviceId": "Downstream Device ID",
+      "reason": "Notes"
+    },
+    "field": {
+      "name": "Rule Name",
+      "alertTypes": "Alert types to suppress (empty = all types)",
+      "reason": "Rule Notes"
+    },
+    "validation": {
+      "sameDevice": "Upstream and downstream devices must differ",
+      "upstreamRequired": "Please enter the upstream device ID",
+      "downstreamRequired": "Please enter the downstream device ID"
+    },
+    "placeholder": {
+      "name": "e.g. Core switch → access switch dependency",
+      "upstreamId": "e.g. 1",
+      "downstreamId": "e.g. 2",
+      "reason": "e.g. Suppress downstream access switch alerts when the core switch is down"
+    },
+    "modal": {
+      "createTitle": "New Dependency Suppression Rule",
+      "editTitle": "Edit Dependency Suppression Rule"
+    },
+    "confirm": {
+      "deleteContent": "Delete this dependency suppression rule? This action cannot be undone."
+    }
+  },
+  "incidents": {
+    "deletedTooltip": "Device permanently deleted; this row is kept from the device-name snapshot (references cleared)",
+    "deleted": "Deleted",
+    "searchPlaceholder": "Search history events by device name"
+  }
+}

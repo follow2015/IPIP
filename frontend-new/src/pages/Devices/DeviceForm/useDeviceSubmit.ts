@@ -22,6 +22,7 @@ import type { StorageItem } from './deviceFormUtils';
 import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
 import type { Device } from '@/types/models';
 import { DeviceType } from '@/types/enums';
+import { useTranslation } from 'react-i18next';
 
 interface UseDeviceSubmitParams {
   form: ReturnType<typeof Form.useForm>[0];
@@ -92,6 +93,8 @@ export function useDeviceSubmit({
   message,
   onClose
 }: UseDeviceSubmitParams) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const handleSubmit = async () => {
     try {
       const values = (await form.validateFields()) as Record<string, any>;
@@ -195,7 +198,7 @@ export function useDeviceSubmit({
                     await del(`/devices/${editRecord!.id}/port-links/${conn.id}`);
                   } catch (err: any) {
                     if (err?.response?.status !== 404) {
-                      console.warn('删除旧上行连接失败:', conn.id, err);
+                      console.warn(t('form.submit.n2n.deleteOldLinkFailed'), conn.id, err);
                     }
                   }
                 }
@@ -221,8 +224,7 @@ export function useDeviceSubmit({
 
             const pairCount = Math.min(uplinkPortIds.length, peerPortIds.length);
             if (pairCount === 0) {
-              n2nWarning =
-                '已选择上行设备与对端互联端口，但无法确定本机上行端口，上行连接未创建（请同时选择上行端口）';
+              n2nWarning = t('form.submit.n2n.noLocalPorts');
             } else {
               const createErrors: string[] = [];
               for (let i = 0; i < pairCount; i++) {
@@ -238,20 +240,25 @@ export function useDeviceSubmit({
                   });
                 } catch (err: any) {
                   createErrors.push(
-                    `端口对 ${i + 1}: ${err?.response?.data?.message || err?.message || '未知错误'}`
+                    t('form.submit.n2n.portPairError', {
+                      index: i + 1,
+                      message: err?.response?.data?.message || err?.message || t('probeError.UNKNOWN')
+                    })
                   );
                 }
               }
               if (createErrors.length > 0) {
-                n2nWarning = `部分上行连接创建失败：${createErrors.join('; ')}`;
+                n2nWarning = t('form.submit.n2n.partialFailed', {
+                  errors: createErrors.join('; ')
+                });
               }
             }
           } else if (uplinkDevId && peerPortIds.length === 0) {
-            n2nWarning = '已选择上行设备但未选择对端互联端口，上行连接未创建';
+            n2nWarning = t('form.submit.n2n.noPeerPorts');
           }
         }
 
-        message.success('更新成功');
+        message.success(tCommon('message.updateSuccess'));
         if (n2nWarning) {
           message.warning(n2nWarning, 5);
         }
@@ -265,7 +272,7 @@ export function useDeviceSubmit({
         }
 
         const result = await createDevice.mutateAsync(values);
-        message.success('创建成功');
+        message.success(tCommon('message.createSuccess'));
         const deviceId = result?.data?.id;
 
         if (
@@ -302,7 +309,7 @@ export function useDeviceSubmit({
             }
             if (allPorts.length > 0) {
               await post('/devices/switch-ports/batch', { device_id: deviceId, ports: allPorts });
-              message.success(`已生成 ${allPorts.length} 个端口`);
+              message.success(t('form.submit.portsCreated', { count: allPorts.length }));
             }
           } catch {
             /* 端口创建失败不阻断 */
@@ -320,7 +327,7 @@ export function useDeviceSubmit({
             const nicPorts = expandNicPorts(nicPortsFormVal, nicComponentTemplates);
             if (nicPorts.length > 0) {
               await post(`/devices/${deviceId}/nics/batch-create`, { ports: nicPorts });
-              message.success(`已创建 ${nicPorts.length} 个网卡端口`);
+              message.success(t('form.submit.nicPortsCreated', { count: nicPorts.length }));
             }
           } catch {
             /* 网卡创建失败不阻断 */

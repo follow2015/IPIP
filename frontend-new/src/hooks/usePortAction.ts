@@ -15,22 +15,39 @@ import { post } from '@/services/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import type { DeviceChangeEvent } from '@/hooks/useDeviceEvents';
 import { queryKeys } from '@/services/query-keys';
+import { useTranslation } from 'react-i18next';
 
-const ACTION_LABELS: Record<string, string> = {
-  enable_port: '启用端口',
-  disable_port: '关闭端口',
-  update_port_info: '修改端口信息',
-  set_port_speed: '设置端口限速',
-  set_port_vlan: '配置VLAN',
-  set_port_ip: '配置IP',
-  delete_port_ip: '删除IP',
-  clear_port_config: '清除端口配置',
-  delete_interface: '删除接口',
-  add_port_to_trunk: '加入链路聚合',
-  delete_trunk: '删除链路聚合',
-  create_port_channel: '创建链路聚合',
-  remove_port_from_channel: '移除链路聚合成员',
-  delete_vlan: '删除VLAN'
+type PortActionKey =
+  | 'portAction.action.enablePort'
+  | 'portAction.action.disablePort'
+  | 'portAction.action.updatePortInfo'
+  | 'portAction.action.setPortSpeed'
+  | 'portAction.action.setPortVlan'
+  | 'portAction.action.setPortIp'
+  | 'portAction.action.deletePortIp'
+  | 'portAction.action.clearPortConfig'
+  | 'portAction.action.deleteInterface'
+  | 'portAction.action.addPortToTrunk'
+  | 'portAction.action.deleteTrunk'
+  | 'portAction.action.createPortChannel'
+  | 'portAction.action.removePortFromChannel'
+  | 'portAction.action.deleteVlan';
+
+const ACTION_LABEL_KEYS: Record<string, PortActionKey> = {
+  enable_port: 'portAction.action.enablePort',
+  disable_port: 'portAction.action.disablePort',
+  update_port_info: 'portAction.action.updatePortInfo',
+  set_port_speed: 'portAction.action.setPortSpeed',
+  set_port_vlan: 'portAction.action.setPortVlan',
+  set_port_ip: 'portAction.action.setPortIp',
+  delete_port_ip: 'portAction.action.deletePortIp',
+  clear_port_config: 'portAction.action.clearPortConfig',
+  delete_interface: 'portAction.action.deleteInterface',
+  add_port_to_trunk: 'portAction.action.addPortToTrunk',
+  delete_trunk: 'portAction.action.deleteTrunk',
+  create_port_channel: 'portAction.action.createPortChannel',
+  remove_port_from_channel: 'portAction.action.removePortFromChannel',
+  delete_vlan: 'portAction.action.deleteVlan'
 };
 
 const FALLBACK_POLL_INTERVAL = 5_000;
@@ -49,6 +66,7 @@ interface UsePortActionOptions {
  * 操作结果由站内信承载，不再弹出 notification 卡片。
  */
 export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortActionOptions) {
+  const { t } = useTranslation('device');
   const message = useMessage();
   const queryClient = useQueryClient();
 
@@ -99,7 +117,8 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
 
   const submitAction = useCallback(
     async (action: string, port: string, params: Record<string, unknown> = {}) => {
-      const label = ACTION_LABELS[action] || action;
+      const actionKey = ACTION_LABEL_KEYS[action];
+      const label = actionKey ? t(actionKey) : action;
 
       try {
         if (!hasSsh) {
@@ -111,9 +130,9 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
 
           const result = res.data?.result;
           if (result?.success) {
-            message.success(result.message || `${label}成功`);
+            message.success(result.message || t('portAction.message.success', { action: label }));
           } else {
-            message.error(result?.error || `${label}失败`);
+            message.error(result?.error || t('portAction.message.failed', { action: label }));
           }
           queryClient.invalidateQueries({ queryKey: ['switches', switchId, 'ports'] });
           queryClient.invalidateQueries({ queryKey: queryKeys.vlans.all });
@@ -131,7 +150,7 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
         const task_id = res.data?.task_id;
         if (!task_id) return;
 
-        message.info(`${label}已提交，完成后将通过消息通知您`);
+        message.info(t('portAction.message.submitted', { action: label }));
 
         pendingRef.current.set(task_id, { action, port });
 
@@ -151,10 +170,10 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        message.error(`${label}提交失败：${msg}`);
+        message.error(t('portAction.message.submitFailed', { action: label, message: msg }));
       }
     },
-    [switchId, hasSsh, message, onRefresh, queryClient]
+    [switchId, hasSsh, message, onRefresh, queryClient, t]
   );
 
   return { submitAction, onEvent };

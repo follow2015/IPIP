@@ -36,6 +36,7 @@ import {
   type MonitorSilenceRuleInput
 } from '@/services/monitor';
 import { formatDateTime } from '@/utils/format';
+import { useTranslation } from 'react-i18next';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
@@ -51,6 +52,8 @@ const ALERT_TYPE_OPTIONS = [
 ];
 
 export default function SilenceRulesPage() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
   const { data, isLoading } = useSilenceRules();
   const createMut = useCreateSilenceRule();
   const updateMut = useUpdateSilenceRule();
@@ -94,7 +97,7 @@ export default function SilenceRulesPage() {
     try {
       const values = await form.validateFields();
       if (!values.range || values.range.length !== 2) {
-        message.error('请选择静默时间窗口');
+        message.error(t('silence.validation.windowRequired'));
         return;
       }
       let deviceIds: number[] | null = null;
@@ -115,10 +118,10 @@ export default function SilenceRulesPage() {
       };
       if (editing) {
         await updateMut.mutateAsync({ id: editing.id, ...payload });
-        message.success('已更新');
+        message.success(t('crud.updated'));
       } else {
         await createMut.mutateAsync(payload);
-        message.success('已创建');
+        message.success(t('crud.created'));
       }
       modal.close();
     } catch (err: unknown) {
@@ -129,44 +132,48 @@ export default function SilenceRulesPage() {
   const handleDelete = async (id: number) => {
     try {
       await deleteMut.mutateAsync(id);
-      message.success('已删除');
+      message.success(t('crud.deleted'));
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '删除失败');
+      message.error(err instanceof Error ? err.message : t('crud.deleteFailed'));
     }
   };
 
   const columns = [
     {
-      title: '名称',
+      title: tc('field.name'),
       dataIndex: 'name',
       key: 'name',
       render: (v: string, r: MonitorSilenceRule) => (
         <Space>
           <Text strong>{v}</Text>
-          {!r.enabled && <Tag color="default">已停用</Tag>}
+          {!r.enabled && <Tag color="default">{t('credential.status.disabled')}</Tag>}
         </Space>
       )
     },
     {
-      title: '设备范围',
+      title: t('silence.column.deviceScope'),
       dataIndex: 'device_ids',
       key: 'device_ids',
       render: (v: number[] | null) =>
-        v === null || v.length === 0 ? <Tag color="blue">全部设备</Tag> : `${v.length} 台`
+        v === null || v.length === 0 ? (
+          <Tag color="blue">{t('silence.allDevices')}</Tag>
+        ) : (
+          `${v.length} ${t('stat.unitDevice', { count: v.length })}`
+        )
     },
     {
-      title: '告警类型',
+      title: t('column.alertType'),
       dataIndex: 'alert_type',
       key: 'alert_type',
       render: (v: string[] | null) =>
         v === null || v.length === 0 ? (
-          <Tag color="blue">全部类型</Tag>
+          <Tag color="blue">{t('escalation.matchAllTypes')}</Tag>
         ) : (
           v.map((t) => <Tag key={t}>{t}</Tag>)
         )
     },
     {
-      title: '静默窗口',
+      title: t('silence.column.window'),
       key: 'window',
       render: (_: unknown, r: MonitorSilenceRule) => (
         <Text type="secondary">
@@ -175,32 +182,32 @@ export default function SilenceRulesPage() {
       )
     },
     {
-      title: '原因',
+      title: t('silence.column.reason'),
       dataIndex: 'reason',
       key: 'reason',
       ellipsis: true
     },
     {
-      title: '创建人',
+      title: t('silence.column.createdBy'),
       dataIndex: 'created_by',
       key: 'created_by'
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       render: (_: unknown, r: MonitorSilenceRule) => (
         <Space>
           <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(r)}>
-            编辑
+            {tc('action.edit')}
           </Button>
           <ConfirmButton
             type="link"
             icon={<DeleteOutlined />}
-            title="确认删除"
-            content="确定要删除该静默规则吗？此操作不可恢复。"
+            title={tc('confirm.deleteTitle')}
+            content={t('silence.confirm.deleteContent')}
             onConfirm={() => handleDelete(r.id)}
           >
-            删除
+            {tc('action.delete')}
           </ConfirmButton>
         </Space>
       )
@@ -212,14 +219,14 @@ export default function SilenceRulesPage() {
       <Alert
         type="info"
         showIcon
-        message="维护模式自动静默"
-        description="设备状态为「维护中」时，系统自动跳过该设备的告警生成（连通性告警 + 指标告警均静默），但仍会采集指标数据供维护后对比。无需在此手动创建静默规则。"
+        message={t('silence.alert.title')}
+        description={t('silence.alert.description')}
       />
       <Card
-        title="静默规则管理"
+        title={t('silence.title')}
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建规则
+            {t('silence.action.create')}
           </Button>
         }
       >
@@ -229,7 +236,7 @@ export default function SilenceRulesPage() {
           loading={isLoading}
           rowKey={(r) => String(r.id)}
           total={items.length}
-          emptyText="暂无静默规则"
+          emptyText={t('silence.empty')}
           searchable={false}
           showCard={false}
           tableProps={table}
@@ -237,7 +244,7 @@ export default function SilenceRulesPage() {
       </Card>
 
       <Modal
-        title={editing ? '编辑静默规则' : '新建静默规则'}
+        title={editing ? t('silence.modal.editTitle') : t('silence.modal.createTitle')}
         open={modal.isOpen}
         onOk={handleSubmit}
         onCancel={() => modal.close()}
@@ -248,33 +255,35 @@ export default function SilenceRulesPage() {
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item
             name="name"
-            label="规则名称"
-            rules={[{ required: true, message: '请输入名称' }]}
+            label={t('silence.field.name')}
+            rules={[
+              { required: true, message: tc('validation.inputRequiredField', { field: tc('field.name') }) }
+            ]}
           >
-            <Input placeholder="如：核心交换机维护窗口" maxLength={128} />
+            <Input placeholder={t('silence.placeholder.name')} maxLength={128} />
           </Form.Item>
           <Form.Item
             name="range"
-            label="静默时间窗口"
-            rules={[{ required: true, message: '请选择时间窗口' }]}
+            label={t('silence.field.window')}
+            rules={[{ required: true, message: t('silence.validation.windowPickerRequired') }]}
           >
             <RangePicker showTime style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="device_ids" label="静默设备 ID（逗号分隔，留空=全部设备）">
-            <Input placeholder="如：1,2,3（留空表示全部设备）" />
+          <Form.Item name="device_ids" label={t('silence.field.deviceIds')}>
+            <Input placeholder={t('silence.placeholder.deviceIds')} />
           </Form.Item>
-          <Form.Item name="alert_types" label="静默告警类型（留空=全部类型）">
+          <Form.Item name="alert_types" label={t('silence.field.alertTypes')}>
             <Select
               mode="multiple"
-              placeholder="选择告警类型（留空=全部）"
+              placeholder={t('placeholder.alertTypesOptional')}
               options={ALERT_TYPE_OPTIONS}
               allowClear
             />
           </Form.Item>
-          <Form.Item name="reason" label="静默原因">
-            <Input.TextArea rows={2} placeholder="如：计划内维护" maxLength={255} />
+          <Form.Item name="reason" label={t('silence.field.reason')}>
+            <Input.TextArea rows={2} placeholder={t('silence.placeholder.reason')} maxLength={255} />
           </Form.Item>
-          <Form.Item name="enabled" label="启用" valuePropName="checked">
+          <Form.Item name="enabled" label={tc('action.enable')} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

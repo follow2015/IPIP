@@ -1,0 +1,391 @@
+{
+  "validation": {
+    "enterQuestion": "请输入问题"
+  },
+  "error": {
+    "unknown": "未知错误"
+  },
+  "rag": {
+    "tab": {
+      "qa": "知识问答",
+      "manage": "知识库管理"
+    },
+    "status": {
+      "available": "可用",
+      "unavailable": "不可用"
+    },
+    "validation": {
+      "relativePath": "请填相对路径（相对 AI_DOCS_ROOT）；'.' 或留空表示根目录本身"
+    },
+    "placeholder": {
+      "question": "输入问题，基于知识库检索回答",
+      "subDir": "子目录（相对 AI_DOCS_ROOT；'.' 或留空表示根目录）"
+    },
+    "action": {
+      "ask": "提问",
+      "ingest": "入库",
+      "rebuildIndex": "重建索引",
+      "reset": "清空知识库"
+    },
+    "answer": {
+      "title": "回答",
+      "hitFragments": "命中片段（{{count}}）："
+    },
+    "degraded": {
+      "title": "本地检索模式（无 LLM 参与）",
+      "description": "当前结果仅来自本地知识库检索，未经过 LLM 模型生成：AI 未配置或模型服务不可用。以下为命中的原文片段，请自行判读。"
+    },
+    "stat": {
+      "status": "知识库状态",
+      "docCount": "文档总数"
+    },
+    "progress": {
+      "ingesting": "正在入库 {{current}}/{{total}}..."
+    },
+    "docsRoot": {
+      "rootLabel": "文档根目录：",
+      "relativeIntro": "。下方填",
+      "relativeWord": "相对",
+      "pathLabel": "路径：",
+      "dotHint": " 或留空 = 根目录本身；填",
+      "equals": " = ",
+      "envNote": "。根目录由 .env 的 ",
+      "rootPlaceholder": "<根目录>",
+      "restartNote": " 决定，改动需重启后端。"
+    },
+    "docs": {
+      "title": "文档列表",
+      "column": {
+        "docId": "文档 ID",
+        "preview": "内容预览"
+      },
+      "confirmDelete": "删除文档 {{docId}}？",
+      "deleteSuccess": "已删除"
+    },
+    "rebuild": {
+      "title": "确认重建知识库",
+      "content": "将清空全部文档与索引，并自动重新全量入库，不可恢复。重跑目录：{{dir}}",
+      "okText": "清空并重建"
+    },
+    "reset": {
+      "title": "确认清空知识库",
+      "content": "将删除所有文档与索引，不可恢复。下次入库会自动重建。",
+      "okText": "清空"
+    },
+    "message": {
+      "loadStatusFailed": "加载状态失败",
+      "loadDocsFailed": "加载文档列表失败",
+      "ingestSubmitted": "入库任务已提交：{{taskId}}",
+      "ingestDone_one": "入库完成，共 {{count}} 篇文档",
+      "ingestDone_other": "入库完成，共 {{count}} 篇文档",
+      "ingestFailed": "入库失败：{{reason}}",
+      "sseDisconnected": "SSE 连接中断",
+      "ingestSubmitFailed": "提交入库失败",
+      "storeClearedReingesting": "知识库已清空，正在重新入库",
+      "rebuildFailed": "重建失败",
+      "storeCleared": "知识库已清空",
+      "resetFailed": "清空失败",
+      "qaFailed": "问答失败"
+    }
+  },
+  "skills": {
+    "title": "AI 技能管理",
+    "action": {
+      "create": "新建技能",
+      "reload": "热加载"
+    },
+    "column": {
+      "name": "技能名称"
+    },
+    "field": {
+      "identifier": "标识",
+      "category": "分类",
+      "version": "版本",
+      "triggers": "触发词",
+      "params": "参数",
+      "none": "无",
+      "displayName": "展示名"
+    },
+    "source": {
+      "builtin": "内置",
+      "custom": "自定义"
+    },
+    "tooltip": {
+      "needAdmin": "需要 ai:admin 权限",
+      "builtinCannotDisable": "内置技能不可禁用"
+    },
+    "detail": {
+      "title": "技能详情",
+      "steps": "执行步骤",
+      "outputVar": "输出变量",
+      "condition": "条件",
+      "filePath": "文件路径",
+      "editTitle": "编辑技能"
+    },
+    "form": {
+      "namePattern": "小写字母/数字/下划线/连字符，1-64 字符",
+      "maxLlmSteps": "LLM 步骤上限",
+      "paramSection": "参数声明",
+      "paramNamePlaceholder": "参数名",
+      "requiredLabel": "必填",
+      "optionalLabel": "可选",
+      "remarkPlaceholder": "说明",
+      "addParam": "添加参数",
+      "stepSection": "执行步骤",
+      "stepIdPlaceholder": "步骤 id",
+      "stepCallPlaceholder": "capability/prompt 名",
+      "addStep": "添加步骤",
+      "outputAlias": "输出别名",
+      "conditionOptional": "条件（可选）",
+      "conditionPlaceholder": "true/false 表达式",
+      "args": "args（JSON）",
+      "branches": "branches（JSON，route 专用）",
+      "triggerPlaceholder": "输入触发词后回车",
+      "returnValue": "返回值（Jinja 表达式或 JSON）"
+    },
+    "deleteConfirm": {
+      "title": "确认删除该技能？",
+      "content": "将永久删除 {{name}}，此操作不可恢复。"
+    },
+    "message": {
+      "loadFailed": "加载技能列表失败",
+      "builtinCannotDisable": "内置技能不可禁用",
+      "enabled": "已启用",
+      "disabled": "已禁用",
+      "loadDetailFailed": "加载详情失败",
+      "reloaded_one": "已重新加载 {{count}} 个技能",
+      "reloaded_other": "已重新加载 {{count}} 个技能",
+      "reloadFailed": "热加载失败",
+      "loadSkillDetailFailed": "加载技能详情失败",
+      "saved": "已保存",
+      "saveFailed": "保存失败"
+    }
+  },
+  "monitor": {
+    "ready": {
+      "title": "AI 配置就绪",
+      "hintUnknown": "健康探针不可用（接口异常或缺少 ai:use 权限），当前无法判定配置状态",
+      "hintConfigured": "LLM 客户端凭据已就绪，AI 问答 / 诊断 / RAG 能力可用",
+      "hintNotConfigured": "LLM 客户端未配置凭据，AI 问答 / 诊断 / RAG 能力将不可用"
+    },
+    "status": {
+      "configured": "已配置",
+      "notConfigured": "未配置",
+      "circuitOpen": "熔断开启",
+      "normal": "正常"
+    },
+    "metrics": {
+      "title": "AI 运行指标",
+      "empty": "暂无指标数据",
+      "source": {
+        "errorTip": "Redis 可达但本次读取失败，以下为本进程兜底数据，不代表全局真实值，请刷新重试",
+        "errorTag": "读取异常 · pid {{pid}}",
+        "localTip": "Redis 不可用，当前仅为处理本请求的进程内的兜底数据，会随命中的 worker 变化，不可作为全局依据",
+        "localTag": "本进程兜底 · pid {{pid}}",
+        "aggregateTip": "来自 Redis 聚合，覆盖全部 gunicorn worker 与 celery worker；python_gc 等系统指标仍只反映本进程",
+        "aggregateTag": "全进程聚合 · pid {{pid}}"
+      }
+    },
+    "circuit": {
+      "title": "熔断器状态",
+      "empty": "暂无熔断器记录（无 AI 调用发生）"
+    },
+    "column": {
+      "provider": "Provider",
+      "failures": "失败次数",
+      "cooldownSeconds": "冷却时间（秒）",
+      "cooldownRemaining": "剩余冷却"
+    },
+    "reset": {
+      "title": "重置熔断器",
+      "content": "确认重置 {{provider}} 的熔断器？将清零失败计数。"
+    },
+    "message": {
+      "loadFailed": "加载监控数据失败",
+      "resetDone": "已重置",
+      "resetFailed": "重置失败"
+    },
+    "metric": {
+      "callsTotal": "LLM 调用次数（累计）",
+      "errorsTotal": "调用失败（累计）",
+      "promptTokensTotal": "输入 Token（累计）",
+      "completionTokensTotal": "输出 Token（累计）",
+      "tokensTotal": "Token 总消耗（累计）",
+      "skillRunsTotal": "技能执行次数（累计）",
+      "callsToday": "LLM 调用次数（今日）",
+      "errorsToday": "调用失败（今日）",
+      "promptTokensToday": "输入 Token（今日）",
+      "completionTokensToday": "输出 Token（今日）",
+      "tokensToday": "Token 总消耗（今日）",
+      "skillRunsToday": "技能执行次数（今日）"
+    }
+  },
+  "config": {
+    "title": "AI 配置管理",
+    "field": {
+      "apiKeyStatus": "API Key 状态",
+      "apiKeyMasked": "API Key（脱敏）",
+      "apiKey": "API Key（留空不修改）",
+      "provider": "Provider",
+      "baseUrl": "API Base URL",
+      "model": "模型",
+      "timeout": "请求超时（秒）",
+      "streamTimeout": "流式超时（秒）",
+      "maxTokens": "最大 Token",
+      "temperature": "温度"
+    },
+    "tag": {
+      "localProcessNotSynced": "本进程未同步",
+      "empty": "空"
+    },
+    "tooltip": {
+      "apiKeyLocalOnly": "api_key 不跨进程同步。其他 worker 已配置，但处理本次请求的进程未生效，需重启该进程或改用环境变量注入。",
+      "provider": "OpenAI 兼容协议（DeepSeek/通义千问/Ollama 等）统一填 openai，通过下方 Base URL 切换端点。填错未注册的 provider 会被后端拒绝。"
+    },
+    "providerExample": {
+      "intro": "兼容服务示例：openai（官方/DeepSeek ",
+      "qwen": " / 通义 ",
+      "ollama": " / Ollama ",
+      "suffix": "）"
+    },
+    "placeholder": {
+      "apiKey": "输入新 Key 以更新，留空保持不变"
+    },
+    "action": {
+      "save": "保存配置"
+    },
+    "message": {
+      "loadFailed": "加载配置失败",
+      "saveFailed": "保存失败",
+      "updated": "已更新: {{fields}}"
+    },
+    "empty": "暂无配置数据"
+  },
+  "nlq": {
+    "title": "AI 智能查询",
+    "description": "用自然语言查询运维数据，例如：「哪台设备 CPU 最高」「各机房有多少设备」「巡检异常设备」",
+    "placeholder": "输入你的问题...",
+    "action": "查询",
+    "result": "查询结果",
+    "validation": {
+      "questionTooLong": "问题过长，请控制在 2000 字以内"
+    },
+    "message": {
+      "queryFailed": "查询失败"
+    }
+  },
+  "audit": {
+    "title": "AI 审计日志",
+    "resource": {
+      "ai": "AI 调用",
+      "device": "设备",
+      "rag": "RAG 知识库",
+      "skill": "AI 技能",
+      "config": "AI 配置",
+      "circuit": "熔断器"
+    }
+  },
+  "diagnosis": {
+    "title": "智能运维诊断",
+    "field": {
+      "autoRoute": "自动路由（自然语言）",
+      "deviceId": "设备 ID"
+    },
+    "placeholder": {
+      "symptom": "描述故障现象，如：'设备 12 CPU 异常'"
+    },
+    "action": {
+      "checkAlerts": "检查告警",
+      "diagnose": "诊断"
+    },
+    "empty": "输入问题开始诊断，如：'设备 12 CPU 异常'",
+    "progress": {
+      "round": "第 {{current}}/{{total}} 轮分析中...",
+      "analyzing": "诊断中..."
+    },
+    "tooltip": {
+      "noExecutePermission": "无 ai:execute 权限，无法执行修复命令"
+    },
+    "verify": {
+      "title": "处置验证：{{status}}",
+      "item": "{{metric}}: {{pre}} → {{post}} ({{statusText}})",
+      "separator": " | ",
+      "recovered": "恢复",
+      "notRecovered": "未恢复"
+    },
+    "persist": {
+      "title": "案例沉淀",
+      "content": "设备已恢复，是否将本次处置案例沉淀入 RAG 知识库？"
+    },
+    "rollback": {
+      "alert_one": "回滚失败告警：{{count}} 个设备处于“已变更未回滚”状态",
+      "alert_other": "回滚失败告警：{{count}} 个设备处于“已变更未回滚”状态",
+      "tag": "设备 {{deviceId}} | {{skill}} | {{time}}"
+    },
+    "result": {
+      "title": "诊断结论",
+      "incomplete": "未完成",
+      "incompleteTitle": "诊断未完成",
+      "incompleteDesc": "已采集多轮数据但未能定位根因，建议人工介入。",
+      "rootCause": "根因：",
+      "confidence": "置信度：",
+      "evidence": "证据：",
+      "noEvidence": "暂无证据",
+      "evidenceTag": "证据 {{index}}"
+    },
+    "message": {
+      "failed": "诊断失败：{{reason}}",
+      "taskError": "任务执行出错，请稍后重试",
+      "progressDisconnected": "进度订阅断开，任务仍在后台执行，请稍后刷新会话查看结果",
+      "taskFinishedExpired": "该诊断任务已完成（结果已过期），请重新发起",
+      "noAnomalousSkip": "无异常指标记录，跳过自动验证",
+      "waitingVerify": "等待指标刷新后验证...",
+      "verifyTimeout": "验证超时，请手动检查",
+      "verifyFailed": "验证失败：{{reason}}",
+      "recovered": "设备已恢复",
+      "partial": "部分恢复，建议继续诊断",
+      "notRecovered": "未恢复，建议人工介入",
+      "caseSaved": "案例已入库",
+      "caseSaveFailed": "案例入库失败：{{reason}}"
+    }
+  },
+  "command": {
+    "title": "待确认命令",
+    "diagnosticLabel": "诊断命令（只读，可安全执行）：",
+    "alert": {
+      "title": "修复命令需人工确认",
+      "description": "以下命令将变更设备配置，执行前已自动备份。高危命令失败将自动回滚。"
+    },
+    "field": {
+      "params": "参数：{{params}}",
+      "rollback": "回滚："
+    },
+    "action": {
+      "execute": "执行",
+      "rollback": "回滚"
+    },
+    "preview": {
+      "intro": "即将在设备上执行：",
+      "noticeTitle": "执行前须知",
+      "highRiskTitle": "高危操作",
+      "highRiskDesc": "此命令风险等级为 high，执行前已自动备份 running-config，失败将自动回滚。",
+      "rollbackLabel": "回滚命令："
+    },
+    "confirm": {
+      "title": "确认执行修复命令",
+      "okText": "确认执行"
+    },
+    "message": {
+      "executed": "命令执行完成",
+      "taskFinished": "任务已完成，请刷新状态",
+      "execFailedHint": "执行失败：{{reason}}（如为临时故障，请重试）",
+      "execFailed": "执行失败：{{reason}}",
+      "progressDisconnected": "进度订阅断开，请检查网络",
+      "unavailable": "命令不可用：{{reason}}",
+      "duplicateReused": "检测到重复请求，已复用首次任务",
+      "notExecutedNoRollback": "该命令尚未执行，无需回滚",
+      "rollbackSuccess": "回滚成功",
+      "rollbackFailed": "回滚失败：{{reason}}"
+    }
+  }
+}

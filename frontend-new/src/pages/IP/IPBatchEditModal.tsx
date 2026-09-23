@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal, Form, Select, Input, Typography } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { SelectOption } from '@/services';
 
 interface IPBatchEditModalProps {
@@ -21,6 +22,7 @@ export function IPBatchEditModal({
   onClose,
   onSubmit
 }: IPBatchEditModalProps) {
+  const { t } = useTranslation('network');
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export function IPBatchEditModal({
 
   return (
     <Modal
-      title={mode === 'customer' ? '批量分配客户' : '批量修改备注'}
+      title={mode === 'customer' ? t('ip.batchEdit.titleCustomer') : t('ip.batchEdit.titleNotes')}
       open={open}
       onOk={handleOk}
       onCancel={onClose}
@@ -48,20 +50,31 @@ export function IPBatchEditModal({
       destroyOnHidden
     >
       <Typography.Paragraph type="secondary">
-        将对选中的 {count} 个 IP {mode === 'customer' ? '分配客户' : '修改备注'}。
+        {mode === 'customer'
+          ? t('ip.batchEdit.descCustomer', { count })
+          : t('ip.batchEdit.descNotes', { count })}
       </Typography.Paragraph>
       <Form form={form} layout="vertical">
         {mode === 'customer' ? (
           <Form.Item
             name="customer_id"
-            label="客户"
-            rules={[{ required: true, message: '请选择客户' }]}
+            label={t('ip.field.customer')}
+            rules={[{ required: true, message: t('ip.batchEdit.customerRequired') }]}
           >
-            <Select placeholder="选择客户" options={customerOptions} allowClear />
+            <Select
+              placeholder={t('ip.edit.selectCustomer')}
+              options={customerOptions}
+              allowClear
+            />
           </Form.Item>
         ) : (
-          <Form.Item name="notes" label="备注">
-            <Input.TextArea rows={3} placeholder="输入备注内容" maxLength={200} showCount />
+          <Form.Item name="notes" label={t('ip.field.notes')}>
+            <Input.TextArea
+              rows={3}
+              placeholder={t('ip.batchEdit.notesPlaceholder')}
+              maxLength={200}
+              showCount
+            />
           </Form.Item>
         )}
       </Form>

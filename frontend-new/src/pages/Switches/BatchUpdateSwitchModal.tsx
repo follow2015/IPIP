@@ -5,13 +5,14 @@
  */
 import { Modal, Form, Input, Select, InputNumber, Row, Col, Checkbox, Space, Alert } from 'antd';
 import { useBatchUpdateSwitch, type BatchUpdateSwitchResult } from '@/services/switch';
+import { SSH_PROTOCOL_OPTIONS } from '@/types/enums';
 import {
-  SWITCH_ROLE_MAP,
-  SWITCH_DEVICE_TYPE_OPTIONS,
-  AUTH_METHOD_OPTIONS,
-  SSH_PROTOCOL_OPTIONS,
-  NETWORK_LAYER_OPTIONS
-} from '@/types/enums';
+  getAuthMethodOptions,
+  getNetworkLayerOptions,
+  getSwitchDeviceTypeOptions,
+  getSwitchRoleOptions
+} from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { Switch } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
 import { useState } from 'react';
@@ -29,15 +30,25 @@ const EDITABLE_FIELDS = [
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
 
-const FIELD_LABELS: Record<EditableField, string> = {
-  port: '端口号',
-  protocol: '协议',
-  username: '用户名',
-  password: '密码',
-  device_type: '设备类型',
-  switch_role: '设备角色',
-  layer: '网络层级',
-  authentication_method: '认证方法'
+type BatchFieldLabelKey =
+  | 'switch.batchField.port'
+  | 'switch.batchField.protocol'
+  | 'switch.batchField.username'
+  | 'switch.batchField.password'
+  | 'switch.batchField.deviceType'
+  | 'switch.batchField.switchRole'
+  | 'switch.batchField.layer'
+  | 'switch.batchField.authenticationMethod';
+
+const FIELD_LABELS: Record<EditableField, BatchFieldLabelKey> = {
+  port: 'switch.batchField.port',
+  protocol: 'switch.batchField.protocol',
+  username: 'switch.batchField.username',
+  password: 'switch.batchField.password',
+  device_type: 'switch.batchField.deviceType',
+  switch_role: 'switch.batchField.switchRole',
+  layer: 'switch.batchField.layer',
+  authentication_method: 'switch.batchField.authenticationMethod'
 };
 
 interface BatchUpdateSwitchModalProps {
@@ -47,6 +58,8 @@ interface BatchUpdateSwitchModalProps {
 }
 
 function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdateSwitchModalProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const [form] = Form.useForm();
   const message = useMessage();
   const batchUpdate = useBatchUpdateSwitch();
@@ -67,7 +80,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
 
   const handleSubmit = async () => {
     if (checkedFields.size === 0) {
-      message.warning('请至少勾选一个要修改的字段');
+      message.warning(td('switch.batchUpdate.selectFieldRequired'));
       return;
     }
 
@@ -84,7 +97,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
           if (values.password) {
             updates.password = values.password;
           } else {
-            message.warning('已勾选密码字段，但密码为空，将跳过密码更新');
+            message.warning(td('switch.batchUpdate.passwordEmptySkipped'));
           }
         } else {
           updates[field] = values[field];
@@ -95,9 +108,16 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
 
       if (result.failed_count > 0) {
         setPartialResult(result);
-        message.warning(`部分更新成功：${result.success_count} 成功，${result.failed_count} 失败`);
+        message.warning(
+          td('switch.batchUpdate.partialSuccess', {
+            success: result.success_count,
+            failed: result.failed_count
+          })
+        );
       } else {
-        message.success(`批量更新成功：${result.success_count} 台网络设备已更新`);
+        message.success(
+          td('switch.batchUpdate.success', { count: result.success_count })
+        );
         handleClose();
       }
     } catch (err) {
@@ -114,7 +134,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
 
   return (
     <Modal
-      title={`批量修改远程信息（已选 ${selectedSwitches.length} 台）`}
+      title={td('switch.batchUpdate.title', { count: selectedSwitches.length })}
       open={open}
       onOk={handleSubmit}
       onCancel={handleClose}
@@ -127,12 +147,18 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`${partialResult.success_count} 台更新成功，${partialResult.failed_count} 台失败`}
+          message={td('switch.batchUpdate.resultSummary', {
+            success: partialResult.success_count,
+            failed: partialResult.failed_count
+          })}
           description={
             <ul style={{ margin: 0, paddingLeft: 20 }}>
               {partialResult.failed_items.map((item) => (
                 <li key={item.device_id}>
-                  设备ID {item.device_id}：{item.error}
+                  {td('switch.batchUpdate.failedItem', {
+                    id: item.device_id,
+                    error: item.error
+                  })}
                 </li>
               ))}
             </ul>
@@ -153,7 +179,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                     checked={checkedFields.has('port')}
                     onChange={(e) => handleCheckChange('port', e.target.checked)}
                   />
-                  {FIELD_LABELS.port}
+                  {td(FIELD_LABELS.port)}
                 </Space>
               }
             >
@@ -162,7 +188,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                   min={1}
                   max={65535}
                   style={{ width: '100%' }}
-                  placeholder="默认按协议自动填充"
+                  placeholder={td('switch.form.portPlaceholder')}
                   disabled={!checkedFields.has('port')}
                 />
               </Form.Item>
@@ -178,7 +204,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                     checked={checkedFields.has('protocol')}
                     onChange={(e) => handleCheckChange('protocol', e.target.checked)}
                   />
-                  {FIELD_LABELS.protocol}
+                  {td(FIELD_LABELS.protocol)}
                 </Space>
               }
             >
@@ -186,11 +212,13 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                 name="protocol"
                 noStyle
                 rules={
-                  checkedFields.has('protocol') ? [{ required: true, message: '请选择协议' }] : []
+                  checkedFields.has('protocol')
+                    ? [{ required: true, message: td('switch.form.protocolRequired') }]
+                    : []
                 }
               >
                 <Select
-                  placeholder="请选择"
+                  placeholder={tc('message.selectRequired')}
                   options={SSH_PROTOCOL_OPTIONS}
                   disabled={!checkedFields.has('protocol')}
                 />
@@ -207,7 +235,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                     checked={checkedFields.has('username')}
                     onChange={(e) => handleCheckChange('username', e.target.checked)}
                   />
-                  {FIELD_LABELS.username}
+                  {td(FIELD_LABELS.username)}
                 </Space>
               }
             >
@@ -215,10 +243,15 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                 name="username"
                 noStyle
                 rules={
-                  checkedFields.has('username') ? [{ required: true, message: '请输入用户名' }] : []
+                  checkedFields.has('username')
+                    ? [{ required: true, message: td('switch.form.usernameRequired') }]
+                    : []
                 }
               >
-                <Input placeholder="登录用户名" disabled={!checkedFields.has('username')} />
+                <Input
+                  placeholder={td('switch.form.usernamePlaceholder')}
+                  disabled={!checkedFields.has('username')}
+                />
               </Form.Item>
             </Form.Item>
           </Col>
@@ -232,13 +265,13 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                     checked={checkedFields.has('password')}
                     onChange={(e) => handleCheckChange('password', e.target.checked)}
                   />
-                  {FIELD_LABELS.password}
+                  {td(FIELD_LABELS.password)}
                 </Space>
               }
             >
               <Form.Item name="password" noStyle>
                 <Input.Password
-                  placeholder="留空则不修改"
+                  placeholder={td('switch.form.passwordPlaceholder')}
                   disabled={!checkedFields.has('password')}
                 />
               </Form.Item>
@@ -254,7 +287,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                     checked={checkedFields.has('device_type')}
                     onChange={(e) => handleCheckChange('device_type', e.target.checked)}
                   />
-                  {FIELD_LABELS.device_type}
+                  {td(FIELD_LABELS.device_type)}
                 </Space>
               }
             >
@@ -263,13 +296,13 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                 noStyle
                 rules={
                   checkedFields.has('device_type')
-                    ? [{ required: true, message: '请选择设备类型' }]
+                    ? [{ required: true, message: td('switch.form.deviceTypeRequired') }]
                     : []
                 }
               >
                 <Select
-                  placeholder="请选择"
-                  options={SWITCH_DEVICE_TYPE_OPTIONS}
+                  placeholder={tc('message.selectRequired')}
+                  options={getSwitchDeviceTypeOptions(td)}
                   disabled={!checkedFields.has('device_type')}
                 />
               </Form.Item>
@@ -285,7 +318,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                     checked={checkedFields.has('switch_role')}
                     onChange={(e) => handleCheckChange('switch_role', e.target.checked)}
                   />
-                  {FIELD_LABELS.switch_role}
+                  {td(FIELD_LABELS.switch_role)}
                 </Space>
               }
             >
@@ -294,16 +327,13 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                 noStyle
                 rules={
                   checkedFields.has('switch_role')
-                    ? [{ required: true, message: '请选择设备角色' }]
+                    ? [{ required: true, message: td('switch.form.switchRoleRequired') }]
                     : []
                 }
               >
                 <Select
-                  placeholder="请选择"
-                  options={Object.entries(SWITCH_ROLE_MAP).map(([k, v]) => ({
-                    label: v.label,
-                    value: Number(k)
-                  }))}
+                  placeholder={tc('message.selectRequired')}
+                  options={getSwitchRoleOptions(td)}
                   disabled={!checkedFields.has('switch_role')}
                 />
               </Form.Item>
@@ -319,7 +349,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                     checked={checkedFields.has('layer')}
                     onChange={(e) => handleCheckChange('layer', e.target.checked)}
                   />
-                  {FIELD_LABELS.layer}
+                  {td(FIELD_LABELS.layer)}
                 </Space>
               }
             >
@@ -327,12 +357,14 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                 name="layer"
                 noStyle
                 rules={
-                  checkedFields.has('layer') ? [{ required: true, message: '请选择网络层级' }] : []
+                  checkedFields.has('layer')
+                    ? [{ required: true, message: td('switch.form.networkLayerRequired') }]
+                    : []
                 }
               >
                 <Select
-                  placeholder="请选择"
-                  options={NETWORK_LAYER_OPTIONS}
+                  placeholder={tc('message.selectRequired')}
+                  options={getNetworkLayerOptions(td)}
                   disabled={!checkedFields.has('layer')}
                 />
               </Form.Item>
@@ -348,7 +380,7 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                     checked={checkedFields.has('authentication_method')}
                     onChange={(e) => handleCheckChange('authentication_method', e.target.checked)}
                   />
-                  {FIELD_LABELS.authentication_method}
+                  {td(FIELD_LABELS.authentication_method)}
                 </Space>
               }
             >
@@ -357,13 +389,13 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
                 noStyle
                 rules={
                   checkedFields.has('authentication_method')
-                    ? [{ required: true, message: '请选择认证方法' }]
+                    ? [{ required: true, message: td('switch.form.authMethodRequired') }]
                     : []
                 }
               >
                 <Select
-                  placeholder="请选择"
-                  options={[...AUTH_METHOD_OPTIONS]}
+                  placeholder={tc('message.selectRequired')}
+                  options={getAuthMethodOptions(td)}
                   disabled={!checkedFields.has('authentication_method')}
                 />
               </Form.Item>

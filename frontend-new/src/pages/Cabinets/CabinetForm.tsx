@@ -4,8 +4,9 @@ import { useCreateCabinet, useUpdateCabinet, useBatchCreateCabinet } from '@/ser
 import { useMessage } from '@/hooks/useMessage';
 import { useRoomCabinets, useRoomLayoutMarkers, useRoomOptions } from '@/services/room';
 import { useAllocatableCustomerOptions } from '@/services/customer';
-import { MARKER_TYPE_LABEL } from '@/components/RoomLayout/palette';
-import { CABINET_STATUS_OPTIONS } from '@/types/enums';
+import { MARKER_TYPE_LABEL_KEYS } from '@/components/RoomLayout/palette';
+import { getCabinetStatusOptions } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { Cabinet } from '@/types/models';
 
 interface CabinetFormProps {
@@ -37,6 +38,9 @@ function parseCabinetNumbers(input: string): string[] {
 }
 
 function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
+  const { t: ta } = useTranslation('asset');
   const [form] = Form.useForm();
   const message = useMessage();
   const createCabinet = useCreateCabinet();
@@ -112,7 +116,7 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
       }
       if (isEdit) {
         await updateCabinet.mutateAsync({ id: editRecord.id, ...values });
-        message.success('更新成功');
+        message.success(tc('message.updateSuccess'));
         onClose();
         return;
       }
@@ -120,27 +124,30 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
       if (batchMode) {
         const numbers = parseCabinetNumbers(values.cabinet_number);
         if (numbers.length === 0) {
-          message.warning('请输入有效的机柜编号');
+          message.warning(td('cabinet.batch.invalidNumber'));
           return;
         }
         if (numbers.length > 100) {
-          message.warning('单次最多创建 100 个机柜');
+          message.warning(td('cabinet.batch.maxLimit'));
           return;
         }
         const res = await batchCreateCabinet.mutateAsync(values);
         const data = res.data;
         if (data?.created_count && data.created_count > 0) {
-          message.success(`成功创建 ${data.created_count} 个机柜`);
+          message.success(td('cabinet.batch.created', { count: data.created_count }));
         }
         if (data?.failed_count && data.failed_count > 0) {
           const failedList = data.failed.slice(0, 5).join(', ');
-          const more = data.failed_count > 5 ? ` 等共 ${data.failed_count} 个` : '';
-          message.warning(`以下机柜创建失败：${failedList}${more}`);
+          const more =
+            data.failed_count > 5
+              ? td('cabinet.batch.moreCount', { count: data.failed_count })
+              : '';
+          message.warning(td('cabinet.batch.createFailed', { list: failedList, more }));
         }
         onClose();
       } else {
         await createCabinet.mutateAsync(values);
-        message.success('创建成功');
+        message.success(tc('message.createSuccess'));
         onClose();
       }
     } catch (err) {
@@ -158,7 +165,7 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
 
   return (
     <Modal
-      title={isEdit ? '编辑机柜' : batchMode ? '批量新增机柜' : '新增机柜'}
+      title={isEdit ? td('cabinet.edit') : batchMode ? td('cabinet.batchAdd') : td('cabinet.add')}
       open={open}
       onOk={handleSubmit}
       onCancel={onClose}
@@ -174,11 +181,11 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
               <Switch
                 checked={batchMode}
                 onChange={handleBatchModeChange}
-                checkedChildren="批量"
-                unCheckedChildren="单条"
+                checkedChildren={td('cabinet.batch.modeBatch')}
+                unCheckedChildren={td('cabinet.batch.modeSingle')}
               />
               <span style={{ color: '#8c8c8c', fontSize: 13 }}>
-                {batchMode ? '支持逗号分隔和范围展开' : '逐个添加机柜'}
+                {batchMode ? td('cabinet.batch.hintRange') : td('cabinet.batch.hintSingle')}
               </span>
             </Space>
           </Form.Item>
@@ -187,13 +194,22 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
         {/* 机柜编号输入 */}
         <Form.Item
           name="cabinet_number"
-          label={batchMode ? '机柜编号表达式' : '机柜名称'}
+          label={batchMode ? td('cabinet.form.numberExpression') : td('cabinet.form.name')}
           rules={[
-            { required: true, message: batchMode ? '请输入机柜编号表达式' : '请输入机柜名称' }
+            {
+              required: true,
+              message: batchMode
+                ? td('cabinet.form.numberExpressionRequired')
+                : td('cabinet.form.nameRequired')
+            }
           ]}
         >
           <Input
-            placeholder={batchMode ? '如：m11,m13,n10 或 h1-10 或 m01-05' : '请输入机柜名称/编号'}
+            placeholder={
+              batchMode
+                ? td('cabinet.form.numberExpressionPlaceholder')
+                : td('cabinet.form.namePlaceholder')
+            }
             onChange={handleCabinetNumberChange}
           />
         </Form.Item>
@@ -207,7 +223,7 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
               message={
                 <div>
                   <div style={{ marginBottom: 8, fontWeight: 500 }}>
-                    将创建 {previewNumbers.length} 个机柜：
+                    {td('cabinet.batch.preview', { count: previewNumbers.length })}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {previewNumbers.map((num) => (
@@ -224,44 +240,57 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
 
         <Form.Item
           name="room_id"
-          label="所属机房"
-          rules={[{ required: true, message: '请选择所属机房' }]}
+          label={td('basic.field.room')}
+          rules={[{ required: true, message: td('cabinet.form.roomRequired') }]}
         >
-          <Select placeholder="请选择机房" options={roomOptions} allowClear />
+          <Select placeholder={td('form.select.room')} options={roomOptions} allowClear />
         </Form.Item>
 
         <Form.Item
           name="total_u"
-          label="U位容量"
-          rules={[{ required: true, message: '请输入U位容量' }]}
+          label={td('cabinet.field.totalU')}
+          rules={[{ required: true, message: td('cabinet.form.totalURequired') }]}
           initialValue={42}
         >
-          <InputNumber min={1} max={50} style={{ width: '100%' }} placeholder="U位容量" />
+          <InputNumber
+            min={1}
+            max={50}
+            style={{ width: '100%' }}
+            placeholder={td('cabinet.field.totalU')}
+          />
         </Form.Item>
 
         {/* 批量模式下隐藏位置相关字段，因为所有机柜共享同一值无意义，可在创建后逐个编辑 */}
         {!batchMode && (
           <>
-            <Form.Item name="location" label="机柜位置">
-              <Input placeholder="机柜位置（可选）" />
+            <Form.Item name="location" label={td('cabinet.form.location')}>
+              <Input placeholder={td('cabinet.form.locationPlaceholder')} />
             </Form.Item>
 
             <div style={{ display: 'flex', gap: 16 }}>
               <Form.Item
                 name="row"
-                label="行号"
+                label={td('cabinet.form.row')}
                 style={{ flex: 1 }}
-                tooltip="机房平面图中的行坐标，从1开始。如：1、2、3"
+                tooltip={td('cabinet.form.rowTooltip')}
               >
-                <InputNumber min={1} style={{ width: '100%' }} placeholder="如：1" />
+                <InputNumber
+                  min={1}
+                  style={{ width: '100%' }}
+                  placeholder={td('cabinet.form.rowColPlaceholder')}
+                />
               </Form.Item>
               <Form.Item
                 name="col"
-                label="列号"
+                label={td('cabinet.form.col')}
                 style={{ flex: 1 }}
-                tooltip="机房平面图中的列坐标，从1开始。如：1、2、3"
+                tooltip={td('cabinet.form.colTooltip')}
               >
-                <InputNumber min={1} style={{ width: '100%' }} placeholder="如：1" />
+                <InputNumber
+                  min={1}
+                  style={{ width: '100%' }}
+                  placeholder={td('cabinet.form.rowColPlaceholder')}
+                />
               </Form.Item>
             </div>
 
@@ -271,37 +300,51 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
                 type="error"
                 showIcon
                 style={{ marginBottom: 16 }}
-                message={`第 ${watchedRow} 行 第 ${watchedCol} 列已被机柜 ${occupiedBy.cabinet_number} 占用`}
-                description="同一机房的一个格子只能放一台机柜。请更换行列号，否则提交会被拒绝。"
+                message={ta('roomLayout.cabinetForm.occupied', {
+                  row: watchedRow,
+                  col: watchedCol,
+                  cabinet: occupiedBy.cabinet_number
+                })}
+                description={ta('roomLayout.cabinetForm.occupiedHint')}
               />
             ) : markerAtCell ? (
               <Alert
                 type="warning"
                 showIcon
                 style={{ marginBottom: 16 }}
-                message={`该位置已标记为占位设施（${
-                  MARKER_TYPE_LABEL[markerAtCell.marker_type] ?? markerAtCell.marker_type
-                }）`}
-                description="占位设施通常表示该格子不放机柜。确需放置可继续提交，平面上会以冲突角标提示。"
+                message={ta('roomLayout.cabinetForm.markerOccupied', {
+                  type: MARKER_TYPE_LABEL_KEYS[markerAtCell.marker_type]
+                    ? ta(MARKER_TYPE_LABEL_KEYS[markerAtCell.marker_type])
+                    : markerAtCell.marker_type
+                })}
+                description={ta('roomLayout.cabinetForm.markerOccupiedHint')}
               />
             ) : null}
           </>
         )}
 
-        <Form.Item name="status" label="状态" initialValue={1}>
-          <Select options={CABINET_STATUS_OPTIONS} placeholder="请选择状态" />
+        <Form.Item name="status" label={tc('field.status')} initialValue={1}>
+          <Select options={getCabinetStatusOptions(td)} placeholder={td('cabinet.form.statusPlaceholder')} />
         </Form.Item>
 
-        <Form.Item name="customer_id" label="租赁客户">
-          <Select options={customerOptions} placeholder="整柜租赁客户（可选）" allowClear />
+        <Form.Item name="customer_id" label={td('cabinet.field.leaseCustomer')}>
+          <Select
+            options={customerOptions}
+            placeholder={td('cabinet.form.leaseCustomerPlaceholder')}
+            allowClear
+          />
         </Form.Item>
 
-        <Form.Item name="total_power" label="额定功率(W)">
-          <InputNumber min={0} style={{ width: '100%' }} placeholder="额定功率" />
+        <Form.Item name="total_power" label={td('cabinet.field.ratedPowerUnit')}>
+          <InputNumber
+            min={0}
+            style={{ width: '100%' }}
+            placeholder={td('cabinet.field.ratedPower')}
+          />
         </Form.Item>
 
-        <Form.Item name="notes" label="备注">
-          <Input.TextArea rows={2} placeholder="机柜备注（可选）" />
+        <Form.Item name="notes" label={tc('field.remarks')}>
+          <Input.TextArea rows={2} placeholder={td('cabinet.form.notesPlaceholder')} />
         </Form.Item>
       </Form>
     </Modal>

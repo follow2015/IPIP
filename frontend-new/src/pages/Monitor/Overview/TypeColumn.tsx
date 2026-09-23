@@ -7,6 +7,7 @@
 import { useMemo } from 'react';
 import { Card, Empty, theme } from 'antd';
 import { Column } from '@ant-design/charts';
+import { useTranslation } from 'react-i18next';
 
 const { useToken } = theme;
 
@@ -16,6 +17,8 @@ interface TypeColumnProps {
 }
 
 export default function TypeColumn({ data, loading }: TypeColumnProps) {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
   const { token } = useToken();
 
   const chartData = useMemo(
@@ -35,7 +38,7 @@ export default function TypeColumn({ data, loading }: TypeColumnProps) {
       label: { position: 'top' as const },
       tooltip: {
         title: 'type',
-        items: [{ field: 'count', name: '数量' }]
+        items: [{ field: 'count', name: t('chart.count') }]
       },
       axis: {
         x: {
@@ -51,19 +54,19 @@ export default function TypeColumn({ data, loading }: TypeColumnProps) {
       interactions: [{ type: 'element-active' }],
       animation: { appear: { duration: 600, easing: 'easeQuadOut' } }
     }),
-    [chartData, token]
+    [chartData, token, t]
   );
 
   return (
     <Card
-      title="设备类型分布"
+      title={t('chart.deviceTypeDistribution')}
       size="small"
       loading={loading}
       variant="borderless"
       style={{ height: '100%' }}
     >
       {isEmpty ? (
-        <Empty description="暂无数据" style={{ padding: '48px 0' }} />
+        <Empty description={tc('message.noData')} style={{ padding: '48px 0' }} />
       ) : (
         <Column {...config} height={260} />
       )}

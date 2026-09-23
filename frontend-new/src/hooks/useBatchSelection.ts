@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { Key } from 'react';
 import type { TableProps } from 'antd';
+import type { TFunction } from 'i18next';
 
 export interface UseBatchSelectionOptions<T> {
   getRowKey?: (record: T) => Key;
@@ -23,15 +24,16 @@ export interface UseBatchSelectionReturn<T> {
 }
 
 export function scopeViolationMessage<T>(
+  t: TFunction<'device'>,
   batch: Pick<UseBatchSelectionReturn<T>, 'unresolvedSelectedCount'>,
   actionLabel: string,
-  unit = '项'
+  unit = t('batch.unit')
 ): string {
-  return (
-    `「${actionLabel}」需要逐条读取已选内容，仅支持当前页勾选：` +
-    `另有 ${batch.unresolvedSelectedCount} ${unit}已选但不在当前页。` +
-    '请先取消跨页选择（清空后在本页重新勾选）再操作。'
-  );
+  return t('batch.crossPageWarning', {
+    action: actionLabel,
+    count: batch.unresolvedSelectedCount,
+    unit
+  });
 }
 
 function defaultGetRowKey<T>(record: T): Key {

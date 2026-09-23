@@ -3,8 +3,9 @@
  * - 通用验证规则集合
  */
 import type { Rule } from 'antd/es/form';
+import type { TFunction } from 'i18next';
 
-export const ipRule: Rule = {
+export const ipRule = (t: TFunction<'common'>): Rule => ({
   validator: (_, value: string) => {
     if (!value) return Promise.resolve();
     const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
@@ -14,27 +15,27 @@ export const ipRule: Rule = {
         return Promise.resolve();
       }
     }
-    return Promise.reject(new Error('请输入有效的 IP 地址'));
-  },
-};
+    return Promise.reject(new Error(t('validation.invalidIp')));
+  }
+});
 
-export const macRule: Rule = {
+export const macRule = (t: TFunction<'common'>): Rule => ({
   validator: (_, value: string) => {
     if (!value) return Promise.resolve();
     const macRegex = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
     if (macRegex.test(value)) {
       return Promise.resolve();
     }
-    return Promise.reject(new Error('请输入有效的 MAC 地址（格式：XX:XX:XX:XX:XX:XX）'));
-  },
-};
+    return Promise.reject(new Error(t('validation.invalidMac')));
+  }
+});
 
-export const emailRule: Rule = {
+export const emailRule = (t: TFunction<'common'>): Rule => ({
   type: 'email',
-  message: '请输入有效的邮箱地址',
-};
+  message: t('validation.invalidEmail')
+});
 
-export const phoneRule: Rule = {
+export const phoneRule = (t: TFunction<'common'>): Rule => ({
   pattern: /^1[3-9]\d{9}$/,
-  message: '请输入有效的手机号',
-};
+  message: t('validation.invalidPhone')
+});

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal, Form, Input, Select } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { IPAddress } from '@/types/models';
 import type { SelectOption } from '@/services';
 
@@ -20,6 +21,7 @@ export function IPEditModal({
   submitting,
   onSubmit
 }: IPEditModalProps) {
+  const { t } = useTranslation('network');
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -35,7 +37,7 @@ export function IPEditModal({
 
   return (
     <Modal
-      title="编辑 IP"
+      title={t('ip.edit.title')}
       open={open}
       onOk={handleOk}
       onCancel={onClose}
@@ -43,13 +45,13 @@ export function IPEditModal({
       destroyOnHidden
     >
       <Form form={form} layout="vertical">
-        <Form.Item label="IP地址">
+        <Form.Item label={t('ip.field.ipAddress')}>
           <Input value={ip?.ip_address} disabled />
         </Form.Item>
-        <Form.Item name="customer_id" label="客户">
-          <Select placeholder="选择客户" options={customerOptions} allowClear />
+        <Form.Item name="customer_id" label={t('ip.field.customer')}>
+          <Select placeholder={t('ip.edit.selectCustomer')} options={customerOptions} allowClear />
         </Form.Item>
-        <Form.Item name="notes" label="备注">
+        <Form.Item name="notes" label={t('ip.field.notes')}>
           <Input.TextArea rows={2} />
         </Form.Item>
       </Form>

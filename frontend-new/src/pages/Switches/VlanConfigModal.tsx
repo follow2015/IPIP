@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal, Form, InputNumber, Input, Select } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 export interface VlanConfigValues {
   vlan_id: number;
@@ -24,6 +25,7 @@ export function VlanConfigModal({
   initialVlanId,
   onSubmit
 }: VlanConfigModalProps) {
+  const { t } = useTranslation('device');
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export function VlanConfigModal({
 
   return (
     <Modal
-      title={`配置 VLAN — ${portName}`}
+      title={t('switch.vlanConfig.title', { name: portName })}
       open={open}
       onOk={handleOk}
       onCancel={onClose}
@@ -65,9 +67,7 @@ export function VlanConfigModal({
           border: '1px solid #ffccc7'
         }}
       >
-        <div>
-          <b>⚠ 注意：</b>此操作将清空端口现有配置，并导致端口 up/down 一次。
-        </div>
+        <div>{t('switch.portConfigWarning')}</div>
       </div>
       <div
         style={{
@@ -80,9 +80,9 @@ export function VlanConfigModal({
           lineHeight: 1.8
         }}
       >
-        <div>若输入的 VLAN ID 在交换机上不存在，系统将自动创建该 VLAN。</div>
-        <div>Access 模式适合终端设备接入，Trunk 模式适合交换机互连。</div>
-        <div>Trunk 模式下，允许 VLAN 列表中的所有 VLAN 也会被自动创建。</div>
+        <div>{t('switch.vlanConfig.info1')}</div>
+        <div>{t('switch.vlanConfig.info2')}</div>
+        <div>{t('switch.vlanConfig.info3')}</div>
       </div>
       <Form form={form} layout="vertical">
         <Form.Item noStyle shouldUpdate={(prev, cur) => prev.mode !== cur.mode}>
@@ -91,10 +91,10 @@ export function VlanConfigModal({
               name="vlan_id"
               label={
                 getFieldValue('mode') === 'trunk'
-                  ? 'PVID / Native VLAN (1-4094)'
-                  : 'VLAN ID (1-4094)'
+                  ? t('switch.vlanConfig.pvidLabel')
+                  : t('switch.vlanConfig.vlanIdLabel')
               }
-              rules={[{ required: true, message: '请输入VLAN ID' }]}
+              rules={[{ required: true, message: t('switch.vlanConfig.vlanIdRequired') }]}
             >
               <InputNumber
                 min={1}
@@ -102,17 +102,19 @@ export function VlanConfigModal({
                 style={{ width: '100%' }}
                 disabled={portType === 'vlan'}
                 placeholder={
-                  getFieldValue('mode') === 'trunk' ? 'Trunk 端口的默认 VLAN' : '例如：100'
+                  getFieldValue('mode') === 'trunk'
+                    ? t('switch.vlanConfig.pvidPlaceholder')
+                    : t('switch.vlanConfig.vlanIdPlaceholder')
                 }
               />
             </Form.Item>
           )}
         </Form.Item>
-        <Form.Item name="mode" label="端口模式" rules={[{ required: true }]}>
+        <Form.Item name="mode" label={t('switch.vlanConfig.portMode')} rules={[{ required: true }]}>
           <Select
             options={[
-              { value: 'access', label: 'Access（单VLAN，适合终端设备）' },
-              { value: 'trunk', label: 'Trunk（多VLAN，适合交换机互连）' }
+              { value: 'access', label: t('switch.vlanConfig.modeAccess') },
+              { value: 'trunk', label: t('switch.vlanConfig.modeTrunk') }
             ]}
           />
         </Form.Item>
@@ -121,9 +123,9 @@ export function VlanConfigModal({
             getFieldValue('mode') === 'trunk' ? (
               <Form.Item
                 name="allowed_vlans"
-                label="允许 VLAN（Trunk 模式）"
-                rules={[{ required: true, message: 'Trunk 模式必须指定允许的 VLAN 范围' }]}
-                help="例如：10-12,14。这些 VLAN 不存在时会自动创建"
+                label={t('switch.vlanConfig.allowedVlans')}
+                rules={[{ required: true, message: t('switch.vlanConfig.allowedVlansRequired') }]}
+                help={t('switch.vlanConfig.allowedVlansHelp')}
               >
                 <Input placeholder="1-10,20,30-40" />
               </Form.Item>

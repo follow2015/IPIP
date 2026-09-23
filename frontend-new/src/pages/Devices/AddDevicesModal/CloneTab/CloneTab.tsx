@@ -6,12 +6,15 @@
  */
 import React from 'react';
 import { Button, Space, Steps } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useCloneTab, type CloneTabProps } from './useCloneTab';
 import StepSource from './StepSource';
 import StepEdit from './StepEdit';
 import BatchResultModal from '../../BatchResultModal';
 
 const CloneTab: React.FC<CloneTabProps> = (props) => {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const {
     step,
     setStep,
@@ -52,7 +55,10 @@ const CloneTab: React.FC<CloneTabProps> = (props) => {
       <Steps
         current={step}
         size="small"
-        items={[{ title: '选择模板' }, { title: '配置差异项' }]}
+        items={[
+          { title: t('addModal.clone.step.source') },
+          { title: t('addModal.clone.step.edit') }
+        ]}
         style={{ marginBottom: 24 }}
       />
 
@@ -96,20 +102,20 @@ const CloneTab: React.FC<CloneTabProps> = (props) => {
 
       <div style={{ marginTop: 16, textAlign: 'right' }}>
         <Space>
-          <Button onClick={() => props.onClose()}>取消</Button>
-          {step === 1 && <Button onClick={() => setStep(0)}>上一步</Button>}
+          <Button onClick={() => props.onClose()}>{tCommon('action.cancel')}</Button>
+          {step === 1 && <Button onClick={() => setStep(0)}>{t('addModal.action.prev')}</Button>}
           {step === 0 && (
             <Button
               type="primary"
               disabled={!templateId || isTemplateLoading || (isNodeTemplate && !cloneChassisId)}
               onClick={handleNext}
             >
-              下一步
+              {t('addModal.action.next')}
             </Button>
           )}
           {step === 1 && (
             <Button type="primary" loading={batchCreate.isPending} onClick={handleSubmit}>
-              开始克隆（{diffRows.length} 台）
+              {t('addModal.clone.submit', { count: diffRows.length })}
             </Button>
           )}
         </Space>
@@ -118,7 +124,7 @@ const CloneTab: React.FC<CloneTabProps> = (props) => {
       <BatchResultModal
         open={batchCreate.resultOpen}
         result={batchCreate.result}
-        title="克隆设备结果"
+        title={t('addModal.clone.resultTitle')}
         onClose={handleResultClose}
         onRetry={handleRetry}
       />

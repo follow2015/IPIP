@@ -1,18 +1,14 @@
-/**
- * UnifiedPortTab 常量
- * 占用状态筛选/表单选项 + 状态色映射（原内联于组件顶部）
- */
+import type { DeviceT } from '@/types/statusMeta';
 
-export const USAGE_STATUS_FILTER_OPTIONS = [
-  { label: '空闲', value: 'free' },
-  { label: '占用', value: 'occupied' },
-  { label: '禁用', value: 'disabled' },
-  { label: '异常', value: 'error' }
+export const getUsageStatusFilterOptions = (t: DeviceT) => [
+  { label: t('portUsage.FREE'), value: 'free' },
+  { label: t('portUsage.OCCUPIED'), value: 'occupied' },
+  { label: t('portUsage.DISABLED'), value: 'disabled' },
+  { label: t('portUsage.ERROR'), value: 'error' }
 ];
 
-export const USAGE_STATUS_FORM_OPTIONS = [
-  { value: 'free', label: '空闲' },
-  { value: 'occupied', label: '占用' },
-  { value: 'disabled', label: '禁用' }
+export const getUsageStatusFormOptions = (t: DeviceT) => [
+  { value: 'free', label: t('portUsage.FREE') },
+  { value: 'occupied', label: t('portUsage.OCCUPIED') },
+  { value: 'disabled', label: t('portUsage.DISABLED') }
 ];
-

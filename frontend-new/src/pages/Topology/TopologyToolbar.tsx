@@ -3,7 +3,7 @@
  *
  * 布局切换 / 缩放 / 适配 / 搜索定位
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Space, Select, Button, Input, Tooltip, Segmented } from 'antd';
 import {
   ZoomInOutlined,
@@ -11,6 +11,7 @@ import {
   FullscreenOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { LayoutType } from './TopologyGraph';
 
 interface TopologyToolbarProps {
@@ -22,11 +23,17 @@ interface TopologyToolbarProps {
   onSearch: (value: string) => void;
 }
 
-const LAYOUT_OPTIONS: { label: string; value: LayoutType }[] = [
-  { label: '力导向', value: 'force' },
-  { label: '分层', value: 'dagre' },
-  { label: '同心圆', value: 'concentric' },
-  { label: '辐射', value: 'radial' },
+type LayoutLabelKey =
+  | 'topology.layout.force'
+  | 'topology.layout.hierarchical'
+  | 'topology.layout.concentric'
+  | 'topology.layout.radial';
+
+const LAYOUT_OPTIONS: { key: LayoutLabelKey; value: LayoutType }[] = [
+  { key: 'topology.layout.force', value: 'force' },
+  { key: 'topology.layout.hierarchical', value: 'dagre' },
+  { key: 'topology.layout.concentric', value: 'concentric' },
+  { key: 'topology.layout.radial', value: 'radial' },
 ];
 
 const TopologyToolbar: React.FC<TopologyToolbarProps> = ({
@@ -37,6 +44,13 @@ const TopologyToolbar: React.FC<TopologyToolbarProps> = ({
   onFitView,
   onSearch,
 }) => {
+  const { t } = useTranslation('network');
+
+  const layoutOptions = useMemo(
+    () => LAYOUT_OPTIONS.map((o) => ({ label: t(o.key), value: o.value })),
+    [t]
+  );
+
   return (
     <div
       style={{
@@ -50,9 +64,9 @@ const TopologyToolbar: React.FC<TopologyToolbarProps> = ({
       }}
     >
       <Space size="middle">
-        <span style={{ fontSize: 13, color: '#666' }}>布局</span>
+        <span style={{ fontSize: 13, color: '#666' }}>{t('topology.toolbar.layout')}</span>
         <Segmented
-          options={LAYOUT_OPTIONS}
+          options={layoutOptions}
           value={layout}
           onChange={(val) => onLayoutChange(val as LayoutType)}
           size="small"
@@ -61,7 +75,7 @@ const TopologyToolbar: React.FC<TopologyToolbarProps> = ({
 
       <Space size="small">
         <Input
-          placeholder="搜索设备名"
+          placeholder={t('topology.toolbar.searchPlaceholder')}
           prefix={<SearchOutlined />}
           allowClear
           size="small"
@@ -72,13 +86,13 @@ const TopologyToolbar: React.FC<TopologyToolbarProps> = ({
       </Space>
 
       <Space size="small">
-        <Tooltip title="放大">
+        <Tooltip title={t('topology.toolbar.zoomIn')}>
           <Button size="small" icon={<ZoomInOutlined />} onClick={onZoomIn} />
         </Tooltip>
-        <Tooltip title="缩小">
+        <Tooltip title={t('topology.toolbar.zoomOut')}>
           <Button size="small" icon={<ZoomOutOutlined />} onClick={onZoomOut} />
         </Tooltip>
-        <Tooltip title="适配画布">
+        <Tooltip title={t('topology.toolbar.fitView')}>
           <Button size="small" icon={<FullscreenOutlined />} onClick={onFitView} />
         </Tooltip>
       </Space>

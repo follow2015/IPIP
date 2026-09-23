@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Form,
@@ -15,6 +15,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import {
   useCreateRoomLayoutMarker,
   useDeleteRoomLayoutMarker,
@@ -22,7 +23,7 @@ import {
   useRoomLayoutMarkers,
   useUpdateRoomLayoutMarker
 } from '@/services/room';
-import { MARKER_TYPE_LABEL, positionLabel } from './palette';
+import { MARKER_TYPE_LABEL_KEYS, positionLabel } from './palette';
 import type { RoomLayoutMarker } from '@/types/models';
 import type { RoomLayoutMarkerCreate } from '@/types/api-bridge';
 
@@ -40,12 +41,10 @@ export interface MarkerConfigModalProps {
   onClose: () => void;
 }
 
-const MARKER_TYPE_OPTIONS = Object.keys(MARKER_TYPE_LABEL).map((value) => ({
-  value,
-  label: MARKER_TYPE_LABEL[value]
-}));
-
 export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfigModalProps) {
+  const { t: ta } = useTranslation('asset');
+  const { t: tc } = useTranslation('common');
+
   const { data: markers = [], isLoading } = useRoomLayoutMarkers(roomId);
   const { data: cabinets = [] } = useRoomCabinets(roomId);
   const createMutation = useCreateRoomLayoutMarker(roomId);
@@ -56,6 +55,15 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
   const [editing, setEditing] = useState<RoomLayoutMarker | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const markerTypeOptions = useMemo(
+    () =>
+      Object.keys(MARKER_TYPE_LABEL_KEYS).map((value) => ({
+        value,
+        label: ta(MARKER_TYPE_LABEL_KEYS[value])
+      })),
+    [ta]
+  );
 
   const pendingValuesRef = useRef<MarkerFormValues | null>(null);
 
@@ -78,19 +86,21 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
         };
         if (editing) {
           await updateMutation.mutateAsync({ markerId: editing.id, data: payload });
-          message.success('占位标记已更新');
+          message.success(ta('roomLayout.marker.message.updated'));
         } else {
           await createMutation.mutateAsync(payload);
-          message.success('占位标记已新增');
+          message.success(ta('roomLayout.marker.message.created'));
         }
         setFormOpen(false);
       } catch (err) {
-        message.error(err instanceof Error ? err.message : '保存占位标记失败');
+        message.error(
+          err instanceof Error ? err.message : ta('roomLayout.marker.message.saveFailed')
+        );
       } finally {
         setSubmitting(false);
       }
     },
-    [createMutation, editing, updateMutation]
+    [createMutation, editing, ta, updateMutation]
   );
 
   const handleSubmit = useCallback(async () => {
@@ -106,19 +116,20 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
     );
     if (occupied) {
       Modal.confirm({
-        title: '该位置已有机柜',
-        content: `${positionLabel(values.row_number, values.col_number)} 已放置机柜 ${
-          occupied.cabinet_number
-        }。继续添加标记会与该机柜占用同一格，平面图上将以冲突角标提示。确认继续？`,
-        okText: '仍要添加',
-        cancelText: '取消',
+        title: ta('roomLayout.marker.occupiedTitle'),
+        content: ta('roomLayout.marker.occupiedContent', {
+          position: positionLabel(values.row_number, values.col_number, ta),
+          cabinet: occupied.cabinet_number
+        }),
+        okText: ta('roomLayout.marker.stillAdd'),
+        cancelText: tc('action.cancel'),
         onOk: () => doSubmit(values)
       });
       return;
     }
 
     await doSubmit(values);
-  }, [cabinets, doSubmit, form]);
+  }, [cabinets, doSubmit, form, ta, tc]);
 
   const openCreate = useCallback(() => {
     const maxRow = cabinets.reduce((acc, c) => Math.max(acc, c.row ?? 0), 0);
@@ -149,74 +160,86 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
     async (markerId: number) => {
       try {
         await deleteMutation.mutateAsync(markerId);
-        message.success('占位标记已删除');
+        message.success(ta('roomLayout.marker.message.deleted'));
       } catch (err) {
-        message.error(err instanceof Error ? err.message : '删除占位标记失败');
+        message.error(
+          err instanceof Error ? err.message : ta('roomLayout.marker.message.deleteFailed')
+        );
       }
     },
-    [deleteMutation]
+    [deleteMutation, ta]
   );
 
-  const columns: ColumnsType<RoomLayoutMarker> = [
-    {
-      title: '类型',
-      dataIndex: 'marker_type',
-      width: 100,
-      render: (type: string) => <Tag>{MARKER_TYPE_LABEL[type] ?? type}</Tag>
-    },
-    {
-      title: '位置',
-      key: 'position',
-      width: 160,
-      render: (_, record) => positionLabel(record.row_number, record.col_number)
-    },
-    {
-      title: '标签',
-      dataIndex: 'label',
-      ellipsis: true,
-      render: (label?: string | null) => label || '-'
-    },
-    {
-      title: '备注',
-      dataIndex: 'notes',
-      ellipsis: true,
-      render: (notes?: string | null) => notes || '-'
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 110,
-      render: (_, record) => (
-        <Space size={0}>
-          <Button type="link" size="small" onClick={() => openEdit(record)}>
-            编辑
-          </Button>
-          <Popconfirm
-            title="确认删除该占位标记？"
-            okText="删除"
-            cancelText="取消"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button type="link" size="small" danger>
-              删除
+  const columns: ColumnsType<RoomLayoutMarker> = useMemo(
+    () => [
+      {
+        title: tc('field.type'),
+        dataIndex: 'marker_type',
+        width: 100,
+        render: (type: string) => {
+          const key = MARKER_TYPE_LABEL_KEYS[type];
+          return <Tag>{key ? ta(key) : type}</Tag>;
+        }
+      },
+      {
+        title: ta('roomLayout.marker.position'),
+        key: 'position',
+        width: 160,
+        render: (_, record) => positionLabel(record.row_number, record.col_number, ta)
+      },
+      {
+        title: ta('roomLayout.marker.label'),
+        dataIndex: 'label',
+        ellipsis: true,
+        render: (label?: string | null) => label || '-'
+      },
+      {
+        title: tc('field.remarks'),
+        dataIndex: 'notes',
+        ellipsis: true,
+        render: (notes?: string | null) => notes || '-'
+      },
+      {
+        title: tc('field.actions'),
+        key: 'action',
+        width: 110,
+        render: (_, record) => (
+          <Space size={0}>
+            <Button type="link" size="small" onClick={() => openEdit(record)}>
+              {tc('action.edit')}
             </Button>
-          </Popconfirm>
-        </Space>
-      )
-    }
-  ];
+            <Popconfirm
+              title={ta('roomLayout.marker.confirmDelete')}
+              okText={tc('action.delete')}
+              cancelText={tc('action.cancel')}
+              onConfirm={() => handleDelete(record.id)}
+            >
+              <Button type="link" size="small" danger>
+                {tc('action.delete')}
+              </Button>
+            </Popconfirm>
+          </Space>
+        )
+      }
+    ],
+    [handleDelete, openEdit, ta, tc]
+  );
 
   return (
     <>
-      <Modal title="管理占位标记" open={open} onCancel={onClose} footer={null} width={780}>
+      <Modal
+        title={ta('roomLayout.marker.title')}
+        open={open}
+        onCancel={onClose}
+        footer={null}
+        width={780}
+      >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          标记用于表达「这个格子不能放机柜」——门、精密空调、PDU、立柱等。行列号填 0
-          表示机柜网格外侧（如第 1 列外侧的门）。本功能只做位置提示，**不是设施资产台账**，
-          不记录型号与维保信息。
+          {ta('roomLayout.marker.hint')}
         </Typography.Paragraph>
         <div style={{ marginBottom: 12 }}>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新增标记
+            {ta('roomLayout.marker.add')}
           </Button>
         </div>
         <Table<RoomLayoutMarker>
@@ -226,34 +249,34 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
           dataSource={markers}
           columns={columns}
           pagination={false}
-          locale={{ emptyText: '尚未添加占位标记' }}
+          locale={{ emptyText: ta('roomLayout.marker.empty') }}
         />
       </Modal>
 
       <Modal
-        title={editing ? '编辑占位标记' : '新增占位标记'}
+        title={editing ? ta('roomLayout.marker.editTitle') : ta('roomLayout.marker.createTitle')}
         open={formOpen}
         onCancel={() => setFormOpen(false)}
         onOk={handleSubmit}
         confirmLoading={submitting}
-        okText="保存"
+        okText={tc('action.save')}
       >
         <Form form={form} layout="vertical">
           <Form.Item
             name="marker_type"
-            label="设施类型"
-            rules={[{ required: true, message: '请选择设施类型' }]}
+            label={ta('roomLayout.marker.facilityType')}
+            rules={[{ required: true, message: ta('roomLayout.marker.facilityTypeRequired') }]}
           >
-            <Select options={MARKER_TYPE_OPTIONS} />
+            <Select options={markerTypeOptions} />
           </Form.Item>
 
           <Form.Item
             name="row_number"
-            label="行号"
-            extra="0 表示机柜网格外侧（如端头空调）"
+            label={ta('roomLayout.marker.rowNumber')}
+            extra={ta('roomLayout.marker.rowExtra')}
             rules={[
-              { required: true, message: '请填写行号' },
-              { type: 'number', min: 0, message: '行号不能为负数' }
+              { required: true, message: ta('roomLayout.marker.rowRequired') },
+              { type: 'number', min: 0, message: ta('roomLayout.marker.rowNegative') }
             ]}
           >
             <InputNumber min={0} max={9999} style={{ width: '100%' }} />
@@ -261,21 +284,25 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
 
           <Form.Item
             name="col_number"
-            label="列号"
-            extra="0 表示机柜网格外侧（如端头空调、门）"
+            label={ta('roomLayout.marker.colNumber')}
+            extra={ta('roomLayout.marker.colExtra')}
             rules={[
-              { required: true, message: '请填写列号' },
-              { type: 'number', min: 0, message: '列号不能为负数' }
+              { required: true, message: ta('roomLayout.marker.colRequired') },
+              { type: 'number', min: 0, message: ta('roomLayout.marker.colNegative') }
             ]}
           >
             <InputNumber min={0} max={9999} style={{ width: '100%' }} />
           </Form.Item>
 
-          <Form.Item name="label" label="标签" extra="留空则按类型显示，如「空调」">
-            <Input maxLength={100} placeholder="如：空调-01" />
+          <Form.Item
+            name="label"
+            label={ta('roomLayout.marker.label')}
+            extra={ta('roomLayout.marker.labelExtra')}
+          >
+            <Input maxLength={100} placeholder={ta('roomLayout.marker.labelPlaceholder')} />
           </Form.Item>
 
-          <Form.Item name="notes" label="备注">
+          <Form.Item name="notes" label={tc('field.remarks')}>
             <Input.TextArea maxLength={500} rows={2} showCount />
           </Form.Item>
         </Form>

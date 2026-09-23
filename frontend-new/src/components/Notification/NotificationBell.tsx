@@ -17,10 +17,15 @@ import {
 } from '@/services/notification';
 import { useAuthStore } from '@/stores/auth';
 import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
-import { SEVERITY_COLOR_MAP, SEVERITY_LABELS } from '@/types/enums';
+import { SEVERITY_COLOR_MAP } from '@/types/enums';
+import { getSeverityLabel } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { formatDate, parseServerTime } from '@/utils/format';
 
 const { Text, Paragraph } = Typography;
+
+type NotificationT = TFunction<'settings'>;
 
 function NotificationItemRow({
   item,
@@ -30,6 +35,8 @@ function NotificationItemRow({
   onRead: (id: number) => void;
 }) {
   const { token } = theme.useToken();
+  const { t: tDevice } = useTranslation('device');
+  const { t } = useTranslation('settings');
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -48,7 +55,7 @@ function NotificationItemRow({
         title={
           <Space size={4}>
             <Tag color={SEVERITY_COLOR_MAP[item.severity]} style={{ marginRight: 0 }}>
-              {SEVERITY_LABELS[item.severity] ?? item.severity}
+              {getSeverityLabel(item.severity, tDevice) ?? item.severity}
             </Tag>
             <Text strong={!item.is_read} style={{ fontSize: 13 }}>
               {item.title}
@@ -63,7 +70,8 @@ function NotificationItemRow({
                 rows: 2,
                 expandable: true,
                 expanded,
-                symbol: (expandedState) => (expandedState ? '收起' : '展开'),
+                symbol: (expandedState) =>
+                  expandedState ? t('notification.bell.collapse') : t('notification.bell.expand'),
                 onExpand: (_e, info) => setExpanded(info.expanded)
               }}
               style={{ marginBottom: 0, fontSize: 12, whiteSpace: 'pre-wrap' }}
@@ -74,30 +82,33 @@ function NotificationItemRow({
         }
       />
       <Text type="secondary" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
-        {formatTime(item.created_at)}
+        {formatTime(item.created_at, t)}
       </Text>
     </List.Item>
   );
 }
 
-function formatTime(iso: string | null): string {
+function formatTime(iso: string | null, t: NotificationT): string {
   if (!iso) return '';
   const d = parseServerTime(iso);
   if (!d) return '';
   const diffMs = Date.now() - d.valueOf();
   const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) return '刚刚';
-  if (diffMin < 60) return `${diffMin}分钟前`;
+  if (diffMin < 1) return t('notification.bell.time.justNow');
+  if (diffMin < 60) return t('notification.bell.time.minutesAgo', { count: diffMin });
   const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}小时前`;
+  if (diffHour < 24) return t('notification.bell.time.hoursAgo', { count: diffHour });
   const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 30) return `${diffDay}天前`;
+  if (diffDay < 30) return t('notification.bell.time.daysAgo', { count: diffDay });
   return formatDate(iso);
 }
 
 function NotificationBell() {
   const confirm = useConfirm();
   const { token } = theme.useToken();
+  const { t: tDevice } = useTranslation('device');
+  const { t } = useTranslation('settings');
+  const { t: tCommon } = useTranslation('common');
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   const [open, setOpen] = useState(false);
@@ -143,9 +154,16 @@ function NotificationBell() {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     const payload = event.payload as Record<string, unknown>;
     const severity = String(payload.severity ?? 'warning');
-    const alertType = String(payload.alert_type ?? '告警');
-    const title = `[${SEVERITY_LABELS[severity] ?? severity}] 监控告警`;
-    const body = `${alertType}（设备 #${payload.device_id ?? '-'}）`;
+    const alertType = String(
+      payload.alert_type ?? t('notification.bell.browserNotification.defaultAlertType')
+    );
+    const title = t('notification.bell.browserNotification.title', {
+      severity: getSeverityLabel(severity, tDevice) ?? severity
+    });
+    const body = t('notification.bell.browserNotification.body', {
+      alertType,
+      deviceId: String(payload.device_id ?? '-')
+    });
     try {
       new Notification(title, { body, tag: String(payload.dedup_key ?? '') });
     } catch {
@@ -165,7 +183,7 @@ function NotificationBell() {
         }}
       >
         <Text strong style={{ fontSize: 14 }}>
-          消息通知
+          {t('notification.bell.title')}
         </Text>
         <Space size={4}>
           {hasReadItems && (
@@ -176,16 +194,16 @@ function NotificationBell() {
               style={{ padding: 0, fontSize: 12 }}
               onClick={() =>
                 confirm({
-                  title: '确认清除所有已读消息？',
-                  content: '未读消息将保留',
-                  okText: '清除',
-                  cancelText: '取消',
+                  title: t('notification.bell.deleteReadConfirmTitle'),
+                  content: t('notification.bell.deleteReadConfirmContent'),
+                  okText: t('notification.bell.clearRead'),
+                  cancelText: tCommon('action.cancel'),
                   okButtonProps: { danger: true, size: 'small' },
                   onOk: handleClearRead
                 })
               }
             >
-              清除已读
+              {t('notification.bell.clearRead')}
             </Button>
           )}
           {unreadCount > 0 && (
@@ -196,7 +214,7 @@ function NotificationBell() {
               onClick={handleMarkAllRead}
               style={{ padding: 0, fontSize: 12 }}
             >
-              全部已读
+              {t('notification.bell.markAllRead')}
             </Button>
           )}
         </Space>
@@ -205,12 +223,12 @@ function NotificationBell() {
       {/* 通知列表 */}
       {isLoading ? (
         <div style={{ padding: 40, textAlign: 'center' }}>
-          <Text type="secondary">加载中...</Text>
+          <Text type="secondary">{tCommon('message.loading')}</Text>
         </div>
       ) : !sortedItems.length ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="暂无通知"
+          description={t('notification.bell.empty')}
           style={{ padding: '40px 0' }}
         />
       ) : (

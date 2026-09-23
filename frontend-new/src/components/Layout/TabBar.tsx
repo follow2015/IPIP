@@ -6,6 +6,7 @@
 import React from 'react';
 import { Tabs, theme } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { TabInfo } from '@/stores/ui';
 
 interface TabBarProps {
@@ -18,6 +19,7 @@ interface TabBarProps {
 function TabBar({ openTabs, activeTabKey, onRemoveTab, onSetActiveTab }: TabBarProps) {
   const navigate = useNavigate();
   const { token } = theme.useToken();
+  const { t } = useTranslation('common');
 
   const handleTabChange = (key: string) => {
     onSetActiveTab(key);
@@ -48,7 +50,7 @@ function TabBar({ openTabs, activeTabKey, onRemoveTab, onSetActiveTab }: TabBarP
       onEdit={handleTabEdit}
       items={openTabs.map((tab) => ({
         key: tab.key,
-        label: tab.title,
+        label: tab.titleKey ? t(tab.titleKey) : tab.title ?? tab.key,
         closable: tab.closable,
       }))}
       style={{ padding: '8px 16px 0', background: token.colorBgContainer, borderBottom: `1px solid ${token.colorBorderSecondary}` }}

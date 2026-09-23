@@ -17,7 +17,8 @@ import { useMessage } from '@/hooks/useMessage';
 import { buildSshColumns } from './columns';
 import { PortTable } from './PortTable';
 import { PortStats } from './PortStats';
-import { USAGE_STATUS_FILTER_OPTIONS } from './constants';
+import { getUsageStatusFilterOptions } from './constants';
+import { useTranslation } from 'react-i18next';
 
 interface SshPortViewProps {
   deviceId: number;
@@ -58,15 +59,19 @@ export function SshPortView({
   onPortPanelClick,
   onClearSelection
 }: SshPortViewProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
+  const usageStatusOptions = useMemo(() => getUsageStatusFilterOptions(t), [t]);
   const columns = useMemo(
     () =>
       buildSshColumns({
         deviceId,
         renderPortActions: renderPortActions ?? (() => null),
         refetch,
-        submitAction
+        submitAction,
+        t: { d: t, c: tCommon }
       }),
-    [deviceId, renderPortActions, refetch, submitAction]
+    [deviceId, renderPortActions, refetch, submitAction, t, tCommon]
   );
 
   const message = useMessage();
@@ -84,26 +89,28 @@ export function SshPortView({
     (checked: boolean) => {
       setPortSync.mutate(checked, {
         onSuccess: () => {
-          message.success(checked ? '已开启端口状态自动同步' : '已关闭端口状态自动同步');
+          message.success(
+            checked ? t('port.message.statusSyncEnabled') : t('port.message.statusSyncDisabled')
+          );
         },
         onError: () => {
-          message.error('开关设置失败');
+          message.error(t('port.message.toggleFailed'));
         }
       });
     },
-    [setPortSync, message]
+    [setPortSync, message, t]
   );
 
   const handleResetToGlobal = useCallback(() => {
     setPortSync.mutate(null, {
       onSuccess: () => {
-        message.success('已重置为跟随全局开关');
+        message.success(t('port.message.resetToGlobal'));
       },
       onError: () => {
-        message.error('重置失败');
+        message.error(t('asset.message.resetFailed'));
       }
     });
-  }, [setPortSync, message]);
+  }, [setPortSync, message, t]);
 
   return (
     <>
@@ -120,9 +127,9 @@ export function SshPortView({
           filters={[
             {
               key: 'usage_status',
-              label: '占用状态筛选',
+              label: t('port.filter.usageStatus'),
               type: 'select',
-              options: USAGE_STATUS_FILTER_OPTIONS,
+              options: usageStatusOptions,
               width: 160
             }
           ]}
@@ -133,10 +140,14 @@ export function SshPortView({
           <Tooltip
             title={
               !hasMonitorCredential
-                ? '请先添加 SNMP 或 Zabbix 监控凭据后才能开启端口状态自动同步'
+                ? t('port.tooltip.needCredentialStatus')
                 : deviceOverride === null
-                  ? `跟随全局开关（当前：${globalEnabled ? '开' : '关'}），点击切换为设备级强制开关。开启后监控轮询时用 SNMP/Zabbix 凭据更新端口状态，SSH 同步仍保留全量替换`
-                  : '设备级开关已强制设置，开启后监控轮询时仅更新端口状态，SSH 同步仍保留全量替换。点击"跟随全局"可恢复'
+                  ? t('port.tooltip.followGlobalStatus', {
+                      state: globalEnabled ? t('port.state.on') : t('port.state.off')
+                    })
+                  : t('port.tooltip.deviceOverrideStatus', {
+                      follow: t('batchMonitor.modeFollow')
+                    })
             }
           >
             <span>
@@ -144,8 +155,8 @@ export function SshPortView({
                 checked={effectiveEnabled}
                 onChange={handleTogglePortSync}
                 disabled={!hasMonitorCredential || setPortSync.isPending}
-                checkedChildren="状态同步"
-                unCheckedChildren="不同步"
+                checkedChildren={t('port.switch.statusSync')}
+                unCheckedChildren={t('port.switch.notSync')}
                 size="small"
               />
             </span>
@@ -157,11 +168,11 @@ export function SshPortView({
               onClick={handleResetToGlobal}
               disabled={setPortSync.isPending}
             >
-              跟随全局
+              {t('batchMonitor.modeFollow')}
             </Button>
           )}
           <Button icon={<SyncOutlined />} onClick={handleSync} loading={isPending}>
-            同步数据
+            {t('port.action.syncData')}
           </Button>
         </Space>
       </div>

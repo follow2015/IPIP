@@ -7,6 +7,8 @@ import IdCell from '@/components/IdCell';
 import RoomForm from './RoomForm';
 import { useRoomList, useDeleteRoom, useRoomBuildings, useRoomFloors } from '@/services/room';
 import { ROOM_STATUS_MAP } from '@/types/enums';
+import { getRoomStatusMeta } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { Room } from '@/types/models';
 import { useCrudPage } from '@/hooks/useCrudPage';
 import { formatDateTime } from '@/utils/format';
@@ -20,12 +22,14 @@ type RoomListParams = PaginationParams & {
 };
 
 function Rooms() {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const navigate = useNavigate();
   const crud = useCrudPage<Room, RoomListParams>({
     useList: useRoomList,
     useDelete: useDeleteRoom,
     nameKey: 'name',
-    nameLabel: '机房',
+    nameLabel: td('room.name'),
     buildListParams: (tp) => ({
       page: tp.page,
       per_page: tp.per_page,
@@ -53,7 +57,7 @@ function Rooms() {
       width: 80,
       render: (id: number) => <IdCell value={id} />
     },
-    { title: '机房名称', dataIndex: 'name', key: 'name' },
+    { title: td('room.field.name'), dataIndex: 'name', key: 'name' },
     {
       title: '房间号',
       dataIndex: 'room_number',
@@ -74,55 +78,60 @@ function Rooms() {
       width: 90,
       render: (v: string | null) => v || '-'
     },
-    { title: '位置', dataIndex: 'location', key: 'location' },
+    { title: td('cabinet.field.location'), dataIndex: 'location', key: 'location' },
     {
-      title: '状态',
+      title: tc('field.status'),
       dataIndex: 'status',
       key: 'status',
       render: (v: number) => {
-        const s = ROOM_STATUS_MAP[v as keyof typeof ROOM_STATUS_MAP];
+        const s = getRoomStatusMeta(v, td);
         return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{v}</Tag>;
       }
     },
-    { title: '机柜数', dataIndex: 'cabinet_count', key: 'cabinet_count', width: 80 },
     {
-      title: '联系人',
+      title: td('customer.stats.cabinetCount'),
+      dataIndex: 'cabinet_count',
+      key: 'cabinet_count',
+      width: 80
+    },
+    {
+      title: td('customer.field.contactPerson'),
       dataIndex: 'contact',
       key: 'contact',
       render: (v: string | null) => v || '-'
     },
     {
-      title: '联系电话',
+      title: td('customer.field.contactPhone'),
       dataIndex: 'contact_phone',
       key: 'contact_phone',
       render: (v: string | null) => v || '-'
     },
     {
-      title: '创建时间',
+      title: tc('field.createdAt'),
       dataIndex: 'created_at',
       key: 'created_at',
       render: (v: string) => formatDateTime(v)
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       render: (_: unknown, record: Room) => (
         <Space>
           <Button type="link" size="small" onClick={() => handleDetail(record)}>
-            平面图
+            {td('room.action.floorPlan')}
           </Button>
           <Button
             type="link"
             size="small"
             onClick={() => navigate(`/cabinets?roomId=${record.id}`)}
           >
-            查看机柜
+            {td('room.action.viewCabinets')}
           </Button>
           <Button type="link" size="small" onClick={() => crud.handleEdit(record)}>
-            编辑
+            {tc('action.edit')}
           </Button>
           <Button type="link" size="small" danger onClick={() => crud.handleDelete(record)}>
-            删除
+            {tc('action.delete')}
           </Button>
         </Space>
       )
@@ -155,7 +164,7 @@ function Rooms() {
           type: 'select',
           width: 120,
           options: Object.entries(ROOM_STATUS_MAP).map(([value, s]) => ({
-            label: s.label,
+            label: td(s.labelKey),
             value: Number(value)
           }))
         }

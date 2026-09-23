@@ -2,6 +2,7 @@ import React from 'react';
 import { Tooltip, Button, theme } from 'antd';
 import { RightOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { TYPE_CONFIG, NODE_STATUS_COLOR } from './constants';
 import { displayLabel } from './geometry';
 import NodeGrid from './NodeGrid';
@@ -15,6 +16,7 @@ interface DetailPanelProps {
 const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
   const navigate = useNavigate();
   const { token } = theme.useToken();
+  const { t } = useTranslation('asset');
 
   if (!device) {
     return (
@@ -28,7 +30,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
           fontSize: 12
         }}
       >
-        点击设备查看详情
+        {t('uposition.detail.empty')}
       </div>
     );
   }
@@ -38,15 +40,20 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
 
   const uStart = displayLabel(device.uPosition, totalU);
   const uEnd = displayLabel(device.uPosition + device.uSize - 1, totalU);
-  const uRange = `U${uEnd}–U${uStart}（${device.uSize}U）`;
+  const uRange = t('uposition.detail.uRange', {
+    end: uEnd,
+    start: uStart,
+    size: device.uSize
+  });
 
-  const rows: [string, string][] = [['U 位', uRange]];
+  const rows: [string, string][] = [[t('uposition.detail.uPosition'), uRange]];
   if (device.ip) rows.push(['IP', device.ip]);
   if (device.ipmiAddress) rows.push(['IPMI', device.ipmiAddress]);
-  if (device.vendor && device.model) rows.push(['型号', `${device.vendor} ${device.model}`]);
-  else if (device.model) rows.push(['型号', device.model]);
-  if (device.sn) rows.push(['序列号', device.sn]);
-  if (device.power) rows.push(['功率', `${device.power}W`]);
+  if (device.vendor && device.model)
+    rows.push([t('uposition.detail.model'), `${device.vendor} ${device.model}`]);
+  else if (device.model) rows.push([t('uposition.detail.model'), device.model]);
+  if (device.sn) rows.push([t('uposition.detail.sn'), device.sn]);
+  if (device.power) rows.push([t('uposition.label.power'), `${device.power}W`]);
 
   return (
     <div
@@ -84,7 +91,9 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
         >
           {device.deviceName}
         </span>
-        <span style={{ fontSize: 10, color: cfg.subText, flexShrink: 0 }}>{cfg.label}</span>
+        <span style={{ fontSize: 10, color: cfg.subText, flexShrink: 0 }}>
+          {t(cfg.labelKey)}
+        </span>
       </div>
 
       {/* 字段列表 */}
@@ -119,8 +128,11 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
           }}
         >
           <div style={{ fontSize: 10, color: token.colorTextSecondary, marginBottom: 4 }}>
-            节点 {device.nodes.filter((n) => n.status === 'active').length}/{device.nodes.length}{' '}
-            在线 · {device.nodes.filter((n) => n.status === 'fault').length} 故障
+            {t('uposition.detail.nodeSummary', {
+              online: device.nodes.filter((n) => n.status === 'active').length,
+              total: device.nodes.length,
+              fault: device.nodes.filter((n) => n.status === 'fault').length
+            })}
           </div>
           {device.nodeRows && device.nodeCols ? (
             <NodeGrid nodes={device.nodes} nodeRows={device.nodeRows} nodeCols={device.nodeCols} />
@@ -156,7 +168,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
             navigate(`/devices/${device.deviceId}`);
           }}
         >
-          查看设备详情
+          {t('uposition.detail.viewDetail')}
         </Button>
       </div>
     </div>

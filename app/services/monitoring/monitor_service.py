@@ -84,6 +84,18 @@ CONFIG_ERROR_CODES = frozenset({
     "zabbix_empty_host_list",
 })
 
+MONITOR_STATUS_CODES = frozenset({
+    "no_credential",
+    "not_probed",
+    "credential_error",
+    "unreachable",
+    "normal",
+    "normal_no_group",
+    "no_data",
+    "no_data_template",
+    "breached",
+})
+
 
 @dataclass(frozen=True)
 class AlertTarget:
@@ -801,10 +813,15 @@ class MonitorService:
         / ``not_probed`` / ``no_credential`` 时，``metric_status`` 返回空 list，
         前端在指标区域直接展示对应状态，不渲染历史 latest 值（避免误导）。
 
+        ``monitor_status_code`` 是比 ``overall_status`` 更细的状态码（例如同为 ``no_data``
+        区分「命中模板组但未采到数据」与「未命中模板组且无数据」），供前端做 i18n
+        键映射（``device:monitorStatus.<monitor_status_code>``）；``status_reason`` 的中文
+        保留为兜底，老前端/日志不受影响。
+
         Returns:
             dict: 包含 has_credential / has_zabbix / template_group / grouped /
-                  metric_status / overall_status / status_reason / reachable /
-                  last_error / last_checked_at。
+                  metric_status / overall_status / status_reason / monitor_status_code /
+                  reachable / last_error / last_checked_at。
         """
         device = self._device_repo.find_by_id_or_404(device_id)
         creds = self._credential_repo.find_enabled_protocols(device_id)
@@ -841,7 +858,7 @@ class MonitorService:
         reachable = status.reachable if status else None
         last_error = status.last_error if status else None
         last_checked_at = status.last_checked_at.isoformat() if status and status.last_checked_at else None
-        overall_status, status_reason = self._dashboard_overall_status(
+        overall_status, status_reason, monitor_status_code = self._dashboard_overall_status(
             has_credential, status, grouped
         )
 
@@ -893,9 +910,13 @@ class MonitorService:
                         }
                     )
                 if not metric_status:
-                    overall_status, status_reason = "no_data", "模板组已命中但尚未采集到指标数据"
+                    overall_status, status_reason, monitor_status_code = (
+                        "no_data", "模板组已命中但尚未采集到指标数据", "no_data_template",
+                    )
                 elif any(m["breached"] for m in metric_status):
-                    overall_status, status_reason = "breached", "存在超阈值指标，请关注"
+                    overall_status, status_reason, monitor_status_code = (
+                        "breached", "存在超阈值指标，请关注", "breached",
+                    )
             else:
                 tpl_map: dict = {}
                 try:
@@ -923,9 +944,13 @@ class MonitorService:
                         }
                     )
                 if any(m["breached"] for m in metric_status):
-                    overall_status, status_reason = "breached", "存在超阈值指标，请关注"
+                    overall_status, status_reason, monitor_status_code = (
+                        "breached", "存在超阈值指标，请关注", "breached",
+                    )
                 elif not metric_status:
-                    overall_status, status_reason = "no_data", "尚未采集到指标数据"
+                    overall_status, status_reason, monitor_status_code = (
+                        "no_data", "尚未采集到指标数据", "no_data",
+                    )
 
         return {
             "device_id": device_id,
@@ -937,6 +962,7 @@ class MonitorService:
             "metric_status": metric_status,
             "overall_status": overall_status,
             "status_reason": status_reason,
+            "monitor_status_code": monitor_status_code,
             "reachable": reachable,
             "last_error": last_error,
             "last_checked_at": last_checked_at,
@@ -959,26 +985,33 @@ class MonitorService:
         group = groups[0]
         return {"id": group.id, "name": group.name}
 
-    def _dashboard_overall_status(self, has_credential: bool, status, grouped: bool) -> tuple[str, str]:
+    def _dashboard_overall_status(
+        self, has_credential: bool, status, grouped: bool
+    ) -> tuple[str, str, str]:
         """聚合判定「监控数据」卡片整体状态。
 
         Returns:
-            tuple: (overall_status, status_reason)
+            tuple: (overall_status, status_reason, monitor_status_code)
             overall_status: no_credential / not_probed / unreachable / credential_error
                             / no_data / breached / normal
-            status_reason: 供前端展示的中文说明
+            status_reason: 供前端展示的中文说明（兜底，勿删）
+            monitor_status_code: 细粒度状态码，与 overall_status 同值时后者即 code；
+                         唯一例外是 normal 细分为 normal / normal_no_group。
+                         取值见 MONITOR_STATUS_CODES（本模块常量）。
         """
         if not has_credential:
-            return "no_credential", "设备未关联任何监控凭据"
+            return "no_credential", "设备未关联任何监控凭据", "no_credential"
         if status is None:
-            return "not_probed", "已配置凭据，等待首次探测"
+            return "not_probed", "已配置凭据，等待首次探测", "not_probed"
         if not status.reachable:
             if status.last_error in CONFIG_ERROR_CODES:
-                return "credential_error", "监控凭据或配置异常，指标无法采集"
-            return "unreachable", "设备当前不可达，暂无指标数据"
+                return (
+                    "credential_error", "监控凭据或配置异常，指标无法采集", "credential_error",
+                )
+            return "unreachable", "设备当前不可达，暂无指标数据", "unreachable"
         if not grouped:
-            return "normal", "未命中模板组，按默认规则采集指标"
-        return "normal", "指标采集正常"
+            return "normal", "未命中模板组，按默认规则采集指标", "normal_no_group"
+        return "normal", "指标采集正常", "normal"
 
     def set_device_monitor_enabled(self, device_id: int, enabled: bool) -> dict:
         """设备级监控启停（PATCH /monitor/devices/<id>/monitor-enabled）。

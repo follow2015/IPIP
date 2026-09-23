@@ -16,6 +16,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Query, joinedload
 
 from app.models.device import Device
+from app.models.device_hardware import (
+    SNAPSHOT_KEY_CHILDREN,
+    SNAPSHOT_KEY_LOCATION,
+)
 from app.core.enums import DeviceStatus
 from app.persistence.base import SQLAlchemyRepository, QueryOptimizationMixin
 from app.exceptions.data_access import QueryExecutionError
@@ -791,7 +795,11 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
         - **不执行 COUNT、不使用 OFFSET**。``OFFSET`` 翻到第 k 页要先扫描并丢弃
           ``(k-1) * limit`` 行，全量遍历的累计代价是 O(n²/limit)；keyset 每页都是
-          索引范围扫描（需 ``(device_name, id)`` 联合索引），累计 O(n)。
+          索引范围扫描（InnoDB 二级索引叶节点隐含 PK，单列 ``idx_device_name``
+          即可支撑 ``(device_name, id)`` 有序扫描，实测 Covering index scan），
+          累计 O(n)。实际是否走该索引取决于优化器对 ``status`` 过滤的代价决策；
+          **重新 EXPLAIN 的触发条件 = 任一分页表 ≥ 10 万行**（WP-8/8.3 澄清，
+          2026-09-23；原"需联合索引"的说法不成立）。
         - 游标是"上一页最后一条的 ``(device_name, id)``"而非页码 —— 遍历期间即使
           有并发插入/删除也不会漏行或重复行（``OFFSET`` 的经典问题）。
 
@@ -1361,7 +1369,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 query = query.filter(
                     func.json_extract(
                         DeviceHardware.device_config,
-                        "$.deleted_location_snapshot.room_id"
+                        f"$.{SNAPSHOT_KEY_LOCATION}.room_id"
                     ) == str(room_id)
                 )
 
@@ -1400,8 +1408,8 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             for d in devices:
                 dd = d.to_dict()
                 if d.hardware and d.hardware.device_config:
-                    dd['deleted_location_snapshot'] = d.hardware.device_config.get('deleted_location_snapshot')
-                    dd['deleted_children_snapshot'] = d.hardware.device_config.get('deleted_children_snapshot')
+                    dd[SNAPSHOT_KEY_LOCATION] = d.hardware.device_config.get(SNAPSHOT_KEY_LOCATION)
+                    dd[SNAPSHOT_KEY_CHILDREN] = d.hardware.device_config.get(SNAPSHOT_KEY_CHILDREN)
                 devices_data.append(dd)
 
             return {

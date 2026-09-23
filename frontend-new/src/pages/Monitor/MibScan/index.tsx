@@ -32,23 +32,40 @@ import {
   type MibScanOid,
   type MibImportItem
 } from '@/services/monitor';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 const { Text, Paragraph } = Typography;
 
-const DEVICE_TYPE_OPTIONS = [
-  { label: 'network（网络设备）', value: 'network' },
-  { label: 'server（服务器）', value: 'server' },
-  { label: 'other（其他）', value: 'other' }
-];
+type MibDeviceTypeKey = 'oid.deviceType.network' | 'oid.deviceType.server' | 'oid.deviceType.other';
+type MibMetricTypeKey =
+  | 'mib.metricTypeOption.gauge'
+  | 'mib.metricTypeOption.counter'
+  | 'mib.metricTypeOption.state'
+  | 'mib.metricTypeOption.event';
 
-const METRIC_TYPE_OPTIONS = [
-  { label: 'gauge（瞬时值）', value: 'gauge' },
-  { label: 'counter（累加计数）', value: 'counter' },
-  { label: 'state（状态）', value: 'state' },
-  { label: 'event（事件）', value: 'event' }
-];
+const getDeviceTypeOptions = (t: TFunction<'monitor'>) =>
+  (
+    [
+      { key: 'oid.deviceType.network', value: 'network' },
+      { key: 'oid.deviceType.server', value: 'server' },
+      { key: 'oid.deviceType.other', value: 'other' }
+    ] as { key: MibDeviceTypeKey; value: string }[]
+  ).map(({ key, value }) => ({ label: t(key), value }));
+
+const getMetricTypeOptions = (t: TFunction<'monitor'>) =>
+  (
+    [
+      { key: 'mib.metricTypeOption.gauge', value: 'gauge' },
+      { key: 'mib.metricTypeOption.counter', value: 'counter' },
+      { key: 'mib.metricTypeOption.state', value: 'state' },
+      { key: 'mib.metricTypeOption.event', value: 'event' }
+    ] as { key: MibMetricTypeKey; value: string }[]
+  ).map(({ key, value }) => ({ label: t(key), value }));
 
 export default function MibScanPage() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
   const [deviceId, setDeviceId] = useState<number | null>(null);
   const [deviceType, setDeviceType] = useState<string>('network');
   const [selectedOids, setSelectedOids] = useState<MibScanOid[]>([]);
@@ -95,12 +112,12 @@ export default function MibScanPage() {
   const handleRecommend = () => {
     const hits = rawDetected.filter((r) => isRecommended(r));
     if (hits.length === 0) {
-      message.info('当前探测结果无匹配的推荐指标');
+      message.info(t('mib.message.noRecommend'));
       return;
     }
     setSelectedOids(hits);
     setRecommendSort(true);
-    message.success(`已勾选 ${hits.length} 个推荐指标并置顶`);
+    message.success(t('mib.message.recommendSelected', { count: hits.length }));
   };
 
   const handlePersistRule = async (r: MibScanOid) => {
@@ -111,29 +128,29 @@ export default function MibScanPage() {
         device_type: deviceType,
         vendor_id: scanResult?.vendor_id ?? null
       });
-      message.success(`已将「${r.category_label ?? r.category}」保存为该设备的分类规则`);
+      message.success(t('mib.message.ruleSaved', { name: r.category_label ?? r.category }));
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '保存规则失败');
+      message.error(err instanceof Error ? err.message : t('mib.message.saveRuleFailed'));
     }
   };
 
   const handleScan = async () => {
     if (!deviceId) {
-      message.warning('请先选择设备');
+      message.warning(t('mib.message.selectDeviceFirst'));
       return;
     }
     setSelectedOids([]);
     setMetricKeys({});
     const t0 = Date.now();
-    const elapsedHint = message.loading('探测中，MIB walk 预计 10-40s，请稍候...', 0);
+    const elapsedHint = message.loading(t('mib.message.scanning'), 0);
     try {
       await scanMut.mutateAsync({ device_id: deviceId, timeout: 15 });
       elapsedHint();
       const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-      message.success(`探测完成，耗时 ${elapsed}s`);
+      message.success(t('mib.message.scanDone', { seconds: elapsed }));
     } catch (err: unknown) {
       elapsedHint();
-      message.error(err instanceof Error ? err.message : '探测失败');
+      message.error(err instanceof Error ? err.message : t('mib.message.scanFailed'));
     }
   };
 
@@ -144,7 +161,7 @@ export default function MibScanPage() {
 
   const handleImport = async () => {
     if (selectedOids.length === 0) {
-      message.warning('请先勾选要导入的 OID');
+      message.warning(t('mib.message.selectOidFirst'));
       return;
     }
     const selectedDevice = devices.find((d) => d.id === deviceId);
@@ -169,12 +186,12 @@ export default function MibScanPage() {
     try {
       const res = await importMut.mutateAsync(items);
       const autoNote =
-        autoFilled.length > 0 ? `（其中 ${autoFilled.length} 个自动推断 metric_key）` : '';
-      message.success(`已导入 ${res.count} 个指标模板${autoNote}`);
+        autoFilled.length > 0 ? t('mib.message.autoFilledNote', { count: autoFilled.length }) : '';
+      message.success(t('mib.message.imported', { count: res.count }) + autoNote);
       setSelectedOids([]);
       setMetricKeys({});
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '导入失败');
+      message.error(err instanceof Error ? err.message : t('mib.message.importFailed'));
     }
   };
 
@@ -191,7 +208,7 @@ export default function MibScanPage() {
       )
     },
     {
-      title: '类别',
+      title: t('mib.column.category'),
       dataIndex: 'category',
       key: 'category',
       width: 180,
@@ -210,7 +227,7 @@ export default function MibScanPage() {
                 onClick={() => handlePersistRule(r)}
                 style={{ padding: 0, fontSize: 12 }}
               >
-                存为规则
+                {t('mib.action.saveAsRule')}
               </Button>
             )}
           </Space>
@@ -218,14 +235,14 @@ export default function MibScanPage() {
       }
     },
     {
-      title: '类型',
+      title: tc('field.type'),
       dataIndex: 'type',
       key: 'type',
       width: 160,
       render: (v: string) => <Tag color="blue">{v}</Tag>
     },
     {
-      title: '采样值',
+      title: t('mib.column.sampleValue'),
       dataIndex: 'value',
       key: 'value',
       ellipsis: true,
@@ -248,17 +265,17 @@ export default function MibScanPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Card title="MIB 自动探测" variant="borderless">
+      <Card title={t('mib.title')} variant="borderless">
         <Alert
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="对设备做 MIB walk，自动发现可采集的 OID 清单"
-          description="勾选感兴趣的 OID + 填写 metric_key，一键导入指标模板。无需手敲 OID，无需 MIB 文件。"
+          message={t('mib.alert.message')}
+          description={t('mib.alert.description')}
         />
         <Space wrap size="middle">
           <Input
-            placeholder="搜索设备名称/IP"
+            placeholder={t('mib.placeholder.searchDevice')}
             prefix={<SearchOutlined />}
             style={{ width: 200 }}
             value={search}
@@ -267,7 +284,7 @@ export default function MibScanPage() {
           />
           <Select
             style={{ width: 280 }}
-            placeholder="选择设备"
+            placeholder={t('mib.placeholder.selectDevice')}
             value={deviceId}
             onChange={(v) => setDeviceId(v)}
             showSearch
@@ -281,7 +298,7 @@ export default function MibScanPage() {
             style={{ width: 180 }}
             value={deviceType}
             onChange={setDeviceType}
-            options={DEVICE_TYPE_OPTIONS}
+            options={getDeviceTypeOptions(t)}
           />
           <Button
             type="primary"
@@ -290,7 +307,7 @@ export default function MibScanPage() {
             loading={scanMut.isPending}
             disabled={!deviceId}
           >
-            开始探测
+            {t('mib.action.scan')}
           </Button>
         </Space>
       </Card>
@@ -300,14 +317,14 @@ export default function MibScanPage() {
           <Card variant="borderless">
             <Row gutter={16}>
               <Col xs={12} md={6}>
-                <Statistic title="设备 IP" value={scanResult.device_ip} />
+                <Statistic title={t('mib.stat.deviceIp')} value={scanResult.device_ip} />
               </Col>
               <Col xs={12} md={6}>
-                <Statistic title="发现 OID 数" value={scanResult.oid_count} />
+                <Statistic title={t('mib.stat.oidCount')} value={scanResult.oid_count} />
               </Col>
               <Col xs={24} md={12}>
                 <Statistic
-                  title="类型分布"
+                  title={t('mib.stat.typeDistribution')}
                   valueRender={() => (
                     <Space size={4} wrap>
                       {Object.entries(scanResult.type_summary).map(([t, c]) => (
@@ -325,14 +342,16 @@ export default function MibScanPage() {
           <Card
             title={
               <Space>
-                <Text strong>OID 清单</Text>
-                <Tag color="processing">{selectedOids.length} 已选</Tag>
+                <Text strong>{t('mib.oidListTitle')}</Text>
+                <Tag color="processing">
+                  {t('mib.count.selected', { count: selectedOids.length })}
+                </Tag>
                 <Tag>
                   {filteredDetected.length}/{rawDetected.length}
                 </Tag>
                 {recommendCatSet.size > 0 && (
                   <Tag color="gold" icon={<StarOutlined />}>
-                    {recommendCatSet.size} 推荐类别
+                    {t('mib.count.recommendCategory', { count: recommendCatSet.size })}
                   </Tag>
                 )}
               </Space>
@@ -344,7 +363,7 @@ export default function MibScanPage() {
                   onClick={handleRecommend}
                   disabled={rawDetected.length === 0 || recommendCatSet.size === 0}
                 >
-                  推荐勾选
+                  {t('mib.action.recommend')}
                 </Button>
                 <Button
                   icon={<ReloadOutlined />}
@@ -354,7 +373,7 @@ export default function MibScanPage() {
                     setRecommendSort(false);
                   }}
                 >
-                  清空选择
+                  {t('mib.action.clear')}
                 </Button>
                 <Button
                   type="primary"
@@ -363,7 +382,7 @@ export default function MibScanPage() {
                   loading={importMut.isPending}
                   disabled={selectedOids.length === 0}
                 >
-                  导入 {selectedOids.length} 个指标模板
+                  {t('mib.action.import', { count: selectedOids.length })}
                 </Button>
               </Space>
             }
@@ -371,7 +390,7 @@ export default function MibScanPage() {
             <Space wrap style={{ marginBottom: 12 }}>
               <Input
                 allowClear
-                placeholder="筛选 OID / 采样值"
+                placeholder={t('mib.placeholder.filterOid')}
                 prefix={<SearchOutlined />}
                 style={{ width: 240 }}
                 value={oidKeyword}
@@ -379,7 +398,7 @@ export default function MibScanPage() {
               />
               <Select
                 allowClear
-                placeholder="类型筛选"
+                placeholder={t('mib.placeholder.filterType')}
                 style={{ width: 160 }}
                 value={oidTypeFilter}
                 onChange={setOidTypeFilter}
@@ -395,7 +414,7 @@ export default function MibScanPage() {
               loading={scanMut.isPending}
               rowKey={(r) => r.oid}
               total={displayDetected.length}
-              emptyText="未发现 OID"
+              emptyText={t('mib.empty')}
               searchable={false}
               showCard={false}
               tableProps={table}
@@ -417,7 +436,7 @@ export default function MibScanPage() {
       {!scanResult && !scanMut.isPending && (
         <Card variant="borderless">
           <Paragraph type="secondary" style={{ textAlign: 'center', padding: 48 }}>
-            选择设备后点击「开始探测」，将自动发现设备支持的 OID 清单
+            {t('mib.emptyHint', { action: t('mib.action.scan') })}
           </Paragraph>
         </Card>
       )}

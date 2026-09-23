@@ -20,6 +20,8 @@ import {
 import type { ComponentTemplate } from '@/services/component-template';
 import { useCustomerOptions, useAllocatableCustomerOptions } from '@/services/customer';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import FilterBar from '@/components/FilterBar';
 import IdCell from '@/components/IdCell';
 import { useTable } from '@/hooks/useTable';
@@ -31,53 +33,63 @@ import {
   GpuSpecFields
 } from './ComponentSpecFields';
 
-const CATEGORY_LABELS: Record<string, string> = {
-  cpu: 'CPU',
-  memory: '内存',
-  disk: '硬盘',
-  nic: '网卡',
-  gpu: '显卡'
+type CategoryKey = 'cpu' | 'memory' | 'disk' | 'nic' | 'gpu';
+
+type SettingsT = TFunction<'settings'>;
+
+const CATEGORY_LABELS: Record<CategoryKey, string> = {
+  cpu: 'componentTemplate.category.cpu',
+  memory: 'componentTemplate.category.memory',
+  disk: 'componentTemplate.category.disk',
+  nic: 'componentTemplate.category.nic',
+  gpu: 'componentTemplate.category.gpu'
 };
 
-const CATEGORY_OPTIONS = [
-  { label: 'CPU', key: 'cpu' },
-  { label: '内存', key: 'memory' },
-  { label: '硬盘', key: 'disk' },
-  { label: '网卡', key: 'nic' },
-  { label: '显卡', key: 'gpu' }
-];
+const CATEGORY_KEYS: CategoryKey[] = ['cpu', 'memory', 'disk', 'nic', 'gpu'];
 
-function specSummary(category: string, spec: Record<string, unknown>): string {
+function specSummary(
+  t: SettingsT,
+  category: string,
+  spec: Record<string, unknown>
+): string {
   if (!spec || typeof spec !== 'object') return '-';
   const parts: string[] = [];
   switch (category) {
     case 'cpu':
-      if (spec.cores_per_cpu) parts.push(`${spec.cores_per_cpu}核`);
+      if (spec.cores_per_cpu)
+        parts.push(t('componentTemplate.spec.cores', { value: String(spec.cores_per_cpu) }));
       if (spec.architecture) parts.push(String(spec.architecture));
-      if (spec.base_freq_ghz) parts.push(`${spec.base_freq_ghz}GHz`);
+      if (spec.base_freq_ghz)
+        parts.push(t('componentTemplate.spec.freq', { value: String(spec.base_freq_ghz) }));
       break;
     case 'memory':
-      if (spec.capacity_gb) parts.push(`${spec.capacity_gb}GB`);
+      if (spec.capacity_gb)
+        parts.push(t('componentTemplate.spec.capacity', { value: String(spec.capacity_gb) }));
       if (spec.type) parts.push(String(spec.type));
-      if (spec.speed_mhz) parts.push(`${spec.speed_mhz}MHz`);
+      if (spec.speed_mhz)
+        parts.push(t('componentTemplate.spec.speed', { value: String(spec.speed_mhz) }));
       break;
     case 'disk':
       if (spec.storage_type) parts.push(String(spec.storage_type));
-      if (spec.capacity_gb) parts.push(`${spec.capacity_gb}GB`);
+      if (spec.capacity_gb)
+        parts.push(t('componentTemplate.spec.capacity', { value: String(spec.capacity_gb) }));
       if (spec.interface_type) parts.push(String(spec.interface_type));
       break;
     case 'nic':
-      if (spec.port_count) parts.push(`${spec.port_count}口`);
+      if (spec.port_count)
+        parts.push(t('componentTemplate.spec.ports', { value: String(spec.port_count) }));
       if (spec.port_speed) parts.push(String(spec.port_speed));
       if (spec.port_type) parts.push(String(spec.port_type));
       break;
     case 'gpu':
-      if (spec.vram_gb) parts.push(`${spec.vram_gb}GB`);
+      if (spec.vram_gb)
+        parts.push(t('componentTemplate.spec.capacity', { value: String(spec.vram_gb) }));
       if (spec.gpu_memory_type) parts.push(String(spec.gpu_memory_type));
-      if (spec.fp32_tflops) parts.push(`${spec.fp32_tflops}TFLOPS`);
+      if (spec.fp32_tflops)
+        parts.push(t('componentTemplate.spec.tflops', { value: String(spec.fp32_tflops) }));
       break;
   }
-  return parts.length > 0 ? parts.join(' / ') : '-';
+  return parts.length > 0 ? parts.join(t('componentTemplate.spec.separator')) : '-';
 }
 
 interface TemplateFormValues {
@@ -94,6 +106,8 @@ interface TemplateFormValues {
 function ComponentTemplateManager() {
   const confirm = useConfirm();
   const message = useMessage();
+  const { t } = useTranslation('settings');
+  const { t: tc } = useTranslation('common');
   const [form] = Form.useForm<TemplateFormValues>();
 
   const [activeCategory, setActiveCategory] = useState<string>('cpu');
@@ -122,6 +136,11 @@ function ComponentTemplateManager() {
     () =>
       (allocatableCustomerOptions ?? []).map((o) => ({ label: o.label, value: o.value as number })),
     [allocatableCustomerOptions]
+  );
+
+  const categoryOptions = useMemo(
+    () => CATEGORY_KEYS.map((key) => ({ key, label: t(`componentTemplate.category.${key}`) })),
+    [t]
   );
 
   const handleAdd = () => {
@@ -158,9 +177,9 @@ function ComponentTemplateManager() {
   const handleDelete = async (id: number) => {
     try {
       await deleteTemplate.mutateAsync(id);
-      message.success('删除成功');
+      message.success(tc('message.deleteSuccess'));
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '删除失败');
+      message.error(err instanceof Error ? err.message : tc('message.deleteFailed'));
     }
   };
 
@@ -169,10 +188,10 @@ function ComponentTemplateManager() {
       const values = await form.validateFields();
       if (editRecord) {
         await updateTemplate.mutateAsync({ id: editRecord.id, data: values });
-        message.success('更新成功');
+        message.success(tc('message.updateSuccess'));
       } else {
         await createTemplate.mutateAsync(values);
-        message.success('创建成功');
+        message.success(tc('message.createSuccess'));
       }
       modal.close();
     } catch (err) {
@@ -193,30 +212,47 @@ function ComponentTemplateManager() {
       render: (id: number) => <IdCell value={id} />
     },
     {
-      title: '客户归属',
+      title: t('componentTemplate.column.customerOwner'),
       dataIndex: 'customer_name',
       key: 'customer_name',
       width: 120,
-      render: (v: string | null) => (v ? <Tag>{v}</Tag> : <Tag color="default">通用</Tag>)
+      render: (v: string | null) =>
+        v ? <Tag>{v}</Tag> : <Tag color="default">{t('componentTemplate.shared')}</Tag>
     },
-    { title: '品牌', dataIndex: 'brand', key: 'brand', width: 100 },
-    { title: '型号', dataIndex: 'model', key: 'model', width: 160 },
     {
-      title: '规格摘要',
+      title: t('componentTemplate.column.brand'),
+      dataIndex: 'brand',
+      key: 'brand',
+      width: 100
+    },
+    {
+      title: t('componentTemplate.column.model'),
+      dataIndex: 'model',
+      key: 'model',
+      width: 160
+    },
+    {
+      title: t('componentTemplate.column.specSummary'),
       key: 'spec_summary',
       width: 200,
-      render: (_: unknown, r: ComponentTemplate) => specSummary(r.category, r.spec)
+      render: (_: unknown, r: ComponentTemplate) => specSummary(t, r.category, r.spec)
     },
     {
-      title: '启用',
+      title: t('componentTemplate.column.enabled'),
       dataIndex: 'is_active',
       key: 'is_active',
       width: 60,
-      render: (v: boolean) => (v ? <Tag color="green">是</Tag> : <Tag color="red">否</Tag>)
+      render: (v: boolean) =>
+        v ? <Tag color="green">{t('componentTemplate.yes')}</Tag> : <Tag color="red">{t('componentTemplate.no')}</Tag>
     },
-    { title: '排序', dataIndex: 'sort_order', key: 'sort_order', width: 60 },
     {
-      title: '备注',
+      title: t('componentTemplate.column.sortOrder'),
+      dataIndex: 'sort_order',
+      key: 'sort_order',
+      width: 60
+    },
+    {
+      title: tc('field.remarks'),
       dataIndex: 'remark',
       key: 'remark',
       width: 150,
@@ -224,13 +260,13 @@ function ComponentTemplateManager() {
       render: (v: string | null) => v || '-'
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 140,
       render: (_: unknown, r: ComponentTemplate) => (
         <Space>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(r)}>
-            编辑
+            {tc('action.edit')}
           </Button>
           <Button
             type="link"
@@ -239,14 +275,16 @@ function ComponentTemplateManager() {
             icon={<DeleteOutlined />}
             onClick={() =>
               confirm({
-                title: `确定要删除「${r.brand} ${r.model}」吗？`,
-                okText: '删除',
+                title: t('componentTemplate.deleteConfirmTitle', {
+                  name: `${r.brand} ${r.model}`
+                }),
+                okText: tc('action.delete'),
                 okButtonProps: { danger: true },
                 onOk: () => handleDelete(r.id)
               })
             }
           >
-            删除
+            {tc('action.delete')}
           </Button>
         </Space>
       )
@@ -261,7 +299,7 @@ function ComponentTemplateManager() {
           filters={[
             {
               key: 'customer_id',
-              label: '筛选客户',
+              label: t('componentTemplate.filterCustomer'),
               type: 'select',
               options: customerSelectOptions,
               width: 200
@@ -270,7 +308,7 @@ function ComponentTemplateManager() {
           table={filterTable}
         />
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增模板
+          {t('componentTemplate.addTemplate')}
         </Button>
       </div>
 
@@ -278,7 +316,7 @@ function ComponentTemplateManager() {
       <Tabs
         activeKey={activeCategory}
         onChange={(key) => setActiveCategory(key)}
-        items={CATEGORY_OPTIONS.map((cat) => ({
+        items={categoryOptions.map((cat) => ({
           key: cat.key,
           label: cat.label,
           children: (
@@ -299,7 +337,9 @@ function ComponentTemplateManager() {
 
       {/* 新增/编辑弹窗 */}
       <Modal
-        title={editRecord ? '编辑配件模板' : '新增配件模板'}
+        title={
+          editRecord ? t('componentTemplate.modal.editTitle') : t('componentTemplate.modal.createTitle')
+        }
         open={modal.isOpen}
         onOk={handleFormSubmit}
         onCancel={() => modal.close()}
@@ -308,23 +348,35 @@ function ComponentTemplateManager() {
         destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="category" label="类别" rules={[{ required: true }]}>
+          <Form.Item
+            name="category"
+            label={t('componentTemplate.field.category')}
+            rules={[{ required: true }]}
+          >
             <Select
-              options={CATEGORY_OPTIONS.map((c) => ({ label: c.label, value: c.key }))}
+              options={categoryOptions.map((c) => ({ label: c.label, value: c.key }))}
               disabled={!!editRecord}
             />
           </Form.Item>
-          <Form.Item name="customer_id" label="客户归属">
+          <Form.Item name="customer_id" label={t('componentTemplate.column.customerOwner')}>
             <Select
-              placeholder="通用（不选客户）"
+              placeholder={t('componentTemplate.placeholder.customerOwner')}
               allowClear
               options={allocatableCustomerSelectOptions}
             />
           </Form.Item>
-          <Form.Item name="brand" label="品牌" rules={[{ required: true, message: '请输入品牌' }]}>
+          <Form.Item
+            name="brand"
+            label={t('componentTemplate.column.brand')}
+            rules={[{ required: true, message: t('componentTemplate.validation.brandRequired') }]}
+          >
             <Input />
           </Form.Item>
-          <Form.Item name="model" label="型号" rules={[{ required: true, message: '请输入型号' }]}>
+          <Form.Item
+            name="model"
+            label={t('componentTemplate.column.model')}
+            rules={[{ required: true, message: t('componentTemplate.validation.modelRequired') }]}
+          >
             <Input />
           </Form.Item>
 
@@ -335,13 +387,17 @@ function ComponentTemplateManager() {
           {modalCategory === 'nic' && <NicSpecFields prefix={['spec']} />}
           {modalCategory === 'gpu' && <GpuSpecFields prefix={['spec']} />}
 
-          <Form.Item name="is_active" label="启用" valuePropName="checked">
+          <Form.Item
+            name="is_active"
+            label={t('componentTemplate.column.enabled')}
+            valuePropName="checked"
+          >
             <Switch />
           </Form.Item>
-          <Form.Item name="sort_order" label="排序">
+          <Form.Item name="sort_order" label={t('componentTemplate.column.sortOrder')}>
             <InputNumber min={0} />
           </Form.Item>
-          <Form.Item name="remark" label="备注">
+          <Form.Item name="remark" label={tc('field.remarks')}>
             <Input.TextArea rows={2} />
           </Form.Item>
         </Form>

@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Modal, Tabs } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 import BatchAddTab from './BatchAddTab';
 import CloneTab from './CloneTab';
@@ -37,6 +38,7 @@ const AddDevicesModal: React.FC<AddDevicesModalProps> = ({
   templateDeviceId,
   defaultTab = 'batch'
 }) => {
+  const { t } = useTranslation('device');
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
   useEffect(() => {
@@ -52,12 +54,12 @@ const AddDevicesModal: React.FC<AddDevicesModalProps> = ({
   const tabItems = [
     {
       key: 'batch',
-      label: '手动批量',
+      label: t('addModal.tab.manual'),
       children: <BatchAddTab active={open && activeTab === 'batch'} onClose={onClose} />
     },
     {
       key: 'clone',
-      label: '克隆复制',
+      label: t('batch.cloneCopy'),
       children: (
         <CloneTab
           active={open && activeTab === 'clone'}
@@ -70,7 +72,7 @@ const AddDevicesModal: React.FC<AddDevicesModalProps> = ({
 
   return (
     <Modal
-      title="批量添加设备"
+      title={t('addModal.title')}
       open={open}
       onCancel={() => onClose()}
       width={1000}

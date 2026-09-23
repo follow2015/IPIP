@@ -16,9 +16,11 @@
 import { Form, Select, Row, Col, Divider, Button, Tag, Alert } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
+import { useTranslation } from 'react-i18next';
+import { useMemo } from 'react';
+import i18next from '@/i18n';
 import { useComponentTemplates } from '@/services/component-template';
 import type { ComponentTemplate } from '@/services/component-template';
-import { useMemo } from 'react';
 
 export interface NicConfigFieldsProps {
   form: FormInstance;
@@ -39,6 +41,7 @@ export default function NicConfigFields({
   listName = 'nic_ports',
   showPreview = true
 }: NicConfigFieldsProps) {
+  const { t } = useTranslation('device');
   const { data: nicTemplates = [], isLoading: nicTplLoading } = useComponentTemplates(
     'nic',
     customerId
@@ -81,7 +84,9 @@ export default function NicConfigFields({
           port_number: i + 1,
           port_type: portType,
           port_speed: portSpeed,
-          nic_name: model ? `${model}:端口${i + 1}` : `网卡${nicNum}`,
+          nic_name: model
+            ? t('nic.autoPortName', { model, index: i + 1 })
+            : t('nic.autoNicName', { index: nicNum }),
           port_name: `port${i + 1}`,
           description: combinedDesc
         });
@@ -89,27 +94,37 @@ export default function NicConfigFields({
       nicNum++;
     }
     return result;
-  }, [nicPortsValue, nicTemplates]);
+  }, [nicPortsValue, nicTemplates, t]);
 
   return (
     <>
-      <Divider plain>网卡配置</Divider>
+      <Divider plain>{t('node.field.nic')}</Divider>
       <Form.List name={prefix ? [prefix, listName] : listName} initialValue={[{}]}>
         {(fields, { add, remove }) => (
           <>
             {fields.map(({ key, name, ...restField }, idx) => (
               <Row key={key} gutter={8} align="middle" style={{ marginBottom: 8 }}>
                 <Col xs={20} md={14}>
-                  <Form.Item {...restField} name={[name, 'template_id']} label={`网卡 ${idx + 1}`}>
+                  <Form.Item
+                    {...restField}
+                    name={[name, 'template_id']}
+                    label={t('nic.itemLabel', { index: idx + 1 })}
+                  >
                     <Select
                       allowClear
                       showSearch
                       loading={nicTplLoading}
-                      placeholder="选择网卡模板（自动展开端口）"
+                      placeholder={t('nic.templatePlaceholder')}
                       optionFilterProp="label"
-                      options={nicTemplates.map((t) => ({
-                        label: `${t.brand} ${t.model}（${t.spec?.port_count ?? '?'}×${t.spec?.port_speed ?? '?'} ${t.spec?.port_type ?? ''}）`,
-                        value: t.id
+                      options={nicTemplates.map((template) => ({
+                        label: t('nic.templateOption', {
+                          brand: template.brand,
+                          model: template.model,
+                          ports: template.spec?.port_count ?? '?',
+                          speed: template.spec?.port_speed ?? '?',
+                          type: template.spec?.port_type ?? ''
+                        }),
+                        value: template.id
                       }))}
                     />
                   </Form.Item>
@@ -125,7 +140,7 @@ export default function NicConfigFields({
               </Row>
             ))}
             <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />} size="small">
-              添加网卡
+              {t('nic.add')}
             </Button>
           </>
         )}
@@ -135,7 +150,10 @@ export default function NicConfigFields({
       {showPreview && portPreview.length > 0 && (
         <Alert
           type="info"
-          message={`共 ${portPreview.length} 个端口，${new Set(portPreview.map((p) => p.nic_number)).size} 块网卡`}
+          message={t('nic.preview.summary', {
+            count: portPreview.length,
+            nics: new Set(portPreview.map((p) => p.nic_number)).size
+          })}
           description={
             <div style={{ marginTop: 4 }}>
               {portPreview.map((p, i) => (
@@ -202,7 +220,9 @@ export function expandNicPorts(
         port_number: i + 1,
         port_type: portType,
         port_speed: portSpeed,
-        nic_name: model ? `${model}:端口${i + 1}` : `网卡${nicNum}`,
+        nic_name: model
+          ? i18next.t('nic.autoPortName', { ns: 'device', model, index: i + 1 })
+          : i18next.t('nic.autoNicName', { ns: 'device', index: nicNum }),
         port_name: `port${i + 1}`,
         description: combinedDesc
       });

@@ -6,7 +6,7 @@ IP 地址编解码 —— 全仓唯一的 IPv4 整数换算实现（P1-3 工具�
 switch_route、ip_route_service 四处（≈20 个调用点），IPv6 纳管时无处统一改造，
 故收口到本模块；旧导入名全部保留为**瘦封装/再导出**，调用方零改动。
 
-双栈接口约定（IPv6 纳管评估见 docs/IPv6改造-数据模型评估.md）：
+双栈接口约定（IPv6 纳管评估见 docs/_archive/IPv6改造-数据模型评估.md）：
 - ``ip_to_int`` 仅 IPv4（32 位整数，等价 MySQL INET_ATON）。IPv6 输入返回 None
   —— 现有 INTEGER(unsigned) 列装不下 128 位，这是**列类型约束**而非接口缺陷；
   纳管后应改走 ``ip_to_bytes``/``bytes_to_ip``（4/16 字节，VARBINARY(16) 友好）。

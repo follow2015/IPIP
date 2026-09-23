@@ -21,6 +21,7 @@ import DataTable from '@/components/DataTable';
 import FilterBar from '@/components/FilterBar';
 import { useCrudPage } from '@/hooks/useCrudPage';
 import { formatDateTime } from '@/utils/format';
+import { useTranslation } from 'react-i18next';
 import VLANForm from './VLANForm';
 
 interface VLANWithHasSsh extends VLAN {
@@ -28,6 +29,8 @@ interface VLANWithHasSsh extends VLAN {
 }
 
 function VLANs() {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const navigate = useNavigate();
   const { data: roomOptions } = useRoomOptions();
   const { data: switchList } = useSwitchList();
@@ -67,16 +70,16 @@ function VLANs() {
   const columns = useMemo(
     () => [
       { title: 'VLAN ID', dataIndex: 'vlan_id', key: 'vlan_id', width: 90 },
-      { title: '名称', dataIndex: 'name', key: 'name', width: 140 },
+      { title: tc('field.name'), dataIndex: 'name', key: 'name', width: 140 },
       {
-        title: '用途',
+        title: tc('field.purpose'),
         dataIndex: 'purpose',
         key: 'purpose',
         width: 140,
         render: (v: string | null) => v ?? '-'
       },
       {
-        title: '交换机',
+        title: td('deviceSubtype.SWITCH'),
         dataIndex: 'device_id',
         key: 'device_id',
         width: 160,
@@ -85,27 +88,28 @@ function VLANs() {
           const name = record.device_name || switchNameMap.get(v);
           return (
             <Button type="link" size="small" style={{ padding: 0 }} onClick={() => goToVlanTab(v)}>
-              {name || `设备 #${v}`}
+              {name || td('vlan.deviceFallback', { id: v })}
             </Button>
           );
         }
       },
       {
-        title: '机房',
+        title: td('room.name'),
         dataIndex: 'room_id',
         key: 'room_id',
         width: 100,
-        render: (v: number | null, record: any) => record.room_name || (v ? `机房 #${v}` : '-')
+        render: (v: number | null, record: any) =>
+          record.room_name || (v ? td('vlan.roomFallback', { id: v }) : '-')
       },
       {
-        title: '状态',
+        title: tc('field.status'),
         dataIndex: 'status',
         key: 'status',
         width: 80,
         render: (v: number) => <StatusTag status={v} statusMap={VLAN_STATUS_MAP} />
       },
       {
-        title: '成员端口',
+        title: td('memberPort.column'),
         dataIndex: 'member_ports',
         key: 'member_ports',
         render: (v: string[] | null) => {
@@ -121,18 +125,18 @@ function VLANs() {
         }
       },
       {
-        title: '更新时间',
+        title: tc('field.updatedAt'),
         dataIndex: 'updated_at',
         key: 'updated_at',
         width: 150,
         render: (v: string) => formatDateTime(v)
       },
       {
-        title: '操作',
+        title: tc('field.actions'),
         key: 'action',
         width: 100,
         render: (_: unknown, r: VLANWithHasSsh) => {
-          if (r.has_ssh) return <span style={{ color: '#999' }}>网管型</span>;
+          if (r.has_ssh) return <span style={{ color: '#999' }}>{td('vlan.managed')}</span>;
           return (
             <Button
               type="link"
@@ -141,13 +145,13 @@ function VLANs() {
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(r)}
             >
-              删除
+              {tc('action.delete')}
             </Button>
           );
         }
       }
     ],
-    [switchNameMap, goToVlanTab, handleDelete]
+    [switchNameMap, goToVlanTab, handleDelete, td, tc]
   );
 
   return (
@@ -158,7 +162,7 @@ function VLANs() {
         rowKey="id"
         loading={isLoading}
         searchable
-        searchPlaceholder="搜索 VLAN ID/名称/用途..."
+        searchPlaceholder={td('vlan.searchPlaceholder')}
         searchValue={table.search}
         onSearch={table.setSearch}
         onRefresh={() => refetch()}
@@ -174,7 +178,7 @@ function VLANs() {
             filters={[
               {
                 key: 'room_id',
-                label: '按机房筛选',
+                label: td('filter.byRoom'),
                 type: 'select',
                 options: roomOptions ?? [],
                 width: 160
@@ -183,7 +187,7 @@ function VLANs() {
             table={table}
             extra={
               <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                新增 VLAN
+                {td('vlan.action.add')}
               </Button>
             }
           />

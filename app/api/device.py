@@ -12,6 +12,10 @@ from marshmallow import Schema, fields, validate, EXCLUDE
 logger = get_logger(__name__)
 
 from app.openapi.doc import doc, public
+from app.models.device_hardware import (
+    SNAPSHOT_KEY_CHILDREN,
+    SNAPSHOT_KEY_LOCATION,
+)
 from app.services import DeviceService, CabinetService
 from app.services.network_device_service import NetworkDeviceService
 from app.api.monitor import monitor_service
@@ -990,7 +994,7 @@ CLONE_EXCLUDE_FIELDS = {
     "parent_u_position", "parent_height_u",
     "switch_credential",
     "port_summary", "nic_ports", "storage_items",
-    "deleted_location_snapshot", "deleted_children_snapshot",
+    SNAPSHOT_KEY_LOCATION, SNAPSHOT_KEY_CHILDREN,
 }
 
 @device_bp.route("/clone/<int:device_id>", methods=["POST"])

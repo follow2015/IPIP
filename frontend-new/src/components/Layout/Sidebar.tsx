@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Menu, theme, Tooltip } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { usePermission } from '@/hooks/usePermission';
 import { useAppVersion } from '@/hooks/useAppVersion';
 import { useUIStore } from '@/stores/ui';
@@ -20,6 +21,7 @@ function Sidebar({ collapsed, onNavigate }: SidebarProps) {
   const { token } = theme.useToken(); // 已 useCallback 包裹，引用稳定
   const addTab = useUIStore((s) => s.addTab);
   const version = useAppVersion();
+  const { t } = useTranslation();
 
   const filteredMenus = useMemo(
     () => MENU_CONFIGS.filter((item) => !item.permission || hasPermission(item.permission)),
@@ -35,25 +37,25 @@ function Sidebar({ collapsed, onNavigate }: SidebarProps) {
             .map((c) => ({
               key: c.key,
               icon: c.icon,
-              label: collapsed ? null : c.label,
-              title: c.label
+              label: collapsed ? null : t(c.labelKey),
+              title: t(c.labelKey)
             }));
           return {
             key: item.key,
             icon: item.icon,
-            label: collapsed ? null : item.label,
-            title: item.label,
+            label: collapsed ? null : t(item.labelKey),
+            title: t(item.labelKey),
             children: childItems
           };
         }
         return {
           key: item.key,
           icon: item.icon,
-          label: collapsed ? null : item.label,
-          title: item.label
+          label: collapsed ? null : t(item.labelKey),
+          title: t(item.labelKey)
         };
       }),
-    [filteredMenus, collapsed, hasPermission]
+    [filteredMenus, collapsed, hasPermission, t]
   );
 
   const selectedKey = useMemo(() => {
@@ -68,7 +70,7 @@ function Sidebar({ collapsed, onNavigate }: SidebarProps) {
       if (config) {
         addTab({
           key: config.key,
-          title: config.label,
+          title: t(config.labelKey),
           path: config.path,
           closable: key !== 'dashboard'
         });
@@ -92,7 +94,7 @@ function Sidebar({ collapsed, onNavigate }: SidebarProps) {
         }}
       >
         <h2 style={{ margin: 0, fontSize: collapsed ? 14 : 18, whiteSpace: 'nowrap' }}>
-          {collapsed ? 'IP' : 'IPIP 管理系统'}
+          {collapsed ? 'IP' : t('app.name')}
         </h2>
       </div>
 
@@ -107,7 +109,7 @@ function Sidebar({ collapsed, onNavigate }: SidebarProps) {
 
       {/* 版本号：常驻可见，便于报障时快速核对线上版本；折叠态只留版本号 */}
       {version && (
-        <Tooltip title={`后端版本 v${version}`} placement="right">
+        <Tooltip title={t('version.backend', { version })} placement="right">
           <div
             data-testid="sidebar-version"
             style={{
@@ -124,7 +126,7 @@ function Sidebar({ collapsed, onNavigate }: SidebarProps) {
               cursor: 'default'
             }}
           >
-            {collapsed ? `v${version}` : `版本 v${version}`}
+            {collapsed ? `v${version}` : t('version.label', { version })}
           </div>
         </Tooltip>
       )}

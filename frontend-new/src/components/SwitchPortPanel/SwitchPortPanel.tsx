@@ -22,10 +22,12 @@ import {
   PORT_TYPE_ORDER,
   PORT_TYPE_TAG_COLOR,
   getBlockWidth,
-  getBlockFontSize
+  getBlockFontSize,
+  getPortTypeLabel
 } from '@/utils/portType';
 import { getStatusLabel } from '@/utils/portStatus';
-import { PORT_USAGE_STATUS_MAP } from '@/types/enums';
+import { getPortUsageMeta } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { SwitchPort } from '@/types/models';
 
 interface SwitchPortPanelProps {
@@ -100,6 +102,9 @@ function getPortVisual(status: string | null | undefined, underspeed: boolean) {
 
 function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
   const { token } = theme.useToken();
+  const { t } = useTranslation('network');
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const groupedPorts = useMemo(() => {
     const groups: Record<string, SwitchPort[]> = {};
     for (const port of ports) {
@@ -130,22 +135,24 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
       <div
         style={{ marginBottom: 8, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}
       >
-        <span style={{ fontSize: 12, color: token.colorTextSecondary }}>状态：</span>
+        <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
+          {t('switchPort.legend.caption')}
+        </span>
         <Space size={4} wrap>
           <Tag color="green" style={{ fontSize: 11, margin: 0 }}>
-            在线
+            {td('linkStatus.UP')}
           </Tag>
           <Tag color="red" style={{ fontSize: 11, margin: 0 }}>
-            离线
+            {td('linkStatus.DOWN')}
           </Tag>
           <Tag color="#faad14" style={{ fontSize: 11, margin: 0, color: '#fff' }}>
-            降速
+            {t('switchPort.legend.reducedSpeed')}
           </Tag>
           <Tag color="default" style={{ fontSize: 11, margin: 0, borderStyle: 'dashed' }}>
-            管理关闭
+            {td('linkStatus.ADMIN_DOWN')}
           </Tag>
           <Tag color="default" style={{ fontSize: 11, margin: 0, borderStyle: 'dotted' }}>
-            未知
+            {tc('field.unknown')}
           </Tag>
         </Space>
       </div>
@@ -169,10 +176,10 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
                 color={PORT_TYPE_TAG_COLOR[type] ?? 'default'}
                 style={{ margin: 0, fontSize: 12, fontWeight: 500 }}
               >
-                {type}
+                {getPortTypeLabel(type, td)}
               </Tag>
               <span style={{ fontSize: 11, color: token.colorTextSecondary }}>
-                共 {groupPorts.length} 口
+                {t('switchPort.group.total', { count: groupPorts.length })}
                 {upCount > 0 && (
                   <span style={{ color: '#52c41a', marginLeft: 4 }}>
                     ↑{upCount - underspeedCount}
@@ -218,35 +225,52 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
                       <b>{port.port_name}</b>
                     </div>
                     <div>
-                      链路状态：{getStatusLabel(getLinkStatus(port))}
-                      {underspeed ? '（降速）' : ''}
+                      {underspeed
+                        ? t('switchPort.tooltip.linkStatusUnderspeed', {
+                            value: getStatusLabel(getLinkStatus(port), td)
+                          })
+                        : t('switchPort.tooltip.linkStatus', {
+                            value: getStatusLabel(getLinkStatus(port), td)
+                          })}
                     </div>
                     <div>
-                      占用状态：
-                      {PORT_USAGE_STATUS_MAP[port.usage_status]?.label ?? port.usage_status}
+                      {t('portField.usageStatus', {
+                        value: getPortUsageMeta(port.usage_status, td)?.label ?? port.usage_status
+                      })}
                     </div>
-                    <div>速率：{port.speed || '-'}</div>
+                    <div>{t('portField.speed', { value: port.speed || '-' })}</div>
                     {underspeed && (
                       <div style={{ color: '#faad14' }}>
-                        降速：{type} 口实际运行 {port.speed}
+                        {t('switchPort.tooltip.underspeed', { type, speed: port.speed })}
                       </div>
                     )}
-                    <div>VLAN：{port.vlan ?? '-'}</div>
+                    <div>{t('portField.vlan', { value: port.vlan ?? '-' })}</div>
                     {port.ip_list && port.ip_list.length > 0
-                      ? port.ip_list.map((ip, i) => (
-                          <div key={i}>
-                            IP
-                            {port.ip_list!.length > 1 ? (ip.is_primary ? '（主）' : '（从）') : ''}
-                            ：{ip.ip_address}
-                            {ip.prefix
+                      ? port.ip_list.map((ip, i) => {
+                          const addr = `${ip.ip_address}${
+                            ip.prefix
                               ? `/${ip.prefix}`
                               : ip.subnet_mask
                                 ? `/${ip.subnet_mask}`
-                                : ''}
-                          </div>
-                        ))
-                      : port.ip_address && <div>IP：{port.ip_address}</div>}
-                    {port.customer_name && <div>客户：{port.customer_name}</div>}
+                                : ''
+                          }`;
+                          return (
+                            <div key={i}>
+                              {port.ip_list!.length > 1
+                                ? t('portField.ipWithRole', {
+                                    role: ip.is_primary
+                                      ? t('switchPort.tooltip.ipRolePrimary')
+                                      : t('switchPort.tooltip.ipRoleSecondary'),
+                                    value: addr
+                                  })
+                                : t('portField.ip', { value: addr })}
+                            </div>
+                          );
+                        })
+                      : port.ip_address && <div>{t('portField.ip', { value: port.ip_address })}</div>}
+                    {port.customer_name && (
+                      <div>{t('portField.customer', { value: port.customer_name })}</div>
+                    )}
                   </div>
                 );
 

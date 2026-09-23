@@ -27,9 +27,12 @@ import { useTable } from '@/hooks/useTable';
 import { useMessage } from '@/hooks/useMessage';
 import FilterBar from '@/components/FilterBar';
 import { formatDateTime } from '@/utils/format';
+import { useTranslation } from 'react-i18next';
 import LAGForm from './LAGForm';
 
 function LinkAggregations() {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
   const navigate = useNavigate();
   const message = useMessage();
@@ -61,13 +64,13 @@ function LinkAggregations() {
     async (record: LinkAggregationGroupWithDevice) => {
       try {
         await deleteLag.mutateAsync({ deviceId: record.device_id, lagId: record.id });
-        message.success('已删除');
+        message.success(tc('message.deleteSuccess'));
         refetch();
       } catch (err) {
-        message.error(err instanceof Error ? err.message : '删除失败');
+        message.error(err instanceof Error ? err.message : tc('message.deleteFailed'));
       }
     },
-    [deleteLag, message, refetch]
+    [deleteLag, message, refetch, tc]
   );
 
   const goToLagTab = useCallback(
@@ -80,7 +83,7 @@ function LinkAggregations() {
   const columns = useMemo(
     () => [
       {
-        title: '交换机',
+        title: td('deviceSubtype.SWITCH'),
         dataIndex: 'device_name',
         key: 'device_name',
         width: 180,
@@ -95,57 +98,59 @@ function LinkAggregations() {
           </Button>
         )
       },
-      { title: '聚合组名称', dataIndex: 'lag_name', key: 'lag_name', width: 140 },
+      { title: td('lag.column.lagName'), dataIndex: 'lag_name', key: 'lag_name', width: 140 },
       {
-        title: '类型',
+        title: tc('field.type'),
         dataIndex: 'lag_type',
         key: 'lag_type',
         width: 100,
         render: (v: string) => (
-          <Tag color={v === 'lacp' ? 'blue' : 'default'}>{v === 'lacp' ? 'LACP' : '静态'}</Tag>
+          <Tag color={v === 'lacp' ? 'blue' : 'default'}>
+            {v === 'lacp' ? td('lag.type.lacp') : td('lag.type.static')}
+          </Tag>
         )
       },
       {
-        title: '负载算法',
+        title: td('lag.column.algorithm'),
         dataIndex: 'algorithm',
         key: 'algorithm',
         width: 120,
         render: (v: string | null) => v || '-'
       },
       {
-        title: '用途',
+        title: tc('field.purpose'),
         dataIndex: 'purpose',
         key: 'purpose',
         width: 140,
         render: (v: string | null) => v ?? '-'
       },
-      { title: '成员数', dataIndex: 'member_count', key: 'member_count', width: 80 },
+      { title: td('lag.column.memberCount'), dataIndex: 'member_count', key: 'member_count', width: 80 },
       {
-        title: '成员端口',
+        title: td('memberPort.column'),
         dataIndex: 'member_ports',
         key: 'member_ports',
         render: (v: string[] | null) => (v?.length ? v.join(', ') : '-')
       },
       {
-        title: '状态',
+        title: tc('field.status'),
         dataIndex: 'status',
         key: 'status',
         width: 80,
         render: (v: number) => <StatusTag status={v} statusMap={LAG_STATUS_MAP} />
       },
       {
-        title: '更新时间',
+        title: tc('field.updatedAt'),
         dataIndex: 'updated_at',
         key: 'updated_at',
         width: 160,
         render: (v: string) => formatDateTime(v)
       },
       {
-        title: '操作',
+        title: tc('field.actions'),
         key: 'action',
         width: 100,
         render: (_: unknown, record: LinkAggregationGroupWithDevice) => {
-          if (record.has_ssh) return <span style={{ color: '#999' }}>网管型</span>;
+          if (record.has_ssh) return <span style={{ color: '#999' }}>{td('lag.managed')}</span>;
           return (
             <Button
               type="link"
@@ -154,32 +159,32 @@ function LinkAggregations() {
               icon={<DeleteOutlined />}
               onClick={() =>
                 confirm({
-                  title: `确定要删除「${record.lag_name}」吗？`,
-                  okText: '删除',
+                  title: td('lag.confirmDeleteContent', { name: record.lag_name }),
+                  okText: tc('action.delete'),
                   okButtonProps: { danger: true },
                   onOk: () => handleDelete(record)
                 })
               }
             >
-              删除
+              {tc('action.delete')}
             </Button>
           );
         }
       }
     ],
-    [confirm, goToLagTab, handleDelete]
+    [confirm, goToLagTab, handleDelete, td, tc]
   );
 
   return (
     <div>
       <Card
-        title="链路聚合组管理"
+        title={td('lag.pageTitle')}
         extra={
           <FilterBar
             filters={[
               {
                 key: 'room_id',
-                label: '按机房筛选',
+                label: td('filter.byRoom'),
                 type: 'select',
                 options: roomOptions ?? [],
                 width: 160
@@ -188,7 +193,7 @@ function LinkAggregations() {
             table={table}
             extra={
               <Button type="primary" icon={<PlusOutlined />} onClick={() => createModal.open()}>
-                新建
+                {tc('action.create')}
               </Button>
             }
           />
@@ -204,6 +209,8 @@ function LinkAggregations() {
             current: table.page,
             pageSize: table.perPage,
             total: lagData?.total ?? 0,
+            showSizeChanger: true,
+            showTotal: (total) => tc('pagination.total', { count: total }),
             onChange: (p, ps) => {
               table.setPage(p);
               table.setPerPage(ps);

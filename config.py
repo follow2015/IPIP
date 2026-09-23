@@ -12,7 +12,8 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-load_dotenv()
+if not os.getenv("IPIP_PRECHECK_SKIP_DOTENV"):
+    load_dotenv()
 
 
 _ENV_FALLBACKS: list[str] = []
@@ -628,11 +629,17 @@ class ProductionConfig(Config):
         app.logger.addHandler(file_handler)
         app.logger.setLevel(logging.INFO)
 
-    @classmethod
-    def validate(cls):
-        """验证生产环境配置"""
-        super().validate()
+    _PRODUCTION_CHECKS = (
+        ("REQUIRED_SECRETS", "_check_required_secrets"),
+        ("CORS_ORIGINS", "_check_cors_origins"),
+        ("DEBUG_DISABLED", "_check_debug_disabled"),
+        ("METRICS_EXPOSURE", "_check_metrics_exposure"),
+        ("SECRET_KEY_DUPLICATE", "_check_secret_key_duplication"),
+        ("LDAP_CA_MISSING", "_check_ldap_ca"),
+    )
 
+    @classmethod
+    def _check_required_secrets(cls):
         if not cls.SECRET_KEY:
             raise ValueError("生产环境必须设置SECRET_KEY环境变量")
         if not cls.JWT_SECRET_KEY:
@@ -648,12 +655,18 @@ class ProductionConfig(Config):
                 "生产环境必须设置SWITCH_SECRET_KEY环境变量（设备凭据加密密钥）"
             )
 
+    @classmethod
+    def _check_cors_origins(cls):
         if not cls.CORS_ORIGINS or cls.CORS_ORIGINS == ["*"]:
             raise ValueError("生产环境必须明确指定CORS_ORIGINS")
 
+    @classmethod
+    def _check_debug_disabled(cls):
         if cls.DEBUG:
             raise ValueError("生产环境禁止启用 DEBUG 模式")
 
+    @classmethod
+    def _check_metrics_exposure(cls):
         if getattr(cls, "METRICS_ENABLED", False):
             _has_token = bool(getattr(cls, "METRICS_TOKEN", ""))
             _has_allowlist = bool(getattr(cls, "METRICS_ALLOWED_IPS", None))
@@ -664,6 +677,8 @@ class ProductionConfig(Config):
                     "确实不需要该端点请设 METRICS_ENABLED=false（路由直接 404）"
                 )
 
+    @classmethod
+    def _check_secret_key_duplication(cls):
         if cls.SECRET_KEY and cls.SECRET_KEY == cls.JWT_SECRET_KEY:
             raise ValueError(
                 "生产环境 SECRET_KEY 与 JWT_SECRET_KEY 不得相同："
@@ -671,6 +686,8 @@ class ProductionConfig(Config):
                 "（请分别用 `openssl rand -hex 32` 生成）"
             )
 
+    @classmethod
+    def _check_ldap_ca(cls):
         if getattr(cls, "LDAP_ENABLED", False) and not getattr(cls, "LDAP_CA_FILE", ""):
             raise ValueError(
                 "生产环境启用 LDAP 时必须设置 LDAP_CA_FILE（企业 CA 证书 PEM 路径）："
@@ -678,6 +695,33 @@ class ProductionConfig(Config):
                 "确需依赖系统信任库的部署请**显式**指向系统 CA bundle"
                 "（如 /etc/ssl/certs/ca-certificates.crt），而不是留空"
             )
+
+    @classmethod
+    def collect_violations(cls):
+        """收集全部生产配置缺陷（不中止在第一处）——离线预检专用。
+
+        Returns:
+            list[tuple[str, str]]: (检查 ID, 错误消息) 列表；空列表 = 通过。
+            检查 ID 是稳定契约，预检测试按集合严格相等断言（防漏报/多报双向漂移）。
+        """
+        violations = []
+        try:
+            super().validate()
+        except ValueError as exc:
+            violations.append(("BASE_CONFIG", str(exc)))
+        for _id, _name in cls._PRODUCTION_CHECKS:
+            try:
+                getattr(cls, _name)()
+            except ValueError as exc:
+                violations.append((_id, str(exc)))
+        return violations
+
+    @classmethod
+    def validate(cls):
+        """验证生产环境配置"""
+        super().validate()
+        for _id, _name in cls._PRODUCTION_CHECKS:
+            getattr(cls, _name)()
 
 
 config = {

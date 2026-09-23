@@ -15,12 +15,15 @@ import CabinetForm from './CabinetForm';
 import { useCabinetList, useDeleteCabinet, type CabinetQueryParams } from '@/services/cabinet';
 import { useRoomOptions } from '@/services/room';
 import { useAllocatableCustomerOptions } from '@/services/customer';
-import { CABINET_STATUS_MAP } from '@/types/enums';
+import { getCabinetStatusMeta } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { Cabinet } from '@/types/models';
 import { useCrudPage } from '@/hooks/useCrudPage';
 import { formatDateTime, formatPercent } from '@/utils/format';
 
 function Cabinets() {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { data: roomOptions } = useRoomOptions();
@@ -30,7 +33,7 @@ function Cabinets() {
     useList: useCabinetList,
     useDelete: useDeleteCabinet,
     nameKey: 'cabinet_number',
-    nameLabel: '机柜',
+    nameLabel: td('field.cabinet'),
     buildListParams: (tp) =>
       ({
         ...tp,
@@ -62,32 +65,32 @@ function Cabinets() {
       width: 80,
       render: (id: number) => <IdCell value={id} />
     },
-    { title: '机柜编号', dataIndex: 'cabinet_number', key: 'cabinet_number', width: 120 },
-    { title: '所属机房', dataIndex: 'room_name', key: 'room_name', width: 120 },
+    { title: td('cabinet.number'), dataIndex: 'cabinet_number', key: 'cabinet_number', width: 120 },
+    { title: td('basic.field.room'), dataIndex: 'room_name', key: 'room_name', width: 120 },
     {
-      title: '位置',
+      title: td('cabinet.field.location'),
       key: 'position',
       width: 100,
       render: (_: unknown, record: Cabinet) => {
         if (record.row != null && record.col != null) {
-          return `行${record.row} 列${record.col}`;
+          return td('cabinet.field.rowCol', { row: record.row, col: record.col });
         }
         return record.location ?? '-';
       }
     },
     {
-      title: '状态',
+      title: tc('field.status'),
       dataIndex: 'status',
       key: 'status',
       width: 80,
       render: (v: number) => {
-        const s = CABINET_STATUS_MAP[v as keyof typeof CABINET_STATUS_MAP];
+        const s = getCabinetStatusMeta(v, td);
         return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{v}</Tag>;
       }
     },
-    { title: 'U位容量', dataIndex: 'total_u', key: 'total_u', width: 80 },
+    { title: td('cabinet.field.totalU'), dataIndex: 'total_u', key: 'total_u', width: 80 },
     {
-      title: '已用U位',
+      title: td('cabinet.field.usedU'),
       key: 'used_u',
       width: 120,
       render: (_: unknown, record: Cabinet) => (
@@ -97,22 +100,22 @@ function Cabinets() {
       )
     },
     {
-      title: '客户',
+      title: tc('field.customer'),
       dataIndex: 'customer_name',
       key: 'customer_name',
       width: 120,
       render: (v: string | null) => v ?? '-'
     },
-    { title: '设备数', dataIndex: 'device_count', key: 'device_count', width: 80 },
+    { title: td('cabinet.field.deviceCount'), dataIndex: 'device_count', key: 'device_count', width: 80 },
     {
-      title: '创建时间',
+      title: tc('field.createdAt'),
       dataIndex: 'created_at',
       key: 'created_at',
       width: 160,
       render: (v: string) => formatDateTime(v)
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       render: (_: unknown, record: Cabinet) => (
         <Space>
@@ -121,16 +124,16 @@ function Cabinets() {
             size="small"
             onClick={() => navigate(`/devices?cabinetId=${record.id}`)}
           >
-            查看设备
+            {td('cabinet.viewDevices')}
           </Button>
           <Button type="link" size="small" onClick={() => handleDetail(record)}>
-            详情
+            {tc('action.detail')}
           </Button>
           <Button type="link" size="small" onClick={() => crud.handleEdit(record)}>
-            编辑
+            {tc('action.edit')}
           </Button>
           <Button type="link" size="small" danger onClick={() => crud.handleDelete(record)}>
-            删除
+            {tc('action.delete')}
           </Button>
         </Space>
       )
@@ -159,14 +162,14 @@ function Cabinets() {
             filters={[
               {
                 key: 'room_id',
-                label: '按机房筛选',
+                label: td('filter.byRoom'),
                 type: 'select',
                 options: roomOptions ?? [],
                 width: 200
               },
               {
                 key: 'customer_id',
-                label: '按客户筛选',
+                label: td('filter.byCustomer'),
                 type: 'select',
                 options: customerOptions ?? [],
                 width: 200
@@ -175,7 +178,7 @@ function Cabinets() {
             table={crud.table}
             extra={
               <Button type="primary" icon={<PlusOutlined />} onClick={crud.handleAdd}>
-                新增机柜
+                {td('cabinet.add')}
               </Button>
             }
           />

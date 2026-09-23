@@ -57,6 +57,7 @@ import CreateCredentialModal from './CreateCredentialModal';
 import EditCredentialModal from './EditCredentialModal';
 import LinkDeviceModal from './LinkDeviceModal';
 import CredentialDetail from './CredentialDetail';
+import { useTranslation } from 'react-i18next';
 
 const { Text, Paragraph } = Typography;
 
@@ -69,6 +70,8 @@ const PROTOCOL_ICONS: Record<string, React.ReactNode> = {
 
 export default function MonitorCredentials() {
   const msg = useMessage();
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
 
   const { data: creds = [], isLoading: credsLoading, refetch } = useMonitorCredentials();
   const [selectedCredId, setSelectedCredId] = useState<number | null>(null);
@@ -121,29 +124,29 @@ export default function MonitorCredentials() {
   const handleToggleEnabled = async (credId: number, enabled: boolean) => {
     try {
       await patchCred.mutateAsync({ credentialId: credId, enabled });
-      msg.success(enabled ? '已启用' : '已禁用');
+      msg.success(enabled ? t('settings.enabled') : t('settings.disabled'));
     } catch (err) {
-      msg.error(err instanceof Error ? err.message : '操作失败');
+      msg.error(err instanceof Error ? err.message : tc('message.operationFailed'));
     }
   };
 
   const handleRename = async (credId: number, newName: string) => {
     try {
       await patchCred.mutateAsync({ credentialId: credId, name: newName || undefined });
-      msg.success('已更新名称');
+      msg.success(t('credential.message.renamed'));
     } catch (err) {
-      msg.error(err instanceof Error ? err.message : '改名失败');
+      msg.error(err instanceof Error ? err.message : t('credential.message.renameFailed'));
     }
   };
 
   const handleDeleteCred = async (credId: number) => {
     try {
       await deleteCred.mutateAsync(credId);
-      msg.success('凭据已删除');
+      msg.success(t('credential.message.deleted'));
       if (selectedCredId === credId) setSelectedCredId(null);
       setSelectedRowKeys((prev) => prev.filter((k) => k !== credId));
     } catch (err) {
-      msg.error(err instanceof Error ? err.message : '删除失败');
+      msg.error(err instanceof Error ? err.message : tc('message.deleteFailed'));
     }
   };
 
@@ -155,28 +158,40 @@ export default function MonitorCredentials() {
     const skipped = selectedRowKeys.length - toDelete.length;
 
     if (toDelete.length === 0) {
-      msg.warning('所选凭据均有关联设备，无法删除');
+      msg.warning(t('credential.message.allLinked'));
       return;
     }
 
     try {
       const result = await batchDeleteCred.mutateAsync(toDelete.map((c) => c.id!));
-      if (result.failed.length > 0) {
+      const failedCount = result.failed.length;
+      if (failedCount > 0) {
         result.failed.forEach((f) => {
-          msg.error(`凭据 #${f.id} 删除失败：${f.reason}`);
+          msg.error(t('credential.message.deleteItemFailed', { id: f.id, reason: f.reason }));
         });
         if (result.deleted > 0) {
           msg.success(
-            `已删除 ${result.deleted} 条凭据${skipped > 0 ? `，跳过 ${skipped} 条（有关联设备）` : ''}，${result.failed.length} 条失败`
+            skipped > 0
+              ? t('credential.message.batchDeletedSkippedFailed', {
+                  count: result.deleted,
+                  skipped,
+                  failed: failedCount
+                })
+              : t('credential.message.batchDeletedFailed', {
+                  count: result.deleted,
+                  failed: failedCount
+                })
           );
         }
       } else {
         msg.success(
-          `已删除 ${result.deleted} 条凭据${skipped > 0 ? `，跳过 ${skipped} 条（有关联设备）` : ''}`
+          skipped > 0
+            ? t('credential.message.batchDeletedSkipped', { count: result.deleted, skipped })
+            : t('credential.message.batchDeleted', { count: result.deleted })
         );
       }
     } catch {
-      msg.error('批量删除失败');
+      msg.error(t('credential.message.batchDeleteFailed'));
     }
     setSelectedRowKeys([]);
   };
@@ -188,7 +203,7 @@ export default function MonitorCredentials() {
 
   const credColumns = [
     {
-      title: '名称',
+      title: tc('field.name'),
       dataIndex: 'name',
       key: 'name',
       render: (name: string | null, record: MonitorCredentialListItem) => (
@@ -207,7 +222,7 @@ export default function MonitorCredentials() {
       )
     },
     {
-      title: '协议',
+      title: t('column.protocol'),
       dataIndex: 'protocol',
       key: 'protocol',
       width: 90,
@@ -216,7 +231,7 @@ export default function MonitorCredentials() {
       )
     },
     {
-      title: '关联设备',
+      title: t('credential.column.linkedDevices'),
       dataIndex: 'linked_count',
       key: 'linked_count',
       width: 90,
@@ -230,19 +245,23 @@ export default function MonitorCredentials() {
       )
     },
     {
-      title: '状态',
+      title: tc('field.status'),
       key: 'status',
       width: 110,
       render: (_: unknown, record: MonitorCredentialListItem) => (
         <Space size={4}>
-          {!record.enabled && <Tag>已停用</Tag>}
-          {(record.linked_count ?? 0) === 0 && <Tag color="orange">无关联</Tag>}
-          {record.enabled && (record.linked_count ?? 0) > 0 && <Tag color="green">正常</Tag>}
+          {!record.enabled && <Tag>{t('credential.status.disabled')}</Tag>}
+          {(record.linked_count ?? 0) === 0 && (
+            <Tag color="orange">{t('credential.status.unlinked')}</Tag>
+          )}
+          {record.enabled && (record.linked_count ?? 0) > 0 && (
+            <Tag color="green">{t('alertPopover.normal')}</Tag>
+          )}
         </Space>
       )
     },
     {
-      title: '启用',
+      title: tc('action.enable'),
       dataIndex: 'enabled',
       key: 'enabled',
       width: 60,
@@ -256,21 +275,29 @@ export default function MonitorCredentials() {
       )
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 100,
       render: (_: unknown, record: MonitorCredentialListItem) => (
         <Space size="small">
-          <Tooltip title="编辑密文（影响全部关联设备）">
+          <Tooltip title={t('credential.tooltip.editSecret')}>
             <Button size="small" icon={<EditOutlined />} onClick={() => handleOpenEdit(record)} />
           </Tooltip>
-          <Tooltip title={record.linked_count ? '请先取消所有设备关联' : '删除共享凭据'}>
+          <Tooltip
+            title={
+              record.linked_count
+                ? t('credential.tooltip.deleteLinked')
+                : t('credential.tooltip.deleteShared')
+            }
+          >
             <ConfirmButton
               size="small"
               icon={<DeleteOutlined />}
-              title="确认删除此共享凭据？"
+              title={t('credential.confirm.deleteTitle')}
               content={
-                record.linked_count ? `仍关联 ${record.linked_count} 台设备，无法删除` : undefined
+                record.linked_count
+                  ? t('credential.confirm.deleteLinkedContent', { count: record.linked_count })
+                  : undefined
               }
               okType="danger"
               disabled={!!record.linked_count}
@@ -326,16 +353,14 @@ export default function MonitorCredentials() {
       {/* ── 汇总信息 ────────────────────────────────────────── */}
       <div style={{ marginBottom: 16, padding: '8px 0' }}>
         <Space size="large">
+          <Text type="secondary">{t('credential.summary.total', { count: stats.total })}</Text>
           <Text type="secondary">
-            共 <Text strong>{stats.total}</Text> 条凭据
-          </Text>
-          <Text type="secondary">
-            关联 <Text strong>{stats.totalLinked}</Text> 台设备
+            {t('credential.summary.linked', { count: stats.totalLinked })}
           </Text>
           {stats.disabledCount > 0 && (
             <Text type="warning">
               <WarningOutlined style={{ marginRight: 4 }} />
-              {stats.disabledCount} 条已停用
+              {t('credential.summary.disabled', { count: stats.disabledCount })}
             </Text>
           )}
         </Space>
@@ -345,25 +370,25 @@ export default function MonitorCredentials() {
         {/* ── 左栏：凭据列表 ─────────────────────────────────── */}
         <Col xs={24} lg={10}>
           <Card
-            title="共享凭据"
+            title={t('credential.title')}
             extra={
               <Space>
                 <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
-                  刷新
+                  {tc('action.refresh')}
                 </Button>
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={() => formDisclosure.open()}
                 >
-                  新建凭据
+                  {t('credential.action.create')}
                 </Button>
               </Space>
             }
           >
             {/* 搜索框 */}
             <Input
-              placeholder="搜索凭据名称"
+              placeholder={t('credential.searchPlaceholder')}
               prefix={<SearchOutlined />}
               allowClear
               value={searchKeyword}
@@ -378,7 +403,7 @@ export default function MonitorCredentials() {
                 color={protocolFilter.length === 0 ? 'blue' : 'default'}
                 onClick={() => setProtocolFilter([])}
               >
-                全部
+                {t('filter.all')}
               </Tag>
               {MONITOR_PROTOCOL_OPTIONS.map((opt) => (
                 <Tag
@@ -406,19 +431,19 @@ export default function MonitorCredentials() {
                 style={{ marginBottom: 12 }}
                 message={
                   <Space>
-                    <Text>已选 {selectedRowKeys.length} 项</Text>
+                    <Text>{t('credential.batch.selected', { count: selectedRowKeys.length })}</Text>
                     <ConfirmButton
                       size="small"
                       icon={<DeleteOutlined />}
-                      title="确认批量删除？"
-                      content="仅删除无关联设备的凭据，有关联的将跳过。"
+                      title={t('credential.confirm.batchDeleteTitle')}
+                      content={t('credential.confirm.batchDeleteContent')}
                       okType="danger"
                       onConfirm={handleBatchDelete}
                     >
-                      批量删除
+                      {tc('action.batchDelete')}
                     </ConfirmButton>
                     <Button size="small" type="link" onClick={() => setSelectedRowKeys([])}>
-                      取消选择
+                      {tc('batch.clear')}
                     </Button>
                   </Space>
                 }
@@ -431,7 +456,7 @@ export default function MonitorCredentials() {
               loading={credsLoading}
               rowKey={(r) => String(r.id)}
               total={filteredCreds.length}
-              emptyText="暂无共享凭据"
+              emptyText={t('credential.empty')}
               searchable={false}
               showCard={false}
               tableProps={credTable}

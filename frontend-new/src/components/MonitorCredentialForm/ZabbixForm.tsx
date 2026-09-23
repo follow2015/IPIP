@@ -3,32 +3,34 @@
  * 仅渲染 Form.Item，依赖父级 <Form> 上下文。
  */
 import { Form, Input, Select, Switch } from 'antd';
+import { useTranslation } from 'react-i18next';
 const { Password } = Input;
 
-const KEEP_PLACEHOLDER = '留空保持不变';
-
 export default function ZabbixForm({ mode }: { mode: 'create' | 'edit' }) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const isEdit = mode === 'edit';
-  const required = isEdit ? [] : [{ required: true, message: '此项必填' }];
+  const keepPlaceholder = t('credential.form.keepUnchanged');
+  const required = isEdit ? [] : [{ required: true, message: tCommon('validation.required') }];
 
   return (
     <>
-      <Form.Item label="API 地址" name="api_url" rules={required}>
+      <Form.Item label={t('credential.form.apiUrl')} name="api_url" rules={required}>
         <Input placeholder="https://zabbix.example.com/api_jsonrpc.php" />
       </Form.Item>
-      <Form.Item label="API Token" name="api_token" rules={required}>
-        <Password placeholder={isEdit ? KEEP_PLACEHOLDER : undefined} />
+      <Form.Item label={t('credential.form.apiToken')} name="api_token" rules={required}>
+        <Password placeholder={isEdit ? keepPlaceholder : undefined} />
       </Form.Item>
-      <Form.Item label="验证 SSL" name="verify_ssl" valuePropName="checked">
+      <Form.Item label={t('credential.form.verifySsl')} name="verify_ssl" valuePropName="checked">
         <Switch />
       </Form.Item>
-      <Form.Item label="匹配方式" name="match_by">
+      <Form.Item label={t('credential.form.matchBy.label')} name="match_by">
         <Select
           allowClear
-          placeholder="默认按 host"
+          placeholder={t('credential.form.matchBy.placeholder')}
           options={[
-            { value: 'host', label: '主机名' },
-            { value: 'ip', label: 'IP 地址' }
+            { value: 'host', label: t('credential.form.matchBy.host') },
+            { value: 'ip', label: t('credential.form.matchBy.ip') }
           ]}
         />
       </Form.Item>

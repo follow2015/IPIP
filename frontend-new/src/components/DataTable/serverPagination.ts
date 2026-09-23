@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
 import type { TablePaginationConfig } from 'antd';
+import i18n from '@/i18n';
 
 export const MAX_OFFSET = 10_000;
 
-export const OFFSET_LIMIT_HINT = '结果过多，请用筛选缩小范围';
+export const OFFSET_LIMIT_HINT_KEY = 'pagination.offsetLimitHint';
 
 export function isBeyondOffsetLimit(total: number | undefined): boolean {
   return typeof total === 'number' && total > MAX_OFFSET;
@@ -14,15 +16,15 @@ export interface ServerPaginationInput {
   total: number | undefined;
   onChange?: (page: number, pageSize: number) => void;
   showSizeChanger?: boolean;
-  showTotal?: boolean;
+  showTotal?: boolean | ((total: number) => ReactNode);
 }
 
 function formatTotal(total: number): string {
-  return `共 ${total} 条`;
+  return i18n.t('pagination.total', { count: total });
 }
 
 export function formatLimitHint(): string {
-  return OFFSET_LIMIT_HINT;
+  return i18n.t(OFFSET_LIMIT_HINT_KEY);
 }
 
 export function serverPagination({
@@ -34,12 +36,20 @@ export function serverPagination({
   showTotal = true
 }: ServerPaginationInput): TablePaginationConfig {
   const beyondLimit = isBeyondOffsetLimit(total);
+  const showTotalFn =
+    typeof showTotal === 'function'
+      ? showTotal
+      : showTotal
+        ? beyondLimit
+          ? formatLimitHint
+          : formatTotal
+        : null;
   return {
     current,
     pageSize,
     total,
     showSizeChanger,
-    ...(showTotal ? { showTotal: beyondLimit ? formatLimitHint : formatTotal } : {}),
+    ...(showTotalFn ? { showTotal: showTotalFn } : {}),
     ...(onChange ? { onChange } : {})
   };
 }

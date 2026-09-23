@@ -5,14 +5,17 @@
  * 标签/颜色统一取自 enums.ts 的 LINK_STATUS_MAP，保证跨页一致。
  */
 
+import type { TFunction } from 'i18next';
 import { LINK_STATUS_MAP } from '@/types/enums';
+import { getLinkStatusMeta } from '@/types/statusMeta';
+import type { DeviceT } from '@/types/statusMeta';
 
-export function getStatusLabel(status: string | null | undefined): string {
+export function getStatusLabel(status: string | null | undefined, t: DeviceT): string {
   const lower = (status || '').toLowerCase();
   if (lower === 'admin_down' || lower.includes('administratively') || lower === '*down') {
-    return LINK_STATUS_MAP.admin_down.label;
+    return getLinkStatusMeta('admin_down', t)?.label ?? (status || '');
   }
-  return LINK_STATUS_MAP[lower]?.label ?? (status || '未知');
+  return getLinkStatusMeta(lower, t)?.label ?? (status || '');
 }
 
 /**
@@ -32,11 +35,11 @@ export function isAdminDown(status: string | null | undefined): boolean {
   return lower === 'admin_down' || lower.includes('administratively') || lower === '*down';
 }
 
-export function extractErrorMessage(err: unknown): string {
+export function extractErrorMessage(err: unknown, t: TFunction<'common'>): string {
   if (err instanceof Error) {
     const axiosErr = err as { response?: { data?: { message?: string } } };
     const backendMsg = axiosErr?.response?.data?.message;
     return backendMsg || err.message;
   }
-  return '操作失败';
+  return t('message.operationFailed');
 }

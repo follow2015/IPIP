@@ -53,29 +53,45 @@ import {
 import { useMessage } from '@/hooks/useMessage';
 import { useTable } from '@/hooks/useTable';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
-import { NotificationTypeCode, SEVERITY_OPTIONS, SEVERITY_COLOR_MAP } from '@/types/enums';
+import {
+  NotificationTypeCode,
+  SEVERITY_COLOR_MAP,
+  NOTIFICATION_TYPE_LABEL_KEYS
+} from '@/types/enums';
+import { getSeverityOptions } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import { translateProbeError, formatDateTime, relativeTime } from '@/utils/format';
-import { ALERT_TYPE_LABEL, ALERT_TYPE_COLOR } from '@/constants/monitor';
+import { ALERT_TYPE_COLOR } from '@/constants/monitor';
+import type { TFunction } from 'i18next';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
-const ALERT_TYPE_OPTIONS = [
-  { label: '全部', value: '' },
-  { label: '设备不可达', value: NotificationTypeCode.DEVICE_UNREACHABLE },
-  { label: '设备恢复', value: NotificationTypeCode.DEVICE_RECOVERED },
-  { label: '温度告警', value: NotificationTypeCode.TEMPERATURE_ALERT },
-  { label: '硬盘故障', value: NotificationTypeCode.DISK_FAILURE_ALERT },
-  { label: '端口状态变化', value: NotificationTypeCode.PORT_STATUS_CHANGED },
-  { label: '监控中断', value: NotificationTypeCode.MONITOR_INTERRUPTED },
-  { label: 'RAID故障', value: NotificationTypeCode.RAID_FAILURE_ALERT }
+const alertTypeLabel = (type: string, td: TFunction<'device'>) => {
+  const key = NOTIFICATION_TYPE_LABEL_KEYS[type as NotificationTypeCode];
+  return key ? td(key) : type;
+};
+
+const getAlertTypeOptions = (t: TFunction<'monitor'>, td: TFunction<'device'>) => [
+  { label: t('filter.all'), value: '' },
+  ...(
+    [
+      NotificationTypeCode.DEVICE_UNREACHABLE,
+      NotificationTypeCode.DEVICE_RECOVERED,
+      NotificationTypeCode.TEMPERATURE_ALERT,
+      NotificationTypeCode.DISK_FAILURE_ALERT,
+      NotificationTypeCode.PORT_STATUS_CHANGED,
+      NotificationTypeCode.MONITOR_INTERRUPTED,
+      NotificationTypeCode.RAID_FAILURE_ALERT
+    ] as NotificationTypeCode[]
+  ).map((code) => ({ label: alertTypeLabel(code, td), value: code }))
 ];
 
-const STATUS_OPTIONS = [
-  { label: '全部', value: '' },
-  { label: '待投递', value: 'pending' },
-  { label: '已投递', value: 'sent' },
-  { label: '失败', value: 'failed' }
+const getStatusOptions = (t: TFunction<'monitor'>) => [
+  { label: t('filter.all'), value: '' },
+  { label: t('alerts.deliveryStatus.pending'), value: 'pending' },
+  { label: t('alerts.deliveryStatus.sent'), value: 'sent' },
+  { label: t('alerts.deliveryStatus.failed'), value: 'failed' }
 ];
 
 const STATUS_COLOR: Record<string, string> = {
@@ -85,6 +101,9 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function MonitorAlerts() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
+  const { t: td } = useTranslation('device');
   const message = useMessage();
   const navigate = useNavigate();
   const table = useTable();
@@ -143,11 +162,14 @@ export default function MonitorAlerts() {
       const ids = batch.selectedKeys.map(Number);
       const res = await batchAckAlert.mutateAsync({ alertIds: ids });
       message.success(
-        `已确认 ${res.acknowledged} 条${res.not_found ? `，${res.not_found} 条不存在` : ''}`
+        t('alerts.message.batchAck', { count: res.acknowledged }) +
+          (res.not_found
+            ? t('alerts.message.notFoundSuffix', { count: res.not_found })
+            : '')
       );
       batch.clear();
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '批量确认失败');
+      message.error(err instanceof Error ? err.message : t('alerts.message.batchAckFailed'));
     }
   };
 
@@ -156,20 +178,21 @@ export default function MonitorAlerts() {
       const ids = batch.selectedKeys.map(Number);
       const res = await batchRetryAlert.mutateAsync(ids);
       message.success(
-        `已重试 ${res.retried} 条${res.skipped ? `，${res.skipped} 条非 failed 状态已跳过` : ''}`
+        t('alerts.message.batchRetry', { count: res.retried }) +
+          (res.skipped ? t('alerts.message.skipSuffix', { count: res.skipped }) : '')
       );
       batch.clear();
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '批量重试失败');
+      message.error(err instanceof Error ? err.message : t('alerts.message.batchRetryFailed'));
     }
   };
 
   const handleClose = async (item: MonitorAlertItem) => {
     try {
       await closeAlert.mutateAsync({ alertId: item.id });
-      message.success('告警已关闭');
+      message.success(t('alerts.message.closed'));
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '关闭失败');
+      message.error(err instanceof Error ? err.message : t('alerts.message.closeFailed'));
     }
   };
 
@@ -178,11 +201,14 @@ export default function MonitorAlerts() {
       const ids = batch.selectedKeys.map(Number);
       const res = await batchCloseAlert.mutateAsync({ alertIds: ids });
       message.success(
-        `已关闭 ${res.closed} 条${res.not_found ? `，${res.not_found} 条不存在` : ''}`
+        t('alerts.message.batchClose', { count: res.closed }) +
+          (res.not_found
+            ? t('alerts.message.notFoundSuffix', { count: res.not_found })
+            : '')
       );
       batch.clear();
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '批量关闭失败');
+      message.error(err instanceof Error ? err.message : t('alerts.message.batchCloseFailed'));
     }
   };
 
@@ -200,12 +226,12 @@ export default function MonitorAlerts() {
     try {
       const res = await retryAlert.mutateAsync(item.id);
       if (res.retried) {
-        message.success('已重新加入投递队列');
+        message.success(t('alerts.message.retryQueued'));
       } else {
-        message.info('该告警非失败状态，无需重试');
+        message.info(t('alerts.message.retryNotNeeded'));
       }
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '重试请求失败');
+      message.error(err instanceof Error ? err.message : t('alerts.message.retryFailed'));
     }
   };
 
@@ -219,35 +245,35 @@ export default function MonitorAlerts() {
     if (!ackTarget) return;
     try {
       await ackAlert.mutateAsync({ alertId: ackTarget.id, note: ackNote || undefined });
-      message.success('已确认告警');
+      message.success(t('alerts.message.acknowledgedDone'));
       ackModal.close();
       setAckTarget(null);
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '确认请求失败');
+      message.error(err instanceof Error ? err.message : t('alerts.message.ackFailed'));
     }
   };
 
   const columns = [
     {
-      title: '设备',
+      title: t('column.device'),
       key: 'device',
       render: (_: unknown, record: MonitorAlertItem) => {
         if (record.device_id == null || !record.device_name) {
-          return <Text type="secondary">已删除设备</Text>;
+          return <Text type="secondary">{t('alerts.deletedDevice')}</Text>;
         }
         return <Link to={`/devices/${record.device_id}`}>{record.device_name}</Link>;
       }
     },
     {
-      title: '类型',
+      title: tc('field.type'),
       dataIndex: 'device_type',
       key: 'device_type',
       width: 100,
       responsive: ['md'] satisfies Breakpoint[], // ≥768
-      render: (t: string | null) => (t ? <Tag>{t}</Tag> : '-')
+      render: (deviceType: string | null) => (deviceType ? <Tag>{deviceType}</Tag> : '-')
     },
     {
-      title: '管理IP',
+      title: t('column.managementIp'),
       dataIndex: 'management_ip',
       key: 'management_ip',
       width: 140,
@@ -255,16 +281,18 @@ export default function MonitorAlerts() {
       render: (ip: string | null) => ip || '-'
     },
     {
-      title: '告警类型',
+      title: t('column.alertType'),
       dataIndex: 'alert_type',
       key: 'alert_type',
       width: 120,
-      render: (t: string) => (
-        <Tag color={ALERT_TYPE_COLOR[t] || 'default'}>{ALERT_TYPE_LABEL[t] || t}</Tag>
+      render: (alertType: string) => (
+        <Tag color={ALERT_TYPE_COLOR[alertType] || 'default'}>
+          {alertTypeLabel(alertType, td)}
+        </Tag>
       )
     },
     {
-      title: '指标实例',
+      title: t('column.metricInstance'),
       key: 'metric_instance',
       width: 140,
       responsive: ['lg'] satisfies Breakpoint[], // ≥992
@@ -285,14 +313,14 @@ export default function MonitorAlerts() {
       }
     },
     {
-      title: '级别',
+      title: tc('field.level'),
       dataIndex: 'severity',
       key: 'severity',
       width: 90,
       render: (s: string) => <Tag color={SEVERITY_COLOR_MAP[s] || 'default'}>{s}</Tag>
     },
     {
-      title: '投递状态',
+      title: t('column.deliveryStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
@@ -300,7 +328,7 @@ export default function MonitorAlerts() {
       render: (s: string) => <Tag color={STATUS_COLOR[s] || 'default'}>{s}</Tag>
     },
     {
-      title: '重试次数',
+      title: t('column.attempts'),
       dataIndex: 'attempts',
       key: 'attempts',
       width: 90,
@@ -309,16 +337,16 @@ export default function MonitorAlerts() {
       render: (n: number) => (n > 0 ? <Text type="danger">{n}</Text> : '-')
     },
     {
-      title: '告警时间',
+      title: t('column.alertTime'),
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
       render: (iso: string | null) => (
-        <Tooltip title={relativeTime(iso)}>{formatDateTime(iso)}</Tooltip>
+        <Tooltip title={relativeTime(iso, tc)}>{formatDateTime(iso)}</Tooltip>
       )
     },
     {
-      title: '最后错误',
+      title: t('column.lastError'),
       dataIndex: 'last_error',
       key: 'last_error',
       ellipsis: true,
@@ -326,14 +354,14 @@ export default function MonitorAlerts() {
       render: (e: string | null) =>
         e ? (
           <Text type="danger" ellipsis title={e}>
-            {translateProbeError(e)}
+            {translateProbeError(e, td)}
           </Text>
         ) : (
           '-'
         )
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 180,
       fixed: 'right' as const,
@@ -345,10 +373,10 @@ export default function MonitorAlerts() {
     <Space size="small" wrap>
       {/* P1-6: 告警详情 */}
       <Button size="small" onClick={() => setDetailId(record.id)}>
-        详情
+        {tc('action.detail')}
       </Button>
       {record.device_id != null && (
-        <Tooltip title="查看历史趋势">
+        <Tooltip title={t('alerts.viewTrend')}>
           <Button
             size="small"
             icon={<LineChartOutlined />}
@@ -363,12 +391,12 @@ export default function MonitorAlerts() {
           loading={retryAlert.isPending && retryAlert.variables === record.id}
           onClick={() => handleRetry(record)}
         >
-          重试
+          {tc('action.retry')}
         </Button>
       )}
       {/* G9: 人工确认/认领 */}
       <Button size="small" icon={<CheckOutlined />} onClick={() => openAckModal(record)}>
-        {record.acknowledged_by ? '已确认' : '确认'}
+        {record.acknowledged_by ? t('alerts.acknowledged') : tc('action.confirm')}
       </Button>
       {/* P2-16: 手动关闭 */}
       {!record.closed_at && (
@@ -378,7 +406,7 @@ export default function MonitorAlerts() {
           onClick={() => handleClose(record)}
           loading={closeAlert.isPending && closeAlert.variables?.alertId === record.id}
         >
-          关闭
+          {tc('action.close')}
         </Button>
       )}
     </Space>
@@ -390,7 +418,7 @@ export default function MonitorAlerts() {
         <Space size={4} wrap>
           <Tag color={SEVERITY_COLOR_MAP[record.severity] || 'default'}>{record.severity}</Tag>
           <Tag color={ALERT_TYPE_COLOR[record.alert_type] || 'default'}>
-            {ALERT_TYPE_LABEL[record.alert_type] || record.alert_type}
+            {alertTypeLabel(record.alert_type, td)}
           </Tag>
           <Tag color={STATUS_COLOR[record.status] || 'default'}>{record.status}</Tag>
         </Space>
@@ -400,7 +428,7 @@ export default function MonitorAlerts() {
       </div>
       <div>
         {record.device_id == null || !record.device_name ? (
-          <Text type="secondary">已删除设备</Text>
+          <Text type="secondary">{t('alerts.deletedDevice')}</Text>
         ) : (
           <Link to={`/devices/${record.device_id}`}>{record.device_name}</Link>
         )}
@@ -412,7 +440,7 @@ export default function MonitorAlerts() {
       </div>
       {record.last_error && (
         <Text type="danger" style={{ fontSize: 12 }} ellipsis>
-          {translateProbeError(record.last_error)}
+          {translateProbeError(record.last_error, td)}
         </Text>
       )}
       {renderActions(record)}
@@ -433,26 +461,26 @@ export default function MonitorAlerts() {
           <Select
             style={{ width: isMobile ? '100%' : 160 }}
             value={alertType}
-            options={ALERT_TYPE_OPTIONS}
+            options={getAlertTypeOptions(t, td)}
             onChange={(v) => {
               setAlertType(v);
               table.setPage(1);
             }}
-            placeholder="告警类型"
+            placeholder={t('column.alertType')}
           />
           <Select
             style={{ width: isMobile ? '100%' : 140 }}
             value={severity}
-            options={[{ label: '全部', value: '' }, ...SEVERITY_OPTIONS]}
+            options={[{ label: t('filter.all'), value: '' }, ...getSeverityOptions(td)]}
             onChange={(v) => {
               setSeverity(v);
               table.setPage(1);
             }}
-            placeholder="严重级别"
+            placeholder={tc('field.severity')}
           />
           <Segmented
             style={{ width: isMobile ? '100%' : undefined }}
-            options={STATUS_OPTIONS}
+            options={getStatusOptions(t)}
             value={status}
             onChange={(v) => {
               setStatus(v as string);
@@ -471,8 +499,8 @@ export default function MonitorAlerts() {
           <Segmented
             style={{ width: isMobile ? '100%' : undefined }}
             options={[
-              { label: '全部可见', value: 'all' },
-              { label: '我负责的', value: 'mine' }
+              { label: t('alerts.filter.scopeAll'), value: 'all' },
+              { label: t('alerts.filter.scopeMine'), value: 'mine' }
             ]}
             value={scope}
             onChange={(v) => {
@@ -484,8 +512,8 @@ export default function MonitorAlerts() {
           <Segmented
             style={{ width: isMobile ? '100%' : undefined }}
             options={[
-              { label: '列表视图', value: 'list' },
-              { label: '聚合视图', value: 'aggregation' }
+              { label: t('alerts.view.list'), value: 'list' },
+              { label: t('alerts.view.aggregation'), value: 'aggregation' }
             ]}
             value={viewMode}
             onChange={(v) => setViewMode(v as 'list' | 'aggregation')}
@@ -493,7 +521,7 @@ export default function MonitorAlerts() {
           {/* P1-7: 按 metric_key/index_key 过滤 */}
           <Input
             allowClear
-            placeholder="指标键（metric_key）"
+            placeholder={t('alerts.filter.metricKey')}
             value={metricKey}
             onChange={(e) => setMetricKey(e.target.value)}
             onPressEnter={() => table.setPage(1)}
@@ -501,7 +529,7 @@ export default function MonitorAlerts() {
           />
           <Input
             allowClear
-            placeholder="实例键（index_key）"
+            placeholder={t('alerts.filter.indexKey')}
             value={indexKey}
             onChange={(e) => setIndexKey(e.target.value)}
             onPressEnter={() => table.setPage(1)}
@@ -513,10 +541,10 @@ export default function MonitorAlerts() {
             loading={isFetching}
             block={isMobile}
           >
-            刷新
+            {tc('action.refresh')}
           </Button>
           <Button onClick={resetFilters} block={isMobile}>
-            重置
+            {tc('action.reset')}
           </Button>
           {/* G5: 导出告警 CSV */}
           <Button
@@ -527,18 +555,18 @@ export default function MonitorAlerts() {
               try {
                 await exportAlerts.mutateAsync(query);
               } catch (err: unknown) {
-                message.error(err instanceof Error ? err.message : '导出失败');
+                message.error(err instanceof Error ? err.message : t('export.failed'));
               }
             }}
           >
-            导出 CSV
+            {t('export.csv')}
           </Button>
         </Space>
       </Card>
 
       {/* 告警历史表格 */}
       <Card
-        title={viewMode === 'list' ? '告警历史' : '告警聚合（风暴组）'}
+        title={viewMode === 'list' ? t('alerts.title') : t('alerts.aggregationTitle')}
         variant="borderless"
         style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
       >
@@ -552,18 +580,18 @@ export default function MonitorAlerts() {
             showCard={false}
             columns={[
               {
-                title: '告警类型',
+                title: t('column.alertType'),
                 dataIndex: 'alert_type',
                 render: (v: string) => <Tag>{v}</Tag>
               },
               {
-                title: '级别',
+                title: tc('field.level'),
                 dataIndex: 'severity',
                 render: (v: string) => <Tag color={SEVERITY_COLOR_MAP[v] ?? 'default'}>{v}</Tag>
               },
-              { title: '设备', dataIndex: 'device_name' },
+              { title: t('column.device'), dataIndex: 'device_name' },
               {
-                title: '告警数',
+                title: t('column.alertCount'),
                 dataIndex: 'count',
                 render: (v: number) => (
                   <span
@@ -579,19 +607,19 @@ export default function MonitorAlerts() {
                 defaultSortOrder: 'descend'
               },
               {
-                title: '首次',
+                title: t('column.firstAt'),
                 dataIndex: 'first_at',
                 responsive: ['lg'] satisfies Breakpoint[], // ≥992
                 render: (v: string) => (v ? dayjs(v).format('MM-DD HH:mm:ss') : '-')
               },
               {
-                title: '最近',
+                title: t('column.lastAt'),
                 dataIndex: 'last_at',
                 responsive: ['sm'] satisfies Breakpoint[], // ≥576
                 render: (v: string) => (v ? dayjs(v).format('MM-DD HH:mm:ss') : '-')
               },
               {
-                title: '样本告警 ID',
+                title: t('column.sampleIds'),
                 dataIndex: 'sample_ids',
                 responsive: ['lg'] satisfies Breakpoint[], // ≥992
                 render: (ids: number[]) => ids.join(', ')
@@ -600,14 +628,18 @@ export default function MonitorAlerts() {
           />
         ) : (
           <>
-            <BatchActionBar count={batch.count} unit="条告警" onClear={batch.clear}>
+            <BatchActionBar
+              count={batch.count}
+              unit={t('stat.unitAlert', { count: batch.count })}
+              onClear={batch.clear}
+            >
               <Button
                 size="small"
                 icon={<CheckOutlined />}
                 onClick={handleBatchAck}
                 loading={batchAckAlert.isPending}
               >
-                批量确认
+                {t('alerts.batch.ack')}
               </Button>
               <Button
                 size="small"
@@ -615,7 +647,7 @@ export default function MonitorAlerts() {
                 onClick={handleBatchRetry}
                 loading={batchRetryAlert.isPending}
               >
-                批量重试
+                {t('alerts.batch.retry')}
               </Button>
               <Button
                 size="small"
@@ -623,7 +655,7 @@ export default function MonitorAlerts() {
                 onClick={handleBatchClose}
                 loading={batchCloseAlert.isPending}
               >
-                批量关闭
+                {t('alerts.batch.close')}
               </Button>
             </BatchActionBar>
             <DataTable<MonitorAlertItem>
@@ -632,7 +664,7 @@ export default function MonitorAlerts() {
               loading={isLoading}
               rowKey={(r) => String(r.id)}
               rowSelection={batch.rowSelection}
-              emptyText="暂无告警记录"
+              emptyText={t('alerts.empty')}
               total={data?.total ?? 0}
               searchable={false}
               showCard={false}
@@ -646,7 +678,7 @@ export default function MonitorAlerts() {
 
       {/* G9: 确认告警 Modal */}
       <Modal
-        title="确认告警"
+        title={t('alerts.ackModal.title')}
         open={ackModal.isOpen}
         onOk={handleAckSubmit}
         onCancel={() => {
@@ -654,22 +686,27 @@ export default function MonitorAlerts() {
           setAckTarget(null);
         }}
         confirmLoading={ackAlert.isPending}
-        okText="确认"
-        cancelText="取消"
+        okText={tc('action.confirm')}
+        cancelText={tc('action.cancel')}
         width={isMobile ? 'calc(100vw - 32px)' : 520}
       >
         {ackTarget && (
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
             <Text>
-              确认告警 #{ackTarget.id}（{ackTarget.alert_type}）
+              {t('alerts.ackModal.prompt', {
+                id: ackTarget.id,
+                type: alertTypeLabel(ackTarget.alert_type, td)
+              })}
               {ackTarget.acknowledged_by && (
-                <Text type="secondary"> · 已由 {ackTarget.acknowledged_by} 确认</Text>
+                <Text type="secondary">
+                  {t('alerts.ackModal.acknowledgedBy', { user: ackTarget.acknowledged_by })}
+                </Text>
               )}
             </Text>
             <Input.TextArea
               value={ackNote}
               onChange={(e) => setAckNote(e.target.value)}
-              placeholder="确认备注（可选）"
+              placeholder={t('alerts.ackModal.notePlaceholder')}
               maxLength={2000}
               showCount
               autoSize={{ minRows: 3, maxRows: 6 }}
@@ -680,58 +717,67 @@ export default function MonitorAlerts() {
 
       {/* P1-6: 告警详情 Drawer */}
       <Drawer
-        title="告警详情"
+        title={t('alerts.detail.title')}
         open={detailId != null}
         onClose={() => setDetailId(null)}
         width={isMobile ? '100vw' : 640}
         destroyOnClose
       >
-        {detailQuery.isLoading && <Typography.Text type="secondary">加载中…</Typography.Text>}
+        {detailQuery.isLoading && (
+          <Typography.Text type="secondary">{tc('message.loading')}</Typography.Text>
+        )}
         {detailQuery.data && (
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
             <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
-              <Descriptions.Item label="告警ID">{detailQuery.data.id}</Descriptions.Item>
-              <Descriptions.Item label="类型">
+              <Descriptions.Item label={t('alerts.detail.id')}>
+                {detailQuery.data.id}
+              </Descriptions.Item>
+              <Descriptions.Item label={tc('field.type')}>
                 <Tag color={ALERT_TYPE_COLOR[detailQuery.data.alert_type] || 'default'}>
-                  {ALERT_TYPE_LABEL[detailQuery.data.alert_type] || detailQuery.data.alert_type}
+                  {alertTypeLabel(detailQuery.data.alert_type, td)}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="级别">
+              <Descriptions.Item label={tc('field.level')}>
                 <Tag color={SEVERITY_COLOR_MAP[detailQuery.data.severity] || 'default'}>
                   {detailQuery.data.severity}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="状态">
+              <Descriptions.Item label={tc('field.status')}>
                 <Tag color={STATUS_COLOR[detailQuery.data.status] || 'default'}>
                   {detailQuery.data.status}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="设备" span={2}>
+              <Descriptions.Item label={t('column.device')} span={2}>
                 {detailQuery.data.device_name ?? (
-                  <Typography.Text type="secondary">已删除</Typography.Text>
+                  <Typography.Text type="secondary">
+                    {t('alerts.detail.deviceDeleted')}
+                  </Typography.Text>
                 )}
                 {detailQuery.data.device_name && (
                   <>
                     {' '}
                     <Typography.Text type="secondary">
-                      ({detailQuery.data.device_type} / {detailQuery.data.management_ip || '无IP'})
+                      ({detailQuery.data.device_type} /{' '}
+                      {detailQuery.data.management_ip || t('alerts.detail.noIp')})
                     </Typography.Text>
                   </>
                 )}
               </Descriptions.Item>
-              <Descriptions.Item label="去重键" span={2}>
+              <Descriptions.Item label={t('alerts.detail.dedupKey')} span={2}>
                 <Typography.Text code copyable style={{ wordBreak: 'break-all' }}>
                   {detailQuery.data.dedup_key}
                 </Typography.Text>
               </Descriptions.Item>
-              <Descriptions.Item label="创建时间">
+              <Descriptions.Item label={tc('field.createdAt')}>
                 {detailQuery.data.created_at ? formatDateTime(detailQuery.data.created_at) : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="发送时间">
+              <Descriptions.Item label={t('alerts.detail.sentAt')}>
                 {detailQuery.data.sent_at ? formatDateTime(detailQuery.data.sent_at) : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="尝试次数">{detailQuery.data.attempts}</Descriptions.Item>
-              <Descriptions.Item label="最后错误">
+              <Descriptions.Item label={t('alerts.detail.attempts')}>
+                {detailQuery.data.attempts}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('column.lastError')}>
                 {detailQuery.data.last_error ? (
                   <Typography.Text type="danger" style={{ wordBreak: 'break-all' }}>
                     {detailQuery.data.last_error}
@@ -743,24 +789,31 @@ export default function MonitorAlerts() {
             </Descriptions>
 
             {/* 确认信息 */}
-            <Descriptions column={1} bordered size="small" title="确认信息">
-              <Descriptions.Item label="确认人">
+            <Descriptions column={1} bordered size="small" title={t('alerts.detail.ackSection')}>
+              <Descriptions.Item label={t('alerts.detail.ackBy')}>
                 {detailQuery.data.acknowledged_by ?? (
-                  <Typography.Text type="secondary">未确认</Typography.Text>
+                  <Typography.Text type="secondary">
+                    {t('alerts.detail.notAcknowledged')}
+                  </Typography.Text>
                 )}
               </Descriptions.Item>
-              <Descriptions.Item label="确认时间">
+              <Descriptions.Item label={t('alerts.detail.ackAt')}>
                 {detailQuery.data.acknowledged_at
                   ? formatDateTime(detailQuery.data.acknowledged_at)
                   : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="确认备注">
+              <Descriptions.Item label={t('alerts.detail.ackNote')}>
                 {detailQuery.data.ack_note ?? '-'}
               </Descriptions.Item>
             </Descriptions>
 
             {/* Payload 解析 */}
-            <Descriptions column={1} bordered size="small" title="告警载荷">
+            <Descriptions
+              column={1}
+              bordered
+              size="small"
+              title={t('alerts.detail.payloadSection')}
+            >
               <Descriptions.Item label="payload">
                 <pre style={{ margin: 0, maxHeight: 240, overflow: 'auto', fontSize: 12 }}>
                   {JSON.stringify(detailQuery.data.payload, null, 2)}

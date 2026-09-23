@@ -9,16 +9,21 @@ import { get } from '@/services/api-client';
 import { useIPAuditLogs } from '@/services/ip-audit';
 import type { IPAuditLog } from '@/services/ip-audit';
 import { useRoomOptions } from '@/services/room';
-import { IP_AUDIT_ACTION_MAP, IP_AUDIT_ACTION_OPTIONS } from '@/types/enums';
+import { getIPAuditActionMeta, getIPAuditActionOptions } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { User } from '@/types/models';
 import { formatDateTime } from '@/utils/format';
 
 function ActionTag({ action }: { action: string }) {
-  const meta = IP_AUDIT_ACTION_MAP[action as keyof typeof IP_AUDIT_ACTION_MAP];
+  const { t: td } = useTranslation('device');
+  const meta = getIPAuditActionMeta(action, td);
   return <Tag color={meta?.color ?? 'default'}>{meta?.label ?? action}</Tag>;
 }
 
 export default function IPAudit() {
+  const { t: td } = useTranslation('device');
+  const { t } = useTranslation('network');
+  const { t: tc } = useTranslation('common');
   const table = useTable();
   const [detail, setDetail] = useState<IPAuditLog | null>(null);
 
@@ -46,10 +51,10 @@ export default function IPAudit() {
   const userNameMap = useMemo(() => {
     const map = new Map<number, string>();
     for (const u of users ?? []) {
-      if (u.id != null) map.set(u.id, u.name || u.username || `用户 #${u.id}`);
+      if (u.id != null) map.set(u.id, u.name || u.username || t('audit.userFallback', { id: u.id }));
     }
     return map;
-  }, [users]);
+  }, [users, t]);
 
   const { data: roomOptions } = useRoomOptions();
   const roomNameMap = useMemo(() => {
@@ -62,51 +67,52 @@ export default function IPAudit() {
   }, [roomOptions]);
 
   const renderOperator = (id: number | null) =>
-    id == null ? '-' : (userNameMap.get(id) ?? `用户 #${id}`);
+    id == null ? '-' : (userNameMap.get(id) ?? t('audit.userFallback', { id }));
 
   const columns: ColumnsType<IPAuditLog> = [
     {
-      title: '时间',
+      title: t('audit.field.time'),
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
       render: (t: string | null) => (t ? formatDateTime(t) : '-')
     },
     {
-      title: '操作人',
+      title: t('audit.field.operator'),
       dataIndex: 'operator_id',
       key: 'operator_id',
       width: 110,
       render: renderOperator
     },
-    { title: 'IP 地址', dataIndex: 'ip_address', key: 'ip_address', width: 140 },
+    { title: t('audit.field.ipAddress'), dataIndex: 'ip_address', key: 'ip_address', width: 140 },
     {
-      title: '机房',
+      title: t('audit.field.room'),
       dataIndex: 'room_id',
       key: 'room_id',
       width: 130,
-      render: (id: number | null) => (id == null ? '-' : (roomNameMap.get(id) ?? `机房 #${id}`))
+      render: (id: number | null) =>
+        id == null ? '-' : (roomNameMap.get(id) ?? t('audit.roomFallback', { id }))
     },
     {
-      title: '动作',
+      title: t('audit.field.action'),
       dataIndex: 'action',
       key: 'action',
       width: 90,
       render: (a: string) => <ActionTag action={a} />
     },
     {
-      title: '归属客户',
+      title: t('audit.field.customer'),
       key: 'customer',
       width: 150,
       render: (_, record) => (record.source === 'allocation' ? (record.customer_name ?? '-') : '-')
     },
     {
-      title: '详情',
+      title: t('audit.field.detail'),
       key: 'action_btn',
       width: 80,
       render: (_, record) => (
         <Button type="link" onClick={() => setDetail(record)}>
-          查看
+          {t('audit.action.view')}
         </Button>
       )
     }
@@ -120,7 +126,7 @@ export default function IPAudit() {
         rowKey="id"
         loading={isLoading}
         searchable
-        searchPlaceholder="搜索 IP 地址..."
+        searchPlaceholder={t('audit.searchPlaceholder')}
         searchValue={table.search}
         onSearch={table.setSearch}
         onRefresh={refetch}
@@ -137,23 +143,23 @@ export default function IPAudit() {
             filters={[
               {
                 key: 'action',
-                label: '动作',
+                label: t('audit.field.action'),
                 type: 'select',
-                options: IP_AUDIT_ACTION_OPTIONS,
+                options: getIPAuditActionOptions(td),
                 width: 120
               },
               {
                 key: 'room_id',
-                label: '机房',
+                label: t('audit.field.room'),
                 type: 'select',
                 options: roomOptions ?? [],
                 width: 150
               },
               {
                 key: 'date_range',
-                label: '时间',
+                label: t('audit.field.time'),
                 type: 'rangePicker',
-                placeholders: ['开始日期', '结束日期']
+                placeholders: [tc('range.startDate'), tc('range.endDate')]
               }
             ]}
           />
@@ -161,7 +167,7 @@ export default function IPAudit() {
       />
 
       <Modal
-        title="审计记录详情"
+        title={t('audit.detail.title')}
         open={!!detail}
         onCancel={() => setDetail(null)}
         footer={null}
@@ -171,33 +177,45 @@ export default function IPAudit() {
         {detail && (
           <Card size="small" type="inner">
             <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
-              <Descriptions.Item label="时间" span={2}>
+              <Descriptions.Item label={t('audit.field.time')} span={2}>
                 {detail.created_at ? formatDateTime(detail.created_at) : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="操作人">
+              <Descriptions.Item label={t('audit.field.operator')}>
                 {renderOperator(detail.operator_id)}
               </Descriptions.Item>
-              <Descriptions.Item label="来源">
-                {detail.source === 'allocation' ? '归属变更' : '封禁/解封'}
+              <Descriptions.Item label={t('audit.detail.source')}>
+                {detail.source === 'allocation'
+                  ? t('audit.detail.sourceAllocation')
+                  : t('audit.detail.sourceBan')}
               </Descriptions.Item>
-              <Descriptions.Item label="IP 地址">{detail.ip_address}</Descriptions.Item>
-              <Descriptions.Item label="机房">
+              <Descriptions.Item label={t('audit.field.ipAddress')}>
+                {detail.ip_address}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('audit.field.room')}>
                 {detail.room_id == null
                   ? '-'
-                  : (roomNameMap.get(detail.room_id) ?? `机房 #${detail.room_id}`)}
+                  : (roomNameMap.get(detail.room_id) ??
+                    t('audit.roomFallback', { id: detail.room_id }))}
               </Descriptions.Item>
-              <Descriptions.Item label="动作">
+              <Descriptions.Item label={t('audit.field.action')}>
                 <ActionTag action={detail.action} />
               </Descriptions.Item>
               {detail.source === 'allocation' ? (
-                <Descriptions.Item label="归属客户">
+                <Descriptions.Item label={t('audit.field.customer')}>
                   {detail.customer_name ?? '-'}
                 </Descriptions.Item>
               ) : (
-                <Descriptions.Item label="封禁方式">{detail.ban_mode ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label={t('audit.detail.banMode')}>
+                  {detail.ban_mode ?? '-'}
+                </Descriptions.Item>
               )}
             </Descriptions>
-            <Card size="small" title="详情（detail）" type="inner" style={{ marginTop: 12 }}>
+            <Card
+              size="small"
+              title={t('audit.detail.detailTitle')}
+              type="inner"
+              style={{ marginTop: 12 }}
+            >
               <pre style={{ maxHeight: 300, overflow: 'auto', fontSize: 12, margin: 0 }}>
                 {JSON.stringify(detail.detail, null, 2)}
               </pre>

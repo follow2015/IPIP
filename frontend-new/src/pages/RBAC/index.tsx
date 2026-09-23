@@ -24,8 +24,11 @@ import {
 } from '@/services/rbac';
 import type { Role, Permission, RoleDetail } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 function RBAC() {
+  const { t } = useTranslation('settings');
+  const { t: tc } = useTranslation('common');
   const [activeTab, setActiveTab] = useState('roles');
   const form = useDisclosure();
   const [editRecord, setEditRecord] = useState<Role | null>(null);
@@ -59,11 +62,11 @@ function RBAC() {
   const confirmAction = useConfirmAction();
   const handleDelete = (r: Role) => {
     confirmAction({
-      title: '确认删除',
-      content: `确定要删除角色「${r.display_name}」吗？`,
+      title: tc('confirm.deleteTitle'),
+      content: t('role.deleteConfirmContent', { name: r.display_name }),
       okType: 'danger',
-      successMessage: '删除成功',
-      errorMessage: '删除失败',
+      successMessage: tc('message.deleteSuccess'),
+      errorMessage: tc('message.deleteFailed'),
       onConfirm: () => deleteRole.mutateAsync(r.id),
       afterConfirm: refetchRoles
     });
@@ -81,47 +84,56 @@ function RBAC() {
           id: editRecord.id,
           data: values as unknown as CreateRoleRequest
         });
-        message.success('更新成功');
+        message.success(tc('message.updateSuccess'));
       } else {
         await createRole.mutateAsync(values as unknown as CreateRoleRequest);
-        message.success('创建成功');
+        message.success(tc('message.createSuccess'));
       }
       form.close();
       refetchRoles();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '操作失败');
+      message.error(err instanceof Error ? err.message : tc('message.operationFailed'));
     }
   };
 
   const roleColumns = [
-    { title: '角色名', dataIndex: 'name', key: 'name' },
-    { title: '显示名', dataIndex: 'display_name', key: 'display_name' },
+    { title: t('role.field.name'), dataIndex: 'name', key: 'name' },
+    { title: t('role.field.displayName'), dataIndex: 'display_name', key: 'display_name' },
     {
-      title: '状态',
+      title: tc('field.status'),
       dataIndex: 'status',
       key: 'status',
-      render: (v: number) => (v === 0 ? <Tag color="green">正常</Tag> : <Tag color="red">禁用</Tag>)
+      render: (v: number) =>
+        v === 0 ? (
+          <Tag color="green">{t('role.status.normal')}</Tag>
+        ) : (
+          <Tag color="red">{t('role.status.disabled')}</Tag>
+        )
     },
     {
-      title: '权限数',
+      title: t('role.field.permissionCount'),
       key: 'perm_count',
       render: (_: unknown, r: Role) =>
         (r as Role & { permission_count?: number }).permission_count ?? r.permissions?.length ?? 0
     },
-    { title: '用户数', key: 'user_count', render: (_: unknown, r: Role) => r.user_count ?? 0 },
     {
-      title: '描述',
+      title: t('role.field.userCount'),
+      key: 'user_count',
+      render: (_: unknown, r: Role) => r.user_count ?? 0
+    },
+    {
+      title: tc('field.description'),
       dataIndex: 'description',
       key: 'description',
       render: (v: string | null) => v ?? '-'
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       render: (_: unknown, r: Role) => (
         <Space>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(r)}>
-            编辑
+            {tc('action.edit')}
           </Button>
           <Button
             type="link"
@@ -129,7 +141,7 @@ function RBAC() {
             icon={<SafetyOutlined />}
             onClick={() => handlePermAssign(r)}
           >
-            权限
+            {t('permission.label')}
           </Button>
           <Button
             type="link"
@@ -138,7 +150,7 @@ function RBAC() {
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(r)}
           >
-            删除
+            {tc('action.delete')}
           </Button>
         </Space>
       )
@@ -148,25 +160,30 @@ function RBAC() {
   const permCategories = useMemo(() => {
     const map = new Map<string, Permission[]>();
     permissions.forEach((p) => {
-      const cat = p.category ?? '未分类';
+      const cat = p.category ?? t('permission.uncategorized');
       const list = map.get(cat) ?? [];
       list.push(p);
       map.set(cat, list);
     });
     return Array.from(map.entries());
-  }, [permissions]);
+  }, [permissions, t]);
 
   const permColumns = [
-    { title: '权限编码', dataIndex: 'code', key: 'code', render: (v: string) => <Tag>{v}</Tag> },
-    { title: '权限名称', dataIndex: 'name', key: 'name' },
     {
-      title: '分类',
+      title: t('permission.field.code'),
+      dataIndex: 'code',
+      key: 'code',
+      render: (v: string) => <Tag>{v}</Tag>
+    },
+    { title: t('permission.field.name'), dataIndex: 'name', key: 'name' },
+    {
+      title: t('permission.field.category'),
       dataIndex: 'category',
       key: 'category',
-      render: (v: string | null) => v ?? '未分类'
+      render: (v: string | null) => v ?? t('permission.uncategorized')
     },
     {
-      title: '描述',
+      title: tc('field.description'),
       dataIndex: 'description',
       key: 'description',
       render: (v: string | null) => v ?? '-'
@@ -181,12 +198,12 @@ function RBAC() {
         items={[
           {
             key: 'roles',
-            label: '角色管理',
+            label: t('rbac.tab.roles'),
             children: (
               <>
                 <div style={{ marginBottom: 16, textAlign: 'right' }}>
                   <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                    新增角色
+                    {t('role.action.add')}
                   </Button>
                 </div>
                 <Table<Role>
@@ -202,7 +219,7 @@ function RBAC() {
           },
           {
             key: 'permissions',
-            label: '权限列表',
+            label: t('rbac.tab.permissions'),
             children: (
               <Table<Permission>
                 columns={permColumns}
@@ -210,7 +227,7 @@ function RBAC() {
                 rowKey="id"
                 loading={permsLoading}
                 size="small"
-                pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 条` }}
+                pagination={{ pageSize: 20, showTotal: (t) => tc('pagination.total', { count: t }) }}
                 scroll={{ x: 'max-content' }}
               />
             )

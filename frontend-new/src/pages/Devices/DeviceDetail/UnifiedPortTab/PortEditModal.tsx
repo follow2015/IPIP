@@ -3,12 +3,13 @@
  * 自包含：内部填充表单（兼容网管/非网管两套字段名）+ 提交更新
  */
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, Form, Input, Select, Row, Col } from 'antd';
 import type { SwitchPort } from '@/types/models';
 import { useUpdateNetworkPort } from '@/services/network-port';
 import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useMessage } from '@/hooks/useMessage';
-import { USAGE_STATUS_FORM_OPTIONS } from './constants';
+import { getUsageStatusFormOptions } from './constants';
 
 interface PortEditModalProps {
   deviceId: number;
@@ -17,10 +18,13 @@ interface PortEditModalProps {
 }
 
 export function PortEditModal({ deviceId, port, onClose }: PortEditModalProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const message = useMessage();
   const [editForm] = Form.useForm();
   const updatePort = useUpdateNetworkPort(deviceId);
   const { data: customerOptions } = useAllocatableCustomerOptions();
+  const usageStatusOptions = getUsageStatusFormOptions(t);
 
   useEffect(() => {
     if (!port) return;
@@ -45,7 +49,7 @@ export function PortEditModal({ deviceId, port, onClose }: PortEditModalProps) {
 
       const { port_name, port_type, ...updateData } = values;
       await updatePort.mutateAsync({ portId: port.id, data: updateData });
-      message.success('端口更新成功');
+      message.success(t('port.message.updated'));
       onClose();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -54,7 +58,7 @@ export function PortEditModal({ deviceId, port, onClose }: PortEditModalProps) {
 
   return (
     <Modal
-      title="编辑端口"
+      title={t('nic.editTitle')}
       open={!!port}
       onOk={handleEditSubmit}
       onCancel={onClose}
@@ -64,40 +68,40 @@ export function PortEditModal({ deviceId, port, onClose }: PortEditModalProps) {
       <Form form={editForm} layout="vertical">
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item name="port_name" label="端口名称">
+            <Form.Item name="port_name" label={t('nic.column.portName')}>
               <Input disabled />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="port_type" label="端口类型">
+            <Form.Item name="port_type" label={t('nic.column.portType')}>
               <Input disabled />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item name="speed" label="速率">
-              <Input placeholder="如 1G、10G" />
+            <Form.Item name="speed" label={t('nic.column.speed')}>
+              <Input placeholder={t('port.field.speedHintMulti')} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="usage_status" label="占用状态">
-              <Select options={USAGE_STATUS_FORM_OPTIONS} />
+            <Form.Item name="usage_status" label={t('port.column.usageStatus')}>
+              <Select options={usageStatusOptions} />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item name="vlan" label="VLAN">
-              <Input placeholder="如 100" />
+            <Form.Item name="vlan" label={t('connection.column.vlan')}>
+              <Input placeholder={t('port.field.vlanHint')} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="customer_id" label="客户">
+            <Form.Item name="customer_id" label={tCommon('field.customer')}>
               <Select
                 allowClear
                 showSearch
-                placeholder="选择客户"
+                placeholder={t('port.field.selectCustomer')}
                 options={customerOptions ?? []}
                 filterOption={(input, option) =>
                   (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
@@ -108,18 +112,18 @@ export function PortEditModal({ deviceId, port, onClose }: PortEditModalProps) {
         </Row>
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item name="mac" label="MAC地址">
-              <Input placeholder="如 00:1A:2B:3C:4D:5E" />
+            <Form.Item name="mac" label={t('form.network.macAddress.label')}>
+              <Input placeholder={t('port.field.macHint')} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="ip_address" label="IP地址">
-              <Input placeholder="如 192.168.1.1" />
+            <Form.Item name="ip_address" label={t('port.column.ipAddress')}>
+              <Input placeholder={t('port.field.ipHint')} />
             </Form.Item>
           </Col>
         </Row>
-        <Form.Item name="description" label="备注">
-          <Input placeholder="端口备注" />
+        <Form.Item name="description" label={tCommon('field.remarks')}>
+          <Input placeholder={t('port.field.remarksHint')} />
         </Form.Item>
       </Form>
     </Modal>

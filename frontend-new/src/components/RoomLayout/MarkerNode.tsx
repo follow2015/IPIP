@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tooltip } from 'antd';
 import type { GlobalToken } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
   AppstoreOutlined,
   BorderOutlined,
@@ -9,7 +10,7 @@ import {
   ThunderboltOutlined
 } from '@ant-design/icons';
 import type { RoomLayoutMarker } from '@/types/models';
-import { MARKER_TYPE_LABEL, positionLabel } from './palette';
+import { MARKER_TYPE_LABEL_KEYS, positionLabel } from './palette';
 
 const MARKER_ICON: Record<string, React.ReactNode> = {
   ac: <CloudOutlined />,
@@ -40,16 +41,28 @@ function MarkerNode({
   selected,
   onSelect
 }: MarkerNodeProps) {
-  const typeLabel = MARKER_TYPE_LABEL[marker.marker_type] ?? marker.marker_type;
+  const { t: ta } = useTranslation('asset');
+  const { t: tc } = useTranslation('common');
+
+  const typeKey = MARKER_TYPE_LABEL_KEYS[marker.marker_type];
+  const typeLabel = typeKey ? ta(typeKey) : marker.marker_type;
   const name = marker.label || typeLabel;
   const showTypeText = cellWidth >= 96;
 
   const tooltip = (
     <div style={{ fontSize: 12 }}>
       <div style={{ fontWeight: 600 }}>{name}</div>
-      <div>类型：{typeLabel}</div>
-      <div>位置：{positionLabel(marker.row_number, marker.col_number)}</div>
-      {marker.notes ? <div>备注：{marker.notes}</div> : null}
+      <div>
+        {tc('field.type')}: {typeLabel}
+      </div>
+      <div>
+        {ta('roomLayout.marker.position')}: {positionLabel(marker.row_number, marker.col_number, ta)}
+      </div>
+      {marker.notes ? (
+        <div>
+          {tc('field.remarks')}: {marker.notes}
+        </div>
+      ) : null}
     </div>
   );
 

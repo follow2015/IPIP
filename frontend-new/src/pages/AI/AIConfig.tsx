@@ -17,8 +17,11 @@ import {
 import { SettingOutlined, SaveOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getAIConfig, updateAIConfig, type AIConfig } from '@/services/ai';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 export default function AIConfigPage() {
+  const { t } = useTranslation('ai');
+  const { t: tc } = useTranslation('common');
   const [config, setConfig] = useState<AIConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -42,13 +45,13 @@ export default function AIConfigPage() {
         temperature: data.temperature
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '加载配置失败';
+      const msg = err instanceof Error ? err.message : t('config.message.loadFailed');
       setLoadError(msg);
       message.error(msg);
     } finally {
       setLoading(false);
     }
-  }, [form, message]);
+  }, [form, message, t]);
 
   useEffect(() => {
     fetchConfig();
@@ -64,12 +67,12 @@ export default function AIConfigPage() {
       setSaving(true);
       const result = await updateAIConfig(updates);
       setConfig(result);
-      message.success(`已更新: ${result.changed.join(', ')}`);
+      message.success(t('config.message.updated', { fields: result.changed.join(', ') }));
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) {
         return;
       }
-      message.error(err instanceof Error ? err.message : '保存失败');
+      message.error(err instanceof Error ? err.message : t('config.message.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -80,12 +83,12 @@ export default function AIConfigPage() {
       title={
         <Space>
           <SettingOutlined />
-          <span>AI 配置管理</span>
+          <span>{t('config.title')}</span>
         </Space>
       }
       extra={
         <Button icon={<ReloadOutlined />} onClick={fetchConfig} loading={loading}>
-          刷新
+          {tc('action.refresh')}
         </Button>
       }
     >
@@ -95,11 +98,11 @@ export default function AIConfigPage() {
         <Alert
           type="error"
           showIcon
-          message="加载配置失败"
+          message={t('config.message.loadFailed')}
           description={loadError}
           action={
             <Button size="small" onClick={fetchConfig}>
-              重试
+              {tc('action.retry')}
             </Button>
           }
           style={{ marginBottom: 16 }}
@@ -115,12 +118,12 @@ export default function AIConfigPage() {
                 bordered
                 style={{ marginBottom: 24 }}
               >
-                <Descriptions.Item label="API Key 状态">
+                <Descriptions.Item label={t('config.field.apiKeyStatus')}>
                   <Space size={4} wrap>
                     {config.api_key_configured ? (
-                      <Tag color="green">已配置</Tag>
+                      <Tag color="green">{t('monitor.status.configured')}</Tag>
                     ) : (
-                      <Tag color="red">未配置</Tag>
+                      <Tag color="red">{t('monitor.status.notConfigured')}</Tag>
                     )}
                     {/* F13 修复：后端已返回 api_key_local_only，此前前端未展示。
                     为 true 表示"其他 worker 进程配过 key，但当前进程未同步"
@@ -128,55 +131,79 @@ export default function AIConfigPage() {
                     若不展示，多 worker 下页面显示"已配置✅"，会掩盖
                     "当前进程实际无 key"的真实故障。 */}
                     {config.api_key_local_only && (
-                      <Tooltip title="api_key 不跨进程同步。其他 worker 已配置，但处理本次请求的进程未生效，需重启该进程或改用环境变量注入。">
-                        <Tag color="orange">本进程未同步</Tag>
+                      <Tooltip title={t('config.tooltip.apiKeyLocalOnly')}>
+                        <Tag color="orange">{t('config.tag.localProcessNotSynced')}</Tag>
                       </Tooltip>
                     )}
                   </Space>
                 </Descriptions.Item>
-                <Descriptions.Item label="API Key（脱敏）">
-                  {config.api_key_masked || <Tag>空</Tag>}
+                <Descriptions.Item label={t('config.field.apiKeyMasked')}>
+                  {config.api_key_masked || <Tag>{t('config.tag.empty')}</Tag>}
                 </Descriptions.Item>
               </Descriptions>
 
               <Form form={form} layout="vertical">
                 <Form.Item
-                  label="Provider"
+                  label={t('config.field.provider')}
                   name="provider"
                   rules={[{ required: true }]}
-                  tooltip="OpenAI 兼容协议（DeepSeek/通义千问/Ollama 等）统一填 openai，通过下方 Base URL 切换端点。填错未注册的 provider 会被后端拒绝。"
+                  tooltip={t('config.tooltip.provider')}
                   extra={
                     <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                      兼容服务示例：openai（官方/DeepSeek <code>https://api.deepseek.com/v1</code> /
-                      通义 <code>https://dashscope.aliyuncs.com/compatible-mode/v1</code> / Ollama{' '}
-                      <code>http://localhost:11434/v1</code>）
+                      {t('config.providerExample.intro')}
+                      <code>https://api.deepseek.com/v1</code>
+                      {t('config.providerExample.qwen')}
+                      <code>https://dashscope.aliyuncs.com/compatible-mode/v1</code>
+                      {t('config.providerExample.ollama')}
+                      <code>http://localhost:11434/v1</code>
+                      {t('config.providerExample.suffix')}
                     </span>
                   }
                 >
                   <Input placeholder="openai" />
                 </Form.Item>
-                <Form.Item label="API Base URL" name="base_url" rules={[{ required: true }]}>
+                <Form.Item
+                  label={t('config.field.baseUrl')}
+                  name="base_url"
+                  rules={[{ required: true }]}
+                >
                   <Input placeholder="https://api.openai.com/v1" />
                 </Form.Item>
-                <Form.Item label="模型" name="model" rules={[{ required: true }]}>
+                <Form.Item
+                  label={t('config.field.model')}
+                  name="model"
+                  rules={[{ required: true }]}
+                >
                   <Input placeholder="gpt-4o-mini" />
                 </Form.Item>
-                <Form.Item label="API Key（留空不修改）" name="api_key">
-                  <Input.Password placeholder="输入新 Key 以更新，留空保持不变" />
+                <Form.Item label={t('config.field.apiKey')} name="api_key">
+                  <Input.Password placeholder={t('config.placeholder.apiKey')} />
                 </Form.Item>
                 <Space size="large" style={{ display: 'flex' }}>
-                  <Form.Item label="请求超时（秒）" name="timeout" style={{ flex: 1 }}>
+                  <Form.Item label={t('config.field.timeout')} name="timeout" style={{ flex: 1 }}>
                     <InputNumber min={1} max={300} style={{ width: '100%' }} />
                   </Form.Item>
-                  <Form.Item label="流式超时（秒）" name="stream_timeout" style={{ flex: 1 }}>
+                  <Form.Item
+                    label={t('config.field.streamTimeout')}
+                    name="stream_timeout"
+                    style={{ flex: 1 }}
+                  >
                     <InputNumber min={1} max={600} style={{ width: '100%' }} />
                   </Form.Item>
                 </Space>
                 <Space size="large" style={{ display: 'flex' }}>
-                  <Form.Item label="最大 Token" name="max_tokens" style={{ flex: 1 }}>
+                  <Form.Item
+                    label={t('config.field.maxTokens')}
+                    name="max_tokens"
+                    style={{ flex: 1 }}
+                  >
                     <InputNumber min={1} max={8192} style={{ width: '100%' }} />
                   </Form.Item>
-                  <Form.Item label="温度" name="temperature" style={{ flex: 1 }}>
+                  <Form.Item
+                    label={t('config.field.temperature')}
+                    name="temperature"
+                    style={{ flex: 1 }}
+                  >
                     <InputNumber min={0} max={2} step={0.1} style={{ width: '100%' }} />
                   </Form.Item>
                 </Space>
@@ -187,13 +214,13 @@ export default function AIConfigPage() {
                   onClick={handleSave}
                   loading={saving}
                 >
-                  保存配置
+                  {t('config.action.save')}
                 </Button>
               </Form>
             </>
           )}
           {/* 加载完成但无数据（后端异常返回空）时给出空态，而非空白 */}
-          {!loading && !loadError && !config && <Empty description="暂无配置数据" />}
+          {!loading && !loadError && !config && <Empty description={t('config.empty')} />}
         </Skeleton>
       )}
     </Card>

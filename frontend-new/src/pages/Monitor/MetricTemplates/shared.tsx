@@ -1,18 +1,44 @@
-/**
- * 指标模板共享常量与工具函数
- *
- * 从 MetricTemplates/index.tsx 拆分（M27）：表单与表格共用的标签映射、
- * 选项列表、阈值结构化转换与友好展示。
- */
 import { Typography } from 'antd';
+import type { TFunction } from 'i18next';
 
 const { Text } = Typography;
 
-export const DEVICE_TYPE_LABEL: Record<string, string> = {
-  network: '网络设备',
-  server: '服务器',
-  other: '其他'
+export type MetricDeviceTypeKey =
+  | 'deviceType.NETWORK'
+  | 'deviceType.SERVER'
+  | 'deviceType.OTHER';
+
+export const DEVICE_TYPE_LABEL_KEYS: Record<string, MetricDeviceTypeKey> = {
+  network: 'deviceType.NETWORK',
+  server: 'deviceType.SERVER',
+  other: 'deviceType.OTHER'
 };
+
+export type MetricTypeKey =
+  | 'metricTemplate.metricType.gauge'
+  | 'metricTemplate.metricType.counter'
+  | 'metricTemplate.metricType.state'
+  | 'metricTemplate.metricType.event';
+
+export type MetricTypeOptionKey =
+  | 'metricTemplate.metricTypeOption.gauge'
+  | 'metricTemplate.metricTypeOption.counter'
+  | 'metricTemplate.metricTypeOption.state'
+  | 'metricTemplate.metricTypeOption.event';
+
+export const METRIC_TYPE_LABEL_KEYS: Record<string, MetricTypeKey> = {
+  gauge: 'metricTemplate.metricType.gauge',
+  counter: 'metricTemplate.metricType.counter',
+  state: 'metricTemplate.metricType.state',
+  event: 'metricTemplate.metricType.event'
+};
+
+const METRIC_TYPE_OPTION_KEYS: { value: string; key: MetricTypeOptionKey }[] = [
+  { value: 'gauge', key: 'metricTemplate.metricTypeOption.gauge' },
+  { value: 'counter', key: 'metricTemplate.metricTypeOption.counter' },
+  { value: 'state', key: 'metricTemplate.metricTypeOption.state' },
+  { value: 'event', key: 'metricTemplate.metricTypeOption.event' }
+];
 
 export const SOURCE_LABEL: Record<string, string> = {
   snmp: 'SNMP',
@@ -20,31 +46,30 @@ export const SOURCE_LABEL: Record<string, string> = {
   zabbix: 'Zabbix'
 };
 
-export const METRIC_TYPE_LABEL: Record<string, string> = {
-  gauge: '瞬时值',
-  counter: '累加计数',
-  state: '状态',
-  event: '事件'
-};
-
-export const DEVICE_TYPE_OPTIONS = [
-  { label: '网络设备', value: 'network' },
-  { label: '服务器', value: 'server' },
-  { label: '其他', value: 'other' }
-];
-
 export const SOURCE_OPTIONS = [
   { label: 'SNMP', value: 'snmp' },
   { label: 'IPMI', value: 'ipmi' },
   { label: 'Zabbix', value: 'zabbix' }
 ];
 
-export const METRIC_TYPE_OPTIONS = [
-  { label: '瞬时值（gauge）', value: 'gauge' },
-  { label: '累加计数（counter）', value: 'counter' },
-  { label: '状态（state）', value: 'state' },
-  { label: '事件（event）', value: 'event' }
-];
+export const deviceTypeLabel = (v: string, td: TFunction<'device'>): string => {
+  const key = DEVICE_TYPE_LABEL_KEYS[v];
+  return key ? td(key) : v;
+};
+
+export const metricTypeLabel = (v: string, t: TFunction<'monitor'>): string => {
+  const key = METRIC_TYPE_LABEL_KEYS[v];
+  return key ? t(key) : v;
+};
+
+export const buildDeviceTypeOptions = (td: TFunction<'device'>) =>
+  (['network', 'server', 'other'] as const).map((value) => ({
+    label: deviceTypeLabel(value, td),
+    value
+  }));
+
+export const buildMetricTypeOptions = (t: TFunction<'monitor'>) =>
+  METRIC_TYPE_OPTION_KEYS.map(({ value, key }) => ({ label: t(key), value }));
 
 export interface MetricTemplateFormValues {
   device_type: string;
@@ -111,24 +136,28 @@ export function parseThreshold(
 
 export function renderThreshold(
   threshold: Record<string, unknown> | null | undefined,
-  metricType: string
+  metricType: string,
+  t: TFunction<'monitor'>
 ): React.ReactNode {
-  if (!threshold) return <Text type="secondary">未配置</Text>;
+  const notConfigured = <Text type="secondary">{t('metricTemplate.threshold.notConfigured')}</Text>;
+  if (!threshold) return notConfigured;
   if (metricType === 'gauge' || metricType === 'counter') {
     const parts: string[] = [];
-    if (threshold.warn !== undefined) parts.push(`告警≥${threshold.warn}`);
-    if (threshold.crit !== undefined) parts.push(`严重≥${threshold.crit}`);
-    return parts.length > 0 ? (
-      <Text>{parts.join(' / ')}</Text>
-    ) : (
-      <Text type="secondary">未配置</Text>
-    );
+    if (threshold.warn !== undefined) {
+      parts.push(t('metricTemplate.threshold.warnAt', { value: String(threshold.warn) }));
+    }
+    if (threshold.crit !== undefined) {
+      parts.push(t('metricTemplate.threshold.critAt', { value: String(threshold.crit) }));
+    }
+    return parts.length > 0 ? <Text>{parts.join(' / ')}</Text> : notConfigured;
   }
   if (metricType === 'state') {
     return threshold.expected !== undefined ? (
-      <Text>期望={String(threshold.expected)}</Text>
+      <Text>
+        {t('metricTemplate.threshold.expected', { value: String(threshold.expected) })}
+      </Text>
     ) : (
-      <Text type="secondary">未配置</Text>
+      notConfigured
     );
   }
   return (

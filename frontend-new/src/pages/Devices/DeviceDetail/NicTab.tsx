@@ -7,8 +7,8 @@
 import { useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import { useConfirm } from '@/utils/confirm';
-import { Button, Space, Modal, Form, Input, InputNumber, Select } from 'antd';
-import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
+import { useTranslation } from 'react-i18next';
+import { Table, Button, Space, Modal, Form, Input, InputNumber, Select } from 'antd';
 import { AppstoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   useDeviceNics,
@@ -30,15 +30,28 @@ interface NicTabProps {
   deviceId: number;
 }
 
-const PORT_TYPE_OPTIONS = [
-  { label: 'RJ45 (电口)', value: 'RJ45' },
-  { label: 'SFP (1G光口)', value: 'SFP' },
-  { label: 'SFP+ (10G光口)', value: 'SFP+' },
-  { label: 'SFP28 (25G光口)', value: 'SFP28' },
-  { label: 'QSFP+ (40G光口)', value: 'QSFP+' },
-  { label: 'QSFP28 (100G光口)', value: 'QSFP28' },
-  { label: 'QSFP56 (200G光口)', value: 'QSFP56' },
-  { label: 'QSFP-DD (400G光口)', value: 'QSFP-DD' }
+type NicOptionKey =
+  | 'nic.portType.rj45'
+  | 'nic.portType.sfp'
+  | 'nic.portType.sfpPlus'
+  | 'nic.portType.sfp28'
+  | 'nic.portType.qsfpPlus'
+  | 'nic.portType.qsfp28'
+  | 'nic.portType.qsfp56'
+  | 'nic.portType.qsfpdd'
+  | 'nic.status.free'
+  | 'nic.status.occupied'
+  | 'nic.status.disabled';
+
+const PORT_TYPE_OPTIONS: { labelKey: NicOptionKey; value: string }[] = [
+  { labelKey: 'nic.portType.rj45', value: 'RJ45' },
+  { labelKey: 'nic.portType.sfp', value: 'SFP' },
+  { labelKey: 'nic.portType.sfpPlus', value: 'SFP+' },
+  { labelKey: 'nic.portType.sfp28', value: 'SFP28' },
+  { labelKey: 'nic.portType.qsfpPlus', value: 'QSFP+' },
+  { labelKey: 'nic.portType.qsfp28', value: 'QSFP28' },
+  { labelKey: 'nic.portType.qsfp56', value: 'QSFP56' },
+  { labelKey: 'nic.portType.qsfpdd', value: 'QSFP-DD' }
 ];
 
 const PORT_SPEED_OPTIONS = [
@@ -51,13 +64,15 @@ const PORT_SPEED_OPTIONS = [
   { label: '400G', value: '400G' }
 ];
 
-const PORT_STATUS_OPTIONS = [
-  { label: '空闲', value: 'free' },
-  { label: '占用', value: 'occupied' },
-  { label: '禁用', value: 'disabled' }
+const PORT_STATUS_OPTIONS: { labelKey: NicOptionKey; value: string }[] = [
+  { labelKey: 'nic.status.free', value: 'free' },
+  { labelKey: 'nic.status.occupied', value: 'occupied' },
+  { labelKey: 'nic.status.disabled', value: 'disabled' }
 ];
 
 function NicTab({ deviceId }: NicTabProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const { data: nics, isLoading } = useDeviceNics(deviceId);
   const updateNic = useUpdateNic(deviceId);
@@ -89,7 +104,7 @@ function NicTab({ deviceId }: NicTabProps) {
       const values = await form.validateFields();
       if (editingNic) {
         await updateNic.mutateAsync({ portId: editingNic.id, data: values });
-        message.success('更新成功');
+        message.success(tCommon('message.updateSuccess'));
       }
       formDisclosure.close();
     } catch (err) {
@@ -103,13 +118,13 @@ function NicTab({ deviceId }: NicTabProps) {
       const res = await batchDeleteNics.mutateAsync({ port_ids: batch.selectedKeys.map(Number) });
       const deleted = res.data?.deleted.length ?? 0;
       const skipped = res.data?.skipped.length ?? 0;
-      message.success(`已删除 ${deleted} 个端口`);
+      message.success(t('nic.message.deleted', { count: deleted }));
       if (skipped > 0) {
-        message.warning(`${skipped} 个端口因占用或无效被跳过`);
+        message.warning(t('nic.message.skipped', { count: skipped }));
       }
       batch.clear();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '批量删除失败');
+      message.error(err instanceof Error ? err.message : t('nic.message.batchDeleteFailed'));
     }
   };
 
@@ -123,59 +138,59 @@ function NicTab({ deviceId }: NicTabProps) {
     const nicPortsFormVal = values.nic_ports as { template_id?: number }[] | undefined;
     const ports = expandNicPorts(nicPortsFormVal, nicTemplates);
     if (ports.length === 0) {
-      message.warning('请至少选择一个网卡模板');
+      message.warning(t('nic.message.needTemplate'));
       return;
     }
     try {
       await batchCreateNics.mutateAsync({ ports });
-      message.success(`已按模板创建 ${ports.length} 个端口`);
+      message.success(t('nic.message.created', { count: ports.length }));
       template.close();
       templateForm.resetFields();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '创建失败');
+      message.error(err instanceof Error ? err.message : t('nic.message.createFailed'));
     }
   };
 
   const columns = [
-    { title: '显示名', dataIndex: 'display_name', key: 'display_name' },
-    { title: '网卡号', dataIndex: 'nic_number', key: 'nic_number', width: 80 },
-    { title: '端口号', dataIndex: 'port_number', key: 'port_number', width: 80 },
+    { title: t('nic.column.displayName'), dataIndex: 'display_name', key: 'display_name' },
+    { title: t('nic.column.nicIndex'), dataIndex: 'nic_number', key: 'nic_number', width: 80 },
+    { title: t('nic.column.portIndex'), dataIndex: 'port_number', key: 'port_number', width: 80 },
     {
-      title: '端口名称',
+      title: t('nic.column.portName'),
       dataIndex: 'port_name',
       key: 'port_name',
       width: 120,
       render: (v: string) => v || '-'
     },
     {
-      title: '端口类型',
+      title: t('nic.column.portType'),
       dataIndex: 'port_type',
       key: 'port_type',
       width: 90,
       render: (v: string) => v || '-'
     },
     {
-      title: '速率',
+      title: t('nic.column.speed'),
       dataIndex: 'port_speed',
       key: 'port_speed',
       width: 80,
       render: (v: string) => v || '-'
     },
     {
-      title: '端口状态',
+      title: t('nic.column.portStatus'),
       dataIndex: 'port_status',
       key: 'port_status',
       width: 90,
       render: (v: string) => <StatusTag status={v} statusMap={PORT_USAGE_STATUS_MAP} />
     },
     {
-      title: '描述',
+      title: t('nic.column.description'),
       dataIndex: 'description',
       key: 'description',
       render: (v: string) => v || '-'
     },
     {
-      title: '操作',
+      title: tCommon('field.actions'),
       key: 'action',
       width: 80,
       render: (_: unknown, record: DeviceNicPort) => (
@@ -193,15 +208,15 @@ function NicTab({ deviceId }: NicTabProps) {
             icon={<DeleteOutlined />}
             onClick={() =>
               confirm({
-                title: '确定删除该端口？',
-                okText: '删除',
+                title: t('nic.confirmDelete'),
+                okText: tCommon('action.delete'),
                 okButtonProps: { danger: true },
                 onOk: async () => {
                   try {
                     await deleteNic.mutateAsync(record.id);
-                    message.success('删除成功');
+                    message.success(tCommon('message.deleteSuccess'));
                   } catch (err) {
-                    message.error(err instanceof Error ? err.message : '删除失败');
+                    message.error(err instanceof Error ? err.message : tCommon('message.deleteFailed'));
                   }
                 }
               })
@@ -215,20 +230,20 @@ function NicTab({ deviceId }: NicTabProps) {
   return (
     <div>
       {/* 批量操作浮条（勾选后浮出，统一批量删除入口） */}
-      <BatchActionBar count={batch.count} unit="个端口" onClear={batch.clear}>
+      <BatchActionBar count={batch.count} unit={t('nic.unit')} onClear={batch.clear}>
         <Button
           danger
           icon={<DeleteOutlined />}
           onClick={() =>
             confirm({
-              title: `确定删除选中的 ${batch.count} 个端口？`,
-              okText: '删除',
+              title: t('nic.confirmBatchDelete', { count: batch.count }),
+              okText: tCommon('action.delete'),
               okButtonProps: { danger: true },
               onOk: handleBatchDelete
             })
           }
         >
-          批量删除
+          {tCommon('action.batchDelete')}
         </Button>
       </BatchActionBar>
 
@@ -242,26 +257,24 @@ function NicTab({ deviceId }: NicTabProps) {
               templateForm.resetFields();
             }}
           >
-            模板配置
+            {t('nic.templateConfig')}
           </Button>
         </Space>
       </div>
 
-      <DataTable
+      <Table
         columns={columns}
         dataSource={nics ?? []}
         rowKey="id"
         loading={isLoading}
         size="small"
         rowSelection={batch.rowSelection}
-        showCard={false}
-        searchable={false}
-        pagination={DENSE_PAGINATION}
+        scroll={{ x: 'max-content' }}
       />
 
       {/* ─── 编辑 Modal ─── */}
       <Modal
-        title="编辑端口"
+        title={t('nic.editTitle')}
         open={formDisclosure.isOpen}
         onOk={handleSubmit}
         onCancel={() => formDisclosure.close()}
@@ -270,31 +283,31 @@ function NicTab({ deviceId }: NicTabProps) {
         <Form form={form} layout="vertical">
           <Form.Item
             name="nic_number"
-            label="网卡号"
-            rules={[{ required: true, message: '请输入网卡号' }]}
+            label={t('nic.column.nicIndex')}
+            rules={[{ required: true, message: t('nic.field.nicIndexPlaceholder') }]}
           >
-            <InputNumber min={1} max={8} style={{ width: '100%' }} placeholder="网卡编号" />
+            <InputNumber min={1} max={8} style={{ width: '100%' }} placeholder={t('nic.field.nicIndexHint')} />
           </Form.Item>
           <Form.Item
             name="port_number"
-            label="端口号"
-            rules={[{ required: true, message: '请输入端口号' }]}
+            label={t('nic.column.portIndex')}
+            rules={[{ required: true, message: t('nic.field.portIndexPlaceholder') }]}
           >
-            <InputNumber min={1} max={16} style={{ width: '100%' }} placeholder="端口编号" />
+            <InputNumber min={1} max={16} style={{ width: '100%' }} placeholder={t('nic.field.portIndexHint')} />
           </Form.Item>
-          <Form.Item name="port_name" label="端口名称">
-            <Input placeholder="如 port1" />
+          <Form.Item name="port_name" label={t('nic.column.portName')}>
+            <Input placeholder={t('nic.field.portNameHint')} />
           </Form.Item>
-          <Form.Item name="port_type" label="端口类型">
-            <Select placeholder="请选择" options={PORT_TYPE_OPTIONS} allowClear />
+          <Form.Item name="port_type" label={t('nic.column.portType')}>
+            <Select placeholder={tCommon('message.selectRequired')} options={PORT_TYPE_OPTIONS.map((o) => ({ label: t(o.labelKey), value: o.value }))} allowClear />
           </Form.Item>
-          <Form.Item name="port_speed" label="速率">
-            <Select placeholder="请选择" options={PORT_SPEED_OPTIONS} allowClear />
+          <Form.Item name="port_speed" label={t('nic.column.speed')}>
+            <Select placeholder={tCommon('message.selectRequired')} options={PORT_SPEED_OPTIONS} allowClear />
           </Form.Item>
-          <Form.Item name="port_status" label="端口状态">
-            <Select placeholder="请选择" options={PORT_STATUS_OPTIONS} allowClear />
+          <Form.Item name="port_status" label={t('nic.column.portStatus')}>
+            <Select placeholder={tCommon('message.selectRequired')} options={PORT_STATUS_OPTIONS.map((o) => ({ label: t(o.labelKey), value: o.value }))} allowClear />
           </Form.Item>
-          <Form.Item name="description" label="描述">
+          <Form.Item name="description" label={t('nic.column.description')}>
             <Input.TextArea rows={2} />
           </Form.Item>
         </Form>
@@ -302,11 +315,11 @@ function NicTab({ deviceId }: NicTabProps) {
 
       {/* ─── 模板配置 Modal（复用 NicConfigFields） ─── */}
       <Modal
-        title="模板配置"
+        title={t('nic.templateConfig')}
         open={template.isOpen}
         onCancel={() => template.close()}
         onOk={handleTemplateSubmit}
-        okText={`确认创建`}
+        okText={t('nic.confirmCreate')}
         confirmLoading={batchCreateNics.isPending}
         width={700}
         destroyOnHidden

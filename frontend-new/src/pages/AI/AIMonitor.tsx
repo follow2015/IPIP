@@ -21,25 +21,48 @@ import {
 } from '@/services/ai';
 import { useMessage } from '@/hooks/useMessage';
 import { useConfirm } from '@/utils/confirm';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 const META_KEYS = new Set(['metrics_source', 'pid']);
 
-const METRIC_LABELS: Record<string, string> = {
-  ai_calls_total: 'LLM 调用次数（累计）',
-  ai_errors_total: '调用失败（累计）',
-  ai_prompt_tokens_total: '输入 Token（累计）',
-  ai_completion_tokens_total: '输出 Token（累计）',
-  ai_tokens_total: 'Token 总消耗（累计）',
-  ai_skill_runs_total: '技能执行次数（累计）',
-  ai_calls_today: 'LLM 调用次数（今日）',
-  ai_errors_today: '调用失败（今日）',
-  ai_prompt_tokens_today: '输入 Token（今日）',
-  ai_completion_tokens_today: '输出 Token（今日）',
-  ai_tokens_today: 'Token 总消耗（今日）',
-  ai_skill_runs_today: '技能执行次数（今日）'
+type MetricLabelKey =
+  | 'monitor.metric.callsTotal'
+  | 'monitor.metric.errorsTotal'
+  | 'monitor.metric.promptTokensTotal'
+  | 'monitor.metric.completionTokensTotal'
+  | 'monitor.metric.tokensTotal'
+  | 'monitor.metric.skillRunsTotal'
+  | 'monitor.metric.callsToday'
+  | 'monitor.metric.errorsToday'
+  | 'monitor.metric.promptTokensToday'
+  | 'monitor.metric.completionTokensToday'
+  | 'monitor.metric.tokensToday'
+  | 'monitor.metric.skillRunsToday';
+
+const METRIC_LABEL_KEYS: Record<string, MetricLabelKey> = {
+  ai_calls_total: 'monitor.metric.callsTotal',
+  ai_errors_total: 'monitor.metric.errorsTotal',
+  ai_prompt_tokens_total: 'monitor.metric.promptTokensTotal',
+  ai_completion_tokens_total: 'monitor.metric.completionTokensTotal',
+  ai_tokens_total: 'monitor.metric.tokensTotal',
+  ai_skill_runs_total: 'monitor.metric.skillRunsTotal',
+  ai_calls_today: 'monitor.metric.callsToday',
+  ai_errors_today: 'monitor.metric.errorsToday',
+  ai_prompt_tokens_today: 'monitor.metric.promptTokensToday',
+  ai_completion_tokens_today: 'monitor.metric.completionTokensToday',
+  ai_tokens_today: 'monitor.metric.tokensToday',
+  ai_skill_runs_today: 'monitor.metric.skillRunsToday'
+};
+
+const metricLabel = (key: string, t: TFunction<'ai'>) => {
+  const k = METRIC_LABEL_KEYS[key];
+  return k ? t(k) : key;
 };
 
 export default function AIMonitor() {
+  const { t } = useTranslation('ai');
+  const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
   const [circuits, setCircuits] = useState<CircuitStatus[]>([]);
   const [metrics, setMetrics] = useState<AIMetrics | null>(null);
@@ -67,12 +90,12 @@ export default function AIMonitor() {
       setAiConfigured(configured);
     } catch (err) {
       if (!mountedRef.current) return;
-      message.error(err instanceof Error ? err.message : '加载监控数据失败');
+      message.error(err instanceof Error ? err.message : t('monitor.message.loadFailed'));
     } finally {
       inFlightRef.current = false;
       if (mountedRef.current) setLoading(false);
     }
-  }, [message]);
+  }, [message, t]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -111,15 +134,15 @@ export default function AIMonitor() {
 
   const handleReset = (provider: string) => {
     confirm({
-      title: '重置熔断器',
-      content: `确认重置 ${provider} 的熔断器？将清零失败计数。`,
+      title: t('monitor.reset.title'),
+      content: t('monitor.reset.content', { provider }),
       onOk: async () => {
         try {
           await resetCircuit(provider);
-          message.success('已重置');
+          message.success(t('monitor.message.resetDone'));
           fetchAll();
         } catch (err) {
-          message.error(err instanceof Error ? err.message : '重置失败');
+          message.error(err instanceof Error ? err.message : t('monitor.message.resetFailed'));
         }
       }
     });
@@ -127,21 +150,25 @@ export default function AIMonitor() {
 
   const columns: ColumnsType<CircuitStatus> = [
     {
-      title: 'Provider',
+      title: t('monitor.column.provider'),
       dataIndex: 'name',
       key: 'name',
       render: (name: string) => <Tag color="blue">{name}</Tag>
     },
     {
-      title: '状态',
+      title: tc('field.status'),
       dataIndex: 'open',
       key: 'open',
       width: 100,
       render: (open: boolean) =>
-        open ? <Tag color="red">熔断开启</Tag> : <Tag color="green">正常</Tag>
+        open ? (
+          <Tag color="red">{t('monitor.status.circuitOpen')}</Tag>
+        ) : (
+          <Tag color="green">{t('monitor.status.normal')}</Tag>
+        )
     },
     {
-      title: '失败次数',
+      title: t('monitor.column.failures'),
       dataIndex: 'failures',
       key: 'failures',
       width: 100,
@@ -152,20 +179,20 @@ export default function AIMonitor() {
       )
     },
     {
-      title: '冷却时间（秒）',
+      title: t('monitor.column.cooldownSeconds'),
       dataIndex: 'cooldown_seconds',
       key: 'cooldown_seconds',
       width: 120
     },
     {
-      title: '剩余冷却',
+      title: t('monitor.column.cooldownRemaining'),
       dataIndex: 'cooldown_remaining',
       key: 'cooldown_remaining',
       width: 100,
       render: (r: number) => (r > 0 ? <Tag color="orange">{r}s</Tag> : <Tag>-</Tag>)
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 100,
       render: (_, record) => (
@@ -175,7 +202,7 @@ export default function AIMonitor() {
           onClick={() => handleReset(record.name)}
           disabled={!record.open && record.failures === 0}
         >
-          重置
+          {tc('action.reset')}
         </Button>
       )
     }
@@ -192,28 +219,28 @@ export default function AIMonitor() {
         title={
           <Space>
             <ApiOutlined />
-            <span>AI 配置就绪</span>
+            <span>{t('monitor.ready.title')}</span>
           </Space>
         }
       >
         <Space align="center" size="middle" wrap>
           {aiConfigured === null ? (
-            <Tag icon={<QuestionCircleOutlined />}>未知</Tag>
+            <Tag icon={<QuestionCircleOutlined />}>{tc('field.unknown')}</Tag>
           ) : aiConfigured ? (
             <Tag color="green" icon={<CheckCircleOutlined />}>
-              已配置
+              {t('monitor.status.configured')}
             </Tag>
           ) : (
             <Tag color="red" icon={<CloseCircleOutlined />}>
-              未配置
+              {t('monitor.status.notConfigured')}
             </Tag>
           )}
           <span style={{ fontSize: 13, color: 'rgba(0,0,0,0.45)' }}>
             {aiConfigured === null
-              ? '健康探针不可用（接口异常或缺少 ai:use 权限），当前无法判定配置状态'
+              ? t('monitor.ready.hintUnknown')
               : aiConfigured
-                ? 'LLM 客户端凭据已就绪，AI 问答 / 诊断 / RAG 能力可用'
-                : 'LLM 客户端未配置凭据，AI 问答 / 诊断 / RAG 能力将不可用'}
+                ? t('monitor.ready.hintConfigured')
+                : t('monitor.ready.hintNotConfigured')}
           </span>
         </Space>
       </Card>
@@ -222,7 +249,7 @@ export default function AIMonitor() {
         title={
           <Space>
             <DashboardOutlined />
-            <span>AI 运行指标</span>
+            <span>{t('monitor.metrics.title')}</span>
           </Space>
         }
         extra={
@@ -230,33 +257,39 @@ export default function AIMonitor() {
             {/* 数据来源提示：local/error 都不可作为全局依据，
                 若不明示会被误读成"全局就是这些数"，且随命中的 worker 漂移。 */}
             {metrics?.metrics_source === 'error' ? (
-              <Tooltip title="Redis 可达但本次读取失败，以下为本进程兜底数据，不代表全局真实值，请刷新重试">
-                <Tag color="error">读取异常 · pid {metrics?.pid}</Tag>
+              <Tooltip title={t('monitor.metrics.source.errorTip')}>
+                <Tag color="error">
+                  {t('monitor.metrics.source.errorTag', { pid: metrics?.pid })}
+                </Tag>
               </Tooltip>
             ) : metrics?.metrics_source === 'local' ? (
-              <Tooltip title="Redis 不可用，当前仅为处理本请求的进程内的兜底数据，会随命中的 worker 变化，不可作为全局依据">
-                <Tag color="warning">本进程兜底 · pid {metrics?.pid}</Tag>
+              <Tooltip title={t('monitor.metrics.source.localTip')}>
+                <Tag color="warning">
+                  {t('monitor.metrics.source.localTag', { pid: metrics?.pid })}
+                </Tag>
               </Tooltip>
             ) : (
-              <Tooltip title="来自 Redis 聚合，覆盖全部 gunicorn worker 与 celery worker；python_gc 等系统指标仍只反映本进程">
-                <Tag color="success">全进程聚合 · pid {metrics?.pid}</Tag>
+              <Tooltip title={t('monitor.metrics.source.aggregateTip')}>
+                <Tag color="success">
+                  {t('monitor.metrics.source.aggregateTag', { pid: metrics?.pid })}
+                </Tag>
               </Tooltip>
             )}
             <Button icon={<ReloadOutlined />} onClick={fetchAll} loading={loading}>
-              刷新
+              {tc('action.refresh')}
             </Button>
           </Space>
         }
       >
         {metricEntries.length === 0 ? (
-          <Empty description="暂无指标数据" />
+          <Empty description={t('monitor.metrics.empty')} />
         ) : (
           <Row gutter={[16, 16]}>
             {metricEntries.map(([key, val]) => {
               const isNumeric = typeof val === 'number' && Number.isFinite(val);
               const isRawText = key === 'raw' && typeof val === 'string';
               const isCount = /_(total|today)$/.test(key);
-              const label = METRIC_LABELS[key] ?? key;
+              const label = metricLabel(key, t);
               return (
                 <Col key={key} xs={24} sm={12} md={8} lg={isRawText ? 24 : 6}>
                   <Card size="small" type="inner">
@@ -307,14 +340,14 @@ export default function AIMonitor() {
         title={
           <Space>
             <ThunderboltOutlined />
-            <span>熔断器状态</span>
+            <span>{t('monitor.circuit.title')}</span>
           </Space>
         }
       >
         {/* F10 修复：熔断器表 6 列合计约 750px 固定宽，移动端列被压缩。
             加横向滚动后各列保持可读宽度。 */}
         {circuits.length === 0 ? (
-          <Empty description="暂无熔断器记录（无 AI 调用发生）" />
+          <Empty description={t('monitor.circuit.empty')} />
         ) : (
           <DataTable
             rowKey="name"

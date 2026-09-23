@@ -5,6 +5,7 @@
  */
 import { useCallback } from 'react';
 import { message } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {
@@ -23,10 +24,14 @@ export function formatRecordAsText(record: Record<string, unknown>, labelMap?: R
 }
 
 export function useCopyInfo() {
-  return useCallback((text: string, successMsg = '已复制') => {
-    copyToClipboard(text).then((ok) => {
-      if (ok) message.success(successMsg);
-      else message.error('复制失败');
-    });
-  }, []);
+  const { t } = useTranslation();
+  return useCallback(
+    (text: string, successMsg?: string) => {
+      copyToClipboard(text).then((ok) => {
+        if (ok) message.success(successMsg ?? t('clipboard.copied'));
+        else message.error(t('clipboard.failed'));
+      });
+    },
+    [t]
+  );
 }

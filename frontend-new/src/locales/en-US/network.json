@@ -1,0 +1,391 @@
+{
+  "portField": {
+    "type": "Type: {{value}}",
+    "usage": "Occupancy: {{value}}",
+    "usageStatus": "Occupancy Status: {{value}}",
+    "link": "Link: {{value}}",
+    "speed": "Speed: {{value}}",
+    "vlan": "VLAN: {{value}}",
+    "ip": "IP: {{value}}",
+    "ipWithRole": "IP{{role}}: {{value}}",
+    "customer": "Customer: {{value}}",
+    "notes": "Notes: {{value}}"
+  },
+  "switchPort": {
+    "legend": {
+      "caption": "Status:",
+      "reducedSpeed": "Reduced Speed"
+    },
+    "group": {
+      "total": "Total {{count}} ports"
+    },
+    "tooltip": {
+      "linkStatus": "Link Status: {{value}}",
+      "linkStatusUnderspeed": "Link Status: {{value}} (Reduced Speed)",
+      "underspeed": "Reduced Speed: {{type}} port running at {{speed}}",
+      "ipRolePrimary": "(Primary)",
+      "ipRoleSecondary": "(Secondary)"
+    }
+  },
+  "portMember": {
+    "detailTitle": "Port Details",
+    "noDetailData": "No port details available",
+    "groupCount": "{{count}} ports",
+    "legend": {
+      "usage": "Occupancy:",
+      "type": "Type:"
+    }
+  },
+  "ip": {
+    "unit": "IPs",
+    "field": {
+      "ipAddress": "IP Address",
+      "status": "Status",
+      "switch": "Switch",
+      "port": "Port",
+      "customer": "Customer",
+      "room": "Room",
+      "macAddress": "MAC Address",
+      "notes": "Remarks",
+      "actions": "Actions"
+    },
+    "action": {
+      "detail": "Details",
+      "edit": "Edit",
+      "scan": "Scan",
+      "batchBan": "Batch Ban",
+      "batchUnban": "Batch Unban",
+      "batchAssignCustomer": "Batch Assign Customer",
+      "batchEditNotes": "Batch Edit Remarks",
+      "exportCsv": "Export CSV",
+      "stats": "Statistics",
+      "scanNetwork": "Scan Subnet"
+    },
+    "tooltip": {
+      "unban": "Unban IP",
+      "ban": "Ban IP (blackhole route)",
+      "banning": "Banning in progress, please wait",
+      "unbanning": "Unbanning in progress, please wait",
+      "privateUnreachable": "Private addresses are not reachable across networks"
+    },
+    "confirm": {
+      "banTitle": "Confirm Ban",
+      "banContent": "Ban IP \"{{address}}\"? A blackhole route will be pushed through the core switch.",
+      "unbanTitle": "Confirm Unban",
+      "unbanContent": "Unban IP \"{{address}}\"? The ban rule will be withdrawn.",
+      "batchBanTitle": "Confirm Batch Ban",
+      "batchBanContent_one": "Ban the selected {{count}} IP? A blackhole route will be pushed through the core switch.",
+      "batchBanContent_other": "Ban the selected {{count}} IPs? Blackhole routes will be pushed through the core switch.",
+      "batchUnbanTitle": "Confirm Batch Unban",
+      "batchUnbanContent_one": "Unban the selected {{count}} IP? The ban rules will be withdrawn.",
+      "batchUnbanContent_other": "Unban the selected {{count}} IPs? The ban rules will be withdrawn.",
+      "scanNetworkTitle": "Scan All IPs in the Subnet",
+      "scanNetworkContent": "The status of every IP in subnet {{network}} will be scanned in the background and refreshed when done."
+    },
+    "message": {
+      "banned": "IP {{address}} banned",
+      "unbanned": "IP {{address}} unbanned",
+      "banFailed": "Ban failed",
+      "unbanFailed": "Unban failed",
+      "batchBanSubmitted": "Batch ban submitted. You will be notified when it finishes.",
+      "batchUnbanSubmitted": "Batch unban submitted. You will be notified when it finishes.",
+      "batchBanFailed": "Batch ban failed",
+      "batchUnbanFailed": "Batch unban failed",
+      "batchCustomerAssigned_one": "Assigned a customer to {{count}} IP",
+      "batchCustomerAssigned_other": "Assigned a customer to {{count}} IPs",
+      "batchNotesUpdated_one": "Updated remarks for {{count}} IP",
+      "batchNotesUpdated_other": "Updated remarks for {{count}} IPs",
+      "batchUpdateFailed": "Batch update failed",
+      "selectIpFirst": "Please select IPs first",
+      "inputIpRequired": "Please enter an IP address",
+      "pingReachable": "{{address}} is reachable",
+      "pingUnreachable": "{{address}} is unreachable",
+      "pingFailed": "Ping failed",
+      "scanFailed": "Scan failed",
+      "selectRoomFirst": "Please select a room first",
+      "inputNetworkFirst": "Enter a subnet address in the search box first (e.g. 10.10.1.0/24)",
+      "privateNetworkUnreachable": "Private addresses are not reachable across networks; status is derived from the ARP table",
+      "scanNetworkSubmitted": "Subnet scan submitted. You will be notified when it finishes.",
+      "scanNetworkFailed": "Failed to start the scan",
+      "noDataToExport": "No data to export"
+    },
+    "searchPlaceholder": "Search by IP or MAC address",
+    "scanResult": {
+      "title": "Scan Result - {{address}}",
+      "openPorts": "Open ports: {{ports}}",
+      "none": "None"
+    },
+    "copy": {
+      "ip": "IP: {{value}}",
+      "mac": "MAC: {{value}}",
+      "switch": "Switch: {{value}}",
+      "port": "Port: {{value}}",
+      "room": "Room: {{value}}",
+      "customer": "Customer: {{value}}",
+      "status": "Status: {{value}}"
+    },
+    "filter": {
+      "byStatus": "Filter by status",
+      "byRoom": "Filter by room",
+      "byCustomer": "Filter by customer",
+      "bySwitch": "Filter by switch"
+    },
+    "detail": {
+      "title": "IP Details - {{address}}",
+      "notFound": "No details found"
+    },
+    "edit": {
+      "title": "Edit IP",
+      "selectCustomer": "Select customer"
+    },
+    "batchBan": {
+      "title": "Batch Ban IPs",
+      "description": "One IP address per line. Each will be banned via a blackhole route pushed through the core switch."
+    },
+    "batchEdit": {
+      "titleCustomer": "Batch Assign Customer",
+      "titleNotes": "Batch Edit Remarks",
+      "descCustomer_one": "A customer will be assigned to the selected {{count}} IP.",
+      "descCustomer_other": "A customer will be assigned to the selected {{count}} IPs.",
+      "descNotes_one": "Remarks will be updated for the selected {{count}} IP.",
+      "descNotes_other": "Remarks will be updated for the selected {{count}} IPs.",
+      "customerRequired": "Please select a customer",
+      "notesPlaceholder": "Enter remarks"
+    },
+    "stats": {
+      "title": "IP Status Statistics",
+      "total": "Total",
+      "active": "Active",
+      "inactive": "Inactive",
+      "blocked": "Banned",
+      "unused": "Unused",
+      "scopeLabel": "Scope: {{scope}}",
+      "scopeRoom": "room filter + ",
+      "scopeSearch": "search \"{{value}}\"",
+      "scopeAll": "all"
+    }
+  },
+  "audit": {
+    "field": {
+      "time": "Time",
+      "operator": "Operator",
+      "ipAddress": "IP Address",
+      "room": "Room",
+      "action": "Action",
+      "customer": "Assigned Customer",
+      "detail": "Details"
+    },
+    "action": {
+      "view": "View"
+    },
+    "searchPlaceholder": "Search IP address...",
+    "detail": {
+      "title": "Audit Record Details",
+      "source": "Source",
+      "sourceAllocation": "Assignment Change",
+      "sourceBan": "Ban / Unban",
+      "banMode": "Ban Mode",
+      "detailTitle": "Details (detail)"
+    },
+    "userFallback": "User #{{id}}",
+    "roomFallback": "Room #{{id}}"
+  },
+  "allocation": {
+    "field": {
+      "time": "Time",
+      "actionType": "Operation Type",
+      "oldStatus": "Old Status",
+      "newStatus": "New Status",
+      "operator": "Operator"
+    },
+    "action": {
+      "allocate": "Allocate",
+      "release": "Release",
+      "changeStatus": "Status Change"
+    },
+    "userFallback": "User #{{id}}",
+    "operator": "Operator: User #{{id}}"
+  },
+  "networkList": {
+    "field": {
+      "network": "Subnet",
+      "switch": "Switch",
+      "port": "Port",
+      "room": "Room",
+      "customer": "Customer",
+      "nexthop": "Next Hop",
+      "notes": "Remarks",
+      "actions": "Actions",
+      "destination": "Destination Subnet",
+      "outInterface": "Outbound Interface"
+    },
+    "action": {
+      "assignCustomer": "Assign Customer",
+      "delete": "Delete",
+      "routeList": "Route List",
+      "fullScan": "Full Scan"
+    },
+    "filter": {
+      "searchPlaceholder": "Search subnet, switch or customer..."
+    },
+    "tooltip": {
+      "defaultRouteNotScannable": "Default route subnet ({{route}}) cannot be scanned"
+    },
+    "confirm": {
+      "deleteContent": "Delete subnet {{network}}?",
+      "scanTitle": "Confirm Scan",
+      "scanContent": "Scan subnet {{network}}? The scan runs in the background and refreshes automatically when done.",
+      "fullScanContent": "A full scan (port collection + route sync + MAC index + ARP sync + IP reconciliation + supplemental detection) will run on every switch in the current room. It may take a long time. The scan runs in the background and refreshes automatically when done."
+    },
+    "message": {
+      "missingParams": "Missing required parameters (room_id/switch_id/notes/nexthop); cannot delete",
+      "customerUpdated": "Customer updated",
+      "updateFailed": "Update failed",
+      "missingRoomForScan": "This subnet has no room information and cannot be scanned",
+      "scanSubmitted": "Scan of subnet {{network}} submitted. You will be notified when it finishes.",
+      "fullScanRoomRequired": "Select a room first; a full scan must be scoped to a single room",
+      "fullScanSubmitted": "Full scan submitted. You will be notified when it finishes."
+    },
+    "form": {
+      "ipSyncPolicy": "IP Sync Policy",
+      "ipSyncPolicyTooltip": "Overwriting every IP switches the customer in one step, but clears the previous customer assignment of all IPs in the subnet",
+      "policyNullOnly": "Fill unassigned IPs only",
+      "policyAll": "Overwrite all IPs"
+    },
+    "scan": {
+      "failed": "{{count}} failed",
+      "phase": {
+        "preparing": "Preparing",
+        "collecting": "Collecting Data",
+        "portInfo": "Port Collection",
+        "deviceInfo": "Device Info",
+        "routeSync": "Route Sync",
+        "macIndex": "MAC Index",
+        "arpSync": "ARP Sync",
+        "locationVerify": "Location Verification",
+        "nexthopInfer": "Route Inference",
+        "degrade": "Degradation Handling",
+        "ipReconcile": "IP Reconciliation",
+        "supplementDetect": "Supplemental Detection",
+        "done": "Completed"
+      }
+    }
+  },
+  "networkDetail": {
+    "title": "Subnet Details - {{network}}",
+    "notFound": "Subnet not found",
+    "action": {
+      "viewIps": "View Subnet IPs"
+    },
+    "field": {
+      "gateway": "Gateway",
+      "usableIps": "Usable IPs",
+      "ipRange": "IP Range",
+      "flags": "Flags"
+    },
+    "usage": {
+      "title": "Utilization",
+      "totalIps": "Total IPs",
+      "usedIps": "Used",
+      "availableIps": "Available"
+    },
+    "routeInfo": {
+      "title": "Route Information"
+    }
+  },
+  "topology": {
+    "view": {
+      "network": "Network Topology",
+      "device": "Device Topology"
+    },
+    "filter": {
+      "roomPlaceholder": "Select room",
+      "groupPhysicalRoom": "Physical Rooms",
+      "groupVirtualRoom": "Virtual Rooms"
+    },
+    "action": {
+      "lldpDiscovery": "LLDP Discovery",
+      "autoDetect": "Auto Detect"
+    },
+    "stats": {
+      "node": "Nodes",
+      "link": "Links"
+    },
+    "loading": "Loading topology data...",
+    "empty": "No topology data. Make sure switches and connections are configured.",
+    "mobileHint": "Drag with one finger and zoom with two. For dense graphs, a desktop view is recommended.",
+    "autoDetect": {
+      "needPhysicalRoom": "Select a physical room first (auto detect does not support virtual rooms)",
+      "noChanges": "No fields need to be detected",
+      "updatedRecords_one": "Updated {{count}} record",
+      "updatedRecords_other": "Updated {{count}} records",
+      "previewTitle": "Auto Detect Result Preview",
+      "applyChanges": "Apply Changes",
+      "previewAlert": "This is a preview of the detection result. Click \"{{action}}\" to write it to the database.",
+      "column": {
+        "device": "Device",
+        "changedFields": "Changed Fields"
+      }
+    },
+    "toolbar": {
+      "layout": "Layout",
+      "searchPlaceholder": "Search device name",
+      "zoomIn": "Zoom In",
+      "zoomOut": "Zoom Out",
+      "fitView": "Fit to View"
+    },
+    "layout": {
+      "force": "Force",
+      "hierarchical": "Hierarchical",
+      "concentric": "Concentric",
+      "radial": "Radial"
+    },
+    "node": {
+      "connectionCount": "Connections",
+      "connectionList": "Connection List",
+      "deviceFallback": "Device {{id}}"
+    },
+    "edgeType": {
+      "uplink": "Uplink"
+    },
+    "combo": {
+      "cabinetFallback": "Cabinet {{id}}"
+    },
+    "tooltip": {
+      "role": "Role: {{value}}",
+      "layer": "Layer: L{{value}}",
+      "type": "Type: {{value}}",
+      "bandwidth": "Bandwidth: {{value}}",
+      "status": "Status: {{value}}"
+    },
+    "discovery": {
+      "title": "LLDP/CDP Topology Discovery",
+      "notice": "Results are suggestions only: a link is created only when both endpoints (device and port) match and the port is not occupied. Manually entered connections will not be overwritten.",
+      "selectPlaceholderInRoom": "Select switches in this room to probe",
+      "selectPlaceholder": "Select switches to probe (filter by room first)",
+      "start": "Start Discovery",
+      "selectSwitchFirst": "Select the switches to probe first",
+      "noSuggestions": "No new neighbor suggestions found",
+      "selectMatchedOnly": "Select suggestions with status \"{{status}}\"",
+      "createdLinks_one": "Created {{count}} link",
+      "createdLinks_other": "Created {{count}} links",
+      "createdLinksWithSkipped_one": "Created {{count}} link, {{skipped}} safely skipped",
+      "createdLinksWithSkipped_other": "Created {{count}} links, {{skipped}} safely skipped",
+      "applySelected": "Apply Selected",
+      "applySelectedWithCount": "Apply Selected ({{count}})",
+      "partialFailed": "Some switches failed to probe (SSH timeout or missing credentials); see the Description column. Other results are unaffected.",
+      "emptyText": "Select switches and click \"{{action}}\"",
+      "column": {
+        "peer": "Peer",
+        "reason": "Description"
+      },
+      "status": {
+        "existing": "Existing",
+        "matched": "Can Create",
+        "partial": "Partial Match",
+        "unknownPeer": "Unknown Peer",
+        "portOccupied": "Port Occupied"
+      }
+    }
+  }
+}

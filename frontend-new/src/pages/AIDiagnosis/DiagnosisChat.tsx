@@ -34,6 +34,7 @@ import {
 import { usePermission } from '@/hooks/usePermission';
 import { useMessage } from '@/hooks/useMessage';
 import { useConfirm } from '@/utils/confirm';
+import { useTranslation } from 'react-i18next';
 import DiagnosisResultCard from './DiagnosisResultCard';
 import CommandConfirmCard from './CommandConfirmCard';
 
@@ -52,6 +53,8 @@ interface ChatMessage {
 export default function DiagnosisChat() {
   const confirm = useConfirm();
   const message = useMessage();
+  const { t } = useTranslation('ai');
+  const { t: tc } = useTranslation('common');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -140,14 +143,20 @@ export default function DiagnosisChat() {
           if (!mountedRef.current) return;
           if (event.type === 'progress') {
             const total = event.total || 0;
-            setProgressText(total > 0 ? `第 ${event.progress}/${total} 轮分析中...` : '诊断中...');
+            setProgressText(
+              total > 0
+                ? t('diagnosis.progress.round', { current: event.progress, total })
+                : t('diagnosis.progress.analyzing')
+            );
             return;
           }
           if (event.type === 'error') {
             finishAsync({
               id: nextId(),
               role: 'assistant',
-              content: `诊断失败：${event.message || '任务执行出错，请稍后重试'}`
+              content: t('diagnosis.message.failed', {
+                reason: event.message || t('diagnosis.message.taskError')
+              })
             });
             return;
           }
@@ -167,12 +176,12 @@ export default function DiagnosisChat() {
           finishAsync({
             id: nextId(),
             role: 'assistant',
-            content: '进度订阅断开，任务仍在后台执行，请稍后刷新会话查看结果'
+            content: t('diagnosis.message.progressDisconnected')
           });
         }
       );
     },
-    [finishAsync]
+    [finishAsync, t]
   );
 
   const runSkillAsync = useCallback(
@@ -186,7 +195,7 @@ export default function DiagnosisChat() {
         if (!mountedRef.current) return;
         if (resp.finished) {
           finishAsync();
-          message.info('该诊断任务已完成（结果已过期），请重新发起');
+          message.info(t('diagnosis.message.taskFinishedExpired'));
           return;
         }
         subscribeProgress(resp.task_id, skill);
@@ -195,11 +204,13 @@ export default function DiagnosisChat() {
         finishAsync({
           id: nextId(),
           role: 'assistant',
-          content: `诊断失败：${e instanceof Error ? e.message : String(e)}`
+          content: t('diagnosis.message.failed', {
+            reason: e instanceof Error ? e.message : String(e)
+          })
         });
       }
     },
-    [finishAsync, subscribeProgress, message]
+    [finishAsync, subscribeProgress, message, t]
   );
 
   const handleSend = async () => {
@@ -242,7 +253,9 @@ export default function DiagnosisChat() {
       const errMsg: ChatMessage = {
         id: nextId(),
         role: 'assistant',
-        content: `诊断失败：${e instanceof Error ? e.message : String(e)}`
+        content: t('diagnosis.message.failed', {
+          reason: e instanceof Error ? e.message : String(e)
+        })
       };
       setMessages((prev) => [...prev, errMsg]);
     } finally {
@@ -261,7 +274,7 @@ export default function DiagnosisChat() {
       const anomalousMetrics = msg.result.anomalous_metrics || [];
       const preSnapshot = msg.result.pre_snapshot || {};
       if (anomalousMetrics.length === 0) {
-        message.info('无异常指标记录，跳过自动验证');
+        message.info(t('diagnosis.message.noAnomalousSkip'));
         return;
       }
 
@@ -269,7 +282,7 @@ export default function DiagnosisChat() {
       const VERIFY_INTERVAL_MS = 3_000;
       const verifyDeadline = Date.now() + VERIFY_TIMEOUT_MS;
       let verification: VerificationResult | null = null;
-      message.loading('等待指标刷新后验证...', 0);
+      message.loading(t('diagnosis.message.waitingVerify'), 0);
 
       try {
         while (Date.now() < verifyDeadline) {
@@ -284,7 +297,7 @@ export default function DiagnosisChat() {
         }
         message.destroy();
         if (!verification) {
-          message.error('验证超时，请手动检查');
+          message.error(t('diagnosis.message.verifyTimeout'));
           return;
         }
         const verifyResult: VerificationResult = verification;
@@ -293,13 +306,13 @@ export default function DiagnosisChat() {
         );
 
         if (verifyResult.status === 'recovered') {
-          message.success('设备已恢复');
+          message.success(t('diagnosis.message.recovered'));
           if (!canAdmin) return;
           const userMsg = [...messages].reverse().find((m) => m.role === 'user' && m.id < msgId);
           const symptom = userMsg?.content || '';
           confirm({
-            title: '案例沉淀',
-            content: '设备已恢复，是否将本次处置案例沉淀入 RAG 知识库？',
+            title: t('diagnosis.persist.title'),
+            content: t('diagnosis.persist.content'),
             onOk: async () => {
               try {
                 await caseToRag(
@@ -309,22 +322,30 @@ export default function DiagnosisChat() {
                   msg.result!.proposed_commands,
                   verifyResult.status
                 );
-                message.success('案例已入库');
+                message.success(t('diagnosis.message.caseSaved'));
               } catch (err) {
-                message.error(`案例入库失败：${err instanceof Error ? err.message : String(err)}`);
+                message.error(
+                  t('diagnosis.message.caseSaveFailed', {
+                    reason: err instanceof Error ? err.message : String(err)
+                  })
+                );
               }
             }
           });
         } else if (verifyResult.status === 'partial') {
-          message.warning('部分恢复，建议继续诊断');
+          message.warning(t('diagnosis.message.partial'));
         } else {
-          message.error('未恢复，建议人工介入');
+          message.error(t('diagnosis.message.notRecovered'));
         }
       } catch (e) {
-        message.error(`验证失败：${e instanceof Error ? e.message : String(e)}`);
+        message.error(
+          t('diagnosis.message.verifyFailed', {
+            reason: e instanceof Error ? e.message : String(e)
+          })
+        );
       }
     },
-    [confirm, deviceId, messages, canAdmin, message]
+    [confirm, deviceId, messages, canAdmin, message, t]
   );
 
   return (
@@ -337,10 +358,10 @@ export default function DiagnosisChat() {
             <Space>
               <WarningOutlined />
               <Text strong>
-                回滚失败告警：{rollbackFailures.length} 个设备处于"已变更未回滚"状态
+                {t('diagnosis.rollback.alert', { count: rollbackFailures.length })}
               </Text>
               <Button size="small" type="link" onClick={loadRollbackFailures}>
-                刷新
+                {tc('action.refresh')}
               </Button>
             </Space>
           }
@@ -349,7 +370,11 @@ export default function DiagnosisChat() {
               {/* 设备名快照优先、回落裸 ID：这条告警说的正是"某台设备卡在
                   已变更未回滚"，而设备很可能已被删除 ⇒ 只认 ID 会显示成
                   `设备 null`（后端已把 device_id 置空、靠快照列自证）。 */}
-              设备 {f.device_name ?? f.device_id} | {f.skill_name} | {f.created_at}
+              {t('diagnosis.rollback.tag', {
+                deviceId: f.device_name ?? f.device_id,
+                skill: f.skill_name,
+                time: f.created_at
+              })}
             </Tag>
           ))}
           style={{ marginBottom: 16 }}
@@ -357,12 +382,12 @@ export default function DiagnosisChat() {
       )}
 
       <Card
-        title="智能运维诊断"
+        title={t('diagnosis.title')}
         extra={
           <Space>
             <Select
               allowClear
-              placeholder="自动路由（自然语言）"
+              placeholder={t('diagnosis.field.autoRoute')}
               value={skillName}
               onChange={(v) => setSkillName(v ?? undefined)}
               style={{ width: 200 }}
@@ -373,20 +398,20 @@ export default function DiagnosisChat() {
               }))}
             />
             <InputNumber
-              placeholder="设备 ID"
+              placeholder={t('diagnosis.field.deviceId')}
               value={deviceId}
               onChange={(v) => setDeviceId(v ?? undefined)}
               style={{ width: 120 }}
             />
             <Button icon={<ReloadOutlined />} onClick={loadRollbackFailures}>
-              检查告警
+              {t('diagnosis.action.checkAlerts')}
             </Button>
           </Space>
         }
       >
         <div style={{ minHeight: 400, marginBottom: 16 }}>
           {messages.length === 0 && !loading && (
-            <Empty description="输入问题开始诊断，如：'设备 12 CPU 异常'" />
+            <Empty description={t('diagnosis.empty')} />
           )}
           {messages.map((msg) => (
             <div
@@ -419,7 +444,7 @@ export default function DiagnosisChat() {
                           onExecuted={() => handleExecuted(msg.id)}
                         />
                       ) : (
-                        <Tooltip title="无 ai:execute 权限，无法执行修复命令">
+                        <Tooltip title={t('diagnosis.tooltip.noExecutePermission')}>
                           <span>
                             <CommandConfirmCard
                               commands={msg.result.proposed_commands}
@@ -441,15 +466,22 @@ export default function DiagnosisChat() {
                           ? 'warning'
                           : 'error'
                     }
-                    message={`处置验证：${msg.verification.status}`}
+                    message={t('diagnosis.verify.title', { status: msg.verification.status })}
                     description={msg.verification.comparison
-                      .map(
-                        (c) =>
-                          `${c.metric}: ${c.pre} → ${c.post} (${
-                            c.recovered === null ? '未知' : c.recovered ? '恢复' : '未恢复'
-                          })`
+                      .map((c) =>
+                        t('diagnosis.verify.item', {
+                          metric: c.metric,
+                          pre: c.pre,
+                          post: c.post,
+                          statusText:
+                            c.recovered === null
+                              ? tc('field.unknown')
+                              : c.recovered
+                                ? t('diagnosis.verify.recovered')
+                                : t('diagnosis.verify.notRecovered')
+                        })
                       )
-                      .join(' | ')}
+                      .join(t('diagnosis.verify.separator'))}
                     showIcon
                     style={{ marginTop: 8 }}
                   />
@@ -458,7 +490,7 @@ export default function DiagnosisChat() {
             </div>
           ))}
           {loading && (
-            <Spin tip={progressText ?? '诊断中...'}>
+            <Spin tip={progressText ?? t('diagnosis.progress.analyzing')}>
               <div style={{ minHeight: 48 }} />
             </Spin>
           )}
@@ -469,11 +501,11 @@ export default function DiagnosisChat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onPressEnter={handleSend}
-            placeholder="描述故障现象，如：'设备 12 CPU 持续 90%'"
+            placeholder={t('diagnosis.placeholder.symptom')}
             disabled={loading}
           />
           <Button type="primary" icon={<SendOutlined />} onClick={handleSend} loading={loading}>
-            诊断
+            {t('diagnosis.action.diagnose')}
           </Button>
         </Space.Compact>
       </Card>

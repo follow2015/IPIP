@@ -23,7 +23,7 @@ export const AUTH_PROTOCOL_OPTIONS = [
   { value: 'sha256', label: 'SHA-256' },
   { value: 'sha512', label: 'SHA-512' },
   { value: 'md5', label: 'MD5' },
-  { value: 'none', label: '无' }
+  { value: 'none', label: 'None' }
 ];
 
 export const PRIV_PROTOCOL_OPTIONS = [
@@ -31,10 +31,10 @@ export const PRIV_PROTOCOL_OPTIONS = [
   { value: 'aes256', label: 'AES-256' },
   { value: 'des', label: 'DES' },
   { value: '3des', label: '3DES' },
-  { value: 'none', label: '无' }
+  { value: 'none', label: 'None' }
 ];
 
 export const MATCH_BY_OPTIONS = [
-  { value: 'host', label: '主机名' },
-  { value: 'ip', label: 'IP 地址' }
+  { value: 'host', label: 'Hostname' },
+  { value: 'ip', label: 'IP Address' }
 ];

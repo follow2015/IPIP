@@ -12,6 +12,7 @@
  */
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import i18next from 'i18next';
 import type { User } from '@/types/models';
 import { login as apiLogin, logout as apiLogout } from '@/services/auth';
 import type { LoginRequest, LoginResponse } from '@/types/api';
@@ -59,7 +60,7 @@ export const useAuthStore = create<AuthState>()(
       login: async (credentials) => {
         const res = await apiLogin(credentials);
         if (!res.success || !res.data) {
-          throw new Error(res.message || '登录失败');
+          throw new Error(res.message || i18next.t('message.loginFailed', { ns: 'auth' }));
         }
         const { token, user: loginUser, permissions } = res.data;
         const user = buildUserFromLogin(loginUser);

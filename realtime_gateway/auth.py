@@ -15,7 +15,7 @@ JWT claims 与 Flask 主应用一致：payload 中包含 user_id 字段，
   S1 加固：Flask 提供 POST /api/sse/ticket 签发 60s 一次性票据，前端连接
   网关前先换票；`?token=` 回退路径保留但不推荐使用。
 
-  P0#4 加固（审计 docs/ipip-full-audit-20260915.md）：
+  P0#4 加固（审计 docs/review/ipip-full-audit-20260915.md）：
   - **类型白名单**：`?token=` 路径只接受 `type=access`。修复前任意类型都能
     建连——refresh 令牌（"记住我" 下有效期 30 天）可当长期凭据用；sse_ticket
     走 `?token=` 还能跳过 Redis SETNX 一次性消费，防重放保护整体失效。

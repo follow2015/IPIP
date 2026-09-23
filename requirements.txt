@@ -38,7 +38,7 @@ qrcode==8.2
 redis==8.0.0
 requests==2.34.2
 textfsm==2.1.0
-reportlab==4.5.1  # 客户终止存档 PDF 生成（惰性 import，决策见 docs/CUSTOMER_TERMINATED_PLAN.md §4.4.1）
+reportlab==4.5.1  # 客户终止存档 PDF 生成（惰性 import，决策见 docs/_archive/CUSTOMER_TERMINATED_PLAN.md §4.4.1）
 PyYAML==6.0.3  # 配置/种子与脚本（如 import_zabbix_templates.py）
 
 # ── 时序存储：ClickHouse 客户端（>300 台切 CH 时的接入层）──────────────

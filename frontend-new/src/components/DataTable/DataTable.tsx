@@ -1,6 +1,7 @@
 import React from 'react';
 import { Table, Card, Space, Button, List, Pagination, Checkbox } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { TableProps, TablePaginationConfig, CheckboxProps } from 'antd';
 import type { UseTableReturn } from '@/hooks/useTable';
 import SearchInput from '@/components/SearchInput';
@@ -62,9 +63,9 @@ function DataTable<T extends object>({
   rowSelection,
   onRow,
   toolbar,
-  emptyText = '暂无数据',
+  emptyText,
   searchable = true,
-  searchPlaceholder = '搜索...',
+  searchPlaceholder,
   searchValue,
   onSearch,
   searchDebounce = 300,
@@ -83,7 +84,10 @@ function DataTable<T extends object>({
   rowClassName,
   scroll = DEFAULT_SCROLL
 }: DataTableProps<T>) {
+  const { t } = useTranslation();
   const { isMobile } = useResponsive();
+  const resolvedEmptyText = emptyText === undefined ? t('message.noData') : emptyText;
+  const resolvedSearchPlaceholder = searchPlaceholder ?? t('action.search');
   const hasToolbar = searchable || toolbar || onRefresh || filters || actions;
   const showAsCard = mobileCardMode && isMobile && !!cardRender;
   const resolvedPage = page ?? tableProps?.page;
@@ -106,7 +110,7 @@ function DataTable<T extends object>({
     ? { simple: true, showSizeChanger: false, showQuickJumper: false }
     : beyondOffsetLimit
       ? { showSizeChanger: true, showQuickJumper: false, showTotal: formatLimitHint }
-      : { showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 条` };
+      : { showSizeChanger: true, showQuickJumper: true, showTotal: (total) => t('pagination.total', { count: total }) };
   const paginationConfig: false | TablePaginationConfig =
     pagination === false
       ? false
@@ -168,7 +172,7 @@ function DataTable<T extends object>({
               <SearchInput
                 value={resolvedSearchValue}
                 onSearch={resolvedOnSearch ?? (() => {})}
-                placeholder={searchPlaceholder}
+                placeholder={resolvedSearchPlaceholder}
                 debounce={searchDebounce}
               />
             )}
@@ -176,8 +180,8 @@ function DataTable<T extends object>({
               <Button
                 icon={<ReloadOutlined />}
                 onClick={onRefresh}
-                title="刷新"
-                aria-label="刷新"
+                title={t('action.refresh')}
+                aria-label={t('action.refresh')}
               />
             )}
             {filters}
@@ -199,7 +203,7 @@ function DataTable<T extends object>({
                 indeterminate={somePageSelected}
                 onChange={handleCardCheckAll}
               >
-                全选本页（{dataSource.length} 条）
+                {t('pagination.selectAllOnPage', { count: dataSource.length })}
               </Checkbox>
             </div>
           )}
@@ -208,7 +212,7 @@ function DataTable<T extends object>({
             rowKey={rowKeyFn}
             loading={loading}
             split={false}
-            locale={{ emptyText }}
+            locale={{ emptyText: resolvedEmptyText }}
             renderItem={(record) => (
               <List.Item style={{ padding: '8px 0' }}>
                 <Card
@@ -244,7 +248,7 @@ function DataTable<T extends object>({
           pagination={paginationConfig}
           rowSelection={rowSelection}
           onRow={onRow}
-          locale={{ emptyText }}
+          locale={{ emptyText: resolvedEmptyText }}
           scroll={scroll}
           size={size}
           rowClassName={rowClassName}

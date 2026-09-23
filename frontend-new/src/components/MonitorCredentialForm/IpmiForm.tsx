@@ -3,27 +3,28 @@
  * 仅渲染 Form.Item，依赖父级 <Form> 上下文。
  */
 import { Form, Input, Switch } from 'antd';
+import { useTranslation } from 'react-i18next';
 const { Password } = Input;
 
-const KEEP_PLACEHOLDER = '留空保持不变';
-
 export default function IpmiForm({ mode }: { mode: 'create' | 'edit' }) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const isEdit = mode === 'edit';
-  const required = isEdit ? [] : [{ required: true, message: '此项必填' }];
+  const required = isEdit ? [] : [{ required: true, message: tCommon('validation.required') }];
 
   return (
     <>
-      <Form.Item label="用户名" name="username" rules={required}>
+      <Form.Item label={t('credential.form.username')} name="username" rules={required}>
         <Input />
       </Form.Item>
-      <Form.Item label="密码" name="password" rules={required}>
-        <Password placeholder={isEdit ? KEEP_PLACEHOLDER : undefined} />
+      <Form.Item label={t('credential.form.password')} name="password" rules={required}>
+        <Password placeholder={isEdit ? t('credential.form.keepUnchanged') : undefined} />
       </Form.Item>
       <Form.Item
-        label="验证SSL证书"
+        label={t('credential.form.verifySslIpmi')}
         name="verify_ssl"
         valuePropName="checked"
-        tooltip="BMC通常使用自签名证书，默认关闭"
+        tooltip={t('credential.form.verifySslTooltip')}
       >
         <Switch />
       </Form.Item>

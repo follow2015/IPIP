@@ -11,7 +11,8 @@ import {
   type CreateCustomerRequest,
   type UpdateCustomerRequest
 } from '@/services/customer';
-import { CUSTOMER_STATUS_OPTIONS } from '@/types/enums';
+import { getCustomerStatusOptions } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { Customer } from '@/types/models';
 
 interface CustomerFormProps {
@@ -21,6 +22,8 @@ interface CustomerFormProps {
 }
 
 function CustomerForm({ open, editRecord, onCancel }: CustomerFormProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const { form, isEdit, handleSubmit, confirmLoading } = useCrudForm<
     Customer,
     CreateCustomerRequest,
@@ -35,7 +38,7 @@ function CustomerForm({ open, editRecord, onCancel }: CustomerFormProps) {
 
   return (
     <Modal
-      title={isEdit ? '编辑客户' : '新增客户'}
+      title={isEdit ? td('customer.edit') : td('customer.add')}
       open={open}
       onOk={handleSubmit}
       onCancel={onCancel}
@@ -46,28 +49,36 @@ function CustomerForm({ open, editRecord, onCancel }: CustomerFormProps) {
       <Form form={form} layout="vertical">
         <Form.Item
           name="customer_name"
-          label="客户名称"
-          rules={[{ required: true, message: '请输入客户名称' }]}
+          label={td('customer.field.name')}
+          rules={[{ required: true, message: td('customer.form.nameRequired') }]}
         >
-          <Input placeholder="请输入客户名称" />
+          <Input placeholder={td('customer.form.namePlaceholder')} />
         </Form.Item>
-        <Form.Item name="customer_status" label="客户状态">
-          <Select options={CUSTOMER_STATUS_OPTIONS} placeholder="请选择状态" allowClear />
+        <Form.Item name="customer_status" label={td('customer.field.status')}>
+          <Select
+            options={getCustomerStatusOptions(td)}
+            placeholder={td('cabinet.form.statusPlaceholder')}
+            allowClear
+          />
         </Form.Item>
-        <Form.Item name="contact_person" label="联系人">
-          <Input placeholder="请输入联系人" />
+        <Form.Item name="contact_person" label={td('customer.field.contactPerson')}>
+          <Input placeholder={td('customer.form.contactPersonPlaceholder')} />
         </Form.Item>
-        <Form.Item name="contact_phone" label="联系电话">
-          <Input placeholder="请输入联系电话" />
+        <Form.Item name="contact_phone" label={td('customer.field.contactPhone')}>
+          <Input placeholder={td('customer.form.contactPhonePlaceholder')} />
         </Form.Item>
-        <Form.Item name="email" label="邮箱" rules={[{ type: 'email', message: '邮箱格式不正确' }]}>
-          <Input placeholder="请输入邮箱" />
+        <Form.Item
+          name="email"
+          label={td('customer.field.email')}
+          rules={[{ type: 'email', message: td('customer.form.emailInvalid') }]}
+        >
+          <Input placeholder={td('customer.form.emailPlaceholder')} />
         </Form.Item>
-        <Form.Item name="address" label="地址">
-          <Input placeholder="请输入地址" />
+        <Form.Item name="address" label={td('customer.field.address')}>
+          <Input placeholder={td('customer.form.addressPlaceholder')} />
         </Form.Item>
-        <Form.Item name="notes" label="备注">
-          <Input.TextArea rows={3} placeholder="请输入备注" />
+        <Form.Item name="notes" label={tc('field.remarks')}>
+          <Input.TextArea rows={3} placeholder={td('customer.form.notesPlaceholder')} />
         </Form.Item>
       </Form>
     </Modal>

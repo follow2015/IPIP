@@ -17,6 +17,18 @@
 上绕过查重的写入也可能留下重名——回填后建唯一键会直接失败。防撞：按归一化后的 name
 检测重复，冲突记录追加 `-{id}` 后缀（唯一且可追溯），并在日志输出被改写清单。
 
+**防撞判据必须用"唯一键的口径"，而不是"存储的口径"（v4 复核，2026-09-22）**：
+`uk_room_name_number(name, room_number)` 建在 `utf8mb4_0900_ai_ci` 列上 ⇒ 比较时
+**大小写与重音都不敏感**（`'A栋'` ≡ `'a栋'`、`'cafe'` ≡ `'café'`）。`_normalize_grouping_value`
+只做 NFKC/Cf/strip（存储口径，**写出值不得被折叠污染**），拿它当判撞键会漏判这两类：
+两行各自拿到"看起来不重复"的房间号，`ADD UNIQUE KEY` 随即 1062 —— 而此时列已加、值已写，
+迁移**在半途中断**。故判据分两层：
+  ① `_collation_key()`：在存储口径上再加 casefold + 去组合符，作为 Python 侧判撞键；
+  ② `_assert_no_collation_conflicts()`：加约束前**问一次库自己**（`GROUP BY name, room_number
+     HAVING COUNT(*) > 1`，与 ALTER 同一套比较规则），修完再验，验不过带真因抛错。
+②不可省：①只是 UCA 的近似 —— `'ø'`/`'o'`、`'ł'`/`'l'` 这类字符 NFKD **不分解**却同主权重，
+折不出来；且库的排序规则本身可能被环境改过。
+
 **幂等**：列已存在 / 回填已无 NULL 行 / 列已 NOT NULL / 约束已存在，各步骤独立跳过。
 
 **部署**：与 0011 同理建议低峰执行（`ADD UNIQUE KEY` 抢 rooms 的 MDL）。
@@ -32,6 +44,13 @@ COLUMN_NAME = "room_number"
 CONSTRAINT_NAME = "uk_room_name_number"
 
 _MDL_WAIT_TIMEOUT_SECONDS = 300
+
+_CONFLICT_QUERY_TEMPLATE = (
+    "SELECT name, `{column}`, COUNT(*) AS cnt, MIN(id) AS keep_id FROM `rooms` "
+    "GROUP BY name, `{column}` HAVING COUNT(*) > 1 ORDER BY keep_id"
+)
+
+_CONFLICT_MAX_ROUNDS = 3
 
 
 def _column_exists(conn, table: str, column: str) -> bool:
@@ -87,10 +106,38 @@ def _normalize_grouping_value(value):
     return normalized or None
 
 
+def _collation_key(value: str) -> str:
+    """判撞键：与最终唯一键的比较口径（`utf8mb4_0900_ai_ci`）对齐。
+
+    ⚠️ **只用于判撞，绝不用于写出值** —— 写出值走 `_normalize_grouping_value`
+    （小写化/去重音会破坏"房间号 = 原来的机房名"这一语义）。
+
+    折叠顺序：NFKD 分解 → `casefold`（含 ß→ss、大小写）→ 丢空白/组合符/格式字符
+    ⇒ 大小写、重音、全半角、零宽差异都收敛到同一个键。
+
+    ⚠️ 两条实测踩过的顺序/覆盖要求（都由 `test_collation_key_is_at_least_as_wide_as_
+    the_storage_normalizer` 钉住）：
+      · **分解必须在 casefold 之前**：`'𝔸'`（U+1D538）casefold 不动它，NFKD 才折成
+        `'A'`，若先 casefold 就会得到 `'A'` 与 `'a'` 两个键；
+      · **Cf/空白也要丢**：否则对"原始输入"用时判据比存储口径**更窄**
+        （`'A栋'` 与 `'A\\u200b栋'` 存储判等、判据判不等）。
+
+    仍是 UCA 的**近似**：`'ø'`/`'o'`、`'ł'`/`'l'`、`'đ'`/`'d'` 这类字符 NFKD 不分解，
+    折不出来（而库视为同主权重）。兜底见 `_assert_no_collation_conflicts()`。
+    """
+    folded = unicodedata.normalize("NFKD", value).casefold()
+    stripped = "".join(
+        ch for ch in folded
+        if unicodedata.category(ch) not in ("Mn", "Mc", "Me", "Cf")
+    )
+    return stripped.strip()
+
+
 def _backfill(conn) -> None:
     """为存量行回填 room_number = 归一化(name)，组内撞名时追加 -{id} 后缀。
 
     rooms 表为十级量级，逐行 UPDATE 可接受；撞名清单打 WARNING 供人工核对。
+    判撞用 `_collation_key`（唯一键口径，大小写/重音不敏感），写出仍用存储口径。
     """
     cur = conn.cursor()
     try:
@@ -108,19 +155,21 @@ def _backfill(conn) -> None:
             normalized = _normalize_grouping_value(name or "")
             if normalized is None:
                 normalized = str(room_id)
-            if normalized in seen:
+            value = normalized
+            key = _collation_key(value)
+            if key in seen:
+                first_id = seen[key]
                 value = f"{normalized}-{room_id}"
+                key = _collation_key(value)
                 logger.warning(
-                    "房间号撞名：id=%s name=%r 与 id=%s 归一化后同名，"
-                    "房间号改用 %r（请人工修订为编号格式）",
+                    "房间号撞名：id=%s name=%r 与 id=%s 在唯一键口径（大小写/重音不敏感）"
+                    "下同名，房间号改用 %r（请人工修订为编号格式）",
                     room_id,
                     name,
-                    seen[normalized],
+                    first_id,
                     value,
                 )
-            else:
-                seen[normalized] = room_id
-                value = normalized
+            seen[key] = room_id
             updates.append((value, room_id))
 
         for value, room_id in updates:
@@ -132,6 +181,83 @@ def _backfill(conn) -> None:
         logger.info("已回填 rooms.%s：%s 行", COLUMN_NAME, len(updates))
     finally:
         cur.close()
+
+
+def _find_collation_conflicts(conn) -> list:
+    """库侧判撞：返回 `[(name, room_number, 行数, 保留的 id), ...]`，空 = 可安全加唯一键。"""
+    cur = conn.cursor()
+    try:
+        cur.execute(_CONFLICT_QUERY_TEMPLATE.format(column=COLUMN_NAME))
+        return [tuple(row) for row in (cur.fetchall() or [])]
+    finally:
+        cur.close()
+
+
+def _repair_collation_conflicts(conn, conflicts: list) -> int:
+    """把冲突组里**非最小 id** 的行追加 `-{id}` 后缀（与 Python 侧同一规则），返回改写行数。"""
+    cur = conn.cursor()
+    repaired = 0
+    try:
+        for name, room_number, _cnt, keep_id in conflicts:
+            cur.execute(
+                f"UPDATE `rooms` SET `{COLUMN_NAME}` = CONCAT(`{COLUMN_NAME}`, '-', id) "
+                f"WHERE name = %s AND `{COLUMN_NAME}` = %s AND id <> %s",
+                (name, room_number, keep_id),
+            )
+            repaired += cur.rowcount or 0
+        conn.commit()
+        return repaired
+    finally:
+        cur.close()
+
+
+def _assert_no_collation_conflicts(conn, max_rounds: int = _CONFLICT_MAX_ROUNDS) -> int:
+    """加唯一键**之前**的库侧闸门：冲突必须清零，否则带真因抛错。
+
+    为什么不能只靠 Python 侧 `_collation_key`：
+      · 它是 UCA(_0900_ai_ci) 的近似（'ø'/'o' 等 NFKD 不分解却同主权重，折不出来）；
+      · 库的排序规则可能被环境改过（迁库/改 collation/换 MariaDB）；
+      · 而 `ADD UNIQUE KEY` 用的是**库自己的**比较规则。
+    ⇒ 只有"用同一套规则再问一次库"，才能保证 ALTER 不 1062。修满 max_rounds 轮仍不干净
+    就抛 RuntimeError（附冲突组清单）：比让 ALTER 报一个查不到出处的 1062 好定位。
+
+    Returns:
+        实际执行的修复轮数（0 = 一次就干净，无需改写）。
+    """
+    for round_no in range(1, max_rounds + 1):
+        conflicts = _find_collation_conflicts(conn)
+        if not conflicts:
+            if round_no > 1:
+                logger.info("库侧判撞复核通过（第 %s 轮）：冲突已清零", round_no)
+            return round_no - 1
+        repaired = _repair_collation_conflicts(conn, conflicts)
+        logger.warning(
+            "库侧判撞：发现 %s 组 (name, room_number) 在库比较口径下重复"
+            "（Python 侧折叠不出的形态），已改写 %s 行，准备复核（第 %s/%s 轮）",
+            len(conflicts),
+            repaired,
+            round_no,
+            max_rounds,
+        )
+
+    stuck = _find_collation_conflicts(conn)
+    details = "\n".join(
+        f"  · name={name!r} room_number={room_number!r} 行数={cnt} 保留 id={keep_id}"
+        for name, room_number, cnt, keep_id in stuck
+    )
+    logger.error(
+        "库侧判撞修复 %s 轮后仍有 %s 组重复 —— 本次迁移**未完成**，且**未尝试加唯一键**"
+        "（避免 1062 中断在半途）。\n%s",
+        max_rounds,
+        len(stuck),
+        details,
+    )
+    raise RuntimeError(
+        f"回填后仍存在 {len(stuck)} 组 (name, room_number) 在库比较口径下重复"
+        f"（uk 用的是 *_ai_ci：大小写与重音均不敏感）⇒ 若继续执行，"
+        f"ADD UNIQUE KEY `{CONSTRAINT_NAME}` 会以 1062 中断：\n{details}\n"
+        f"请按上面的清单把重复行改成编号格式后再重跑（迁移幂等）。"
+    )
 
 
 def _log_blocking_transactions(conn) -> None:
@@ -200,6 +326,8 @@ def apply(conn) -> None:
     if _constraint_exists(conn, "rooms", CONSTRAINT_NAME):
         logger.info("跳过：rooms.%s 已存在", CONSTRAINT_NAME)
         return
+
+    _assert_no_collation_conflicts(conn)
 
     conn.commit()
     cur = conn.cursor()

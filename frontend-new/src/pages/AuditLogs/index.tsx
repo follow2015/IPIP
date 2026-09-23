@@ -1,29 +1,31 @@
+import { useMemo } from 'react';
 import { Space } from 'antd';
 import { AuditOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import AuditLogTable from '@/components/AuditLogTable';
 
 const ACTION_OPTIONS = [
-  { label: '创建', value: 'create' },
-  { label: '更新', value: 'update' },
-  { label: '删除', value: 'delete' },
-  { label: '登录', value: 'login' },
-  { label: '登出', value: 'logout' },
-  { label: '导入', value: 'import' },
-  { label: '导出', value: 'export' }
-];
+  { labelKey: 'audit.actionType.create', value: 'create' },
+  { labelKey: 'audit.actionType.update', value: 'update' },
+  { labelKey: 'audit.actionType.delete', value: 'delete' },
+  { labelKey: 'audit.actionType.login', value: 'login' },
+  { labelKey: 'audit.actionType.logout', value: 'logout' },
+  { labelKey: 'audit.actionType.import', value: 'import' },
+  { labelKey: 'audit.actionType.export', value: 'export' }
+] as const;
 
 const RESOURCE_OPTIONS = [
-  { label: '设备', value: 'device' },
-  { label: '机柜', value: 'cabinet' },
-  { label: '机房', value: 'room' },
-  { label: 'IP', value: 'ip' },
-  { label: '网段', value: 'network' },
-  { label: '交换机', value: 'switch' },
-  { label: '客户', value: 'customer' },
-  { label: '用户', value: 'user' },
-  { label: 'VLAN', value: 'vlan' },
-  { label: '角色', value: 'role' }
-];
+  { labelKey: 'audit.resourceType.device', value: 'device' },
+  { labelKey: 'audit.resourceType.cabinet', value: 'cabinet' },
+  { labelKey: 'audit.resourceType.room', value: 'room' },
+  { labelKey: 'audit.resourceType.ip', value: 'ip' },
+  { labelKey: 'audit.resourceType.network', value: 'network' },
+  { labelKey: 'audit.resourceType.switch', value: 'switch' },
+  { labelKey: 'audit.resourceType.customer', value: 'customer' },
+  { labelKey: 'audit.resourceType.user', value: 'user' },
+  { labelKey: 'audit.resourceType.vlan', value: 'vlan' },
+  { labelKey: 'audit.resourceType.role', value: 'role' }
+] as const;
 
 const ACTION_COLOR_MAP: Record<string, string> = {
   create: 'green',
@@ -36,16 +38,29 @@ const ACTION_COLOR_MAP: Record<string, string> = {
 };
 
 function AuditLogs() {
+  const { t } = useTranslation('settings');
+  const { t: tc } = useTranslation('common');
+
+  const actionOptions = useMemo(
+    () => ACTION_OPTIONS.map((o) => ({ label: t(o.labelKey), value: o.value })),
+    [t]
+  );
+
+  const resourceOptions = useMemo(
+    () => RESOURCE_OPTIONS.map((o) => ({ label: t(o.labelKey), value: o.value })),
+    [t]
+  );
+
   return (
     <AuditLogTable
       title={
         <Space>
           <AuditOutlined />
-          <span>审计日志</span>
+          <span>{tc('menu.auditLogs')}</span>
         </Space>
       }
-      actionOptions={ACTION_OPTIONS}
-      resourceOptions={RESOURCE_OPTIONS}
+      actionOptions={actionOptions}
+      resourceOptions={resourceOptions}
       actionColorMap={ACTION_COLOR_MAP}
     />
   );

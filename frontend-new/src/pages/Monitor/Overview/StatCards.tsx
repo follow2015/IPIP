@@ -20,6 +20,7 @@ import {
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { Button, Space } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { MonitorOverviewData } from '@/services/monitor';
 
 const { Text } = Typography;
@@ -49,6 +50,7 @@ function healthColor(score: number): string {
 }
 
 export default function StatCards({ overview, loading }: StatCardsProps) {
+  const { t } = useTranslation('monitor');
   const { token } = theme.useToken();
 
   const total = overview?.total_monitored ?? 0;
@@ -60,15 +62,15 @@ export default function StatCards({ overview, loading }: StatCardsProps) {
 
   const kpiStats = [
     {
-      title: '监控设备',
+      title: t('stat.devices'),
       value: total,
-      suffix: '台',
+      suffix: t('stat.unitDevice', { count: total }),
       icon: <MonitorOutlined />,
       color: token.colorPrimary,
       bg: 'linear-gradient(135deg, #e6f4ff 0%, #f0f5ff 100%)'
     },
     {
-      title: '可用率',
+      title: t('stat.availability'),
       value: availability,
       suffix: '%',
       icon: <CheckCircleOutlined />,
@@ -76,9 +78,9 @@ export default function StatCards({ overview, loading }: StatCardsProps) {
       bg: 'linear-gradient(135deg, #f6ffed 0%, #f0f9eb 100%)'
     },
     {
-      title: '活跃告警',
+      title: t('stat.activeAlerts'),
       value: activeAlerts,
-      suffix: '条',
+      suffix: t('stat.unitAlert', { count: activeAlerts }),
       icon: <WarningOutlined />,
       color: activeAlerts > 0 ? token.colorError : token.colorSuccess,
       bg:
@@ -87,9 +89,9 @@ export default function StatCards({ overview, loading }: StatCardsProps) {
           : 'linear-gradient(135deg, #f6ffed 0%, #f0f9eb 100%)'
     },
     {
-      title: '告警盲区',
+      title: t('status.blindspot'),
       value: blindspot,
-      suffix: '台',
+      suffix: t('stat.unitDevice', { count: blindspot }),
       icon: <EyeInvisibleOutlined />,
       color: blindspot > 0 ? token.colorWarning : token.colorTextSecondary,
       bg: 'linear-gradient(135deg, #fffbe6 0%, #fff7e6 100%)'
@@ -141,7 +143,9 @@ export default function StatCards({ overview, loading }: StatCardsProps) {
         >
           <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
             <Space direction="vertical" size={2}>
-              <Text style={{ fontSize: 13, color: token.colorTextSecondary }}>健康度</Text>
+              <Text style={{ fontSize: 13, color: token.colorTextSecondary }}>
+                {t('stat.health')}
+              </Text>
               <span
                 style={{
                   fontSize: 28,
@@ -155,7 +159,7 @@ export default function StatCards({ overview, loading }: StatCardsProps) {
               </span>
               <Link to="/settings/notification-preferences">
                 <Button icon={<SettingOutlined />} size="small" type="text">
-                  通知配置
+                  {t('stat.notificationSettings')}
                 </Button>
               </Link>
             </Space>

@@ -7,6 +7,7 @@
 
 import { useMemo } from 'react';
 import { Tooltip } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 type UBlockStatus = 'available' | 'occupied' | 'current';
 
@@ -26,6 +27,7 @@ export default function UPositionView({ layout, currentU, currentHeightU }: {
   currentU?: number | null;
   currentHeightU?: number | null;
 }) {
+  const { t } = useTranslation('device');
   const currentUSet = useMemo(() => {
     const set = new Set<number>();
     if (currentU && currentHeightU) {
@@ -61,18 +63,18 @@ export default function UPositionView({ layout, currentU, currentHeightU }: {
     }}>
       {/* 图例 */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 12, alignItems: 'center' }}>
-        <span style={{ color: '#8c8c8c' }}>U位视图：</span>
+        <span style={{ color: '#8c8c8c' }}>{t('uPosition.view.title')}</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 2, background: statusColors.available.bg, border: `1px solid ${statusColors.available.border}` }} />
-          <span>可分配</span>
+          <span>{t('uPosition.legend.available')}</span>
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 2, background: statusColors.occupied.bg, border: `1px solid ${statusColors.occupied.border}` }} />
-          <span>已分配</span>
+          <span>{t('uPosition.legend.occupied')}</span>
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 2, background: statusColors.current.bg, border: `1px solid ${statusColors.current.border}` }} />
-          <span>当前分配</span>
+          <span>{t('uPosition.legend.current')}</span>
         </span>
       </div>
 
@@ -85,8 +87,8 @@ export default function UPositionView({ layout, currentU, currentHeightU }: {
           const tooltip = info?.is_start
             ? `${info.device_name} (U${u}~U${u + info.height_u - 1})`
             : status === 'current'
-              ? `当前设备 U${u}`
-              : `U${u} 可分配`;
+              ? t('uPosition.tooltip.current', { u })
+              : t('uPosition.tooltip.available', { u });
 
           return (
             <Tooltip key={u} title={tooltip}>

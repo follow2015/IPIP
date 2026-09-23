@@ -6,6 +6,7 @@
  */
 import { Form, Modal, Select, Input, Row, Col } from 'antd';
 import type { FormInstance, SelectProps } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 interface ConnectionFormModalProps {
   open: boolean;
@@ -38,22 +39,35 @@ export default function ConnectionFormModal({
   localPortOptions,
   nicPortOptions
 }: ConnectionFormModalProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const selectedRoomId = Form.useWatch('room_id', form);
   const selectedCabinetId = Form.useWatch('cabinet_id', form);
   const selectedSwitchId = Form.useWatch('switch_device_id', form);
 
   return (
-    <Modal title="新增连接" open={open} onOk={onOk} onCancel={onCancel} width={700} destroyOnHidden>
+    <Modal
+      title={t('connection.action.add')}
+      open={open}
+      onOk={onOk}
+      onCancel={onCancel}
+      width={700}
+      destroyOnHidden
+    >
       <Form form={form} layout="vertical">
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item name="link_type" label="连接模式">
-              <Select placeholder="请选择" options={linkTypeOptions} disabled />
+            <Form.Item name="link_type" label={t('connection.column.linkType')}>
+              <Select placeholder={tCommon('message.selectRequired')} options={linkTypeOptions} disabled />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="connection_type" label="连接类型">
-              <Select placeholder="请选择" options={connectionTypeOptions} allowClear />
+            <Form.Item name="connection_type" label={t('connection.column.connectionType')}>
+              <Select
+                placeholder={tCommon('message.selectRequired')}
+                options={connectionTypeOptions}
+                allowClear
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -64,11 +78,11 @@ export default function ConnectionFormModal({
             <Col xs={24} md={12}>
               <Form.Item
                 name="switch_port_id"
-                label="本机端口"
-                rules={[{ required: true, message: '请选择本机端口' }]}
+                label={t('connection.column.localPort')}
+                rules={[{ required: true, message: t('connection.form.selectLocalPort') }]}
               >
                 <Select
-                  placeholder="请选择本机端口"
+                  placeholder={t('connection.form.selectLocalPort')}
                   options={localPortOptions}
                   allowClear
                   showSearch
@@ -82,9 +96,9 @@ export default function ConnectionFormModal({
         {/* ── 机房 + 机柜筛选 ── */}
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item name="room_id" label="对端设备所在机房">
+            <Form.Item name="room_id" label={t('connection.form.peerDeviceRoom')}>
               <Select
-                placeholder="请选择机房"
+                placeholder={t('connection.form.selectRoom')}
                 options={roomOptions}
                 allowClear
                 onChange={() => {
@@ -94,9 +108,9 @@ export default function ConnectionFormModal({
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="cabinet_id" label="机柜">
+            <Form.Item name="cabinet_id" label={t('field.cabinet')}>
               <Select
-                placeholder="请选择机柜"
+                placeholder={t('connection.form.selectCabinet')}
                 options={cabinetOptions}
                 allowClear
                 showSearch
@@ -115,11 +129,11 @@ export default function ConnectionFormModal({
           <Col xs={24} md={12}>
             <Form.Item
               name="switch_device_id"
-              label="对端设备"
-              rules={[{ required: true, message: '请选择对端设备' }]}
+              label={t('connection.column.peerDevice')}
+              rules={[{ required: true, message: t('connection.form.selectPeerDevice') }]}
             >
               <Select
-                placeholder="请选择设备"
+                placeholder={t('connection.form.selectDevice')}
                 options={switchOptions}
                 allowClear
                 showSearch
@@ -130,11 +144,15 @@ export default function ConnectionFormModal({
           <Col xs={24} md={12}>
             <Form.Item
               name={isNetworkDevice ? 'peer_port_id' : 'switch_port_id'}
-              label="对端端口"
-              rules={[{ required: true, message: '请选择对端端口' }]}
+              label={t('connection.column.peerPort')}
+              rules={[{ required: true, message: t('connection.form.selectPeerPort') }]}
             >
               <Select
-                placeholder={selectedSwitchId ? '请选择端口' : '请先选择对端设备'}
+                placeholder={
+                  selectedSwitchId
+                    ? t('connection.form.selectPort')
+                    : t('connection.form.selectPeerDeviceFirst')
+                }
                 options={peerPortOptions}
                 allowClear
                 showSearch
@@ -149,9 +167,9 @@ export default function ConnectionFormModal({
         {!isNetworkDevice && (
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item name="device_nics_port_id" label="本机网卡端口">
+              <Form.Item name="device_nics_port_id" label={t('connection.form.localNicPort')}>
                 <Select
-                  placeholder="请选择网卡端口"
+                  placeholder={t('connection.form.selectNicPort')}
                   options={nicPortOptions}
                   allowClear
                   showSearch
@@ -162,7 +180,7 @@ export default function ConnectionFormModal({
           </Row>
         )}
 
-        <Form.Item name="notes" label="备注">
+        <Form.Item name="notes" label={tCommon('field.remarks')}>
           <Input.TextArea rows={2} />
         </Form.Item>
       </Form>

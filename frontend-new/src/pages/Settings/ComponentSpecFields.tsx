@@ -4,24 +4,47 @@
  * - 每个组件接收 prefix 参数，用于 Form.Item 的 name 前缀嵌套
  */
 import { Form, InputNumber, Select, Input } from 'antd';
+import { useTranslation } from 'react-i18next';
+
+type NicPortTypeKey =
+  | 'rj45'
+  | 'sfp'
+  | 'sfpPlus'
+  | 'sfp28'
+  | 'qsfpPlus'
+  | 'qsfp28'
+  | 'qsfp56'
+  | 'qsfpdd';
+
+const NIC_PORT_TYPES: { key: NicPortTypeKey; value: string }[] = [
+  { key: 'rj45', value: 'RJ45' },
+  { key: 'sfp', value: 'SFP' },
+  { key: 'sfpPlus', value: 'SFP+' },
+  { key: 'sfp28', value: 'SFP28' },
+  { key: 'qsfpPlus', value: 'QSFP+' },
+  { key: 'qsfp28', value: 'QSFP28' },
+  { key: 'qsfp56', value: 'QSFP56' },
+  { key: 'qsfpdd', value: 'QSFP-DD' }
+];
 
 export function CpuSpecFields({ prefix }: { prefix?: (string | number)[] }) {
+  const { t } = useTranslation('settings');
   const name = (field: string) => prefix ? [...prefix, field] : field;
   return (
     <>
-      <Form.Item name={name('cores_per_cpu')} label="核数/颗">
+      <Form.Item name={name('cores_per_cpu')} label={t('componentSpec.cpu.coresPerCpu')}>
         <InputNumber min={1} max={256} />
       </Form.Item>
-      <Form.Item name={name('tdp_w')} label="功耗 (W)">
+      <Form.Item name={name('tdp_w')} label={t('componentSpec.cpu.tdp')}>
         <InputNumber min={1} max={1000} />
       </Form.Item>
-      <Form.Item name={name('architecture')} label="架构">
+      <Form.Item name={name('architecture')} label={t('componentSpec.cpu.architecture')}>
         <Select options={[{ label: 'x86_64', value: 'x86_64' }, { label: 'ARM64', value: 'ARM64' }]} />
       </Form.Item>
-      <Form.Item name={name('base_freq_ghz')} label="基础频率 (GHz)">
+      <Form.Item name={name('base_freq_ghz')} label={t('componentSpec.cpu.baseFreq')}>
         <InputNumber min={0} step={0.1} />
       </Form.Item>
-      <Form.Item name={name('boost_freq_ghz')} label="Boost 频率 (GHz)">
+      <Form.Item name={name('boost_freq_ghz')} label={t('componentSpec.cpu.boostFreq')}>
         <InputNumber min={0} step={0.1} />
       </Form.Item>
     </>
@@ -29,45 +52,47 @@ export function CpuSpecFields({ prefix }: { prefix?: (string | number)[] }) {
 }
 
 export function MemorySpecFields({ prefix }: { prefix?: (string | number)[] }) {
+  const { t } = useTranslation('settings');
   const name = (field: string) => prefix ? [...prefix, field] : field;
   return (
     <>
-      <Form.Item name={name('capacity_gb')} label="单条容量 (GB)">
+      <Form.Item name={name('capacity_gb')} label={t('componentSpec.memory.capacity')}>
         <InputNumber min={1} max={256} />
       </Form.Item>
-      <Form.Item name={name('speed_mhz')} label="速率 (MHz)">
+      <Form.Item name={name('speed_mhz')} label={t('componentSpec.memory.speed')}>
         <InputNumber min={1} />
       </Form.Item>
-      <Form.Item name={name('type')} label="类型">
+      <Form.Item name={name('type')} label={t('componentSpec.memory.type')}>
         <Select options={[{ label: 'DDR4', value: 'DDR4' }, { label: 'DDR5', value: 'DDR5' }, { label: 'LPDDR5', value: 'LPDDR5' }]} />
       </Form.Item>
-      <Form.Item name={name('form_factor')} label="规格">
+      <Form.Item name={name('form_factor')} label={t('componentSpec.memory.formFactor')}>
         <Select options={[{ label: 'RDIMM', value: 'RDIMM' }, { label: 'UDIMM', value: 'UDIMM' }, { label: 'SO-DIMM', value: 'SO-DIMM' }]} />
       </Form.Item>
-      <Form.Item name={name('ecc')} label="ECC">
-        <Select options={[{ label: '是', value: true }, { label: '否', value: false }]} />
+      <Form.Item name={name('ecc')} label={t('componentSpec.memory.ecc')}>
+        <Select options={[{ label: t('componentSpec.yes'), value: true }, { label: t('componentSpec.no'), value: false }]} />
       </Form.Item>
     </>
   );
 }
 
 export function DiskSpecFields({ prefix }: { prefix?: (string | number)[] }) {
+  const { t } = useTranslation('settings');
   const name = (field: string) => prefix ? [...prefix, field] : field;
   return (
     <>
-      <Form.Item name={name('storage_type')} label="存储类型">
+      <Form.Item name={name('storage_type')} label={t('componentSpec.disk.storageType')}>
         <Select options={[{ label: 'SSD', value: 'SSD' }, { label: 'HDD', value: 'HDD' }, { label: 'NVMe', value: 'NVMe' }]} />
       </Form.Item>
-      <Form.Item name={name('capacity_gb')} label="容量 (GB)">
+      <Form.Item name={name('capacity_gb')} label={t('componentSpec.disk.capacity')}>
         <InputNumber min={1} />
       </Form.Item>
-      <Form.Item name={name('interface_type')} label="接口类型">
+      <Form.Item name={name('interface_type')} label={t('componentSpec.disk.interfaceType')}>
         <Select options={[{ label: 'NVMe', value: 'NVMe' }, { label: 'SATA', value: 'SATA' }, { label: 'SAS', value: 'SAS' }]} />
       </Form.Item>
-      <Form.Item name={name('form_factor')} label="规格">
+      <Form.Item name={name('form_factor')} label={t('componentSpec.disk.formFactor')}>
         <Select options={[{ label: '2.5"', value: '2.5"' }, { label: '3.5"', value: '3.5"' }]} />
       </Form.Item>
-      <Form.Item name={name('endurance_tbw')} label="TBW">
+      <Form.Item name={name('endurance_tbw')} label={t('componentSpec.disk.tbw')}>
         <InputNumber min={0} />
       </Form.Item>
     </>
@@ -75,28 +100,24 @@ export function DiskSpecFields({ prefix }: { prefix?: (string | number)[] }) {
 }
 
 export function NicSpecFields({ prefix }: { prefix?: (string | number)[] }) {
+  const { t } = useTranslation('settings');
   const name = (field: string) => prefix ? [...prefix, field] : field;
+  const portTypeOptions = NIC_PORT_TYPES.map(({ key, value }) => ({
+    label: t(`componentSpec.nic.portTypeOption.${key}`),
+    value
+  }));
   return (
     <>
-      <Form.Item name={name('port_count')} label="端口数">
+      <Form.Item name={name('port_count')} label={t('componentSpec.nic.portCount')}>
         <InputNumber min={1} max={16} />
       </Form.Item>
-      <Form.Item name={name('port_type')} label="端口类型">
-        <Select options={[
-          { label: 'RJ45 (电口)', value: 'RJ45' },
-          { label: 'SFP (1G光口)', value: 'SFP' },
-          { label: 'SFP+ (10G光口)', value: 'SFP+' },
-          { label: 'SFP28 (25G光口)', value: 'SFP28' },
-          { label: 'QSFP+ (40G光口)', value: 'QSFP+' },
-          { label: 'QSFP28 (100G光口)', value: 'QSFP28' },
-          { label: 'QSFP56 (200G光口)', value: 'QSFP56' },
-          { label: 'QSFP-DD (400G光口)', value: 'QSFP-DD' },
-        ]} />
+      <Form.Item name={name('port_type')} label={t('componentSpec.nic.portType')}>
+        <Select options={portTypeOptions} />
       </Form.Item>
-      <Form.Item name={name('port_speed')} label="端口速率">
+      <Form.Item name={name('port_speed')} label={t('componentSpec.nic.portSpeed')}>
         <Select options={['100M', '1G', '10G', '25G', '40G', '100G', '400G'].map(v => ({ label: v, value: v }))} />
       </Form.Item>
-      <Form.Item name={name('form_factor')} label="板型">
+      <Form.Item name={name('form_factor')} label={t('componentSpec.nic.formFactor')}>
         <Select options={[{ label: 'PCIe', value: 'PCIe' }, { label: 'OCP', value: 'OCP' }, { label: 'Mezzanine', value: 'Mezzanine' }, { label: 'Onboard', value: 'Onboard' }]} />
       </Form.Item>
     </>
@@ -104,13 +125,14 @@ export function NicSpecFields({ prefix }: { prefix?: (string | number)[] }) {
 }
 
 export function GpuSpecFields({ prefix }: { prefix?: (string | number)[] }) {
+  const { t } = useTranslation('settings');
   const name = (field: string) => prefix ? [...prefix, field] : field;
   return (
     <>
-      <Form.Item name={name('vram_gb')} label="显存容量 (GB)">
+      <Form.Item name={name('vram_gb')} label={t('componentSpec.gpu.vram')}>
         <InputNumber min={1} max={256} />
       </Form.Item>
-      <Form.Item name={name('gpu_memory_type')} label="显存类型">
+      <Form.Item name={name('gpu_memory_type')} label={t('componentSpec.gpu.memoryType')}>
         <Select options={[
           { label: 'HBM3e', value: 'HBM3e' },
           { label: 'HBM3', value: 'HBM3' },
@@ -121,13 +143,13 @@ export function GpuSpecFields({ prefix }: { prefix?: (string | number)[] }) {
           { label: 'LPDDR4X', value: 'LPDDR4X' },
         ]} />
       </Form.Item>
-      <Form.Item name={name('cuda_cores')} label="CUDA核心数/计算单元">
+      <Form.Item name={name('cuda_cores')} label={t('componentSpec.gpu.cudaCores')}>
         <InputNumber min={1} />
       </Form.Item>
-      <Form.Item name={name('tdp_w')} label="功耗 (W)">
+      <Form.Item name={name('tdp_w')} label={t('componentSpec.gpu.tdp')}>
         <InputNumber min={1} max={1200} />
       </Form.Item>
-      <Form.Item name={name('interface')} label="接口类型">
+      <Form.Item name={name('interface')} label={t('componentSpec.gpu.interface')}>
         <Select options={[
           { label: 'PCIe 5.0', value: 'PCIe 5.0' },
           { label: 'PCIe 4.0', value: 'PCIe 4.0' },
@@ -137,7 +159,7 @@ export function GpuSpecFields({ prefix }: { prefix?: (string | number)[] }) {
           { label: 'OAM', value: 'OAM' },
         ]} />
       </Form.Item>
-      <Form.Item name={name('fp32_tflops')} label="FP32 算力 (TFLOPS)">
+      <Form.Item name={name('fp32_tflops')} label={t('componentSpec.gpu.fp32')}>
         <InputNumber min={0} step={0.1} />
       </Form.Item>
     </>

@@ -7,8 +7,9 @@
 import { useEffect, useMemo } from 'react';
 import { Modal, Form, Input, Select } from 'antd';
 import type { User } from '@/types/models';
+import { useTranslation } from 'react-i18next';
 
-const PASSWORD_TIPS = '至少8位，需包含大写字母、小写字母、数字和特殊字符';
+const PASSWORD_TIPS_KEY = 'user.field.passwordTips' as const;
 
 interface UserFormProps {
   open: boolean;
@@ -20,6 +21,8 @@ interface UserFormProps {
 }
 
 function UserForm({ open, editRecord, onCancel, onOk, loading, roleOptions }: UserFormProps) {
+  const { t } = useTranslation('settings');
+  const { t: ta } = useTranslation('auth');
   const [form] = Form.useForm();
   const isEdit = !!editRecord;
 
@@ -47,7 +50,7 @@ function UserForm({ open, editRecord, onCancel, onOk, loading, roleOptions }: Us
 
   return (
     <Modal
-      title={isEdit ? '编辑用户' : '新增用户'}
+      title={isEdit ? t('user.modal.editTitle') : t('user.modal.createTitle')}
       open={open}
       onOk={handleSubmit}
       onCancel={onCancel}
@@ -58,72 +61,74 @@ function UserForm({ open, editRecord, onCancel, onOk, loading, roleOptions }: Us
       <Form form={form} layout="vertical">
         <Form.Item
           name="username"
-          label="用户名"
-          rules={[{ required: true, message: '请输入用户名' }]}
+          label={ta('field.username')}
+          rules={[{ required: true, message: ta('validation.usernameRequired') }]}
         >
-          <Input placeholder="用户名" disabled={isEdit} />
+          <Input placeholder={ta('field.username')} disabled={isEdit} />
         </Form.Item>
 
         <Form.Item
           name="password"
-          label="密码"
+          label={ta('field.password')}
           rules={isEdit
             ? [{ required: false }]
             : [
-                { required: true, message: '请输入密码' },
-                { min: 8, message: '密码至少8位' },
+                { required: true, message: ta('validation.passwordRequired') },
+                { min: 8, message: t('user.validation.passwordMinLength') },
               ]
           }
-          extra={!isEdit ? PASSWORD_TIPS : '留空则不修改'}
+          extra={!isEdit ? t(PASSWORD_TIPS_KEY) : t('user.field.passwordKeepHint')}
         >
-          <Input.Password placeholder={isEdit ? '留空则不修改' : '请输入密码'} />
+          <Input.Password
+            placeholder={isEdit ? t('user.field.passwordKeepHint') : ta('validation.passwordRequired')}
+          />
         </Form.Item>
 
         {!isEdit && (
           <Form.Item
             name="confirm_password"
-            label="确认密码"
+            label={t('user.field.confirmPassword')}
             dependencies={['password']}
             rules={[
-              { required: true, message: '请确认密码' },
+              { required: true, message: t('user.validation.confirmPasswordRequired') },
               ({ getFieldValue }) => ({
                 validator(_, value) {
                   if (!value || getFieldValue('password') === value) {
                     return Promise.resolve();
                   }
-                  return Promise.reject(new Error('两次密码不一致'));
+                  return Promise.reject(new Error(t('user.validation.passwordMismatch')));
                 },
               }),
             ]}
           >
-            <Input.Password placeholder="再次输入密码" />
+            <Input.Password placeholder={t('user.field.passwordAgain')} />
           </Form.Item>
         )}
 
         <Form.Item
           name="email"
-          label="邮箱"
-          rules={[{ required: !isEdit, message: '请输入邮箱' }]}
+          label={t('user.field.email')}
+          rules={[{ required: !isEdit, message: t('user.validation.emailRequired') }]}
         >
-          <Input placeholder="邮箱" />
+          <Input placeholder={t('user.field.email')} />
         </Form.Item>
 
-        <Form.Item name="name" label="姓名">
-          <Input placeholder="真实姓名" />
+        <Form.Item name="name" label={t('user.field.fullName')}>
+          <Input placeholder={t('user.field.realNamePlaceholder')} />
         </Form.Item>
 
-        <Form.Item name="department" label="部门">
-          <Input placeholder="部门" />
+        <Form.Item name="department" label={t('user.field.department')}>
+          <Input placeholder={t('user.field.department')} />
         </Form.Item>
 
-        <Form.Item name="contact_phone" label="联系电话">
-          <Input placeholder="联系电话" />
+        <Form.Item name="contact_phone" label={t('user.field.contactPhone')}>
+          <Input placeholder={t('user.field.contactPhone')} />
         </Form.Item>
 
-        <Form.Item name="roles" label="角色">
+        <Form.Item name="roles" label={t('role.label')}>
           <Select
             mode="multiple"
-            placeholder="选择角色"
+            placeholder={t('role.selectPlaceholder')}
             options={roleOptions}
             allowClear
           />

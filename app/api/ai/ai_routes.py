@@ -58,13 +58,21 @@ def _check_device_access(device_id: int,
     Args:
         device_id: 目标设备 ID。
         fail_closed: data_scope 服务故障时的降级语义（P0-4）。
-            False（默认）= fail-open 放行，适用查询/预览等只读路径；
+            False = fail-open 放行，适用查询/预览等只读路径；
             True = 拒绝并 403，适用 execute/rollback 等设备写路径——
             鉴权服务不可用不能成为绕过数据域、向真实设备下发变更的通道。
+            ⚠️ 门禁要求**每个调用点显式传参**（`tests/test_data_scope_fail_open_guard.py`）。
 
     Returns:
         (True, "") 有权限
         (False, reason) 无权限/服务故障拒绝，reason 用于 403 响应
+
+    ⚠️ P0-1（2026-09-23）：这条 `except` 此前**永不可达**——旧实现的
+    `get_visible_device_ids` 吞掉异常并 `return None`（= 无限制），异常传不到这里，
+    于是"写路径 fail-closed"这层保护形同虚设（execute 在 scope 后端故障时照常 202
+    入队）。现服务改为抛 `DataScopeUnavailableError`，本分支才真正生效；
+    回归用例如 `tests/api/test_remedial_idempotency.py::test_execute_fail_closed_when_scope_backend_really_fails`
+    （该用例自带对照组，防"403 只是设备不存在"这类解释）。
     """
     user_id = get_current_user_id()
     if not user_id:
@@ -78,12 +86,16 @@ def _check_device_access(device_id: int,
             return True, ""
         return False, f"无权操作设备 {device_id}（数据域隔离）"
     except Exception:  # noqa: BLE001
-        logger.warning(
-            "ai.device_scope_check_failed user=%s device=%s fail_closed=%s",
-            user_id, device_id, fail_closed,
-        )
         if fail_closed:
+            logger.error(
+                "ai.device_scope_check_failed user=%s device=%s（fail-closed：拒绝）",
+                user_id, device_id, exc_info=True,
+            )
             return False, "设备权限服务暂不可用，已拒绝该操作"
+        logger.warning(
+            "ai.device_scope_check_failed user=%s device=%s（显式 fail-open：只读路径放行）",
+            user_id, device_id, exc_info=True,
+        )
         return True, ""
 
 
@@ -381,7 +393,7 @@ def preview_remedial_command():
     if err:
         return APIResponse.error(err, status_code=400)
 
-    ok, reason = _check_device_access(dev_id)
+    ok, reason = _check_device_access(dev_id, fail_closed=False)
     if not ok:
         return APIResponse.error(reason, status_code=403)
 
@@ -625,7 +637,7 @@ def verify_remediation():
     if err:
         return APIResponse.error(err, status_code=400)
 
-    ok, reason = _check_device_access(dev_id)
+    ok, reason = _check_device_access(dev_id, fail_closed=True)
     if not ok:
         return APIResponse.error(reason, status_code=403)
 

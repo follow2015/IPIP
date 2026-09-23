@@ -39,7 +39,9 @@ import HardwareConfigFields, {
 import NicConfigFields, { expandNicPorts } from '@/components/NicConfigFields';
 import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
 import type { Device, Switch } from '@/types/models';
-import { DeviceType, DeviceSubtype, DEVICE_SUBTYPE_LABELS } from '@/types/enums';
+import { DeviceType, DeviceSubtype } from '@/types/enums';
+import { getDeviceSubtypeLabel } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
@@ -67,6 +69,8 @@ const HW_FIELDS = [
 ] as const;
 
 function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigModalProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const [form] = Form.useForm();
   const batchUpdateConfig = useBatchUpdateDeviceConfig();
   const message = useMessage();
@@ -84,7 +88,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
     .map((v) => ({ key: v.id, label: v.label, value: v.enterprise_no }));
   const isUnmanagedNetwork = isNetwork && !firstDevice?.switch_credential?.has_ssh;
   const subtypeLabel = deviceSubtype
-    ? (DEVICE_SUBTYPE_LABELS[deviceSubtype] ?? deviceSubtype)
+    ? (getDeviceSubtypeLabel(deviceSubtype, t) ?? deviceSubtype)
     : (deviceType ?? '');
 
   const formCustomerId = Form.useWatch('customer_id', form);
@@ -221,11 +225,21 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
 
     try {
       const result = await batchUpdateConfig.mutateAsync(payload);
-      const parts = [`更新 ${result.data.updated} 台，跳过 ${result.data.skipped} 台`];
-      if (result.data.nic_created) parts.push(`生成网卡端口 ${result.data.nic_created} 个`);
-      if (result.data.port_created) parts.push(`生成交换机端口 ${result.data.port_created} 个`);
-      if (result.data.storage_created) parts.push(`生成存储 ${result.data.storage_created} 条`);
-      message.success(parts.join('，'));
+      const parts = [
+        t('batch.message.updateResult', {
+          updated: result.data.updated,
+          skipped: result.data.skipped
+        })
+      ];
+      if (result.data.nic_created)
+        parts.push(t('batchConfig.message.nicPortsCreated', { count: result.data.nic_created }));
+      if (result.data.port_created)
+        parts.push(
+          t('batchConfig.message.switchPortsCreated', { count: result.data.port_created })
+        );
+      if (result.data.storage_created)
+        parts.push(t('batchConfig.message.storageCreated', { count: result.data.storage_created }));
+      message.success(parts.join(t('batchConfig.separator')));
       onClose(true);
       form.resetFields();
     } catch (err) {
@@ -240,7 +254,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
 
   return (
     <Modal
-      title={`批量修改配置（${devices.length} 台 · ${subtypeLabel}）`}
+      title={t('batchConfig.title', { count: devices.length, subtype: subtypeLabel })}
       open={open}
       onOk={handleSubmit}
       onCancel={handleCancel}
@@ -250,15 +264,15 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
     >
       <Form form={form} layout="vertical" preserve={false}>
         {/* 通用字段 */}
-        <Divider plain>通用信息</Divider>
+        <Divider plain>{t('batchConfig.section.general')}</Divider>
         <Row gutter={16}>
           <Col xs={24} md={8}>
-            <Form.Item name="brand" label="品牌">
+            <Form.Item name="brand" label={t('basic.field.brand')}>
               <Select
                 options={vendorOptions}
                 showSearch
                 allowClear
-                placeholder="选择品牌"
+                placeholder={t('form.basicInfo.brand.placeholder')}
                 filterOption={(input, option) =>
                   (option?.label as string).toLowerCase().includes(input.toLowerCase())
                 }
@@ -266,21 +280,25 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
             </Form.Item>
           </Col>
           <Col xs={24} md={8}>
-            <Form.Item name="device_model" label="型号">
-              <Input placeholder="型号" />
+            <Form.Item name="device_model" label={t('basic.field.model')}>
+              <Input placeholder={t('form.basicInfo.model.placeholder')} />
             </Form.Item>
           </Col>
           <Col xs={24} md={8}>
-            <Form.Item name="power" label="功耗(W)">
-              <InputNumber min={0} style={{ width: '100%' }} placeholder="功耗" />
+            <Form.Item name="power" label={t('form.basicInfo.power.label')}>
+              <InputNumber
+                min={0}
+                style={{ width: '100%' }}
+                placeholder={t('form.basicInfo.power.placeholder')}
+              />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item name="responsible_person" label="负责人">
+            <Form.Item name="responsible_person" label={t('basic.field.owner')}>
               <Select
-                placeholder="请选择负责人"
+                placeholder={t('form.basicInfo.owner.placeholder')}
                 options={userOptions}
                 allowClear
                 showSearch
@@ -289,9 +307,9 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="customer_id" label="客户">
+            <Form.Item name="customer_id" label={tCommon('field.customer')}>
               <Select
-                placeholder="请选择客户"
+                placeholder={t('form.basicInfo.customer.placeholder')}
                 options={customerOptions}
                 allowClear
                 showSearch
@@ -304,12 +322,12 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
         {/* 服务器硬件配置 + 网卡 */}
         {isServerHw && (
           <>
-            <Divider plain>硬件配置（服务器）</Divider>
+            <Divider plain>{t('batchConfig.section.hardware')}</Divider>
             <Alert
               type="info"
               showIcon
               style={{ marginBottom: 12 }}
-              message="IPMI 仅可批量修改用户名/密码，不会覆盖 IPMI 管理地址"
+              message={t('batchConfig.alert.ipmiBatchHint')}
             />
             <HardwareConfigFields
               form={form}
@@ -326,50 +344,66 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
           <Alert
             type="warning"
             showIcon
-            message="网管型网络设备仅支持批量修改通用字段（品牌/型号/功耗/负责人/客户）"
+            message={t('batchConfig.alert.managedNetworkLimited')}
           />
         )}
 
         {/* 非网管型网络设备拓扑 + 端口生成 */}
         {isUnmanagedNetwork && (
           <>
-            <Divider plain>网络拓扑</Divider>
+            <Divider plain>{t('form.section.networkTopology')}</Divider>
             <Row gutter={16}>
               <Col xs={24} md={8}>
-                <Form.Item name={['switch_config', 'switch_role']} label="角色">
+                <Form.Item
+                  name={['switch_config', 'switch_role']}
+                  label={t('form.networkTopology.role.label')}
+                >
                   <Select
-                    placeholder="请选择"
+                    placeholder={tCommon('message.selectRequired')}
                     allowClear
                     options={[
-                      { label: '核心', value: 0 },
-                      { label: '接入', value: 1 }
+                      { label: t('form.networkTopology.roleOption.core'), value: 0 },
+                      { label: t('form.networkTopology.roleOption.access'), value: 1 }
                     ]}
                   />
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
-                <Form.Item name={['switch_config', 'layer']} label="网络层">
+                <Form.Item
+                  name={['switch_config', 'layer']}
+                  label={t('form.networkTopology.layer.label')}
+                >
                   <Select
-                    placeholder="请选择"
+                    placeholder={tCommon('message.selectRequired')}
                     allowClear
                     options={[
-                      { label: '二层 (L2)', value: 2 },
-                      { label: '三层 (L3)', value: 3 }
+                      { label: t('form.networkTopology.layerOption.l2'), value: 2 },
+                      { label: t('form.networkTopology.layerOption.l3'), value: 3 }
                     ]}
                   />
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
-                <Form.Item name={['switch_config', 'port_num']} label="端口数量">
-                  <InputNumber placeholder="端口数" style={{ width: '100%' }} min={0} />
+                <Form.Item
+                  name={['switch_config', 'port_num']}
+                  label={t('form.networkTopology.portCount.label')}
+                >
+                  <InputNumber
+                    placeholder={t('form.networkTopology.portCount.placeholder')}
+                    style={{ width: '100%' }}
+                    min={0}
+                  />
                 </Form.Item>
               </Col>
             </Row>
             <Row gutter={16}>
               <Col xs={24} md={8}>
-                <Form.Item name={['switch_config', 'uplink_device_id']} label="上行设备">
+                <Form.Item
+                  name={['switch_config', 'uplink_device_id']}
+                  label={t('form.networkTopology.uplinkDevice.label')}
+                >
                   <Select
-                    placeholder="选择上行设备"
+                    placeholder={t('form.networkTopology.uplinkDevice.placeholder')}
                     allowClear
                     showSearch
                     optionFilterProp="label"
@@ -378,9 +412,12 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
-                <Form.Item name={['switch_config', 'core_device_id']} label="核心交换机">
+                <Form.Item
+                  name={['switch_config', 'core_device_id']}
+                  label={t('form.networkTopology.coreDevice.label')}
+                >
                   <Select
-                    placeholder="选择核心交换机"
+                    placeholder={t('form.networkTopology.coreDevice.placeholder')}
                     allowClear
                     showSearch
                     optionFilterProp="label"
@@ -393,14 +430,14 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                   type="info"
                   showIcon
                   style={{ marginTop: 4, marginBottom: 0 }}
-                  message="上行端口需逐台设备在详情中单独修改"
+                  message={t('batchConfig.alert.uplinkPortPerDevice')}
                 />
               </Col>
             </Row>
 
             {/* 端口生成（支持多组） */}
             <Card
-              title="端口生成"
+              title={t('form.section.portGeneration')}
               size="small"
               style={{ marginBottom: 16 }}
               styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
@@ -416,7 +453,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                   color: '#595959'
                 }}
               >
-                支持多组端口，如 48口GE + 4口10GE。命名规则：前缀 + 槽位/卡号/端口号
+                {t('form.portGeneration.intro')}
               </div>
               <Form.List
                 name="port_groups"
@@ -439,13 +476,13 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                           <Form.Item
                             {...restField}
                             name={[name, 'template']}
-                            label="端口类型"
+                            label={t('form.portGeneration.template.label')}
                             initialValue="GE"
                             style={{ marginBottom: 0 }}
                           >
                             <Select
                               options={PORT_TYPE_TEMPLATES}
-                              placeholder="选择类型"
+                              placeholder={t('form.portGeneration.template.placeholder')}
                               size="small"
                             />
                           </Form.Item>
@@ -454,7 +491,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                           <Form.Item
                             {...restField}
                             name={[name, 'slot']}
-                            label="槽位"
+                            label={t('form.portGeneration.slot.label')}
                             initialValue={0}
                             style={{ marginBottom: 0 }}
                           >
@@ -465,7 +502,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                           <Form.Item
                             {...restField}
                             name={[name, 'card']}
-                            label="卡号"
+                            label={t('form.portGeneration.card.label')}
                             initialValue={0}
                             style={{ marginBottom: 0 }}
                           >
@@ -476,7 +513,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                           <Form.Item
                             {...restField}
                             name={[name, 'start']}
-                            label="起始"
+                            label={t('form.portGeneration.start.label')}
                             initialValue={1}
                             style={{ marginBottom: 0 }}
                           >
@@ -492,7 +529,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                           <Form.Item
                             {...restField}
                             name={[name, 'end']}
-                            label="结束"
+                            label={t('form.portGeneration.end.label')}
                             initialValue={24}
                             style={{ marginBottom: 0 }}
                           >
@@ -524,7 +561,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                       size="small"
                       style={{ marginBottom: 8 }}
                     >
-                      添加端口组
+                      {t('form.portGeneration.addGroup')}
                     </Button>
                   </>
                 )}
@@ -533,7 +570,11 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                 <Alert
                   type="info"
                   showIcon
-                  message={`将生成 ${portPreview.length} 个端口：${portPreview.slice(0, 5).join(', ')}${portPreview.length > 5 ? ' ...' : ''}`}
+                  message={t('form.portGeneration.preview', {
+                    count: portPreview.length,
+                    list: portPreview.slice(0, 5).join(', '),
+                    ellipsis: portPreview.length > 5 ? ' ...' : ''
+                  })}
                   style={{ marginBottom: 8 }}
                 />
               )}
@@ -546,7 +587,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
           <Alert
             type="warning"
             showIcon
-            message="机箱类设备暂不支持批量硬件/端口修改，仅可修改上方通用字段"
+            message={t('batchConfig.alert.chassisNotSupported')}
           />
         )}
       </Form>

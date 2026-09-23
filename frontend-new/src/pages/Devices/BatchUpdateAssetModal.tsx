@@ -9,6 +9,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { useBatchUpdateDeviceAsset, type BatchUpdateAssetRequest } from '@/services/device';
 import { useMessage } from '@/hooks/useMessage';
 import AssetInfoFields from '@/components/AssetInfoFields';
+import { useTranslation } from 'react-i18next';
 
 const ASSET_DATE_FIELDS = [
   'purchase_date',
@@ -32,6 +33,7 @@ interface BatchUpdateAssetModalProps {
 }
 
 function BatchUpdateAssetModal({ open, deviceIds, onClose }: BatchUpdateAssetModalProps) {
+  const { t } = useTranslation('device');
   const [form] = Form.useForm();
   const batchUpdateAsset = useBatchUpdateDeviceAsset();
   const message = useMessage();
@@ -50,7 +52,12 @@ function BatchUpdateAssetModal({ open, deviceIds, onClose }: BatchUpdateAssetMod
         ...serialized
       };
       const result = await batchUpdateAsset.mutateAsync(payload);
-      message.success(`更新 ${result.data.updated} 台，跳过 ${result.data.skipped} 台`);
+      message.success(
+        t('batch.message.updateResult', {
+          updated: result.data.updated,
+          skipped: result.data.skipped
+        })
+      );
       onClose(true);
       form.resetFields();
       setAutoGenerate(false);
@@ -69,7 +76,7 @@ function BatchUpdateAssetModal({ open, deviceIds, onClose }: BatchUpdateAssetMod
 
   return (
     <Modal
-      title={`批量修改资产信息（${deviceIds.length} 台设备）`}
+      title={t('batch.updateAssetTitle', { count: deviceIds.length })}
       open={open}
       onOk={handleSubmit}
       onCancel={handleCancel}

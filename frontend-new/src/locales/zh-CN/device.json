@@ -1,0 +1,2219 @@
+{
+  "field": {
+    "name": "设备名称",
+    "managementIp": "管理IP",
+    "brandModel": "品牌/型号",
+    "memory": "内存",
+    "power": "功率",
+    "cabinet": "机柜",
+    "uPosition": "U位",
+    "portOverview": "端口概览",
+    "monitor": "监控"
+  },
+  "status": {
+    "unknown": "未知",
+    "notConfigured": "未配置",
+    "pending": "待探测",
+    "reachable": "可达",
+    "unreachable": "不可达",
+    "interrupted": "中断",
+    "alerting": "告警 {{count}}",
+    "SCRAPPED": "已报废",
+    "AVAILABLE": "可用",
+    "ONLINE": "在线",
+    "OFFLINE": "离线",
+    "MAINTENANCE": "维护中",
+    "RESERVED": "预留",
+    "PENDING_ONLINE": "待上线",
+    "TESTING": "测试中"
+  },
+  "tooltip": {
+    "notPinged": "未 ping 探测",
+    "pingOk": "管理 IP 可 ping 通",
+    "pingFailed": "管理 IP 不可 ping 通",
+    "interrupted": "监控中断：长时间未探测到",
+    "unreachable": "不可达（协议: {{protocol}}）",
+    "reachable": "可达（协议: {{protocol}}）",
+    "alerting": "可达但 {{count}} 项指标告警",
+    "pending": "已配置凭据，等待首次探测",
+    "portUsage": "已用: {{used}}, 空闲: {{free}}",
+    "hasCredential": "有管理权限",
+    "recordOnly": "仅记录"
+  },
+  "port": {
+    "summary": "{{total}}口({{used}}用/{{free}}空)",
+    "unknown": "{{count}}口",
+    "type": {
+      "mgmt": "管理口",
+      "other": "其他"
+    },
+    "template": {
+      "ge": "GE（千兆）",
+      "ge10": "10GE（万兆）",
+      "custom": "自定义"
+    },
+    "action": {
+      "add": "新增端口",
+      "syncData": "同步数据"
+    },
+    "mode": {
+      "batch": "批量添加",
+      "single": "单条添加"
+    },
+    "column": {
+      "usageStatus": "占用状态",
+      "linkStatus": "链路状态",
+      "ipAddress": "IP地址"
+    },
+    "ipRole": {
+      "primary": "主",
+      "secondary": "从"
+    },
+    "filter": {
+      "usageStatus": "占用状态筛选"
+    },
+    "switch": {
+      "sync": "同步",
+      "statusSync": "状态同步",
+      "notSync": "不同步"
+    },
+    "state": {
+      "on": "开",
+      "off": "关"
+    },
+    "namingRule": "命名规则：前缀 + 槽位/卡号/端口号（支持多组）",
+    "namingExample": "{{prefix}} + 槽{{slot}}/卡{{card}}/{{start}}~{{end}}",
+    "preview": {
+      "count": "将创建 {{count}} 个端口：",
+      "count_one": "将创建 {{count}} 个端口：",
+      "count_other": "将创建 {{count}} 个端口："
+    },
+    "field": {
+      "portNameHint": "如 GE1/0/1",
+      "portTypeHint": "如 GE",
+      "speedHint": "如 1G",
+      "speedHintMulti": "如 1G、10G",
+      "vlanHint": "如 100",
+      "macHint": "如 00:1A:2B:3C:4D:5E",
+      "ipHint": "如 192.168.1.1",
+      "descriptionHint": "端口描述",
+      "remarksHint": "端口备注",
+      "selectCustomer": "选择客户"
+    },
+    "validation": {
+      "inputPortName": "请输入端口名称"
+    },
+    "confirm": {
+      "deleteTitle": "确认删除端口",
+      "deleteContent": "确定要删除端口「{{name}}」吗？",
+      "enableTitle": "确认启用端口",
+      "enableContent": "确定要启用端口「{{name}}」吗？",
+      "disableTitle": "确认禁用端口",
+      "disableContent": "确定要禁用端口「{{name}}」吗？",
+      "syncTitle": "确认同步",
+      "syncContent": "将从设备获取所有端口信息并更新，此操作在后台执行，完成后自动刷新。"
+    },
+    "message": {
+      "createSuccess": "端口创建成功",
+      "updated": "端口更新成功",
+      "deleted": "端口已删除",
+      "noPortsToCreate": "没有可创建的端口",
+      "enabled": "启用成功",
+      "disabled": "禁用成功",
+      "syncEnabled": "已开启端口自动同步",
+      "syncDisabled": "已关闭端口自动同步",
+      "statusSyncEnabled": "已开启端口状态自动同步",
+      "statusSyncDisabled": "已关闭端口状态自动同步",
+      "toggleFailed": "开关设置失败",
+      "resetToGlobal": "已重置为跟随全局开关",
+      "syncSubmitted": "端口同步已提交，完成后将通过消息通知您",
+      "batchCreated": "成功创建 {{count}} 个端口",
+      "batchCreated_one": "成功创建 {{count}} 个端口",
+      "batchCreated_other": "成功创建 {{count}} 个端口",
+      "batchCreatedWithSkipped": "成功创建 {{count}} 个端口，{{skipped}} 个已存在被跳过",
+      "batchCreatedWithSkipped_one": "成功创建 {{count}} 个端口，{{skipped}} 个已存在被跳过",
+      "batchCreatedWithSkipped_other": "成功创建 {{count}} 个端口，{{skipped}} 个已存在被跳过",
+      "batchUpdated": "已更新 {{count}} 个端口",
+      "batchUpdated_one": "已更新 {{count}} 个端口",
+      "batchUpdated_other": "已更新 {{count}} 个端口",
+      "batchUpdatePartialFailed": "批量操作完成，{{count}} 个端口更新失败",
+      "batchUpdatePartialFailed_one": "批量操作完成，{{count}} 个端口更新失败",
+      "batchUpdatePartialFailed_other": "批量操作完成，{{count}} 个端口更新失败"
+    },
+    "tooltip": {
+      "needCredential": "请先添加 SNMP 或 Zabbix 监控凭据后才能开启端口自动同步",
+      "needCredentialStatus": "请先添加 SNMP 或 Zabbix 监控凭据后才能开启端口状态自动同步",
+      "followGlobal": "跟随全局开关（当前：{{state}}），点击切换为设备级强制开关",
+      "followGlobalStatus": "跟随全局开关（当前：{{state}}），点击切换为设备级强制开关。开启后监控轮询时用 SNMP/Zabbix 凭据更新端口状态，SSH 同步仍保留全量替换",
+      "deviceOverride": "设备级开关已强制设置，点击\"{{follow}}\"可恢复",
+      "deviceOverrideStatus": "设备级开关已强制设置，开启后监控轮询时仅更新端口状态，SSH 同步仍保留全量替换。点击\"{{follow}}\"可恢复"
+    },
+    "alert": {
+      "credentialTip": "如果有监控凭据，建议先添加 SNMP 或 Zabbix 监控凭据来自动获取端口",
+      "credentialTipDesc": "添加监控凭据后，可开启上方「端口同步」开关，系统将在监控轮询时自动同步端口。未添加凭据时开关不可开启。"
+    }
+  },
+  "action": {
+    "clone": "克隆"
+  },
+  "filter": {
+    "mainType": "主类型",
+    "subType": "子类型",
+    "sshAccess": "管理权限",
+    "byStatus": "按状态筛选",
+    "byRoom": "按机房筛选",
+    "byCustomer": "按客户筛选",
+    "byCabinet": "按机柜筛选"
+  },
+  "batch": {
+    "addDevice": "新增设备",
+    "batchAdd": "批量添加",
+    "manualBatchAdd": "手动批量添加",
+    "cloneCopy": "克隆复制",
+    "changeStatus": "批量变更状态",
+    "updateAsset": "批量修改资产信息",
+    "updateAssetTitle": "批量修改资产信息（{{count}} 台设备）",
+    "updateConfig": "批量修改配置",
+    "updateMonitor": "批量修改监控",
+    "crossPageWarning": "「{{action}}」需要逐条读取已选内容，仅支持当前页勾选：另有 {{count}} {{unit}}已选但不在当前页。请先取消跨页选择（清空后在本页重新勾选）再操作。",
+    "unit": "台设备",
+    "message": {
+      "updateResult": "更新 {{updated}} 台，跳过 {{skipped}} 台"
+    }
+  },
+  "confirm": {
+    "deleteContent": "确定要删除设备「{{name}}」吗？",
+    "batchDeleteContent": "确定要删除选中的 {{count}} 台设备吗？此操作不可恢复。",
+    "batchDeleteContent_one": "确定要删除选中的 {{count}} 台设备吗？此操作不可恢复。",
+    "batchDeleteContent_other": "确定要删除选中的 {{count}} 台设备吗？此操作不可恢复。",
+    "batchStatusContent": "确定要将选中的 {{count}} 台设备状态变更为「{{status}}」吗？",
+    "batchStatusContent_one": "确定要将选中的 {{count}} 台设备状态变更为「{{status}}」吗？",
+    "batchStatusContent_other": "确定要将选中的 {{count}} 台设备状态变更为「{{status}}」吗？",
+    "deleteOk": "确定删除"
+  },
+  "message": {
+    "batchDeleteSuccess": "成功删除 {{count}} 台设备",
+    "batchDeleteSuccess_one": "成功删除 {{count}} 台设备",
+    "batchDeleteSuccess_other": "成功删除 {{count}} 台设备",
+    "batchDeleteFailed": "批量删除失败",
+    "batchStatusSuccess": "已变更 {{count}} 台设备状态",
+    "batchStatusSuccess_one": "已变更 {{count}} 台设备状态",
+    "batchStatusSuccess_other": "已变更 {{count}} 台设备状态",
+    "batchStatusFailed": "批量状态变更失败",
+    "noDeviceSelected": "未找到所选设备，请重新勾选",
+    "configSubtypeRequired": "批量修改配置要求所选设备的子类型必须一致",
+    "monitorSubtypeRequired": "批量修改监控要求所选设备的子类型必须一致"
+  },
+  "metric": {
+    "title": "监控数据",
+    "sectionTitle": "监控指标",
+    "trafficTitle": "端口流量",
+    "trafficLoadFailed": "流量图加载失败，请刷新重试",
+    "templateGroup": "指标模板组：{{name}}",
+    "lastError": "错误详情：{{error}}",
+    "lastChecked": "最近探测：{{time}}",
+    "activeAlertCount": "{{count}} 条活跃指标告警",
+    "groupAlertCount": "{{count}} 告警",
+    "itemCount": "{{count}} 条",
+    "activeAlertDetail": "活跃告警明细",
+    "emptyGroup": "该模板组暂未包含任何指标",
+    "needCredential": "需要关联凭据",
+    "needCredentialHint": "请到「监控凭据」Tab 关联至少一种监控凭据（SNMP / IPMI / Zabbix）后查看监控数据",
+    "column": {
+      "name": "指标",
+      "source": "来源",
+      "value": "当前值",
+      "status": "状态",
+      "alert": "告警",
+      "collectedAt": "采集时间",
+      "instance": "实例",
+      "severity": "级别",
+      "updatedAt": "更新时间"
+    },
+    "severity": {
+      "critical": "严重",
+      "warning": "警告",
+      "info": "信息"
+    },
+    "status": {
+      "normal": "正常",
+      "noData": "无数据",
+      "interrupted": "监控中断",
+      "waitingProbe": "等待探测"
+    },
+    "overall": {
+      "noCredential": "本机尚未关联监控凭据",
+      "notProbed": "已配置凭据，等待首次探测",
+      "unreachable": "设备当前不可达，暂无指标数据",
+      "credentialError": "监控凭据或配置异常，指标无法采集",
+      "noData": "尚未采集到指标数据",
+      "breached": "存在超阈值指标，请关注",
+      "normal": "指标采集正常"
+    },
+    "group": {
+      "temperature": "温度",
+      "portStatus": "端口状态",
+      "ifInErrors": "入错包",
+      "ifOutErrors": "出错包",
+      "ifInDiscards": "入丢包",
+      "ifOutDiscards": "出丢包",
+      "ifUtilization": "端口利用率",
+      "cpuUsage": "CPU 利用率",
+      "memoryUsage": "内存利用率",
+      "sysUptime": "系统运行时间",
+      "fanSpeed": "风扇转速",
+      "zabbixCpuUsage": "CPU 利用率(Zabbix)",
+      "zabbixMemoryUsage": "内存利用率(Zabbix)",
+      "zabbixTemperature": "温度(Zabbix)",
+      "zabbixSysUptime": "系统运行时间(Zabbix)",
+      "zabbixIfInErrors": "入错包(Zabbix)",
+      "zabbixIfOutErrors": "出错包(Zabbix)",
+      "zabbixIfInDiscards": "入丢包(Zabbix)",
+      "zabbixIfOutDiscards": "出丢包(Zabbix)",
+      "raidFailure": "RAID",
+      "diskFailure": "磁盘",
+      "monitorInterrupted": "监控中断"
+    }
+  },
+  "credential": {
+    "monitorSwitchTitle": "设备监控开关",
+    "monitorEnabled": "启用监控探测",
+    "monitorEnabledHint": "关闭后本设备不再纳入监控轮询（仅影响本设备）",
+    "templateGroupTitle": "指标模板组",
+    "currentBinding": "当前绑定：",
+    "autoMatch": "自动匹配",
+    "templateGroupHint": "为该设备显式绑定指标模板组；留空保存则清除绑定，回到按设备类型 + 厂商 + 协议自动匹配规则",
+    "selectTemplateGroup": "选择指标模板组（留空 = 解除绑定）",
+    "currentType": "当前类型",
+    "noMatchedGroup": "没有匹配 {{type}} 的指标模板组",
+    "createInMonitorCenter": "可在「监控中心 → 指标模板」中创建",
+    "linkedTitle": "本机已关联凭据",
+    "notLinked": "本机尚未关联任何监控凭据",
+    "editSecret": "编辑密文",
+    "unlink": "取消关联",
+    "linkExistingTitle": "关联已有共享凭据",
+    "protocolExclusive": "协议互斥",
+    "protocolExclusiveDesc": "每台设备同一时刻只能使用一种监控协议。关联新协议凭据将自动解除本机 {{protocols}} 协议的关联。",
+    "protocolExclusiveDescCreate": "每台设备同一时刻只能使用一种监控协议。新建并关联不同协议的凭据将自动解除本机 {{protocols}} 协议的关联。",
+    "selectShared": "选择共享凭据",
+    "noAvailable": "无可关联凭据",
+    "sharedOption": "[{{protocol}}] {{name}}（已关联 {{count}} 台）",
+    "linkThisDevice": "关联本机",
+    "createAndLinkTitle": "新建共享凭据并关联本机",
+    "createAndLink": "新建并关联",
+    "editSecretTitle": "编辑本机凭据密文（{{protocol}}）",
+    "onlyThisDevice": "仅影响本设备",
+    "onlyThisDeviceDesc": "该凭据可能被其它设备共享；本次编辑只迁移本设备到独立凭据行，不影响其它设备。",
+    "name": "凭据名称",
+    "namePlaceholder": "请输入凭据名称",
+    "nameHint": "如：机房A SNMP只读团体字",
+    "protocol": "协议",
+    "separator": "、",
+    "selectSharedFirst": "请选择要关联的共享凭据",
+    "replaceTitle": "关联新协议将替换旧协议",
+    "replaceContent": "每台设备同一时刻只能使用一种监控协议。关联新协议凭据将自动解除本机 {{protocols}} 协议的关联。确认继续？",
+    "confirmReplace": "确认替换",
+    "clearGroupTitle": "清除指标模板组关联",
+    "clearGroupContent": "清除后将回到按设备类型 + 厂商 + 协议自动匹配规则。确认继续？",
+    "confirmClear": "确认清除",
+    "form": {
+      "keepUnchanged": "留空保持不变",
+      "username": "用户名",
+      "password": "密码",
+      "none": "无",
+      "snmpVersion": "SNMP 版本",
+      "authKey": "认证密钥 (Auth Key)",
+      "authProtocol": "认证协议",
+      "privKey": "加密密钥 (Priv Key)",
+      "privKeyPlaceholder": "无加密时留空",
+      "privProtocol": "加密协议",
+      "apiUrl": "API 地址",
+      "apiToken": "API Token",
+      "verifySsl": "验证 SSL",
+      "verifySslIpmi": "验证SSL证书",
+      "verifySslTooltip": "BMC通常使用自签名证书，默认关闭",
+      "matchBy": {
+        "label": "匹配方式",
+        "placeholder": "默认按 host",
+        "host": "主机名",
+        "ip": "IP 地址"
+      }
+    },
+    "message": {
+      "linked": "已关联到共享凭据",
+      "unlinked": "已取消 {{protocol}} 关联",
+      "monitorResumed": "已恢复该设备监控",
+      "monitorPaused": "已暂停该设备监控",
+      "groupCleared": "已清除指标模板组关联（回到自动匹配）",
+      "groupUpdated": "已更新指标模板组关联",
+      "saveFailed": "保存失败",
+      "createdAndLinked": "已新建并关联共享凭据",
+      "updated": "本机凭据已更新",
+      "updateFailed": "更新失败"
+    }
+  },
+  "hardware": {
+    "cpu": {
+      "model": "CPU型号",
+      "modelPlaceholder": "选择CPU模板（可搜索品牌/型号）",
+      "way": "CPU路数",
+      "wayPlaceholder": "路数",
+      "cores": "单颗核心数",
+      "coresPlaceholder": "核心数"
+    },
+    "memory": {
+      "model": "内存型号",
+      "modelPlaceholder": "选择内存模板",
+      "dimmCount": "内存条数",
+      "dimmCountPlaceholder": "条数",
+      "dimmCountUnit": "条",
+      "totalCapacity": "内存总容量"
+    },
+    "os": {
+      "label": "操作系统",
+      "placeholder": "如 CentOS 7.9"
+    },
+    "gpu": {
+      "model": "显卡型号",
+      "modelPlaceholder": "选择显卡模板（可搜索品牌/型号）",
+      "count": "显卡数量",
+      "countUnit": "张",
+      "description": "显卡描述",
+      "descriptionPlaceholder": "如 NVIDIA A100 80GB × 8"
+    },
+    "ipmi": {
+      "address": "IPMI地址",
+      "addressPlaceholder": "IPMI管理地址",
+      "username": "IPMI用户名",
+      "usernamePlaceholder": "IPMI登录用户名",
+      "password": "IPMI密码",
+      "passwordPlaceholder": "IPMI登录密码"
+    },
+    "storage": {
+      "title": "存储配置",
+      "model": "硬盘型号",
+      "placeholder": "选择硬盘模板",
+      "count": "数量",
+      "countUnit": "块",
+      "optional": "可选",
+      "add": "添加硬盘",
+      "templateDefault": "(模板默认)"
+    }
+  },
+  "storage": {
+    "unit": "条存储",
+    "totalCapacity": "总容量：{{capacity}}",
+    "blockCount": "{{count}}块 {{capacity}}",
+    "confirmDelete": "确定删除该存储？",
+    "confirmBatchDelete": "确定删除选中的 {{count}} 条存储？",
+    "confirmBatchDelete_one": "确定删除选中的 {{count}} 条存储？",
+    "confirmBatchDelete_other": "确定删除选中的 {{count}} 条存储？",
+    "templateConfig": "模板配置",
+    "templateTitle": "存储模板配置",
+    "confirmCreate": "确认创建",
+    "editTitle": "编辑存储",
+    "selectType": "请选择存储类型",
+    "column": {
+      "capacity": "容量",
+      "interface": "接口类型",
+      "slot": "插槽号",
+      "vendor": "厂商",
+      "model": "型号",
+      "serial": "序列号"
+    },
+    "status": {
+      "normal": "正常",
+      "fault": "故障",
+      "warning": "预警"
+    },
+    "field": {
+      "type": "存储类型",
+      "capacityGb": "容量(GB)",
+      "capacityGbHint": "仅用于计算总容量，不会在列表中显示",
+      "capacityPlaceholder": "请输入容量",
+      "capacityHint": "如 2TB",
+      "capacityGbConvertHint": "换算为GB，如 2TB填2048",
+      "vendorHint": "如 Samsung",
+      "modelHint": "如 PM983"
+    },
+    "message": {
+      "deleted": "已删除 {{count}} 条存储",
+      "deleted_one": "已删除 {{count}} 条存储",
+      "deleted_other": "已删除 {{count}} 条存储",
+      "batchDeleteFailed": "批量删除失败",
+      "needOneConfig": "请至少配置一项存储",
+      "created": "已按模板创建 {{count}} 条存储",
+      "created_one": "已按模板创建 {{count}} 条存储",
+      "created_other": "已按模板创建 {{count}} 条存储",
+      "createFailed": "创建失败"
+    }
+  },
+  "nic": {
+    "unit": "个端口",
+    "itemLabel": "网卡 {{index}}",
+    "templatePlaceholder": "选择网卡模板（自动展开端口）",
+    "templateOption": "{{brand}} {{model}}（{{ports}}×{{speed}} {{type}}）",
+    "add": "添加网卡",
+    "autoNicName": "网卡{{index}}",
+    "autoPortName": "{{model}}:端口{{index}}",
+    "preview": {
+      "summary_one": "共 {{count}} 个端口，{{nics}} 块网卡",
+      "summary_other": "共 {{count}} 个端口，{{nics}} 块网卡"
+    },
+    "column": {
+      "displayName": "显示名",
+      "nicIndex": "网卡号",
+      "portIndex": "端口号",
+      "portName": "端口名称",
+      "portType": "端口类型",
+      "speed": "速率",
+      "portStatus": "端口状态",
+      "description": "描述"
+    },
+    "portType": {
+      "rj45": "RJ45 (电口)",
+      "sfp": "SFP (1G光口)",
+      "sfpPlus": "SFP+ (10G光口)",
+      "sfp28": "SFP28 (25G光口)",
+      "qsfpPlus": "QSFP+ (40G光口)",
+      "qsfp28": "QSFP28 (100G光口)",
+      "qsfp56": "QSFP56 (200G光口)",
+      "qsfpdd": "QSFP-DD (400G光口)"
+    },
+    "status": {
+      "free": "空闲",
+      "occupied": "占用",
+      "disabled": "禁用"
+    },
+    "confirmDelete": "确定删除该端口？",
+    "confirmBatchDelete": "确定删除选中的 {{count}} 个端口？",
+    "confirmBatchDelete_one": "确定删除选中的 {{count}} 个端口？",
+    "confirmBatchDelete_other": "确定删除选中的 {{count}} 个端口？",
+    "templateConfig": "模板配置",
+    "editTitle": "编辑端口",
+    "confirmCreate": "确认创建",
+    "field": {
+      "nicIndexPlaceholder": "请输入网卡号",
+      "nicIndexHint": "网卡编号",
+      "portIndexPlaceholder": "请输入端口号",
+      "portIndexHint": "端口编号",
+      "portNameHint": "如 port1"
+    },
+    "message": {
+      "deleted": "已删除 {{count}} 个端口",
+      "deleted_one": "已删除 {{count}} 个端口",
+      "deleted_other": "已删除 {{count}} 个端口",
+      "skipped": "{{count}} 个端口因占用或无效被跳过",
+      "skipped_one": "{{count}} 个端口因占用或无效被跳过",
+      "skipped_other": "{{count}} 个端口因占用或无效被跳过",
+      "batchDeleteFailed": "批量删除失败",
+      "needTemplate": "请至少选择一个网卡模板",
+      "created": "已按模板创建 {{count}} 个端口",
+      "created_one": "已按模板创建 {{count}} 个端口",
+      "created_other": "已按模板创建 {{count}} 个端口",
+      "createFailed": "创建失败"
+    }
+  },
+  "node": {
+    "notesTemplate": "{{name}} 节点 {{position}}",
+    "positionFull": "当前机箱节点位置已满，无法继续添加子节点",
+    "deleteContent": "确定要删除节点「{{name}}」吗？",
+    "createSuccess": "节点创建成功",
+    "noVacant": "当前没有空余节点位置",
+    "countMustPositive": "生成数量必须大于0",
+    "countExceed": "生成数量不能超过剩余空余位置（{{count}}个）",
+    "generated": "已生成 {{count}} 个子节点",
+    "generated_one": "已生成 {{count}} 个子节点",
+    "generated_other": "已生成 {{count}} 个子节点",
+    "column": {
+      "position": "节点位置",
+      "name": "设备名称",
+      "hostname": "主机名",
+      "memory": "内存",
+      "os": "操作系统"
+    },
+    "memorySummary": "单条 {{single}}GB × {{count}} = ",
+    "layout": "节点布局：{{rows}}行 × {{cols}}列 = {{total}}节点（已占用 {{used}}，空余 {{vacant}}）— 拖拽节点可更换位置",
+    "dragTooltip": "拖拽更换位置 · 点击查看 {{name}}",
+    "vacantSlot": "空位 R{{row}}C{{col}}（可拖入节点）",
+    "regenerateHint": "如需重新生成所有节点（覆盖已有），请在编辑机箱时勾选「生成子节点」",
+    "fillTooltip": "填满所有空余节点位置（当前空余 {{count}} 个）",
+    "fillButton": "填满空余节点",
+    "chassisFull": "机箱节点位置已满，无法继续添加",
+    "addChildTooltip": "新增一个子节点到空余位置",
+    "addButton": "新增节点",
+    "field": {
+      "name": "节点名称",
+      "namePlaceholder": "请输入节点名称",
+      "nameHint": "如 Chassis-01-Node1",
+      "position": "节点位置",
+      "positionPlaceholder": "请输入节点位置",
+      "positionHint": "位置编号",
+      "hostname": "主机名",
+      "hardware": "硬件配置",
+      "nic": "网卡配置"
+    },
+    "generateTitle": "填满空余节点位置",
+    "generateDesc": "当前机箱共 {{total}} 个节点位置，已有 {{existing}} 个子节点，空余 {{vacant}} 个位置。将按顺序填充空余位置，已有子节点不受影响。",
+    "generateCount": "生成节点数量",
+    "generateCountPlaceholder": "请输入生成数量",
+    "generateCountMin": "至少生成1个节点",
+    "generateCountMax": "不能超过剩余空余位置（{{count}}个）",
+    "generateCountMaxShort": "最多 {{count}} 个",
+    "message": {
+      "swapFailed": "节点位置交换失败"
+    }
+  },
+  "basic": {
+    "field": {
+      "deviceType": "设备类型",
+      "deviceSubtype": "设备子类型",
+      "brand": "品牌",
+      "model": "型号",
+      "serialNumber": "序列号",
+      "businessIp": "业务IP",
+      "room": "所属机房",
+      "occupiedU": "占用U数",
+      "owner": "负责人",
+      "cpu": "CPU",
+      "gpu": "GPU",
+      "power": "功耗",
+      "memoryPerDimm": "单条 {{size}}GB × {{count}} = "
+    },
+    "cpu": {
+      "way": "{{count}}路",
+      "cores": "{{count}}核",
+      "cores_one": "{{count}}核",
+      "cores_other": "{{count}}核"
+    },
+    "invalidFormat": "(格式错误)",
+    "clearAll": "清空全部",
+    "confirmClear": "确认清空所有业务IP？",
+    "message": {
+      "ipDeleted": "已删除",
+      "cleared": "已清空所有业务IP",
+      "clearFailed": "清空失败"
+    }
+  },
+  "detail": {
+    "invalidParam": "参数无效",
+    "invalidDeviceId": "设备 ID 无效",
+    "backToList": "返回列表",
+    "changeStatus": "变更状态",
+    "refreshInfo": "刷新设备信息",
+    "refreshInfoContent": "将从设备实时获取型号、版本、序列号等信息，后台执行完成后自动刷新。",
+    "refreshInfoSubmitted": "刷新设备信息已提交，完成后将通过消息通知您",
+    "notFound": "设备不存在",
+    "statusChanged": "状态已变更",
+    "statusChangeFailed": "状态变更失败"
+  },
+  "config": {
+    "tab": {
+      "backups": "配置备份",
+      "changes": "配置变更审批"
+    },
+    "backupType": {
+      "manual": "手动",
+      "scheduled": "定时",
+      "preChange": "变更前"
+    },
+    "changeStatus": {
+      "draft": "草稿",
+      "pending": "待审批",
+      "approved": "已批准",
+      "rejected": "已拒绝",
+      "applied": "已应用"
+    },
+    "column": {
+      "fileSize": "文件大小",
+      "configHash": "配置哈希",
+      "summary": "摘要"
+    },
+    "action": {
+      "diff": "对比",
+      "approve": "批准",
+      "reject": "拒绝",
+      "triggerBackup": "触发备份"
+    },
+    "confirmApprove": "确定批准此变更？",
+    "confirmReject": "确定拒绝此变更？",
+    "viewTitle": "配置内容",
+    "diffTitle": "配置对比",
+    "oldConfig": "旧配置",
+    "newConfig": "新配置",
+    "message": {
+      "backupSubmitted": "配置备份已提交，完成后将通过消息通知您",
+      "backupFailed": "备份失败",
+      "noDiff": "没有可对比的配置"
+    }
+  },
+  "connection": {
+    "type": {
+      "ethernet": "以太网",
+      "fiber": "光纤",
+      "management": "管理口",
+      "serial": "串口",
+      "other": "其他"
+    },
+    "linkType": {
+      "deviceToNetwork": "设备→网络",
+      "networkToNetwork": "网络→网络"
+    },
+    "column": {
+      "connectionType": "连接类型",
+      "linkType": "连接模式",
+      "localPort": "本机端口",
+      "peerDevice": "对端设备",
+      "peerPort": "对端端口",
+      "vlan": "VLAN",
+      "bandwidth": "带宽",
+      "lagGroup": "LAG 组"
+    },
+    "form": {
+      "peerDeviceRoom": "对端设备所在机房",
+      "localNicPort": "本机网卡端口",
+      "selectLocalPort": "请选择本机端口",
+      "selectRoom": "请选择机房",
+      "selectCabinet": "请选择机柜",
+      "selectPeerDevice": "请选择对端设备",
+      "selectDevice": "请选择设备",
+      "selectPeerPort": "请选择对端端口",
+      "selectPort": "请选择端口",
+      "selectPeerDeviceFirst": "请先选择对端设备",
+      "selectNicPort": "请选择网卡端口",
+      "selectVlan": "选择 VLAN",
+      "bandwidthHint": "如 10G",
+      "selectLagGroup": "选择 LAG 组"
+    },
+    "action": {
+      "add": "新增连接"
+    },
+    "editTitle": "编辑连接",
+    "confirmDeleteContent": "确定要删除该连接吗？",
+    "confirmDisconnect": "确认断开",
+    "confirmDisconnectContent": "确定要断开该端口互联吗？将双向释放端口。",
+    "unnamed": "未命名",
+    "loadFailed": "连接数据加载失败",
+    "loadFailedDesc": "请检查网络后重试，或联系管理员。",
+    "message": {
+      "disconnected": "断开成功",
+      "disconnectFailed": "断开失败"
+    }
+  },
+  "memberPort": {
+    "column": "成员端口",
+    "selectPlaceholder": "选择成员端口",
+    "editTitle": "编辑成员端口 - {{name}}",
+    "updateSuccess": "成员端口更新成功",
+    "syncSubmitted": "成员端口同步已提交，完成后将通过消息通知您",
+    "purposeHint": "此处仅记录用途信息，不操作交换机。操作交换机需要在端口列表对应的端口操作。"
+  },
+  "portAction": {
+    "action": {
+      "enablePort": "启用端口",
+      "disablePort": "关闭端口",
+      "updatePortInfo": "修改端口信息",
+      "setPortSpeed": "设置端口限速",
+      "setPortVlan": "配置VLAN",
+      "setPortIp": "配置IP",
+      "deletePortIp": "删除IP",
+      "clearPortConfig": "清除端口配置",
+      "deleteInterface": "删除接口",
+      "addPortToTrunk": "加入链路聚合",
+      "deleteTrunk": "删除链路聚合",
+      "createPortChannel": "创建链路聚合",
+      "removePortFromChannel": "移除链路聚合成员",
+      "deleteVlan": "删除VLAN"
+    },
+    "message": {
+      "success": "{{action}}成功",
+      "failed": "{{action}}失败",
+      "submitted": "{{action}}已提交，完成后将通过消息通知您",
+      "submitFailed": "{{action}}提交失败：{{message}}"
+    }
+  },
+  "lag": {
+    "pageTitle": "链路聚合组管理",
+    "managed": "网管型",
+    "column": {
+      "lagName": "聚合组名称",
+      "algorithm": "负载算法",
+      "memberCount": "成员数"
+    },
+    "type": {
+      "lacp": "LACP",
+      "lacpDynamic": "LACP（动态）",
+      "static": "静态"
+    },
+    "action": {
+      "members": "成员",
+      "syncMembers": "同步成员",
+      "create": "创建链路聚合组"
+    },
+    "confirmDelete": "确认删除链路聚合组",
+    "confirmDeleteContent": "确定要删除链路聚合组「{{name}}」吗？",
+    "confirmSync": "同步链路聚合成员端口",
+    "confirmSyncContent": "将从设备 SSH 获取所有 Eth-Trunk 配置并解析成员端口列表，可能需要较长时间。确定继续？",
+    "form": {
+      "selectSwitch": "请选择交换机",
+      "lagType": "聚合类型",
+      "inputLagName": "请输入聚合组名称",
+      "lagNamePlaceholder": "如 Eth-Trunk1",
+      "purposePlaceholder": "如 上行链路、服务器互联"
+    },
+    "editPurposeTitle": "编辑用途 - {{name}}",
+    "message": {
+      "created": "链路聚合组创建成功",
+      "deleted": "链路聚合组已删除",
+      "purposeUpdated": "用途更新成功"
+    }
+  },
+  "vlan": {
+    "searchPlaceholder": "搜索 VLAN ID/名称/用途...",
+    "managed": "网管型",
+    "deviceFallback": "设备 #{{id}}",
+    "roomFallback": "机房 #{{id}}",
+    "column": {
+      "vlanId": "VLAN ID"
+    },
+    "action": {
+      "members": "成员",
+      "syncMembers": "同步成员",
+      "add": "新增 VLAN"
+    },
+    "editTitle": "编辑 VLAN",
+    "confirmDelete": "确认删除 VLAN",
+    "confirmDeleteContent": "确定要删除 VLAN {{id}}（{{name}}）吗？",
+    "confirmSync": "同步 VLAN 成员端口",
+    "confirmSyncContent": "将从设备 SSH 获取所有 VLANIF 配置并解析成员端口列表，可能需要较长时间。确定继续？",
+    "form": {
+      "switch": "所属交换机",
+      "room": "所属机房",
+      "selectSwitch": "请选择交换机",
+      "selectRoom": "请选择机房",
+      "selectStatus": "请选择状态",
+      "inputPurpose": "请输入用途",
+      "inputVlanId": "请输入 VLAN ID",
+      "inputName": "请输入名称",
+      "namePlaceholder": "如 VLAN100",
+      "purposePlaceholder": "如 办公网络"
+    },
+    "message": {
+      "created": "VLAN 创建成功",
+      "updated": "VLAN 更新成功",
+      "deleted": "VLAN 已删除"
+    }
+  },
+  "asset": {
+    "field": {
+      "assetNumber": "资产编号",
+      "warrantyStatus": "保修状态",
+      "supplier": "供应商",
+      "supplierContact": "供应商联系人",
+      "contractNumber": "合同编号",
+      "purchaseDate": "采购日期",
+      "purchasePrice": "采购价格",
+      "invoiceNumber": "发票号码",
+      "warrantyType": "保修类型",
+      "warrantyPeriod": "保修期限",
+      "onlineDate": "上线日期",
+      "offlineDate": "下线日期",
+      "lifecycleYears": "预计使用年限",
+      "years": "{{count}}年",
+      "years_one": "{{count}}年",
+      "years_other": "{{count}}年"
+    },
+    "warranty": {
+      "notSet": "未设置",
+      "expired": "已过期",
+      "expiring": "即将到期({{count}}天)",
+      "expiring_one": "即将到期({{count}}天)",
+      "expiring_other": "即将到期({{count}}天)",
+      "active": "保修中"
+    },
+    "editTitle": "编辑资产信息",
+    "confirmResetTitle": "重置资产信息",
+    "confirmResetContent": "确定要清空设备「{{name}}」的所有资产信息吗？此操作不可恢复。",
+    "confirmResetOk": "确定重置",
+    "message": {
+      "updated": "资产信息已更新",
+      "resetSuccess": "资产信息已重置",
+      "resetFailed": "重置失败"
+    }
+  },
+  "batchMonitor": {
+    "title": "批量修改监控（{{count}} 台 · {{subtype}}）",
+    "monitorSwitch": "监控开关",
+    "monitorStatus": "监控状态",
+    "paused": "暂停",
+    "enableHint": "启用后，监控 Worker 将在下一轮探测中纳入这些设备",
+    "pauseHint": "暂停后，这些设备将不会被监控 Worker 探测，直到重新启用",
+    "credentialTitle": "监控凭据",
+    "configCredential": "配置凭据",
+    "config": "配置",
+    "skip": "跳过",
+    "credentialHint": "将为所有选中设备配置相同的监控凭据（共享凭据模式）",
+    "credentialNameOptional": "凭据名称（可选）",
+    "skipCredentialHint": "跳过凭据配置，仅修改监控开关状态",
+    "configGroup": "配置指标模板组",
+    "groupHint": "为所有选中设备绑定统一的指标模板组；不选择模板组则保持自动匹配规则",
+    "groupClearHint": "留空清除已绑定关系（回到按设备类型 + 厂商 + 协议自动匹配）；未开启本开关则不做任何改动",
+    "portSyncTitle": "端口同步开关",
+    "configPortSync": "配置端口同步",
+    "portSyncHintWithSkip": "批量设置网络设备的端口自动同步开关（选中含 {{count}} 台非网络设备将自动跳过）。非网管设备走全量替换，网管设备仅更新端口状态。需先配置 SNMP 或 Zabbix 监控凭据后才能生效。",
+    "portSyncHint": "批量设置网络设备的端口自动同步开关。非网管设备走全量替换，网管设备仅更新端口状态。需先配置 SNMP 或 Zabbix 监控凭据后才能生效。",
+    "syncMode": "同步模式",
+    "syncModeHint": "跟随全局=使用运行配置中心的默认开关；强制开/关=覆盖全局设置，仅对这些设备生效",
+    "modeFollow": "跟随全局",
+    "modeForceOn": "强制开启",
+    "modeForceOff": "强制关闭",
+    "skipPortSyncHint": "跳过端口同步开关配置，保持各设备当前设置",
+    "separator": "，",
+    "message": {
+      "toggleResult": {
+        "enabled": "监控已启用：更新 {{updated}} 台，跳过 {{skipped}} 台",
+        "paused": "监控已暂停：更新 {{updated}} 台，跳过 {{skipped}} 台"
+      },
+      "toggleFailed": "批量监控启停失败",
+      "credentialConfigured": "已为 {{count}} 台设备配置 {{protocol}} 凭据",
+      "credentialConfigured_one": "已为 {{count}} 台设备配置 {{protocol}} 凭据",
+      "credentialConfigured_other": "已为 {{count}} 台设备配置 {{protocol}} 凭据",
+      "credentialFailed": "批量配置凭据失败",
+      "groupBound": "已为 {{count}} 台设备绑定指标模板组",
+      "groupBound_one": "已为 {{count}} 台设备绑定指标模板组",
+      "groupBound_other": "已为 {{count}} 台设备绑定指标模板组",
+      "groupCleared": "已清除 {{count}} 台设备的指标模板组关联",
+      "groupCleared_one": "已清除 {{count}} 台设备的指标模板组关联",
+      "groupCleared_other": "已清除 {{count}} 台设备的指标模板组关联",
+      "groupFailed": "批量更新指标模板组失败",
+      "portSyncDone": {
+        "forceOn_one": "已强制开启 {{count}} 台网络设备的端口同步开关",
+        "forceOn_other": "已强制开启 {{count}} 台网络设备的端口同步开关",
+        "forceOff_one": "已强制关闭 {{count}} 台网络设备的端口同步开关",
+        "forceOff_other": "已强制关闭 {{count}} 台网络设备的端口同步开关",
+        "follow_one": "已跟随全局 {{count}} 台网络设备的端口同步开关",
+        "follow_other": "已跟随全局 {{count}} 台网络设备的端口同步开关"
+      },
+      "withCredential": "{{count}} 台有监控凭据可立即生效",
+      "withCredential_one": "{{count}} 台有监控凭据可立即生效",
+      "withCredential_other": "{{count}} 台有监控凭据可立即生效",
+      "withoutCredential": "{{count}} 台需配置 SNMP/Zabbix 凭据后才能同步",
+      "withoutCredential_one": "{{count}} 台需配置 SNMP/Zabbix 凭据后才能同步",
+      "withoutCredential_other": "{{count}} 台需配置 SNMP/Zabbix 凭据后才能同步",
+      "skipNonNetwork": "跳过 {{count}} 台非网络设备",
+      "skipNonNetwork_one": "跳过 {{count}} 台非网络设备",
+      "skipNonNetwork_other": "跳过 {{count}} 台非网络设备",
+      "portSyncFailed": "批量更新端口同步开关失败"
+    }
+  },
+  "batchConfig": {
+    "title": "批量修改配置（{{count}} 台 · {{subtype}}）",
+    "section": {
+      "general": "通用信息",
+      "hardware": "硬件配置（服务器）"
+    },
+    "alert": {
+      "ipmiBatchHint": "IPMI 仅可批量修改用户名/密码，不会覆盖 IPMI 管理地址",
+      "managedNetworkLimited": "网管型网络设备仅支持批量修改通用字段（品牌/型号/功耗/负责人/客户）",
+      "uplinkPortPerDevice": "上行端口需逐台设备在详情中单独修改",
+      "chassisNotSupported": "机箱类设备暂不支持批量硬件/端口修改，仅可修改上方通用字段"
+    },
+    "separator": "，",
+    "message": {
+      "nicPortsCreated_one": "生成网卡端口 {{count}} 个",
+      "nicPortsCreated_other": "生成网卡端口 {{count}} 个",
+      "switchPortsCreated_one": "生成交换机端口 {{count}} 个",
+      "switchPortsCreated_other": "生成交换机端口 {{count}} 个",
+      "storageCreated_one": "生成存储 {{count}} 条",
+      "storageCreated_other": "生成存储 {{count}} 条"
+    }
+  },
+  "batchResult": {
+    "title": "批量操作结果",
+    "column": {
+      "index": "序号",
+      "reason": "失败原因"
+    },
+    "unknownError": "未知错误",
+    "summary": {
+      "success": "成功:",
+      "failed": "失败:",
+      "unit_one": "台",
+      "unit_other": "台"
+    },
+    "exportFailed": "导出失败记录",
+    "retryFailed": "重试失败项"
+  },
+  "deviceType": {
+    "SERVER": "服务器",
+    "NETWORK": "网络设备",
+    "OTHER": "其他设备"
+  },
+  "deviceSubtype": {
+    "STANDALONE": "独立服务器",
+    "CHASSIS": "机箱",
+    "NODE": "节点",
+    "STORAGE": "存储服务器",
+    "GPU": "GPU服务器",
+    "SWITCH": "交换机",
+    "ROUTER": "路由器",
+    "FIREWALL": "防火墙",
+    "PDU": "配电单元",
+    "UPS": "不间断电源",
+    "OTHER": "其他"
+  },
+  "ipStatus": {
+    "ACTIVE": "活跃",
+    "INACTIVE": "非活跃",
+    "BANNED": "封禁",
+    "UNUSED": "未使用",
+    "PENDING_BAN": "封禁中",
+    "PENDING_UNBAN": "解封中"
+  },
+  "routeNote": {
+    "DEFAULT": "默认路由",
+    "INTERCONNECT": "互联地址",
+    "SUBNET": "子网路由",
+    "NETWORK": "网络路由",
+    "BLACKHOLE": "黑洞路由",
+    "GATEWAY": "网关地址",
+    "NEXTHOP": "下一跳地址"
+  },
+  "switchRole": {
+    "CORE": "核心交换机",
+    "ACCESS": "接入交换机"
+  },
+  "switchDeviceType": {
+    "HUAWEI": "华为",
+    "H3C": "H3C",
+    "CISCO": "思科"
+  },
+  "customerStatus": {
+    "ACTIVE": "活跃",
+    "DISABLED": "停用",
+    "PENDING": "待审核",
+    "TERMINATED": "终止"
+  },
+  "customer": {
+    "detailTitle": "客户详情 - {{name}}",
+    "notFound": "客户不存在",
+    "invalidId": "客户 ID 无效",
+    "add": "新增客户",
+    "edit": "编辑客户",
+    "infoTitle": "客户信息",
+    "exportExcel": "导出 Excel",
+    "resourceStats": "资源统计",
+    "field": {
+      "name": "客户名称",
+      "status": "客户状态",
+      "contactPerson": "联系人",
+      "contactPhone": "联系电话",
+      "email": "邮箱",
+      "address": "地址"
+    },
+    "form": {
+      "namePlaceholder": "请输入客户名称",
+      "nameRequired": "请输入客户名称",
+      "contactPersonPlaceholder": "请输入联系人",
+      "contactPhonePlaceholder": "请输入联系电话",
+      "emailPlaceholder": "请输入邮箱",
+      "emailInvalid": "邮箱格式不正确",
+      "addressPlaceholder": "请输入地址",
+      "notesPlaceholder": "请输入备注"
+    },
+    "stats": {
+      "roomCount": "机房数",
+      "cabinetCount": "机柜数",
+      "fullCabinets": "整柜租赁",
+      "partialCabinets": "部分使用",
+      "fullCabinetDevices": "整柜设备",
+      "partialCabinetDevices": "部分使用设备",
+      "networkCount": "网段数",
+      "fullNetworks": "整网段租赁",
+      "ipTotal": "IP总数"
+    },
+    "archive": {
+      "title": "终止存档",
+      "empty": "暂无终止存档",
+      "terminatedAt": "终止时间",
+      "operator": "操作人",
+      "reason": "终止原因",
+      "size": "大小",
+      "generated": "已生成",
+      "notGenerated": "未生成",
+      "download": "下载"
+    },
+    "action": {
+      "resources": "资源",
+      "terminate": "终止"
+    },
+    "terminate": {
+      "title": "终止客户",
+      "ok": "确定终止",
+      "confirmContent": "终止将不可逆地释放该客户名下全部资源，确定操作？",
+      "reasonPlaceholder": "请输入终止原因（选填）"
+    },
+    "message": {
+      "copied": "客户信息已复制",
+      "terminated": "客户已终止",
+      "terminateFailed": "终止失败",
+      "exportFailed": "导出失败",
+      "downloadFailed": "下载失败"
+    }
+  },
+  "roomStatus": {
+    "NORMAL": "正常",
+    "DISABLED": "停用"
+  },
+  "cabinetStatus": {
+    "DISABLED": "禁用",
+    "AVAILABLE": "可用",
+    "IN_USE": "使用中",
+    "MAINTENANCE": "维护中",
+    "RESERVED": "已预留"
+  },
+  "vlanStatus": {
+    "INACTIVE": "禁用",
+    "ACTIVE": "正常",
+    "RESERVED": "预留"
+  },
+  "userStatus": {
+    "ACTIVE": "活跃",
+    "INACTIVE": "禁用"
+  },
+  "lagStatus": {
+    "INACTIVE": "禁用",
+    "ACTIVE": "正常",
+    "DEGRADED": "降级"
+  },
+  "portUsage": {
+    "FREE": "空闲",
+    "OCCUPIED": "占用",
+    "DISABLED": "禁用",
+    "ERROR": "异常"
+  },
+  "linkStatus": {
+    "UP": "在线",
+    "DOWN": "离线",
+    "ADMIN_DOWN": "管理关闭",
+    "DISABLED": "已禁用"
+  },
+  "nodeStatus": {
+    "ONLINE": "在线",
+    "OFFLINE": "离线",
+    "WARNING": "告警"
+  },
+  "connectionStatus": {
+    "ACTIVE": "活跃",
+    "INACTIVE": "不活跃"
+  },
+  "probeError": {
+    "TIMEOUT": "超时",
+    "PROBE_TIMEOUT": "探测超时",
+    "PROBE_ERROR": "探测异常",
+    "NO_MANAGEMENT_IP": "无管理IP",
+    "DNS_RESOLVE_TIMEOUT": "DNS解析超时",
+    "AUTH_FAILED": "认证失败",
+    "AUTH_ERROR": "认证失败",
+    "CONNECTION_REFUSED": "连接被拒绝",
+    "CONNECTION_ERROR": "连接错误",
+    "NETWORK_ERROR": "网络错误",
+    "SSL_ERROR": "SSL错误",
+    "TLS_INCOMPATIBLE": "TLS不兼容",
+    "IPMI_ERROR": "IPMI错误",
+    "IPMI_NO_DATA": "IPMI无数据",
+    "UNKNOWN": "未知错误",
+    "NO_HOST_REF": "无主机引用",
+    "NO_API_URL": "无API地址",
+    "ZABBIX_API_ERROR": "Zabbix API错误",
+    "ZABBIX_EMPTY_HOST_LIST": "Zabbix主机列表为空",
+    "HOST_NOT_IN_ZABBIX": "主机不在Zabbix中"
+  },
+  "ipAuditAction": {
+    "ALLOCATE": "分配",
+    "RELEASE": "回收",
+    "BAN": "封禁",
+    "UNBAN": "解封"
+  },
+  "notificationType": {
+    "DEVICE_UNREACHABLE": "设备不可达",
+    "DEVICE_RECOVERED": "设备恢复",
+    "TEMPERATURE_ALERT": "温度告警",
+    "DISK_FAILURE_ALERT": "硬盘故障",
+    "PORT_STATUS_CHANGED": "端口状态变化",
+    "MONITOR_INTERRUPTED": "监控中断",
+    "RAID_FAILURE_ALERT": "RAID故障",
+    "BATCH_CREATE_DEVICES": "批量创建设备",
+    "BATCH_BAN_IP": "批量封禁IP",
+    "BATCH_UNBAN_IP": "批量解封IP",
+    "IP_SCAN_COMPLETE": "IP扫描完成",
+    "IP_SCAN_FAILED": "IP扫描失败",
+    "ROOM_SCAN_COMPLETE": "机房扫描完成",
+    "ROOM_SCAN_FAILED": "机房扫描失败",
+    "VIRTUAL_ROOM_SCAN_COMPLETE": "虚拟机房扫描完成",
+    "VIRTUAL_ROOM_SCAN_FAILED": "虚拟机房扫描失败",
+    "PORT_ACTION": "端口操作结果",
+    "ASYNC_ACTION": "异步操作结果",
+    "RATE_LIMIT_EXCEEDED": "频率超限",
+    "SERVICE_UNHEALTHY": "服务异常",
+    "SERVICE_RECOVERED": "服务恢复",
+    "ASSET_WARRANTY_ALERT": "资产到期提醒"
+  },
+  "notificationGroup": {
+    "MONITOR": "监控告警",
+    "OPERATION": "操作结果",
+    "SCAN": "扫描完成",
+    "PORT_ASYNC": "端口/异步操作",
+    "OPS": "运维告警",
+    "ASSET": "资产提醒"
+  },
+  "loginType": {
+    "WEB": "Web",
+    "WECHAT": "微信",
+    "API": "API",
+    "MOBILE": "移动端",
+    "TOKEN": "Token"
+  },
+  "authMethod": {
+    "PASSWORD": "密码",
+    "CERTIFICATE": "证书"
+  },
+  "networkLayer": {
+    "L2": "二层交换机 (L2)",
+    "L3": "三层交换机 (L3)"
+  },
+  "severity": {
+    "CRITICAL": "严重",
+    "WARNING": "警告",
+    "INFO": "信息"
+  },
+  "channel": {
+    "INBOX": "站内信",
+    "EMAIL": "邮件",
+    "VOICE": "语音通知",
+    "WECHAT_WORK": "企业微信",
+    "FEISHU": "飞书",
+    "DINGTALK": "钉钉",
+    "CUSTOM": "自定义"
+  },
+  "monitorStatus": {
+    "no_credential": "设备未关联任何监控凭据",
+    "not_probed": "已配置凭据，等待首次探测",
+    "credential_error": "监控凭据或配置异常，指标无法采集",
+    "unreachable": "设备当前不可达，暂无指标数据",
+    "normal": "指标采集正常",
+    "normal_no_group": "未命中模板组，按默认规则采集指标",
+    "no_data": "尚未采集到指标数据",
+    "no_data_template": "模板组已命中但尚未采集到指标数据",
+    "breached": "存在超阈值指标，请关注"
+  },
+  "health": {
+    "unreachableSince": "不可达（上次可达：{{time}}）",
+    "metricAlertCount": "指标告警 {{count}}"
+  },
+  "tab": {
+    "basic": "基本信息",
+    "nics": "网卡",
+    "ports": "端口",
+    "vlans": "VLAN",
+    "lag": "链路聚合",
+    "connections": "连接",
+    "storage": "存储",
+    "asset": "资产信息",
+    "nodes": "子节点",
+    "credentials": "监控凭据"
+  },
+  "form": {
+    "title": {
+      "edit": "编辑设备"
+    },
+    "section": {
+      "nodeAssoc": "节点关联",
+      "location": "位置信息",
+      "network": "网络信息",
+      "networkTopology": "网络拓扑",
+      "switchConfig": "交换机配置",
+      "portGeneration": "端口生成",
+      "chassis": "机箱节点配置"
+    },
+    "select": {
+      "room": "请选择机房",
+      "chassis": "请选择机箱",
+      "position": "请选择位置",
+      "cabinet": "请选择机柜"
+    },
+    "hint": {
+      "selectRoomFirst": "请先选择机房",
+      "selectChassisFirst": "请先选择机箱",
+      "selectCabinetFirst": "请先选择机柜",
+      "selectUplinkDeviceFirst": "先选择上行设备"
+    },
+    "basicInfo": {
+      "deviceName": {
+        "placeholder": "请输入设备名称"
+      },
+      "autoGenerateTitle": "自动生成",
+      "mainType": {
+        "label": "设备主类型",
+        "required": "请选择设备主类型"
+      },
+      "owner": {
+        "placeholder": "请选择负责人"
+      },
+      "brand": {
+        "placeholder": "选择品牌"
+      },
+      "model": {
+        "placeholder": "型号"
+      },
+      "power": {
+        "label": "功耗(W)",
+        "placeholder": "功耗"
+      },
+      "metricTemplateGroup": {
+        "label": "指标模板组（监控数据展示规则）",
+        "autoMatchHint": "不选择时按「设备类型 + 厂商 + 协议」自动匹配模板组",
+        "priorityHint": "选择后将优先展示该组包含的监控指标",
+        "placeholder": "不选择 = 自动匹配"
+      },
+      "serialNumber": {
+        "label": "序列号（抄写设备标签）",
+        "placeholder": "抄写设备上的序列号"
+      },
+      "hostname": {
+        "placeholder": "主机名"
+      },
+      "customer": {
+        "placeholder": "请选择客户"
+      },
+      "notes": {
+        "placeholder": "备注信息"
+      }
+    },
+    "nodeAssoc": {
+      "chassis": {
+        "label": "所属机箱",
+        "required": "节点必须选择所属机箱",
+        "option": "{{name}} ({{used}}/{{max}}节点)"
+      },
+      "position": {
+        "required": "请选择节点位置",
+        "option": "节点 {{position}}"
+      },
+      "vacantPositions": "空余位置：{{count}} 个（{{list}}{{ellipsis}}）",
+      "vacantCount": "空余位置：{{count}} 个",
+      "noVacantPosition": "该机箱无空余节点位置"
+    },
+    "location": {
+      "cabinet": {
+        "label": "所属机柜",
+        "required": "请选择所属机柜"
+      },
+      "occupiedU": {
+        "placeholder": "占用U数"
+      },
+      "deviceGap": {
+        "label": "设备间隔(U)",
+        "extra": "自动分配U位时生效",
+        "placeholder": "间隔"
+      },
+      "uPosition": {
+        "placeholder": "手动输入或自动分配",
+        "autoAssignTooltip": "自动分配U位",
+        "conflict": "U位冲突：U{{positions}}",
+        "assigned": "已分配U{{start}}~U{{end}}",
+        "allocateFailed": "分配失败：无可用 U 位"
+      },
+      "availableUPositions": "可用U位：{{count}} 个",
+      "noAvailableUPosition": "机柜无可用U位"
+    },
+    "network": {
+      "managementIp": {
+        "placeholder": "管理IP地址"
+      },
+      "macAddress": {
+        "label": "MAC地址",
+        "placeholder": "MAC地址"
+      },
+      "businessIp": {
+        "tooltip": "支持多种格式：单个IP、逗号分隔、CIDR、子网掩码、范围",
+        "formatError": "格式错误: {{list}}"
+      },
+      "managementAccess": {
+        "label": "管理权限",
+        "on": "开",
+        "off": "关"
+      }
+    },
+    "networkTopology": {
+      "role": {
+        "label": "角色"
+      },
+      "roleOption": {
+        "core": "核心",
+        "access": "接入"
+      },
+      "layer": {
+        "label": "网络层"
+      },
+      "layerOption": {
+        "l2": "二层 (L2)",
+        "l3": "三层 (L3)"
+      },
+      "portCount": {
+        "label": "端口数量",
+        "placeholder": "端口数"
+      },
+      "uplinkDevice": {
+        "label": "上行设备",
+        "placeholder": "选择上行设备"
+      },
+      "peerPorts": {
+        "label": "对端互联端口",
+        "placeholder": "选择对端端口"
+      },
+      "uplinkPorts": {
+        "label": "上行端口",
+        "placeholder": "选择本机上行端口",
+        "placeholderAfterSave": "保存后可选端口"
+      },
+      "coreDevice": {
+        "label": "核心交换机",
+        "placeholder": "选择核心交换机"
+      }
+    },
+    "switchConfig": {
+      "managementIp": {
+        "placeholder": "管理IP"
+      },
+      "sshPort": {
+        "label": "SSH端口",
+        "placeholder": "默认22"
+      },
+      "username": {
+        "placeholder": "登录用户名"
+      },
+      "password": {
+        "keepUnchanged": "留空则不修改",
+        "placeholder": "登录密码"
+      },
+      "authMethod": {
+        "label": "认证方法"
+      },
+      "driver": {
+        "label": "设备驱动"
+      }
+    },
+    "chassis": {
+      "rows": {
+        "label": "节点行数",
+        "required": "请输入行数",
+        "placeholder": "行数"
+      },
+      "cols": {
+        "label": "节点列数",
+        "required": "请输入列数",
+        "placeholder": "列数"
+      },
+      "totalNodes": {
+        "label": "总节点数",
+        "placeholder": "自动计算"
+      },
+      "namingPattern": {
+        "label": "命名规则"
+      },
+      "generateNodes": {
+        "label": "生成子节点（保存时自动按行×列规格生成所有子节点{{suffix}}）",
+        "overwriteSuffix": "，已有子节点将被覆盖",
+        "alertOverwrite": "保存时将删除已有子节点并重新生成所有子节点，使用下方硬件配置统一设置",
+        "alertCreate": "保存时将自动创建所有子节点，并使用下方硬件配置统一设置所有子节点硬件信息",
+        "confirmTitle": "生成子节点",
+        "confirmContent": "勾选后，保存时将自动创建所有子节点（包括已经存在的子节点），并使用下方输入的硬件配置统一设置所有子节点。确定？"
+      }
+    },
+    "portGeneration": {
+      "intro": "支持多组端口，如 48口GE + 4口10GE。命名规则：前缀 + 槽位/卡号/端口号",
+      "template": {
+        "label": "端口类型",
+        "placeholder": "选择类型"
+      },
+      "slot": {
+        "label": "槽位"
+      },
+      "card": {
+        "label": "卡号"
+      },
+      "start": {
+        "label": "起始"
+      },
+      "end": {
+        "label": "结束"
+      },
+      "addGroup": "添加端口组",
+      "preview_one": "将生成 {{count}} 个端口：{{list}}{{ellipsis}}",
+      "preview_other": "将生成 {{count}} 个端口：{{list}}{{ellipsis}}"
+    },
+    "submit": {
+      "n2n": {
+        "deleteOldLinkFailed": "删除旧上行连接失败:",
+        "noLocalPorts": "已选择上行设备与对端互联端口，但无法确定本机上行端口，上行连接未创建（请同时选择上行端口）",
+        "noPeerPorts": "已选择上行设备但未选择对端互联端口，上行连接未创建",
+        "portPairError": "端口对 {{index}}: {{message}}",
+        "partialFailed": "部分上行连接创建失败：{{errors}}"
+      },
+      "portsCreated_one": "已生成 {{count}} 个端口",
+      "portsCreated_other": "已生成 {{count}} 个端口",
+      "nicPortsCreated_one": "已创建 {{count}} 个网卡端口",
+      "nicPortsCreated_other": "已创建 {{count}} 个网卡端口"
+    }
+  },
+  "uPosition": {
+    "view": {
+      "title": "U位视图："
+    },
+    "legend": {
+      "available": "可分配",
+      "occupied": "已分配",
+      "current": "当前分配"
+    },
+    "tooltip": {
+      "current": "当前设备 U{{u}}",
+      "available": "U{{u}} 可分配"
+    }
+  },
+  "room": {
+    "name": "机房",
+    "add": "新增机房",
+    "edit": "编辑机房",
+    "notFound": "机房不存在",
+    "invalidId": "机房 ID 无效",
+    "detailTitle": "机房详情 - {{name}}",
+    "floorPlanTitle": "机房平面图",
+    "action": {
+      "floorPlan": "平面图",
+      "viewCabinets": "查看机柜",
+      "viewCabinetList": "查看机柜列表"
+    },
+    "field": {
+      "name": "机房名称",
+      "roomNumber": "房间号",
+      "building": "楼栋",
+      "floor": "楼层",
+      "buildingOwn": "所属楼栋",
+      "floorOwn": "所属楼层"
+    },
+    "form": {
+      "namePlaceholder": "请输入机房名称",
+      "locationPlaceholder": "请输入机房位置",
+      "contactPlaceholder": "联系人（可选）",
+      "contactPhonePlaceholder": "联系电话（可选）",
+      "buildingPlaceholder": "如：A栋（可选，留空归入「未分组」）",
+      "namePlaceholderGroup": "机房名称（同名机房将归为一组）",
+      "mergeHint": "将并入「{{name}}」机房组（现有 {{count}} 条记录）",
+      "floorPlaceholder": "如：3F（可选，留空表示未标注）",
+      "roomNumberPlaceholder": "如：01（同一机房名称下不可重复）",
+      "newGroupTitle": "创建新机房组",
+      "newGroupContent": "机房组「{{name}}」不存在，保存将创建新机房组。同一物理机房的房间应使用相同的机房名称。"
+    },
+    "stats": {
+      "title": "统计概览",
+      "avgUUsage": "平均U位利用率",
+      "positionedCabinets": "已定位机柜"
+    },
+    "filter": {
+      "allRooms": "全部机房",
+      "allBuildings": "全部楼栋",
+      "allFloors": "全部楼层",
+      "floorNeedsBuilding": "楼层（先选楼栋）",
+      "allStatus": "全部状态",
+      "searchName": "搜索机房名"
+    },
+    "overview": {
+      "title": "机房总览",
+      "loadFailed": "加载机房总览失败",
+      "empty": "暂无机房",
+      "noneMatched": "没有符合条件的机房（共 {{count}} 个机房{{filtered}}）",
+      "filtered": "，当前已过滤",
+      "clearFilter": "清除过滤条件",
+      "utilTooltip": "利用率是全机房口径；过滤后无法按房间容量加权平均，故不展示",
+      "uAvg": "U 位平均利用率",
+      "uAvgDisabled": "U 位平均利用率（过滤时不可用）",
+      "roomLabel": "房间 {{number}}",
+      "buildingTag": "楼栋 {{value}}",
+      "floorTag": "楼层 {{value}}",
+      "groupRoom": "机房 {{name}}",
+      "roomCount": "{{count}} 个房间",
+      "cabinetCount": "{{count}} 台机柜",
+      "uUsage": "U 位利用率",
+      "powerUsage": "功率利用率"
+    }
+  },
+  "virtualRoom": {
+    "name": "虚拟机房",
+    "add": "新增虚拟机房",
+    "edit": "编辑虚拟机房",
+    "searchPlaceholder": "搜索虚拟机房名称",
+    "notScanned": "未扫描",
+    "scanProgressTooltip": "阶段: {{phase}} | 完成: {{completed}}/{{total}} | 失败: {{failed}}",
+    "field": {
+      "name": "虚拟机房名称",
+      "lastScan": "最近扫描"
+    },
+    "action": {
+      "manageMembers": "管理成员",
+      "scan": "触发扫描",
+      "startScan": "开始扫描"
+    },
+    "confirm": {
+      "scanTitle": "确认扫描？",
+      "scanContent": "将对虚拟机房「{{name}}」下的所有交换机执行全量扫描"
+    },
+    "message": {
+      "scanSubmitted": "虚拟机房扫描已提交，完成后将通过消息通知您",
+      "loadSwitchesFailed": "加载交换机列表失败",
+      "membersUpdated": "成员更新成功"
+    },
+    "members": {
+      "title": "管理成员 - {{name}}",
+      "deviceFallback": "设备#{{id}}",
+      "loading": "加载交换机列表...",
+      "empty": "暂无可用交换机",
+      "availableTitle": "可选交换机",
+      "selectedTitle": "已选成员"
+    },
+    "form": {
+      "namePlaceholder": "请输入虚拟机房名称",
+      "descriptionPlaceholder": "请输入描述（可选）"
+    }
+  },
+  "cabinet": {
+    "number": "机柜编号",
+    "add": "新增机柜",
+    "edit": "编辑机柜",
+    "batchAdd": "批量新增机柜",
+    "notFound": "机柜不存在",
+    "invalidId": "机柜 ID 无效",
+    "detailTitle": "机柜详情 - {{number}}",
+    "viewDevices": "查看设备",
+    "field": {
+      "location": "位置",
+      "rowCol": "行{{row}} 列{{col}}",
+      "roomLocation": "机房位置",
+      "exactLocation": "具体位置",
+      "leaseCustomer": "租赁客户",
+      "totalU": "U位容量",
+      "usedU": "已用U位",
+      "availableU": "可用U位",
+      "deviceCount": "设备数",
+      "ratedPower": "额定功率",
+      "ratedPowerUnit": "额定功率(W)",
+      "usedPower": "已用功率",
+      "maxWeight": "最大承重"
+    },
+    "message": {
+      "uPositionUpdated": "U位更新成功",
+      "uPositionUpdateFailed": "U位更新失败"
+    },
+    "form": {
+      "roomRequired": "请选择所属机房",
+      "totalURequired": "请输入U位容量",
+      "location": "机柜位置",
+      "locationPlaceholder": "机柜位置（可选）",
+      "row": "行号",
+      "col": "列号",
+      "rowTooltip": "机房平面图中的行坐标，从1开始。如：1、2、3",
+      "colTooltip": "机房平面图中的列坐标，从1开始。如：1、2、3",
+      "rowColPlaceholder": "如：1",
+      "leaseCustomerPlaceholder": "整柜租赁客户（可选）",
+      "notesPlaceholder": "机柜备注（可选）",
+      "numberExpression": "机柜编号表达式",
+      "name": "机柜名称",
+      "numberExpressionRequired": "请输入机柜编号表达式",
+      "nameRequired": "请输入机柜名称",
+      "numberExpressionPlaceholder": "如：m11,m13,n10 或 h1-10 或 m01-05",
+      "namePlaceholder": "请输入机柜名称/编号",
+      "statusPlaceholder": "请选择状态"
+    },
+    "batch": {
+      "modeBatch": "批量",
+      "modeSingle": "单条",
+      "hintRange": "支持逗号分隔和范围展开",
+      "hintSingle": "逐个添加机柜",
+      "preview_one": "将创建 {{count}} 个机柜：",
+      "preview_other": "将创建 {{count}} 个机柜：",
+      "invalidNumber": "请输入有效的机柜编号",
+      "maxLimit": "单次最多创建 100 个机柜",
+      "created_one": "成功创建 {{count}} 个机柜",
+      "created_other": "成功创建 {{count}} 个机柜",
+      "createFailed": "以下机柜创建失败：{{list}}{{more}}",
+      "moreCount": " 等共 {{count}} 个"
+    }
+  },
+  "addModal": {
+    "title": "批量添加设备",
+    "tab": {
+      "manual": "手动批量"
+    },
+    "section": {
+      "hardware": "硬件配置（统一设置）",
+      "chassisNodes": "机箱子节点配置"
+    },
+    "managedSwitch": "网管型（有SSH管理权限）",
+    "chassis": {
+      "autoCreateNodes": "创建时自动按行×列规格生成所有子节点"
+    },
+    "port": {
+      "selectType": "选择端口类型",
+      "start": "起始端口",
+      "end": "结束端口",
+      "customPrefix": "自定义前缀",
+      "prefixRequired": "请输入前缀",
+      "prefixPlaceholder": "如 GE"
+    },
+    "column": {
+      "heightU": "U高",
+      "layout": "行×列",
+      "nodeRow": "行号",
+      "nodeCol": "列号",
+      "rowPlaceholder": "行",
+      "colPlaceholder": "列"
+    },
+    "row": {
+      "add": "添加行",
+      "copy": "复制行",
+      "delete": "删除行",
+      "count": "共 {{count}} 行"
+    },
+    "uGap": "U位间隔",
+    "action": {
+      "setHeightU": "设置U高",
+      "regenerateNames": "重生成名称",
+      "prev": "上一步",
+      "next": "下一步"
+    },
+    "hint": {
+      "selectDeviceTypeFirst": "请先选择设备主类型",
+      "noCabinetUPosition": "未选择机柜时 U 位信息不会保存，如需指定位置请先选择机房和机柜。",
+      "autoNodesSuffix": "（已为每台机箱自动生成子节点）"
+    },
+    "submitBatch": "批量创建（{{count}} 台）",
+    "resultTitle": "批量添加结果",
+    "unassigned": "未分配",
+    "conflict": {
+      "u": "U位冲突：「{{nameA}}」(U{{uA}}, 高{{heightA}}U) 与「{{nameB}}」(U{{uB}}) 重叠",
+      "nodePosition": "节点位置冲突：「{{nameA}}」与「{{nameB}}」都填了 行{{row}}列{{col}}"
+    },
+    "message": {
+      "maxRows": "最多 50 行",
+      "heightURange": "U高须在 1-42 之间",
+      "selectChassisRequired": "请选择所属机箱",
+      "nodeSlotInsufficient_one": "机箱空余节点位置不足：仅剩 {{count}} 个空位，当前 {{rows}} 行",
+      "nodeSlotInsufficient_other": "机箱空余节点位置不足：仅剩 {{count}} 个空位，当前 {{rows}} 行",
+      "cabinetSpaceInsufficient": "机柜空间不足，分配失败",
+      "autoAssignDone": "自动分配完成",
+      "allocateFailed": "U位分配请求失败，请重试",
+      "batchCreateSuccess_one": "批量创建成功：{{count}} 台{{hint}}",
+      "batchCreateSuccess_other": "批量创建成功：{{count}} 台{{hint}}",
+      "portGenPartial": "端口生成：{{success}} 台成功，{{failed}} 台失败，请检查",
+      "portGenDone_one": "已为 {{devices}} 台设备各生成 {{count}} 个端口",
+      "portGenDone_other": "已为 {{devices}} 台设备各生成 {{count}} 个端口",
+      "nodePositionOutOfRange_one": "{{count}} 行的节点位置超出新机箱范围，已清空",
+      "nodePositionOutOfRange_other": "{{count}} 行的节点位置超出新机箱范围，已清空",
+      "submitFailed": "提交失败",
+      "retryHint": "已保留失败项，请修正后重新提交"
+    },
+    "confirm": {
+      "partialNoU": {
+        "title": "部分设备未分配U位",
+        "content_one": "有 {{count}} 台设备未指定U位，创建后将放入机柜但无U位信息。是否继续？",
+        "content_other": "有 {{count}} 台设备未指定U位，创建后将放入机柜但无U位信息。是否继续？",
+        "ok": "继续创建"
+      }
+    },
+    "clone": {
+      "step": {
+        "source": "选择模板",
+        "edit": "配置差异项"
+      },
+      "templateDevice": "模板设备",
+      "searchPlaceholder": "搜索设备名称...",
+      "noMatchDevice": "无匹配设备",
+      "loadingTemplate": "加载模板详情...",
+      "deviceOption": "{{name}}（{{cabinet}} / {{status}}）",
+      "preview": {
+        "uPositionHeight": "U位/U高",
+        "nodeLayout": "节点布局",
+        "nodeLayoutValue": "{{rows}}行 × {{cols}}列 = {{total}}节点"
+      },
+      "chassisHint": "机箱设备克隆将自动生成与模板相同布局的子节点",
+      "count": "克隆数量",
+      "maxCount": "最多 50 台",
+      "targetChassis": "目标机箱",
+      "selectTargetChassis": "请选择目标机箱",
+      "targetCabinet": "目标机柜",
+      "selectTargetCabinet": "选择目标机柜",
+      "defaultPrefix": "默认：{{name}}",
+      "selectTemplateFirst": "请先选择模板设备",
+      "countRange": "克隆数量须在 1-50 之间",
+      "nodeNeedChassis": "节点设备克隆必须选择目标机箱",
+      "nodeSlotInsufficient_one": "目标机箱空余节点位置不足：仅剩 {{count}} 个空位，需要 {{required}} 个",
+      "nodeSlotInsufficient_other": "目标机箱空余节点位置不足：仅剩 {{count}} 个空位，需要 {{required}} 个",
+      "noAvailableU": "当前机柜无可用 U 位",
+      "duplicateNodePosition": "存在重复的节点位置，请检查",
+      "success_one": "克隆成功：{{count}} 台{{hint}}",
+      "success_other": "克隆成功：{{count}} 台{{hint}}",
+      "submit": "开始克隆（{{count}} 台）",
+      "resultTitle": "克隆设备结果",
+      "totalCount": "共 {{count}} 台",
+      "chassisVacant": "机箱空余：{{count}} 个",
+      "noCabinetHint": "未选择机柜时 U 位不会保存，可在上一步选择目标机柜。"
+    }
+  },
+  "switch": {
+    "invalidIdSubTitle": "交换机 ID 无效",
+    "copyDetail": "复制详情",
+    "detailCopied": "详情已复制",
+    "remoteInfo": "远程信息管理",
+    "sshEnabled": "有SSH权限",
+    "deleteContent": "确定要删除网络设备「{{name}}」吗？将同时删除关联的凭据和端口数据。",
+    "refreshInfoSubmitFailed": "刷新设备信息提交失败",
+    "field": {
+      "sshPort": "SSH端口",
+      "protocol": "协议",
+      "deviceDriver": "设备驱动",
+      "layer": "层级",
+      "version": "版本",
+      "uptime": "运行时间",
+      "mac": "MAC地址",
+      "connectedDevices": "关联设备"
+    },
+    "copy": {
+      "header": "交换机详细信息",
+      "name": "名称: {{value}}",
+      "ip": "IP地址: {{value}}",
+      "port": "端口: {{value}}",
+      "username": "用户名: {{value}}",
+      "protocol": "协议: {{value}}",
+      "role": "类型: {{value}}",
+      "deviceType": "设备类型: {{value}}",
+      "deviceModel": "设备型号: {{value}}",
+      "room": "所在机房: {{value}}",
+      "version": "设备版本: {{value}}",
+      "serial": "序列号: {{value}}",
+      "uptime": "运行时间: {{value}}",
+      "mac": "MAC地址: {{value}}"
+    },
+    "action": {
+      "add": "新增网络设备",
+      "scanRoom": "扫描机房",
+      "exportCsv": "导出CSV",
+      "batchUpdate": "批量修改",
+      "viewDetail": "查看详情"
+    },
+    "message": {
+      "selectRoomFirst": "请先选择机房",
+      "scanSubmitted": "机房扫描已提交，完成后将通过消息通知您",
+      "scanSubmitFailed": "机房扫描提交失败",
+      "copied": "已复制",
+      "noDataToExport": "无数据可导出"
+    },
+    "confirm": {
+      "scanRoomContent": "将对机房内所有网络设备执行全量扫描，可能需要较长时间。"
+    },
+    "view": {
+      "group": "分组视图",
+      "flat": "平铺视图"
+    },
+    "group": {
+      "managed": "有管理权限",
+      "unmanaged": "无管理权限"
+    },
+    "search": {
+      "placeholder": "搜索网络设备..."
+    },
+    "tooltip": {
+      "connectedDevices": "{{name}} 关联设备"
+    },
+    "tag": {
+      "connectedDevices": "关联设备 {{count}}"
+    },
+    "form": {
+      "editTitle": "编辑交换机",
+      "name": "交换机名称",
+      "nameRequired": "请输入名称",
+      "managementIpRequired": "请输入管理IP",
+      "managementIpPlaceholder": "管理IP地址",
+      "ipFormatInvalid": "IP格式不正确",
+      "port": "端口号",
+      "portExtra": "留空则按协议自动填充：SSH→22，Telnet→23",
+      "portPlaceholder": "默认按协议自动填充",
+      "protocolRequired": "请选择协议",
+      "usernameRequired": "请输入用户名",
+      "usernamePlaceholder": "登录用户名",
+      "password": "密码",
+      "passwordExtra": "留空则不修改密码",
+      "passwordPlaceholder": "留空则不修改",
+      "deviceTypeRequired": "请选择设备类型",
+      "switchType": "交换机类型",
+      "switchTypeRequired": "请选择交换机类型",
+      "switchRoleRequired": "请选择设备角色",
+      "networkLayer": "网络层级",
+      "networkLayerRequired": "请选择网络层级",
+      "authMethod": "认证方法",
+      "authMethodRequired": "请选择认证方法"
+    },
+    "batchField": {
+      "port": "端口号",
+      "protocol": "协议",
+      "username": "用户名",
+      "password": "密码",
+      "deviceType": "设备类型",
+      "switchRole": "设备角色",
+      "layer": "网络层级",
+      "authenticationMethod": "认证方法"
+    },
+    "batchUpdate": {
+      "title": "批量修改远程信息（已选 {{count}} 台）",
+      "selectFieldRequired": "请至少勾选一个要修改的字段",
+      "passwordEmptySkipped": "已勾选密码字段，但密码为空，将跳过密码更新",
+      "partialSuccess": "部分更新成功：{{success}} 成功，{{failed}} 失败",
+      "success_one": "批量更新成功：{{count}} 台网络设备已更新",
+      "success_other": "批量更新成功：{{count}} 台网络设备已更新",
+      "resultSummary": "{{success}} 台更新成功，{{failed}} 台失败",
+      "failedItem": "设备ID {{id}}：{{error}}"
+    },
+    "batch": {
+      "portUnit_one": "个端口",
+      "portUnit_other": "个端口",
+      "action": "批量操作",
+      "sshOnlyTip": "需SSH连接设备，非网管设备不支持",
+      "confirmTitle": "确认批量操作",
+      "confirmContent_one": "确定要对 {{count}} 个端口执行「{{action}}」吗？",
+      "confirmContent_other": "确定要对 {{count}} 个端口执行「{{action}}」吗？",
+      "submitted": "批量操作已提交，完成后将通过消息通知您",
+      "submitFailed": "批量操作提交失败：{{error}}",
+      "failed": "批量操作失败：{{error}}",
+      "enable": "批量启用",
+      "disable": "批量禁用",
+      "setVlan": "批量配置VLAN",
+      "updateInfo": "批量修改描述",
+      "assignCustomer": "批量分配客户",
+      "addToTrunk": "批量加入链路聚合",
+      "removeFromChannel": "批量退出链路聚合",
+      "clearConfig": "批量恢复默认",
+      "setSpeed": "批量限速",
+      "cancelSpeed": "批量取消限速",
+      "modal": {
+        "setVlanTitle": "批量配置VLAN",
+        "descTitle": "批量修改端口描述",
+        "trunkTitle": "批量加入链路聚合",
+        "customerTitle": "批量分配客户",
+        "speedTitle": "批量限速",
+        "cancelSpeedTitle": "批量取消限速"
+      },
+      "form": {
+        "vlanId": "VLAN ID",
+        "vlanIdRequired": "请输入VLAN ID",
+        "vlanIdPlaceholder": "如 100",
+        "mode": "模式",
+        "allowedVlans": "允许的VLAN（如 200-210,300）",
+        "allowedVlansPlaceholder": "如 200-210,300",
+        "description": "端口描述",
+        "descriptionPlaceholder": "输入新的端口描述（留空则清除描述）",
+        "trunkId": "Eth-Trunk ID",
+        "trunkIdRequired": "请输入Eth-Trunk ID",
+        "trunkIdPlaceholder": "如 10",
+        "customer": "选择客户",
+        "customerPlaceholder": "选择要分配的客户（留空则清除客户）",
+        "inbound": "入向限速 (Mbps)",
+        "inboundExtra": "上行限速，留空表示不设置",
+        "inboundPlaceholder": "如 1000",
+        "outbound": "出向限速 (Mbps)",
+        "outboundExtra": "下行限速，留空表示不设置",
+        "outboundPlaceholder": "如 1200",
+        "cancelInbound": "取消入向限速（上行）",
+        "cancelOutbound": "取消出向限速（下行）"
+      },
+      "alert": {
+        "speedPolicy": "限速策略按「方向 + 限速值」共享：相同限速值的端口复用同一份策略，不在设备上重复生成。",
+        "cancelSpeedTip": "取消限速会按方向逐端口撤销交换机上已应用的限速策略引用（华为CE需带策略名撤销）。未应用限速的端口会自动跳过。"
+      },
+      "warning": {
+        "speedRequired": "请至少填写一个大于 0 的限速值（入向/出向）",
+        "directionRequired": "请至少勾选一个要取消的方向（入向/出向）"
+      }
+    },
+    "port": {
+      "assign": "分配",
+      "enable": "开启",
+      "disable": "关闭",
+      "speedLimit": "限速",
+      "aggregate": "汇聚",
+      "enableTitle": "确认开启端口",
+      "disableTitle": "确认关闭端口",
+      "enableContent": "确定要开启端口 {{name}} 吗？将通过SSH执行操作。",
+      "disableContent": "确定要关闭端口 {{name}} 吗？将通过SSH执行操作。",
+      "speedNegative": "限速值不能为负数",
+      "vlanRange": "VLAN ID 范围：1-4094",
+      "trunkIdInvalid": "Trunk ID 必须为非负整数",
+      "detailNotLoaded": "端口详情未加载，请稍候再试",
+      "cannotDeletePrimaryIp": "无法删除主IP",
+      "cannotDeletePrimaryIpContent": "该端口存在多个IP地址，请先删除所有从IP后再删除主IP。",
+      "deleteIpTitle": "确认删除IP",
+      "deleteIpContent": "确定删除端口 \"{{name}}\" 的 IP 地址 {{ip}}/{{mask}}？",
+      "configRefreshed": "配置已刷新并同步",
+      "configFromCache": "已从缓存加载配置",
+      "configFetched": "已从设备获取配置并同步",
+      "clearConfigTitle": "确认清除端口配置",
+      "clearConfigContent": "确定清除端口 \"{{name}}\" 的设备配置？该端口配置将还原为初始状态。此操作不可逆！",
+      "clearConfigOk": "确认清除",
+      "vlanIdUnparsable": "无法解析VLAN ID",
+      "deleteVlanIfTitle": "确认删除VLAN接口",
+      "deleteVlanIfContent": "确定删除 VLAN 接口 \"{{name}}\"（VLAN {{vlanId}}）？该操作将删除对应的VLAN配置及VLANIF接口，不可恢复！",
+      "trunkIdUnparsable": "无法解析Trunk ID",
+      "deleteTrunkIfTitle": "确认删除链路聚合接口",
+      "deleteTrunkIfContent": "确定删除 Eth-Trunk 接口 \"{{name}}\"（Trunk {{trunkId}}）？该操作将删除对应的链路聚合组及所有成员端口配置，不可恢复！",
+      "deleteInterfaceTitle": "确认删除接口",
+      "deleteInterfaceContent": "确定删除接口 \"{{name}}\"？该操作不可恢复！",
+      "trunkIpBlocked": "端口属于 Eth-Trunk {{id}}，不能直接配置 IP。请在 Eth-Trunk {{id}} 端口上配置。",
+      "vlanIpBlocked": "端口属于 VLAN {{vlan}}，不能直接配置 IP。请先去端口详情页清除配置。"
+    },
+    "portConfigWarning": "⚠ 注意：此操作将清空端口现有配置，并导致端口 up/down 一次。",
+    "portDetail": {
+      "title": "端口详情 — {{name}}",
+      "portNumber": "端口号",
+      "speed": "速率",
+      "noMembers": "暂无成员端口",
+      "vlanMembers": "VLAN 成员端口",
+      "trunkMembers": "Trunk 成员端口",
+      "configTitle": "端口配置",
+      "viewConfig": "查看配置",
+      "fetchConfig": "获取配置",
+      "clear": "清除",
+      "cached": " (缓存)",
+      "cachedConfig": "已有缓存配置（{{time}}）",
+      "unknownTime": "未知时间",
+      "noConfig": "暂无配置数据，点击\"获取配置\"从设备读取",
+      "notFound": "未找到端口详情"
+    },
+    "ipConfig": {
+      "title": "配置端口 IP — {{name}}",
+      "currentLabel": "当前已配置IP：",
+      "replaceHint": "如需更换IP，请先在端口详情页IP地址栏删除原IP，再配置新IP。",
+      "addressRequired": "请输入IP地址",
+      "addressInvalid": "请输入有效的IPv4地址",
+      "subnetMask": "子网掩码",
+      "subnetMaskRequired": "请选择子网掩码",
+      "ipType": "IP 类型",
+      "helpHasPrimary": "该端口已有主IP，默认添加为从IP",
+      "helpNoPrimary": "该端口暂无IP，将配置为主IP",
+      "typePrimary": "主 IP（ip address）",
+      "typeSecondary": "从 IP（ip address sub/secondary）"
+    },
+    "vlanConfig": {
+      "title": "配置 VLAN — {{name}}",
+      "info1": "若输入的 VLAN ID 在交换机上不存在，系统将自动创建该 VLAN。",
+      "info2": "Access 模式适合终端设备接入，Trunk 模式适合交换机互连。",
+      "info3": "Trunk 模式下，允许 VLAN 列表中的所有 VLAN 也会被自动创建。",
+      "pvidLabel": "PVID / Native VLAN (1-4094)",
+      "vlanIdLabel": "VLAN ID (1-4094)",
+      "vlanIdRequired": "请输入VLAN ID",
+      "pvidPlaceholder": "Trunk 端口的默认 VLAN",
+      "vlanIdPlaceholder": "例如：100",
+      "portMode": "端口模式",
+      "modeAccess": "Access（单VLAN，适合终端设备）",
+      "modeTrunk": "Trunk（多VLAN，适合交换机互连）",
+      "allowedVlans": "允许 VLAN（Trunk 模式）",
+      "allowedVlansRequired": "Trunk 模式必须指定允许的 VLAN 范围",
+      "allowedVlansHelp": "例如：10-12,14。这些 VLAN 不存在时会自动创建"
+    },
+    "trunk": {
+      "title": "端口汇聚 — {{name}}",
+      "info1": "将当前端口加入指定的链路聚合组（Eth-Trunk）。",
+      "info2": "若输入的 Eth-Trunk ID 在交换机上不存在，系统将自动创建。",
+      "trunkIdRequired": "请输入Trunk ID",
+      "trunkIdPlaceholder": "例如：1"
+    },
+    "assign": {
+      "title": "分配客户",
+      "port": "端口",
+      "none": "无",
+      "description": "描述/备注",
+      "descriptionPlaceholder": "端口描述..."
+    },
+    "speed": {
+      "title": "设置端口限速 — {{name}}",
+      "infoPolicy": "使用 QoS 策略限速（traffic-policy / qos policy）",
+      "inboundLabel": "上行（inbound）",
+      "inboundDesc": "：流量进入交换机端口的方向，即用户上传方向",
+      "outboundLabel": "下行（outbound）",
+      "outboundDesc": "：流量离开交换机端口的方向，即用户下载方向",
+      "zeroPrefix": "输入 ",
+      "zeroSuffix": " 表示取消该方向限速，端口速率上限：{{max}} Mbps",
+      "inbound": "上行限速 (Mbps)",
+      "inboundRequired": "请输入上行限速",
+      "rangePlaceholder": "0-{{max}}，0 取消限速",
+      "outbound": "下行限速 (Mbps)",
+      "outboundRequired": "请输入下行限速"
+    }
+  },
+  "importExport": {
+    "tab": {
+      "import": "数据导入",
+      "export": "数据导出"
+    },
+    "type": {
+      "device": "设备"
+    },
+    "step": {
+      "selectType": "选择数据类型",
+      "downloadTemplate": "下载模板并填写数据",
+      "uploadFile": "上传填写好的文件"
+    },
+    "panel": {
+      "importTitle": "导入操作",
+      "exportTitle": "导出操作"
+    },
+    "action": {
+      "downloadTemplate": "下载{{type}}导入模板",
+      "reselect": "重新选择",
+      "selectFile": "选择文件",
+      "startImport": "开始导入",
+      "continueImport": "继续导入",
+      "exportData": "导出{{type}}数据"
+    },
+    "message": {
+      "templateDownloaded": "模板下载成功",
+      "templateDownloadFailed": "下载模板失败",
+      "importedWithFailed": "成功导入 {{imported}} 条，{{failed}} 条失败",
+      "imported": "成功导入 {{count}} 条数据",
+      "imported_one": "成功导入 {{count}} 条数据",
+      "imported_other": "成功导入 {{count}} 条数据",
+      "importDone": "导入完成",
+      "importFailed": "导入失败，请检查文件格式是否与模板一致",
+      "exportSuccess": "导出成功",
+      "exportFailed": "导出失败"
+    },
+    "guide": {
+      "title": "使用说明",
+      "step1": "1. 选择要导入的数据类型",
+      "step2": "2. 下载对应模板，按格式填写数据",
+      "step3": "3. 上传填写好的文件，系统自动校验并导入",
+      "supportedFormats": "支持 .xlsx、.xls、.csv 格式",
+      "keepHeader": "请勿修改模板表头，否则可能导致导入失败",
+      "deviceTemplateTitle": "设备模板类型说明："
+    },
+    "template": {
+      "server": {
+        "desc": "硬件配置必须通过配件模板ID指定，{{cpu}}/{{mem}}必填",
+        "hardwareByTemplate": "硬件配置必须通过配件模板ID指定"
+      },
+      "network": {
+        "desc": "含网管凭据、SSH配置、交换机拓扑字段"
+      },
+      "other": {
+        "desc": "PDU、UPS等，仅基本信息+资产归属"
+      },
+      "header": {
+        "cpuTemplateId": "CPU模板ID",
+        "memoryTemplateId": "内存模板ID",
+        "storageTemplateId": "存储模板ID",
+        "nicTemplateId": "网卡模板ID"
+      },
+      "cpuMemoryRequired": "{{cpu}}、{{mem}} 为必填项",
+      "storageNicOptional": "{{storage}}、{{nic}} 为选填，填写后自动创建对应子记录"
+    },
+    "result": {
+      "title": "导入结果",
+      "success": "成功导入",
+      "failed": "导入失败",
+      "column": {
+        "row": "行号",
+        "errorReason": "错误原因"
+      }
+    },
+    "export": {
+      "guideTitle": "导出说明",
+      "filterTitle": "过滤条件（可选）",
+      "cabinetId": "机柜ID",
+      "customerId": "客户ID",
+      "all": "全部",
+      "noFilterHint": "不填则导出全部数据",
+      "excelFormat": "导出数据为 Excel (.xlsx) 格式",
+      "deviceFilterTitle": "设备导出支持按条件过滤：",
+      "filterByCabinet": "- 指定机柜ID：仅导出该机柜下的设备",
+      "filterByCustomer": "- 指定客户ID：仅导出归属该客户的设备",
+      "filterBoth": "- 两个条件可同时使用"
+    }
+  },
+  "recycleBin": {
+    "column": {
+      "originalCabinet": "原机柜",
+      "originalUPosition": "原U位",
+      "deletedAt": "删除时间"
+    },
+    "action": {
+      "restore": "恢复",
+      "permanentDelete": "永久删除",
+      "batchRestore": "批量恢复",
+      "batchPermanentDelete": "批量永久删除"
+    },
+    "confirm": {
+      "permanentDeleteTitle": "永久删除",
+      "permanentDeleteContent": "此操作不可恢复，确定要永久删除该设备吗？",
+      "irreversible": "此操作不可恢复！",
+      "batchPermanentDeleteTitle": "批量永久删除",
+      "batchPermanentDeleteContent": "确定要永久删除选中的 {{count}} 个设备吗？",
+      "batchPermanentDeleteContent_one": "确定要永久删除选中的 {{count}} 个设备吗？",
+      "batchPermanentDeleteContent_other": "确定要永久删除选中的 {{count}} 个设备吗？",
+      "batchPermanentDeleteOk": "确定永久删除"
+    },
+    "message": {
+      "restoreSuccess": "设备恢复成功",
+      "autoAssigned": "，自动分配至 {{u}}U",
+      "childrenRestored": "，已重建 {{count}} 个子节点",
+      "childrenRestored_one": "，已重建 {{count}} 个子节点",
+      "childrenRestored_other": "，已重建 {{count}} 个子节点",
+      "restoreFailed": "恢复失败",
+      "conflictSelectCabinet": "原U位有冲突，请选择目标机柜（可不填U位，系统将自动分配）",
+      "nodePositionOccupied": "原节点位置已被占用（冲突设备：{{devices}}），请先删除或移走冲突节点后再恢复",
+      "uPositionOccupied": "原U位已被占用（冲突设备：{{devices}}），请选择目标机柜",
+      "batchRestoreSuccess": "成功恢复 {{count}} 个设备",
+      "batchRestoreSuccess_one": "成功恢复 {{count}} 个设备",
+      "batchRestoreSuccess_other": "成功恢复 {{count}} 个设备",
+      "batchRestoreFailed": "批量恢复失败",
+      "permanentDeleted": "设备已永久删除",
+      "permanentDeleteFailed": "永久删除失败",
+      "batchPermanentDeleteSuccess": "成功永久删除 {{count}} 个设备",
+      "batchPermanentDeleteSuccess_one": "成功永久删除 {{count}} 个设备",
+      "batchPermanentDeleteSuccess_other": "成功永久删除 {{count}} 个设备",
+      "batchPermanentDeleteFailed": "批量永久删除失败"
+    },
+    "filter": {
+      "deletedDate": "删除日期",
+      "deletedStart": "删除开始",
+      "deletedEnd": "删除结束"
+    },
+    "modal": {
+      "restoreTitle": "恢复设备",
+      "confirmRestore": "确认恢复",
+      "deviceName": "设备名称：",
+      "childNodeOnlyTitle": "子节点设备只能恢复到原机箱",
+      "childNodeOnlyDesc": "子节点将恢复到删除前所属的机箱，无需选择机柜",
+      "uPositionOccupiedTitle": "原U位已被占用",
+      "nodePositionOccupiedTitle": "原节点位置已被占用",
+      "restoreToOriginalTitle": "将恢复到原位置",
+      "restoreToOriginalDesc": "机柜：{{cabinet}}，U位：{{u}}U",
+      "uAutoAssignTitle": "U位将自动分配",
+      "uAutoAssignDesc": "未填写U位时，系统将自动在所选机柜中寻找可用U位",
+      "uAutoAssignBatchDesc": "未填写起始U位时，系统将自动在所选机柜中依次分配可用U位",
+      "selectTargetCabinet": "选择目标机柜（不选则恢复到原位置）",
+      "uStartAuto": "U位起始位置（不填则自动分配）",
+      "uStartOriginal": "U位起始位置（不填则使用原U位）",
+      "batchRestoreTitle": "批量恢复",
+      "batchRestoreCount": "将恢复选中的 {{count}} 个设备",
+      "batchRestoreCount_one": "将恢复选中的 {{count}} 个设备",
+      "batchRestoreCount_other": "将恢复选中的 {{count}} 个设备"
+    }
+  }
+}

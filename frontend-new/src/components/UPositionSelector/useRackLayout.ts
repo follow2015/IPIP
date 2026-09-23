@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { physicalToInternal, internalToPhysical, displayLabel, checkConflict } from './geometry';
 import { computeLayout } from './layout';
 import type { LayoutMetrics } from './layout';
@@ -39,6 +40,7 @@ export interface UseRackLayoutResult {
 
 export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResult {
   const { totalU = 42, ratedPower = 8000, occupiedPositions, onPositionChange, onSelect } = props;
+  const { t } = useTranslation('asset');
 
   const [devices, setDevices] = useState<OccupiedPosition[]>(() =>
     occupiedPositions.map((p) => ({ ...p, uPosition: physicalToInternal(p.uPosition, totalU) }))
@@ -153,11 +155,13 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
       const uRangeStr = `U${dispEnd}–U${dispStart}`;
 
       setDropMsg({
-        text: conflict ? `${uRangeStr} 位置冲突` : `放置到 ${uRangeStr}`,
+        text: conflict
+          ? t('uposition.drop.conflict', { range: uRangeStr })
+          : t('uposition.drop.place', { range: uRangeStr }),
         type: conflict ? 'err' : 'ok'
       });
     },
-    [dragId, devices, getDropTarget, totalU]
+    [dragId, devices, getDropTarget, t, totalU]
   );
 
   const handleSlotDrop = useCallback(
@@ -169,7 +173,7 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
       const newStart = getDropTarget(e, device);
 
       if (checkConflict(devices, dragId, newStart, device.uSize)) {
-        setDropMsg({ text: '位置冲突，移动取消', type: 'err' });
+        setDropMsg({ text: t('uposition.drop.conflictCancel'), type: 'err' });
         clearTimeout(msgTimer.current);
         msgTimer.current = setTimeout(() => setDropMsg({ text: '', type: '' }), 2500);
         return;
@@ -185,13 +189,16 @@ export function useRackLayout(props: UPositionSelectorProps): UseRackLayoutResul
       const dispStart = displayLabel(newStart, totalU);
       const dispEnd = displayLabel(newStart + device.uSize - 1, totalU);
       const uRangeStr = `U${dispEnd}–U${dispStart}`;
-      setDropMsg({ text: `${device.deviceName} 已移至 ${uRangeStr}`, type: 'ok' });
+      setDropMsg({
+        text: t('uposition.drop.moved', { device: device.deviceName, range: uRangeStr }),
+        type: 'ok'
+      });
       clearTimeout(msgTimer.current);
       msgTimer.current = setTimeout(() => setDropMsg({ text: '', type: '' }), 2500);
 
       onPositionChange?.(dragId, physicalPos);
     },
-    [dragId, devices, getDropTarget, onPositionChange, totalU, toPhysical]
+    [dragId, devices, getDropTarget, onPositionChange, t, totalU, toPhysical]
   );
 
   const toggleCollapse = useCallback((deviceId: number) => {

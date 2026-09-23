@@ -52,7 +52,7 @@ function AppLayout() {
     if (menu) {
       addTab({
         key: menu.key,
-        title: menu.label,
+        titleKey: menu.labelKey,
         path: menu.path,
         closable: menu.key !== 'dashboard'
       });

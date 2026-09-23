@@ -8,10 +8,11 @@
 import React from 'react';
 import { Table, Input, InputNumber, Select, Button, Space } from 'antd';
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons';
-import { STATUS_OPTIONS } from '../shared';
+import { getStatusOptions } from '../shared';
 import type { DeviceBatchRow } from '../shared';
 import type { EditableRowsApi } from './useBatchAddTab';
 import { buildCommonBatchColumns, type BatchColumns } from '../batchColumns';
+import { useTranslation } from 'react-i18next';
 
 interface BatchDeviceTableProps {
   rows: DeviceBatchRow[];
@@ -32,10 +33,12 @@ const BatchDeviceTable: React.FC<BatchDeviceTableProps> = ({
   deleteRow,
   genNodeName
 }) => {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const columns: BatchColumns = [
     { title: '#', width: 44, render: (_value, _record, index) => index + 1 },
     {
-      title: '设备名称',
+      title: t('field.name'),
       dataIndex: 'device_name',
       width: 200,
       render: (value, record) => (
@@ -43,12 +46,12 @@ const BatchDeviceTable: React.FC<BatchDeviceTableProps> = ({
           size="small"
           value={value}
           onChange={(e) => updateRow(record.key, 'device_name', e.target.value)}
-          placeholder="设备名称"
+          placeholder={t('field.name')}
         />
       )
     },
     {
-      title: '型号',
+      title: t('basic.field.model'),
       dataIndex: 'device_model',
       width: 140,
       render: (value, record) => (
@@ -56,7 +59,7 @@ const BatchDeviceTable: React.FC<BatchDeviceTableProps> = ({
           size="small"
           value={value}
           onChange={(e) => updateRow(record.key, 'device_model', e.target.value)}
-          placeholder="型号"
+          placeholder={t('basic.field.model')}
         />
       )
     },
@@ -64,10 +67,11 @@ const BatchDeviceTable: React.FC<BatchDeviceTableProps> = ({
       updateRow,
       genNodeName,
       isChassis: isChassisMode,
-      isNode: isNodeMode
+      isNode: isNodeMode,
+      t
     }),
     {
-      title: 'U高',
+      title: t('addModal.column.heightU'),
       dataIndex: 'height_u',
       width: 72,
       render: (value, record) => (
@@ -82,21 +86,21 @@ const BatchDeviceTable: React.FC<BatchDeviceTableProps> = ({
       )
     },
     {
-      title: '状态',
+      title: tCommon('field.status'),
       dataIndex: 'status',
       width: 100,
       render: (value, record) => (
         <Select
           size="small"
           value={value}
-          options={STATUS_OPTIONS}
+          options={getStatusOptions(t)}
           style={{ width: '100%' }}
           onChange={(val) => updateRow(record.key, 'status', val)}
         />
       )
     },
     {
-      title: '操作',
+      title: tCommon('field.actions'),
       width: 76,
       render: (_value, record) => (
         <Space size={4}>
@@ -104,7 +108,7 @@ const BatchDeviceTable: React.FC<BatchDeviceTableProps> = ({
             type="text"
             size="small"
             icon={<CopyOutlined />}
-            title="复制行"
+            title={t('addModal.row.copy')}
             onClick={() => copyRow(record.key, { serial_number: '' })}
           />
           <Button
@@ -112,7 +116,7 @@ const BatchDeviceTable: React.FC<BatchDeviceTableProps> = ({
             size="small"
             danger
             icon={<DeleteOutlined />}
-            title="删除行"
+            title={t('addModal.row.delete')}
             disabled={rows.length <= 1}
             onClick={() => deleteRow(record.key)}
           />

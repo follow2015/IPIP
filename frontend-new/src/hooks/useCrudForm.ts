@@ -20,6 +20,7 @@
  */
 import { useEffect } from 'react';
 import { Form } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useMessage } from './useMessage';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { ApiResponse } from '@/types/api';
@@ -52,6 +53,7 @@ export interface UseCrudFormReturn<TCreate> {
 export function useCrudForm<T extends { id: number }, TCreate, TUpdate>(
   options: UseCrudFormOptions<T, TCreate, TUpdate>,
 ): UseCrudFormReturn<TCreate> {
+  const { t } = useTranslation();
   const {
     open,
     editRecord,
@@ -86,10 +88,10 @@ export function useCrudForm<T extends { id: number }, TCreate, TUpdate>(
           ? toUpdatePayload(editRecord.id, values)
           : { id: editRecord.id, ...values } as unknown as TUpdate;
         await updateMutation.mutateAsync(payload);
-        message.success('更新成功');
+        message.success(t('message.updateSuccess'));
       } else {
         await createMutation.mutateAsync(values);
-        message.success('创建成功');
+        message.success(t('message.createSuccess'));
       }
       onClose();
     } catch (err) {

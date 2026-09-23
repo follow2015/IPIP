@@ -42,6 +42,7 @@ from app.services.ip_status_service import (
     detect_ip_status,
     ping_quality,
 )
+from app.utils.network_utils import validate_ip_address
 from app.services.monitoring.adapters.base_adapter import (
     MonitorAdapter,
     MonitorProtocolCode,
@@ -111,6 +112,41 @@ def _resolve_quality_params(credential: dict) -> tuple | None:
     )
 
 
+def _invalid_target_reason(ip) -> str | None:
+    """目标不是**合法的 IP 字面量**时返回可读原因；``None`` = 合法、可发包。
+
+
+    本模块最终走 ``ping <ip>`` 子进程（``create_subprocess_exec``，argv 形式、无
+    shell），所以**外壳注入不成立**；但**选项注入成立**：``ip = "-f"`` 会让 ping
+    进入 flood 模式、``ip = "-c"`` 会顶掉后面的参数位 —— 值来自设备记录/导入文件，
+    不是可信常量。故这里用**白名单**（``ipaddress`` 能解析才算合法），而不是黑名单过滤。
+
+    为什么连**域名**也拒（本系统语义上 ping 目标就是 IP 字面量）：
+      · ``detect_ip_status`` 用 ``ipaddress.ip_address(ip).is_private`` 决定"只 ping
+        还是额外做公网 TCP 探测"，域名会在这里抛 ``ValueError`` 并被当作"非私网"
+        ⇒ 策略静默错位；
+      · 子进程内做 DNS 解析会把轮询拖成不确定耗时（同族问题见 ``monitor_service``
+        里"hostname 场景 DNS 挂死"的注释）。
+    真要支持域名，正确做法是在**调用方**先用 ``resolve_hostname_with_timeout``
+    解析成 IP 再进来，而不是让适配器把域名塞给子进程。
+
+    校验复用 ``network_utils.validate_ip_address``：仓内已有唯一入口，不再写第三份。
+    """
+    if not ip:
+        return "设备无可用探测目标"
+    text = str(ip).strip()
+    if not text:
+        return "探测目标为空白"
+    if not validate_ip_address(text):
+        return (
+            f"探测目标不是合法的 IP 字面量：{text!r}"
+            "（示例：999.1.1.1 / example.com / 1.2.3.4:22 / -f）"
+        )
+    if text != str(ip):
+        return f"探测目标含首尾空白：{ip!r}"
+    return None
+
+
 def _quality_sample(ip: str, samples: int, interval_ms: int, timeout: int):
     """执行一次质量采样（连续 N 包），返回 ``PingQuality``。"""
     return ping_quality(ip, count=samples, interval_ms=interval_ms, timeout=timeout)
@@ -126,7 +162,15 @@ def _ping_with_ports(ip: str, timeout: int, ports: tuple) -> tuple[bool, str | N
 
     说明：`detect_ip_status` 已内置「私网只 Ping / 公网默认端口」策略；
     这里在 Ping 不通时，用凭据配置的 `ports` 做补充探测，二者互补。
+
+    ⚠️ 首行是**兜底**：本函数是"真正发包"的公共入口（`probe` 的 fast 分支与
+    `_probe_quality` 的回落分支都会到此），故即使上游漏检也不发包。
     """
+    reason = _invalid_target_reason(ip)
+    if reason is not None:
+        logger.warning("跳过 ping 探测（未发包）：%s", reason)
+        return False, ProbeErrorCode.INVALID_TARGET_IP.value
+
     if detect_ip_status(ip, timeout=timeout) == IPStatus.ACTIVE:
         return True, None
 
@@ -206,6 +250,14 @@ class PingAdapter(MonitorAdapter):
         ip = self.resolve_target_ip(device)
         if not ip or not templates:
             return {}
+        reason = _invalid_target_reason(ip)
+        if reason is not None:
+            logger.warning(
+                "设备 %s 的 ping 质量采集跳过（未发包）：%s",
+                getattr(device, "id", None),
+                reason,
+            )
+            return {}
         wanted = {
             t["metric_key"] for t in templates
             if t.get("metric_key") in PING_QUALITY_METRIC_KEYS
@@ -245,6 +297,14 @@ class PingAdapter(MonitorAdapter):
         ip = self.resolve_target_ip(device)
         if not ip:
             return ProbeResult(reachable=False, error=ProbeErrorCode.NO_MANAGEMENT_IP.value)
+        reason = _invalid_target_reason(ip)
+        if reason is not None:
+            logger.warning("设备 %s 探测目标非法，未发包：%s", getattr(device, "id", None), reason)
+            return ProbeResult(
+                reachable=False,
+                error=ProbeErrorCode.INVALID_TARGET_IP.value,
+                extra={"source": "ping", "raw_error": reason},
+            )
 
         timeout = monitor_timeout_seconds()
         params = _resolve_quality_params(credential or {})

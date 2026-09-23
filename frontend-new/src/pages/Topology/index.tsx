@@ -36,6 +36,7 @@ import {
   ReloadOutlined,
   NodeIndexOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useNetworkTopology, useDeviceTopology, useAutoDetectTopology } from '@/services/topology';
 import { useRoomOptions } from '@/services/room';
 import { useVirtualRooms } from '@/services/virtual-room';
@@ -64,6 +65,9 @@ const TopologyPage: React.FC = () => {
   const discoveryModal = useDisclosure();
   const graphRef = useRef<TopologyGraphHandle>(null);
   const { isMobile } = useResponsive();
+  const { t: tn } = useTranslation('network');
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
 
   const { data: roomOptions } = useRoomOptions();
   const { data: virtualRoomsData } = useVirtualRooms({ per_page: 200 });
@@ -111,7 +115,7 @@ const TopologyPage: React.FC = () => {
 
   const handleAutoDetect = useCallback(() => {
     if (!roomId) {
-      message.warning('请先选择物理机房（自动推断不支持虚拟机房）');
+      message.warning(tn('topology.autoDetect.needPhysicalRoom'));
       return;
     }
     autoDetectMutation.mutate(
@@ -119,14 +123,14 @@ const TopologyPage: React.FC = () => {
       {
         onSuccess: (data) => {
           if (data.changes.length === 0) {
-            message.success('未发现需要推断的字段');
+            message.success(tn('topology.autoDetect.noChanges'));
           } else {
             autoDetectModal.open();
           }
         }
       }
     );
-  }, [roomId, autoDetectMutation]);
+  }, [roomId, autoDetectMutation, tn]);
 
   const handleApplyAutoDetect = useCallback(() => {
     if (!roomId) return;
@@ -134,38 +138,46 @@ const TopologyPage: React.FC = () => {
       { room_id: roomId, dry_run: false },
       {
         onSuccess: (data) => {
-          message.success(`已更新 ${data.changes.length} 条记录`);
+          message.success(tn('topology.autoDetect.updatedRecords', { count: data.changes.length }));
           autoDetectModal.close();
         }
       }
     );
-  }, [roomId, autoDetectMutation]);
+  }, [roomId, autoDetectMutation, tn]);
 
   const statsItems = useMemo(() => {
     if (!topologyData?.stats) return [];
     const s = topologyData.stats;
     if (viewMode === 'network') {
       return [
-        { label: '节点', value: s.total_nodes, icon: <SwapOutlined /> },
-        { label: '连接', value: s.total_edges, icon: <ApartmentOutlined /> },
-        { label: '核心', value: s.core_count ?? 0, icon: <ThunderboltOutlined /> },
-        { label: '接入', value: s.access_count ?? 0, icon: <SwapOutlined /> },
-        { label: '在线', value: s.online_count, icon: <CloudServerOutlined /> }
+        { label: tn('topology.stats.node'), value: s.total_nodes, icon: <SwapOutlined /> },
+        { label: tn('topology.stats.link'), value: s.total_edges, icon: <ApartmentOutlined /> },
+        {
+          label: td('form.networkTopology.roleOption.core'),
+          value: s.core_count ?? 0,
+          icon: <ThunderboltOutlined />
+        },
+        {
+          label: td('form.networkTopology.roleOption.access'),
+          value: s.access_count ?? 0,
+          icon: <SwapOutlined />
+        },
+        { label: td('status.ONLINE'), value: s.online_count, icon: <CloudServerOutlined /> }
       ];
     }
     return [
-      { label: '节点', value: s.total_nodes, icon: <CloudServerOutlined /> },
-      { label: '连接', value: s.total_edges, icon: <ApartmentOutlined /> },
-      { label: '交换机', value: s.switch_count ?? 0, icon: <SwapOutlined /> },
-      { label: '服务器', value: s.server_count ?? 0, icon: <CloudServerOutlined /> },
-      { label: '在线', value: s.online_count, icon: <CloudServerOutlined /> }
+      { label: tn('topology.stats.node'), value: s.total_nodes, icon: <CloudServerOutlined /> },
+      { label: tn('topology.stats.link'), value: s.total_edges, icon: <ApartmentOutlined /> },
+      { label: tn('ip.field.switch'), value: s.switch_count ?? 0, icon: <SwapOutlined /> },
+      { label: td('deviceType.SERVER'), value: s.server_count ?? 0, icon: <CloudServerOutlined /> },
+      { label: td('status.ONLINE'), value: s.online_count, icon: <CloudServerOutlined /> }
     ];
-  }, [topologyData?.stats, viewMode]);
+  }, [topologyData?.stats, viewMode, tn, td]);
 
   const autoDetectColumns = [
-    { title: '设备', dataIndex: 'device_name', key: 'device_name' },
+    { title: tn('topology.autoDetect.column.device'), dataIndex: 'device_name', key: 'device_name' },
     {
-      title: '变更字段',
+      title: tn('topology.autoDetect.column.changedFields'),
       dataIndex: 'fields',
       key: 'fields',
       render: (fields: Record<string, { old: unknown; new: unknown }>) => (
@@ -210,18 +222,18 @@ const TopologyPage: React.FC = () => {
               >
                 <Radio.Button value="network">
                   <Space size={4}>
-                    <ApartmentOutlined /> 网络拓扑
+                    <ApartmentOutlined /> {tn('topology.view.network')}
                   </Space>
                 </Radio.Button>
                 <Radio.Button value="device">
                   <Space size={4}>
-                    <CloudServerOutlined /> 设备拓扑
+                    <CloudServerOutlined /> {tn('topology.view.device')}
                   </Space>
                 </Radio.Button>
               </Radio.Group>
 
               <Select
-                placeholder="选择机房"
+                placeholder={tn('topology.filter.roomPlaceholder')}
                 allowClear
                 style={{ width: isMobile ? '100%' : 200 }}
                 size="small"
@@ -242,11 +254,11 @@ const TopologyPage: React.FC = () => {
                 }}
                 options={[
                   {
-                    label: '物理机房',
+                    label: tn('topology.filter.groupPhysicalRoom'),
                     options: rooms.map((r) => ({ label: r.label, value: `room_${r.value}` }))
                   },
                   {
-                    label: '虚拟机房',
+                    label: tn('topology.filter.groupVirtualRoom'),
                     options: virtualRooms.map((vr) => ({ label: vr.name, value: `vr_${vr.id}` }))
                   }
                 ]}
@@ -261,7 +273,7 @@ const TopologyPage: React.FC = () => {
                 }}
                 loading={isLoading}
               >
-                刷新
+                {tc('action.refresh')}
               </Button>
             </Space>
           </Col>
@@ -287,7 +299,7 @@ const TopologyPage: React.FC = () => {
                 icon={<NodeIndexOutlined />}
                 onClick={() => discoveryModal.open()}
               >
-                LLDP 发现
+                {tn('topology.action.lldpDiscovery')}
               </Button>
               <Button
                 size="small"
@@ -297,7 +309,7 @@ const TopologyPage: React.FC = () => {
                 onClick={handleAutoDetect}
                 loading={autoDetectMutation.isPending}
               >
-                自动推断
+                {tn('topology.action.autoDetect')}
               </Button>
             </Space>
           </Col>
@@ -330,7 +342,7 @@ const TopologyPage: React.FC = () => {
             banner
             type="info"
             showIcon
-            message="拓扑图支持单指拖动、双指缩放；节点较密集时建议在桌面端查看"
+            message={tn('topology.mobileHint')}
             style={{ fontSize: 12 }}
           />
         )}
@@ -348,7 +360,7 @@ const TopologyPage: React.FC = () => {
                 background: 'rgba(255,255,255,0.7)'
               }}
             >
-              <Spin size="large" description="加载拓扑数据..." />
+              <Spin size="large" description={tn('topology.loading')} />
             </div>
           )}
 
@@ -362,7 +374,7 @@ const TopologyPage: React.FC = () => {
                 justifyContent: 'center'
               }}
             >
-              <Empty description="暂无拓扑数据，请确保已配置交换机和连接关系" />
+              <Empty description={tn('topology.empty')} />
             </div>
           )}
 
@@ -399,13 +411,13 @@ const TopologyPage: React.FC = () => {
 
       {/* 自动推断预览 Modal */}
       <Modal
-        title="自动推断结果预览"
+        title={tn('topology.autoDetect.previewTitle')}
         open={autoDetectModal.isOpen}
         onCancel={() => autoDetectModal.close()}
         width={isMobile ? 'calc(100vw - 24px)' : 600}
         footer={[
           <Button key="cancel" onClick={() => autoDetectModal.close()}>
-            取消
+            {tc('action.cancel')}
           </Button>,
           <Button
             key="apply"
@@ -413,14 +425,16 @@ const TopologyPage: React.FC = () => {
             onClick={handleApplyAutoDetect}
             loading={autoDetectMutation.isPending}
           >
-            应用变更
+            {tn('topology.autoDetect.applyChanges')}
           </Button>
         ]}
       >
         <Alert
           type="info"
           showIcon
-          message='以下为推断结果预览，点击"应用变更"将写入数据库'
+          message={tn('topology.autoDetect.previewAlert', {
+            action: tn('topology.autoDetect.applyChanges')
+          })}
           style={{ marginBottom: 12 }}
         />
         <Table

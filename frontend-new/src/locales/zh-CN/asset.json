@@ -1,0 +1,326 @@
+{
+  "assetInfo": {
+    "section": {
+      "purchase": "采购信息",
+      "warranty": "保修信息",
+      "lifecycle": "生命周期"
+    },
+    "assetNumber": {
+      "label": "资产编号",
+      "tooltip": "可手动输入，或开启自动生成",
+      "placeholderManual": "手动输入资产编号",
+      "placeholder": "资产编号（可自动生成）",
+      "autoGenerate": "自动生成"
+    },
+    "autoGenerate": {
+      "label": "自动生成资产编号",
+      "tooltip": "开启后，每个设备将获得不同的唯一编号（ZC-YYYYMMDD-HHmmss-XXXX）",
+      "hintBatch": "将为每台设备自动生成唯一编号（ZC-YYYYMMDD-HHmmss-XXXX）",
+      "hint": "将自动生成唯一编号（ZC-YYYYMMDD-HHmmss-XXXX）",
+      "on": "开启",
+      "off": "关闭",
+      "auto": "自动",
+      "manual": "手动"
+    },
+    "supplier": {
+      "label": "供应商",
+      "placeholder": "供应商名称"
+    },
+    "supplierContact": {
+      "label": "供应商联系人",
+      "placeholder": "联系人"
+    },
+    "contractNumber": {
+      "label": "合同编号",
+      "placeholder": "采购合同编号"
+    },
+    "invoiceNumber": {
+      "label": "发票号码",
+      "placeholder": "发票号码"
+    },
+    "purchaseDate": {
+      "label": "采购日期",
+      "placeholder": "采购日期"
+    },
+    "purchasePrice": {
+      "label": "采购价格(元)",
+      "placeholder": "价格"
+    },
+    "warrantyType": {
+      "label": "保修类型",
+      "placeholder": "如：原厂保修"
+    },
+    "warrantyStart": {
+      "label": "保修开始",
+      "placeholder": "开始日期"
+    },
+    "warrantyEnd": {
+      "label": "保修到期",
+      "placeholder": "选择到期日",
+      "tooltip": "可直接选择日期，或点右侧「快捷」按钮从「保修开始」按 1/2/3/5 年自动推算",
+      "popoverTitle": "从「保修开始」快速推算到期日",
+      "quick": "快捷",
+      "quickYear": "{{count}} 年"
+    },
+    "onlineDate": {
+      "label": "上线日期",
+      "placeholder": "上线投产日期",
+      "tooltipDefault": "默认填充为设备添加时间，可手动修改；清空后生命周期按编辑当天重新计算",
+      "tooltip": "清空后生命周期按编辑当天重新计算"
+    },
+    "offlineDate": {
+      "label": "下线日期",
+      "placeholder": "下线/报废日期",
+      "tooltip": "填写后将自动推算「预计使用年限」；两者都有时取更久的一方并同步对齐"
+    },
+    "lifecycleYears": {
+      "label": "预计使用年限",
+      "placeholder": "年",
+      "unit": "年",
+      "tooltip": "填写后将自动推算「下线日期」；两者都有时取更久的一方并同步对齐"
+    }
+  },
+  "roomLayout": {
+    "density": {
+      "compact": "紧凑",
+      "standard": "标准",
+      "large": "大图"
+    },
+    "searchPlaceholder": "搜索机柜编号或客户",
+    "matched": "匹配 {{count}} 个",
+    "empty": {
+      "noPosition": "暂无机柜位置信息，请在机柜表单中设置行号和列号",
+      "noCabinetOrMarker": "该机房暂无机柜与占位标记"
+    },
+    "action": {
+      "viewDetail": "查看详情",
+      "clearSelection": "取消选中"
+    },
+    "readOnlyHint": "（只读模式，不可跳转）",
+    "colHeader": "列{{index}}",
+    "tooltip": {
+      "status": "状态：{{value}}",
+      "u": "U位：{{used}}/{{total}}U ({{pct}}%)",
+      "power": "功率：{{used}}/{{total}}W ({{pct}}%)",
+      "position": "位置：{{value}}",
+      "positionUnset": "位置：未定位",
+      "customer": "客户：{{value}}",
+      "notes": "备注：{{value}}"
+    },
+    "position": "第{{row}}行 第{{col}}列",
+    "positionUnset": "未定位",
+    "devices": "设备：{{count}}台",
+    "cellDeviceCount": "{{count}}台",
+    "uUsage": "U位：{{pct}}%",
+    "unpositioned": "未设置位置的机柜（{{count}}个）",
+    "channelType": {
+      "cold": "冷通道",
+      "hot": "热通道",
+      "mixed": "混合通道"
+    },
+    "supply": {
+      "floor": "地板下送风",
+      "direct": "上送风直吹（非推荐）",
+      "none": "无"
+    },
+    "markerType": {
+      "ac": "空调",
+      "pdu": "PDU",
+      "pillar": "立柱",
+      "door": "门",
+      "other": "其他"
+    },
+    "outsideRow": "第 1 行外侧",
+    "outsideCol": "第 1 列外侧",
+    "positionRow": "第 {{row}} 行",
+    "positionCol": "第 {{col}} 列",
+    "legend": {
+      "status": "状态",
+      "channel": "通道",
+      "channelHint": "（实线+封头 = 封闭，虚线 = 开放）"
+    },
+    "zoom": {
+      "out": "缩小",
+      "in": "放大",
+      "reset": "复位缩放",
+      "level": "缩放 {{pct}}%"
+    },
+    "conflict": {
+      "listSeparator": "、",
+      "separator": "；",
+      "verify": "。请核实并修正。",
+      "cellCabinets": "该位置有 {{count}} 台机柜：{{list}}",
+      "cellMarkers": "该位置还标有占位设施：{{list}}",
+      "listTitle": "位置冲突的机柜（{{count}}个）：与同机房其它机柜填了相同的行列号，未在平面图上显示，请修正行列号",
+      "tagTip": "{{cabinet}}（{{position}}）与图上机柜位置重复",
+      "tagTipDetail": "，点击查看详情"
+    },
+    "cabinetForm": {
+      "occupied": "第 {{row}} 行 第 {{col}} 列已被机柜 {{cabinet}} 占用",
+      "occupiedHint": "同一机房的一个格子只能放一台机柜。请更换行列号，否则提交会被拒绝。",
+      "markerOccupied": "该位置已标记为占位设施（{{type}}）",
+      "markerOccupiedHint": "占位设施通常表示该格子不放机柜。确需放置可继续提交，平面上会以冲突角标提示。"
+    },
+    "planPosition": "平面图位置",
+    "viewOnPlan": "在平面图中查看",
+    "positionNotSet": "未设置（可在机柜表单中填写行号与列号）",
+    "channel": {
+      "title": "配置通道",
+      "hint": "通道位于相邻两列之间：填 N 表示「第 N 列与第 N+1 列之间」，填 0 表示「第 1 列外侧」。是否封闭是图上区分老式机房与模块化机房的主要依据。",
+      "add": "新增通道",
+      "empty": "尚未配置通道，平面图上不会渲染色带",
+      "position": "位置",
+      "colSlot": "第 {{col}} 列位",
+      "enclosed": "是否封闭",
+      "enclosedTag": "封闭",
+      "openTag": "开放",
+      "supply": "送风",
+      "confirmDelete": "确认删除该通道配置？",
+      "editTitle": "编辑通道配置",
+      "createTitle": "新增通道配置",
+      "colNumber": "列位",
+      "colNumberExtra": "N = 第 N 列与第 N+1 列之间；0 = 第 1 列外侧（机柜网格外）",
+      "colNumberRequired": "请填写列位",
+      "colNumberNegative": "列位不能为负数",
+      "type": "通道类型",
+      "typeRequired": "请选择通道类型",
+      "enclosedField": "封闭通道",
+      "enclosedExtra": "有端门/顶板的封闭通道；新式模块机房的封闭冷通道即此类",
+      "enclosedWrap": "（封闭）",
+      "openWrap": "（开放）",
+      "supplyField": "送风方式",
+      "supplyExtra": "「上送风直吹」易气流掺混，标准不推荐，仅适用于低热密度区域",
+      "supplyUnset": "未标注",
+      "displayName": "展示名",
+      "displayNameExtra": "留空则按列位自动生成，如「第 1 列与第 2 列之间」",
+      "displayNamePlaceholder": "如：A-B 冷通道",
+      "sideLeft": "左侧",
+      "sideRight": "右侧",
+      "enclosedDot": "·封闭",
+      "openDot": "·开放",
+      "unmarked": "通道未标注",
+      "message": {
+        "updated": "通道配置已更新",
+        "created": "通道配置已新增",
+        "deleted": "通道配置已删除",
+        "saveFailed": "保存通道配置失败",
+        "deleteFailed": "删除通道配置失败"
+      }
+    },
+    "marker": {
+      "title": "管理占位标记",
+      "hint": "标记用于表达「这个格子不能放机柜」——门、精密空调、PDU、立柱等。行列号填 0 表示机柜网格外侧（如第 1 列外侧的门）。本功能只做位置提示，不是设施资产台账，不记录型号与维保信息。",
+      "add": "新增标记",
+      "empty": "尚未添加占位标记",
+      "position": "位置",
+      "confirmDelete": "确认删除该占位标记？",
+      "editTitle": "编辑占位标记",
+      "createTitle": "新增占位标记",
+      "facilityType": "设施类型",
+      "facilityTypeRequired": "请选择设施类型",
+      "rowNumber": "行号",
+      "rowExtra": "0 表示机柜网格外侧（如端头空调）",
+      "rowRequired": "请填写行号",
+      "rowNegative": "行号不能为负数",
+      "colNumber": "列号",
+      "colExtra": "0 表示机柜网格外侧（如端头空调、门）",
+      "colRequired": "请填写列号",
+      "colNegative": "列号不能为负数",
+      "label": "标签",
+      "labelExtra": "留空则按类型显示，如「空调」",
+      "labelPlaceholder": "如：空调-01",
+      "occupiedTitle": "该位置已有机柜",
+      "occupiedContent": "{{position}} 已放置机柜 {{cabinet}}。继续添加标记会与该机柜占用同一格，平面图上将以冲突角标提示。确认继续？",
+      "stillAdd": "仍要添加",
+      "message": {
+        "updated": "占位标记已更新",
+        "created": "占位标记已新增",
+        "deleted": "占位标记已删除",
+        "saveFailed": "保存占位标记失败",
+        "deleteFailed": "删除占位标记失败"
+      }
+    }
+  },
+  "uposition": {
+    "header": {
+      "title": "U 位布局",
+      "stats": "{{totalU}}U · {{count}} 台",
+      "draggable": " · 可拖拽"
+    },
+    "label": {
+      "u": "U位",
+      "power": "功率",
+      "devices": "设备"
+    },
+    "footer": {
+      "deviceValue": "{{count}}台"
+    },
+    "type": {
+      "server": "服务器",
+      "switch": "网络设备",
+      "storage": "存储",
+      "multinode": "多节点服务器",
+      "pdu": "PDU 电源",
+      "kvm": "KVM 控制台"
+    },
+    "detail": {
+      "empty": "点击设备查看详情",
+      "uPosition": "U 位",
+      "model": "型号",
+      "sn": "序列号",
+      "uRange": "U{{end}}–U{{start}}（{{size}}U）",
+      "viewDetail": "查看设备详情",
+      "nodeSummary": "节点 {{online}}/{{total}} 在线 · {{fault}} 故障"
+    },
+    "node": {
+      "status": "状态：{{value}}",
+      "online": "在线",
+      "offline": "离线",
+      "fault": "故障"
+    },
+    "side": {
+      "uUsage": "U位利用率",
+      "powerUsage": "功率利用率"
+    },
+    "drop": {
+      "conflict": "{{range}} 位置冲突",
+      "place": "放置到 {{range}}",
+      "conflictCancel": "位置冲突，移动取消",
+      "moved": "{{device}} 已移至 {{range}}"
+    },
+    "device": {
+      "onlineSummary": "{{online}}/{{total}} 在线",
+      "powerSuffix": " · {{power}}W"
+    }
+  },
+  "vendorBrand": {
+    "title": "厂商品牌",
+    "add": "新增品牌",
+    "edit": "编辑品牌",
+    "empty": "暂无厂商品牌",
+    "field": {
+      "enterpriseNo": "enterprise 号",
+      "brandName": "品牌全称",
+      "displayName": "显示名称",
+      "labelPlaceholder": "DELL（服务器）",
+      "sortOrder": "排序"
+    },
+    "deviceType": {
+      "network": "network（网络）",
+      "server": "server（服务器）",
+      "storage": "storage（存储）",
+      "other": "other（其他）"
+    },
+    "validation": {
+      "enterpriseNoRequired": "请输入 enterprise 号",
+      "deviceTypeRequired": "请选择设备类型",
+      "brandNameRequired": "请输入品牌全称",
+      "displayNameRequired": "请输入显示名称"
+    },
+    "confirmDeleteContent": "确定要删除该厂商品牌吗？此操作不可恢复。",
+    "message": {
+      "created": "新增成功",
+      "saveFailed": "保存失败"
+    }
+  }
+}

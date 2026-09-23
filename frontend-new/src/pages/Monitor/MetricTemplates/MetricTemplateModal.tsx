@@ -6,10 +6,11 @@
 import { Modal, Form, Input, Select, InputNumber, Switch, Row, Col, type FormInstance } from 'antd';
 import { useMessage } from '@/hooks/useMessage';
 import { useUpsertMetricTemplate, type MetricTemplateItem } from '@/services/monitor';
+import { useTranslation } from 'react-i18next';
 import {
-  DEVICE_TYPE_OPTIONS,
   SOURCE_OPTIONS,
-  METRIC_TYPE_OPTIONS,
+  buildDeviceTypeOptions,
+  buildMetricTypeOptions,
   buildThreshold,
   parseThreshold,
   type MetricTemplateFormValues
@@ -30,6 +31,12 @@ export default function MetricTemplateModal({
 }: MetricTemplateModalProps) {
   const upsert = useUpsertMetricTemplate();
   const message = useMessage();
+  const { t } = useTranslation('monitor');
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
+
+  const deviceTypeOptions = buildDeviceTypeOptions(td);
+  const metricTypeOptions = buildMetricTypeOptions(t);
 
   const handleSubmit = async (values: MetricTemplateFormValues) => {
     const threshold = buildThreshold(values);
@@ -37,7 +44,7 @@ export default function MetricTemplateModal({
       try {
         JSON.parse(values.threshold_json);
       } catch {
-        message.error('阈值 JSON 格式不合法，请检查');
+        message.error(t('metricTemplate.message.invalidThresholdJson'));
         return;
       }
     }
@@ -64,10 +71,14 @@ export default function MetricTemplateModal({
         runbook_url: values.runbook_url || null,
         runbook_title: values.runbook_title || null
       });
-      message.success(editingRecord ? '指标模板已更新' : '指标模板已保存');
+      message.success(
+        editingRecord
+          ? t('metricTemplate.message.updated')
+          : t('metricTemplate.message.saved')
+      );
       onClose();
     } catch {
-      message.error('保存失败，请检查输入');
+      message.error(t('metricTemplate.message.saveFailed'));
     }
   };
 
@@ -76,7 +87,7 @@ export default function MetricTemplateModal({
 
   return (
     <Modal
-      title={editingRecord ? '编辑指标模板' : '新增指标模板'}
+      title={editingRecord ? t('metricTemplate.modal.editTitle') : t('metricTemplate.modal.createTitle')}
       open={open}
       onOk={() => form.submit()}
       onCancel={onClose}
@@ -93,68 +104,68 @@ export default function MetricTemplateModal({
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-              label="设备类型"
+              label={td('switch.batchField.deviceType')}
               name="device_type"
-              rules={[{ required: true, message: '请选择设备类型' }]}
+              rules={[{ required: true, message: td('switch.form.deviceTypeRequired') }]}
             >
-              <Select options={DEVICE_TYPE_OPTIONS} />
+              <Select options={deviceTypeOptions} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
-              label="指标 Key"
+              label={t('metricTemplate.field.metricKey')}
               name="metric_key"
-              rules={[{ required: true, message: '请输入指标 Key' }]}
-              tooltip="与 OID 分类规则 category 对齐的技术标识"
+              rules={[{ required: true, message: t('metricTemplate.validation.metricKeyRequired') }]}
+              tooltip={t('metricTemplate.tooltip.metricKey')}
             >
-              <Input placeholder="如 if_status / temperature / disk_failure" />
+              <Input placeholder={t('metricTemplate.placeholder.metricKey')} />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-              label="显示名称"
+              label={t('metricTemplate.field.displayName')}
               name="display_name"
-              tooltip="中文显示名，表格优先展示；为空时回退 metric_key"
+              tooltip={t('metricTemplate.tooltip.displayName')}
             >
-              <Input placeholder="如 端口状态 / 温度 / 硬盘故障" />
+              <Input placeholder={t('metricTemplate.placeholder.displayName')} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
-              label="分类 category"
+              label={t('metricTemplate.field.categoryKey')}
               name="category"
-              tooltip="关联 OID 分类规则，MIB 扫描导入时自动填充"
+              tooltip={t('metricTemplate.tooltip.category')}
             >
-              <Input placeholder="如 if_status / temperature" />
+              <Input placeholder={t('metricTemplate.placeholder.category')} />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-              label="厂商 vendor"
+              label={t('metricTemplate.field.vendorKey')}
               name="vendor"
-              tooltip="厂家约束（如 Huawei / H3C / Dell），声明时仅匹配同厂商设备；留空=全适用"
+              tooltip={t('metricTemplate.tooltip.vendor')}
             >
-              <Input placeholder="如 Dell / Huawei（留空=全适用）" />
+              <Input placeholder={t('metricTemplate.placeholder.vendor')} />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
           <Col xs={24} md={8}>
-            <Form.Item label="来源" name="source">
+            <Form.Item label={tc('field.source')} name="source">
               <Select options={SOURCE_OPTIONS} />
             </Form.Item>
           </Col>
           <Col xs={24} md={8}>
-            <Form.Item label="类型" name="metric_type">
-              <Select options={METRIC_TYPE_OPTIONS} />
+            <Form.Item label={tc('field.type')} name="metric_type">
+              <Select options={metricTypeOptions} />
             </Form.Item>
           </Col>
           <Col xs={24} md={8}>
-            <Form.Item label="采集频率(秒)" name="poll_interval">
+            <Form.Item label={t('metricTemplate.field.pollInterval')} name="poll_interval">
               <InputNumber min={10} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
@@ -162,105 +173,131 @@ export default function MetricTemplateModal({
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item label="MIB" name="mib">
-              <Input placeholder="如 IF-MIB" />
+              <Input placeholder={t('metricTemplate.placeholder.mib')} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item label="OID 符号" name="oid_symbol" tooltip="MIB 符号名，如 ifOperStatus">
-              <Input placeholder="如 ifOperStatus / entPhySensorValue" />
+            <Form.Item
+              label={t('metricTemplate.field.oidSymbol')}
+              name="oid_symbol"
+              tooltip={t('metricTemplate.tooltip.oidSymbol')}
+            >
+              <Input placeholder={t('metricTemplate.placeholder.oidSymbol')} />
             </Form.Item>
           </Col>
         </Row>
         <Form.Item
-          label="数字 OID"
+          label={t('metricTemplate.field.numericOid')}
           name="oid"
-          tooltip="完整数字 OID，与 oid_symbol 互补；MIB 扫描导入时承接"
+          tooltip={t('metricTemplate.tooltip.numericOid')}
         >
-          <Input placeholder="如 1.3.6.1.2.1.2.2.1.7" />
+          <Input placeholder={t('metricTemplate.placeholder.numericOid')} />
         </Form.Item>
         {currentSource === 'zabbix' && (
           <Form.Item
             label="Zabbix Item Key"
             name="zabbix_item_key"
-            rules={[{ required: true, message: 'source=zabbix 时 item key 必填' }]}
-            tooltip="Zabbix item key，如 system.cpu.util / vm.memory.size[pavailable]"
+            rules={[{ required: true, message: t('metricTemplate.validation.zabbixItemKeyRequired') }]}
+            tooltip={t('metricTemplate.tooltip.zabbixItemKey')}
           >
-            <Input placeholder="如 system.cpu.util / vm.memory.size[pavailable]" />
+            <Input placeholder={t('metricTemplate.placeholder.zabbixItemKey')} />
           </Form.Item>
         )}
-        <Form.Item label="索引维度" name="index_kind">
-          <Input placeholder="如 ifIndex（端口）" />
+        <Form.Item label={t('metricTemplate.field.indexKind')} name="index_kind">
+          <Input placeholder={t('metricTemplate.placeholder.indexKind')} />
         </Form.Item>
 
         {/* 结构化阈值：按 metric_type 动态渲染 */}
         {(currentMetricType === 'gauge' || currentMetricType === 'counter') && (
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item label="告警阈值 (warn)" name="warn" tooltip="达到该值触发告警">
-                <InputNumber style={{ width: '100%' }} placeholder="如 60" />
+              <Form.Item
+                label={t('metricTemplate.field.warn')}
+                name="warn"
+                tooltip={t('metricTemplate.tooltip.warn')}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  placeholder={t('metricTemplate.placeholder.warn')}
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item label="严重阈值 (crit)" name="crit" tooltip="达到该值触发严重告警">
-                <InputNumber style={{ width: '100%' }} placeholder="如 70" />
+              <Form.Item
+                label={t('metricTemplate.field.crit')}
+                name="crit"
+                tooltip={t('metricTemplate.tooltip.crit')}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  placeholder={t('metricTemplate.placeholder.crit')}
+                />
               </Form.Item>
             </Col>
           </Row>
         )}
         {currentMetricType === 'state' && (
-          <Form.Item label="期望值 (expected)" name="expected" tooltip="实际值不等于该值时告警">
-            <Input placeholder="如 up / 1" />
+          <Form.Item
+            label={t('metricTemplate.field.expected')}
+            name="expected"
+            tooltip={t('metricTemplate.tooltip.expected')}
+          >
+            <Input placeholder={t('metricTemplate.placeholder.expected')} />
           </Form.Item>
         )}
         {currentMetricType === 'event' && (
-          <Form.Item label="阈值 JSON" name="threshold_json" tooltip="事件类型阈值，自由 JSON 结构">
+          <Form.Item
+            label={t('metricTemplate.field.thresholdJson')}
+            name="threshold_json"
+            tooltip={t('metricTemplate.tooltip.thresholdJson')}
+          >
             <Input.TextArea placeholder={'{\n  "pattern": "error"\n}'} rows={3} />
           </Form.Item>
         )}
 
         <Form.Item
-          label="默认告警级别"
+          label={t('metricTemplate.field.severityDefault')}
           name="severity_default"
-          tooltip="未配置阈值时回退使用的告警级别"
+          tooltip={t('metricTemplate.tooltip.severityDefault')}
         >
           <Select
             allowClear
             options={[
-              { label: '告警 (warn)', value: 'warn' },
-              { label: '严重 (crit)', value: 'crit' }
+              { label: t('metricTemplate.severity.warn'), value: 'warn' },
+              { label: t('metricTemplate.severity.crit'), value: 'crit' }
             ]}
-            placeholder="选择默认级别"
+            placeholder={t('metricTemplate.placeholder.severityDefault')}
           />
         </Form.Item>
 
         <Row gutter={16}>
           <Col xs={24} md={12}>
-            <Form.Item label="单位" name="unit">
-              <Input placeholder="如 Celsius / Mbps" />
+            <Form.Item label={t('metricTemplate.field.unit')} name="unit">
+              <Input placeholder={t('metricTemplate.placeholder.unit')} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item label="启用" name="enabled" valuePropName="checked">
+            <Form.Item label={tc('action.enable')} name="enabled" valuePropName="checked">
               <Switch />
             </Form.Item>
           </Col>
         </Row>
-        <Form.Item label="说明" name="description">
-          <Input.TextArea rows={2} placeholder="指标含义、采集对象说明等" />
+        <Form.Item label={tc('field.description')} name="description">
+          <Input.TextArea rows={2} placeholder={t('metricTemplate.placeholder.description')} />
         </Form.Item>
         <Row gutter={16}>
           <Col xs={24} md={16}>
             <Form.Item
-              label="处置预案 URL"
+              label={t('metricTemplate.field.runbookUrl')}
               name="runbook_url"
-              tooltip="告警触发时在告警详情展示的处置文档链接（内部 wiki 等）"
+              tooltip={t('metricTemplate.tooltip.runbookUrl')}
             >
-              <Input placeholder="如 https://wiki.internal/runbook/temp-high" />
+              <Input placeholder={t('metricTemplate.placeholder.runbookUrl')} />
             </Form.Item>
           </Col>
           <Col xs={24} md={8}>
-            <Form.Item label="预案标题" name="runbook_title">
-              <Input placeholder="如 温度过高处置流程" />
+            <Form.Item label={t('metricTemplate.field.runbookTitle')} name="runbook_title">
+              <Input placeholder={t('metricTemplate.placeholder.runbookTitle')} />
             </Form.Item>
           </Col>
         </Row>

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import type { DragEvent } from 'react';
 import {
+  Table,
   Button,
   Space,
   Form,
@@ -17,7 +18,6 @@ import {
   Tooltip,
   Modal
 } from 'antd';
-import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import { PlusOutlined, DeleteOutlined, FullscreenOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -28,8 +28,10 @@ import {
   useDeviceDetail,
   useSwapNodePositions
 } from '@/services/device';
-import { DEVICE_STATUS_MAP, DeviceStatusCode } from '@/types/enums';
+import { DeviceStatusCode } from '@/types/enums';
+import { getDeviceStatusMeta, getDeviceStatusOptions } from '@/types/statusMeta';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 import type { Device } from '@/types/models';
 import HardwareConfigFields, {
   buildStorageSummary,
@@ -48,6 +50,8 @@ interface NodeTabProps {
 }
 
 function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeTabProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const navigate = useNavigate();
   const message = useMessage();
@@ -93,12 +97,12 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       .replace('{col}', String(col))
       .replace('{COL}', String(col));
     form.setFieldValue('device_name', newName);
-    form.setFieldValue('notes', `${deviceName} 节点 ${watchedNodePosition}`);
-  }, [formDisclosure.isOpen, watchedNodePosition, deviceName, chassisDetail, form]);
+    form.setFieldValue('notes', t('node.notesTemplate', { name: deviceName, position: watchedNodePosition }));
+  }, [formDisclosure.isOpen, watchedNodePosition, deviceName, chassisDetail, form, t]);
 
   const handleAdd = () => {
     if (vacantCount === 0) {
-      message.info('当前机箱节点位置已满，无法继续添加子节点');
+      message.info(t('node.positionFull'));
       return;
     }
     form.resetFields();
@@ -116,14 +120,14 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
 
   const handleDelete = (record: Device) => {
     confirm({
-      title: '确认删除',
-      content: `确定要删除节点「${record.device_name}」吗？`,
+      title: tCommon('confirm.deleteTitle'),
+      content: t('node.deleteContent', { name: record.device_name }),
       onOk: async () => {
         try {
           await deleteDevice.mutateAsync(record.id);
-          message.success('删除成功');
+          message.success(tCommon('message.deleteSuccess'));
         } catch (err) {
-          message.error(err instanceof Error ? err.message : '删除失败');
+          message.error(err instanceof Error ? err.message : tCommon('message.deleteFailed'));
         }
       }
     });
@@ -144,7 +148,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
         storage_items: storageList.length > 0 ? storageList : undefined,
         nic_ports: nicPorts.length > 0 ? nicPorts : undefined
       });
-      message.success('节点创建成功');
+      message.success(t('node.createSuccess'));
       formDisclosure.close();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -153,7 +157,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
 
   const handleFillOpen = () => {
     if (vacantCount === 0) {
-      message.info('当前没有空余节点位置');
+      message.info(t('node.noVacant'));
       return;
     }
     fillForm.resetFields();
@@ -169,11 +173,11 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       const fillCount = values.fill_count as number;
 
       if (fillCount <= 0) {
-        message.warning('生成数量必须大于0');
+        message.warning(t('node.countMustPositive'));
         return;
       }
       if (fillCount > vacantCount) {
-        message.warning(`生成数量不能超过剩余空余位置（${vacantCount}个）`);
+        message.warning(t('node.countExceed', { count: vacantCount }));
         return;
       }
 
@@ -202,7 +206,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
         nic_ports: nicPorts.length > 0 ? nicPorts : undefined
       });
 
-      message.success(`已生成 ${fillCount} 个子节点`);
+      message.success(t('node.generated', { count: fillCount }));
       fill.close();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -211,14 +215,14 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
 
   const columns = [
     {
-      title: '节点位置',
+      title: t('node.column.position'),
       dataIndex: 'node_position',
       key: 'node_position',
       width: 90,
       render: (v: number | null) => v ?? '-'
     },
     {
-      title: '设备名称',
+      title: t('node.column.name'),
       dataIndex: 'device_name',
       key: 'device_name',
       render: (name: string, record: Device) => (
@@ -228,24 +232,24 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       )
     },
     {
-      title: '状态',
+      title: tCommon('field.status'),
       dataIndex: 'status',
       key: 'status',
       width: 90,
       render: (v: number) => {
-        const info = DEVICE_STATUS_MAP[v as DeviceStatusCode];
-        return <Tag color={info?.color}>{info?.label ?? '未知'}</Tag>;
+        const info = getDeviceStatusMeta(v, t);
+        return <Tag color={info?.color}>{info?.label ?? tCommon('field.unknown')}</Tag>;
       }
     },
     {
-      title: '主机名',
+      title: t('node.column.hostname'),
       dataIndex: 'hostname',
       key: 'hostname',
       render: (v: string | null) => v ?? '-'
     },
     { title: 'CPU', dataIndex: 'cpu', key: 'cpu', render: (v: string | null) => v ?? '-' },
     {
-      title: '内存',
+      title: t('node.column.memory'),
       key: 'memory',
       render: (_: unknown, r: Device) => {
         const total = r.memory_size_gb;
@@ -256,7 +260,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
             <div>{r.memory ? `${r.memory}${count ? ` ×${count}` : ''}` : '-'}</div>
             {total ? (
               <div style={{ fontSize: 12, color: '#888', lineHeight: 1.6 }}>
-                {single ? `单条 ${single}GB × ${count} = ` : ''}
+                {single ? t('node.memorySummary', { single, count }) : ''}
                 {total}GB
               </div>
             ) : null}
@@ -265,13 +269,13 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       }
     },
     {
-      title: '操作系统',
+      title: t('node.column.os'),
       dataIndex: 'os_version',
       key: 'os_version',
       render: (v: string | null) => v ?? '-'
     },
     {
-      title: '操作',
+      title: tCommon('field.actions'),
       key: 'action',
       width: 80,
       render: (_: unknown, record: Device) => (
@@ -297,7 +301,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     } catch (err) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        '节点位置交换失败';
+        t('node.message.swapFailed');
       message.error(msg);
     } finally {
       setSwapping(false);
@@ -313,8 +317,13 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     return (
       <div style={{ marginBottom: 16 }}>
         <div style={{ marginBottom: 8, color: '#8c8c8c', fontSize: 12 }}>
-          节点布局：{nodeRows}行 × {nodeCols}列 = {total}节点（已占用 {existingNodeCount}，空余{' '}
-          {vacantCount}）— 拖拽节点可更换位置
+          {t('node.layout', {
+            rows: nodeRows,
+            cols: nodeCols,
+            total,
+            used: existingNodeCount,
+            vacant: vacantCount
+          })}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${nodeCols}, 1fr)`, gap: 4 }}>
           {Array.from({ length: total }, (_, idx) => {
@@ -373,8 +382,8 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
                 onClick={() => node && !dragSource && navigate(`/devices/${node.id}#basic`)}
                 title={
                   node
-                    ? `拖拽更换位置 · 点击查看 ${node.device_name}`
-                    : `空位 R${row}C${col}（可拖入节点）`
+                    ? t('node.dragTooltip', { name: node.device_name })
+                    : t('node.vacantSlot', { row, col })
                 }
               >
                 {node ? node.device_name : `R${row}C${col}`}
@@ -391,7 +400,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       {/* 提示 banner：始终显示，引导用户到编辑机箱处操作 */}
       <Alert
         type="info"
-        message="如需重新生成所有节点（覆盖已有），请在编辑机箱时勾选「生成子节点」"
+        message={t('node.regenerateHint')}
         style={{ marginBottom: 12 }}
         showIcon
         banner
@@ -407,15 +416,15 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       >
         <Space>
           {vacantCount > 0 && (
-            <Tooltip title={`填满所有空余节点位置（当前空余 ${vacantCount} 个）`}>
+            <Tooltip title={t('node.fillTooltip', { count: vacantCount })}>
               <Button icon={<FullscreenOutlined />} onClick={handleFillOpen}>
-                填满空余节点
+                {t('node.fillButton')}
               </Button>
             </Tooltip>
           )}
         </Space>
         <Tooltip
-          title={vacantCount === 0 ? '机箱节点位置已满，无法继续添加' : '新增一个子节点到空余位置'}
+          title={vacantCount === 0 ? t('node.chassisFull') : t('node.addChildTooltip')}
         >
           <Button
             type="primary"
@@ -423,25 +432,23 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
             onClick={handleAdd}
             disabled={vacantCount === 0}
           >
-            新增节点
+            {t('node.addButton')}
           </Button>
         </Tooltip>
       </div>
       {renderNodeGrid()}
-      <DataTable
+      <Table
         columns={columns}
         dataSource={data?.items ?? []}
         rowKey="id"
         loading={isLoading}
         size="small"
-        showCard={false}
-        searchable={false}
-        pagination={DENSE_PAGINATION}
+        scroll={{ x: 'max-content' }}
       />
 
       {/* 新增节点弹窗 */}
       <Modal
-        title="新增节点"
+        title={t('node.addButton')}
         open={formDisclosure.isOpen}
         onOk={handleSubmit}
         onCancel={() => formDisclosure.close()}
@@ -462,46 +469,43 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
 
           <Form.Item
             name="device_name"
-            label="节点名称"
-            rules={[{ required: true, message: '请输入节点名称' }]}
+            label={t('node.field.name')}
+            rules={[{ required: true, message: t('node.field.namePlaceholder') }]}
           >
-            <Input placeholder="如 Chassis-01-Node1" />
+            <Input placeholder={t('node.field.nameHint')} />
           </Form.Item>
           <Row gutter={16}>
             <Col xs={24} md={8}>
               <Form.Item
                 name="node_position"
-                label="节点位置"
-                rules={[{ required: true, message: '请输入节点位置' }]}
+                label={t('node.field.position')}
+                rules={[{ required: true, message: t('node.field.positionPlaceholder') }]}
               >
                 <InputNumber
                   min={1}
                   max={totalNodes ?? 128}
                   style={{ width: '100%' }}
-                  placeholder="位置编号"
+                  placeholder={t('node.field.positionHint')}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
-              <Form.Item name="status" label="状态">
+              <Form.Item name="status" label={tCommon('field.status')}>
                 <Select
-                  placeholder="请选择"
-                  options={Object.entries(DEVICE_STATUS_MAP).map(([k, v]) => ({
-                    label: v.label,
-                    value: Number(k)
-                  }))}
+                  placeholder={tCommon('message.selectRequired')}
+                  options={getDeviceStatusOptions(t)}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
-              <Form.Item name="hostname" label="主机名">
-                <Input placeholder="主机名" />
+              <Form.Item name="hostname" label={t('node.field.hostname')}>
+                <Input placeholder={t('node.field.hostname')} />
               </Form.Item>
             </Col>
           </Row>
 
           <Card
-            title="硬件配置"
+            title={t('node.field.hardware')}
             size="small"
             style={{ marginBottom: 12 }}
             styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
@@ -509,7 +513,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
             <HardwareConfigFields form={form} showIpmi />
           </Card>
           <Card
-            title="网卡配置"
+            title={t('node.field.nic')}
             size="small"
             style={{ marginBottom: 12 }}
             styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
@@ -521,7 +525,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
 
       {/* 填满空余节点弹窗 */}
       <Modal
-        title="填满空余节点位置"
+        title={t('node.generateTitle')}
         open={fill.isOpen}
         onOk={handleFillSubmit}
         onCancel={() => fill.close()}
@@ -532,20 +536,24 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
         <Form form={fillForm} layout="vertical">
           <Alert
             type="info"
-            message={`当前机箱共 ${maxTotal} 个节点位置，已有 ${existingNodeCount} 个子节点，空余 ${vacantCount} 个位置。将按顺序填充空余位置，已有子节点不受影响。`}
+            message={t('node.generateDesc', {
+          total: maxTotal,
+          existing: existingNodeCount,
+          vacant: vacantCount
+        })}
             style={{ marginBottom: 16 }}
             showIcon
           />
           <Form.Item
             name="fill_count"
-            label="生成节点数量"
+            label={t('node.generateCount')}
             rules={[
-              { required: true, message: '请输入生成数量' },
-              { type: 'number', min: 1, message: '至少生成1个节点' },
+              { required: true, message: t('node.generateCountPlaceholder') },
+              { type: 'number', min: 1, message: t('node.generateCountMin') },
               {
                 type: 'number',
                 max: vacantCount,
-                message: `不能超过剩余空余位置（${vacantCount}个）`
+                message: t('node.generateCountMax', { count: vacantCount })
               }
             ]}
           >
@@ -553,12 +561,12 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
               min={1}
               max={vacantCount}
               style={{ width: '100%' }}
-              placeholder={`最多 ${vacantCount} 个`}
+              placeholder={t('node.generateCountMaxShort', { count: vacantCount })}
             />
           </Form.Item>
 
           <Card
-            title="硬件配置"
+            title={t('node.field.hardware')}
             size="small"
             style={{ marginBottom: 12 }}
             styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
@@ -566,7 +574,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
             <HardwareConfigFields form={fillForm} showIpmi />
           </Card>
           <Card
-            title="网卡配置"
+            title={t('node.field.nic')}
             size="small"
             style={{ marginBottom: 12 }}
             styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}

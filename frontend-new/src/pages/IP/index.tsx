@@ -32,7 +32,9 @@ import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useRoomOptions } from '@/services/room';
 import { useSwitchOptions } from '@/services/switch';
 import type { IPAddress, PingResult, IPScanResult } from '@/types/models';
-import { IP_STATUS_MAP, IPStatusCode } from '@/types/enums';
+import { IPStatusCode } from '@/types/enums';
+import { getIPStatusMeta } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import { useTable } from '@/hooks/useTable';
 import { useMessage } from '@/hooks/useMessage';
 import { useCopyInfo } from '@/utils/clipboard';
@@ -49,6 +51,9 @@ import { IPStatsModal } from './IPStatsModal';
 import { IPTableToolbar } from './IPTableToolbar';
 
 function IP() {
+  const { t: td } = useTranslation('device');
+  const { t } = useTranslation('network');
+  const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
   const table = useTable();
   const [urlParams] = useSearchParams();
@@ -147,18 +152,18 @@ function IP() {
 
   const handleBan = (record: IPAddress) => {
     confirm({
-      title: '确认封禁',
-      content: `确定要封禁 IP「${record.ip_address}」吗？将通过核心交换机下发黑洞路由。`,
+      title: t('ip.confirm.banTitle'),
+      content: t('ip.confirm.banContent', { address: record.ip_address }),
       okType: 'danger',
       onOk: async () => {
         try {
           const result = await banIP.mutateAsync({
             ip_address: record.ip_address
           });
-          msg.success(result.message || `IP ${result.data.ip_address} 已封禁`);
+          msg.success(result.message || t('ip.message.banned', { address: result.data.ip_address }));
           refetch();
         } catch (err) {
-          msg.error(err instanceof Error ? err.message : '封禁失败');
+          msg.error(err instanceof Error ? err.message : t('ip.message.banFailed'));
         }
       }
     });
@@ -166,18 +171,20 @@ function IP() {
 
   const handleUnban = (record: IPAddress) => {
     confirm({
-      title: '确认解封',
-      content: `确定要解封 IP「${record.ip_address}」吗？将撤销封禁规则。`,
+      title: t('ip.confirm.unbanTitle'),
+      content: t('ip.confirm.unbanContent', { address: record.ip_address }),
       onOk: async () => {
         try {
           const result = await unbanIP.mutateAsync({
             ip_address: record.ip_address,
             room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined
           });
-          msg.success(result.message || `IP ${result.data.ip_address} 已解封`);
+          msg.success(
+            result.message || t('ip.message.unbanned', { address: result.data.ip_address })
+          );
           refetch();
         } catch (err) {
-          msg.error(err instanceof Error ? err.message : '解封失败');
+          msg.error(err instanceof Error ? err.message : t('ip.message.unbanFailed'));
         }
       }
     });
@@ -185,38 +192,38 @@ function IP() {
 
   const handleBatchBanSubmit = async (ips: string[]) => {
     if (!ips.length) {
-      msg.warning('请输入IP地址');
+      msg.warning(t('ip.message.inputIpRequired'));
       return;
     }
     try {
       await batchBanIP.mutateAsync({ ip_list: ips });
-      msg.info('批量封禁已提交，完成后将通过消息通知您');
+      msg.info(t('ip.message.batchBanSubmitted'));
       batchBan.close();
       refetch();
     } catch (err) {
-      msg.error(err instanceof Error ? err.message : '批量封禁失败');
+      msg.error(err instanceof Error ? err.message : t('ip.message.batchBanFailed'));
     }
   };
 
   const handleBatchBanSelected = () => {
     if (!batch.count) {
-      msg.warning('请先选择IP');
+      msg.warning(t('ip.message.selectIpFirst'));
       return;
     }
     confirm({
-      title: '确认批量封禁',
-      content: `确定要封禁选中的 ${batch.count} 个IP吗？将通过核心交换机下发黑洞路由。`,
+      title: t('ip.confirm.batchBanTitle'),
+      content: t('ip.confirm.batchBanContent', { count: batch.count }),
       okType: 'danger',
       onOk: async () => {
         try {
           await batchBanIP.mutateAsync({
             ip_list: batch.selectedKeys.map((k) => String(k).split('|')[0])
           });
-          msg.info(`批量封禁已提交，完成后将通过消息通知您`);
+          msg.info(t('ip.message.batchBanSubmitted'));
           batch.clear();
           refetch();
         } catch (err) {
-          msg.error(err instanceof Error ? err.message : '批量封禁失败');
+          msg.error(err instanceof Error ? err.message : t('ip.message.batchBanFailed'));
         }
       }
     });
@@ -224,23 +231,23 @@ function IP() {
 
   const handleBatchUnbanSelected = () => {
     if (!batch.count) {
-      msg.warning('请先选择IP');
+      msg.warning(t('ip.message.selectIpFirst'));
       return;
     }
     confirm({
-      title: '确认批量解封',
-      content: `确定要解封选中的 ${batch.count} 个IP吗？将撤销封禁规则。`,
+      title: t('ip.confirm.batchUnbanTitle'),
+      content: t('ip.confirm.batchUnbanContent', { count: batch.count }),
       onOk: async () => {
         try {
           await batchUnbanIP.mutateAsync({
             ip_list: batch.selectedKeys.map((k) => String(k).split('|')[0]),
             room_id: table.filters.room_id ? Number(table.filters.room_id) : undefined
           });
-          msg.info(`批量解封已提交，完成后将通过消息通知您`);
+          msg.info(t('ip.message.batchUnbanSubmitted'));
           batch.clear();
           refetch();
         } catch (err) {
-          msg.error(err instanceof Error ? err.message : '批量解封失败');
+          msg.error(err instanceof Error ? err.message : t('ip.message.batchUnbanFailed'));
         }
       }
     });
@@ -248,7 +255,7 @@ function IP() {
 
   const openBatchEdit = (mode: 'customer' | 'notes') => {
     if (!batch.count) {
-      msg.warning('请先选择IP');
+      msg.warning(t('ip.message.selectIpFirst'));
       return;
     }
     setBatchEditMode(mode);
@@ -276,7 +283,7 @@ function IP() {
             room_id: viewRoomId ?? (Number.isNaN(roomId) ? undefined : roomId)
           });
         }
-        msg.success(`已为 ${keys.length} 个 IP 分配客户`);
+        msg.success(t('ip.message.batchCustomerAssigned', { count: keys.length }));
       } else if (values.notes !== undefined) {
         for (const [roomId, ips] of groups) {
           await batchUpdateIPNotes.mutateAsync({
@@ -285,13 +292,13 @@ function IP() {
             room_id: viewRoomId ?? (Number.isNaN(roomId) ? undefined : roomId)
           });
         }
-        msg.success(`已更新 ${keys.length} 个 IP 的备注`);
+        msg.success(t('ip.message.batchNotesUpdated', { count: keys.length }));
       }
       batchEdit.close();
       batch.clear();
       refetch();
     } catch (err) {
-      msg.error(err instanceof Error ? err.message : '批量更新失败');
+      msg.error(err instanceof Error ? err.message : t('ip.message.batchUpdateFailed'));
     }
   };
 
@@ -300,12 +307,12 @@ function IP() {
       const result = await pingIP.mutateAsync(record.ip_address);
       const r = result.data as unknown as PingResult;
       if (r?.reachable) {
-        msg.success(`${record.ip_address} 可达`);
+        msg.success(t('ip.message.pingReachable', { address: record.ip_address }));
       } else {
-        msg.warning(`${record.ip_address} 不可达`);
+        msg.warning(t('ip.message.pingUnreachable', { address: record.ip_address }));
       }
     } catch {
-      msg.error('Ping 失败');
+      msg.error(t('ip.message.pingFailed'));
     }
   };
 
@@ -314,27 +321,52 @@ function IP() {
       const result = await scanIP.mutateAsync(record.ip_address);
       const r = result.data as unknown as IPScanResult;
       Modal.info({
-        title: `扫描结果 - ${record.ip_address}`,
-        content: <p>开放端口: {r?.open_ports?.join(', ') || '无'}</p>,
+        title: t('ip.scanResult.title', { address: record.ip_address }),
+        content: (
+          <p>
+            {t('ip.scanResult.openPorts', {
+              ports: r?.open_ports?.join(', ') || t('ip.scanResult.none')
+            })}
+          </p>
+        ),
         width: 480
       });
     } catch {
-      msg.error('扫描失败');
+      msg.error(t('ip.message.scanFailed'));
     }
   };
 
   const handleCopy = (record: IPAddress) => {
-    const text = `IP: ${record.ip_address}\nMAC: ${record.mac_address ?? 'N/A'}\n交换机: ${record.switch_name ?? '-'}\n端口: ${record.port ?? '-'}\n机房: ${record.room_name ?? '-'}\n客户: ${record.customer_name ?? '-'}\n状态: ${IP_STATUS_MAP[record.status as IPStatusCode]?.label ?? record.status}`;
+    const text = [
+      t('ip.copy.ip', { value: record.ip_address }),
+      t('ip.copy.mac', { value: record.mac_address ?? 'N/A' }),
+      t('ip.copy.switch', { value: record.switch_name ?? '-' }),
+      t('ip.copy.port', { value: record.port ?? '-' }),
+      t('ip.copy.room', { value: record.room_name ?? '-' }),
+      t('ip.copy.customer', { value: record.customer_name ?? '-' }),
+      t('ip.copy.status', {
+        value: getIPStatusMeta(record.status, td)?.label ?? record.status
+      })
+    ].join('\n');
     copyInfo(text);
   };
 
   const handleExport = () => {
     const items = data?.items ?? [];
     if (!items.length) {
-      msg.warning('无数据可导出');
+      msg.warning(t('ip.message.noDataToExport'));
       return;
     }
-    const headers = ['IP地址', 'MAC地址', '交换机', '端口', '机房', '客户', '状态', '备注'];
+    const headers = [
+      t('ip.field.ipAddress'),
+      t('ip.field.macAddress'),
+      t('ip.field.switch'),
+      t('ip.field.port'),
+      t('ip.field.room'),
+      t('ip.field.customer'),
+      t('ip.field.status'),
+      t('ip.field.notes')
+    ];
     const rows = items.map((r) => [
       r.ip_address,
       r.mac_address ?? '',
@@ -342,7 +374,7 @@ function IP() {
       r.port ?? '',
       r.room_name ?? '',
       r.customer_name ?? '',
-      IP_STATUS_MAP[r.status as IPStatusCode]?.label ?? String(r.status),
+      getIPStatusMeta(r.status, td)?.label ?? String(r.status),
       r.notes ?? ''
     ]);
     exportCSV(headers, rows, { filename: 'ip_addresses' });
@@ -364,7 +396,7 @@ function IP() {
           room_id: selectedIP.room_id ?? undefined
         });
       }
-      msg.success('更新成功');
+      msg.success(tc('message.updateSuccess'));
       editModal.close();
       refetch();
     } catch (err) {
@@ -374,86 +406,96 @@ function IP() {
 
   const handleScanNetwork = () => {
     if (!table.filters.room_id) {
-      msg.warning('请先选择机房');
+      msg.warning(t('ip.message.selectRoomFirst'));
       return;
     }
     if (!table.search) {
-      msg.warning('请先在搜索框输入网段地址（如 10.10.1.0/24）');
+      msg.warning(t('ip.message.inputNetworkFirst'));
       return;
     }
     if (isPrivateNetwork(table.search)) {
-      msg.warning('私网地址跨网不可达，状态由ARP表判断');
+      msg.warning(t('ip.message.privateNetworkUnreachable'));
       return;
     }
     confirm({
-      title: '扫描网段内所有IP',
-      content: `将扫描网段 ${table.search} 内所有IP状态，扫描在后台执行，完成后自动刷新。`,
+      title: t('ip.confirm.scanNetworkTitle'),
+      content: t('ip.confirm.scanNetworkContent', { network: table.search }),
       onOk: async () => {
         try {
           await scanNetwork.mutateAsync({
             ipNetwork: table.search,
             roomId: Number(table.filters.room_id)
           });
-          msg.info('网段扫描已提交，完成后将通过消息通知您');
+          msg.info(t('ip.message.scanNetworkSubmitted'));
         } catch {
-          msg.error('扫描启动失败');
+          msg.error(t('ip.message.scanNetworkFailed'));
         }
       }
     });
   };
 
   const columns = [
-    { title: 'IP地址', dataIndex: 'ip_address', key: 'ip_address' },
+    { title: t('ip.field.ipAddress'), dataIndex: 'ip_address', key: 'ip_address' },
     {
-      title: '状态',
+      title: t('ip.field.status'),
       dataIndex: 'status',
       key: 'status',
       render: (v: number) => {
-        const info = IP_STATUS_MAP[v as IPStatusCode];
-        return <Tag color={info?.color}>{info?.label ?? '未知'}</Tag>;
+        const info = getIPStatusMeta(v, td);
+        return <Tag color={info?.color}>{info?.label ?? tc('field.unknown')}</Tag>;
       }
     },
     {
-      title: '交换机',
+      title: t('ip.field.switch'),
       dataIndex: 'switch_name',
       key: 'switch_name',
       render: (v: string | null) => v || '-'
     },
-    { title: '端口', dataIndex: 'port', key: 'port', render: (v: string | null) => v || '-' },
     {
-      title: '客户',
+      title: t('ip.field.port'),
+      dataIndex: 'port',
+      key: 'port',
+      render: (v: string | null) => v || '-'
+    },
+    {
+      title: t('ip.field.customer'),
       dataIndex: 'customer_name',
       key: 'customer_name',
       render: (v: string | null) => v || '-'
     },
     {
-      title: '机房',
+      title: t('ip.field.room'),
       dataIndex: 'room_name',
       key: 'room_name',
       render: (v: string | null) => v || '-'
     },
     {
-      title: 'MAC地址',
+      title: t('ip.field.macAddress'),
       dataIndex: 'mac_address',
       key: 'mac_address',
       render: (v: string) => (v === 'N/A' ? '-' : v)
     },
-    { title: '备注', dataIndex: 'notes', key: 'notes', render: (v: string | null) => v || '-' },
     {
-      title: '操作',
+      title: t('ip.field.notes'),
+      dataIndex: 'notes',
+      key: 'notes',
+      render: (v: string | null) => v || '-'
+    },
+    {
+      title: t('ip.field.actions'),
       key: 'action',
       render: (_: unknown, record: IPAddress) => {
         const isPrivate = isPrivateIPv4(record.ip_address);
         return (
           <Space wrap>
             <Button type="link" size="small" onClick={() => handleDetail(record)}>
-              详情
+              {t('ip.action.detail')}
             </Button>
             <Button type="link" size="small" onClick={() => handleEdit(record)}>
-              编辑
+              {t('ip.action.edit')}
             </Button>
             {isPrivate ? (
-              <Tooltip title="私网地址跨网不可达">
+              <Tooltip title={t('ip.tooltip.privateUnreachable')}>
                 <Button type="link" size="small" disabled>
                   Ping
                 </Button>
@@ -469,9 +511,9 @@ function IP() {
               </Button>
             )}
             {isPrivate ? (
-              <Tooltip title="私网地址跨网不可达">
+              <Tooltip title={t('ip.tooltip.privateUnreachable')}>
                 <Button type="link" size="small" disabled>
-                  扫描
+                  {t('ip.action.scan')}
                 </Button>
               </Tooltip>
             ) : (
@@ -481,11 +523,11 @@ function IP() {
                 onClick={() => handleScan(record)}
                 loading={scanIP.isPending && scanIP.variables === record.ip_address}
               >
-                扫描
+                {t('ip.action.scan')}
               </Button>
             )}
             {record.status === IPStatusCode.BANNED ? (
-              <Tooltip title="解封IP">
+              <Tooltip title={t('ip.tooltip.unban')}>
                 <Button
                   type="link"
                   size="small"
@@ -498,13 +540,15 @@ function IP() {
               record.status === IPStatusCode.PENDING_UNBAN ? (
               <Tooltip
                 title={
-                  record.status === IPStatusCode.PENDING_BAN ? '封禁中，请稍候' : '解封中，请稍候'
+                  record.status === IPStatusCode.PENDING_BAN
+                    ? t('ip.tooltip.banning')
+                    : t('ip.tooltip.unbanning')
                 }
               >
                 <Button type="link" size="small" icon={<StopOutlined />} disabled />
               </Tooltip>
             ) : (
-              <Tooltip title="封禁IP（黑洞路由）">
+              <Tooltip title={t('ip.tooltip.ban')}>
                 <Button
                   type="link"
                   size="small"
@@ -528,7 +572,7 @@ function IP() {
 
   return (
     <>
-      <BatchActionBar count={batch.count} unit="个IP" onClear={batch.clear}>
+      <BatchActionBar count={batch.count} unit={t('ip.unit')} onClear={batch.clear}>
         <Button
           size="small"
           danger
@@ -536,7 +580,7 @@ function IP() {
           onClick={handleBatchBanSelected}
           loading={batchBanIP.isPending}
         >
-          批量封禁
+          {t('ip.action.batchBan')}
         </Button>
         <Button
           size="small"
@@ -545,7 +589,7 @@ function IP() {
           onClick={handleBatchUnbanSelected}
           loading={batchUnbanIP.isPending}
         >
-          批量解封
+          {t('ip.action.batchUnban')}
         </Button>
         <Button
           size="small"
@@ -553,7 +597,7 @@ function IP() {
           onClick={() => openBatchEdit('customer')}
           loading={batchUpdateIPCustomer.isPending}
         >
-          批量分配客户
+          {t('ip.action.batchAssignCustomer')}
         </Button>
         <Button
           size="small"
@@ -561,7 +605,7 @@ function IP() {
           onClick={() => openBatchEdit('notes')}
           loading={batchUpdateIPNotes.isPending}
         >
-          批量修改备注
+          {t('ip.action.batchEditNotes')}
         </Button>
       </BatchActionBar>
 
@@ -580,7 +624,7 @@ function IP() {
         searchValue={table.search}
         onSearch={table.setSearch}
         onRefresh={() => refetch()}
-        searchPlaceholder="按IP或MAC地址搜索"
+        searchPlaceholder={t('ip.searchPlaceholder')}
         toolbar={
           <IPTableToolbar
             table={table}
@@ -629,7 +673,9 @@ function IP() {
         stats={ipStats}
         scopeLabel={
           table.search || table.filters.room_id
-            ? `统计范围：${table.filters.room_id ? '机房筛选 + ' : ''}${table.search ? `搜索"${table.search}"` : '全部'}`
+            ? t('ip.stats.scopeLabel', {
+                scope: `${table.filters.room_id ? t('ip.stats.scopeRoom') : ''}${table.search ? t('ip.stats.scopeSearch', { value: table.search }) : t('ip.stats.scopeAll')}`
+              })
             : undefined
         }
       />

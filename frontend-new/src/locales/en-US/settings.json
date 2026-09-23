@@ -1,0 +1,585 @@
+{
+  "saveConfig": "Save Configuration",
+  "saveFailed": "Failed to save, please try again",
+  "testRequestFailed": "Test request failed",
+  "mail": {
+    "title": "Mail Server Configuration",
+    "editTitle": "Edit Mail Server Configuration",
+    "createTitle": "Configure Mail Server",
+    "tagConfigured": "Configured",
+    "tagEditing": "Editing",
+    "takeEffectHint": "Configuration takes effect immediately after saving; no service restart is required.",
+    "descriptions": {
+      "server": "SMTP Server"
+    },
+    "action": {
+      "sendTest": "Send Test Email",
+      "send": "Send",
+      "deleteConfirmTitle": "Delete mail configuration?",
+      "deleteConfirmContent": "Email notifications will stop working after deletion and must be configured again."
+    },
+    "field": {
+      "server": "SMTP Server Address",
+      "serverPlaceholder": "e.g. smtp.exmail.qq.com",
+      "port": "Port",
+      "encryption": "Encryption",
+      "encryptionTooltip": "STARTTLS: port 587, connects in plaintext first and then upgrades to encryption (Gmail/SendGrid); SSL: port 465, encrypted for the whole session (Tencent Exmail/Aliyun Enterprise Mail)",
+      "timeout": "Timeout (sec)",
+      "timeoutView": "Timeout",
+      "timeoutValue": "{{seconds}} sec",
+      "username": "Username",
+      "usernamePlaceholder": "e.g. alert@yourcompany.com",
+      "password": "Password / App Password",
+      "passwordView": "Password",
+      "passwordUnset": "Not Set",
+      "passwordSetHint": "(Already set; leave blank to keep the current value)",
+      "passwordPlaceholder": "SMTP authentication password or app password",
+      "passwordKeepPlaceholder": "Leave blank to keep the current password",
+      "sender": "Sender Address"
+    },
+    "section": {
+      "connection": "Server Connection",
+      "auth": "Authentication",
+      "providerPresets": "Quick Setup for Common Providers"
+    },
+    "encryption": {
+      "tls": "STARTTLS",
+      "ssl": "SSL",
+      "none": "No Encryption",
+      "tlsWithPort": "STARTTLS (587)",
+      "sslWithPort": "SSL (465)",
+      "noneWithPort": "No Encryption (25)"
+    },
+    "validation": {
+      "serverRequired": "Please enter the SMTP server address",
+      "portRequired": "Please enter the port number",
+      "encryptionRequired": "Please select the encryption method",
+      "usernameRequired": "Please enter the SMTP authentication username",
+      "passwordRequired": "Please enter the SMTP authentication password",
+      "senderRequired": "Please enter the sender address",
+      "emailInvalid": "Please enter a valid email address",
+      "recipientRequired": "Please enter the recipient email address"
+    },
+    "test": {
+      "modalTitle": "Send Test Email",
+      "recipient": "Recipient Email",
+      "recipientPlaceholder": "Please enter the recipient email address",
+      "hint": "The test email will be sent to the address above using the currently saved SMTP configuration."
+    },
+    "message": {
+      "saved": "Mail configuration saved",
+      "deleted": "Mail configuration deleted",
+      "deleteFailed": "Failed to delete, please try again"
+    },
+    "provider": {
+      "tencentExmail": "Tencent Exmail",
+      "aliyunExmail": "Aliyun Enterprise Mail",
+      "qq": "QQ Mail",
+      "netease163": "163 Mail",
+      "gmail": "Gmail",
+      "sendgrid": "SendGrid"
+    }
+  },
+  "voice": {
+    "title": "Voice Notification Configuration",
+    "tagReady": "Ready",
+    "tagNotReady": "Not Ready",
+    "masterSwitch": "Enable Voice Notifications",
+    "masterSwitchHint": "When the master switch is off, no calls are placed even if individual users have enabled voice notifications.",
+    "listSeparator": ", ",
+    "callbackUrlHint": "Provider callback URL: https://<your-domain>/api/notification/voice/callback (no login required, must be added to the gateway allowlist)",
+    "section": {
+      "provider": "Provider",
+      "common": "Common Parameters",
+      "callbackSecurity": "Callback Security",
+      "testCall": "Test Call"
+    },
+    "alert": {
+      "notReady": "Configuration is not ready, missing: {{fields}}",
+      "requiredFields": "Required fields",
+      "disabledHint": "Voice notifications are disabled; enable the master switch and complete the provider configuration.",
+      "tencentNoVolumeSpeed": "Tencent Cloud VMS does not support the volume / speech rate parameters"
+    },
+    "field": {
+      "accessKeyId": "AccessKey ID",
+      "accessKeyIdPlaceholder": "LTAI...",
+      "accessKeySecret": "AccessKey Secret",
+      "callerNumber": "Caller Number (optional)",
+      "callerNumberTooltip": "Leave blank = shared mode (calls placed from the shared number pool, no filing required); enter a filed number = dedicated mode. Shared mode must be left blank; entering an unfiled number causes the call to fail.",
+      "callerNumberPlaceholder": "Leave blank for shared mode",
+      "ttsCode": "Voice Template ID (TtsCode)",
+      "ttsCodePlaceholder": "TTS_xxxxxx",
+      "ttsParam": "Template Variables (JSON)",
+      "ttsParamTooltip": "Template variable mapping, a JSON object. The dynamic variables title (alert title) and level (severity) are added at runtime.",
+      "secretId": "SecretId",
+      "secretIdPlaceholder": "AKID...",
+      "secretKey": "SecretKey",
+      "sdkAppId": "VoiceSdkAppid",
+      "sdkAppIdTooltip": "Voice application SDKAppID, required for Tencent Cloud",
+      "sdkAppIdPlaceholder": "140xxxxxxx",
+      "templateId": "Voice Template ID (TemplateId)",
+      "templateIdPlaceholder": "Template ID",
+      "configuredPlaceholder": "Displays **** if already configured",
+      "playTimes": "Play Count",
+      "playTimesTooltip": "Number of times the same voice message repeats (1-3)",
+      "volume": "Volume",
+      "volumeTooltip": "Volume 0-100, not supported by Tencent Cloud",
+      "speed": "Speech Rate",
+      "speedTooltip": "Speech rate -500 to 500, not supported by Tencent Cloud",
+      "callTimeout": "Call Timeout (sec)",
+      "callTimeoutTooltip": "Call timeout in seconds (10-30). The hard limit of 30 seconds leaves headroom for the background task's soft timeout.",
+      "verifyMode": "Callback Verification Mode",
+      "callbackToken": "Callback Token",
+      "voiceTemplateId": "Voice Template ID"
+    },
+    "validation": {
+      "invalidJson": "Must be valid JSON"
+    },
+    "providerOption": {
+      "aliyun": "Alibaba Cloud (SingleCallByTts)",
+      "tencent": "Tencent Cloud (SendTtsVoice)"
+    },
+    "verifyModeOption": {
+      "ipOnly": "IP Allowlist Only (Recommended)",
+      "ipOnlyTooltip": "Only validates the callback source IP against the allowlist. Neither provider's official voice callback carries a custom signature header, so use this mode first to verify connectivity.",
+      "signatureAndIp": "Signature + IP Allowlist",
+      "signatureAndIpTooltip": "Signature + IP double validation. The provider must support custom signature headers, otherwise 100% of callbacks are rejected.",
+      "off": "Verification Disabled (Not Recommended)"
+    },
+    "test": {
+      "hint": "Places one test call to the phone number of the current admin account (set your phone number in your profile first). The test uses the current values in the form above, including unsaved changes.",
+      "submit": "Place Test Call"
+    },
+    "message": {
+      "saved": "Voice configuration saved",
+      "testStarted": "Test call placed, please watch for it on your phone",
+      "testFailed": "Test call failed",
+      "testFailedCheckConfig": "Test call failed, please check the configuration"
+    }
+  },
+  "webhook": {
+    "title": "Webhook Channel Configuration",
+    "action": {
+      "create": "Add Configuration",
+      "test": "Test",
+      "deleteConfirmTitle": "Delete this configuration?"
+    },
+    "modalTitle": {
+      "create": "Add Webhook Configuration",
+      "edit": "Edit Webhook Configuration"
+    },
+    "column": {
+      "channel": "Channel",
+      "severity": "Applicable Severities",
+      "severityAll": "All"
+    },
+    "field": {
+      "name": "Configuration Name",
+      "namePlaceholder": "e.g. ops group bot",
+      "channel": "Channel Type",
+      "url": "Webhook URL",
+      "urlPlaceholder": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=***",
+      "secret": "Signing Secret (optional)",
+      "secretPlaceholder": "Lark group bot signing secret",
+      "types": "Applicable Notification Types (empty = all)",
+      "typesPlaceholder": "Select notification types",
+      "severities": "Applicable Severities (empty = all)",
+      "severitiesPlaceholder": "Select severities"
+    },
+    "validation": {
+      "nameRequired": "Please enter the configuration name",
+      "channelRequired": "Please select the channel type",
+      "urlRequired": "Please enter the Webhook URL",
+      "urlInvalid": "Please enter a valid URL"
+    }
+  },
+  "notification": {
+    "preferences": {
+      "title": "Notification Preferences",
+      "sectionChannels": "Delivery Channels",
+      "sectionTypes": "Subscribed Types",
+      "sectionQuietHours": "Quiet Hours",
+      "inbox": "In-App Message",
+      "inboxHint": "In-app notifications are enabled by default and cannot be changed.",
+      "email": "Email Notifications",
+      "emailHint": "Receive email notifications (set your email address in your profile).",
+      "voice": "Voice Notifications",
+      "voiceHint": "Voice phone calls (requires an admin to enable the voice channel and a phone number set in your profile; disabled by default).",
+      "voiceQuietHoursAlert": "Voice notifications still place calls during quiet hours (for late-night wake-up alerts). Turn off voice notifications if you do not want calls at night.",
+      "typesPlaceholder": "Receive notifications of all types if none selected",
+      "typesHint": "Select the notification categories you want to receive. All types are received if none are selected; critical-level notifications always pass through and are not affected by this filter.",
+      "quietHours": "Quiet Hours",
+      "quietHoursSwitch": "Enable Quiet Hours",
+      "quietHoursHint": "Once enabled, only critical-level notifications are received during the configured period.",
+      "timeRangePlaceholderStart": "Start Time",
+      "timeRangePlaceholderEnd": "End Time",
+      "action": {
+        "save": "Save Preferences"
+      },
+      "message": {
+        "saved": "Notification preferences saved"
+      }
+    },
+    "bell": {
+      "title": "Notifications",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "empty": "No notifications",
+      "clearRead": "Clear Read",
+      "markAllRead": "Mark All Read",
+      "deleteReadConfirmTitle": "Clear all read notifications?",
+      "deleteReadConfirmContent": "Unread notifications will be kept.",
+      "time": {
+        "justNow": "Just now",
+        "minutesAgo": "{{count}} minutes ago",
+        "minutesAgo_one": "{{count}} minute ago",
+        "minutesAgo_other": "{{count}} minutes ago",
+        "hoursAgo": "{{count}} hours ago",
+        "hoursAgo_one": "{{count}} hour ago",
+        "hoursAgo_other": "{{count}} hours ago",
+        "daysAgo": "{{count}} days ago",
+        "daysAgo_one": "{{count}} day ago",
+        "daysAgo_other": "{{count}} days ago"
+      },
+      "browserNotification": {
+        "title": "[{{severity}}] Monitoring Alert",
+        "body": "{{alertType}} (Device #{{deviceId}})",
+        "defaultAlertType": "Alert"
+      }
+    }
+  },
+  "audit": {
+    "column": {
+      "operator": "Operator",
+      "action": "Action",
+      "resource": "Resource",
+      "resourceId": "Resource ID",
+      "clientIp": "Client IP"
+    },
+    "filter": {
+      "actionType": "Action Type",
+      "resourceType": "Resource Type"
+    },
+    "loadFailed": "Failed to load audit logs",
+    "detailTitle": "Audit Record Details",
+    "detailRawTitle": "Details (detail)",
+    "userFallback": "User #{{id}}",
+    "actionType": {
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "login": "Sign In",
+      "logout": "Sign Out",
+      "import": "Import",
+      "export": "Export"
+    },
+    "resourceType": {
+      "device": "Device",
+      "cabinet": "Cabinet",
+      "room": "Data Center",
+      "ip": "IP",
+      "network": "Network Segment",
+      "switch": "Switch",
+      "customer": "Customer",
+      "user": "User",
+      "vlan": "VLAN",
+      "role": "Role"
+    }
+  },
+  "loginLog": {
+    "column": {
+      "loginTime": "Login Time",
+      "userFullName": "Full Name",
+      "username": "Username",
+      "ipAddress": "IP Address",
+      "loginType": "Login Type",
+      "userAgent": "Device / Browser"
+    },
+    "filter": {
+      "user": "User:",
+      "allUsers": "All Users",
+      "time": "Time:"
+    }
+  },
+  "license": {
+    "pageTitle": "Open Source Licenses",
+    "introPart1": "This page covers two things: the license terms of this project itself, and the third-party open source components it depends on together with their licenses. Dependencies and versions are generated from the actual declarations in the backend ",
+    "introPart2": " and the frontend ",
+    "introPart3": ".",
+    "selfTitle": "License of This Project",
+    "selfFullText": "Full Text",
+    "selfSummary": "The source code of this project (ipip) is released under the Apache-2.0 license.",
+    "selfTermsPart1": "This license permits free use, modification, distribution and commercialization, with an explicit patent grant and attribution obligation, which suits future commercialization or donation scenarios. You may use it for commercial purposes freely, but must retain the copyright notice and include a copy of the license; if you modify files you must clearly mark the changes. The full terms are available in the ",
+    "selfTermsPart2": " file at the repository root.",
+    "backendDepsTitle": "Third-Party Dependencies (Backend / Python)",
+    "frontendDepsTitle": "Third-Party Dependencies (Frontend / Node.js)",
+    "footerNote": "Development-only build tools (Vite, TypeScript, ESLint, Vitest, etc.) are not listed here; refer to each dependency manifest for a complete SBOM.",
+    "column": {
+      "component": "Component",
+      "version": "Version",
+      "license": "License",
+      "usage": "Usage"
+    },
+    "dep": {
+      "flask": "Web framework (application factory, routing, middleware)",
+      "flaskSqlalchemy": "ORM integration",
+      "sqlalchemy": "SQL toolkit and ORM",
+      "pyjwt": "JWT issuing and verification",
+      "werkzeug": "WSGI utility library",
+      "marshmallow": "Request/response serialization and validation",
+      "apispec": "OpenAPI specification generation",
+      "bcrypt": "Password hashing",
+      "cryptography": "Sensitive configuration encryption",
+      "flaskCors": "Cross-origin resource sharing support",
+      "pymysql": "MySQL driver",
+      "redis": "Cache / alert outbox / realtime gateway",
+      "netmiko": "Network device SSH/Telnet automation",
+      "pysnmp": "SNMP device metric collection",
+      "pyghmi": "BMC/IPMI management",
+      "pandas": "Excel import/export data processing",
+      "openpyxl": "Excel file read/write",
+      "reportlab": "Customer termination archive PDF generation",
+      "textfsm": "Network device output text parsing",
+      "pyyaml": "Configuration file / seed data parsing",
+      "requests": "HTTP client (Webhook delivery)",
+      "qrcode": "QR code generation",
+      "psutil": "Host resource metric collection",
+      "click": "Flask CLI commands",
+      "uvicorn": "Realtime gateway ASGI server",
+      "starlette": "Realtime gateway web framework",
+      "react": "UI view layer framework",
+      "reactDom": "React DOM rendering",
+      "reactRouterDom": "Frontend routing",
+      "antd": "Enterprise UI component library",
+      "antDesignIcons": "Icon assets",
+      "antDesignCharts": "Chart visualization",
+      "antvG6": "Topology graph rendering",
+      "tanstackQuery": "Server state management",
+      "axios": "HTTP request client",
+      "zustand": "Lightweight state management",
+      "dayjs": "Date and time handling",
+      "ipaddrJs": "IP address parsing and calculation"
+    }
+  },
+  "componentTemplate": {
+    "category": {
+      "cpu": "CPU",
+      "memory": "Memory",
+      "disk": "Disk",
+      "nic": "NIC",
+      "gpu": "GPU"
+    },
+    "spec": {
+      "separator": " / ",
+      "cores": "{{value}} cores",
+      "freq": "{{value}}GHz",
+      "capacity": "{{value}}GB",
+      "speed": "{{value}}MHz",
+      "ports": "{{value}} ports",
+      "tflops": "{{value}}TFLOPS"
+    },
+    "column": {
+      "customerOwner": "Customer",
+      "brand": "Brand",
+      "model": "Model",
+      "specSummary": "Spec Summary",
+      "enabled": "Enabled",
+      "sortOrder": "Sort Order"
+    },
+    "shared": "Shared",
+    "yes": "Yes",
+    "no": "No",
+    "addTemplate": "Add Template",
+    "filterCustomer": "Filter by customer",
+    "modal": {
+      "createTitle": "Add Component Template",
+      "editTitle": "Edit Component Template"
+    },
+    "field": {
+      "category": "Category"
+    },
+    "placeholder": {
+      "customerOwner": "Shared (no customer selected)"
+    },
+    "validation": {
+      "brandRequired": "Please enter the brand",
+      "modelRequired": "Please enter the model"
+    },
+    "deleteConfirmTitle": "Delete \"{{name}}\"?"
+  },
+  "rbac": {
+    "tab": {
+      "roles": "Role Management",
+      "permissions": "Permission List"
+    }
+  },
+  "user": {
+    "label": "User",
+    "modal": {
+      "createTitle": "Add User",
+      "editTitle": "Edit User"
+    },
+    "action": {
+      "add": "Add User",
+      "resetPassword": "Reset Password",
+      "confirmReset": "Confirm Reset",
+      "copiedAndClose": "Copied, Close",
+      "loginLogs": "Login Logs"
+    },
+    "field": {
+      "fullName": "Full Name",
+      "realNamePlaceholder": "Full name",
+      "email": "Email",
+      "department": "Department",
+      "contactPhone": "Contact Phone",
+      "confirmPassword": "Confirm Password",
+      "passwordAgain": "Enter password again",
+      "passwordTips": "At least 8 characters, including uppercase, lowercase, digit and special character",
+      "passwordKeepHint": "Leave blank to keep unchanged"
+    },
+    "validation": {
+      "emailRequired": "Please enter email",
+      "passwordMinLength": "Password must be at least 8 characters",
+      "confirmPasswordRequired": "Please confirm password",
+      "passwordMismatch": "The two passwords do not match"
+    },
+    "resetPasswordConfirm": "Reset the password of user \"{{username}}\"? A new password will be generated randomly.",
+    "newPasswordLabel": "New password for user \"{{username}}\":",
+    "passwordKeepSafeHint": "Keep this password safe. It cannot be viewed again after closing.",
+    "message": {
+      "resetPasswordSuccess": "Password reset successful",
+      "passwordReset": "Password has been reset",
+      "resetFailed": "Reset failed",
+      "statusUpdated": "Status updated"
+    }
+  },
+  "profile": {
+    "tab": {
+      "profile": "Profile",
+      "password": "Change Password"
+    },
+    "action": {
+      "editProfile": "Edit Profile"
+    },
+    "field": {
+      "oldPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm New Password"
+    },
+    "validation": {
+      "oldPasswordRequired": "Please enter your current password",
+      "newPasswordRequired": "Please enter a new password"
+    },
+    "column": {
+      "loginTime": "Login Time",
+      "loginType": "Login Type",
+      "userAgent": "Device / Browser"
+    },
+    "noRoles": "No Roles",
+    "message": {
+      "profileUpdated": "Profile updated",
+      "profileUpdateFailed": "Update failed",
+      "passwordChanged": "Password changed, please sign in again",
+      "passwordChangeFailed": "Failed to change password"
+    }
+  },
+  "role": {
+    "label": "Role",
+    "modal": {
+      "createTitle": "Add Role",
+      "editTitle": "Edit Role"
+    },
+    "action": {
+      "add": "Add Role"
+    },
+    "field": {
+      "name": "Role Name",
+      "displayName": "Display Name",
+      "permissionCount": "Permissions",
+      "userCount": "Users"
+    },
+    "placeholder": {
+      "name": "e.g. admin",
+      "displayName": "e.g. Administrator"
+    },
+    "validation": {
+      "nameRequired": "Please enter role name",
+      "displayNameRequired": "Please enter display name"
+    },
+    "deleteConfirmContent": "Delete role \"{{name}}\"?",
+    "assignTitle": "{{username}} - Assign Roles",
+    "selectPlaceholder": "Select roles",
+    "status": {
+      "normal": "Normal",
+      "disabled": "Disabled"
+    },
+    "message": {
+      "updated": "Roles updated",
+      "updateFailed": "Failed to update roles"
+    }
+  },
+  "permission": {
+    "label": "Permission",
+    "field": {
+      "code": "Permission Code",
+      "name": "Permission Name",
+      "category": "Category"
+    },
+    "uncategorized": "Uncategorized",
+    "assignTitle": "Assign Permissions - {{name}}",
+    "loading": "Loading permissions...",
+    "message": {
+      "updated": "Permissions updated",
+      "updateFailed": "Failed to update permissions"
+    }
+  },
+  "componentSpec": {
+    "cpu": {
+      "coresPerCpu": "Cores per CPU",
+      "tdp": "Power (W)",
+      "architecture": "Architecture",
+      "baseFreq": "Base Frequency (GHz)",
+      "boostFreq": "Boost Frequency (GHz)"
+    },
+    "memory": {
+      "capacity": "Capacity per Module (GB)",
+      "speed": "Speed (MHz)",
+      "type": "Type",
+      "formFactor": "Form Factor",
+      "ecc": "ECC"
+    },
+    "disk": {
+      "storageType": "Storage Type",
+      "capacity": "Capacity (GB)",
+      "interfaceType": "Interface Type",
+      "formFactor": "Form Factor",
+      "tbw": "TBW"
+    },
+    "nic": {
+      "portCount": "Port Count",
+      "portType": "Port Type",
+      "portSpeed": "Port Speed",
+      "formFactor": "Form Factor",
+      "portTypeOption": {
+        "rj45": "RJ45 (Copper)",
+        "sfp": "SFP (1G Optical)",
+        "sfpPlus": "SFP+ (10G Optical)",
+        "sfp28": "SFP28 (25G Optical)",
+        "qsfpPlus": "QSFP+ (40G Optical)",
+        "qsfp28": "QSFP28 (100G Optical)",
+        "qsfp56": "QSFP56 (200G Optical)",
+        "qsfpdd": "QSFP-DD (400G Optical)"
+      }
+    },
+    "gpu": {
+      "vram": "VRAM Capacity (GB)",
+      "memoryType": "Memory Type",
+      "cudaCores": "CUDA Cores / Compute Units",
+      "tdp": "Power (W)",
+      "interface": "Interface Type",
+      "fp32": "FP32 Performance (TFLOPS)"
+    },
+    "yes": "Yes",
+    "no": "No"
+  }
+}

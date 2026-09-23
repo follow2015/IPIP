@@ -5,6 +5,7 @@
  * 注意：该 hook 在组合根无条件调用（不限于 hasSsh），以保留「非 SSH 模式也订阅端口 SSE」的原始行为。
  */
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSyncSwitchPorts } from '@/services/switch';
 import { usePortAction } from '@/hooks/usePortAction';
 import { useDeviceEvents } from '@/hooks/useDeviceEvents';
@@ -27,6 +28,7 @@ export function usePortSync({
   scheduleClearHighlight,
   hasSsh = true
 }: UsePortSyncArgs) {
+  const { t } = useTranslation('device');
   const confirm = useConfirm();
   const message = useMessage();
   const syncSwitchPorts = useSyncSwitchPorts();
@@ -90,12 +92,12 @@ export function usePortSync({
 
   const handleSync = () => {
     confirm({
-      title: '确认同步',
-      content: '将从设备获取所有端口信息并更新，此操作在后台执行，完成后自动刷新。',
+      title: t('port.confirm.syncTitle'),
+      content: t('port.confirm.syncContent'),
       onOk: async () => {
         try {
           await syncSwitchPorts.mutateAsync(deviceId);
-          message.info('端口同步已提交，完成后将通过消息通知您');
+          message.info(t('port.message.syncSubmitted'));
           cancelPollingRef.current?.();
           cancelPollingRef.current = startPolling(() => refetch(), 5000, 3);
         } catch {

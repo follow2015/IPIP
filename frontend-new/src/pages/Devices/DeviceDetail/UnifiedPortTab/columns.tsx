@@ -3,6 +3,7 @@
  * - buildSshColumns：网管（SSH）模式，含链路状态 / IP 列表 / PortActions
  * - buildManualColumns：非网管模式，含端口信息 + 启用禁用/编辑/删除
  */
+import type { TFunction } from 'i18next';
 import type { TableProps } from 'antd';
 import { Tag, Tooltip, Space, Button } from 'antd';
 import { EditOutlined, DeleteOutlined, StopOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -14,6 +15,11 @@ import type { SubmitActionFn, RenderPortActionsFn } from '@/types/port';
 
 type ColumnType = TableProps<SwitchPort>['columns'];
 
+interface ColumnT {
+  d: TFunction<'device'>;
+  c: TFunction<'common'>;
+}
+
 function renderUsageStatus(v: string) {
   return <StatusTag status={v} statusMap={PORT_USAGE_STATUS_MAP} />;
 }
@@ -23,42 +29,54 @@ interface SshColumnDeps {
   renderPortActions: RenderPortActionsFn;
   refetch: () => void;
   submitAction: SubmitActionFn;
+  t: ColumnT;
 }
 
 export function buildSshColumns({
   deviceId,
   renderPortActions,
   refetch,
-  submitAction
+  submitAction,
+  t
 }: SshColumnDeps): ColumnType {
   return [
-    { title: '端口号', dataIndex: 'port_name', key: 'port_name' },
+    { title: t.d('nic.column.portIndex'), dataIndex: 'port_name', key: 'port_name' },
     {
-      title: '占用状态',
+      title: t.d('port.column.usageStatus'),
       dataIndex: 'usage_status',
       key: 'usage_status',
       render: (v: string) => renderUsageStatus(v)
     },
     {
-      title: '链路状态',
+      title: t.d('port.column.linkStatus'),
       dataIndex: 'link_status',
       key: 'link_status',
       render: (v: string) => (
-        <Tooltip title={getStatusLabel(v)}>
+        <Tooltip title={getStatusLabel(v, t.d)}>
           <StatusTag status={v} statusMap={LINK_STATUS_MAP} />
         </Tooltip>
       )
     },
-    { title: 'VLAN', dataIndex: 'vlan', key: 'vlan', render: (v: number | null) => v ?? '-' },
-    { title: '速率', dataIndex: 'speed', key: 'speed', render: (v: string) => v || '-' },
     {
-      title: 'MAC地址',
+      title: t.d('connection.column.vlan'),
+      dataIndex: 'vlan',
+      key: 'vlan',
+      render: (v: number | null) => v ?? '-'
+    },
+    {
+      title: t.d('nic.column.speed'),
+      dataIndex: 'speed',
+      key: 'speed',
+      render: (v: string) => v || '-'
+    },
+    {
+      title: t.d('form.network.macAddress.label'),
       dataIndex: 'mac',
       key: 'mac',
       render: (v: string | null) => v || '-'
     },
     {
-      title: 'IP地址',
+      title: t.d('port.column.ipAddress'),
       dataIndex: 'ip_address',
       key: 'ip_address',
       render: (_: unknown, record: SwitchPort) => {
@@ -72,7 +90,7 @@ export function buildSshColumns({
                     color={ip.is_primary ? 'blue' : 'default'}
                     style={{ fontSize: 10, margin: 0, lineHeight: '16px' }}
                   >
-                    {ip.is_primary ? '主' : '从'}
+                    {ip.is_primary ? t.d('port.ipRole.primary') : t.d('port.ipRole.secondary')}
                   </Tag>
                   <code style={{ fontSize: 12 }}>
                     {ip.ip_address}
@@ -87,19 +105,19 @@ export function buildSshColumns({
       }
     },
     {
-      title: '客户',
+      title: t.c('field.customer'),
       dataIndex: 'customer_name',
       key: 'customer_name',
       render: (v: string | null) => v || '-'
     },
     {
-      title: '备注',
+      title: t.c('field.remarks'),
       dataIndex: 'description',
       key: 'description',
       render: (v: string | null) => v || '-'
     },
     {
-      title: '操作',
+      title: t.c('field.actions'),
       key: 'action',
       render: (_: unknown, port: SwitchPort) => renderPortActions(port, { refetch, submitAction })
     }
@@ -110,49 +128,61 @@ interface ManualColumnDeps {
   onToggleUsageStatus: (port: SwitchPort) => void;
   onEdit: (port: SwitchPort) => void;
   onDelete: (port: SwitchPort) => void;
+  t: ColumnT;
 }
 
 export function buildManualColumns({
   onToggleUsageStatus,
   onEdit,
-  onDelete
+  onDelete,
+  t
 }: ManualColumnDeps): ColumnType {
   return [
-    { title: '端口号', dataIndex: 'port_name', key: 'port_name' },
+    { title: t.d('nic.column.portIndex'), dataIndex: 'port_name', key: 'port_name' },
     {
-      title: '占用状态',
+      title: t.d('port.column.usageStatus'),
       dataIndex: 'usage_status',
       key: 'usage_status',
       render: (v: string) => renderUsageStatus(v)
     },
-    { title: 'VLAN', dataIndex: 'vlan', key: 'vlan', render: (v: number | null) => v ?? '-' },
-    { title: '速率', dataIndex: 'speed', key: 'speed', render: (v: string) => v || '-' },
     {
-      title: 'MAC地址',
+      title: t.d('connection.column.vlan'),
+      dataIndex: 'vlan',
+      key: 'vlan',
+      render: (v: number | null) => v ?? '-'
+    },
+    {
+      title: t.d('nic.column.speed'),
+      dataIndex: 'speed',
+      key: 'speed',
+      render: (v: string) => v || '-'
+    },
+    {
+      title: t.d('form.network.macAddress.label'),
       dataIndex: 'mac',
       key: 'mac',
       render: (v: string | null) => v || '-'
     },
     {
-      title: 'IP地址',
+      title: t.d('port.column.ipAddress'),
       dataIndex: 'ip_address',
       key: 'ip_address',
       render: (v: string | null) => v || '-'
     },
     {
-      title: '客户',
+      title: t.c('field.customer'),
       dataIndex: 'customer_name',
       key: 'customer_name',
       render: (v: string | null) => v || '-'
     },
     {
-      title: '备注',
+      title: t.c('field.remarks'),
       dataIndex: 'description',
       key: 'description',
       render: (v: string | null) => v || '-'
     },
     {
-      title: '操作',
+      title: t.c('field.actions'),
       key: 'action',
       width: 200,
       render: (_: unknown, record: SwitchPort) => (
@@ -164,7 +194,7 @@ export function buildManualColumns({
               icon={<CheckCircleOutlined />}
               onClick={() => onToggleUsageStatus(record)}
             >
-              启用
+              {t.c('action.enable')}
             </Button>
           ) : (
             <Button
@@ -174,11 +204,11 @@ export function buildManualColumns({
               icon={<StopOutlined />}
               onClick={() => onToggleUsageStatus(record)}
             >
-              禁用
+              {t.c('action.disable')}
             </Button>
           )}
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => onEdit(record)}>
-            编辑
+            {t.c('action.edit')}
           </Button>
           <Button
             type="link"
@@ -187,7 +217,7 @@ export function buildManualColumns({
             icon={<DeleteOutlined />}
             onClick={() => onDelete(record)}
           >
-            删除
+            {t.c('action.delete')}
           </Button>
         </Space>
       )

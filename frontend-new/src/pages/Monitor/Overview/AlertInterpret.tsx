@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Typography, Spin } from 'antd';
 import { runSkill } from '@/services/ai';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 export interface AlertPayload {
   alert_type: string;
@@ -17,6 +18,7 @@ interface AlertInterpretProps {
 }
 
 export default function AlertInterpret({ alert }: AlertInterpretProps) {
+  const { t } = useTranslation('monitor');
   const [text, setText] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const message = useMessage();
@@ -27,7 +29,7 @@ export default function AlertInterpret({ alert }: AlertInterpretProps) {
       const result = await runSkill<string>('alert_interpret', { alert_payload: alert });
       setText(typeof result === 'string' ? result : JSON.stringify(result));
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'AI 解读失败');
+      message.error(err instanceof Error ? err.message : t('interpret.failed'));
     } finally {
       setLoading(false);
     }
@@ -36,7 +38,7 @@ export default function AlertInterpret({ alert }: AlertInterpretProps) {
   return (
     <div>
       <Button size="small" type="link" onClick={run} disabled={loading}>
-        AI 解读
+        {t('interpret.run')}
       </Button>
       {loading && <Spin size="small" />}
       {text && <Typography.Paragraph style={{ marginTop: 8 }}>{text}</Typography.Paragraph>}

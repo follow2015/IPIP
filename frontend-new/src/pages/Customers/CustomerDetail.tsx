@@ -16,19 +16,22 @@ import {
 import { StatusTag } from '@/components/StatusTag';
 import { CUSTOMER_STATUS_MAP, CustomerStatusCode } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
+import { useTranslation } from 'react-i18next';
 
 function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const customerId = Number(id);
 
   if (Number.isNaN(customerId)) {
     return (
       <Result
         status="404"
-        title="参数无效"
-        subTitle="客户 ID 无效"
-        extra={<Button onClick={() => navigate(-1)}>返回</Button>}
+        title={td('detail.invalidParam')}
+        subTitle={td('customer.invalidId')}
+        extra={<Button onClick={() => navigate(-1)}>{tc('action.back')}</Button>}
       />
     );
   }
@@ -37,6 +40,8 @@ function CustomerDetail() {
 }
 
 function CustomerDetailContent({ customerId }: { customerId: number }) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const message = useMessage();
   const navigate = useNavigate();
   const { data: customer } = useCustomerSuspenseDetail(customerId);
@@ -45,7 +50,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
   const { data: archives } = useTerminationArchives(customerId);
 
   if (!customer) {
-    return <div>客户不存在</div>;
+    return <div>{td('customer.notFound')}</div>;
   }
 
   const s = assetsData?.summary;
@@ -54,7 +59,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
     try {
       await exportCustomerAssets(customerId, customer.customer_name);
     } catch {
-      message.error('导出失败');
+      message.error(td('customer.message.exportFailed'));
     }
   };
 
@@ -65,21 +70,31 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
         onClick={() => navigate('/customers')}
         style={{ marginBottom: 16 }}
       >
-        返回列表
+        {td('detail.backToList')}
       </Button>
 
       {/* 基本信息 Card */}
-      <Card title={`客户详情 - ${customer.customer_name}`}>
+      <Card title={td('customer.detailTitle', { name: customer.customer_name })}>
         <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
-          <Descriptions.Item label="客户名称">{customer.customer_name}</Descriptions.Item>
-          <Descriptions.Item label="状态">
+          <Descriptions.Item label={td('customer.field.name')}>
+            {customer.customer_name}
+          </Descriptions.Item>
+          <Descriptions.Item label={tc('field.status')}>
             <StatusTag status={customer.customer_status} statusMap={CUSTOMER_STATUS_MAP} />
           </Descriptions.Item>
-          <Descriptions.Item label="联系人">{customer.contact_person ?? '-'}</Descriptions.Item>
-          <Descriptions.Item label="联系电话">{customer.contact_phone ?? '-'}</Descriptions.Item>
-          <Descriptions.Item label="邮箱">{customer.email ?? '-'}</Descriptions.Item>
-          <Descriptions.Item label="地址">{customer.address ?? '-'}</Descriptions.Item>
-          <Descriptions.Item label="备注" span={2}>
+          <Descriptions.Item label={td('customer.field.contactPerson')}>
+            {customer.contact_person ?? '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label={td('customer.field.contactPhone')}>
+            {customer.contact_phone ?? '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label={td('customer.field.email')}>
+            {customer.email ?? '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label={td('customer.field.address')}>
+            {customer.address ?? '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label={tc('field.remarks')} span={2}>
             {customer.notes ?? '-'}
           </Descriptions.Item>
         </Descriptions>
@@ -87,39 +102,57 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
 
       {/* 资源统计 Card */}
       <Card
-        title="资源统计"
+        title={td('customer.resourceStats')}
         style={{ marginTop: 16 }}
         extra={
           <Button icon={<DownloadOutlined />} onClick={handleExport} size="small">
-            导出 Excel
+            {td('customer.exportExcel')}
           </Button>
         }
       >
         {assetsLoading ? (
-          <Spin description="加载中..." />
+          <Spin description={tc('message.loading')} />
         ) : assetsData ? (
           <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
-            <Descriptions.Item label="机房数">{s?.total_rooms ?? 0}</Descriptions.Item>
-            <Descriptions.Item label="机柜数">{s?.total_cabinets ?? 0}</Descriptions.Item>
-            <Descriptions.Item label="整柜租赁">{s?.full_cabinets ?? 0}</Descriptions.Item>
-            <Descriptions.Item label="部分使用">{s?.partial_cabinets ?? 0}</Descriptions.Item>
-            <Descriptions.Item label="设备数">{s?.total_devices ?? 0}</Descriptions.Item>
-            <Descriptions.Item label="整柜设备">{s?.full_cabinet_devices ?? 0}</Descriptions.Item>
-            <Descriptions.Item label="部分使用设备">
+            <Descriptions.Item label={td('customer.stats.roomCount')}>
+              {s?.total_rooms ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.cabinetCount')}>
+              {s?.total_cabinets ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.fullCabinets')}>
+              {s?.full_cabinets ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.partialCabinets')}>
+              {s?.partial_cabinets ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('cabinet.field.deviceCount')}>
+              {s?.total_devices ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.fullCabinetDevices')}>
+              {s?.full_cabinet_devices ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.partialCabinetDevices')}>
               {s?.partial_cabinet_devices ?? 0}
             </Descriptions.Item>
-            <Descriptions.Item label="网段数">{s?.total_networks ?? 0}</Descriptions.Item>
-            <Descriptions.Item label="整网段租赁">{s?.full_networks ?? 0}</Descriptions.Item>
-            <Descriptions.Item label="IP总数">{s?.total_ips ?? 0}</Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.networkCount')}>
+              {s?.total_networks ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.fullNetworks')}>
+              {s?.full_networks ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.ipTotal')}>
+              {s?.total_ips ?? 0}
+            </Descriptions.Item>
           </Descriptions>
         ) : (
-          <span>暂无数据</span>
+          <span>{tc('message.noData')}</span>
         )}
       </Card>
 
       {/* 终止存档 Card（仅终止态客户显示） */}
       {isTerminated && (
-        <Card title="终止存档" style={{ marginTop: 16 }}>
+        <Card title={td('customer.archive.title')} style={{ marginTop: 16 }}>
           {archives && archives.length > 0 ? (
             <Table
               size="small"
@@ -128,17 +161,17 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
               pagination={false}
               columns={[
                 {
-                  title: '终止时间',
+                  title: td('customer.archive.terminatedAt'),
                   dataIndex: 'created_at',
                   render: (v: string | null) => (v ? formatDateTime(v) : '-')
                 },
                 {
-                  title: '操作人',
+                  title: td('customer.archive.operator'),
                   dataIndex: 'operator_name',
                   render: (v: string | null) => v ?? '-'
                 },
                 {
-                  title: '终止原因',
+                  title: td('customer.archive.reason'),
                   dataIndex: 'reason',
                   render: (v: string | null) => v ?? '-'
                 },
@@ -146,15 +179,19 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
                   title: 'PDF',
                   dataIndex: 'has_pdf',
                   render: (v: boolean) =>
-                    v ? <Tag color="green">已生成</Tag> : <Tag color="orange">未生成</Tag>
+                    v ? (
+                      <Tag color="green">{td('customer.archive.generated')}</Tag>
+                    ) : (
+                      <Tag color="orange">{td('customer.archive.notGenerated')}</Tag>
+                    )
                 },
                 {
-                  title: '大小',
+                  title: td('customer.archive.size'),
                   dataIndex: 'pdf_size',
                   render: (v: number | null) => (v != null ? `${(v / 1024).toFixed(1)} KB` : '-')
                 },
                 {
-                  title: '操作',
+                  title: tc('field.actions'),
                   key: 'action',
                   render: (_: unknown, r: (typeof archives)[number]) => (
                     <Button
@@ -166,11 +203,11 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
                         try {
                           await downloadTerminationArchive(customerId, customer.customer_name);
                         } catch {
-                          message.error('下载失败');
+                          message.error(td('customer.message.downloadFailed'));
                         }
                       }}
                     >
-                      下载
+                      {td('customer.archive.download')}
                     </Button>
                   )
                 }
@@ -178,7 +215,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
               scroll={{ x: 'max-content' }}
             />
           ) : (
-            <span>暂无终止存档</span>
+            <span>{td('customer.archive.empty')}</span>
           )}
         </Card>
       )}

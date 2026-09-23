@@ -23,6 +23,7 @@ import DataTable from '@/components/DataTable';
 import ConfirmButton from '@/components/ConfirmButton';
 import { useMessage } from '@/hooks/useMessage';
 import { useTable } from '@/hooks/useTable';
+import { useTranslation } from 'react-i18next';
 
 const { Text, Title } = Typography;
 
@@ -34,6 +35,9 @@ interface CredentialDetailProps {
 export default function CredentialDetail({ selectedCred, onOpenLink }: CredentialDetailProps) {
   const navigate = useNavigate();
   const msg = useMessage();
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
+  const { t: td } = useTranslation('device');
   const unlink = useUnlinkCredential();
   const linkedTable = useTable({ initialPerPage: 10 });
 
@@ -56,15 +60,15 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
     if (!selectedCred?.protocol) return;
     try {
       await unlink.mutateAsync({ deviceId, protocol: selectedCred.protocol });
-      msg.success('已取消关联');
+      msg.success(t('credential.message.unlinked'));
     } catch (err) {
-      msg.error(err instanceof Error ? err.message : '操作失败');
+      msg.error(err instanceof Error ? err.message : tc('message.operationFailed'));
     }
   };
 
   const linkedColumns = [
     {
-      title: '设备名称',
+      title: td('field.name'),
       dataIndex: 'device_name',
       key: 'device_name',
       render: (name: string, record: LinkedDevice) => (
@@ -72,26 +76,26 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
       )
     },
     {
-      title: '类型',
+      title: tc('field.type'),
       dataIndex: 'device_type',
       key: 'device_type',
       width: 100,
-      render: (t: string) => <Tag>{t}</Tag>
+      render: (deviceType: string) => <Tag>{deviceType}</Tag>
     },
     {
-      title: '管理IP',
+      title: t('column.managementIp'),
       dataIndex: 'management_ip',
       key: 'management_ip',
       width: 140,
       render: (ip: string | null) => ip || '—'
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 160,
       render: (_: unknown, record: LinkedDevice) => (
         <Space size="small">
-          <Tooltip title="查看历史趋势">
+          <Tooltip title={t('alerts.viewTrend')}>
             <Button
               size="small"
               icon={<LineChartOutlined />}
@@ -101,12 +105,12 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
           <ConfirmButton
             size="small"
             icon={<DisconnectOutlined />}
-            title="确认取消关联"
-            content="确定要取消该设备与此凭据的关联吗？"
+            title={t('credential.confirm.unlinkTitle')}
+            content={t('credential.confirm.unlinkContent')}
             okType="danger"
             onConfirm={() => handleUnlink(record.device_id)}
           >
-            取消关联
+            {td('credential.unlink')}
           </ConfirmButton>
         </Space>
       )
@@ -116,7 +120,10 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
   if (!selectedCred) {
     return (
       <Card>
-        <Empty description="请从左侧选择一个共享凭据查看详情" style={{ padding: '60px 0' }} />
+        <Empty
+          description={t('credential.detail.selectHint')}
+          style={{ padding: '60px 0' }}
+        />
       </Card>
     );
   }
@@ -139,20 +146,26 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
         </Row>
         <Row gutter={24} style={{ marginTop: 12 }}>
           <Col xs={24} md={8}>
-            <Text type="secondary">状态</Text>
-            <div>{selectedCred.enabled ? <Tag color="green">启用</Tag> : <Tag>已停用</Tag>}</div>
+            <Text type="secondary">{tc('field.status')}</Text>
+            <div>
+              {selectedCred.enabled ? (
+                <Tag color="green">{t('credential.status.enabled')}</Tag>
+              ) : (
+                <Tag>{t('credential.status.disabled')}</Tag>
+              )}
+            </div>
           </Col>
           <Col xs={24} md={8}>
-            <Text type="secondary">关联设备</Text>
+            <Text type="secondary">{t('credential.column.linkedDevices')}</Text>
             <div>
               <Text strong style={{ fontSize: 18 }}>
                 {selectedCred.linked_count ?? 0}
               </Text>{' '}
-              台
+              {t('stat.unitDevice', { count: selectedCred.linked_count ?? 0 })}
             </div>
           </Col>
           <Col xs={24} md={8}>
-            <Text type="secondary">凭据 ID</Text>
+            <Text type="secondary">{t('credential.detail.id')}</Text>
             <div>
               <Text code>{selectedCred.id}</Text>
             </div>
@@ -162,15 +175,15 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
 
       {/* 关联设备表 */}
       <Card
-        title="关联设备"
+        title={t('credential.column.linkedDevices')}
         extra={
           <Button type="primary" icon={<LinkOutlined />} onClick={onOpenLink}>
-            关联设备
+            {t('credential.column.linkedDevices')}
           </Button>
         }
       >
         <Input
-          placeholder="搜索设备名称或 IP"
+          placeholder={t('credential.searchDevicePlaceholder')}
           prefix={<SearchOutlined />}
           allowClear
           value={deviceSearchKeyword}
@@ -183,7 +196,11 @@ export default function CredentialDetail({ selectedCred, onOpenLink }: Credentia
           loading={linkedLoading}
           rowKey={(r) => String(r.device_id)}
           total={filteredLinkedDevices.length}
-          emptyText={deviceSearchKeyword ? '无匹配设备' : '暂无关联设备'}
+          emptyText={
+            deviceSearchKeyword
+              ? td('addModal.clone.noMatchDevice')
+              : t('credential.message.linkedEmpty')
+          }
           searchable={false}
           showCard={false}
           tableProps={linkedTable}

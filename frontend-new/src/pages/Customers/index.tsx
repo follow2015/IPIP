@@ -24,37 +24,42 @@ import IdCell from '@/components/IdCell';
 import CustomerForm from './CustomerForm';
 import { useCustomerList, useDeleteCustomer, useTerminateCustomer } from '@/services/customer';
 import type { Customer } from '@/types/models';
-import { CUSTOMER_STATUS_MAP, CustomerStatusCode } from '@/types/enums';
+import { CustomerStatusCode } from '@/types/enums';
+import { getCustomerStatusMeta, type DeviceT } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useCrudPage } from '@/hooks/useCrudPage';
 import { useMessage } from '@/hooks/useMessage';
 import { formatDateTime } from '@/utils/format';
 
-function renderStatus(v: number) {
-  const s = CUSTOMER_STATUS_MAP[v as keyof typeof CUSTOMER_STATUS_MAP];
+function renderStatus(v: number, t: DeviceT) {
+  const s = getCustomerStatusMeta(v, t);
   if (v === undefined || v === null) return '-';
   return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{v}</Tag>;
 }
 
-function customerStatusLabel(v: number | null | undefined) {
+function customerStatusLabel(v: number | null | undefined, t: DeviceT) {
   if (v === null || v === undefined) return '-';
-  const s = CUSTOMER_STATUS_MAP[v as keyof typeof CUSTOMER_STATUS_MAP];
+  const s = getCustomerStatusMeta(v, t);
   return s ? s.label : String(v);
 }
 
-function buildCustomerInfoText(c: Customer): string {
+function buildCustomerInfoText(c: Customer, td: DeviceT, tc: TFunction<'common'>): string {
   return [
-    '客户信息',
+    td('customer.infoTitle'),
     `ID: ${c.id}`,
-    `客户名称: ${c.customer_name ?? '-'}`,
-    `状态: ${customerStatusLabel(c.customer_status)}`,
-    `联系人: ${c.contact_person ?? '-'}`,
-    `联系电话: ${c.contact_phone ?? '-'}`,
-    `邮箱: ${c.email ?? '-'}`,
-    `地址: ${c.address ?? '-'}`
+    `${td('customer.field.name')}: ${c.customer_name ?? '-'}`,
+    `${tc('field.status')}: ${customerStatusLabel(c.customer_status, td)}`,
+    `${td('customer.field.contactPerson')}: ${c.contact_person ?? '-'}`,
+    `${td('customer.field.contactPhone')}: ${c.contact_phone ?? '-'}`,
+    `${td('customer.field.email')}: ${c.email ?? '-'}`,
+    `${td('customer.field.address')}: ${c.address ?? '-'}`
   ].join('\n');
 }
 
 function Customers() {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const navigate = useNavigate();
   const message = useMessage();
 
@@ -62,7 +67,7 @@ function Customers() {
     useList: useCustomerList,
     useDelete: useDeleteCustomer,
     nameKey: 'customer_name',
-    nameLabel: '客户'
+    nameLabel: tc('field.customer')
   });
 
   const { table, data, isLoading, refetch } = crud;
@@ -76,14 +81,14 @@ function Customers() {
   };
 
   const handleCopy = (r: Customer) => {
-    const text = buildCustomerInfoText(r);
+    const text = buildCustomerInfoText(r, td, tc);
     if (navigator.clipboard?.writeText) {
       navigator.clipboard
         .writeText(text)
-        .then(() => message.success('客户信息已复制'))
-        .catch(() => message.error('复制失败，请手动复制'));
+        .then(() => message.success(td('customer.message.copied')))
+        .catch(() => message.error(tc('message.copyFailedManual')));
     } else {
-      message.error('当前环境不支持自动复制');
+      message.error(tc('message.copyUnsupported'));
     }
   };
 
@@ -95,30 +100,30 @@ function Customers() {
       width: 80,
       render: (id: number) => <IdCell value={id} />
     },
-    { title: '客户名称', dataIndex: 'customer_name', key: 'customer_name', width: 160 },
+    { title: td('customer.field.name'), dataIndex: 'customer_name', key: 'customer_name', width: 160 },
     {
-      title: '状态',
+      title: tc('field.status'),
       dataIndex: 'customer_status',
       key: 'customer_status',
       width: 80,
-      render: renderStatus
+      render: (v: number) => renderStatus(v, td)
     },
     {
-      title: '联系人',
+      title: td('customer.field.contactPerson'),
       dataIndex: 'contact_person',
       key: 'contact_person',
       width: 100,
       render: (v: string | null) => v ?? '-'
     },
     {
-      title: '联系电话',
+      title: td('customer.field.contactPhone'),
       dataIndex: 'contact_phone',
       key: 'contact_phone',
       width: 130,
       render: (v: string | null) => v ?? '-'
     },
     {
-      title: '邮箱',
+      title: td('customer.field.email'),
       dataIndex: 'email',
       key: 'email',
       width: 180,
@@ -126,7 +131,7 @@ function Customers() {
       ellipsis: true
     },
     {
-      title: '地址',
+      title: td('customer.field.address'),
       dataIndex: 'address',
       key: 'address',
       width: 200,
@@ -134,20 +139,20 @@ function Customers() {
       ellipsis: true
     },
     {
-      title: '更新时间',
+      title: tc('field.updatedAt'),
       dataIndex: 'updated_at',
       key: 'updated_at',
       width: 160,
       render: (v: string) => formatDateTime(v)
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 240,
       render: (_: unknown, r: Customer) => (
         <Space>
           <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => handleCopy(r)}>
-            复制
+            {tc('action.copy')}
           </Button>
           <Button
             type="link"
@@ -155,7 +160,7 @@ function Customers() {
             icon={<EditOutlined />}
             onClick={() => crud.handleEdit(r)}
           >
-            编辑
+            {tc('action.edit')}
           </Button>
           <Button
             type="link"
@@ -163,7 +168,7 @@ function Customers() {
             icon={<BarChartOutlined />}
             onClick={() => handleAssets(r)}
           >
-            资源
+            {td('customer.action.resources')}
           </Button>
           {r.customer_status !== CustomerStatusCode.TERMINATED && (
             <Button
@@ -176,7 +181,7 @@ function Customers() {
                 setTerminateTarget(r);
               }}
             >
-              终止
+              {td('customer.action.terminate')}
             </Button>
           )}
           <Button
@@ -186,7 +191,7 @@ function Customers() {
             icon={<DeleteOutlined />}
             onClick={() => crud.handleDelete(r)}
           >
-            删除
+            {tc('action.delete')}
           </Button>
         </Space>
       )
@@ -212,7 +217,7 @@ function Customers() {
         onRefresh={() => refetch()}
         toolbar={
           <Button type="primary" icon={<PlusOutlined />} onClick={crud.handleAdd}>
-            新增客户
+            {td('customer.add')}
           </Button>
         }
       />
@@ -222,12 +227,12 @@ function Customers() {
         onCancel={() => crud.closeForm()}
       />
       <Modal
-        title="终止客户"
+        title={td('customer.terminate.title')}
         open={terminateTarget !== null}
         onCancel={() => setTerminateTarget(null)}
         confirmLoading={terminateMutation.isPending}
-        okText="确定终止"
-        cancelText="取消"
+        okText={td('customer.terminate.ok')}
+        cancelText={tc('action.cancel')}
         okButtonProps={{ danger: true }}
         onOk={async () => {
           if (!terminateTarget) return;
@@ -236,18 +241,18 @@ function Customers() {
               id: terminateTarget.id,
               reason: terminateReason.trim() || undefined
             });
-            message.success('客户已终止');
+            message.success(td('customer.message.terminated'));
             setTerminateTarget(null);
           } catch (e: any) {
-            message.error(e?.response?.data?.message || '终止失败');
+            message.error(e?.response?.data?.message || td('customer.message.terminateFailed'));
           }
         }}
       >
-        <p style={{ marginBottom: 12 }}>终止将不可逆地释放该客户名下全部资源，确定操作？</p>
+        <p style={{ marginBottom: 12 }}>{td('customer.terminate.confirmContent')}</p>
         <Input.TextArea
           value={terminateReason}
           onChange={(e) => setTerminateReason(e.target.value)}
-          placeholder="请输入终止原因（选填）"
+          placeholder={td('customer.terminate.reasonPlaceholder')}
           rows={3}
           maxLength={255}
           showCount

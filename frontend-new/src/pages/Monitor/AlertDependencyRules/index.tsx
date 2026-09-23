@@ -36,6 +36,7 @@ import {
   type MonitorAlertDependencyRule,
   type MonitorAlertDependencyRuleInput
 } from '@/services/monitor';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
@@ -50,6 +51,8 @@ const ALERT_TYPE_OPTIONS = [
 ];
 
 export default function AlertDependencyRulesPage() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
   const { data, isLoading } = useAlertDependencyRules();
   const createMut = useCreateAlertDependencyRule();
   const updateMut = useUpdateAlertDependencyRule();
@@ -93,7 +96,7 @@ export default function AlertDependencyRulesPage() {
     try {
       const values = await form.validateFields();
       if (values.upstream_device_id === values.downstream_device_id) {
-        message.error('上游与下游设备不能相同');
+        message.error(t('dependency.validation.sameDevice'));
         return;
       }
       const payload: MonitorAlertDependencyRuleInput = {
@@ -106,10 +109,10 @@ export default function AlertDependencyRulesPage() {
       };
       if (editing) {
         await updateMut.mutateAsync({ id: editing.id, ...payload });
-        message.success('已更新');
+        message.success(t('crud.updated'));
       } else {
         await createMut.mutateAsync(payload);
-        message.success('已创建');
+        message.success(t('crud.created'));
       }
       modal.close();
     } catch (err: unknown) {
@@ -120,69 +123,69 @@ export default function AlertDependencyRulesPage() {
   const handleDelete = async (id: number) => {
     try {
       await deleteMut.mutateAsync(id);
-      message.success('已删除');
+      message.success(t('crud.deleted'));
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '删除失败');
+      message.error(err instanceof Error ? err.message : t('crud.deleteFailed'));
     }
   };
 
   const columns = [
     {
-      title: '名称',
+      title: tc('field.name'),
       dataIndex: 'name',
       key: 'name',
       render: (v: string, r: MonitorAlertDependencyRule) => (
         <Space>
           <Text strong>{v}</Text>
-          {!r.enabled && <Tag color="default">已停用</Tag>}
+          {!r.enabled && <Tag color="default">{t('credential.status.disabled')}</Tag>}
         </Space>
       )
     },
     {
-      title: '上游设备 ID',
+      title: t('dependency.column.upstreamDeviceId'),
       dataIndex: 'upstream_device_id',
       key: 'upstream_device_id',
       render: (v: number) => <Tag color="red">{v}</Tag>
     },
     {
-      title: '下游设备 ID',
+      title: t('dependency.column.downstreamDeviceId'),
       dataIndex: 'downstream_device_id',
       key: 'downstream_device_id',
       render: (v: number) => <Tag color="orange">{v}</Tag>
     },
     {
-      title: '告警类型',
+      title: t('column.alertType'),
       dataIndex: 'alert_types',
       key: 'alert_types',
       render: (v: string[] | null) =>
         v === null || v.length === 0 ? (
-          <Tag color="blue">全部类型</Tag>
+          <Tag color="blue">{t('escalation.matchAllTypes')}</Tag>
         ) : (
           v.map((t) => <Tag key={t}>{t}</Tag>)
         )
     },
     {
-      title: '说明',
+      title: t('dependency.column.reason'),
       dataIndex: 'reason',
       key: 'reason',
       ellipsis: true
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       render: (_: unknown, r: MonitorAlertDependencyRule) => (
         <Space>
           <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(r)}>
-            编辑
+            {tc('action.edit')}
           </Button>
           <ConfirmButton
             type="link"
             icon={<DeleteOutlined />}
-            title="确认删除"
-            content="确定要删除该依赖抑制规则吗？此操作不可恢复。"
+            title={tc('confirm.deleteTitle')}
+            content={t('dependency.confirm.deleteContent')}
             onConfirm={() => handleDelete(r.id)}
           >
-            删除
+            {tc('action.delete')}
           </ConfirmButton>
         </Space>
       )
@@ -194,14 +197,14 @@ export default function AlertDependencyRulesPage() {
       <Alert
         type="info"
         showIcon
-        message="自动拓扑抑制 + 手动规则"
-        description="系统自动基于设备父子拓扑（DeviceServerExt.parent_device_id）抑制下游告警：父设备有 active 告警时，子设备同类型告警自动抑制。本页规则用于手动覆盖或补充自动推断（如网络设备间的依赖）。"
+        message={t('dependency.alert.title')}
+        description={t('dependency.alert.description')}
       />
       <Card
-        title="告警依赖抑制规则"
+        title={t('dependency.title')}
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建规则
+            {t('dependency.action.create')}
           </Button>
         }
       >
@@ -211,7 +214,7 @@ export default function AlertDependencyRulesPage() {
           loading={isLoading}
           rowKey={(r) => String(r.id)}
           total={items.length}
-          emptyText="暂无依赖抑制规则"
+          emptyText={t('dependency.empty')}
           searchable={false}
           showCard={false}
           tableProps={table}
@@ -219,7 +222,7 @@ export default function AlertDependencyRulesPage() {
       </Card>
 
       <Modal
-        title={editing ? '编辑依赖抑制规则' : '新建依赖抑制规则'}
+        title={editing ? t('dependency.modal.editTitle') : t('dependency.modal.createTitle')}
         open={modal.isOpen}
         onOk={handleSubmit}
         onCancel={() => modal.close()}
@@ -230,41 +233,43 @@ export default function AlertDependencyRulesPage() {
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item
             name="name"
-            label="规则名称"
-            rules={[{ required: true, message: '请输入名称' }]}
+            label={t('dependency.field.name')}
+            rules={[
+              { required: true, message: tc('validation.inputRequiredField', { field: tc('field.name') }) }
+            ]}
           >
-            <Input placeholder="如：核心交换机→接入交换机依赖" maxLength={128} />
+            <Input placeholder={t('dependency.placeholder.name')} maxLength={128} />
           </Form.Item>
           <Form.Item
             name="upstream_device_id"
-            label="上游设备 ID"
-            rules={[{ required: true, message: '请输入上游设备 ID' }]}
+            label={t('dependency.column.upstreamDeviceId')}
+            rules={[{ required: true, message: t('dependency.validation.upstreamRequired') }]}
           >
-            <InputNumber placeholder="如：1" style={{ width: '100%' }} min={1} />
+            <InputNumber placeholder={t('dependency.placeholder.upstreamId')} style={{ width: '100%' }} min={1} />
           </Form.Item>
           <Form.Item
             name="downstream_device_id"
-            label="下游设备 ID"
-            rules={[{ required: true, message: '请输入下游设备 ID' }]}
+            label={t('dependency.column.downstreamDeviceId')}
+            rules={[{ required: true, message: t('dependency.validation.downstreamRequired') }]}
           >
-            <InputNumber placeholder="如：2" style={{ width: '100%' }} min={1} />
+            <InputNumber placeholder={t('dependency.placeholder.downstreamId')} style={{ width: '100%' }} min={1} />
           </Form.Item>
-          <Form.Item name="alert_types" label="受抑制告警类型（留空=全部类型）">
+          <Form.Item name="alert_types" label={t('dependency.field.alertTypes')}>
             <Select
               mode="multiple"
-              placeholder="选择告警类型（留空=全部）"
+              placeholder={t('placeholder.alertTypesOptional')}
               options={ALERT_TYPE_OPTIONS}
               allowClear
             />
           </Form.Item>
-          <Form.Item name="reason" label="规则说明">
+          <Form.Item name="reason" label={t('dependency.field.reason')}>
             <Input.TextArea
               rows={2}
-              placeholder="如：核心交换机 down 时抑制下游接入交换机告警"
+              placeholder={t('dependency.placeholder.reason')}
               maxLength={255}
             />
           </Form.Item>
-          <Form.Item name="enabled" label="启用" valuePropName="checked">
+          <Form.Item name="enabled" label={tc('action.enable')} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

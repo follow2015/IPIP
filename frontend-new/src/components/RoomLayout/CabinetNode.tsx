@@ -2,8 +2,9 @@ import React from 'react';
 import { Tooltip, Progress } from 'antd';
 import type { GlobalToken } from 'antd';
 import { CABINET_STATUS_MAP } from '@/types/enums';
+import { useTranslation } from 'react-i18next';
 import type { Cabinet } from '@/types/models';
-import { DEFAULT_STATUS, getStatusPalette } from './palette';
+import { DEFAULT_STATUS, getStatusPalette, positionLabel } from './palette';
 import { isPositioned } from './geometry';
 
 export interface CabinetNodeProps {
@@ -40,6 +41,8 @@ function CabinetNode({
   const status = cabinet.status ?? DEFAULT_STATUS;
   const palette = getStatusPalette(token, status);
   const statusInfo = CABINET_STATUS_MAP[status as keyof typeof CABINET_STATUS_MAP];
+  const { t: td } = useTranslation('device');
+  const { t: ta } = useTranslation('asset');
   const uUsageRate = cabinet.u_usage_rate ?? 0;
   const powerUsageRate = cabinet.power_usage_rate ?? 0;
 
@@ -137,10 +140,10 @@ function CabinetNode({
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 11, color: token.colorTextSecondary }}>
-          {cabinet.device_count ?? 0}台
+          {ta('roomLayout.cellDeviceCount', { count: cabinet.device_count ?? 0 })}
         </span>
         <span style={{ fontSize: 10, color: palette.text, fontWeight: 500 }}>
-          {statusInfo?.label ?? ''}
+          {statusInfo ? td(statusInfo.labelKey) : ''}
         </span>
       </div>
       {showCustomer && cabinet.customer_name ? (
@@ -166,25 +169,41 @@ function CabinetNode({
           <div>
             <strong>{cabinet.cabinet_number}</strong>
           </div>
-          <div>状态：{statusInfo?.label ?? status}</div>
           <div>
-            U位：{cabinet.used_u ?? 0}/{cabinet.total_u ?? 42}U ({uUsageRate}%)
+            {ta('roomLayout.tooltip.status', { value: statusInfo ? td(statusInfo.labelKey) : status })}
+          </div>
+          <div>
+            {ta('roomLayout.tooltip.u', {
+              used: cabinet.used_u ?? 0,
+              total: cabinet.total_u ?? 42,
+              pct: uUsageRate
+            })}
           </div>
           {cabinet.total_power ? (
             <div>
-              功率：{cabinet.used_power ?? 0}/{cabinet.total_power}W ({powerUsageRate}%)
+              {ta('roomLayout.tooltip.power', {
+                used: cabinet.used_power ?? 0,
+                total: cabinet.total_power,
+                pct: powerUsageRate
+              })}
             </div>
           ) : null}
-          <div>设备：{cabinet.device_count ?? 0}台</div>
+          <div>{ta('roomLayout.devices', { count: cabinet.device_count ?? 0 })}</div>
           {isPositioned(cabinet) ? (
             <div>
-              位置：第{cabinet.row}行 第{cabinet.col}列
+              {ta('roomLayout.tooltip.position', {
+                value: positionLabel(cabinet.row ?? 0, cabinet.col ?? 0, ta)
+              })}
             </div>
           ) : (
-            <div>位置：未定位</div>
+            <div>{ta('roomLayout.tooltip.positionUnset')}</div>
           )}
-          {cabinet.customer_name ? <div>客户：{cabinet.customer_name}</div> : null}
-          {cabinet.notes ? <div>备注：{cabinet.notes}</div> : null}
+          {cabinet.customer_name ? (
+            <div>{ta('roomLayout.tooltip.customer', { value: cabinet.customer_name })}</div>
+          ) : null}
+          {cabinet.notes ? (
+            <div>{ta('roomLayout.tooltip.notes', { value: cabinet.notes })}</div>
+          ) : null}
         </div>
       }
       placement="top"

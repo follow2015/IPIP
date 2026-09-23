@@ -9,7 +9,13 @@
  * 注：PORT_TYPE_TEMPLATES 已上提至 @/constants/ports（被 7+ 处消费，不再经本模块重导出）。
  */
 
-import { DEVICE_STATUS_MAP, DEVICE_TYPE_MAP } from '@/types/enums';
+import { DEVICE_STATUS_MAP } from '@/types/enums';
+import {
+  getDeviceStatusMeta,
+  getDeviceStatusOptions,
+  getDeviceTypeOptions,
+  type DeviceT
+} from '@/types/statusMeta';
 
 
 export const TYPE_CODE: Record<string, string> = { server: 'SRV', network: 'NET', other: 'OTH' };
@@ -36,9 +42,8 @@ export function genCloneName(baseName: string, index: number): string {
   return `${baseName}-${index}`;
 }
 
-export function getStatusLabel(code: number): string {
-  const e = DEVICE_STATUS_MAP[code as keyof typeof DEVICE_STATUS_MAP];
-  return typeof e === 'object' && e && 'label' in e ? e.label : String(e ?? code);
+export function getStatusLabel(code: number, t: DeviceT): string {
+  return getDeviceStatusMeta(code, t)?.label ?? String(code);
 }
 
 export function getStatusColor(code: number): string {
@@ -90,12 +95,6 @@ export interface DeviceBatchRow {
 }
 
 
-export const STATUS_OPTIONS = Object.entries(DEVICE_STATUS_MAP).map(([k, v]) => ({
-  value: Number(k),
-  label: typeof v === 'object' && v && 'label' in v ? v.label : String(v)
-}));
+export const getStatusOptions = (t: DeviceT) => getDeviceStatusOptions(t);
 
-export const TYPE_OPTIONS = Object.entries(DEVICE_TYPE_MAP).map(([k, v]) => ({
-  label: v.label,
-  value: k
-}));
+export const getTypeOptions = (t: DeviceT) => getDeviceTypeOptions(t);

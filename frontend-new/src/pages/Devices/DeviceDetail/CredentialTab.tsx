@@ -26,6 +26,7 @@ import {
   Typography
 } from 'antd';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 import { useConfirm } from '@/utils/confirm';
 import {
   useDeviceMonitorStatus,
@@ -51,6 +52,8 @@ interface CredCandidate {
 }
 
 export default function CredentialTab({ device }: { device: Device }) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const deviceId = device.id;
   const { data: status } = useDeviceMonitorStatus(deviceId);
@@ -95,25 +98,27 @@ export default function CredentialTab({ device }: { device: Device }) {
 
   const handleLinkExisting = async () => {
     if (selectedCredId == null) {
-      message.warning('请选择要关联的共享凭据');
+      message.warning(t('credential.selectSharedFirst'));
       return;
     }
     if (configured.length > 0) {
       confirm({
-        title: '关联新协议将替换旧协议',
-        content: `每台设备同一时刻只能使用一种监控协议。关联新协议凭据将自动解除本机 ${configured.map((p) => p.toUpperCase()).join('、')} 协议的关联。确认继续？`,
+        title: t('credential.replaceTitle'),
+        content: t('credential.replaceContent', {
+          protocols: configured.map((p) => p.toUpperCase()).join(t('credential.separator'))
+        }),
         okType: 'danger',
-        okText: '确认替换',
+        okText: t('credential.confirmReplace'),
         onOk: async () => {
           try {
             await linkExisting.mutateAsync({
               credentialId: selectedCredId,
               device_ids: [deviceId]
             });
-            message.success('已关联到共享凭据');
+            message.success(t('credential.message.linked'));
             setSelectedCredId(undefined);
           } catch (err) {
-            message.error(err instanceof Error ? err.message : '操作失败');
+            message.error(err instanceof Error ? err.message : tCommon('message.operationFailed'));
           }
         }
       });
@@ -121,28 +126,30 @@ export default function CredentialTab({ device }: { device: Device }) {
     }
     try {
       await linkExisting.mutateAsync({ credentialId: selectedCredId, device_ids: [deviceId] });
-      message.success('已关联到共享凭据');
+      message.success(t('credential.message.linked'));
       setSelectedCredId(undefined);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '操作失败');
+      message.error(err instanceof Error ? err.message : tCommon('message.operationFailed'));
     }
   };
 
   const handleUnlink = async (p: string) => {
     try {
       await unlink.mutateAsync({ deviceId, protocol: p });
-      message.success(`已取消 ${p} 关联`);
+      message.success(t('credential.message.unlinked', { protocol: p }));
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '操作失败');
+      message.error(err instanceof Error ? err.message : tCommon('message.operationFailed'));
     }
   };
 
   const handleToggleMonitorEnabled = async (enabled: boolean) => {
     try {
       await toggleMonitor.mutateAsync({ deviceId, enabled });
-      message.success(enabled ? '已恢复该设备监控' : '已暂停该设备监控');
+      message.success(
+        enabled ? t('credential.message.monitorResumed') : t('credential.message.monitorPaused')
+      );
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '操作失败');
+      message.error(err instanceof Error ? err.message : tCommon('message.operationFailed'));
     }
   };
 
@@ -156,19 +163,19 @@ export default function CredentialTab({ device }: { device: Device }) {
           metric_template_group_id: groupId
         });
         message.success(
-          groupId === null ? '已清除指标模板组关联（回到自动匹配）' : '已更新指标模板组关联'
+          groupId === null ? t('credential.message.groupCleared') : t('credential.message.groupUpdated')
         );
         setSelectedGroupId(undefined);
       } catch (err) {
-        message.error(err instanceof Error ? err.message : '保存失败');
+        message.error(err instanceof Error ? err.message : t('credential.message.saveFailed'));
       }
     };
     if (isClearing) {
       confirm({
-        title: '清除指标模板组关联',
-        content: '清除后将回到按设备类型 + 厂商 + 协议自动匹配规则。确认继续？',
+        title: t('credential.clearGroupTitle'),
+        content: t('credential.clearGroupContent'),
         okType: 'danger',
-        okText: '确认清除',
+        okText: t('credential.confirmClear'),
         onOk: doSave
       });
       return;
@@ -208,9 +215,9 @@ export default function CredentialTab({ device }: { device: Device }) {
         name: (values.name as string) || undefined,
         device_ids: [deviceId]
       });
-      message.success('已新建并关联共享凭据');
+      message.success(t('credential.message.createdAndLinked'));
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '操作失败');
+      message.error(err instanceof Error ? err.message : tCommon('message.operationFailed'));
     }
   };
 
@@ -257,23 +264,23 @@ export default function CredentialTab({ device }: { device: Device }) {
     }
     try {
       await updateDeviceCred.mutateAsync({ payload, name: (values.name as string) || undefined });
-      message.success('本机凭据已更新');
+      message.success(t('credential.message.updated'));
       edit.close();
       editForm.resetFields();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '更新失败');
+      message.error(err instanceof Error ? err.message : t('credential.message.updateFailed'));
     }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* 0. 设备级监控启停（P1-6，仅影响本设备） */}
-      <Card title="设备监控开关">
+      <Card title={t('credential.monitorSwitchTitle')}>
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
           <Space orientation="vertical" size={0}>
-            <Typography.Text strong>启用监控探测</Typography.Text>
+            <Typography.Text strong>{t('credential.monitorEnabled')}</Typography.Text>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              关闭后本设备不再纳入监控轮询（仅影响本设备）
+              {t('credential.monitorEnabledHint')}
             </Typography.Text>
           </Space>
           <Switch
@@ -285,12 +292,12 @@ export default function CredentialTab({ device }: { device: Device }) {
       </Card>
 
       {/* 0.5 指标模板组关联 */}
-      <Card title="指标模板组">
+      <Card title={t('credential.templateGroupTitle')}>
         <Space direction="vertical" style={{ width: '100%' }} size={12}>
           <Space align="center" size={8}>
-            <Typography.Text type="secondary">当前绑定：</Typography.Text>
+            <Typography.Text type="secondary">{t('credential.currentBinding')}</Typography.Text>
             {currentGroupId === null ? (
-              <Tag color="default">自动匹配</Tag>
+              <Tag color="default">{t('credential.autoMatch')}</Tag>
             ) : (
               <Tag color="blue">{currentGroupName ?? `#${currentGroupId}`}</Tag>
             )}
@@ -298,7 +305,7 @@ export default function CredentialTab({ device }: { device: Device }) {
           <Alert
             type="info"
             showIcon
-            message="为该设备显式绑定指标模板组；留空保存则清除绑定，回到按设备类型 + 厂商 + 协议自动匹配规则"
+            message={t('credential.templateGroupHint')}
           />
           <Space style={{ width: '100%' }}>
             <Select
@@ -307,7 +314,7 @@ export default function CredentialTab({ device }: { device: Device }) {
               showSearch
               optionFilterProp="label"
               loading={groupsLoading}
-              placeholder="选择指标模板组（留空 = 解除绑定）"
+              placeholder={t('credential.selectTemplateGroup')}
               value={effectiveGroupId ?? undefined}
               onChange={(v) => setSelectedGroupId(v ?? null)}
               options={candidateGroups.map((g) => ({
@@ -317,9 +324,13 @@ export default function CredentialTab({ device }: { device: Device }) {
               }))}
               notFoundContent={
                 <Space direction="vertical" size={2} style={{ padding: 8 }}>
-                  <span>没有匹配 {device.device_type ?? '当前类型'} 的指标模板组</span>
+                  <span>
+                    {t('credential.noMatchedGroup', {
+                      type: device.device_type ?? t('credential.currentType')
+                    })}
+                  </span>
                   <span style={{ fontSize: 12, color: '#999' }}>
-                    可在「监控中心 → 指标模板」中创建
+                    {t('credential.createInMonitorCenter')}
                   </span>
                 </Space>
               }
@@ -330,16 +341,16 @@ export default function CredentialTab({ device }: { device: Device }) {
               disabled={selectedGroupId === undefined || selectedGroupId === currentGroupId}
               onClick={handleSaveGroup}
             >
-              保存
+              {tCommon('action.save')}
             </Button>
           </Space>
         </Space>
       </Card>
 
       {/* 1. 本机已关联凭据 */}
-      <Card title="本机已关联凭据">
+      <Card title={t('credential.linkedTitle')}>
         {configured.length === 0 ? (
-          <Empty description="本机尚未关联任何监控凭据" />
+          <Empty description={t('credential.notLinked')} />
         ) : (
           <Space orientation="vertical" style={{ width: '100%' }}>
             {configured.map((p) => {
@@ -355,7 +366,7 @@ export default function CredentialTab({ device }: { device: Device }) {
                   <Space size="small">
                     {credId != null && (
                       <Button size="small" onClick={() => handleOpenEdit(p, credId)}>
-                        编辑密文
+                        {t('credential.editSecret')}
                       </Button>
                     )}
                     <Button
@@ -364,7 +375,7 @@ export default function CredentialTab({ device }: { device: Device }) {
                       loading={unlink.isPending}
                       onClick={() => handleUnlink(p)}
                     >
-                      取消关联
+                      {t('credential.unlink')}
                     </Button>
                   </Space>
                 </Space>
@@ -375,26 +386,32 @@ export default function CredentialTab({ device }: { device: Device }) {
       </Card>
 
       {/* 2. 关联已有共享凭据 */}
-      <Card title="关联已有共享凭据">
+      <Card title={t('credential.linkExistingTitle')}>
         {configured.length > 0 && (
           <Alert
             type="warning"
             showIcon
             style={{ marginBottom: 12 }}
-            message="协议互斥"
-            description={`每台设备同一时刻只能使用一种监控协议。关联新协议凭据将自动解除本机 ${configured.map((p) => p.toUpperCase()).join('、')} 协议的关联。`}
+            message={t('credential.protocolExclusive')}
+            description={t('credential.protocolExclusiveDesc', {
+              protocols: configured.map((p) => p.toUpperCase()).join(t('credential.separator'))
+            })}
           />
         )}
         <Space>
           <Select
             style={{ width: 320 }}
-            placeholder={candidates.length ? '选择共享凭据' : '无可关联凭据'}
+            placeholder={candidates.length ? t('credential.selectShared') : t('credential.noAvailable')}
             value={selectedCredId}
             onChange={setSelectedCredId}
             disabled={candidates.length === 0}
             options={candidates.map((c) => ({
               value: c.id,
-              label: `[${c.protocol.toUpperCase()}] ${c.name || c.protocol}（已关联 ${c.linked_count} 台）`
+              label: t('credential.sharedOption', {
+                protocol: c.protocol.toUpperCase(),
+                name: c.name || c.protocol,
+                count: c.linked_count
+              })
             }))}
           />
           <Button
@@ -403,23 +420,25 @@ export default function CredentialTab({ device }: { device: Device }) {
             loading={linkExisting.isPending}
             onClick={handleLinkExisting}
           >
-            关联本机
+            {t('credential.linkThisDevice')}
           </Button>
         </Space>
         {candidates.length === 0 && (
-          <div style={{ marginTop: 8, color: 'rgba(0,0,0,0.45)' }}>无可关联凭据</div>
+          <div style={{ marginTop: 8, color: 'rgba(0,0,0,0.45)' }}>{t('credential.noAvailable')}</div>
         )}
       </Card>
 
       {/* 3. 新建共享凭据并关联本机（复用共享结构化表单） */}
-      <Card title="新建共享凭据并关联本机">
+      <Card title={t('credential.createAndLinkTitle')}>
         {configured.length > 0 && (
           <Alert
             type="warning"
             showIcon
             style={{ marginBottom: 12 }}
-            message="协议互斥"
-            description={`每台设备同一时刻只能使用一种监控协议。新建并关联不同协议的凭据将自动解除本机 ${configured.map((p) => p.toUpperCase()).join('、')} 协议的关联。`}
+            message={t('credential.protocolExclusive')}
+            description={t('credential.protocolExclusiveDescCreate', {
+              protocols: configured.map((p) => p.toUpperCase()).join(t('credential.separator'))
+            })}
           />
         )}
         <NewCredentialForm
@@ -433,7 +452,7 @@ export default function CredentialTab({ device }: { device: Device }) {
 
       {/* 4. 本机编辑密文弹窗（P0-2 设备级） */}
       <Modal
-        title={`编辑本机凭据密文（${editTarget?.protocol ?? ''}）`}
+        title={t('credential.editSecretTitle', { protocol: editTarget?.protocol ?? '' })}
         open={edit.isOpen}
         onCancel={() => {
           edit.close();
@@ -448,16 +467,16 @@ export default function CredentialTab({ device }: { device: Device }) {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="仅影响本设备"
-          description="该凭据可能被其它设备共享；本次编辑只迁移本设备到独立凭据行，不影响其它设备。"
+          message={t('credential.onlyThisDevice')}
+          description={t('credential.onlyThisDeviceDesc')}
         />
         <Form form={editForm} layout="vertical" initialValues={editInitialValues}>
           <Form.Item
-            label="凭据名称"
+            label={t('credential.name')}
             name="name"
-            rules={[{ required: true, message: '请输入凭据名称' }]}
+            rules={[{ required: true, message: t('credential.namePlaceholder') }]}
           >
-            <Input placeholder="如：机房A SNMP只读团体字" />
+            <Input placeholder={t('credential.nameHint')} />
           </Form.Item>
           {editTarget && (
             <MonitorCredentialForm protocol={editTarget.protocol} mode="edit" form={editForm} />
@@ -481,6 +500,7 @@ function NewCredentialForm({
   onSubmit: (values: Record<string, unknown>) => void;
   configuredProtocols: string[];
 }) {
+  const { t } = useTranslation('device');
   const confirm = useConfirm();
   const [form] = Form.useForm();
 
@@ -488,10 +508,12 @@ function NewCredentialForm({
     const newProtocol = (values.protocol as string) || protocol;
     if (configuredProtocols.length > 0 && !configuredProtocols.includes(newProtocol)) {
       confirm({
-        title: '关联新协议将替换旧协议',
-        content: `每台设备同一时刻只能使用一种监控协议。新建并关联不同协议的凭据将自动解除本机 ${configuredProtocols.map((p) => p.toUpperCase()).join('、')} 协议的关联。`,
+        title: t('credential.replaceTitle'),
+        content: t('credential.protocolExclusiveDescCreate', {
+          protocols: configuredProtocols.map((p) => p.toUpperCase()).join(t('credential.separator'))
+        }),
         okType: 'danger',
-        okText: '确认替换',
+        okText: t('credential.confirmReplace'),
         onOk: () => onSubmit(values)
       });
     } else {
@@ -507,7 +529,7 @@ function NewCredentialForm({
       onFinish={handleFinish}
     >
       <Space>
-        <Form.Item label="协议" name="protocol" style={{ width: 160 }}>
+        <Form.Item label={t('credential.protocol')} name="protocol" style={{ width: 160 }}>
           <Select
             options={MONITOR_PROTOCOL_OPTIONS}
             onChange={(v) => {
@@ -517,17 +539,17 @@ function NewCredentialForm({
           />
         </Form.Item>
         <Form.Item
-          label="凭据名称"
+          label={t('credential.name')}
           name="name"
           style={{ width: 240 }}
-          rules={[{ required: true, message: '请输入凭据名称' }]}
+          rules={[{ required: true, message: t('credential.namePlaceholder') }]}
         >
-          <Input placeholder="如：机房A SNMP只读团体字" />
+          <Input placeholder={t('credential.nameHint')} />
         </Form.Item>
       </Space>
       <MonitorCredentialForm protocol={protocol} mode="create" form={form} />
       <Button type="primary" htmlType="submit" loading={submitting}>
-        新建并关联
+        {t('credential.createAndLink')}
       </Button>
     </Form>
   );

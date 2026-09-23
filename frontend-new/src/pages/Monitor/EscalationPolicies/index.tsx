@@ -41,7 +41,8 @@ import {
   type MonitorEscalationStepInput
 } from '@/services/monitor';
 import { formatDateTime } from '@/utils/format';
-import { SEVERITY_OPTIONS } from '@/types/enums';
+import { getSeverityOptions } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
@@ -54,6 +55,9 @@ const ALERT_TYPE_OPTIONS = [
 ];
 
 export default function EscalationPoliciesPage() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
+  const { t: td } = useTranslation('device');
   const { data, isLoading } = useEscalationPolicies();
   const createMut = useCreateEscalationPolicy();
   const updateMut = useUpdateEscalationPolicy();
@@ -121,10 +125,10 @@ export default function EscalationPoliciesPage() {
       };
       if (editing) {
         await updateMut.mutateAsync({ id: editing.id, ...payload });
-        message.success('已更新');
+        message.success(t('escalation.message.updated'));
       } else {
         await createMut.mutateAsync(payload);
-        message.success('已创建');
+        message.success(t('escalation.message.created'));
       }
       modal.close();
     } catch (err: unknown) {
@@ -135,43 +139,51 @@ export default function EscalationPoliciesPage() {
   const handleDelete = async (id: number) => {
     try {
       await deleteMut.mutateAsync(id);
-      message.success('已删除');
+      message.success(t('escalation.message.deleted'));
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '删除失败');
+      message.error(err instanceof Error ? err.message : tc('message.deleteFailed'));
     }
   };
 
   const columns = [
     {
-      title: '名称',
+      title: tc('field.name'),
       dataIndex: 'name',
       key: 'name',
       render: (v: string, r: MonitorEscalationPolicy) => (
         <Space>
           <Text strong>{v}</Text>
-          {!r.enabled && <Tag color="default">已停用</Tag>}
+          {!r.enabled && <Tag color="default">{t('metricTemplate.status.disabled')}</Tag>}
         </Space>
       )
     },
     {
-      title: '匹配条件',
+      title: t('escalation.column.match'),
       key: 'match',
       render: (_: unknown, r: MonitorEscalationPolicy) => (
         <Space size={4}>
-          {r.alert_type ? <Tag color="blue">{r.alert_type}</Tag> : <Tag>全部类型</Tag>}
-          {r.severity ? <Tag color="orange">{r.severity}</Tag> : <Tag>全部级别</Tag>}
+          {r.alert_type ? (
+            <Tag color="blue">{r.alert_type}</Tag>
+          ) : (
+            <Tag>{t('escalation.matchAllTypes')}</Tag>
+          )}
+          {r.severity ? (
+            <Tag color="orange">{r.severity}</Tag>
+          ) : (
+            <Tag>{t('escalation.matchAllSeverities')}</Tag>
+          )}
         </Space>
       )
     },
     {
-      title: '升级模式',
+      title: t('escalation.column.mode'),
       key: 'mode',
       render: (_: unknown, r: MonitorEscalationPolicy) => {
         const steps = r.steps ?? [];
         if (steps.length > 0) {
           return (
             <Space size={4} wrap>
-              <Tag color="gold">多级链({steps.length}步)</Tag>
+              <Tag color="gold">{t('escalation.mode.multiStep', { count: steps.length })}</Tag>
               {steps.map((s) => (
                 <Tag key={s.id} color={s.enabled ? 'blue' : 'default'}>
                   {s.step_no}:{s.wait_minutes}min
@@ -183,37 +195,41 @@ export default function EscalationPoliciesPage() {
         }
         return (
           <Space size={4} wrap>
-            <Tag>单级 {r.wait_minutes}min</Tag>
+            <Tag>{t('escalation.mode.singleStep', { minutes: r.wait_minutes })}</Tag>
             {r.escalate_severity && <Tag color="red">→{r.escalate_severity}</Tag>}
-            {r.escalate_to_role_id && <Tag color="purple">角色#{r.escalate_to_role_id}</Tag>}
+            {r.escalate_to_role_id && (
+              <Tag color="purple">{t('escalation.mode.role', { id: r.escalate_to_role_id })}</Tag>
+            )}
             {r.escalate_webhook_url && <Tag color="cyan">webhook</Tag>}
-            {r.repeat_minutes > 0 && <Tag>每{r.repeat_minutes}min重复</Tag>}
+            {r.repeat_minutes > 0 && (
+              <Tag>{t('escalation.mode.repeat', { minutes: r.repeat_minutes })}</Tag>
+            )}
           </Space>
         );
       }
     },
     {
-      title: '更新时间',
+      title: tc('field.updatedAt'),
       dataIndex: 'updated_at',
       key: 'updated_at',
       render: (v: string) => <Text type="secondary">{formatDateTime(v)}</Text>
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'op',
       render: (_: unknown, r: MonitorEscalationPolicy) => (
         <Space>
           <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(r)}>
-            编辑
+            {tc('action.edit')}
           </Button>
           <ConfirmButton
             type="link"
             icon={<DeleteOutlined />}
-            title="确认删除"
-            content="确定要删除该升级策略吗？此操作不可恢复。"
+            title={tc('confirm.deleteTitle')}
+            content={t('escalation.confirm.deleteContent')}
             onConfirm={() => handleDelete(r.id)}
           >
-            删除
+            {tc('action.delete')}
           </ConfirmButton>
         </Space>
       )
@@ -223,10 +239,10 @@ export default function EscalationPoliciesPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Card
-        title="升级策略管理"
+        title={t('escalation.title')}
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建策略
+            {t('escalation.action.create')}
           </Button>
         }
       >
@@ -236,7 +252,7 @@ export default function EscalationPoliciesPage() {
           loading={isLoading}
           rowKey={(r) => String(r.id)}
           total={items.length}
-          emptyText="暂无升级策略"
+          emptyText={t('escalation.empty')}
           searchable={false}
           showCard={false}
           tableProps={table}
@@ -244,7 +260,7 @@ export default function EscalationPoliciesPage() {
       </Card>
 
       <Modal
-        title={editing ? '编辑升级策略' : '新建升级策略'}
+        title={editing ? t('escalation.modal.editTitle') : t('escalation.modal.createTitle')}
         open={modal.isOpen}
         onOk={handleSubmit}
         onCancel={() => modal.close()}
@@ -255,39 +271,51 @@ export default function EscalationPoliciesPage() {
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item
             name="name"
-            label="策略名称"
-            rules={[{ required: true, message: '请输入名称' }]}
+            label={t('escalation.field.name')}
+            rules={[{ required: true, message: t('escalation.validation.nameRequired') }]}
           >
-            <Input placeholder="如：未确认告警 30 分钟升级" maxLength={128} />
+            <Input placeholder={t('escalation.placeholder.name')} maxLength={128} />
           </Form.Item>
           <Space style={{ display: 'flex' }} align="start">
-            <Form.Item name="alert_type" label="匹配告警类型" style={{ flex: 1 }}>
-              <Select placeholder="全部类型" options={ALERT_TYPE_OPTIONS} allowClear />
+            <Form.Item name="alert_type" label={t('escalation.field.alertType')} style={{ flex: 1 }}>
+              <Select
+                placeholder={t('escalation.matchAllTypes')}
+                options={ALERT_TYPE_OPTIONS}
+                allowClear
+              />
             </Form.Item>
-            <Form.Item name="severity" label="匹配级别" style={{ flex: 1 }}>
-              <Select placeholder="全部级别" options={SEVERITY_OPTIONS} allowClear />
+            <Form.Item name="severity" label={t('escalation.field.severity')} style={{ flex: 1 }}>
+              <Select
+                placeholder={t('escalation.matchAllSeverities')}
+                options={getSeverityOptions(td)}
+                allowClear
+              />
             </Form.Item>
           </Space>
 
           <Divider titlePlacement="left" plain>
-            多级升级链（可选）
+            {t('escalation.section.multiStepTitle')}
           </Divider>
           <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-            配置后按步骤顺序渐进升级；留空则使用下方单级模式。
+            {t('escalation.section.multiStepHint')}
           </Text>
           <Form.List name="steps">
             {(fields, { add, remove }) => (
               <>
                 {fields.map((field, idx) => (
                   <Space key={field.key} style={{ display: 'flex', marginBottom: 8 }} align="start">
-                    <Tag color="gold">步骤{idx + 1}</Tag>
+                    <Tag color="gold">{t('escalation.step.label', { index: idx + 1 })}</Tag>
                     <Form.Item
                       {...field}
                       name={[field.name, 'wait_minutes']}
-                      rules={[{ required: true, message: '必填' }]}
+                      rules={[{ required: true, message: tc('validation.required') }]}
                       style={{ marginBottom: 0 }}
                     >
-                      <InputNumber min={1} placeholder="等待分钟" style={{ width: 110 }} />
+                      <InputNumber
+                        min={1}
+                        placeholder={t('escalation.step.waitMinutesPlaceholder')}
+                        style={{ width: 110 }}
+                      />
                     </Form.Item>
                     <Form.Item
                       {...field}
@@ -295,8 +323,8 @@ export default function EscalationPoliciesPage() {
                       style={{ marginBottom: 0 }}
                     >
                       <Select
-                        placeholder="升级级别"
-                        options={SEVERITY_OPTIONS}
+                        placeholder={t('escalation.step.escalateSeverityPlaceholder')}
+                        options={getSeverityOptions(td)}
                         allowClear
                         style={{ width: 120 }}
                       />
@@ -306,7 +334,11 @@ export default function EscalationPoliciesPage() {
                       name={[field.name, 'escalate_to_role_id']}
                       style={{ marginBottom: 0 }}
                     >
-                      <InputNumber min={1} placeholder="角色ID" style={{ width: 100 }} />
+                      <InputNumber
+                        min={1}
+                        placeholder={t('escalation.step.roleIdPlaceholder')}
+                        style={{ width: 100 }}
+                      />
                     </Form.Item>
                     <Form.Item
                       {...field}
@@ -314,7 +346,7 @@ export default function EscalationPoliciesPage() {
                       style={{ marginBottom: 0, flex: 1 }}
                     >
                       <Input
-                        placeholder="webhook URL（可选）"
+                        placeholder={t('escalation.step.webhookPlaceholder')}
                         maxLength={512}
                         style={{ width: 200 }}
                       />
@@ -338,7 +370,7 @@ export default function EscalationPoliciesPage() {
                 {fields.length === 0 && (
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="未配置多级链"
+                    description={t('escalation.step.empty')}
                     style={{ margin: '8px 0' }}
                   />
                 )}
@@ -348,41 +380,53 @@ export default function EscalationPoliciesPage() {
                   onClick={() => add({ wait_minutes: 30, enabled: true })}
                   block
                 >
-                  添加升级步骤
+                  {t('escalation.step.add')}
                 </Button>
               </>
             )}
           </Form.List>
 
           <Divider titlePlacement="left" plain>
-            单级模式（无多级链时生效）
+            {t('escalation.section.singleStepTitle')}
           </Divider>
           <Form.Item
             name="wait_minutes"
-            label="未确认等待分钟数"
-            rules={[{ required: true, message: '请输入等待分钟数' }]}
+            label={t('escalation.field.waitMinutes')}
+            rules={[{ required: true, message: t('escalation.validation.waitMinutesRequired') }]}
           >
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="如 30" />
+            <InputNumber
+              min={1}
+              style={{ width: '100%' }}
+              placeholder={t('escalation.placeholder.waitMinutes')}
+            />
           </Form.Item>
           <Space style={{ display: 'flex' }} align="start">
-            <Form.Item name="escalate_severity" label="升级后级别" style={{ flex: 1 }}>
-              <Select placeholder="不升级级别" options={SEVERITY_OPTIONS} allowClear />
+            <Form.Item name="escalate_severity" label={t('escalation.field.escalateSeverity')} style={{ flex: 1 }}>
+              <Select
+                placeholder={t('escalation.placeholder.escalateSeverity')}
+                options={getSeverityOptions(td)}
+                allowClear
+              />
             </Form.Item>
-            <Form.Item name="escalate_to_role_id" label="升级通知角色 ID" style={{ flex: 1 }}>
-              <InputNumber min={1} style={{ width: '100%' }} placeholder="如 5（运维主管）" />
+            <Form.Item name="escalate_to_role_id" label={t('escalation.field.escalateToRoleId')} style={{ flex: 1 }}>
+              <InputNumber
+                min={1}
+                style={{ width: '100%' }}
+                placeholder={t('escalation.placeholder.roleId')}
+              />
             </Form.Item>
           </Space>
-          <Form.Item name="escalate_webhook_url" label="升级 Webhook URL（可选）">
+          <Form.Item name="escalate_webhook_url" label={t('escalation.field.webhookUrl')}>
             <Input placeholder="https://example.com/hook" maxLength={512} />
           </Form.Item>
           <Form.Item
             name="repeat_minutes"
-            label="重复升级间隔分钟（0=只升一次）"
-            extra="设为 N 时，每 N 分钟再次升级未确认告警"
+            label={t('escalation.field.repeatMinutes')}
+            extra={t('escalation.field.repeatMinutesExtra')}
           >
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="enabled" label="启用" valuePropName="checked">
+          <Form.Item name="enabled" label={tc('action.enable')} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Tooltip } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { DownOutlined, RightOutlined as CollapseIcon } from '@ant-design/icons';
 import { TYPE_CONFIG, ROW_GAP, NODE_STATUS_COLOR } from './constants';
 import { computeBlockInfoVisibility } from './layout';
@@ -33,6 +34,7 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
   onDragStart,
   onNodeReorder
 }) => {
+  const { t } = useTranslation('asset');
   const cfg = TYPE_CONFIG[device.deviceType ?? 'server'];
   const h = device.uSize * layout.unit - ROW_GAP;
   const top = uToTop(device.uPosition, layout.unit);
@@ -198,8 +200,11 @@ const DeviceBlock: React.FC<DeviceBlockProps> = ({
                 whiteSpace: 'nowrap'
               }}
             >
-              {localNodes.filter((n) => n.status === 'active').length}/{localNodes.length} 在线
-              {device.power ? ` · ${device.power}W` : ''}
+              {t('uposition.device.onlineSummary', {
+                online: localNodes.filter((n) => n.status === 'active').length,
+                total: localNodes.length
+              })}
+              {device.power ? t('uposition.device.powerSuffix', { power: device.power }) : ''}
             </span>
           )}
 

@@ -8,10 +8,12 @@ export enum DeviceType {
   OTHER = 'other'
 }
 
-export const DEVICE_TYPE_MAP: Record<DeviceType, { label: string; color: string }> = {
-  [DeviceType.SERVER]: { label: '服务器', color: 'blue' },
-  [DeviceType.NETWORK]: { label: '网络设备', color: 'green' },
-  [DeviceType.OTHER]: { label: '其他设备', color: 'default' }
+export type DeviceTypeKey = 'deviceType.SERVER' | 'deviceType.NETWORK' | 'deviceType.OTHER';
+
+export const DEVICE_TYPE_MAP: Record<DeviceType, { labelKey: DeviceTypeKey; color: string }> = {
+  [DeviceType.SERVER]: { labelKey: 'deviceType.SERVER', color: 'blue' },
+  [DeviceType.NETWORK]: { labelKey: 'deviceType.NETWORK', color: 'green' },
+  [DeviceType.OTHER]: { labelKey: 'deviceType.OTHER', color: 'default' }
 };
 
 export enum DeviceSubtype {
@@ -40,18 +42,31 @@ export const DEVICE_SUBTYPE_MAP: Record<DeviceType, DeviceSubtype[]> = {
   [DeviceType.OTHER]: [DeviceSubtype.PDU, DeviceSubtype.UPS, DeviceSubtype.OTHER]
 };
 
-export const DEVICE_SUBTYPE_LABELS: Record<DeviceSubtype, string> = {
-  [DeviceSubtype.STANDALONE]: '独立服务器',
-  [DeviceSubtype.CHASSIS]: '机箱',
-  [DeviceSubtype.NODE]: '节点',
-  [DeviceSubtype.STORAGE]: '存储服务器',
-  [DeviceSubtype.GPU]: 'GPU服务器',
-  [DeviceSubtype.SWITCH]: '交换机',
-  [DeviceSubtype.ROUTER]: '路由器',
-  [DeviceSubtype.FIREWALL]: '防火墙',
-  [DeviceSubtype.PDU]: '配电单元',
-  [DeviceSubtype.UPS]: '不间断电源',
-  [DeviceSubtype.OTHER]: '其他'
+export type DeviceSubtypeKey =
+  | 'deviceSubtype.STANDALONE'
+  | 'deviceSubtype.CHASSIS'
+  | 'deviceSubtype.NODE'
+  | 'deviceSubtype.STORAGE'
+  | 'deviceSubtype.GPU'
+  | 'deviceSubtype.SWITCH'
+  | 'deviceSubtype.ROUTER'
+  | 'deviceSubtype.FIREWALL'
+  | 'deviceSubtype.PDU'
+  | 'deviceSubtype.UPS'
+  | 'deviceSubtype.OTHER';
+
+export const DEVICE_SUBTYPE_LABEL_KEYS: Record<DeviceSubtype, DeviceSubtypeKey> = {
+  [DeviceSubtype.STANDALONE]: 'deviceSubtype.STANDALONE',
+  [DeviceSubtype.CHASSIS]: 'deviceSubtype.CHASSIS',
+  [DeviceSubtype.NODE]: 'deviceSubtype.NODE',
+  [DeviceSubtype.STORAGE]: 'deviceSubtype.STORAGE',
+  [DeviceSubtype.GPU]: 'deviceSubtype.GPU',
+  [DeviceSubtype.SWITCH]: 'deviceSubtype.SWITCH',
+  [DeviceSubtype.ROUTER]: 'deviceSubtype.ROUTER',
+  [DeviceSubtype.FIREWALL]: 'deviceSubtype.FIREWALL',
+  [DeviceSubtype.PDU]: 'deviceSubtype.PDU',
+  [DeviceSubtype.UPS]: 'deviceSubtype.UPS',
+  [DeviceSubtype.OTHER]: 'deviceSubtype.OTHER'
 };
 
 export const DEVICE_SUBTYPE_COLORS: Record<DeviceSubtype, string> = {
@@ -100,11 +115,20 @@ export enum SSHAction {
  * - error: 异常 → 红
  * 注意：与 status-codes.generated.ts 中的后端 PortStatus（int 0/1/2）是不同域，勿混淆。
  */
-export const PORT_USAGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  free: { label: '空闲', color: 'green' },
-  occupied: { label: '占用', color: 'blue' },
-  disabled: { label: '禁用', color: 'default' },
-  error: { label: '异常', color: 'red' }
+export type PortUsageStatusKey =
+  | 'portUsage.FREE'
+  | 'portUsage.OCCUPIED'
+  | 'portUsage.DISABLED'
+  | 'portUsage.ERROR';
+
+export const PORT_USAGE_STATUS_MAP: Record<
+  string,
+  { labelKey: PortUsageStatusKey; color: string }
+> = {
+  free: { labelKey: 'portUsage.FREE', color: 'green' },
+  occupied: { labelKey: 'portUsage.OCCUPIED', color: 'blue' },
+  disabled: { labelKey: 'portUsage.DISABLED', color: 'default' },
+  error: { labelKey: 'portUsage.ERROR', color: 'red' }
 };
 
 /**
@@ -122,9 +146,14 @@ export const PORT_STATUS_BG_COLOR: Record<string, string> = {
  * - active: 活跃 → 绿
  * - inactive: 不活跃 → 默认灰
  */
-export const CONNECTION_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  active: { label: '活跃', color: 'green' },
-  inactive: { label: '不活跃', color: 'default' }
+export type ConnectionStatusKey = 'connectionStatus.ACTIVE' | 'connectionStatus.INACTIVE';
+
+export const CONNECTION_STATUS_MAP: Record<
+  string,
+  { labelKey: ConnectionStatusKey; color: string }
+> = {
+  active: { labelKey: 'connectionStatus.ACTIVE', color: 'green' },
+  inactive: { labelKey: 'connectionStatus.INACTIVE', color: 'default' }
 };
 
 /**
@@ -134,11 +163,17 @@ export const CONNECTION_STATUS_MAP: Record<string, { label: string; color: strin
  * - admin_down: 管理关闭 → 默认灰
  * - disabled: 已禁用 → 默认灰
  */
-export const LINK_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  up: { label: '在线', color: 'success' },
-  down: { label: '离线', color: 'error' },
-  admin_down: { label: '管理关闭', color: 'default' },
-  disabled: { label: '已禁用', color: 'default' }
+export type LinkStatusKey =
+  | 'linkStatus.UP'
+  | 'linkStatus.DOWN'
+  | 'linkStatus.ADMIN_DOWN'
+  | 'linkStatus.DISABLED';
+
+export const LINK_STATUS_MAP: Record<string, { labelKey: LinkStatusKey; color: string }> = {
+  up: { labelKey: 'linkStatus.UP', color: 'success' },
+  down: { labelKey: 'linkStatus.DOWN', color: 'error' },
+  admin_down: { labelKey: 'linkStatus.ADMIN_DOWN', color: 'default' },
+  disabled: { labelKey: 'linkStatus.DISABLED', color: 'default' }
 };
 
 /**
@@ -147,25 +182,38 @@ export const LINK_STATUS_MAP: Record<string, { label: string; color: string }> =
  * - offline: 离线 → 默认灰
  * - warning: 告警 → 橙（warning）
  */
-export const NODE_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  online: { label: '在线', color: 'success' },
-  offline: { label: '离线', color: 'default' },
-  warning: { label: '告警', color: 'warning' }
+export type NodeStatusKey =
+  | 'nodeStatus.ONLINE'
+  | 'nodeStatus.OFFLINE'
+  | 'nodeStatus.WARNING';
+
+export const NODE_STATUS_MAP: Record<string, { labelKey: NodeStatusKey; color: string }> = {
+  online: { labelKey: 'nodeStatus.ONLINE', color: 'success' },
+  offline: { labelKey: 'nodeStatus.OFFLINE', color: 'default' },
+  warning: { labelKey: 'nodeStatus.WARNING', color: 'warning' }
 };
 
+export type LoginTypeKey =
+  | 'loginType.WEB'
+  | 'loginType.WECHAT'
+  | 'loginType.API'
+  | 'loginType.MOBILE'
+  | 'loginType.TOKEN';
 
-export const LOGIN_TYPE_MAP: Record<string, { label: string; color: string }> = {
-  web: { label: 'Web', color: 'blue' },
-  wechat: { label: '微信', color: 'green' },
-  api: { label: 'API', color: 'orange' },
-  mobile: { label: '移动端', color: 'purple' },
-  token: { label: 'Token', color: 'cyan' }
+export const LOGIN_TYPE_MAP: Record<string, { labelKey: LoginTypeKey; color: string }> = {
+  web: { labelKey: 'loginType.WEB', color: 'blue' },
+  wechat: { labelKey: 'loginType.WECHAT', color: 'green' },
+  api: { labelKey: 'loginType.API', color: 'orange' },
+  mobile: { labelKey: 'loginType.MOBILE', color: 'purple' },
+  token: { labelKey: 'loginType.TOKEN', color: 'cyan' }
 };
 
-export const AUTH_METHOD_OPTIONS = [
-  { label: '密码', value: 'password' },
-  { label: '证书', value: 'certificate' }
-];
+export type AuthMethodKey = 'authMethod.PASSWORD' | 'authMethod.CERTIFICATE';
+
+export const AUTH_METHOD_LABEL_KEYS: Record<string, AuthMethodKey> = {
+  password: 'authMethod.PASSWORD',
+  certificate: 'authMethod.CERTIFICATE'
+};
 
 
 
@@ -190,18 +238,20 @@ export const MONITOR_PROTOCOL_PALETTE: Record<string, string> = {
   ping: '#52c41a'
 };
 
+export type NetworkLayerKey = 'networkLayer.L2' | 'networkLayer.L3';
 
-export const NETWORK_LAYER_OPTIONS = [
-  { label: '二层交换机 (L2)', value: 2 },
-  { label: '三层交换机 (L3)', value: 3 }
-];
+export const NETWORK_LAYER_LABEL_KEYS: Record<number, NetworkLayerKey> = {
+  2: 'networkLayer.L2',
+  3: 'networkLayer.L3'
+};
 
+export type SeverityKey = 'severity.CRITICAL' | 'severity.WARNING' | 'severity.INFO';
 
-export const SEVERITY_OPTIONS = [
-  { label: '严重', value: 'critical' },
-  { label: '警告', value: 'warning' },
-  { label: '信息', value: 'info' }
-];
+export const SEVERITY_LABEL_KEYS: Record<string, SeverityKey> = {
+  critical: 'severity.CRITICAL',
+  warning: 'severity.WARNING',
+  info: 'severity.INFO'
+};
 
 export const SEVERITY_COLOR_MAP: Record<string, string> = {
   critical: 'red',
@@ -209,21 +259,23 @@ export const SEVERITY_COLOR_MAP: Record<string, string> = {
   info: 'blue'
 };
 
-export const SEVERITY_LABELS: Record<string, string> = {
-  critical: '严重',
-  warning: '警告',
-  info: '信息'
-};
+export type ChannelKey =
+  | 'channel.INBOX'
+  | 'channel.EMAIL'
+  | 'channel.VOICE'
+  | 'channel.WECHAT_WORK'
+  | 'channel.FEISHU'
+  | 'channel.DINGTALK'
+  | 'channel.CUSTOM';
 
-
-export const CHANNEL_LABELS: Record<string, string> = {
-  inbox: '站内信',
-  email: '邮件',
-  voice: '语音通知',
-  wechat_work: '企业微信',
-  feishu: '飞书',
-  dingtalk: '钉钉',
-  custom: '自定义'
+export const CHANNEL_LABEL_KEYS: Record<string, ChannelKey> = {
+  inbox: 'channel.INBOX',
+  email: 'channel.EMAIL',
+  voice: 'channel.VOICE',
+  wechat_work: 'channel.WECHAT_WORK',
+  feishu: 'channel.FEISHU',
+  dingtalk: 'channel.DINGTALK',
+  custom: 'channel.CUSTOM'
 };
 
 export const CHANNEL_COLORS: Record<string, string> = {
@@ -236,9 +288,4 @@ export const CHANNEL_COLORS: Record<string, string> = {
   custom: 'default'
 };
 
-export const BROADCAST_CHANNEL_OPTIONS = [
-  { label: '企业微信', value: 'wechat_work' },
-  { label: '飞书', value: 'feishu' },
-  { label: '钉钉', value: 'dingtalk' },
-  { label: '自定义', value: 'custom' }
-];
+export const BROADCAST_CHANNELS = ['wechat_work', 'feishu', 'dingtalk', 'custom'];

@@ -1057,6 +1057,11 @@ class CustomerService:
     def generate_customer_assets_excel(self, customer_id: int):
         """生成客户资源导出 Excel（5 个 Sheet）。
 
+        ⚠️ i18n 范围外：这里用中文做 DataFrame 的列名（`"设备名称"` / `"状态"` …），
+        属于**导出文件的格式约定**而非界面文案 —— 改列名会让下游按列名取数的脚本
+        全部失效，且 Excel 是落盘文件、脱离前端语言环境。故**保持中文不动**。
+        界面文案走 i18n，导出文件表头不跟着切语言，这是刻意的产品决策。
+
         Args:
             customer_id: 客户ID
 

@@ -9,6 +9,7 @@
  * - 防抖期间外部 value 回写不会打断用户正在输入的内容
  */
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input } from 'antd';
 
 export interface SearchInputProps {
@@ -23,11 +24,12 @@ export interface SearchInputProps {
 function SearchInput({
   value,
   onSearch,
-  placeholder = '搜索...',
+  placeholder,
   debounce = 300,
   style = { width: 300 },
   size,
 }: SearchInputProps) {
+  const { t } = useTranslation();
   const [localValue, setLocalValue] = useState(value ?? '');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isUserEditingRef = useRef(false);
@@ -71,7 +73,7 @@ function SearchInput({
 
   return (
     <Input.Search
-      placeholder={placeholder}
+      placeholder={placeholder ?? t('action.search')}
       value={localValue}
       onChange={(e) => handleChange(e.target.value)}
       onSearch={handleSearch}

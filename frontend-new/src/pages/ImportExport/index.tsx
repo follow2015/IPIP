@@ -4,6 +4,8 @@
  * - 数据导出：选择类型 → 可选过滤条件 → 导出 Excel
  */
 import { useState } from 'react';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import {
   Tabs,
   Card,
@@ -36,27 +38,68 @@ import { ImportExportType, DeviceType } from '@/types/enums';
 
 const { Text, Title } = Typography;
 
-const TYPE_OPTIONS = [
-  { label: '设备', value: ImportExportType.DEVICE },
-  { label: '客户', value: ImportExportType.CUSTOMER },
-  { label: '机柜', value: ImportExportType.CABINET }
-];
+type ImportExportT = TFunction<'device'>;
+type CommonT = TFunction<'common'>;
 
-const DEVICE_TEMPLATE_OPTIONS: { label: string; value: DeviceType; desc: string }[] = [
-  {
-    label: '服务器',
-    value: DeviceType.SERVER,
-    desc: '硬件配置必须通过配件模板ID指定，CPU/内存模板ID必填'
-  },
-  { label: '网络设备', value: DeviceType.NETWORK, desc: '含网管凭据、SSH配置、交换机拓扑字段' },
-  { label: '其他设备', value: DeviceType.OTHER, desc: 'PDU、UPS等，仅基本信息+资产归属' }
-];
+function getTypeOptions(td: ImportExportT, tc: CommonT) {
+  return [
+    { label: td('importExport.type.device'), value: ImportExportType.DEVICE },
+    { label: tc('field.customer'), value: ImportExportType.CUSTOMER },
+    { label: td('field.cabinet'), value: ImportExportType.CABINET }
+  ];
+}
 
-const TYPE_LABEL: Record<ImportExportType, string> = {
-  [ImportExportType.DEVICE]: '设备',
-  [ImportExportType.CUSTOMER]: '客户',
-  [ImportExportType.CABINET]: '机柜'
-};
+function getTypeLabel(type: ImportExportType, td: ImportExportT, tc: CommonT): string {
+  switch (type) {
+    case ImportExportType.CUSTOMER:
+      return tc('field.customer');
+    case ImportExportType.CABINET:
+      return td('field.cabinet');
+    default:
+      return td('importExport.type.device');
+  }
+}
+
+function getTypeNameLabel(type: ImportExportType, td: ImportExportT): string {
+  switch (type) {
+    case ImportExportType.CUSTOMER:
+      return td('customer.field.name');
+    case ImportExportType.CABINET:
+      return td('cabinet.form.name');
+    default:
+      return td('field.name');
+  }
+}
+
+function getCsvHeaders(td: ImportExportT) {
+  return {
+    cpu: td('importExport.template.header.cpuTemplateId'),
+    memory: td('importExport.template.header.memoryTemplateId'),
+    storage: td('importExport.template.header.storageTemplateId'),
+    nic: td('importExport.template.header.nicTemplateId')
+  };
+}
+
+function getDeviceTemplateOptions(td: ImportExportT) {
+  const headers = getCsvHeaders(td);
+  return [
+    {
+      label: td('deviceType.SERVER'),
+      value: DeviceType.SERVER,
+      desc: td('importExport.template.server.desc', { cpu: headers.cpu, mem: headers.memory })
+    },
+    {
+      label: td('deviceType.NETWORK'),
+      value: DeviceType.NETWORK,
+      desc: td('importExport.template.network.desc')
+    },
+    {
+      label: td('deviceType.OTHER'),
+      value: DeviceType.OTHER,
+      desc: td('importExport.template.other.desc')
+    }
+  ];
+}
 
 interface FailedRowDetail {
   row: number;
@@ -66,6 +109,8 @@ interface FailedRowDetail {
 
 
 function ImportPanel() {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const message = useMessage();
   const [importType, setImportType] = useState<ImportExportType>(ImportExportType.DEVICE);
   const [deviceTemplateType, setDeviceTemplateType] = useState<DeviceType>(DeviceType.SERVER);
@@ -80,6 +125,11 @@ function ImportPanel() {
   const importData = useImportData();
 
   const isDevice = importType === ImportExportType.DEVICE;
+
+  const typeOptions = getTypeOptions(td, tc);
+  const deviceTemplateOptions = getDeviceTemplateOptions(td);
+  const typeLabel = getTypeLabel(importType, td, tc);
+  const csvHeaders = getCsvHeaders(td);
 
   const handleDownloadTemplate = async () => {
     try {
@@ -97,9 +147,9 @@ function ImportPanel() {
       a.download = `${importType}${suffix}_template.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      message.success('模板下载成功');
+      message.success(td('importExport.message.templateDownloaded'));
     } catch {
-      message.error('下载模板失败');
+      message.error(td('importExport.message.templateDownloadFailed'));
     }
   };
 
@@ -118,15 +168,20 @@ function ImportPanel() {
         setImportResult(result);
         const { imported_count, failed_count } = result;
         if (failed_count > 0) {
-          message.warning(`成功导入 ${imported_count} 条，${failed_count} 条失败`);
+          message.warning(
+            td('importExport.message.importedWithFailed', {
+              imported: imported_count,
+              failed: failed_count
+            })
+          );
         } else {
-          message.success(`成功导入 ${imported_count} 条数据`);
+          message.success(td('importExport.message.imported', { count: imported_count }));
         }
       } else {
-        message.success('导入完成');
+        message.success(td('importExport.message.importDone'));
       }
     } catch {
-      message.error('导入失败，请检查文件格式是否与模板一致');
+      message.error(td('importExport.message.importFailed'));
     }
   };
 
@@ -136,16 +191,16 @@ function ImportPanel() {
   };
 
   const failedColumns = [
-    { title: '行号', dataIndex: 'row', key: 'row', width: 60 },
+    { title: td('importExport.result.column.row'), dataIndex: 'row', key: 'row', width: 60 },
     {
-      title: `${TYPE_LABEL[importType]}名称`,
+      title: getTypeNameLabel(importType, td),
       dataIndex: 'name',
       key: 'name',
       width: 120,
       ellipsis: true
     },
     {
-      title: '错误原因',
+      title: td('importExport.result.column.errorReason'),
       dataIndex: 'error',
       key: 'error',
       render: (text: string) => (
@@ -161,18 +216,18 @@ function ImportPanel() {
       {/* 上方：操作区(左) + 说明区(右)，等高 */}
       <Row gutter={24} align="stretch">
         <Col xs={24} lg={14}>
-          <Card title="导入操作" styles={{ body: { padding: 24 } }}>
+          <Card title={td('importExport.panel.importTitle')} styles={{ body: { padding: 24 } }}>
             <Steps
               orientation="vertical"
               size="small"
               current={importResult ? 3 : fileList.length ? 2 : 0}
               items={[
                 {
-                  title: '选择数据类型',
+                  title: td('importExport.step.selectType'),
                   description: (
                     <Space orientation="vertical" style={{ width: '100%' }}>
                       <Select
-                        options={TYPE_OPTIONS}
+                        options={typeOptions}
                         value={importType}
                         onChange={(v) => {
                           setImportType(v);
@@ -182,7 +237,7 @@ function ImportPanel() {
                       />
                       {isDevice && (
                         <Select
-                          options={DEVICE_TEMPLATE_OPTIONS.map((o) => ({
+                          options={deviceTemplateOptions.map((o) => ({
                             label: o.label,
                             value: o.value
                           }))}
@@ -195,7 +250,7 @@ function ImportPanel() {
                   )
                 },
                 {
-                  title: '下载模板并填写数据',
+                  title: td('importExport.step.downloadTemplate'),
                   description: (
                     <Space orientation="vertical" style={{ width: '100%' }}>
                       <Button
@@ -203,21 +258,18 @@ function ImportPanel() {
                         onClick={handleDownloadTemplate}
                         loading={downloadTemplate.isPending}
                       >
-                        下载{TYPE_LABEL[importType]}导入模板
+                        {td('importExport.action.downloadTemplate', { type: typeLabel })}
                       </Button>
                       {isDevice && (
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                          {
-                            DEVICE_TEMPLATE_OPTIONS.find((o) => o.value === deviceTemplateType)
-                              ?.desc
-                          }
+                          {deviceTemplateOptions.find((o) => o.value === deviceTemplateType)?.desc}
                         </Text>
                       )}
                     </Space>
                   )
                 },
                 {
-                  title: '上传填写好的文件',
+                  title: td('importExport.step.uploadFile'),
                   description: (
                     <Space orientation="vertical" style={{ width: '100%' }}>
                       {fileList.length > 0 ? (
@@ -226,7 +278,7 @@ function ImportPanel() {
                             {fileList[0].name}
                           </Tag>
                           <Button size="small" onClick={handleReset}>
-                            重新选择
+                            {td('importExport.action.reselect')}
                           </Button>
                         </Space>
                       ) : (
@@ -236,7 +288,9 @@ function ImportPanel() {
                           showUploadList={false}
                           maxCount={1}
                         >
-                          <Button icon={<UploadOutlined />}>选择文件</Button>
+                          <Button icon={<UploadOutlined />}>
+                            {td('importExport.action.selectFile')}
+                          </Button>
                         </Upload>
                       )}
                       {fileList.length > 0 && !importResult && (
@@ -246,7 +300,7 @@ function ImportPanel() {
                           onClick={handleImport}
                           loading={importData.isPending}
                         >
-                          开始导入
+                          {td('importExport.action.startImport')}
                         </Button>
                       )}
                     </Space>
@@ -258,38 +312,47 @@ function ImportPanel() {
         </Col>
 
         <Col xs={24} lg={10}>
-          <Card title="使用说明" size="small" styles={{ body: { padding: 16 } }}>
+          <Card title={td('importExport.guide.title')} size="small" styles={{ body: { padding: 16 } }}>
             <Space orientation="vertical" style={{ width: '100%' }} size="small">
-              <Text>1. 选择要导入的数据类型</Text>
-              <Text>2. 下载对应模板，按格式填写数据</Text>
-              <Text>3. 上传填写好的文件，系统自动校验并导入</Text>
+              <Text>{td('importExport.guide.step1')}</Text>
+              <Text>{td('importExport.guide.step2')}</Text>
+              <Text>{td('importExport.guide.step3')}</Text>
               <Divider style={{ margin: '8px 0' }} />
               <Text type="secondary" style={{ fontSize: 12 }}>
-                支持 .xlsx、.xls、.csv 格式
+                {td('importExport.guide.supportedFormats')}
               </Text>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                请勿修改模板表头，否则可能导致导入失败
+                {td('importExport.guide.keepHeader')}
               </Text>
               {isDevice && (
                 <>
                   <Divider style={{ margin: '8px 0' }} />
                   <Text strong style={{ fontSize: 12 }}>
-                    设备模板类型说明：
+                    {td('importExport.guide.deviceTemplateTitle')}
                   </Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    <Tag color="blue">服务器</Tag> 硬件配置必须通过配件模板ID指定
+                    <Tag color="blue">{td('deviceType.SERVER')}</Tag>{' '}
+                    {td('importExport.template.server.hardwareByTemplate')}
                   </Text>
                   <Text type="danger" style={{ fontSize: 12 }}>
-                    CPU模板ID、内存模板ID 为必填项
+                    {td('importExport.template.cpuMemoryRequired', {
+                      cpu: csvHeaders.cpu,
+                      mem: csvHeaders.memory
+                    })}
                   </Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    存储模板ID、网卡模板ID 为选填，填写后自动创建对应子记录
+                    {td('importExport.template.storageNicOptional', {
+                      storage: csvHeaders.storage,
+                      nic: csvHeaders.nic
+                    })}
                   </Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    <Tag color="green">网络设备</Tag> 含网管凭据、SSH配置、交换机拓扑字段
+                    <Tag color="green">{td('deviceType.NETWORK')}</Tag>{' '}
+                    {td('importExport.template.network.desc')}
                   </Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    <Tag color="orange">其他设备</Tag> PDU、UPS等，仅基本信息+资产归属
+                    <Tag color="orange">{td('deviceType.OTHER')}</Tag>{' '}
+                    {td('importExport.template.other.desc')}
                   </Text>
                 </>
               )}
@@ -300,7 +363,7 @@ function ImportPanel() {
 
       {/* 导入结果（下方全宽） */}
       {importResult && (
-        <Card title="导入结果" styles={{ body: { padding: 16 } }}>
+        <Card title={td('importExport.result.title')} styles={{ body: { padding: 16 } }}>
           <Space orientation="vertical" style={{ width: '100%' }} size="middle">
             <Row gutter={16}>
               <Col xs={12} md={6}>
@@ -308,7 +371,7 @@ function ImportPanel() {
                   <Title level={3} style={{ color: '#52c41a', margin: 0 }}>
                     {importResult.imported_count}
                   </Title>
-                  <Text type="secondary">成功导入</Text>
+                  <Text type="secondary">{td('importExport.result.success')}</Text>
                 </Card>
               </Col>
               <Col xs={12} md={6}>
@@ -322,7 +385,7 @@ function ImportPanel() {
                   >
                     {importResult.failed_count}
                   </Title>
-                  <Text type="secondary">导入失败</Text>
+                  <Text type="secondary">{td('importExport.result.failed')}</Text>
                 </Card>
               </Col>
             </Row>
@@ -335,7 +398,7 @@ function ImportPanel() {
                 scroll={{ x: 'max-content' }}
               />
             )}
-            <Button onClick={handleReset}>继续导入</Button>
+            <Button onClick={handleReset}>{td('importExport.action.continueImport')}</Button>
           </Space>
         </Card>
       )}
@@ -345,6 +408,8 @@ function ImportPanel() {
 
 
 function ExportPanel() {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const message = useMessage();
   const [exportType, setExportType] = useState<ImportExportType>(ImportExportType.DEVICE);
   const [cabinetId, setCabinetId] = useState<number | null>(null);
@@ -353,6 +418,9 @@ function ExportPanel() {
   const exportData = useExportData();
 
   const isDevice = exportType === ImportExportType.DEVICE;
+
+  const typeOptions = getTypeOptions(td, tc);
+  const typeLabel = getTypeLabel(exportType, td, tc);
 
   const handleExport = async () => {
     try {
@@ -372,24 +440,24 @@ function ExportPanel() {
       a.download = `${exportType}_export_${timestamp}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      message.success('导出成功');
+      message.success(td('importExport.message.exportSuccess'));
     } catch {
-      message.error('导出失败');
+      message.error(td('importExport.message.exportFailed'));
     }
   };
 
   return (
     <Row gutter={24}>
       <Col xs={24} lg={14}>
-        <Card title="导出操作" styles={{ body: { padding: 24 } }}>
+        <Card title={td('importExport.panel.exportTitle')} styles={{ body: { padding: 24 } }}>
           <Space orientation="vertical" style={{ width: '100%' }} size="large">
             {/* 数据类型选择 */}
             <div>
               <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                选择数据类型
+                {td('importExport.step.selectType')}
               </Text>
               <Select
-                options={TYPE_OPTIONS}
+                options={typeOptions}
                 value={exportType}
                 onChange={(v) => {
                   setExportType(v);
@@ -404,13 +472,13 @@ function ExportPanel() {
             {isDevice && (
               <div>
                 <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                  过滤条件（可选）
+                  {td('importExport.export.filterTitle')}
                 </Text>
                 <Space>
                   <Space.Compact>
-                    <Text style={{ lineHeight: '32px' }}>机柜ID</Text>
+                    <Text style={{ lineHeight: '32px' }}>{td('importExport.export.cabinetId')}</Text>
                     <InputNumber
-                      placeholder="全部"
+                      placeholder={td('importExport.export.all')}
                       value={cabinetId}
                       onChange={setCabinetId}
                       min={1}
@@ -418,9 +486,11 @@ function ExportPanel() {
                     />
                   </Space.Compact>
                   <Space.Compact>
-                    <Text style={{ lineHeight: '32px' }}>客户ID</Text>
+                    <Text style={{ lineHeight: '32px' }}>
+                      {td('importExport.export.customerId')}
+                    </Text>
                     <InputNumber
-                      placeholder="全部"
+                      placeholder={td('importExport.export.all')}
                       value={customerId}
                       onChange={setCustomerId}
                       min={1}
@@ -430,7 +500,7 @@ function ExportPanel() {
                 </Space>
                 <br />
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  不填则导出全部数据
+                  {td('importExport.export.noFilterHint')}
                 </Text>
               </div>
             )}
@@ -443,28 +513,28 @@ function ExportPanel() {
               loading={exportData.isPending}
               size="large"
             >
-              导出{TYPE_LABEL[exportType]}数据
+              {td('importExport.action.exportData', { type: typeLabel })}
             </Button>
           </Space>
         </Card>
       </Col>
 
       <Col xs={24} lg={10}>
-        <Card title="导出说明" size="small" styles={{ body: { padding: 16 } }}>
+        <Card title={td('importExport.export.guideTitle')} size="small" styles={{ body: { padding: 16 } }}>
           <Space orientation="vertical" style={{ width: '100%' }} size="small">
-            <Text>导出数据为 Excel (.xlsx) 格式</Text>
+            <Text>{td('importExport.export.excelFormat')}</Text>
             {isDevice && (
               <>
                 <Divider style={{ margin: '8px 0' }} />
-                <Text strong>设备导出支持按条件过滤：</Text>
+                <Text strong>{td('importExport.export.deviceFilterTitle')}</Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  - 指定机柜ID：仅导出该机柜下的设备
+                  {td('importExport.export.filterByCabinet')}
                 </Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  - 指定客户ID：仅导出归属该客户的设备
+                  {td('importExport.export.filterByCustomer')}
                 </Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  - 两个条件可同时使用
+                  {td('importExport.export.filterBoth')}
                 </Text>
               </>
             )}
@@ -477,6 +547,7 @@ function ExportPanel() {
 
 
 function ImportExport() {
+  const { t: td } = useTranslation('device');
   return (
     <Tabs
       defaultActiveKey="import"
@@ -486,7 +557,7 @@ function ImportExport() {
           label: (
             <Space>
               <UploadOutlined />
-              数据导入
+              {td('importExport.tab.import')}
             </Space>
           ),
           children: <ImportPanel />
@@ -496,7 +567,7 @@ function ImportExport() {
           label: (
             <Space>
               <ExportOutlined />
-              数据导出
+              {td('importExport.tab.export')}
             </Space>
           ),
           children: <ExportPanel />

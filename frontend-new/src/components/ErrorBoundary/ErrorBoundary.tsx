@@ -3,6 +3,7 @@
  * - 捕获子组件渲染异常，展示友好错误页面
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -12,6 +13,13 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+}
+
+type FallbackTextKey = 'error.title' | 'action.retry';
+
+function FallbackText({ k }: { k: FallbackTextKey }) {
+  const { t } = useTranslation();
+  return <>{t(k)}</>;
 }
 
 export class ErrorBoundary extends React.Component<
@@ -39,9 +47,13 @@ export class ErrorBoundary extends React.Component<
       }
       return (
         <div style={{ textAlign: 'center', padding: '100px 0' }}>
-          <h2>页面出现错误</h2>
+          <h2>
+            <FallbackText k="error.title" />
+          </h2>
           <p>{this.state.error.message}</p>
-          <button onClick={this.reset}>重试</button>
+          <button onClick={this.reset}>
+            <FallbackText k="action.retry" />
+          </button>
         </div>
       );
     }

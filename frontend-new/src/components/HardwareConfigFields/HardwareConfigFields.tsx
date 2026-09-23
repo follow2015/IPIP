@@ -17,6 +17,8 @@
 import { Form, Input, InputNumber, Select, Row, Col, Divider, Space, Button } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
+import { useTranslation } from 'react-i18next';
+import i18next from '@/i18n';
 import { useComponentTemplates } from '@/services/component-template';
 import type { ComponentTemplate } from '@/services/component-template';
 
@@ -60,6 +62,8 @@ export default function HardwareConfigFields({
   storageListName = 'storage_items',
   storageOnly = false
 }: HardwareConfigFieldsProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const { data: cpuTemplates = [] } = useComponentTemplates('cpu', customerId);
   const { data: memoryTemplates = [] } = useComponentTemplates('memory', customerId);
   const { data: diskTemplates = [] } = useComponentTemplates('disk', customerId);
@@ -79,16 +83,19 @@ export default function HardwareConfigFields({
 
   return (
     <>
-      {!storageOnly && <Divider plain>硬件配置</Divider>}
+      {!storageOnly && <Divider plain>{t('node.field.hardware')}</Divider>}
 
       {!storageOnly && (
         <>
           {/* ── CPU 配置 ── */}
           <Row gutter={16}>
             <Col xs={24} md={8}>
-              <Form.Item name={prefixedName(prefix, 'cpu_template_id')} label="CPU型号">
+              <Form.Item
+                name={prefixedName(prefix, 'cpu_template_id')}
+                label={t('hardware.cpu.model')}
+              >
                 <Select
-                  placeholder="选择CPU模板（可搜索品牌/型号）"
+                  placeholder={t('hardware.cpu.modelPlaceholder')}
                   allowClear
                   showSearch
                   optionFilterProp="label"
@@ -115,13 +122,22 @@ export default function HardwareConfigFields({
               </Form.Item>
             </Col>
             <Col xs={12} md={4}>
-              <Form.Item name={prefixedName(prefix, 'cpu_way')} label="CPU路数">
-                <InputNumber min={1} max={8} style={{ width: '100%' }} placeholder="路数" />
+              <Form.Item name={prefixedName(prefix, 'cpu_way')} label={t('hardware.cpu.way')}>
+                <InputNumber
+                  min={1}
+                  max={8}
+                  style={{ width: '100%' }}
+                  placeholder={t('hardware.cpu.wayPlaceholder')}
+                />
               </Form.Item>
             </Col>
             <Col xs={12} md={4}>
-              <Form.Item name={prefixedName(prefix, 'cpu_cores')} label="单颗核心数">
-                <InputNumber min={1} style={{ width: '100%' }} placeholder="核心数" />
+              <Form.Item name={prefixedName(prefix, 'cpu_cores')} label={t('hardware.cpu.cores')}>
+                <InputNumber
+                  min={1}
+                  style={{ width: '100%' }}
+                  placeholder={t('hardware.cpu.coresPlaceholder')}
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -129,9 +145,12 @@ export default function HardwareConfigFields({
           {/* ── 内存配置 ── */}
           <Row gutter={16}>
             <Col xs={24} md={8}>
-              <Form.Item name={prefixedName(prefix, 'memory_template_id')} label="内存型号">
+              <Form.Item
+                name={prefixedName(prefix, 'memory_template_id')}
+                label={t('hardware.memory.model')}
+              >
                 <Select
-                  placeholder="选择内存模板"
+                  placeholder={t('hardware.memory.modelPlaceholder')}
                   allowClear
                   showSearch
                   optionFilterProp="label"
@@ -162,13 +181,16 @@ export default function HardwareConfigFields({
               </Form.Item>
             </Col>
             <Col xs={12} md={4}>
-              <Form.Item name={prefixedName(prefix, 'memory_dimm_count')} label="内存条数">
+              <Form.Item
+                name={prefixedName(prefix, 'memory_dimm_count')}
+                label={t('hardware.memory.dimmCount')}
+              >
                 <InputNumber
                   min={1}
                   max={32}
                   style={{ width: '100%' }}
-                  placeholder="条数"
-                  addonAfter="条"
+                  placeholder={t('hardware.memory.dimmCountPlaceholder')}
+                  addonAfter={t('hardware.memory.dimmCountUnit')}
                   onChange={(n: number | null) => {
                     const id = getField('memory_template_id');
                     const tpl = memoryTemplates.find((t: ComponentTemplate) => t.id === id);
@@ -183,7 +205,10 @@ export default function HardwareConfigFields({
               </Form.Item>
             </Col>
             <Col xs={12} md={4}>
-              <Form.Item name={prefixedName(prefix, 'memory_size_gb')} label="内存总容量">
+              <Form.Item
+                name={prefixedName(prefix, 'memory_size_gb')}
+                label={t('hardware.memory.totalCapacity')}
+              >
                 <InputNumber
                   min={0}
                   style={{ width: '100%' }}
@@ -194,8 +219,8 @@ export default function HardwareConfigFields({
               </Form.Item>
             </Col>
             <Col xs={12} md={4}>
-              <Form.Item name={prefixedName(prefix, 'os_version')} label="操作系统">
-                <Input placeholder="如 CentOS 7.9" />
+              <Form.Item name={prefixedName(prefix, 'os_version')} label={t('hardware.os.label')}>
+                <Input placeholder={t('hardware.os.placeholder')} />
               </Form.Item>
             </Col>
           </Row>
@@ -203,9 +228,12 @@ export default function HardwareConfigFields({
           {/* ── GPU 配置 ── */}
           <Row gutter={16}>
             <Col xs={24} md={8}>
-              <Form.Item name={prefixedName(prefix, 'gpu_template_id')} label="显卡型号">
+              <Form.Item
+                name={prefixedName(prefix, 'gpu_template_id')}
+                label={t('hardware.gpu.model')}
+              >
                 <Select
-                  placeholder="选择显卡模板（可搜索品牌/型号）"
+                  placeholder={t('hardware.gpu.modelPlaceholder')}
                   allowClear
                   showSearch
                   optionFilterProp="label"
@@ -230,19 +258,19 @@ export default function HardwareConfigFields({
               </Form.Item>
             </Col>
             <Col xs={12} md={4}>
-              <Form.Item name={prefixedName(prefix, 'gpu_count')} label="显卡数量">
+              <Form.Item name={prefixedName(prefix, 'gpu_count')} label={t('hardware.gpu.count')}>
                 <InputNumber
                   min={0}
                   max={16}
                   style={{ width: '100%' }}
                   placeholder="0"
-                  addonAfter="张"
+                  addonAfter={t('hardware.gpu.countUnit')}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
-              <Form.Item name={prefixedName(prefix, 'gpu')} label="显卡描述">
-                <Input placeholder="如 NVIDIA A100 80GB × 8" />
+              <Form.Item name={prefixedName(prefix, 'gpu')} label={t('hardware.gpu.description')}>
+                <Input placeholder={t('hardware.gpu.descriptionPlaceholder')} />
               </Form.Item>
             </Col>
           </Row>
@@ -252,19 +280,28 @@ export default function HardwareConfigFields({
             <Row gutter={16}>
               {showIpmiAddress && (
                 <Col xs={24} md={8}>
-                  <Form.Item name={prefixedName(prefix, 'ipmi_address')} label="IPMI地址">
-                    <Input placeholder="IPMI管理地址" />
+                  <Form.Item
+                    name={prefixedName(prefix, 'ipmi_address')}
+                    label={t('hardware.ipmi.address')}
+                  >
+                    <Input placeholder={t('hardware.ipmi.addressPlaceholder')} />
                   </Form.Item>
                 </Col>
               )}
               <Col xs={24} md={8}>
-                <Form.Item name={prefixedName(prefix, 'ipmi_username')} label="IPMI用户名">
-                  <Input placeholder="IPMI登录用户名" />
+                <Form.Item
+                  name={prefixedName(prefix, 'ipmi_username')}
+                  label={t('hardware.ipmi.username')}
+                >
+                  <Input placeholder={t('hardware.ipmi.usernamePlaceholder')} />
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
-                <Form.Item name={prefixedName(prefix, 'ipmi_password')} label="IPMI密码">
-                  <Input.Password placeholder="IPMI登录密码" />
+                <Form.Item
+                  name={prefixedName(prefix, 'ipmi_password')}
+                  label={t('hardware.ipmi.password')}
+                >
+                  <Input.Password placeholder={t('hardware.ipmi.passwordPlaceholder')} />
                 </Form.Item>
               </Col>
             </Row>
@@ -274,7 +311,9 @@ export default function HardwareConfigFields({
 
       {/* ── 存储配置（模板选择 + 数量） ── */}
       <div style={{ marginBottom: 8 }}>
-        <div style={{ marginBottom: 4, fontWeight: 500, fontSize: 14 }}>存储配置</div>
+        <div style={{ marginBottom: 4, fontWeight: 500, fontSize: 14 }}>
+          {t('hardware.storage.title')}
+        </div>
         <Form.List
           name={prefix ? [prefix, storageListName] : storageListName}
           initialValue={[{ count: 1, template_id: undefined }]}
@@ -286,10 +325,10 @@ export default function HardwareConfigFields({
                   <Form.Item
                     {...restField}
                     name={[name, 'template_id']}
-                    label={name === 0 ? '硬盘型号' : ''}
+                    label={name === 0 ? t('hardware.storage.model') : ''}
                   >
                     <Select
-                      placeholder="选择硬盘模板"
+                      placeholder={t('hardware.storage.placeholder')}
                       allowClear
                       showSearch
                       style={{ width: 220 }}
@@ -320,26 +359,30 @@ export default function HardwareConfigFields({
                       }}
                     />
                   </Form.Item>
-                  <Form.Item {...restField} name={[name, 'count']} label={name === 0 ? '数量' : ''}>
+                  <Form.Item
+                    {...restField}
+                    name={[name, 'count']}
+                    label={name === 0 ? t('hardware.storage.count') : ''}
+                  >
                     <InputNumber
                       min={1}
                       max={128}
                       placeholder="1"
                       style={{ width: 72 }}
-                      addonAfter="块"
+                      addonAfter={t('hardware.storage.countUnit')}
                     />
                   </Form.Item>
                   <Form.Item
                     {...restField}
                     name={[name, 'capacity']}
-                    label={name === 0 ? '容量' : ''}
+                    label={name === 0 ? t('storage.column.capacity') : ''}
                   >
                     <Input placeholder="480GB" style={{ width: 100 }} />
                   </Form.Item>
                   <Form.Item
                     {...restField}
                     name={[name, 'storage_type']}
-                    label={name === 0 ? '类型' : ''}
+                    label={name === 0 ? tCommon('field.type') : ''}
                   >
                     <Select
                       style={{ width: 90 }}
@@ -353,12 +396,12 @@ export default function HardwareConfigFields({
                   <Form.Item
                     {...restField}
                     name={[name, 'interface_type']}
-                    label={name === 0 ? '接口' : ''}
+                    label={name === 0 ? t('storage.column.interface') : ''}
                   >
                     <Select
                       style={{ width: 90 }}
                       allowClear
-                      placeholder="可选"
+                      placeholder={t('hardware.storage.optional')}
                       options={[
                         { label: 'SATA', value: 'SATA' },
                         { label: 'SAS', value: 'SAS' },
@@ -380,7 +423,7 @@ export default function HardwareConfigFields({
                 icon={<PlusOutlined />}
                 size="small"
               >
-                添加硬盘
+                {t('hardware.storage.add')}
               </Button>
             </>
           )}
@@ -392,11 +435,12 @@ export default function HardwareConfigFields({
 
 export function buildStorageSummary(items?: StorageItem[]): string {
   if (!items?.length) return '';
+  const fallbackCapacity = i18next.t('hardware.storage.templateDefault', { ns: 'device' });
   return items
     .filter((it) => it.capacity || it.template_id)
     .map(
       (it) =>
-        `${it.count ?? 1}×${it.capacity || '(模板默认)'} ${it.storage_type || ''}${it.interface_type ? ' ' + it.interface_type : ''}`
+        `${it.count ?? 1}×${it.capacity || fallbackCapacity} ${it.storage_type || ''}${it.interface_type ? ' ' + it.interface_type : ''}`
     )
     .join(' + ');
 }

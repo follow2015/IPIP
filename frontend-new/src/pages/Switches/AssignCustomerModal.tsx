@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal, Form, Select, Input } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { SelectOption } from '@/services';
 
 export interface AssignCustomerValues {
@@ -26,6 +27,8 @@ export function AssignCustomerModal({
   customerOptions,
   onSubmit
 }: AssignCustomerModalProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -47,20 +50,20 @@ export function AssignCustomerModal({
   };
 
   return (
-    <Modal title="分配客户" open={open} onOk={handleOk} onCancel={onClose} destroyOnHidden>
+    <Modal title={td('switch.assign.title')} open={open} onOk={handleOk} onCancel={onClose} destroyOnHidden>
       <Form form={form} layout="vertical">
-        <Form.Item label="端口">
+        <Form.Item label={td('switch.assign.port')}>
           <span>{portName}</span>
         </Form.Item>
-        <Form.Item name="customer_id" label="客户">
+        <Form.Item name="customer_id" label={tc('field.customer')}>
           <Select
-            placeholder="选择客户"
-            options={[{ value: 0, label: '无' }, ...(customerOptions ?? [])]}
+            placeholder={td('port.field.selectCustomer')}
+            options={[{ value: 0, label: td('switch.assign.none') }, ...(customerOptions ?? [])]}
             allowClear
           />
         </Form.Item>
-        <Form.Item name="description" label="描述/备注">
-          <Input.TextArea rows={2} placeholder="端口描述..." />
+        <Form.Item name="description" label={td('switch.assign.description')}>
+          <Input.TextArea rows={2} placeholder={td('switch.assign.descriptionPlaceholder')} />
         </Form.Item>
       </Form>
     </Modal>

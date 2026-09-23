@@ -23,12 +23,13 @@ import { useSwitchList, useDeleteSwitch, useScanRoom } from '@/services/switch';
 import { useRoomOptions } from '@/services/room';
 import type { Switch } from '@/types/models';
 import type { Device } from '@/types/models';
+import { DeviceType } from '@/types/enums';
 import {
-  SWITCH_ROLE_MAP,
-  SwitchRoleCode,
-  DeviceType,
-  SWITCH_DEVICE_TYPE_OPTIONS
-} from '@/types/enums';
+  getSwitchDeviceTypeOptions,
+  getSwitchRoleMeta,
+  getSwitchRoleOptions
+} from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import { useTable } from '@/hooks/useTable';
 import { useBatchSelection, scopeViolationMessage } from '@/hooks/useBatchSelection';
 import { useMessage } from '@/hooks/useMessage';
@@ -39,6 +40,8 @@ const SCAN_TIMEOUT = 5 * 60_000;
 const { Text } = Typography;
 
 function Switches() {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
   const table = useTable();
   const navigate = useNavigate();
@@ -109,23 +112,25 @@ function Switches() {
   const handleScanRoom = () => {
     const roomId = table.filters.room_id ? Number(table.filters.room_id) : undefined;
     if (!roomId) {
-      message.warning('请先选择机房');
+      message.warning(td('switch.message.selectRoomFirst'));
       return;
     }
     confirm({
-      title: '扫描机房',
-      content: `将对机房内所有网络设备执行全量扫描，可能需要较长时间。`,
+      title: td('switch.action.scanRoom'),
+      content: td('switch.confirm.scanRoomContent'),
+      okText: tc('action.ok'),
+      cancelText: tc('action.cancel'),
       onOk: async () => {
         try {
           await scanRoom.mutateAsync(roomId);
           setScanningRoomId(roomId);
-          message.info('机房扫描已提交，完成后将通过消息通知您');
+          message.info(td('switch.message.scanSubmitted'));
           scanTimeoutRef.current = setTimeout(() => {
             scanTimeoutRef.current = null;
             setScanningRoomId(null);
           }, SCAN_TIMEOUT);
         } catch {
-          message.error('机房扫描提交失败');
+          message.error(td('switch.message.scanSubmitFailed'));
         }
       }
     });
@@ -147,31 +152,47 @@ function Switches() {
   const confirmAction = useConfirmAction();
   const handleDelete = (r: Switch) => {
     confirmAction({
-      title: '确认删除',
-      content: `确定要删除网络设备「${r.name}」吗？`,
+      title: tc('confirm.deleteTitle'),
+      content: td('switch.deleteContent', { name: r.name }),
       okType: 'danger',
-      successMessage: '删除成功',
+      successMessage: tc('message.deleteSuccess'),
       onConfirm: () => deleteSwitch.mutateAsync(r.device_id),
       afterConfirm: refetch
     });
   };
 
   const handleCopy = (r: Switch) => {
-    const text = `名称: ${r.name}\nIP: ${r.ip_address}\n类型: ${SWITCH_ROLE_MAP[r.switch_role as SwitchRoleCode]?.label ?? '-'}\n型号: ${r.device_model ?? '-'}\n机房: ${r.room_name ?? '-'}\n协议: ${r.protocol ?? '-'}\n设备类型: ${r.device_type ?? '-'}`;
-    navigator.clipboard.writeText(text).then(() => message.success('已复制'));
+    const text = [
+      td('switch.copy.name', { value: r.name }),
+      td('switch.copy.ip', { value: r.ip_address ?? '-' }),
+      td('switch.copy.role', { value: getSwitchRoleMeta(r.switch_role, td)?.label ?? '-' }),
+      td('switch.copy.deviceModel', { value: r.device_model ?? '-' }),
+      td('switch.copy.room', { value: r.room_name ?? '-' }),
+      td('switch.copy.protocol', { value: r.protocol ?? '-' }),
+      td('switch.copy.deviceType', { value: r.device_type ?? '-' })
+    ].join('\n');
+    navigator.clipboard.writeText(text).then(() => message.success(td('switch.message.copied')));
   };
 
   const handleExport = useCallback(() => {
     const items = data?.items ?? [];
     if (!items.length) {
-      message.warning('无数据可导出');
+      message.warning(td('switch.message.noDataToExport'));
       return;
     }
-    const headers = ['名称', '管理IP', '类型', '型号', '机房', '协议', '设备类型'];
+    const headers = [
+      tc('field.name'),
+      td('field.managementIp'),
+      tc('field.type'),
+      td('basic.field.model'),
+      td('basic.field.room'),
+      td('switch.field.protocol'),
+      td('basic.field.deviceType')
+    ];
     const rows = items.map((r) => [
       r.name,
       r.ip_address,
-      SWITCH_ROLE_MAP[r.switch_role as SwitchRoleCode]?.label ?? String(r.switch_role),
+      getSwitchRoleMeta(r.switch_role, td)?.label ?? String(r.switch_role),
       r.device_model ?? '',
       r.room_name ?? '',
       r.protocol ?? '',
@@ -185,11 +206,11 @@ function Switches() {
     a.download = `switches_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [data]);
+  }, [data, td]);
 
   const columns = [
     {
-      title: '名称',
+      title: tc('field.name'),
       dataIndex: 'name',
       key: 'name',
       render: (v: string, r: Switch) => (
@@ -198,19 +219,19 @@ function Switches() {
         </Button>
       )
     },
-    { title: '管理IP', dataIndex: 'ip_address', key: 'ip_address' },
+    { title: td('field.managementIp'), dataIndex: 'ip_address', key: 'ip_address' },
     {
-      title: '类型',
+      title: tc('field.type'),
       dataIndex: 'switch_role',
       key: 'switch_role',
       render: (v: number) => (
-        <Tag color={SWITCH_ROLE_MAP[v as SwitchRoleCode]?.color}>
-          {SWITCH_ROLE_MAP[v as SwitchRoleCode]?.label ?? '-'}
+        <Tag color={getSwitchRoleMeta(v, td)?.color}>
+          {getSwitchRoleMeta(v, td)?.label ?? '-'}
         </Tag>
       )
     },
     {
-      title: '层级',
+      title: td('switch.field.layer'),
       dataIndex: 'layer',
       key: 'layer',
       render: (v: number | null) =>
@@ -225,7 +246,7 @@ function Switches() {
         )
     },
     {
-      title: '上行设备',
+      title: td('form.networkTopology.uplinkDevice.label'),
       dataIndex: 'uplink_device_name',
       key: 'uplink_device_name',
       width: 120,
@@ -239,32 +260,32 @@ function Switches() {
         )
     },
     {
-      title: '上行端口',
+      title: td('form.networkTopology.uplinkPorts.label'),
       dataIndex: 'uplink_port_names',
       key: 'uplink_port_names',
       width: 120,
       render: (v: string[] | null) => (v?.length ? v.join(', ') : '-')
     },
     {
-      title: '型号',
+      title: td('basic.field.model'),
       dataIndex: 'device_model',
       key: 'device_model',
       render: (v: string | null) => v ?? '-'
     },
     {
-      title: '机房',
+      title: td('basic.field.room'),
       dataIndex: 'room_name',
       key: 'room_name',
       render: (v: string | null) => v ?? '-'
     },
     {
-      title: '协议',
+      title: td('switch.field.protocol'),
       dataIndex: 'protocol',
       key: 'protocol',
       render: (v: string | null) => v ?? '-'
     },
     {
-      title: '关联设备',
+      title: td('switch.field.connectedDevices'),
       dataIndex: 'connected_device_count',
       key: 'connected_device_count',
       width: 90,
@@ -273,8 +294,10 @@ function Switches() {
         if (!count) return <Tag>0</Tag>;
         return (
           <Popover
-            content={<Link to={`/switches/${record.device_id}`}>查看详情</Link>}
-            title={`${record.name} 关联设备`}
+            content={
+              <Link to={`/switches/${record.device_id}`}>{td('switch.action.viewDetail')}</Link>
+            }
+            title={td('switch.tooltip.connectedDevices', { name: record.name })}
           >
             <Tag color="blue" style={{ cursor: 'pointer' }}>
               {count}
@@ -284,7 +307,7 @@ function Switches() {
       }
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       render: (_: unknown, r: Switch) => renderActions(r)
     }
@@ -293,19 +316,19 @@ function Switches() {
   const renderActions = (r: Switch) => (
     <Space size="small" wrap>
       <Button type="link" size="small" onClick={() => handleDetail(r)}>
-        详情
+        {tc('action.detail')}
       </Button>
       {r.has_ssh && (
         <Button type="link" size="small" onClick={() => handleEdit(r)}>
-          远程信息管理
+          {td('switch.remoteInfo')}
         </Button>
       )}
       <Button type="link" size="small" onClick={() => handleFullEdit(r)}>
-        编辑
+        {tc('action.edit')}
       </Button>
       <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => handleCopy(r)} />
       <Button type="link" size="small" danger onClick={() => handleDelete(r)}>
-        删除
+        {tc('action.delete')}
       </Button>
     </Space>
   );
@@ -317,8 +340,8 @@ function Switches() {
           <Text strong>{r.name}</Text>
         </Button>
         <Space size={4} wrap>
-          <Tag color={SWITCH_ROLE_MAP[r.switch_role as SwitchRoleCode]?.color}>
-            {SWITCH_ROLE_MAP[r.switch_role as SwitchRoleCode]?.label ?? '-'}
+          <Tag color={getSwitchRoleMeta(r.switch_role, td)?.color}>
+            {getSwitchRoleMeta(r.switch_role, td)?.label ?? '-'}
           </Tag>
           {r.layer != null && (
             <Tag color={r.layer === 3 ? 'blue' : r.layer === 2 ? 'green' : 'purple'}>
@@ -337,7 +360,9 @@ function Switches() {
       </Text>
       {r.connected_device_count ? (
         <Link to={`/switches/${r.device_id}`}>
-          <Tag color="blue">关联设备 {r.connected_device_count}</Tag>
+          <Tag color="blue">
+            {td('switch.tag.connectedDevices', { count: r.connected_device_count })}
+          </Tag>
         </Link>
       ) : null}
       {renderActions(r)}
@@ -357,7 +382,9 @@ function Switches() {
   const handleBatchUpdate = () => {
     const targets = batch.completeSelectedRows;
     if (targets === null) {
-      message.warning(scopeViolationMessage(batch, '批量修改', '台设备'));
+      message.warning(
+        scopeViolationMessage(td, batch, td('switch.action.batchUpdate'), td('batch.unit'))
+      );
       return;
     }
     setBatchUpdateTargets(targets);
@@ -369,27 +396,24 @@ function Switches() {
       filters={[
         {
           key: 'room_id',
-          label: '按机房筛选',
+          label: td('filter.byRoom'),
           type: 'select',
           options: roomOptions ?? [],
           width: 160
         },
         {
           key: 'device_type',
-          label: '设备类型',
+          label: td('basic.field.deviceType'),
           type: 'select',
-          options: SWITCH_DEVICE_TYPE_OPTIONS,
+          options: getSwitchDeviceTypeOptions(td),
           width: 120
         },
         {
           key: 'switch_role',
-          label: '设备角色',
+          label: td('switch.batchField.switchRole'),
           type: 'select',
           width: 140,
-          options: Object.entries(SWITCH_ROLE_MAP).map(([k, v]) => ({
-            label: v.label,
-            value: Number(k)
-          }))
+          options: getSwitchRoleOptions(td)
         }
       ]}
       table={table}
@@ -397,23 +421,24 @@ function Switches() {
         <>
           <Segmented
             options={[
-              { value: 'group', label: '分组视图' },
-              { value: 'flat', label: '平铺视图' }
+              { value: 'group', label: td('switch.view.group') },
+              { value: 'flat', label: td('switch.view.flat') }
             ]}
             value={groupMode}
             onChange={(v) => setGroupMode(v as 'group' | 'flat')}
           />
           <Button icon={<SearchOutlined />} onClick={handleScanRoom} loading={scanRoom.isPending}>
-            扫描机房
+            {td('switch.action.scanRoom')}
           </Button>
           <Button icon={<ExportOutlined />} onClick={handleExport}>
-            导出CSV
+            {td('switch.action.exportCsv')}
           </Button>
           <Button icon={<EditOutlined />} disabled={batch.count === 0} onClick={handleBatchUpdate}>
-            批量修改{batch.count > 0 ? `(${batch.count})` : ''}
+            {td('switch.action.batchUpdate')}
+            {batch.count > 0 ? `(${batch.count})` : ''}
           </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            新增网络设备
+            {td('switch.action.add')}
           </Button>
         </>
       }
@@ -462,9 +487,13 @@ function Switches() {
               <SearchInput
                 value={table.search}
                 onSearch={table.setSearch}
-                placeholder="搜索网络设备..."
+                placeholder={td('switch.search.placeholder')}
               />
-              <Button icon={<ReloadOutlined />} onClick={() => refetch()} title="刷新" />
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => refetch()}
+                title={tc('action.refresh')}
+              />
             </Space>
             <Space>{filterAndActions}</Space>
           </div>
@@ -474,7 +503,7 @@ function Switches() {
             items={[
               {
                 key: 'managed',
-                label: `有管理权限 (${managedSwitches.length})`,
+                label: `${td('switch.group.managed')} (${managedSwitches.length})`,
                 children: (
                   <DataTable<Switch>
                     columns={columns}
@@ -490,7 +519,7 @@ function Switches() {
               },
               {
                 key: 'unmanaged',
-                label: `无管理权限 (${unmanagedSwitches.length})`,
+                label: `${td('switch.group.unmanaged')} (${unmanagedSwitches.length})`,
                 children: (
                   <DataTable<Switch>
                     columns={columns}

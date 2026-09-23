@@ -10,6 +10,7 @@ import { get } from '@/services/api-client';
 import type { VirtualRoom } from '@/types/models';
 import type { PaginatedData } from '@/types/api';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 interface VirtualRoomMembersProps {
   open: boolean;
@@ -26,6 +27,9 @@ interface SwitchOption {
 }
 
 function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
+  const { t: tn } = useTranslation('network');
   const [targetKeys, setTargetKeys] = useState<string[]>([]);
   const [switchOptions, setSwitchOptions] = useState<SwitchOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,18 +53,18 @@ function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) 
       setSwitchOptions(
         items.map((sw) => ({
           key: String(sw.device_id),
-          title: sw.name || sw.ip_address || `设备#${sw.device_id}`,
+          title: sw.name || sw.ip_address || td('virtualRoom.members.deviceFallback', { id: sw.device_id }),
           description: sw.ip_address || '',
-          roomName: sw.room_name || `机房#${sw.room_id || '?'}`,
+          roomName: sw.room_name || tn('audit.roomFallback', { id: sw.room_id || '?' }),
           roomId: sw.room_id || 0,
         })),
       );
     } catch {
-      message.error('加载交换机列表失败');
+      message.error(td('virtualRoom.message.loadSwitchesFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [td, tn]);
 
   useEffect(() => {
     if (open && record) {
@@ -79,10 +83,10 @@ function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) 
     try {
       const deviceIds = targetKeys.map((k) => Number(k));
       await updateMembers.mutateAsync({ id: record.id, device_ids: deviceIds });
-      message.success('成员更新成功');
+      message.success(td('virtualRoom.message.membersUpdated'));
       onClose();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '更新失败');
+      message.error(err instanceof Error ? err.message : tn('networkList.message.updateFailed'));
     }
   };
 
@@ -94,20 +98,20 @@ function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) 
   return (
     <Modal
       open={open}
-      title={record ? `管理成员 - ${record.name}` : '管理成员'}
+      title={record ? td('virtualRoom.members.title', { name: record.name }) : td('virtualRoom.action.manageMembers')}
       onOk={handleSubmit}
       onCancel={onClose}
       confirmLoading={updateMembers.isPending}
       destroyOnHidden
       width={720}
-      okText="保存"
+      okText={tc('action.save')}
     >
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <Spin description="加载交换机列表..." />
+          <Spin description={td('virtualRoom.members.loading')} />
         </div>
       ) : switchOptions.length === 0 ? (
-        <Empty description="暂无可用交换机" />
+        <Empty description={td('virtualRoom.members.empty')} />
       ) : (
         <Transfer<SwitchOption>
           dataSource={switchOptions}
@@ -126,7 +130,7 @@ function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) 
           )}
           filterOption={filterOption}
           showSearch
-          titles={['可选交换机', '已选成员']}
+          titles={[td('virtualRoom.members.availableTitle'), td('virtualRoom.members.selectedTitle')]}
           listStyle={{ width: 320, height: 400 }}
           oneWay={false}
         />

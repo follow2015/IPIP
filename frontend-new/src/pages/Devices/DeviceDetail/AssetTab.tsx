@@ -20,25 +20,32 @@ import {
 } from '@/services/device';
 import { useMessage } from '@/hooks/useMessage';
 import AssetInfoFields, { generateAssetNumber } from '@/components/AssetInfoFields';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 interface AssetTabProps {
   device: Device;
 }
 
-function getWarrantyStatus(device: Device) {
+function getWarrantyStatus(device: Device, t: TFunction<'device'>) {
   if (!device.warranty_end)
-    return { label: '未设置', color: 'default', icon: <ClockCircleOutlined /> };
+    return { label: t('asset.warranty.notSet'), color: 'default', icon: <ClockCircleOutlined /> };
   const end = new Date(ensureUtc(device.warranty_end));
   const now = new Date();
   const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (daysLeft < 0) return { label: '已过期', color: 'red', icon: <ExclamationCircleOutlined /> };
+  if (daysLeft < 0)
+    return { label: t('asset.warranty.expired'), color: 'red', icon: <ExclamationCircleOutlined /> };
   if (daysLeft <= 90)
     return {
-      label: `即将到期(${daysLeft}天)`,
+      label: t('asset.warranty.expiring', { count: daysLeft }),
       color: 'orange',
       icon: <ExclamationCircleOutlined />
     };
-  return { label: '保修中', color: 'green', icon: <CheckCircleOutlined /> };
+  return {
+    label: t('asset.warranty.active'),
+    color: 'green',
+    icon: <CheckCircleOutlined />
+  };
 }
 
 function formatPrice(price: number | null | undefined): string {
@@ -62,8 +69,10 @@ function serializeAssetDate(value: unknown): unknown {
 }
 
 function AssetTab({ device }: AssetTabProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
-  const warrantyStatus = getWarrantyStatus(device);
+  const warrantyStatus = getWarrantyStatus(device, t);
   const updateDevice = useUpdateDevice();
   const resetAsset = useBatchResetDeviceAsset();
   const message = useMessage();
@@ -126,7 +135,7 @@ function AssetTab({ device }: AssetTabProps) {
       }
 
       await updateDevice.mutateAsync(payload);
-      message.success('资产信息已更新');
+      message.success(t('asset.message.updated'));
       edit.close();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -135,71 +144,91 @@ function AssetTab({ device }: AssetTabProps) {
 
   const handleReset = useCallback(() => {
     confirm({
-      title: '重置资产信息',
-      content: `确定要清空设备「${device.device_name}」的所有资产信息吗？此操作不可恢复。`,
-      okText: '确定重置',
-      cancelText: '取消',
+      title: t('asset.confirmResetTitle'),
+      content: t('asset.confirmResetContent', { name: device.device_name }),
+      okText: t('asset.confirmResetOk'),
+      cancelText: tCommon('action.cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
           await resetAsset.mutateAsync([device.id]);
-          message.success('资产信息已重置');
+          message.success(t('asset.message.resetSuccess'));
         } catch (err) {
-          message.error(err instanceof Error ? err.message : '重置失败');
+          message.error(err instanceof Error ? err.message : t('asset.message.resetFailed'));
         }
       }
     });
-  }, [confirm, device.id, device.device_name, resetAsset]);
+  }, [t, tCommon, confirm, device.id, device.device_name, resetAsset]);
 
   return (
     <>
       {/* 操作按钮 */}
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
         <Button icon={<EditOutlined />} onClick={handleOpenEdit}>
-          编辑
+          {tCommon('action.edit')}
         </Button>
         <Button danger icon={<UndoOutlined />} onClick={handleReset} loading={resetAsset.isPending}>
-          重置
+          {tCommon('action.reset')}
         </Button>
       </div>
 
       <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
         {/* 资产编号 */}
-        <Descriptions.Item label="资产编号">{device.asset_number ?? '-'}</Descriptions.Item>
-        <Descriptions.Item label="保修状态">
+        <Descriptions.Item label={t('asset.field.assetNumber')}>
+          {device.asset_number ?? '-'}
+        </Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.warrantyStatus')}>
           <Tag color={warrantyStatus.color} icon={warrantyStatus.icon}>
             {warrantyStatus.label}
           </Tag>
         </Descriptions.Item>
 
         {/* 采购信息 */}
-        <Descriptions.Item label="供应商">{device.supplier ?? '-'}</Descriptions.Item>
-        <Descriptions.Item label="供应商联系人">{device.supplier_contact ?? '-'}</Descriptions.Item>
-        <Descriptions.Item label="合同编号">{device.contract_number ?? '-'}</Descriptions.Item>
-        <Descriptions.Item label="采购日期">{formatDate(device.purchase_date)}</Descriptions.Item>
-        <Descriptions.Item label="采购价格">{formatPrice(device.purchase_price)}</Descriptions.Item>
-        <Descriptions.Item label="发票号码">{device.invoice_number ?? '-'}</Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.supplier')}>{device.supplier ?? '-'}</Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.supplierContact')}>
+          {device.supplier_contact ?? '-'}
+        </Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.contractNumber')}>
+          {device.contract_number ?? '-'}
+        </Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.purchaseDate')}>
+          {formatDate(device.purchase_date)}
+        </Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.purchasePrice')}>
+          {formatPrice(device.purchase_price)}
+        </Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.invoiceNumber')}>
+          {device.invoice_number ?? '-'}
+        </Descriptions.Item>
 
         {/* 保修信息 */}
-        <Descriptions.Item label="保修类型">{device.warranty_type ?? '-'}</Descriptions.Item>
-        <Descriptions.Item label="保修期限">
+        <Descriptions.Item label={t('asset.field.warrantyType')}>
+          {device.warranty_type ?? '-'}
+        </Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.warrantyPeriod')}>
           {device.warranty_start || device.warranty_end
             ? `${formatDate(device.warranty_start)} ~ ${formatDate(device.warranty_end)}`
             : '-'}
         </Descriptions.Item>
 
         {/* 生命周期 */}
-        <Descriptions.Item label="上线日期">{formatDate(device.online_date)}</Descriptions.Item>
-        <Descriptions.Item label="下线日期">{formatDate(device.offline_date)}</Descriptions.Item>
-        <Descriptions.Item label="预计使用年限">
-          {device.lifecycle_years ? `${device.lifecycle_years}年` : '-'}
+        <Descriptions.Item label={t('asset.field.onlineDate')}>
+          {formatDate(device.online_date)}
         </Descriptions.Item>
-        <Descriptions.Item label="创建时间">{formatDateTime(device.created_at)}</Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.offlineDate')}>
+          {formatDate(device.offline_date)}
+        </Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.lifecycleYears')}>
+          {device.lifecycle_years ? t('asset.field.years', { count: device.lifecycle_years }) : '-'}
+        </Descriptions.Item>
+        <Descriptions.Item label={tCommon('field.createdAt')}>
+          {formatDateTime(device.created_at)}
+        </Descriptions.Item>
       </Descriptions>
 
       {/* 编辑弹窗 */}
       <Modal
-        title="编辑资产信息"
+        title={t('asset.editTitle')}
         open={edit.isOpen}
         onOk={handleEditSubmit}
         onCancel={() => edit.close()}

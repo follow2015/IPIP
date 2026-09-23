@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Form,
@@ -16,13 +16,14 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import {
   useCreateRoomChannel,
   useDeleteRoomChannel,
   useRoomChannels,
   useUpdateRoomChannel
 } from '@/services/room';
-import { CHANNEL_TYPE_LABEL, SUPPLY_LABEL, paletteKeyOf } from './palette';
+import { CHANNEL_TYPE_LABEL_KEYS, SUPPLY_LABEL_KEYS, paletteKeyOf } from './palette';
 import type { RoomChannel } from '@/types/models';
 import type { RoomChannelCreate } from '@/types/api-bridge';
 
@@ -41,17 +42,13 @@ export interface ChannelConfigModalProps {
   onClose: () => void;
 }
 
-const CHANNEL_TYPE_OPTIONS = (['cold', 'hot', 'mixed'] as const).map((value) => ({
-  value,
-  label: CHANNEL_TYPE_LABEL[value]
-}));
-
-const SUPPLY_OPTIONS = (['floor', 'direct', 'none'] as const).map((value) => ({
-  value,
-  label: SUPPLY_LABEL[value]
-}));
+const CHANNEL_TYPE_VALUES = ['cold', 'hot', 'mixed'] as const;
+const SUPPLY_VALUES = ['floor', 'direct', 'none'] as const;
 
 export default function ChannelConfigModal({ roomId, open, onClose }: ChannelConfigModalProps) {
+  const { t: ta } = useTranslation('asset');
+  const { t: tc } = useTranslation('common');
+
   const { data: channels = [], isLoading } = useRoomChannels(roomId);
   const createMutation = useCreateRoomChannel(roomId);
   const updateMutation = useUpdateRoomChannel(roomId);
@@ -61,6 +58,20 @@ export default function ChannelConfigModal({ roomId, open, onClose }: ChannelCon
   const [editing, setEditing] = useState<RoomChannel | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const channelTypeOptions = useMemo(
+    () =>
+      CHANNEL_TYPE_VALUES.map((value) => ({
+        value,
+        label: ta(CHANNEL_TYPE_LABEL_KEYS[value])
+      })),
+    [ta]
+  );
+
+  const supplyOptions = useMemo(
+    () => SUPPLY_VALUES.map((value) => ({ value, label: ta(SUPPLY_LABEL_KEYS[value]) })),
+    [ta]
+  );
 
   const pendingValuesRef = useRef<ChannelFormValues | null>(null);
 
@@ -118,97 +129,118 @@ export default function ChannelConfigModal({ roomId, open, onClose }: ChannelCon
       };
       if (editing) {
         await updateMutation.mutateAsync({ channelId: editing.id, data: payload });
-        message.success('通道配置已更新');
+        message.success(ta('roomLayout.channel.message.updated'));
       } else {
         await createMutation.mutateAsync(payload);
-        message.success('通道配置已新增');
+        message.success(ta('roomLayout.channel.message.created'));
       }
       setFormOpen(false);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '保存通道配置失败');
+      message.error(err instanceof Error ? err.message : ta('roomLayout.channel.message.saveFailed'));
     } finally {
       setSubmitting(false);
     }
-  }, [createMutation, editing, form, updateMutation]);
+  }, [createMutation, editing, form, ta, updateMutation]);
 
   const handleDelete = useCallback(
     async (channelId: number) => {
       try {
         await deleteMutation.mutateAsync(channelId);
-        message.success('通道配置已删除');
+        message.success(ta('roomLayout.channel.message.deleted'));
       } catch (err) {
-        message.error(err instanceof Error ? err.message : '删除通道配置失败');
+        message.error(
+          err instanceof Error ? err.message : ta('roomLayout.channel.message.deleteFailed')
+        );
       }
     },
-    [deleteMutation]
+    [deleteMutation, ta]
   );
 
-  const columns: ColumnsType<RoomChannel> = [
-    {
-      title: '位置',
-      key: 'position',
-      render: (_, record) => record.label || record.display_name || `第 ${record.col_number} 列位`
-    },
-    {
-      title: '类型',
-      dataIndex: 'channel_type',
-      width: 100,
-      render: (type: string) => (
-        <Tag color={paletteKeyOf(type)}>{CHANNEL_TYPE_LABEL[type] ?? type}</Tag>
-      )
-    },
-    {
-      title: '是否封闭',
-      dataIndex: 'enclosed',
-      width: 90,
-      render: (enclosed: boolean) => (enclosed ? <Tag color="green">封闭</Tag> : <Tag>开放</Tag>)
-    },
-    {
-      title: '送风',
-      dataIndex: 'supply',
-      width: 150,
-      render: (supply?: string | null) => (supply ? (SUPPLY_LABEL[supply] ?? supply) : '-')
-    },
-    {
-      title: '备注',
-      dataIndex: 'notes',
-      ellipsis: true,
-      render: (notes?: string | null) => notes || '-'
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 110,
-      render: (_, record) => (
-        <Space size={0}>
-          <Button type="link" size="small" onClick={() => openEdit(record)}>
-            编辑
-          </Button>
-          <Popconfirm
-            title="确认删除该通道配置？"
-            okText="删除"
-            cancelText="取消"
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Button type="link" size="small" danger>
-              删除
+  const columns: ColumnsType<RoomChannel> = useMemo(
+    () => [
+      {
+        title: ta('roomLayout.channel.position'),
+        key: 'position',
+        render: (_, record) =>
+          record.label || record.display_name || ta('roomLayout.channel.colSlot', { col: record.col_number })
+      },
+      {
+        title: tc('field.type'),
+        dataIndex: 'channel_type',
+        width: 100,
+        render: (type: string) => {
+          const key = CHANNEL_TYPE_LABEL_KEYS[type];
+          return <Tag color={paletteKeyOf(type)}>{key ? ta(key) : type}</Tag>;
+        }
+      },
+      {
+        title: ta('roomLayout.channel.enclosed'),
+        dataIndex: 'enclosed',
+        width: 90,
+        render: (enclosed: boolean) =>
+          enclosed ? (
+            <Tag color="green">{ta('roomLayout.channel.enclosedTag')}</Tag>
+          ) : (
+            <Tag>{ta('roomLayout.channel.openTag')}</Tag>
+          )
+      },
+      {
+        title: ta('roomLayout.channel.supply'),
+        dataIndex: 'supply',
+        width: 150,
+        render: (supply?: string | null) => {
+          if (!supply) return '-';
+          const key = SUPPLY_LABEL_KEYS[supply];
+          return key ? ta(key) : supply;
+        }
+      },
+      {
+        title: tc('field.remarks'),
+        dataIndex: 'notes',
+        ellipsis: true,
+        render: (notes?: string | null) => notes || '-'
+      },
+      {
+        title: tc('field.actions'),
+        key: 'action',
+        width: 110,
+        render: (_, record) => (
+          <Space size={0}>
+            <Button type="link" size="small" onClick={() => openEdit(record)}>
+              {tc('action.edit')}
             </Button>
-          </Popconfirm>
-        </Space>
-      )
-    }
-  ];
+            <Popconfirm
+              title={ta('roomLayout.channel.confirmDelete')}
+              okText={tc('action.delete')}
+              cancelText={tc('action.cancel')}
+              onConfirm={() => handleDelete(record.id)}
+            >
+              <Button type="link" size="small" danger>
+                {tc('action.delete')}
+              </Button>
+            </Popconfirm>
+          </Space>
+        )
+      }
+    ],
+    [handleDelete, openEdit, ta, tc]
+  );
 
   return (
     <>
-      <Modal title="配置通道" open={open} onCancel={onClose} footer={null} width={780}>
+      <Modal
+        title={ta('roomLayout.channel.title')}
+        open={open}
+        onCancel={onClose}
+        footer={null}
+        width={780}
+      >
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          通道位于相邻两列之间：填 N 表示「第 N 列与第 N+1 列之间」，填 0 表示「第 1
-          列外侧」。是否封闭是图上区分老式机房与模块化机房的主要依据。
+          {ta('roomLayout.channel.hint')}
         </Typography.Paragraph>
         <div style={{ marginBottom: 12 }}>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新增通道
+            {ta('roomLayout.channel.add')}
           </Button>
         </div>
         <Table<RoomChannel>
@@ -218,26 +250,26 @@ export default function ChannelConfigModal({ roomId, open, onClose }: ChannelCon
           dataSource={channels}
           columns={columns}
           pagination={false}
-          locale={{ emptyText: '尚未配置通道，平面图上不会渲染色带' }}
+          locale={{ emptyText: ta('roomLayout.channel.empty') }}
         />
       </Modal>
 
       <Modal
-        title={editing ? '编辑通道配置' : '新增通道配置'}
+        title={editing ? ta('roomLayout.channel.editTitle') : ta('roomLayout.channel.createTitle')}
         open={formOpen}
         onCancel={() => setFormOpen(false)}
         onOk={handleSubmit}
         confirmLoading={submitting}
-        okText="保存"
+        okText={tc('action.save')}
       >
         <Form form={form} layout="vertical">
           <Form.Item
             name="col_number"
-            label="列位"
-            extra="N = 第 N 列与第 N+1 列之间；0 = 第 1 列外侧（机柜网格外）"
+            label={ta('roomLayout.channel.colNumber')}
+            extra={ta('roomLayout.channel.colNumberExtra')}
             rules={[
-              { required: true, message: '请填写列位' },
-              { type: 'number', min: 0, message: '列位不能为负数' }
+              { required: true, message: ta('roomLayout.channel.colNumberRequired') },
+              { type: 'number', min: 0, message: ta('roomLayout.channel.colNumberNegative') }
             ]}
           >
             <InputNumber min={0} max={999} style={{ width: '100%' }} />
@@ -245,38 +277,45 @@ export default function ChannelConfigModal({ roomId, open, onClose }: ChannelCon
 
           <Form.Item
             name="channel_type"
-            label="通道类型"
-            rules={[{ required: true, message: '请选择通道类型' }]}
+            label={ta('roomLayout.channel.type')}
+            rules={[{ required: true, message: ta('roomLayout.channel.typeRequired') }]}
           >
-            <Select options={CHANNEL_TYPE_OPTIONS} />
+            <Select options={channelTypeOptions} />
           </Form.Item>
 
           <Form.Item
             name="enclosed"
-            label="封闭通道"
+            label={ta('roomLayout.channel.enclosedField')}
             valuePropName="checked"
-            extra="有端门/顶板的封闭通道；新式模块机房的封闭冷通道即此类"
+            extra={ta('roomLayout.channel.enclosedExtra')}
           >
-            <Switch checkedChildren="封闭" unCheckedChildren="开放" />
+            <Switch
+              checkedChildren={ta('roomLayout.channel.enclosedTag')}
+              unCheckedChildren={ta('roomLayout.channel.openTag')}
+            />
           </Form.Item>
 
           <Form.Item
             name="supply"
-            label="送风方式"
-            extra="「上送风直吹」易气流掺混，标准不推荐，仅适用于低热密度区域"
+            label={ta('roomLayout.channel.supplyField')}
+            extra={ta('roomLayout.channel.supplyExtra')}
           >
-            <Select options={SUPPLY_OPTIONS} allowClear placeholder="未标注" />
+            <Select
+              options={supplyOptions}
+              allowClear
+              placeholder={ta('roomLayout.channel.supplyUnset')}
+            />
           </Form.Item>
 
           <Form.Item
             name="label"
-            label="展示名"
-            extra="留空则按列位自动生成，如「第 1 列与第 2 列之间」"
+            label={ta('roomLayout.channel.displayName')}
+            extra={ta('roomLayout.channel.displayNameExtra')}
           >
-            <Input maxLength={100} placeholder="如：A-B 冷通道" />
+            <Input maxLength={100} placeholder={ta('roomLayout.channel.displayNamePlaceholder')} />
           </Form.Item>
 
-          <Form.Item name="notes" label="备注">
+          <Form.Item name="notes" label={tc('field.remarks')}>
             <Input.TextArea maxLength={500} rows={2} showCount />
           </Form.Item>
         </Form>

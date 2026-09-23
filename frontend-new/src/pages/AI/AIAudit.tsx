@@ -1,14 +1,23 @@
 import { Space } from 'antd';
 import { AuditOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import AuditLogTable from '@/components/AuditLogTable';
 
-const RESOURCE_OPTIONS = [
-  { label: 'AI 调用', value: 'ai' },
-  { label: '设备', value: 'device' },
-  { label: 'RAG 知识库', value: 'ai_rag' },
-  { label: 'AI 技能', value: 'ai_skill' },
-  { label: 'AI 配置', value: 'ai_config' },
-  { label: '熔断器', value: 'ai_circuit' }
+type AuditResourceLabelKey =
+  | 'audit.resource.ai'
+  | 'audit.resource.device'
+  | 'audit.resource.rag'
+  | 'audit.resource.skill'
+  | 'audit.resource.config'
+  | 'audit.resource.circuit';
+
+const RESOURCE_OPTIONS: { labelKey: AuditResourceLabelKey; value: string }[] = [
+  { labelKey: 'audit.resource.ai', value: 'ai' },
+  { labelKey: 'audit.resource.device', value: 'device' },
+  { labelKey: 'audit.resource.rag', value: 'ai_rag' },
+  { labelKey: 'audit.resource.skill', value: 'ai_skill' },
+  { labelKey: 'audit.resource.config', value: 'ai_config' },
+  { labelKey: 'audit.resource.circuit', value: 'ai_circuit' }
 ];
 
 const ACTION_COLOR_MAP: Record<string, string> = {
@@ -26,16 +35,20 @@ const ACTION_COLOR_MAP: Record<string, string> = {
 };
 
 export default function AIAudit() {
+  const { t } = useTranslation('ai');
   return (
     <AuditLogTable
       title={
         <Space>
           <AuditOutlined />
-          <span>AI 审计日志</span>
+          <span>{t('audit.title')}</span>
         </Space>
       }
       actionPrefix="ai."
-      resourceOptions={RESOURCE_OPTIONS}
+      resourceOptions={RESOURCE_OPTIONS.map(({ labelKey, value }) => ({
+        label: t(labelKey),
+        value
+      }))}
       actionColorMap={ACTION_COLOR_MAP}
     />
   );

@@ -8,6 +8,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { Spin } from 'antd';
 import { useAuthStore } from '@/stores/auth';
 import { usePermission } from '@/hooks/usePermission';
+import { useTranslation } from 'react-i18next';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -21,11 +22,12 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isVerifying = useAuthStore((s) => s.isVerifying);
   const location = useLocation();
+  const { t } = useTranslation('common');
 
   if (isVerifying) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 0' }}>
-        <Spin size="large" description="验证登录状态..." />
+        <Spin size="large" description={t('error.verifyingAuth')} />
       </div>
     );
   }
@@ -52,13 +54,14 @@ export const PermissionRoute: React.FC<PermissionRouteProps> = ({
   fallback,
 }) => {
   const { hasPermission } = usePermission();
+  const { t } = useTranslation('common');
 
   if (!hasPermission(requiredPermission)) {
     return (
       fallback ?? (
         <div style={{ textAlign: 'center', padding: '100px 0' }}>
           <h1>403</h1>
-          <p>抱歉，您没有访问此页面的权限</p>
+          <p>{t('error.noPermission')}</p>
         </div>
       )
     );

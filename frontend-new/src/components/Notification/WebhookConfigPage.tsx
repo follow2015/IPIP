@@ -37,17 +37,21 @@ import {
   type WebhookConfig,
   type CreateWebhookConfigParams
 } from '@/services/notification';
+import { CHANNEL_COLORS } from '@/types/enums';
 import {
-  NOTIFICATION_TYPE_GROUP_OPTIONS,
-  SEVERITY_OPTIONS,
-  CHANNEL_LABELS,
-  CHANNEL_COLORS,
-  BROADCAST_CHANNEL_OPTIONS
-} from '@/types/enums';
+  getBroadcastChannelOptions,
+  getChannelLabel,
+  getNotificationTypeGroupOptions,
+  getSeverityOptions
+} from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 
 const { Title, Text } = Typography;
 
 const WebhookConfigPage: React.FC = () => {
+  const { t: tDevice } = useTranslation('device');
+  const { t } = useTranslation('settings');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const { data: configs = [], isLoading } = useWebhookConfigs();
   const createMutation = useCreateWebhookConfig();
@@ -89,29 +93,29 @@ const WebhookConfigPage: React.FC = () => {
       try {
         if (editingConfig) {
           await updateMutation.mutateAsync({ id: editingConfig.id, data: values });
-          messageApi.success('更新成功');
+          messageApi.success(tCommon('message.updateSuccess'));
         } else {
           await createMutation.mutateAsync(values);
-          messageApi.success('创建成功');
+          messageApi.success(tCommon('message.createSuccess'));
         }
         modal.close();
       } catch {
-        messageApi.error('操作失败');
+        messageApi.error(tCommon('message.operationFailed'));
       }
     },
-    [editingConfig, createMutation, updateMutation, messageApi]
+    [editingConfig, createMutation, updateMutation, messageApi, tCommon]
   );
 
   const handleDelete = useCallback(
     async (id: number) => {
       try {
         await deleteMutation.mutateAsync(id);
-        messageApi.success('删除成功');
+        messageApi.success(tCommon('message.deleteSuccess'));
       } catch {
-        messageApi.error('删除失败');
+        messageApi.error(tCommon('message.deleteFailed'));
       }
     },
-    [deleteMutation, messageApi]
+    [deleteMutation, messageApi, tCommon]
   );
 
   const handleTest = useCallback(
@@ -124,26 +128,26 @@ const WebhookConfigPage: React.FC = () => {
           messageApi.error(result.message);
         }
       } catch {
-        messageApi.error('测试请求失败');
+        messageApi.error(t('testRequestFailed'));
       }
     },
-    [testMutation, messageApi]
+    [testMutation, messageApi, t]
   );
 
   const columns = [
     {
-      title: '名称',
+      title: tCommon('field.name'),
       dataIndex: 'name',
       key: 'name',
       width: 160
     },
     {
-      title: '渠道',
+      title: t('webhook.column.channel'),
       dataIndex: 'channel',
       key: 'channel',
       width: 100,
       render: (ch: string) => (
-        <Tag color={CHANNEL_COLORS[ch] ?? 'default'}>{CHANNEL_LABELS[ch] ?? ch}</Tag>
+        <Tag color={CHANNEL_COLORS[ch] ?? 'default'}>{getChannelLabel(ch, tDevice) ?? ch}</Tag>
       )
     },
     {
@@ -154,23 +158,23 @@ const WebhookConfigPage: React.FC = () => {
       ellipsis: true
     },
     {
-      title: '状态',
+      title: tCommon('field.status'),
       dataIndex: 'enabled',
       key: 'enabled',
       width: 80,
       render: (enabled: boolean) =>
         enabled ? (
           <Tag icon={<CheckCircleOutlined />} color="success">
-            启用
+            {tCommon('action.enable')}
           </Tag>
         ) : (
           <Tag icon={<CloseCircleOutlined />} color="default">
-            禁用
+            {tCommon('action.disable')}
           </Tag>
         )
     },
     {
-      title: '适用严重程度',
+      title: t('webhook.column.severity'),
       dataIndex: 'applicable_severities',
       key: 'applicable_severities',
       width: 180,
@@ -178,11 +182,11 @@ const WebhookConfigPage: React.FC = () => {
         severities?.length ? (
           severities.map((s) => <Tag key={s}>{s}</Tag>)
         ) : (
-          <Text type="secondary">全部</Text>
+          <Text type="secondary">{t('webhook.column.severityAll')}</Text>
         )
     },
     {
-      title: '操作',
+      title: tCommon('field.actions'),
       key: 'action',
       width: 200,
       render: (_: unknown, record: WebhookConfig) => (
@@ -194,7 +198,7 @@ const WebhookConfigPage: React.FC = () => {
             loading={testMutation.isPending}
             onClick={() => handleTest(record.id)}
           >
-            测试
+            {t('webhook.action.test')}
           </Button>
           <Button
             type="link"
@@ -202,7 +206,7 @@ const WebhookConfigPage: React.FC = () => {
             icon={<EditOutlined />}
             onClick={() => openEditModal(record)}
           >
-            编辑
+            {tCommon('action.edit')}
           </Button>
           <Button
             type="link"
@@ -211,15 +215,15 @@ const WebhookConfigPage: React.FC = () => {
             icon={<DeleteOutlined />}
             onClick={() =>
               confirm({
-                title: '确认删除此配置？',
-                okText: '删除',
-                cancelText: '取消',
+                title: t('webhook.action.deleteConfirmTitle'),
+                okText: tCommon('action.delete'),
+                cancelText: tCommon('action.cancel'),
                 okButtonProps: { danger: true },
                 onOk: () => handleDelete(record.id)
               })
             }
           >
-            删除
+            {tCommon('action.delete')}
           </Button>
         </Space>
       )
@@ -239,10 +243,10 @@ const WebhookConfigPage: React.FC = () => {
           }}
         >
           <Title level={5} style={{ margin: 0 }}>
-            Webhook 渠道配置
+            {t('webhook.title')}
           </Title>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-            新增配置
+            {t('webhook.action.create')}
           </Button>
         </div>
 
@@ -260,7 +264,9 @@ const WebhookConfigPage: React.FC = () => {
       </Card>
 
       <Modal
-        title={editingConfig ? '编辑 Webhook 配置' : '新增 Webhook 配置'}
+        title={
+          editingConfig ? t('webhook.modalTitle.edit') : t('webhook.modalTitle.create')
+        }
         open={modal.isOpen}
         onCancel={() => modal.close()}
         onOk={() => form.submit()}
@@ -270,51 +276,59 @@ const WebhookConfigPage: React.FC = () => {
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item
-            label="配置名称"
+            label={t('webhook.field.name')}
             name="name"
-            rules={[{ required: true, message: '请输入配置名称' }]}
+            rules={[{ required: true, message: t('webhook.validation.nameRequired') }]}
           >
-            <Input placeholder="如：运维群机器人" />
+            <Input placeholder={t('webhook.field.namePlaceholder')} />
           </Form.Item>
 
           <Form.Item
-            label="渠道类型"
+            label={t('webhook.field.channel')}
             name="channel"
-            rules={[{ required: true, message: '请选择渠道类型' }]}
+            rules={[{ required: true, message: t('webhook.validation.channelRequired') }]}
           >
-            <Select options={BROADCAST_CHANNEL_OPTIONS} />
+            <Select options={getBroadcastChannelOptions(tDevice)} />
           </Form.Item>
 
           <Form.Item
-            label="Webhook URL"
+            label={t('webhook.field.url')}
             name="url"
             rules={[
-              { required: true, message: '请输入 Webhook URL' },
-              { type: 'url', message: '请输入有效的 URL' }
+              { required: true, message: t('webhook.validation.urlRequired') },
+              { type: 'url', message: t('webhook.validation.urlInvalid') }
             ]}
           >
-            <Input placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=***" />
+            <Input placeholder={t('webhook.field.urlPlaceholder')} />
           </Form.Item>
 
-          <Form.Item label="签名密钥（可选）" name="secret">
-            <Input.Password placeholder="飞书群机器人签名密钥" />
+          <Form.Item label={t('webhook.field.secret')} name="secret">
+            <Input.Password placeholder={t('webhook.field.secretPlaceholder')} />
           </Form.Item>
 
-          <Form.Item label="启用" name="enabled" valuePropName="checked">
+          <Form.Item
+            label={tCommon('action.enable')}
+            name="enabled"
+            valuePropName="checked"
+          >
             <Switch defaultChecked />
           </Form.Item>
 
-          <Form.Item label="适用通知类型（空=全部）" name="applicable_types">
+          <Form.Item label={t('webhook.field.types')} name="applicable_types">
             <Select
               mode="multiple"
-              placeholder="选择通知类型"
-              options={NOTIFICATION_TYPE_GROUP_OPTIONS}
+              placeholder={t('webhook.field.typesPlaceholder')}
+              options={getNotificationTypeGroupOptions(tDevice)}
               allowClear
             />
           </Form.Item>
 
-          <Form.Item label="适用严重程度（空=全部）" name="applicable_severities">
-            <Select mode="multiple" options={SEVERITY_OPTIONS} placeholder="选择严重程度" />
+          <Form.Item label={t('webhook.field.severities')} name="applicable_severities">
+            <Select
+              mode="multiple"
+              options={getSeverityOptions(tDevice)}
+              placeholder={t('webhook.field.severitiesPlaceholder')}
+            />
           </Form.Item>
         </Form>
       </Modal>

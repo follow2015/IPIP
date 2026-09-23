@@ -46,24 +46,26 @@ import {
   type DeviceMetricLatestItem
 } from '@/services/monitor';
 import { formatDateTime, translateProbeError, ensureUtc } from '@/utils/format';
+import { useTranslation } from 'react-i18next';
 import { useMessage } from '@/hooks/useMessage';
 import { useResetPageOnDeps } from '@/hooks/useResetPageOnDeps';
 import { useTable } from '@/hooks/useTable';
 import DataTable from '@/components/DataTable';
 import dayjs from 'dayjs';
+import type { TFunction } from 'i18next';
 
 const { Text } = Typography;
 const { useToken } = theme;
 
-const RANGE_OPTIONS = [
-  { label: '1 小时', value: '1h', ms: 60 * 60 * 1000 },
-  { label: '24 小时', value: '24h', ms: 24 * 60 * 60 * 1000 },
-  { label: '7 天', value: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
-  { label: '30 天', value: '30d', ms: 30 * 24 * 60 * 60 * 1000 }
+const getRangeOptions = (t: TFunction<'monitor'>) => [
+  { label: t('history.range.h1'), value: '1h', ms: 60 * 60 * 1000 },
+  { label: t('history.range.h24'), value: '24h', ms: 24 * 60 * 60 * 1000 },
+  { label: t('history.range.d7'), value: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
+  { label: t('history.range.d30'), value: '30d', ms: 30 * 24 * 60 * 60 * 1000 }
 ];
 
-const PROTOCOL_OPTIONS = [
-  { label: '全部协议', value: '' },
+const getProtocolOptions = (t: TFunction<'monitor'>) => [
+  { label: t('history.protocolAll'), value: '' },
   { label: 'SNMP', value: 'snmp' },
   { label: 'IPMI', value: 'ipmi' },
   { label: 'Zabbix', value: 'zabbix' },
@@ -82,6 +84,9 @@ function buildQuery(rangeMs: number, protocol: string): ProbeHistoryQuery {
 }
 
 export default function MonitorHistory() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
+  const { t: td } = useTranslation('device');
   const { token } = useToken();
   const [searchParams, setSearchParams] = useSearchParams();
   const [deviceId, setDeviceId] = useState<number>(() => {
@@ -102,7 +107,8 @@ export default function MonitorHistory() {
     [statusData]
   );
 
-  const rangeMs = RANGE_OPTIONS.find((r) => r.value === range)?.ms ?? RANGE_OPTIONS[1].ms;
+  const rangeOptions = getRangeOptions(t);
+  const rangeMs = rangeOptions.find((r) => r.value === range)?.ms ?? rangeOptions[1].ms;
   const query = useMemo(() => buildQuery(rangeMs, protocol), [rangeMs, protocol]);
 
   const handleDeviceChange = (id: number) => {
@@ -173,9 +179,9 @@ export default function MonitorHistory() {
       (history?.items ?? []).map((i) => ({
         time: i.probed_at ? dayjs(ensureUtc(i.probed_at)).format('YYYY-MM-DD HH:mm:ss') : '',
         reachable: i.reachable ? 1 : 0,
-        state: i.reachable ? '可达' : '不可达'
+        state: i.reachable ? t('status.reachable') : t('status.unreachable')
       })),
-    [history]
+    [history, t]
   );
 
   const hasData = (history?.items?.length ?? 0) > 0;
@@ -278,14 +284,14 @@ export default function MonitorHistory() {
       point: { size: 3 },
       style: { stroke: token.colorSuccess },
       axis: {
-        y: { title: '延迟 (ms)' },
+        y: { title: t('history.chart.latencyAxis') },
         x: { title: false }
       },
       tooltip: { title: 'time' },
       legend: false,
       animation: false
     }),
-    [latencyData, token.colorSuccess]
+    [latencyData, token.colorSuccess, t]
   );
 
   const reachConfig = useMemo(
@@ -298,15 +304,16 @@ export default function MonitorHistory() {
       shapeField: 'hv' as const,
       scale: {
         color: {
-          domain: ['可达', '不可达'],
+          domain: [t('status.reachable'), t('status.unreachable')],
           range: [token.colorSuccess, token.colorError]
         }
       },
       axis: {
         y: {
-          title: '可达状态',
+          title: t('history.chart.reachAxis'),
           tickCount: 2,
-          labelFormatter: (v: number) => (v === 1 ? '可达' : '不可达')
+          labelFormatter: (v: number) =>
+            v === 1 ? t('status.reachable') : t('status.unreachable')
         },
         x: { title: false }
       },
@@ -314,34 +321,38 @@ export default function MonitorHistory() {
       legend: false,
       animation: false
     }),
-    [reachData, token.colorSuccess, token.colorError]
+    [reachData, token.colorSuccess, token.colorError, t]
   );
 
   const columns = [
     {
-      title: '探测时间',
+      title: t('column.probedAt'),
       dataIndex: 'probed_at',
       key: 'probed_at',
       width: 200,
       render: (v: string | null) => formatDateTime(v)
     },
     {
-      title: '协议',
+      title: t('column.protocol'),
       dataIndex: 'protocol',
       key: 'protocol',
       width: 100,
       render: (v: string) => <Tag color="blue">{v}</Tag>
     },
     {
-      title: '可达',
+      title: t('status.reachable'),
       dataIndex: 'reachable',
       key: 'reachable',
       width: 90,
       render: (v: boolean) =>
-        v ? <Tag color="success">可达</Tag> : <Tag color="error">不可达</Tag>
+        v ? (
+          <Tag color="success">{t('status.reachable')}</Tag>
+        ) : (
+          <Tag color="error">{t('status.unreachable')}</Tag>
+        )
     },
     {
-      title: '延迟(ms)',
+      title: t('column.latency'),
       dataIndex: 'latency_ms',
       key: 'latency_ms',
       width: 100,
@@ -369,24 +380,24 @@ export default function MonitorHistory() {
       render: (v: number | null) => (v == null ? '—' : v)
     },
     {
-      title: '连续失败',
+      title: t('column.consecutiveFailures'),
       dataIndex: 'consecutive_failures',
       key: 'consecutive_failures',
       width: 100
     },
     {
-      title: '告警',
+      title: t('column.alert'),
       dataIndex: 'is_alert',
       key: 'is_alert',
       width: 80,
-      render: (v: boolean) => (v ? <Tag color="warning">是</Tag> : '—')
+      render: (v: boolean) => (v ? <Tag color="warning">{t('column.yes')}</Tag> : '—')
     },
     {
-      title: '错误',
+      title: t('column.error'),
       dataIndex: 'error',
       key: 'error',
       ellipsis: true,
-      render: (v: string | null) => translateProbeError(v)
+      render: (v: string | null) => translateProbeError(v, td)
     }
   ];
 
@@ -396,18 +407,25 @@ export default function MonitorHistory() {
         <Text style={{ fontSize: 12 }}>{formatDateTime(r.probed_at)}</Text>
         <Space size={4} wrap>
           <Tag color="blue">{r.protocol}</Tag>
-          {r.reachable ? <Tag color="success">可达</Tag> : <Tag color="error">不可达</Tag>}
-          {r.is_alert && <Tag color="warning">告警</Tag>}
+          {r.reachable ? (
+            <Tag color="success">{t('status.reachable')}</Tag>
+          ) : (
+            <Tag color="error">{t('status.unreachable')}</Tag>
+          )}
+          {r.is_alert && <Tag color="warning">{t('column.alert')}</Tag>}
         </Space>
       </div>
       <Text type="secondary" style={{ fontSize: 12 }}>
-        延迟 {r.latency_ms == null ? '—' : `${r.latency_ms} ms`} · 连续失败 {r.consecutive_failures}
+        {t('history.cardSummary', {
+          latency: r.latency_ms == null ? '—' : `${r.latency_ms} ms`,
+          failures: r.consecutive_failures
+        })}
         {r.loss_pct != null && ` · 丢包 ${r.loss_pct}%`}
         {r.jitter_ms != null && ` · 抖动 ${r.jitter_ms} ms`}
       </Text>
       {r.error && (
         <Text type="danger" style={{ fontSize: 12 }}>
-          {translateProbeError(r.error)}
+          {translateProbeError(r.error, td)}
         </Text>
       )}
     </Space>
@@ -418,33 +436,33 @@ export default function MonitorHistory() {
       <Card size="small" variant="borderless" style={{ marginBottom: 16 }}>
         <Space wrap size="middle">
           <Space>
-            <Text strong>设备</Text>
+            <Text strong>{t('column.device')}</Text>
             <Select
               showSearch
               style={{ width: 280 }}
-              placeholder="选择监控设备"
+              placeholder={t('history.selectDevice')}
               loading={devicesLoading}
               value={deviceId || undefined}
               options={deviceOptions}
               onChange={(v) => handleDeviceChange(v)}
               optionFilterProp="label"
-              notFoundContent="暂无可监控设备"
+              notFoundContent={t('history.noDevice')}
             />
           </Space>
           <Space>
-            <Text strong>时间范围</Text>
+            <Text strong>{t('history.timeRange')}</Text>
             <Segmented
-              options={RANGE_OPTIONS.map((r) => ({ label: r.label, value: r.value }))}
+              options={rangeOptions.map((r) => ({ label: r.label, value: r.value }))}
               value={range}
               onChange={(v) => setRange(v as string)}
             />
           </Space>
           <Space>
-            <Text strong>协议</Text>
+            <Text strong>{t('column.protocol')}</Text>
             <Select
               style={{ width: 140 }}
               value={protocol}
-              options={PROTOCOL_OPTIONS}
+              options={getProtocolOptions(t)}
               onChange={(v) => setProtocol(v)}
             />
           </Space>
@@ -461,11 +479,11 @@ export default function MonitorHistory() {
                     end_date: query.to
                   });
                 } catch (err: unknown) {
-                  message.error(err instanceof Error ? err.message : '导出失败');
+                  message.error(err instanceof Error ? err.message : t('export.failed'));
                 }
               }}
             >
-              导出 CSV
+              {t('export.csv')}
             </Button>
           )}
         </Space>
@@ -473,7 +491,7 @@ export default function MonitorHistory() {
 
       {deviceId <= 0 ? (
         <Card variant="borderless">
-          <Empty description="请先选择一台监控设备查看历史趋势" />
+          <Empty description={t('history.pleaseSelectDevice')} />
         </Card>
       ) : (
         <Spin spinning={historyLoading || trendsLoading}>
@@ -481,7 +499,7 @@ export default function MonitorHistory() {
             <Col xs={12} sm={8} md={4}>
               <Card size="small" variant="borderless">
                 <Statistic
-                  title="可用率"
+                  title={t('history.stat.uptime')}
                   value={trends?.uptime_pct ?? 0}
                   precision={1}
                   suffix="%"
@@ -498,7 +516,7 @@ export default function MonitorHistory() {
             <Col xs={12} sm={8} md={4}>
               <Card size="small" variant="borderless">
                 <Statistic
-                  title="探测次数"
+                  title={t('history.stat.probes')}
                   value={trends?.total ?? 0}
                   prefix={<RocketOutlined />}
                   valueStyle={{ fontFamily: 'Fira Code, monospace', fontWeight: 600 }}
@@ -508,7 +526,7 @@ export default function MonitorHistory() {
             <Col xs={12} sm={8} md={4}>
               <Card size="small" variant="borderless">
                 <Statistic
-                  title="宕机周期"
+                  title={t('history.stat.downEpisodes')}
                   value={trends?.down_episodes ?? 0}
                   prefix={<ArrowDownOutlined />}
                   valueStyle={{ fontFamily: 'Fira Code, monospace', fontWeight: 600 }}
@@ -523,7 +541,7 @@ export default function MonitorHistory() {
             <Col xs={12} sm={8} md={4}>
               <Card size="small" variant="borderless">
                 <Statistic
-                  title="平均延迟"
+                  title={t('history.stat.avgLatency')}
                   value={trends?.avg_latency_ms ?? 0}
                   suffix="ms"
                   valueStyle={{ fontFamily: 'Fira Code, monospace', fontWeight: 600 }}
@@ -533,7 +551,7 @@ export default function MonitorHistory() {
             <Col xs={12} sm={8} md={4}>
               <Card size="small" variant="borderless">
                 <Statistic
-                  title="最大延迟"
+                  title={t('history.stat.maxLatency')}
                   value={trends?.max_latency_ms ?? 0}
                   suffix="ms"
                   valueStyle={{ fontFamily: 'Fira Code, monospace', fontWeight: 600 }}
@@ -543,7 +561,7 @@ export default function MonitorHistory() {
             <Col xs={12} sm={8} md={4}>
               <Card size="small" variant="borderless">
                 <Statistic
-                  title="P95 延迟"
+                  title={t('history.stat.p95Latency')}
                   value={trends?.p95_latency_ms ?? 0}
                   suffix="ms"
                   valueStyle={{ fontFamily: 'Fira Code, monospace', fontWeight: 600 }}
@@ -609,7 +627,7 @@ export default function MonitorHistory() {
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
             <Col xs={24} lg={24}>
               <Card
-                title="延迟趋势与可达状态（双轴）"
+                title={t('history.chart.trendTitle')}
                 size="small"
                 variant="borderless"
                 extra={<LineChartOutlined style={{ color: token.colorTextSecondary }} />}
@@ -622,7 +640,10 @@ export default function MonitorHistory() {
                     </div>
                   </>
                 ) : (
-                  <Empty description="暂无延迟数据" style={{ padding: '48px 0' }} />
+                  <Empty
+                    description={t('history.chart.noLatencyData')}
+                    style={{ padding: '48px 0' }}
+                  />
                 )}
               </Card>
             </Col>
@@ -661,7 +682,12 @@ export default function MonitorHistory() {
 
           {/* P1-9: 指标当前值 */}
           {deviceId > 0 && (metricLatestData?.items ?? []).length > 0 && (
-            <Card title="指标当前值" size="small" variant="borderless" style={{ marginTop: 16 }}>
+            <Card
+              title={t('history.latest.title')}
+              size="small"
+              variant="borderless"
+              style={{ marginTop: 16 }}
+            >
               <DataTable<DeviceMetricLatestItem>
                 size="small"
                 searchable={false}
@@ -670,15 +696,15 @@ export default function MonitorHistory() {
                 dataSource={metricLatestData?.items ?? []}
                 pagination={false}
                 columns={[
-                  { title: '指标键', dataIndex: 'metric_key', width: 160 },
-                  { title: '实例', dataIndex: 'index_key', width: 120 },
+                  { title: t('column.metricKey'), dataIndex: 'metric_key', width: 160 },
+                  { title: t('column.instance'), dataIndex: 'index_key', width: 120 },
                   {
-                    title: '当前值',
+                    title: t('column.currentValue'),
                     dataIndex: 'value',
                     render: (v: string | null) => v ?? '-'
                   },
                   {
-                    title: '级别',
+                    title: tc('field.level'),
                     dataIndex: 'severity',
                     width: 80,
                     render: (s: string | null) =>
@@ -691,14 +717,18 @@ export default function MonitorHistory() {
                       )
                   },
                   {
-                    title: '状态',
+                    title: tc('field.status'),
                     dataIndex: 'breached',
                     width: 80,
                     render: (b: boolean) =>
-                      b ? <Tag color="error">越限</Tag> : <Tag color="success">正常</Tag>
+                      b ? (
+                        <Tag color="error">{t('history.latest.breached')}</Tag>
+                      ) : (
+                        <Tag color="success">{t('alertPopover.normal')}</Tag>
+                      )
                   },
                   {
-                    title: '采集时间',
+                    title: t('column.collectedAt'),
                     dataIndex: 'collected_at',
                     width: 180,
                     render: (t: string) => (t ? dayjs(t).format('MM-DD HH:mm:ss') : '-')
@@ -711,7 +741,7 @@ export default function MonitorHistory() {
           {/* P0-3d 指标值趋势图 */}
           {deviceId > 0 && metricKeyOptions.length > 0 && (
             <Card
-              title="指标趋势"
+              title={t('history.trend.title')}
               size="small"
               variant="borderless"
               style={{ marginTop: 16 }}
@@ -719,7 +749,7 @@ export default function MonitorHistory() {
                 <Select
                   showSearch
                   style={{ width: 220 }}
-                  placeholder="选择指标"
+                  placeholder={t('history.trend.selectMetric')}
                   value={selectedMetricKey}
                   options={metricKeyOptions}
                   onChange={(v) => setSelectedMetricKey(v)}
@@ -730,7 +760,7 @@ export default function MonitorHistory() {
             >
               {selectedMetricKey ? (
                 metricHistoryLoading ? (
-                  <Empty description="加载中..." style={{ padding: '48px 0' }} />
+                  <Empty description={tc('message.loading')} style={{ padding: '48px 0' }} />
                 ) : metricSeries.length > 0 ? (
                   <Line
                     data={metricSeries}
@@ -740,29 +770,37 @@ export default function MonitorHistory() {
                     shape="smooth"
                     height={320}
                     axis={{
-                      y: { title: '值' },
+                      y: { title: t('history.trend.valueAxis') },
                       x: { labelAutoRotate: true }
                     }}
                     scale={{ y: { nice: true } }}
                     tooltip={{
                       title: 'time',
                       items: [
-                        { field: 'index', name: '索引' },
-                        { field: 'value', name: '值' }
+                        { field: 'index', name: t('history.trend.indexName') },
+                        { field: 'value', name: t('history.trend.valueName') }
                       ]
                     }}
                     legend={{ color: { position: 'top' } }}
                   />
                 ) : (
-                  <Empty description="该指标在所选时间范围内无数据" style={{ padding: '48px 0' }} />
+                  <Empty description={t('history.trend.noData')} style={{ padding: '48px 0' }} />
                 )
               ) : (
-                <Empty description="请选择一个指标查看趋势" style={{ padding: '48px 0' }} />
+                <Empty
+                  description={t('history.trend.pleaseSelect')}
+                  style={{ padding: '48px 0' }}
+                />
               )}
             </Card>
           )}
 
-          <Card title="最近探测明细" size="small" variant="borderless" style={{ marginTop: 16 }}>
+          <Card
+            title={t('history.recentProbes')}
+            size="small"
+            variant="borderless"
+            style={{ marginTop: 16 }}
+          >
             <DataTable<ProbeHistoryItem>
               columns={columns}
               dataSource={historyItems}

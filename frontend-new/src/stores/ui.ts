@@ -15,10 +15,12 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { MenuLabelKey } from '@/constants/menu';
 
 export interface TabInfo {
   key: string;
-  title: string;
+  titleKey?: MenuLabelKey;
+  title?: string;
   path: string;
   closable: boolean;
 }
@@ -37,7 +39,7 @@ interface UIState {
 
 const HOME_TAB: TabInfo = {
   key: 'dashboard',
-  title: '仪表盘',
+  titleKey: 'menu.dashboard',
   path: '/dashboard',
   closable: false
 };

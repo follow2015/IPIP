@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal, Form, InputNumber } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 export interface TrunkValues {
   trunk_id: number;
@@ -13,6 +14,7 @@ interface TrunkModalProps {
 }
 
 export function TrunkModal({ open, onClose, portName, onSubmit }: TrunkModalProps) {
+  const { t } = useTranslation('device');
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function TrunkModal({ open, onClose, portName, onSubmit }: TrunkModalProp
 
   return (
     <Modal
-      title={`端口汇聚 — ${portName}`}
+      title={t('switch.trunk.title', { name: portName })}
       open={open}
       onOk={handleOk}
       onCancel={onClose}
@@ -47,9 +49,7 @@ export function TrunkModal({ open, onClose, portName, onSubmit }: TrunkModalProp
           border: '1px solid #ffccc7'
         }}
       >
-        <div>
-          <b>⚠ 注意：</b>此操作将清空端口现有配置，并导致端口 up/down 一次。
-        </div>
+        <div>{t('switch.portConfigWarning')}</div>
       </div>
       <div
         style={{
@@ -62,16 +62,20 @@ export function TrunkModal({ open, onClose, portName, onSubmit }: TrunkModalProp
           lineHeight: 1.8
         }}
       >
-        <div>将当前端口加入指定的链路聚合组（Eth-Trunk）。</div>
-        <div>若输入的 Eth-Trunk ID 在交换机上不存在，系统将自动创建。</div>
+        <div>{t('switch.trunk.info1')}</div>
+        <div>{t('switch.trunk.info2')}</div>
       </div>
       <Form form={form} layout="vertical">
         <Form.Item
           name="trunk_id"
-          label="Eth-Trunk ID"
-          rules={[{ required: true, message: '请输入Trunk ID' }]}
+          label={t('switch.batch.form.trunkId')}
+          rules={[{ required: true, message: t('switch.trunk.trunkIdRequired') }]}
         >
-          <InputNumber min={0} placeholder="例如：1" style={{ width: '100%' }} />
+          <InputNumber
+            min={0}
+            placeholder={t('switch.trunk.trunkIdPlaceholder')}
+            style={{ width: '100%' }}
+          />
         </Form.Item>
       </Form>
     </Modal>

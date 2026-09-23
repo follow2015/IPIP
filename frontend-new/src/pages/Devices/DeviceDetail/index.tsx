@@ -2,6 +2,7 @@ import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Tabs, Spin, Button, Space, Tag, Dropdown, Descriptions, Result } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -11,15 +12,13 @@ import {
   ReloadOutlined
 } from '@ant-design/icons';
 import { useDeviceSuspenseDetail, useDeleteDevice, useUpdateDeviceStatus } from '@/services/device';
+import { DEVICE_SUBTYPE_COLORS, DeviceType, DeviceSubtype } from '@/types/enums';
 import {
-  DEVICE_STATUS_MAP,
-  DeviceStatusCode,
-  DEVICE_SUBTYPE_LABELS,
-  DEVICE_SUBTYPE_COLORS,
-  DEVICE_TYPE_MAP,
-  DeviceType,
-  DeviceSubtype
-} from '@/types/enums';
+  getDeviceStatusMeta,
+  getDeviceStatusOptions,
+  getDeviceSubtypeLabel,
+  getDeviceTypeMeta
+} from '@/types/statusMeta';
 import { useMessage } from '@/hooks/useMessage';
 import { useSyncSwitchInfo } from '@/services/switch';
 import { useDeviceEvents } from '@/hooks/useDeviceEvents';
@@ -39,6 +38,8 @@ import { getCategoryConfig } from '../shared/categoryConfig';
 import type { TabKey } from '../shared/categoryConfig';
 
 function DeviceDetail() {
+  const { t: tDevice } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const deviceId = Number(id);
@@ -47,9 +48,9 @@ function DeviceDetail() {
     return (
       <Result
         status="404"
-        title="参数无效"
-        subTitle="设备 ID 无效"
-        extra={<Button onClick={() => navigate(-1)}>返回</Button>}
+        title={tDevice('detail.invalidParam')}
+        subTitle={tDevice('detail.invalidDeviceId')}
+        extra={<Button onClick={() => navigate(-1)}>{tCommon('action.back')}</Button>}
       />
     );
   }
@@ -62,6 +63,8 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { data: device, refetch } = useDeviceSuspenseDetail(deviceId);
+  const { t: tDevice } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const deleteDevice = useDeleteDevice();
   const updateStatus = useUpdateDeviceStatus();
   const message = useMessage();
@@ -93,12 +96,12 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
   const syncSwitchInfo = useSyncSwitchInfo();
   const handleRefreshDeviceInfo = () => {
     confirm({
-      title: '刷新设备信息',
-      content: '将从设备实时获取型号、版本、序列号等信息，后台执行完成后自动刷新。',
+      title: tDevice('detail.refreshInfo'),
+      content: tDevice('detail.refreshInfoContent'),
       onOk: async () => {
         try {
           await syncSwitchInfo.mutateAsync(deviceId);
-          message.info('刷新设备信息已提交，完成后将通过消息通知您');
+          message.info(tDevice('detail.refreshInfoSubmitted'));
         } catch {
         }
       }
@@ -108,23 +111,23 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
   const form = useDisclosure();
 
   if (!device) {
-    return <div>设备不存在</div>;
+    return <div>{tDevice('detail.notFound')}</div>;
   }
 
   const handleDelete = () => {
     confirm({
-      title: '确认删除',
-      content: `确定要删除设备「${device.device_name}」吗？`,
-      okText: '确定',
-      cancelText: '取消',
+      title: tCommon('confirm.deleteTitle'),
+      content: tDevice('confirm.deleteContent', { name: device.device_name }),
+      okText: tCommon('action.ok'),
+      cancelText: tCommon('action.cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
           await deleteDevice.mutateAsync(device.id);
-          message.success('删除成功');
+          message.success(tCommon('message.deleteSuccess'));
           navigate('/devices');
         } catch (err) {
-          message.error(err instanceof Error ? err.message : '删除失败');
+          message.error(err instanceof Error ? err.message : tCommon('message.deleteFailed'));
         }
       }
     });
@@ -133,10 +136,10 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
   const handleStatusChange = async (newStatus: number) => {
     try {
       await updateStatus.mutateAsync({ id: device.id, status: newStatus });
-      message.success('状态已变更');
+      message.success(tDevice('detail.statusChanged'));
       refetch();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '状态变更失败');
+      message.error(err instanceof Error ? err.message : tDevice('detail.statusChangeFailed'));
     }
   };
 
@@ -182,22 +185,23 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
     .filter((t) => (t.when ? t.when(device) : true))
     .map((t) => ({
       key: t.key,
-      label: t.label,
+      label: tDevice(t.labelKey),
       children: renderTab(t.key)
     }));
 
-  const statusInfo = DEVICE_STATUS_MAP[device.status as DeviceStatusCode];
+  const statusInfo = getDeviceStatusMeta(device.status, tDevice);
 
-  const statusMenuItems = Object.entries(DEVICE_STATUS_MAP)
-    .filter(([k]) => Number(k) !== device.status)
-    .map(([k, v]) => ({
-      key: k,
-      label: v.label
+  const statusMenuItems = getDeviceStatusOptions(tDevice)
+    .filter((o) => o.value !== device.status)
+    .map((o) => ({
+      key: String(o.value),
+      label: o.label
     }));
 
   const subtypeTag = device.device_subtype ? (
     <Tag color={DEVICE_SUBTYPE_COLORS[device.device_subtype as DeviceSubtype] ?? 'default'}>
-      {DEVICE_SUBTYPE_LABELS[device.device_subtype as DeviceSubtype] ?? device.device_subtype}
+      {getDeviceSubtypeLabel(device.device_subtype as DeviceSubtype, tDevice) ??
+        device.device_subtype}
     </Tag>
   ) : null;
 
@@ -213,13 +217,13 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
         }}
       >
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/devices')}>
-          返回列表
+          {tDevice('detail.backToList')}
         </Button>
         <Space>
           <Dropdown
             menu={{ items: statusMenuItems, onClick: ({ key }) => handleStatusChange(Number(key)) }}
           >
-            <Button icon={<SwapOutlined />}>变更状态</Button>
+            <Button icon={<SwapOutlined />}>{tDevice('detail.changeStatus')}</Button>
           </Dropdown>
           {hasSsh && (
             <Button
@@ -227,33 +231,34 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
               onClick={handleRefreshDeviceInfo}
               loading={syncSwitchInfo.isPending}
             >
-              刷新设备信息
+              {tDevice('detail.refreshInfo')}
             </Button>
           )}
           <Button type="primary" icon={<EditOutlined />} onClick={() => form.open()}>
-            编辑
+            {tCommon('action.edit')}
           </Button>
           <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
-            删除
+            {tCommon('action.delete')}
           </Button>
         </Space>
       </div>
 
       {/* 设备概要 */}
       <Descriptions column={{ xs: 1, md: 3 }} size="small" style={{ marginBottom: 16 }}>
-        <Descriptions.Item label="设备名称">
+        <Descriptions.Item label={tDevice('field.name')}>
           <strong style={{ fontSize: 16 }}>{device.device_name}</strong>
         </Descriptions.Item>
-        <Descriptions.Item label="类型">
+        <Descriptions.Item label={tCommon('field.type')}>
           <Space>
             <Tag>
-              {DEVICE_TYPE_MAP[device.device_type as DeviceType]?.label ?? device.device_type}
+              {getDeviceTypeMeta(device.device_type as DeviceType, tDevice)?.label ??
+                device.device_type}
             </Tag>
             {subtypeTag}
           </Space>
         </Descriptions.Item>
-        <Descriptions.Item label="状态">
-          <Tag color={statusInfo?.color}>{statusInfo?.label ?? '未知'}</Tag>
+        <Descriptions.Item label={tCommon('field.status')}>
+          <Tag color={statusInfo?.color}>{statusInfo?.label ?? tDevice('status.unknown')}</Tag>
         </Descriptions.Item>
       </Descriptions>
 

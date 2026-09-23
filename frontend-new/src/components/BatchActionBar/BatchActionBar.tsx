@@ -14,6 +14,7 @@
  */
 import { Alert, Button, Space } from 'antd';
 import { CloseCircleOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 
 export interface BatchActionBarProps {
@@ -26,11 +27,14 @@ export interface BatchActionBarProps {
 
 export function BatchActionBar({
   count,
-  unit = '项',
+  unit,
   onClear,
   children,
   className
 }: BatchActionBarProps) {
+  const { t } = useTranslation();
+  const resolvedUnit = unit ?? t('unit.item');
+
   if (count === 0) return null;
 
   return (
@@ -42,11 +46,12 @@ export function BatchActionBar({
       title={
         <Space wrap>
           <span>
-            已选择 <strong>{count}</strong> {unit}
+            {t('batch.selectedPrefix')} <strong>{count}</strong> {resolvedUnit}
+            {t('batch.selectedSuffix')}
           </span>
           {children}
           <Button size="small" type="link" icon={<CloseCircleOutlined />} onClick={onClear}>
-            取消选择
+            {t('batch.clear')}
           </Button>
         </Space>
       }

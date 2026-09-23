@@ -6,6 +6,7 @@
  */
 import { Form, InputNumber, Select, Button, Card, Alert, Row, Col } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
 
 interface PortGenerationFieldsProps {
@@ -13,9 +14,10 @@ interface PortGenerationFieldsProps {
 }
 
 export default function PortGenerationFields({ portPreview }: PortGenerationFieldsProps) {
+  const { t } = useTranslation('device');
   return (
     <Card
-      title="端口生成"
+      title={t('form.section.portGeneration')}
       size="small"
       style={{ marginBottom: 16 }}
       styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
@@ -31,7 +33,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
           color: '#595959'
         }}
       >
-        支持多组端口，如 48口GE + 4口10GE。命名规则：前缀 + 槽位/卡号/端口号
+        {t('form.portGeneration.intro')}
       </div>
       <Form.List
         name="port_groups"
@@ -54,18 +56,22 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                   <Form.Item
                     {...restField}
                     name={[name, 'template']}
-                    label="端口类型"
+                    label={t('nic.column.portType')}
                     initialValue="GE"
                     style={{ marginBottom: 0 }}
                   >
-                    <Select options={PORT_TYPE_TEMPLATES} placeholder="选择类型" size="small" />
+                    <Select
+                      options={PORT_TYPE_TEMPLATES}
+                      placeholder={t('form.portGeneration.template.placeholder')}
+                      size="small"
+                    />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={3}>
                   <Form.Item
                     {...restField}
                     name={[name, 'slot']}
-                    label="槽位"
+                    label={t('form.portGeneration.slot.label')}
                     initialValue={0}
                     style={{ marginBottom: 0 }}
                   >
@@ -76,7 +82,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                   <Form.Item
                     {...restField}
                     name={[name, 'card']}
-                    label="卡号"
+                    label={t('form.portGeneration.card.label')}
                     initialValue={0}
                     style={{ marginBottom: 0 }}
                   >
@@ -87,7 +93,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                   <Form.Item
                     {...restField}
                     name={[name, 'start']}
-                    label="起始"
+                    label={t('form.portGeneration.start.label')}
                     initialValue={1}
                     style={{ marginBottom: 0 }}
                   >
@@ -98,7 +104,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                   <Form.Item
                     {...restField}
                     name={[name, 'end']}
-                    label="结束"
+                    label={t('form.portGeneration.end.label')}
                     initialValue={24}
                     style={{ marginBottom: 0 }}
                   >
@@ -125,7 +131,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
               size="small"
               style={{ marginBottom: 8 }}
             >
-              添加端口组
+              {t('form.portGeneration.addGroup')}
             </Button>
           </>
         )}
@@ -133,7 +139,11 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
       {portPreview.length > 0 && (
         <Alert
           type="info"
-          title={`将生成 ${portPreview.length} 个端口：${portPreview.slice(0, 5).join(', ')}${portPreview.length > 5 ? ' ...' : ''}`}
+          title={t('form.portGeneration.preview', {
+            count: portPreview.length,
+            list: portPreview.slice(0, 5).join(', '),
+            ellipsis: portPreview.length > 5 ? ' ...' : ''
+          })}
           style={{ marginBottom: 8 }}
           showIcon
         />

@@ -1,9 +1,4 @@
-/**
- * portType — 端口类型识别与分组工具
- *
- * 从 SwitchPortPanel / VlanTab / LagTab 提取的共用逻辑，
- * 统一端口类型识别规则、颜色映射、排序权重。
- */
+import type { TFunction } from 'i18next';
 
 
 export const PORT_TYPE_RULES: [RegExp, string][] = [
@@ -33,7 +28,7 @@ export const PORT_TYPE_RULES: [RegExp, string][] = [
   [/^Cluster/i, 'Stack'],
   [/^CSS/i, 'Stack'],
   [/^Peer-link/i, 'Peer-link'],
-  [/^MEth/i, '管理口'],
+  [/^MEth/i, 'MGMT'],
   [/^LoopBack/i, 'LoopBack'],
   [/^NULL/i, 'NULL']
 ];
@@ -42,7 +37,19 @@ export function classifyPortType(name: string): string {
   for (const [regex, type] of PORT_TYPE_RULES) {
     if (regex.test(name)) return type;
   }
-  return '其他';
+  return 'OTHER';
+}
+
+export type PortTypeLabelKey = 'port.type.mgmt' | 'port.type.other';
+
+export const PORT_TYPE_LABEL_KEYS: Record<string, PortTypeLabelKey> = {
+  MGMT: 'port.type.mgmt',
+  OTHER: 'port.type.other'
+};
+
+export function getPortTypeLabel(type: string, t: TFunction<'device'>): string {
+  const key = PORT_TYPE_LABEL_KEYS[type];
+  return key ? t(key) : type;
 }
 
 const PHYSICAL_PORT_TYPES = new Set(['100GE', '40GE', '25GE', '10GE', 'XGE', 'GE', '100M']);
@@ -67,10 +74,10 @@ export const PORT_TYPE_ORDER = [
   'Tunnel',
   'Stack',
   'Peer-link',
-  '管理口',
+  'MGMT',
   'LoopBack',
   'NULL',
-  '其他'
+  'OTHER'
 ];
 
 export const PORT_TYPE_SORT_WEIGHT: Record<string, number> = {
@@ -87,10 +94,10 @@ export const PORT_TYPE_SORT_WEIGHT: Record<string, number> = {
   Tunnel: 103,
   Stack: 104,
   'Peer-link': 105,
-  管理口: 200,
+  MGMT: 200,
   LoopBack: 201,
   NULL: 202,
-  其他: 300
+  OTHER: 300
 };
 
 
@@ -127,10 +134,10 @@ export const PORT_TYPE_TAG_COLOR: Record<string, string> = {
   Tunnel: 'green',
   Stack: 'purple',
   'Peer-link': 'red',
-  管理口: 'default',
+  MGMT: 'default',
   LoopBack: 'default',
   NULL: 'default',
-  其他: 'default'
+  OTHER: 'default'
 };
 
 export const PORT_TYPE_BAR_COLOR: Record<string, string> = {
@@ -142,7 +149,7 @@ export const PORT_TYPE_BAR_COLOR: Record<string, string> = {
   GE: '#1677ff',
   '100M': '#13c2c2',
   'Eth-Trunk': '#d48806',
-  其他: '#8c8c8c'
+  OTHER: '#8c8c8c'
 };
 
 

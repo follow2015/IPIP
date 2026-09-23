@@ -10,6 +10,7 @@
  */
 import { useConfirm } from '@/utils/confirm';
 import { useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button, Space, Modal, Tooltip } from 'antd';
 import {
   EyeOutlined,
@@ -64,6 +65,8 @@ const extractInterfaceId = (name: string): number | null => {
 };
 
 function PortActions({ switchId, port, submitAction, hasSsh = true }: PortActionsProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
   const updatePortCustomer = useUpdatePortCustomer();
   const fetchPortConfig = useFetchPortConfig();
@@ -74,6 +77,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
   const { data: customerOptions } = useAllocatableCustomerOptions();
 
   const portName = port.port_name;
+  const sshOnlyTip = td('switch.batch.sshOnlyTip');
 
   const [activeModal, setActiveModal] = useState<ModalKey | null>(null);
   const openModal = (key: ModalKey) => setActiveModal(key);
@@ -103,8 +107,12 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
   const handleTogglePort = (action: 'enable' | 'disable') => {
     const isEnable = action === 'enable';
     confirm({
-      title: `确认${isEnable ? '开启' : '关闭'}端口`,
-      content: `确定要${isEnable ? '开启' : '关闭'}端口 ${portName} 吗？将通过SSH执行操作。`,
+      title: isEnable ? td('switch.port.enableTitle') : td('switch.port.disableTitle'),
+      content: isEnable
+        ? td('switch.port.enableContent', { name: portName })
+        : td('switch.port.disableContent', { name: portName }),
+      okText: tc('action.ok'),
+      cancelText: tc('action.cancel'),
       onOk: () => {
         submitAction(isEnable ? 'enable_port' : 'disable_port', portName);
       }
@@ -122,14 +130,14 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
       if (customerId !== (port.customer_id ?? null)) {
         updatePortCustomer
           .mutateAsync({ switchId, port: portName, data: { customer_id: customerId } })
-          .catch((err) => msg.error(extractErrorMessage(err)));
+          .catch((err) => msg.error(extractErrorMessage(err, tc)));
       }
 
       if (description !== (port.notes ?? '')) {
         submitAction('update_port_info', portName, { description });
       }
     } catch (err) {
-      msg.error(extractErrorMessage(err));
+      msg.error(extractErrorMessage(err, tc));
     }
   };
 
@@ -141,7 +149,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
       const inbound = Number(values.inbound);
       const outbound = Number(values.outbound);
       if (inbound < 0 || outbound < 0) {
-        msg.error('限速值不能为负数');
+        msg.error(td('switch.port.speedNegative'));
         return;
       }
       closeModal();
@@ -150,7 +158,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
         outbound_speed: outbound
       });
     } catch (err) {
-      msg.error(extractErrorMessage(err));
+      msg.error(extractErrorMessage(err, tc));
     }
   };
 
@@ -159,7 +167,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     try {
       const vlanId = Number(values.vlan_id);
       if (vlanId < 1 || vlanId > 4094) {
-        msg.error('VLAN ID 范围：1-4094');
+        msg.error(td('switch.port.vlanRange'));
         return;
       }
       closeModal();
@@ -170,7 +178,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
           values.mode === 'trunk' && values.allowed_vlans ? values.allowed_vlans.trim() : null
       });
     } catch (err) {
-      msg.error(extractErrorMessage(err));
+      msg.error(extractErrorMessage(err, tc));
     }
   };
 
@@ -179,13 +187,13 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
     try {
       const trunkId = Number(values.trunk_id);
       if (isNaN(trunkId) || trunkId < 0) {
-        msg.error('Trunk ID 必须为非负整数');
+        msg.error(td('switch.port.trunkIdInvalid'));
         return;
       }
       closeModal();
       submitAction('add_port_to_trunk', portName, { channel_id: trunkId });
     } catch (err) {
-      msg.error(extractErrorMessage(err));
+      msg.error(extractErrorMessage(err, tc));
     }
   };
 
@@ -199,26 +207,32 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
         is_secondary: values.ip_type === 'secondary'
       });
     } catch (err) {
-      msg.error(extractErrorMessage(err));
+      msg.error(extractErrorMessage(err, tc));
     }
   };
 
 
   const handleDeleteIP = (ipAddress: string, subnetMask: string, isSecondary: boolean = false) => {
     if (!portDetail) {
-      msg.warning('端口详情未加载，请稍候再试');
+      msg.warning(td('switch.port.detailNotLoaded'));
       return;
     }
     if (!isSecondary && portDetail.ip_list && portDetail.ip_list.length > 1) {
       Modal.warning({
-        title: '无法删除主IP',
-        content: '该端口存在多个IP地址，请先删除所有从IP后再删除主IP。'
+        title: td('switch.port.cannotDeletePrimaryIp'),
+        content: td('switch.port.cannotDeletePrimaryIpContent')
       });
       return;
     }
     confirm({
-      title: '确认删除IP',
-      content: `确定删除端口 "${portName}" 的 IP 地址 ${ipAddress}/${subnetMask}？`,
+      title: td('switch.port.deleteIpTitle'),
+      content: td('switch.port.deleteIpContent', {
+        name: portName,
+        ip: ipAddress,
+        mask: subnetMask
+      }),
+      okText: tc('action.delete'),
+      cancelText: tc('action.cancel'),
       onOk: () => {
         submitAction('delete_port_ip', portName, {
           ip_address: ipAddress,
@@ -240,25 +254,26 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
           setPortConfig(data);
           msgRef.current.success(
             forceRefresh
-              ? '配置已刷新并同步'
+              ? td('switch.port.configRefreshed')
               : data.from_cache
-                ? '已从缓存加载配置'
-                : '已从设备获取配置并同步'
+                ? td('switch.port.configFromCache')
+                : td('switch.port.configFetched')
           );
         }
       } catch (err) {
-        msgRef.current.error(extractErrorMessage(err));
+        msgRef.current.error(extractErrorMessage(err, tc));
       }
     },
-    [fetchPortConfig, refreshPortConfig, switchId, portName]
+    [fetchPortConfig, refreshPortConfig, switchId, portName, td, tc]
   );
 
 
   const handleClearConfig = () => {
     confirm({
-      title: '确认清除端口配置',
-      content: `确定清除端口 "${portName}" 的设备配置？该端口配置将还原为初始状态。此操作不可逆！`,
-      okText: '确认清除',
+      title: td('switch.port.clearConfigTitle'),
+      content: td('switch.port.clearConfigContent', { name: portName }),
+      okText: td('switch.port.clearConfigOk'),
+      cancelText: tc('action.cancel'),
       okButtonProps: { danger: true },
       onOk: () => {
         submitAction('clear_port_config', portName);
@@ -270,13 +285,14 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
   const handleDeleteVlanIf = () => {
     const vlanId = extractInterfaceId(portName);
     if (!vlanId) {
-      msg.error('无法解析VLAN ID');
+      msg.error(td('switch.port.vlanIdUnparsable'));
       return;
     }
     confirm({
-      title: '确认删除VLAN接口',
-      content: `确定删除 VLAN 接口 "${portName}"（VLAN ${vlanId}）？该操作将删除对应的VLAN配置及VLANIF接口，不可恢复！`,
-      okText: '确认删除',
+      title: td('switch.port.deleteVlanIfTitle'),
+      content: td('switch.port.deleteVlanIfContent', { name: portName, vlanId }),
+      okText: tc('action.delete'),
+      cancelText: tc('action.cancel'),
       okButtonProps: { danger: true },
       onOk: () => {
         submitAction('delete_vlan', portName, { vlan_id: vlanId });
@@ -288,13 +304,14 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
   const handleDeleteTrunkIf = () => {
     const trunkId = extractInterfaceId(portName);
     if (!trunkId) {
-      msg.error('无法解析Trunk ID');
+      msg.error(td('switch.port.trunkIdUnparsable'));
       return;
     }
     confirm({
-      title: '确认删除链路聚合接口',
-      content: `确定删除 Eth-Trunk 接口 "${portName}"（Trunk ${trunkId}）？该操作将删除对应的链路聚合组及所有成员端口配置，不可恢复！`,
-      okText: '确认删除',
+      title: td('switch.port.deleteTrunkIfTitle'),
+      content: td('switch.port.deleteTrunkIfContent', { name: portName, trunkId }),
+      okText: tc('action.delete'),
+      cancelText: tc('action.cancel'),
       okButtonProps: { danger: true },
       onOk: () => {
         submitAction('delete_trunk', portName, { trunk_id: trunkId });
@@ -305,9 +322,10 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
 
   const handleDeleteInterface = () => {
     confirm({
-      title: '确认删除接口',
-      content: `确定删除接口 "${portName}"？该操作不可恢复！`,
-      okText: '确认删除',
+      title: td('switch.port.deleteInterfaceTitle'),
+      content: td('switch.port.deleteInterfaceContent', { name: portName }),
+      okText: tc('action.delete'),
+      cancelText: tc('action.cancel'),
       okButtonProps: { danger: true },
       onOk: () => {
         submitAction('delete_interface', portName);
@@ -327,7 +345,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
               icon={<EyeOutlined />}
               onClick={() => openModal('detail')}
             >
-              详情
+              {tc('action.detail')}
             </Button>
             <Button
               type="link"
@@ -335,7 +353,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
               icon={<UserOutlined />}
               onClick={() => openModal('assign')}
             >
-              分配
+              {td('switch.port.assign')}
             </Button>
             {isAdminDown(port.link_status) ? (
               <Button
@@ -344,7 +362,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
                 icon={<CheckOutlined />}
                 onClick={() => handleTogglePort('enable')}
               >
-                开启
+                {td('switch.port.enable')}
               </Button>
             ) : (
               <Button
@@ -354,11 +372,11 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
                 icon={<StopOutlined />}
                 onClick={() => handleTogglePort('disable')}
               >
-                关闭
+                {td('switch.port.disable')}
               </Button>
             )}
             {portType !== 'loopback' && portType !== 'meth' && (
-              <Tooltip title={!hasSsh ? '需SSH连接设备，非网管设备不支持' : undefined}>
+              <Tooltip title={!hasSsh ? sshOnlyTip : undefined}>
                 <Button
                   type="link"
                   size="small"
@@ -366,7 +384,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
                   onClick={() => openModal('speed')}
                   disabled={!hasSsh}
                 >
-                  限速
+                  {td('switch.port.speedLimit')}
                 </Button>
               </Tooltip>
             )}
@@ -381,7 +399,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
               </Button>
             )}
             {portType === 'normal' && (
-              <Tooltip title={!hasSsh ? '需SSH连接设备，非网管设备不支持' : undefined}>
+              <Tooltip title={!hasSsh ? sshOnlyTip : undefined}>
                 <Button
                   type="link"
                   size="small"
@@ -389,11 +407,11 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
                   onClick={() => openModal('trunk')}
                   disabled={!hasSsh}
                 >
-                  汇聚
+                  {td('switch.port.aggregate')}
                 </Button>
               </Tooltip>
             )}
-            <Tooltip title={!hasSsh ? '需SSH连接设备，非网管设备不支持' : undefined}>
+            <Tooltip title={!hasSsh ? sshOnlyTip : undefined}>
               <Button
                 type="link"
                 size="small"
@@ -402,15 +420,13 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
                 onClick={() => {
                   if (portDetail?.eth_trunk_id) {
                     msg.warning(
-                      `端口属于 Eth-Trunk ${portDetail.eth_trunk_id}，不能直接配置 IP。请在 Eth-Trunk ${portDetail.eth_trunk_id} 端口上配置。`
+                      td('switch.port.trunkIpBlocked', { id: portDetail.eth_trunk_id })
                     );
                     return;
                   }
                   const currentVlan = portDetail?.vlan ?? port.vlan;
                   if (currentVlan != null && Number(currentVlan) !== 1) {
-                    msg.warning(
-                      `端口属于 VLAN ${currentVlan}，不能直接配置 IP。请先去端口详情页清除配置。`
-                    );
+                    msg.warning(td('switch.port.vlanIpBlocked', { vlan: currentVlan }));
                     return;
                   }
                   openModal('ip');
@@ -420,7 +436,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
               </Button>
             </Tooltip>
             {portType === 'vlan' && (
-              <Tooltip title={!hasSsh ? '需SSH连接设备，非网管设备不支持' : undefined}>
+              <Tooltip title={!hasSsh ? sshOnlyTip : undefined}>
                 <Button
                   type="link"
                   size="small"
@@ -429,12 +445,12 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
                   onClick={handleDeleteVlanIf}
                   disabled={!hasSsh}
                 >
-                  删除
+                  {tc('action.delete')}
                 </Button>
               </Tooltip>
             )}
             {portType === 'trunk' && (
-              <Tooltip title={!hasSsh ? '需SSH连接设备，非网管设备不支持' : undefined}>
+              <Tooltip title={!hasSsh ? sshOnlyTip : undefined}>
                 <Button
                   type="link"
                   size="small"
@@ -443,12 +459,12 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
                   onClick={handleDeleteTrunkIf}
                   disabled={!hasSsh}
                 >
-                  删除
+                  {tc('action.delete')}
                 </Button>
               </Tooltip>
             )}
             {portType === 'loopback' && (
-              <Tooltip title={!hasSsh ? '需SSH连接设备，非网管设备不支持' : undefined}>
+              <Tooltip title={!hasSsh ? sshOnlyTip : undefined}>
                 <Button
                   type="link"
                   size="small"
@@ -457,7 +473,7 @@ function PortActions({ switchId, port, submitAction, hasSsh = true }: PortAction
                   onClick={handleDeleteInterface}
                   disabled={!hasSsh}
                 >
-                  删除
+                  {tc('action.delete')}
                 </Button>
               </Tooltip>
             )}

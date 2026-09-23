@@ -23,6 +23,8 @@ import {
 } from '@/services/monitor';
 import { formatDateTime } from '@/utils/format';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 const { Text } = Typography;
 
@@ -32,11 +34,22 @@ const SEVERITY_COLOR: Record<string, string> = {
   info: 'blue'
 };
 
-const REASON_LABEL: Record<string, string> = {
-  L1_rule: '规则聚合',
-  L2_topology: '拓扑聚合',
-  L2_manual_rule: '手动规则聚合',
-  L3_change: '变更关联'
+type IncidentReasonCode = 'L1_rule' | 'L2_topology' | 'L2_manual_rule' | 'L3_change';
+type IncidentReasonKey =
+  | 'incident.reason.L1_rule'
+  | 'incident.reason.L2_topology'
+  | 'incident.reason.L2_manual_rule'
+  | 'incident.reason.L3_change';
+const REASON_LABEL_KEYS: Record<IncidentReasonCode, IncidentReasonKey> = {
+  L1_rule: 'incident.reason.L1_rule',
+  L2_topology: 'incident.reason.L2_topology',
+  L2_manual_rule: 'incident.reason.L2_manual_rule',
+  L3_change: 'incident.reason.L3_change'
+};
+const reasonLabel = (code: string | null, t: TFunction<'monitor'>): string | null => {
+  if (!code) return null;
+  const key = REASON_LABEL_KEYS[code as IncidentReasonCode];
+  return key ? t(key) : code;
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -61,6 +74,8 @@ function renderDeviceRef(id: number | null, name: string | null) {
 }
 
 export default function MonitorIncidents() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
   const [params, setParams] = useState<IncidentListParams>({
     page: 1,
     per_page: 20
@@ -84,7 +99,7 @@ export default function MonitorIncidents() {
 
   const columns: ColumnsType<IncidentItem> = [
     {
-      title: '事件标题',
+      title: t('incident.column.title'),
       dataIndex: 'title',
       key: 'title',
       ellipsis: true,
@@ -95,21 +110,21 @@ export default function MonitorIncidents() {
       )
     },
     {
-      title: '严重级别',
+      title: tc('field.severity'),
       dataIndex: 'severity',
       key: 'severity',
       width: 100,
       render: (s: string) => <Tag color={SEVERITY_COLOR[s] ?? 'default'}>{s}</Tag>
     },
     {
-      title: '状态',
+      title: tc('field.status'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
       render: (s: string) => <Tag color={STATUS_COLOR[s] ?? 'default'}>{s}</Tag>
     },
     {
-      title: '告警数',
+      title: t('column.alertCount'),
       dataIndex: 'alert_count',
       key: 'alert_count',
       width: 80,
@@ -118,7 +133,7 @@ export default function MonitorIncidents() {
     },
     {
       responsive: ['md'], // ≥768
-      title: '影响设备数',
+      title: t('incident.column.deviceCount'),
       dataIndex: 'device_count',
       key: 'device_count',
       width: 100,
@@ -131,26 +146,26 @@ export default function MonitorIncidents() {
     },
     {
       responsive: ['lg'], // ≥992
-      title: '归并原因',
+      title: t('incident.column.reasonCode'),
       dataIndex: 'reason_code',
       key: 'reason_code',
       width: 120,
-      render: (r: string | null) => (r ? (REASON_LABEL[r] ?? r) : '-')
+      render: (r: string | null) => reasonLabel(r, t) ?? '-'
     },
     {
-      title: '首告时间',
+      title: t('incident.column.firstAlertAt'),
       dataIndex: 'first_alert_at',
       key: 'first_alert_at',
       width: 160,
-      render: (t: string | null) => (t ? formatDateTime(t) : '-')
+      render: (v: string | null) => (v ? formatDateTime(v) : '-')
     },
     {
       responsive: ['md'], // ≥768
-      title: '末告时间',
+      title: t('incident.column.lastAlertAt'),
       dataIndex: 'last_alert_at',
       key: 'last_alert_at',
       width: 160,
-      render: (t: string | null) => (t ? formatDateTime(t) : '-')
+      render: (v: string | null) => (v ? formatDateTime(v) : '-')
     }
   ];
 
@@ -166,14 +181,16 @@ export default function MonitorIncidents() {
       <Space size={4} wrap>
         <Tag color={SEVERITY_COLOR[row.severity] ?? 'default'}>{row.severity}</Tag>
         <Tag color={STATUS_COLOR[row.status] ?? 'default'}>{row.status}</Tag>
-        {row.reason_code && <Tag>{REASON_LABEL[row.reason_code] ?? row.reason_code}</Tag>}
+        {row.reason_code && <Tag>{reasonLabel(row.reason_code, t)}</Tag>}
       </Space>
       <Text type="secondary" style={{ fontSize: 12 }}>
-        告警 {row.alert_count} · 影响设备 {row.device_count}
+        {t('incident.cardSummary', { alerts: row.alert_count, devices: row.device_count })}
       </Text>
       <Text type="secondary" style={{ fontSize: 12 }}>
-        首告 {row.first_alert_at ? formatDateTime(row.first_alert_at) : '-'} · 末告{' '}
-        {row.last_alert_at ? formatDateTime(row.last_alert_at) : '-'}
+        {t('incident.cardTime', {
+          first: row.first_alert_at ? formatDateTime(row.first_alert_at) : '-',
+          last: row.last_alert_at ? formatDateTime(row.last_alert_at) : '-'
+        })}
       </Text>
     </Space>
   );
@@ -183,7 +200,7 @@ export default function MonitorIncidents() {
       title={
         <Space>
           <ThunderboltOutlined />
-          <span>事件中心</span>
+          <span>{t('incident.title')}</span>
         </Space>
       }
       extra={
@@ -203,18 +220,18 @@ export default function MonitorIncidents() {
           />
           <Select
             allowClear
-            placeholder="状态过滤"
+            placeholder={t('incident.filter.status')}
             style={{ width: 140 }}
             value={params.status}
             onChange={(v) => setParams((p) => ({ ...p, status: v || undefined, page: 1 }))}
             options={[
-              { value: 'active', label: '活跃' },
-              { value: 'acknowledged', label: '已确认' },
-              { value: 'closed', label: '已关闭' }
+              { value: 'active', label: t('incident.status.active') },
+              { value: 'acknowledged', label: t('alerts.acknowledged') },
+              { value: 'closed', label: t('incident.status.closed') }
             ]}
           />
           <Button icon={<ReloadOutlined />} loading={isFetching} onClick={() => refetch()}>
-            刷新
+            {tc('action.refresh')}
           </Button>
         </Space>
       }
@@ -239,7 +256,7 @@ export default function MonitorIncidents() {
       />
 
       <Drawer
-        title="事件详情"
+        title={t('incident.detailTitle')}
         open={selectedId != null}
         onClose={() => setSelectedId(null)}
         width={isMobile ? '100vw' : 680}
@@ -249,38 +266,36 @@ export default function MonitorIncidents() {
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
             {/* 统一为响应式列数配置，避免 JS 分支与 antd 断点两套语义并存 */}
             <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
-              <Descriptions.Item label="事件标题" span={2}>
+              <Descriptions.Item label={t('incident.column.title')} span={2}>
                 {detail.title}
               </Descriptions.Item>
-              <Descriptions.Item label="严重级别">
+              <Descriptions.Item label={tc('field.severity')}>
                 <Tag color={SEVERITY_COLOR[detail.severity] ?? 'default'}>{detail.severity}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="状态">
+              <Descriptions.Item label={tc('field.status')}>
                 <Tag color={STATUS_COLOR[detail.status] ?? 'default'}>{detail.status}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="告警数">{detail.alert_count}</Descriptions.Item>
-              <Descriptions.Item label="影响设备数">
+              <Descriptions.Item label={t('column.alertCount')}>{detail.alert_count}</Descriptions.Item>
+              <Descriptions.Item label={t('incident.column.deviceCount')}>
                 <Text strong style={{ color: detail.device_count > 1 ? '#cf1322' : undefined }}>
                   {detail.device_count}
                 </Text>
               </Descriptions.Item>
-              <Descriptions.Item label="归并原因">
-                {detail.reason_code
-                  ? (REASON_LABEL[detail.reason_code] ?? detail.reason_code)
-                  : '-'}
+              <Descriptions.Item label={t('incident.column.reasonCode')}>
+                {reasonLabel(detail.reason_code, t) ?? '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="根因设备">
+              <Descriptions.Item label={t('incident.detail.rootDevice')}>
                 {renderDeviceRef(detail.root_device_id, detail.root_device_name)}
               </Descriptions.Item>
-              <Descriptions.Item label="首告时间">
+              <Descriptions.Item label={t('incident.column.firstAlertAt')}>
                 {detail.first_alert_at ? formatDateTime(detail.first_alert_at) : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="末告时间">
+              <Descriptions.Item label={t('incident.column.lastAlertAt')}>
                 {detail.last_alert_at ? formatDateTime(detail.last_alert_at) : '-'}
               </Descriptions.Item>
             </Descriptions>
 
-            <Card size="small" title={`关联告警（${detail.related_alerts.length}）`}>
+            <Card size="small" title={t('incident.detail.relatedAlerts', { count: detail.related_alerts.length })}>
               <DataTable
                 searchable={false}
                 showCard={false}
@@ -289,19 +304,22 @@ export default function MonitorIncidents() {
                 pagination={{ pageSize: 5 }}
                 dataSource={detail.related_alerts}
                 columns={[
-                  { title: 'ID', dataIndex: 'id', width: 70 },
-                  { title: '类型', dataIndex: 'alert_type', width: 140 },
-                  { title: '严重级别', dataIndex: 'severity', width: 90 },
+                  { title: t('incident.column.id'), dataIndex: 'id', width: 70 },
+                  { title: tc('field.type'), dataIndex: 'alert_type', width: 140 },
+                  { title: tc('field.severity'), dataIndex: 'severity', width: 90 },
                   {
-                    title: '时间',
+                    title: tc('field.time'),
                     dataIndex: 'created_at',
-                    render: (t: string | null) => (t ? formatDateTime(t) : '-')
+                    render: (v: string | null) => (v ? formatDateTime(v) : '-')
                   }
                 ]}
               />
             </Card>
 
-            <Card size="small" title={`被抑制的下游设备（${detail.suppressed_logs.length}）`}>
+            <Card
+              size="small"
+              title={t('incident.detail.suppressedDevices', { count: detail.suppressed_logs.length })}
+            >
               <DataTable
                 searchable={false}
                 showCard={false}
@@ -311,24 +329,24 @@ export default function MonitorIncidents() {
                 dataSource={detail.suppressed_logs}
                 columns={[
                   {
-                    title: '设备',
+                    title: t('thresholdOverride.column.deviceId'),
                     dataIndex: 'device_name',
                     width: 160,
                     render: (_: string | null, r) => renderDeviceRef(r.device_id, r.device_name)
                   },
-                  { title: '告警类型', dataIndex: 'alert_type', width: 140 },
-                  { title: '严重级别', dataIndex: 'severity', width: 90 },
+                  { title: t('column.alertType'), dataIndex: 'alert_type', width: 140 },
+                  { title: tc('field.severity'), dataIndex: 'severity', width: 90 },
                   {
-                    title: '上游设备',
+                    title: t('incident.column.upstreamDevice'),
                     dataIndex: 'upstream_device_name',
                     width: 160,
                     render: (_: string | null, r) =>
                       renderDeviceRef(r.upstream_device_id, r.upstream_device_name)
                   },
                   {
-                    title: '时间',
+                    title: tc('field.time'),
                     dataIndex: 'created_at',
-                    render: (t: string | null) => (t ? formatDateTime(t) : '-')
+                    render: (v: string | null) => (v ? formatDateTime(v) : '-')
                   }
                 ]}
               />

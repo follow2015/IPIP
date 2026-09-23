@@ -1,14 +1,22 @@
 import { Popover, Table, Tag, Spin, Empty } from 'antd';
 import { WarningOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useDeviceMetricAlerts } from '@/services/monitor';
 
-const METRIC_KEY_LABEL: Record<string, string> = {
-  temperature: '温度',
-  port_updown: '端口状态',
-  disk_failure: '硬盘故障',
-  raid_failure: 'RAID故障',
-  monitor_interrupted: '监控中断'
-};
+type MetricAlertKey =
+  | 'temperature'
+  | 'port_updown'
+  | 'disk_failure'
+  | 'raid_failure'
+  | 'monitor_interrupted';
+
+const METRIC_KEY_LABEL = {
+  temperature: 'alertPopover.metric.temperature',
+  port_updown: 'alertPopover.metric.portUpdown',
+  disk_failure: 'alertPopover.metric.diskFailure',
+  raid_failure: 'alertPopover.metric.raidFailure',
+  monitor_interrupted: 'alertPopover.metric.monitorInterrupted'
+} as const;
 
 const SEVERITY_COLOR: Record<string, string> = {
   crit: 'red',
@@ -26,10 +34,11 @@ interface MetricAlertPopoverProps {
 }
 
 export function MetricAlertPopover({ deviceId, alertCount, maxSeverity }: MetricAlertPopoverProps) {
+  const { t } = useTranslation('monitor');
   const { data, isLoading } = useDeviceMetricAlerts(deviceId);
 
   if (alertCount === 0) {
-    return <span style={{ color: '#999' }}>正常</span>;
+    return <span style={{ color: '#999' }}>{t('alertPopover.normal')}</span>;
   }
 
   const color = maxSeverity >= 3 ? 'magenta' : 'volcano';
@@ -37,7 +46,7 @@ export function MetricAlertPopover({ deviceId, alertCount, maxSeverity }: Metric
   const content = isLoading ? (
     <Spin size="small" />
   ) : !data?.items?.length ? (
-    <Empty description="暂无活跃告警" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+    <Empty description={t('alertPopover.empty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
   ) : (
     <Table
       dataSource={data.items}
@@ -47,20 +56,23 @@ export function MetricAlertPopover({ deviceId, alertCount, maxSeverity }: Metric
       style={{ minWidth: 360 }}
       columns={[
         {
-          title: '指标',
+          title: t('alertPopover.column.metric'),
           dataIndex: 'metric_key',
           width: 90,
-          render: (key: string) => METRIC_KEY_LABEL[key] ?? key
+          render: (key: string) => {
+            const labelKey = METRIC_KEY_LABEL[key as MetricAlertKey];
+            return labelKey ? t(labelKey) : key;
+          }
         },
         {
-          title: '实例',
+          title: t('alertPopover.column.instance'),
           dataIndex: 'index_key',
           width: 120,
           render: (v: string) => v || '—',
           ellipsis: true
         },
         {
-          title: '级别',
+          title: t('alertPopover.column.severity'),
           dataIndex: 'severity',
           width: 70,
           render: (sev: string | null) => (
@@ -68,7 +80,7 @@ export function MetricAlertPopover({ deviceId, alertCount, maxSeverity }: Metric
           )
         },
         {
-          title: '当前值',
+          title: t('alertPopover.column.value'),
           dataIndex: 'last_value',
           width: 80,
           render: (v: string | null) => v ?? '—'
@@ -79,9 +91,9 @@ export function MetricAlertPopover({ deviceId, alertCount, maxSeverity }: Metric
   );
 
   return (
-    <Popover title="指标告警明细" content={content} trigger="click" placement="left">
+    <Popover title={t('alertPopover.title')} content={content} trigger="click" placement="left">
       <Tag color={color} icon={<WarningOutlined />} style={{ cursor: 'pointer' }}>
-        {alertCount} 条告警
+        {t('alertPopover.count', { count: alertCount })}
       </Tag>
     </Popover>
   );

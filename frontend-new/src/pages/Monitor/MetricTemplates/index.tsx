@@ -51,17 +51,18 @@ import {
   type MetricTemplateOidAuditItem
 } from '@/services/monitor';
 import {
-  DEVICE_TYPE_LABEL,
   SOURCE_LABEL,
-  METRIC_TYPE_LABEL,
-  DEVICE_TYPE_OPTIONS,
   SOURCE_OPTIONS,
+  deviceTypeLabel,
+  metricTypeLabel,
+  buildDeviceTypeOptions,
   parseThreshold,
   renderThreshold,
   type MetricTemplateFormValues
 } from './shared';
 import MetricTemplateModal from './MetricTemplateModal';
 import MetricTemplateGroupsSection from './MetricTemplateGroupsSection';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
@@ -74,6 +75,9 @@ export default function MetricTemplatesPage() {
   const batchToggleMut = useBatchToggleMetricTemplateEnabled();
   const { data: vendorBrands } = useVendorBrands();
   const message = useMessage();
+  const { t } = useTranslation('monitor');
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
 
   const {
     data: oidAudit,
@@ -134,6 +138,8 @@ export default function MetricTemplatesPage() {
     }
     return { total, enabled, byDeviceType };
   }, [allItems]);
+
+  const deviceTypeOptions = buildDeviceTypeOptions(td);
 
   const filteredItems = useMemo(() => {
     const kw = search.trim().toLowerCase();
@@ -221,34 +227,36 @@ export default function MetricTemplatesPage() {
         enabled,
         description: record.description
       });
-      message.success(enabled ? '已启用' : '已停用');
+      message.success(
+        enabled ? t('metricTemplate.status.enabled') : t('metricTemplate.status.disabled')
+      );
     } catch {
-      message.error('操作失败，请重试');
+      message.error(t('metricTemplate.message.actionFailed'));
     }
   };
 
   const handleDelete = async (templateId: number) => {
     try {
       await deleteMutation.mutateAsync(templateId);
-      message.success('指标模板已删除');
+      message.success(t('metricTemplate.message.deleted'));
     } catch {
-      message.error('删除失败，请重试');
+      message.error(t('metricTemplate.message.deleteFailed'));
     }
   };
 
   const handleBatchDelete = () => {
     confirm({
-      title: `确认删除选中的 ${batch.count} 个指标模板？`,
-      content: '删除后不可恢复，关联的指标告警规则将一并失效。',
+      title: t('metricTemplate.batch.confirm.deleteTitle', { count: batch.count }),
+      content: t('metricTemplate.confirm.deleteContent'),
       okType: 'danger',
       onOk: async () => {
         try {
           const ids = batch.selectedKeys.map((k) => Number(k));
           const res = await batchDeleteMut.mutateAsync(ids);
-          message.success(`已删除 ${res.deleted} 个指标模板`);
+          message.success(t('metricTemplate.batch.message.deleted', { count: res.deleted }));
           batch.clear();
         } catch {
-          message.error('批量删除失败，请重试');
+          message.error(t('metricTemplate.batch.message.deleteFailed'));
         }
       }
     });
@@ -256,18 +264,24 @@ export default function MetricTemplatesPage() {
 
   const handleBatchToggleEnabled = (enabled: boolean) => {
     confirm({
-      title: `确认${enabled ? '启用' : '停用'}选中的 ${batch.count} 个指标模板？`,
+      title: enabled
+        ? t('metricTemplate.batch.confirm.enableTitle', { count: batch.count })
+        : t('metricTemplate.batch.confirm.disableTitle', { count: batch.count }),
       content: enabled
-        ? '启用后对应指标将恢复采集与告警判定。'
-        : '停用后对应指标将停止采集，已产生的告警不受影响。',
+        ? t('metricTemplate.batch.confirm.enableContent')
+        : t('metricTemplate.batch.confirm.disableContent'),
       onOk: async () => {
         try {
           const ids = batch.selectedKeys.map((k) => Number(k));
           const res = await batchToggleMut.mutateAsync({ ids, enabled });
-          message.success(`已${enabled ? '启用' : '停用'} ${res.updated} 个指标模板`);
+          message.success(
+            enabled
+              ? t('metricTemplate.batch.message.enabled', { count: res.updated })
+              : t('metricTemplate.batch.message.disabled', { count: res.updated })
+          );
           batch.clear();
         } catch {
-          message.error('批量操作失败，请重试');
+          message.error(t('metricTemplate.batch.message.toggleFailed'));
         }
       }
     });
@@ -275,7 +289,7 @@ export default function MetricTemplatesPage() {
 
   const columns = [
     {
-      title: '指标',
+      title: t('metricTemplate.column.metric'),
       dataIndex: 'metric_key',
       width: 180,
       render: (v: string, r: MetricTemplateItem) => (
@@ -290,41 +304,45 @@ export default function MetricTemplatesPage() {
       )
     },
     {
-      title: '分类',
+      title: t('metricTemplate.column.category'),
       dataIndex: 'category',
       width: 110,
       render: (v: string) => (v ? <Tag color="geekblue">{v}</Tag> : '-')
     },
     {
-      title: '厂商',
+      title: t('metricTemplate.field.vendor'),
       dataIndex: 'vendor',
       width: 100,
       render: (v: string | null) => {
         const label = getVendorLabel(v);
-        return label ? <Tag color="purple">{label}</Tag> : <Text type="secondary">全适用</Text>;
+        return label ? (
+          <Tag color="purple">{label}</Tag>
+        ) : (
+          <Text type="secondary">{t('metricTemplate.vendorAll')}</Text>
+        );
       }
     },
     {
-      title: '设备类型',
+      title: td('switch.batchField.deviceType'),
       dataIndex: 'device_type',
       width: 110,
-      render: (v: string) => <Tag>{DEVICE_TYPE_LABEL[v] ?? v}</Tag>
+      render: (v: string) => <Tag>{deviceTypeLabel(v, td)}</Tag>
     },
     {
-      title: '来源',
+      title: tc('field.source'),
       dataIndex: 'source',
       width: 90,
       render: (v: string) => <Tag color="blue">{SOURCE_LABEL[v] ?? v}</Tag>
     },
     {
-      title: '类型',
+      title: tc('field.type'),
       dataIndex: 'metric_type',
       width: 100,
-      render: (v: string) => METRIC_TYPE_LABEL[v] ?? v
+      render: (v: string) => metricTypeLabel(v, t)
     },
     { title: 'MIB', dataIndex: 'mib', width: 110, render: (v: string) => v ?? '-' },
     {
-      title: 'OID 符号',
+      title: t('metricTemplate.field.oidSymbol'),
       dataIndex: 'oid_symbol',
       width: 160,
       render: (v: string) =>
@@ -337,7 +355,7 @@ export default function MetricTemplatesPage() {
         )
     },
     {
-      title: '数字 OID',
+      title: t('metricTemplate.field.numericOid'),
       dataIndex: 'oid',
       width: 200,
       render: (v: string, r: MetricTemplateItem) => {
@@ -355,7 +373,7 @@ export default function MetricTemplatesPage() {
                 时保持沉默 —— 猜成"正常"是假绿灯，猜成"坏"是误报，两者都糟。 */}
             {audit && !audit.resolvable && (
               <Tooltip title={audit.reason_label}>
-                <Tag color="error">采不到</Tag>
+                <Tag color="error">{t('metricTemplate.oidAudit.notCollected')}</Tag>
               </Tooltip>
             )}
           </Space>
@@ -363,20 +381,20 @@ export default function MetricTemplatesPage() {
       }
     },
     {
-      title: '阈值',
+      title: t('metricTemplate.column.threshold'),
       key: 'threshold',
       width: 200,
       render: (_: unknown, r: MetricTemplateItem) =>
-        renderThreshold(r.threshold, r.metric_type ?? 'gauge')
+        renderThreshold(r.threshold, r.metric_type ?? 'gauge', t)
     },
     {
-      title: '采集频率',
+      title: t('metricTemplate.field.pollInterval'),
       dataIndex: 'poll_interval',
       width: 100,
       render: (v: number) => (v ? `${v}s` : '-')
     },
     {
-      title: '状态',
+      title: tc('field.status'),
       dataIndex: 'enabled',
       width: 80,
       render: (v: boolean, record: MetricTemplateItem) => (
@@ -388,13 +406,13 @@ export default function MetricTemplatesPage() {
       )
     },
     {
-      title: '说明',
+      title: tc('field.description'),
       dataIndex: 'description',
       ellipsis: true,
       render: (v: string) => v ?? '-'
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 100,
       render: (_: unknown, record: MetricTemplateItem) => (
@@ -403,8 +421,8 @@ export default function MetricTemplatesPage() {
           <ConfirmButton
             type="text"
             icon={<DeleteOutlined />}
-            title="确认删除该指标模板？"
-            content="删除后不可恢复，关联的指标告警规则将一并失效。"
+            title={t('metricTemplate.confirm.deleteTitle')}
+            content={t('metricTemplate.confirm.deleteContent')}
             okType="danger"
             loading={deleteMutation.isPending}
             onConfirm={() => handleDelete(record.id!)}
@@ -421,19 +439,19 @@ export default function MetricTemplatesPage() {
       <Card variant="borderless">
         <Row gutter={16}>
           <Col xs={12} md={4}>
-            <Statistic title="模板总数" value={stats.total} />
+            <Statistic title={t('metricTemplate.stat.total')} value={stats.total} />
           </Col>
           <Col xs={12} md={4}>
-            <Statistic title="已启用" value={stats.enabled} />
+            <Statistic title={t('metricTemplate.status.enabled')} value={stats.enabled} />
           </Col>
           <Col xs={24} md={16}>
             <Statistic
-              title="设备类型分布"
+              title={t('chart.deviceTypeDistribution')}
               valueRender={() => (
                 <Space size={4} wrap>
-                  {Object.entries(stats.byDeviceType).map(([t, c]) => (
-                    <Tag key={t}>
-                      {DEVICE_TYPE_LABEL[t] ?? t}: {c}
+                  {Object.entries(stats.byDeviceType).map(([type, c]) => (
+                    <Tag key={type}>
+                      {deviceTypeLabel(type, td)}: {c}
                     </Tag>
                   ))}
                 </Space>
@@ -446,10 +464,10 @@ export default function MetricTemplatesPage() {
       <MetricTemplateGroupsSection />
 
       <Card
-        title="监控指标模板"
+        title={t('metricTemplate.title')}
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新增指标
+            {t('metricTemplate.action.create')}
           </Button>
         }
       >
@@ -457,8 +475,8 @@ export default function MetricTemplatesPage() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="指标模板与阈值是告警生效的前置条件"
-          description="设备需先启用监控并绑定凭据，再在此页面对应指标模板启用并配置阈值后，采集到的异常值才会触发告警。仅创建模板但未启用、或未配置阈值，均不会产生告警。"
+          message={t('metricTemplate.alert.message')}
+          description={t('metricTemplate.alert.description')}
         />
         {/* P2-6：OID 解析失败可见化。
             此前这条信息在界面上**根本不存在**：采集侧所有请求都带 lookupMib=False，
@@ -474,26 +492,29 @@ export default function MetricTemplatesPage() {
             style={{ marginBottom: 16 }}
             message={
               unresolvedCount > 0
-                ? `有 ${unresolvedCount} 条指标模板解析不出 OID，永远不会采到数据`
-                : `全部 ${oidAudit.total ?? 0} 条指标模板的 OID 均可解析`
+                ? t('metricTemplate.oidAudit.unresolved', { count: unresolvedCount })
+                : t('metricTemplate.oidAudit.allResolved', { count: oidAudit.total ?? 0 })
             }
             action={
               <Button size="small" loading={auditFetching} onClick={() => refetchAudit()}>
-                重新审计
+                {t('metricTemplate.oidAudit.reaudit')}
               </Button>
             }
             description={
               unresolvedCount > 0 ? (
                 <Space direction="vertical" size={4} style={{ display: 'flex' }}>
                   <span>
-                    这些模板解析不出数字 OID，采集侧不会向设备发出任何请求 ⇒
-                    <Text strong>永远采不到数据，且不会报错</Text>。
+                    {t('metricTemplate.oidAudit.unresolvedIntro')}
+                    <Text strong>{t('metricTemplate.oidAudit.unresolvedStrong')}</Text>
                   </span>
                   {Object.entries(oidAudit.missing_mibs ?? {}).map(([mib, keys]) => (
                     <span key={mib}>
-                      缺少 MIB <Text code>{mib}</Text>，影响 {keys.length} 条：
-                      {keys.slice(0, 6).join('、')}
-                      {keys.length > 6 ? ` 等 ${keys.length} 条` : ''}
+                      {t('metricTemplate.oidAudit.missingMibPrefix')} <Text code>{mib}</Text>
+                      {t('metricTemplate.oidAudit.missingMibSuffix', { count: keys.length })}
+                      {keys.slice(0, 6).join(t('metricTemplate.oidAudit.listSeparator'))}
+                      {keys.length > 6
+                        ? t('metricTemplate.oidAudit.moreItems', { count: keys.length })
+                        : ''}
                     </span>
                   ))}
                   {(oidAudit.unresolved_items ?? [])
@@ -505,19 +526,20 @@ export default function MetricTemplatesPage() {
                     ))}
                   {uncompiledVendorMibs.length > 0 && (
                     <span>
-                      厂商 MIB 目录里已有 {uncompiledVendorMibs.join('、')}
-                      （源文件在、但没有 .py 编译产物 ⇒ 需先编译；pysnmp 不会自动编译文本 MIB）。
+                      {t('metricTemplate.oidAudit.uncompiledMibs', {
+                        list: uncompiledVendorMibs.join(t('metricTemplate.oidAudit.listSeparator'))
+                      })}
                     </span>
                   )}
                   <span>
-                    处理办法：把厂商 MIB 文件放进 <Text code>{oidAudit.vendor_mib_dir}</Text>
-                    （注意厂商再分发许可，请从设备官网自行获取），并编译成 pysnmp 能加载的 .py；
-                    或直接给该模板填上数字 OID。
+                    {t('metricTemplate.oidAudit.fixHintPrefix')}{' '}
+                    <Text code>{oidAudit.vendor_mib_dir}</Text>
+                    {t('metricTemplate.oidAudit.fixHintSuffix')}
                   </span>
                 </Space>
               ) : (
                 <Space direction="vertical" size={4} style={{ display: 'flex' }}>
-                  <span>本地 MIB 树与内置兜底表已覆盖全部模板；与采集侧用的是同一个解析器。</span>
+                  <span>{t('metricTemplate.oidAudit.allCovered')}</span>
                   {/* 判定依据分布：让"审计确实逐条看过了"可见，而不是一句空洞的"正常"。
                       没有这一行的话，审计对象为空（比如模板全被删光）也会显示绿色"正常"。
                       文案取自后端回传的 reason_labels，**不在前端自建映射**。 */}
@@ -543,7 +565,7 @@ export default function MetricTemplatesPage() {
         <Space wrap style={{ marginBottom: 16 }}>
           <Input
             allowClear
-            placeholder="搜索指标 / 显示名 / 分类 / OID / 说明"
+            placeholder={t('metricTemplate.searchPlaceholder')}
             prefix={<SearchOutlined />}
             style={{ width: 280 }}
             value={search}
@@ -551,15 +573,15 @@ export default function MetricTemplatesPage() {
           />
           <Select
             allowClear
-            placeholder="设备类型"
+            placeholder={td('switch.batchField.deviceType')}
             style={{ width: 140 }}
             value={filterDeviceType}
             onChange={setFilterDeviceType}
-            options={DEVICE_TYPE_OPTIONS}
+            options={deviceTypeOptions}
           />
           <Select
             allowClear
-            placeholder="来源"
+            placeholder={tc('field.source')}
             style={{ width: 120 }}
             value={filterSource}
             onChange={setFilterSource}
@@ -567,24 +589,28 @@ export default function MetricTemplatesPage() {
           />
           <Select
             allowClear
-            placeholder="状态"
+            placeholder={tc('field.status')}
             style={{ width: 120 }}
             value={filterEnabled}
             onChange={setFilterEnabled}
             options={[
-              { label: '已启用', value: 'enabled' },
-              { label: '已停用', value: 'disabled' }
+              { label: t('metricTemplate.status.enabled'), value: 'enabled' },
+              { label: t('metricTemplate.status.disabled'), value: 'disabled' }
             ]}
           />
         </Space>
-        <BatchActionBar count={batch.count} unit="个模板" onClear={batch.clear}>
+        <BatchActionBar
+          count={batch.count}
+          unit={t('metricTemplate.batch.unit')}
+          onClear={batch.clear}
+        >
           <Button
             size="small"
             icon={<CheckOutlined />}
             loading={batchToggleMut.isPending}
             onClick={() => handleBatchToggleEnabled(true)}
           >
-            批量启用
+            {t('metricTemplate.batch.enable')}
           </Button>
           <Button
             size="small"
@@ -592,7 +618,7 @@ export default function MetricTemplatesPage() {
             loading={batchToggleMut.isPending}
             onClick={() => handleBatchToggleEnabled(false)}
           >
-            批量停用
+            {t('metricTemplate.batch.disable')}
           </Button>
           <Button
             size="small"
@@ -601,7 +627,7 @@ export default function MetricTemplatesPage() {
             loading={batchDeleteMut.isPending}
             onClick={handleBatchDelete}
           >
-            批量删除
+            {tc('action.batchDelete')}
           </Button>
         </BatchActionBar>
         <DataTable<MetricTemplateItem>
@@ -611,7 +637,7 @@ export default function MetricTemplatesPage() {
           rowKey={(r) => String(r.id)}
           rowSelection={batch.rowSelection}
           total={filteredItems.length}
-          emptyText="暂无指标模板"
+          emptyText={t('metricTemplate.empty')}
           searchable={false}
           showCard={false}
           tableProps={table}

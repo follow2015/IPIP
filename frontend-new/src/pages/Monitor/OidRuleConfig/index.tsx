@@ -41,15 +41,9 @@ import {
   useVendorBrands,
   type OidCategoryRule
 } from '@/services/monitor';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
-
-const DEVICE_TYPE_OPTIONS = [
-  { label: '全适用', value: '' },
-  { label: 'network（网络设备）', value: 'network' },
-  { label: 'server（服务器）', value: 'server' },
-  { label: 'other（其他）', value: 'other' }
-];
 
 function useAllCategories(): string[] {
   const { data } = useOidCategoryRules();
@@ -61,6 +55,9 @@ function useAllCategories(): string[] {
 }
 
 function CategoryRulesTab() {
+  const { t } = useTranslation('monitor');
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const { data, isLoading } = useOidCategoryRules();
   const { data: vendorBrands } = useVendorBrands();
   const createMut = useCreateOidCategoryRule();
@@ -95,7 +92,14 @@ function CategoryRulesTab() {
     }
   }
   const getVendorLabel = (vid: string | null | undefined) =>
-    vid ? (vendorLabelMap.get(vid) ?? vid) : '通用';
+    vid ? (vendorLabelMap.get(vid) ?? vid) : t('oid.vendor.generic');
+
+  const deviceTypeOptions = [
+    { label: t('oid.deviceType.all'), value: '' },
+    { label: t('oid.deviceType.network'), value: 'network' },
+    { label: t('oid.deviceType.server'), value: 'server' },
+    { label: t('oid.deviceType.other'), value: 'other' }
+  ];
 
   const openCreate = () => {
     setEditing(null);
@@ -124,29 +128,29 @@ function CategoryRulesTab() {
     try {
       if (editing) {
         await updateMut.mutateAsync({ id: editing.id, ...payload });
-        message.success('更新成功');
+        message.success(tc('message.updateSuccess'));
       } else {
         await createMut.mutateAsync(payload);
-        message.success('新增成功');
+        message.success(tc('message.createSuccess'));
       }
       modal.close();
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '保存失败');
+      message.error(err instanceof Error ? err.message : t('oid.rule.message.saveFailed'));
     }
   };
 
   const handleDelete = async (id: number) => {
     try {
       await deleteMut.mutateAsync(id);
-      message.success('删除成功');
+      message.success(tc('message.deleteSuccess'));
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '删除失败');
+      message.error(err instanceof Error ? err.message : tc('message.deleteFailed'));
     }
   };
 
   const columns = [
     {
-      title: 'OID 前缀',
+      title: t('oid.rule.field.oidPrefix'),
       dataIndex: 'prefix',
       key: 'prefix',
       width: 320,
@@ -164,42 +168,47 @@ function CategoryRulesTab() {
       render: (v: string) => <Tag color="blue">{v}</Tag>
     },
     {
-      title: '标签',
+      title: t('oid.rule.field.label'),
       dataIndex: 'label',
       key: 'label',
       width: 120,
       render: (v: string) => v ?? '-'
     },
     {
-      title: '设备类型',
+      title: td('switch.batchField.deviceType'),
       dataIndex: 'device_type',
       key: 'device_type',
       width: 100,
-      render: (v: string) => (v ? <Tag>{v}</Tag> : <Text type="secondary">全适用</Text>)
+      render: (v: string) =>
+        v ? <Tag>{v}</Tag> : <Text type="secondary">{t('oid.deviceType.all')}</Text>
     },
     {
-      title: '厂商',
+      title: t('metricTemplate.field.vendor'),
       dataIndex: 'vendor_id',
       key: 'vendor_id',
       width: 120,
       render: (v: string) =>
-        v ? <Tag color="blue">{getVendorLabel(v)}</Tag> : <Text type="secondary">通用</Text>
+        v ? (
+          <Tag color="blue">{getVendorLabel(v)}</Tag>
+        ) : (
+          <Text type="secondary">{t('oid.vendor.generic')}</Text>
+        )
     },
     {
-      title: '优先级',
+      title: t('oid.rule.field.priority'),
       dataIndex: 'priority',
       key: 'priority',
       width: 80
     },
     {
-      title: '启用',
+      title: tc('action.enable'),
       dataIndex: 'enabled',
       key: 'enabled',
       width: 60,
       render: (v: boolean) => <Switch checked={v} disabled size="small" />
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 120,
       render: (_: unknown, r: OidCategoryRule) => (
@@ -209,8 +218,8 @@ function CategoryRulesTab() {
             type="link"
             size="small"
             icon={<DeleteOutlined />}
-            title="确认删除"
-            content="确定要删除该分类规则吗？此操作不可恢复。"
+            title={tc('confirm.deleteTitle')}
+            content={t('oid.rule.confirm.deleteContent')}
             onConfirm={() => handleDelete(r.id)}
           >
             {null}
@@ -222,10 +231,10 @@ function CategoryRulesTab() {
 
   return (
     <Card
-      title="OID 分类规则"
+      title={t('oid.rule.title')}
       extra={
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          新增规则
+          {t('oid.rule.action.create')}
         </Button>
       }
     >
@@ -235,13 +244,13 @@ function CategoryRulesTab() {
         loading={isLoading}
         rowKey={(r) => String(r.id)}
         total={data?.items?.length ?? 0}
-        emptyText="暂无分类规则"
+        emptyText={t('oid.rule.empty')}
         searchable={false}
         showCard={false}
         tableProps={table}
       />
       <Modal
-        title={editing ? '编辑规则' : '新增规则'}
+        title={editing ? t('oid.rule.modal.editTitle') : t('oid.rule.modal.createTitle')}
         open={modal.isOpen}
         onOk={handleSave}
         onCancel={() => modal.close()}
@@ -251,8 +260,8 @@ function CategoryRulesTab() {
         <Form form={form} layout="vertical">
           <Form.Item
             name="prefix"
-            label="OID 前缀"
-            rules={[{ required: true, message: '请输入 OID 前缀' }]}
+            label={t('oid.rule.field.oidPrefix')}
+            rules={[{ required: true, message: t('oid.rule.validation.prefixRequired') }]}
           >
             <Input placeholder="1.3.6.1.4.1.674.10892.5.4.300" />
           </Form.Item>
@@ -261,30 +270,30 @@ function CategoryRulesTab() {
               <Form.Item
                 name="category"
                 label="category"
-                rules={[{ required: true, message: '请输入 category' }]}
+                rules={[{ required: true, message: t('oid.rule.validation.categoryRequired') }]}
               >
                 <Input placeholder="temperature" />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="label" label="标签">
-                <Input placeholder="温度探头" />
+              <Form.Item name="label" label={t('oid.rule.field.label')}>
+                <Input placeholder={t('oid.rule.placeholder.label')} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
             <Col xs={24} md={8}>
-              <Form.Item name="device_type" label="设备类型">
-                <Select options={DEVICE_TYPE_OPTIONS} />
+              <Form.Item name="device_type" label={td('switch.batchField.deviceType')}>
+                <Select options={deviceTypeOptions} />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
-              <Form.Item name="vendor_id" label="厂商">
+              <Form.Item name="vendor_id" label={t('metricTemplate.field.vendor')}>
                 <Select
                   options={vendorOptions ?? []}
                   showSearch
                   allowClear
-                  placeholder="选择厂商或留空通用"
+                  placeholder={t('oid.rule.placeholder.vendor')}
                   filterOption={(input, option) =>
                     (option?.label as string).toLowerCase().includes(input.toLowerCase())
                   }
@@ -292,12 +301,12 @@ function CategoryRulesTab() {
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
-              <Form.Item name="priority" label="优先级">
+              <Form.Item name="priority" label={t('oid.rule.field.priority')}>
                 <InputNumber min={0} max={999} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="enabled" label="启用" valuePropName="checked">
+          <Form.Item name="enabled" label={tc('action.enable')} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
@@ -307,6 +316,9 @@ function CategoryRulesTab() {
 }
 
 function RecommendConfigTab() {
+  const { t } = useTranslation('monitor');
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const { data, isLoading } = useDeviceTypeRecommends();
   const updateMut = useUpdateDeviceTypeRecommend();
   const message = useMessage();
@@ -323,23 +335,23 @@ function RecommendConfigTab() {
     if (!editingType) return;
     try {
       await updateMut.mutateAsync({ device_type: editingType, categories: selectedCats });
-      message.success('更新成功');
+      message.success(tc('message.updateSuccess'));
       setEditingType(null);
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '保存失败');
+      message.error(err instanceof Error ? err.message : t('oid.rule.message.saveFailed'));
     }
   };
 
   const columns = [
     {
-      title: '设备类型',
+      title: td('switch.batchField.deviceType'),
       dataIndex: 'device_type',
       key: 'device_type',
       width: 120,
       render: (v: string) => <Tag color="blue">{v}</Tag>
     },
     {
-      title: '推荐 category 列表',
+      title: t('oid.recommend.column.categories'),
       dataIndex: 'categories',
       key: 'categories',
       render: (cats: string[]) => (
@@ -351,7 +363,7 @@ function RecommendConfigTab() {
       )
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 80,
       render: (_: unknown, r: { device_type: string; categories: string[] }) => (
@@ -361,14 +373,14 @@ function RecommendConfigTab() {
           icon={<EditOutlined />}
           onClick={() => openEdit(r.device_type, r.categories)}
         >
-          编辑
+          {tc('action.edit')}
         </Button>
       )
     }
   ];
 
   return (
-    <Card title="设备类型推荐配置">
+    <Card title={t('oid.recommend.title')}>
       <DataTable
         rowKey="device_type"
         columns={columns}
@@ -380,7 +392,7 @@ function RecommendConfigTab() {
         showCard={false}
       />
       <Modal
-        title={`编辑推荐配置：${editingType}`}
+        title={t('oid.recommend.modal.editTitle', { type: editingType })}
         open={!!editingType}
         onOk={handleSave}
         onCancel={() => setEditingType(null)}
@@ -388,7 +400,7 @@ function RecommendConfigTab() {
         width={600}
       >
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-          勾选该设备类型探测后"推荐勾选"按钮会自动选中的 category
+          {t('oid.recommend.hint')}
         </Text>
         <Checkbox.Group
           value={selectedCats}
@@ -409,13 +421,14 @@ function RecommendConfigTab() {
 }
 
 export default function OidRuleConfigPage() {
+  const { t } = useTranslation('monitor');
   return (
     <Card variant="borderless">
       <Tabs
         defaultActiveKey="rules"
         items={[
-          { key: 'rules', label: '分类规则', children: <CategoryRulesTab /> },
-          { key: 'recommend', label: '推荐配置', children: <RecommendConfigTab /> }
+          { key: 'rules', label: t('oid.tab.rules'), children: <CategoryRulesTab /> },
+          { key: 'recommend', label: t('oid.tab.recommend'), children: <RecommendConfigTab /> }
         ]}
       />
     </Card>

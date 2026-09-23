@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal, Input } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 interface IPBatchBanModalProps {
   open: boolean;
@@ -9,6 +10,7 @@ interface IPBatchBanModalProps {
 }
 
 export function IPBatchBanModal({ open, onClose, submitting, onSubmit }: IPBatchBanModalProps) {
+  const { t } = useTranslation('network');
   const [ips, setIps] = useState('');
 
   const handleOk = () => {
@@ -26,7 +28,7 @@ export function IPBatchBanModal({ open, onClose, submitting, onSubmit }: IPBatch
 
   return (
     <Modal
-      title="批量封禁IP"
+      title={t('ip.batchBan.title')}
       open={open}
       onOk={handleOk}
       onCancel={handleCancel}
@@ -35,7 +37,7 @@ export function IPBatchBanModal({ open, onClose, submitting, onSubmit }: IPBatch
       destroyOnHidden
     >
       <p style={{ marginBottom: 8, color: '#666' }}>
-        每行一个IP地址，将通过核心交换机下发黑洞路由进行封禁。
+        {t('ip.batchBan.description')}
       </p>
       <Input.TextArea
         value={ips}

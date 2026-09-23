@@ -8,6 +8,7 @@ import { Form, Input, Modal } from 'antd';
 import { useCreateVirtualRoom, useUpdateVirtualRoom } from '@/services/virtual-room';
 import type { VirtualRoom } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 interface VirtualRoomFormProps {
   open: boolean;
@@ -16,6 +17,8 @@ interface VirtualRoomFormProps {
 }
 
 function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const [form] = Form.useForm();
   const message = useMessage();
   const createVirtualRoom = useCreateVirtualRoom();
@@ -40,14 +43,14 @@ function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
       const values = await form.validateFields();
       if (isEdit) {
         await updateVirtualRoom.mutateAsync({ id: editRecord!.id, data: values });
-        message.success('更新成功');
+        message.success(tc('message.updateSuccess'));
       } else {
         await createVirtualRoom.mutateAsync({
           name: values.name,
           description: values.description || '',
           device_ids: values.device_ids || [],
         });
-        message.success('创建成功');
+        message.success(tc('message.createSuccess'));
       }
       onClose();
     } catch (err) {
@@ -63,7 +66,7 @@ function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
   return (
     <Modal
       open={open}
-      title={isEdit ? '编辑虚拟机房' : '新增虚拟机房'}
+      title={isEdit ? td('virtualRoom.edit') : td('virtualRoom.add')}
       onOk={handleSubmit}
       onCancel={onClose}
       confirmLoading={createVirtualRoom.isPending || updateVirtualRoom.isPending}
@@ -78,17 +81,14 @@ function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
       >
         <Form.Item
           name="name"
-          label="虚拟机房名称"
-          rules={[{ required: true, message: '请输入虚拟机房名称' }]}
+          label={td('virtualRoom.field.name')}
+          rules={[{ required: true, message: td('virtualRoom.form.namePlaceholder') }]}
         >
-          <Input placeholder="请输入虚拟机房名称" maxLength={255} />
+          <Input placeholder={td('virtualRoom.form.namePlaceholder')} maxLength={255} />
         </Form.Item>
-        <Form.Item
-          name="description"
-          label="描述"
-        >
+        <Form.Item name="description" label={tc('field.description')}>
           <Input.TextArea
-            placeholder="请输入描述（可选）"
+            placeholder={td('virtualRoom.form.descriptionPlaceholder')}
             maxLength={500}
             showCount
             rows={3}

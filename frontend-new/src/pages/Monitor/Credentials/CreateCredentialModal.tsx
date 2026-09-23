@@ -9,6 +9,7 @@ import { MONITOR_PROTOCOL_OPTIONS } from '@/types/enums';
 import { useCreateAndLinkCredential } from '@/services/monitor';
 import MonitorCredentialForm from '@/components/MonitorCredentialForm';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 interface CreateCredentialModalProps {
   open: boolean;
@@ -20,6 +21,8 @@ export default function CreateCredentialModal({ open, form, onClose }: CreateCre
   const [protocol, setProtocol] = useState<string>('snmp');
   const createLink = useCreateAndLinkCredential();
   const msg = useMessage();
+  const { t } = useTranslation('monitor');
+  const { t: td } = useTranslation('device');
 
   const handleSubmitForm = async () => {
     let values: Record<string, unknown>;
@@ -62,16 +65,16 @@ export default function CreateCredentialModal({ open, form, onClose }: CreateCre
         name: (values.name as string) || undefined,
         device_ids: []
       });
-      msg.success('凭据已创建');
+      msg.success(t('credential.message.created'));
       onClose();
     } catch (err) {
-      msg.error(err instanceof Error ? err.message : '创建失败');
+      msg.error(err instanceof Error ? err.message : t('credential.message.createFailed'));
     }
   };
 
   return (
     <Modal
-      title="新建共享凭据"
+      title={t('credential.createTitle')}
       open={open}
       onCancel={onClose}
       onOk={handleSubmitForm}
@@ -80,7 +83,7 @@ export default function CreateCredentialModal({ open, form, onClose }: CreateCre
       destroyOnHidden
     >
       <Form form={form} layout="vertical" initialValues={{ protocol: 'snmp', snmp_version: 'v2c' }}>
-        <Form.Item label="协议" name="protocol">
+        <Form.Item label={t('column.protocol')} name="protocol">
           <Select
             options={MONITOR_PROTOCOL_OPTIONS}
             onChange={(v) => {
@@ -91,11 +94,11 @@ export default function CreateCredentialModal({ open, form, onClose }: CreateCre
         </Form.Item>
 
         <Form.Item
-          label="凭据名称"
+          label={td('credential.name')}
           name="name"
-          rules={[{ required: true, message: '请输入凭据名称' }]}
+          rules={[{ required: true, message: td('credential.namePlaceholder') }]}
         >
-          <Input placeholder="如：机房A SNMP只读团体字" />
+          <Input placeholder={td('credential.nameHint')} />
         </Form.Item>
 
         <MonitorCredentialForm protocol={protocol} mode="create" form={form} />

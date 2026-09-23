@@ -547,7 +547,7 @@ def get_device_by_id(args: Dict[str, Any]) -> dict:
         raise ValueError("device_id 必填")
 
     from app.services.ai.capabilities.device_scope import check_device_access
-    allowed, reason = check_device_access(device_id)
+    allowed, reason = check_device_access(device_id, fail_closed=False)
     if not allowed:
         return {"supported": False, "hint": reason}
 

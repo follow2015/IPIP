@@ -7,6 +7,7 @@
  * 注意：本文件不含 JSX、不含 @antv/g6 运行时依赖，可独立单测。
  */
 import type { CSSProperties } from 'react';
+import type { TFunction } from 'i18next';
 import type { TopologyNode, TopologyEdge } from '@/types/models';
 
 
@@ -120,7 +121,8 @@ export interface G6TopologyData {
  */
 export function transformDataFromRefs(
   nodes: TopologyNode[],
-  edges: TopologyEdge[]
+  edges: TopologyEdge[],
+  t: TFunction<'network'>
 ): G6TopologyData {
   const cabinetMap = new Map<number, { name: string; nodeIds: string[] }>();
   nodes.forEach((node) => {
@@ -128,7 +130,7 @@ export function transformDataFromRefs(
     if (cid == null) return;
     if (!cabinetMap.has(cid)) {
       cabinetMap.set(cid, {
-        name: node.cabinet_name ?? `机柜 ${cid}`,
+        name: node.cabinet_name ?? t('topology.combo.cabinetFallback', { id: cid }),
         nodeIds: []
       });
     }

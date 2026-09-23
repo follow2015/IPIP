@@ -14,6 +14,7 @@ import { buildStorageSummary, buildStorageList } from '@/components/HardwareConf
 import { expandNicPorts } from '@/components/NicConfigFields';
 import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
 import type { DeviceBatchRow } from '../shared';
+import type { DeviceT } from '@/types/statusMeta';
 
 export interface BuildCreateDevicesParams {
   rows: DeviceBatchRow[];
@@ -24,6 +25,7 @@ export interface BuildCreateDevicesParams {
   isServerType: boolean;
   selectedChassis?: Device | undefined;
   nicComponentTemplates?: any[];
+  t: DeviceT;
 }
 
 /**
@@ -39,7 +41,8 @@ export function buildCreateDevices(params: BuildCreateDevicesParams): CreateDevi
     isChassisMode,
     isServerType,
     selectedChassis,
-    nicComponentTemplates
+    nicComponentTemplates,
+    t
   } = params;
 
   return rows.map((row) => {
@@ -75,7 +78,7 @@ export function buildCreateDevices(params: BuildCreateDevicesParams): CreateDevi
       node_col: isNodeMode ? row.node_col : undefined,
       notes:
         isNodeMode && selectedChassis && nodePosition
-          ? `${selectedChassis.device_name} 节点 ${nodePosition}`
+          ? t('node.notesTemplate', { name: selectedChassis.device_name, position: nodePosition })
           : undefined,
       ...(isServerType && !isChassisMode
         ? {

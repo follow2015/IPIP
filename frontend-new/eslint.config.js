@@ -19,13 +19,18 @@ const nodeGlobals = {
   console: 'readonly',
   module: 'readonly',
   require: 'readonly',
-  global: 'readonly'
+  global: 'readonly',
+  URL: 'readonly',
+  URLSearchParams: 'readonly'
 };
 
 export default tseslint.config(
   {
-    // 生成物不参与 lint：status-codes.generated.ts 与 api-generated.ts 同源，
-    // 且其生成器 --check 为字节级比较，任何 --fix 改写都会让 check-enums 失败。
+    // 生成物不参与 lint。
+    // 注意：文件头声称的生成器 scripts/generate_frontend_enums.py 在仓库中并不存在
+    // （2026-09-16 核实），status-codes.generated.ts 实为手工维护，与后端
+    // app/core/enums.py STATUS_DISPLAY 是双真相源，改动时两侧都要同步。
+    // 类型安全由 tsc 保障（tsc 不读 eslint ignores）。
     ignores: [
       'dist',
       'coverage',
@@ -83,7 +88,7 @@ export default tseslint.config(
       'react-refresh/only-export-components': 'off'
     }
   },
-  // 构建 / 测试配置文件：提供 node 全局（__dirname / process 等）
+  // 构建 / 测试配置文件 + scripts 下的 node 脚本：提供 node 全局（__dirname / process 等）
   {
     files: [
       '*.config.ts',
@@ -91,7 +96,10 @@ export default tseslint.config(
       '*.config.cjs',
       '*.config.mjs',
       'vitest.config.ts',
-      'vite.config.ts'
+      'vite.config.ts',
+      'scripts/**/*.mjs',
+      'scripts/**/*.js',
+      'scripts/**/*.cjs'
     ],
     languageOptions: { globals: nodeGlobals }
   }

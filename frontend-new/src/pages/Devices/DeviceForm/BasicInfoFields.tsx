@@ -13,6 +13,7 @@ import {
 } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
 import type { SelectProps } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useVendorBrands, useMetricTemplateGroups } from '@/services/monitor';
 
 interface BasicInfoFieldsProps {
@@ -44,6 +45,8 @@ export default function BasicInfoFields({
   showNodeAssoc,
   onGenerateName
 }: BasicInfoFieldsProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const { data: vendorBrands } = useVendorBrands();
   const formInstance = Form.useFormInstance();
   const watchDeviceType = Form.useWatch('device_type', formInstance) ?? '';
@@ -70,11 +73,11 @@ export default function BasicInfoFields({
         <Col xs={24} md={16}>
           <Form.Item
             name="device_name"
-            label="设备名称"
-            rules={[{ required: true, message: '请输入设备名称' }]}
+            label={t('field.name')}
+            rules={[{ required: true, message: t('form.basicInfo.deviceName.placeholder') }]}
           >
             <Input
-              placeholder="请输入设备名称"
+              placeholder={t('form.basicInfo.deviceName.placeholder')}
               addonAfter={
                 !showNodeAssoc ? (
                   <Button
@@ -82,7 +85,7 @@ export default function BasicInfoFields({
                     size="small"
                     icon={<ThunderboltOutlined />}
                     onClick={onGenerateName}
-                    title="自动生成"
+                    title={t('form.basicInfo.autoGenerateTitle')}
                   />
                 ) : undefined
               }
@@ -92,28 +95,28 @@ export default function BasicInfoFields({
         <Col xs={24} md={8}>
           <Form.Item
             name="device_type"
-            label="设备主类型"
-            rules={[{ required: true, message: '请选择设备主类型' }]}
+            label={t('form.basicInfo.mainType.label')}
+            rules={[{ required: true, message: t('form.basicInfo.mainType.required') }]}
           >
-            <Select placeholder="请选择" options={typeOptions} />
+            <Select placeholder={tCommon('message.selectRequired')} options={typeOptions} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} md={8}>
-          <Form.Item name="device_subtype" label="设备子类型">
-            <Select placeholder="请选择" options={subtypeOptions} allowClear />
+          <Form.Item name="device_subtype" label={t('basic.field.deviceSubtype')}>
+            <Select placeholder={tCommon('message.selectRequired')} options={subtypeOptions} allowClear />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name="status" label="状态">
-            <Select placeholder="请选择" options={statusOptions} />
+          <Form.Item name="status" label={tCommon('field.status')}>
+            <Select placeholder={tCommon('message.selectRequired')} options={statusOptions} />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name="responsible_person" label="负责人">
+          <Form.Item name="responsible_person" label={t('basic.field.owner')}>
             <Select
-              placeholder="请选择负责人"
+              placeholder={t('form.basicInfo.owner.placeholder')}
               options={userOptions}
               allowClear
               showSearch
@@ -125,12 +128,12 @@ export default function BasicInfoFields({
       </Row>
       <Row gutter={16}>
         <Col xs={24} md={8}>
-          <Form.Item name="brand" label="品牌">
+          <Form.Item name="brand" label={t('basic.field.brand')}>
             <Select
               options={vendorOptions}
               showSearch
               allowClear
-              placeholder="选择品牌"
+              placeholder={t('form.basicInfo.brand.placeholder')}
               filterOption={(input, option) =>
                 (option?.label as string).toLowerCase().includes(input.toLowerCase())
               }
@@ -138,13 +141,17 @@ export default function BasicInfoFields({
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name="device_model" label="型号">
-            <Input placeholder="型号" />
+          <Form.Item name="device_model" label={t('basic.field.model')}>
+            <Input placeholder={t('form.basicInfo.model.placeholder')} />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name="power" label="功耗(W)">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="功耗" />
+          <Form.Item name="power" label={t('form.basicInfo.power.label')}>
+            <InputNumber
+              min={0}
+              style={{ width: '100%' }}
+              placeholder={t('form.basicInfo.power.placeholder')}
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -152,20 +159,20 @@ export default function BasicInfoFields({
         <Col xs={24} md={12}>
           <Form.Item
             name="metric_template_group_id"
-            label="指标模板组（监控数据展示规则）"
+            label={t('form.basicInfo.metricTemplateGroup.label')}
             extra={
               <Space direction="vertical" size={0}>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  不选择时按「设备类型 + 厂商 + 协议」自动匹配模板组
+                  {t('form.basicInfo.metricTemplateGroup.autoMatchHint')}
                 </Typography.Text>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  选择后将优先展示该组包含的监控指标
+                  {t('form.basicInfo.metricTemplateGroup.priorityHint')}
                 </Typography.Text>
               </Space>
             }
           >
             <Select
-              placeholder="不选择 = 自动匹配"
+              placeholder={t('form.basicInfo.metricTemplateGroup.placeholder')}
               options={templateGroupOptions}
               loading={groupsLoading}
               allowClear
@@ -173,9 +180,13 @@ export default function BasicInfoFields({
               optionFilterProp="label"
               notFoundContent={
                 <Space direction="vertical" size={2} style={{ padding: 8 }}>
-                  <span>没有匹配 {watchDeviceType || '当前类型'} 的指标模板组</span>
+                  <span>
+                    {t('credential.noMatchedGroup', {
+                      type: watchDeviceType || t('credential.currentType')
+                    })}
+                  </span>
                   <span style={{ fontSize: 12, color: '#999' }}>
-                    可在「监控中心 → 指标模板」中创建
+                    {t('credential.createInMonitorCenter')}
                   </span>
                 </Space>
               }
@@ -183,19 +194,22 @@ export default function BasicInfoFields({
           </Form.Item>
         </Col>
         <Col xs={24} md={12}>
-          <Form.Item name="serial_number" label="序列号（抄写设备标签）">
-            <Input placeholder="抄写设备上的序列号" />
+          <Form.Item
+            name="serial_number"
+            label={t('form.basicInfo.serialNumber.label')}
+          >
+            <Input placeholder={t('form.basicInfo.serialNumber.placeholder')} />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name="hostname" label="主机名">
-            <Input placeholder="主机名" />
+          <Form.Item name="hostname" label={t('node.field.hostname')}>
+            <Input placeholder={t('form.basicInfo.hostname.placeholder')} />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name="customer_id" label="客户">
+          <Form.Item name="customer_id" label={tCommon('field.customer')}>
             <Select
-              placeholder="请选择客户"
+              placeholder={t('form.basicInfo.customer.placeholder')}
               options={customerOptions}
               allowClear
               showSearch
@@ -208,25 +222,33 @@ export default function BasicInfoFields({
       {/* ── 节点关联区块（子节点特有） ── */}
       {showNodeAssoc && (
         <>
-          <Divider plain>节点关联</Divider>
+          <Divider plain>{t('form.section.nodeAssoc')}</Divider>
           <Row gutter={16}>
             <Col xs={24} md={12}>
               <Form.Item
                 name="room_id"
-                label="所属机房"
-                rules={[{ required: true, message: '请选择机房' }]}
+                label={t('basic.field.room')}
+                rules={[{ required: true, message: t('form.select.room') }]}
               >
-                <Select placeholder="请先选择机房" options={roomOptions} allowClear />
+                <Select
+                  placeholder={t('form.hint.selectRoomFirst')}
+                  options={roomOptions}
+                  allowClear
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
               <Form.Item
                 name="parent_device_id"
-                label="所属机箱"
-                rules={[{ required: true, message: '节点必须选择所属机箱' }]}
+                label={t('form.nodeAssoc.chassis.label')}
+                rules={[{ required: true, message: t('form.nodeAssoc.chassis.required') }]}
               >
                 <Select
-                  placeholder={selectedRoomId ? '请选择机箱' : '请先选择机房'}
+                  placeholder={
+                    selectedRoomId
+                      ? t('form.select.chassis')
+                      : t('form.hint.selectRoomFirst')
+                  }
                   options={chassisOptions}
                   allowClear
                   showSearch
@@ -240,14 +262,18 @@ export default function BasicInfoFields({
             <Col xs={24} md={8}>
               <Form.Item
                 name="node_position"
-                label="节点位置"
-                rules={[{ required: true, message: '请选择节点位置' }]}
+                label={t('node.field.position')}
+                rules={[{ required: true, message: t('form.nodeAssoc.position.required') }]}
               >
                 <Select
-                  placeholder={selectedChassisId ? '请选择位置' : '请先选择机箱'}
+                  placeholder={
+                    selectedChassisId
+                      ? t('form.select.position')
+                      : t('form.hint.selectChassisFirst')
+                  }
                   disabled={!selectedChassisId || availablePositions.length === 0}
                   options={availablePositions.map((pos) => ({
-                    label: `节点 ${pos}`,
+                    label: t('form.nodeAssoc.position.option', { position: pos }),
                     value: pos
                   }))}
                 />
@@ -260,9 +286,11 @@ export default function BasicInfoFields({
                 style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}
               >
                 <span style={{ color: '#8c8c8c', fontSize: 12 }}>
-                  空余位置：{availablePositions.length} 个（
-                  {availablePositions.slice(0, 10).join(', ')}
-                  {availablePositions.length > 10 ? '...' : ''}）
+                  {t('form.nodeAssoc.vacantPositions', {
+                    count: availablePositions.length,
+                    list: availablePositions.slice(0, 10).join(', '),
+                    ellipsis: availablePositions.length > 10 ? '...' : ''
+                  })}
                 </span>
               </Col>
             )}
@@ -274,7 +302,7 @@ export default function BasicInfoFields({
               >
                 <Alert
                   type="warning"
-                  title="该机箱无空余节点位置"
+                  title={t('form.nodeAssoc.noVacantPosition')}
                   style={{ padding: '2px 8px' }}
                   showIcon
                 />

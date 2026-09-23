@@ -1,4 +1,5 @@
 import { Tag, Space } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useDeviceMonitorStatus } from '@/services/monitor';
 import { formatDateTime } from '@/utils/format';
 import { WarningOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
@@ -9,6 +10,7 @@ interface DeviceHealthBadgeProps {
 
 export function DeviceHealthBadge({ deviceId }: DeviceHealthBadgeProps) {
   const { data } = useDeviceMonitorStatus(deviceId);
+  const { t } = useTranslation('device');
 
   if (!data || !data.monitored || !data.status) {
     return null;
@@ -19,7 +21,7 @@ export function DeviceHealthBadge({ deviceId }: DeviceHealthBadgeProps) {
   if (data.monitor_interrupted) {
     tags.push(
       <Tag key="interrupted" color="orange" icon={<EyeInvisibleOutlined />}>
-        中断
+        {t('status.interrupted')}
       </Tag>
     );
   }
@@ -27,13 +29,15 @@ export function DeviceHealthBadge({ deviceId }: DeviceHealthBadgeProps) {
   if (data.status.reachable) {
     tags.push(
       <Tag key="reachable" color="green">
-        可达
+        {t('status.reachable')}
       </Tag>
     );
   } else {
     tags.push(
       <Tag key="unreachable" color="red">
-        不可达（上次可达：{formatDateTime(data.status.last_reachable_at)}）
+        {t('health.unreachableSince', {
+          time: formatDateTime(data.status.last_reachable_at)
+        })}
       </Tag>
     );
   }
@@ -44,7 +48,7 @@ export function DeviceHealthBadge({ deviceId }: DeviceHealthBadgeProps) {
     const color = sev >= 3 ? 'magenta' : 'volcano';
     tags.push(
       <Tag key="metric-alert" color={color} icon={<WarningOutlined />}>
-        指标告警 {alertCount}
+        {t('health.metricAlertCount', { count: alertCount })}
       </Tag>
     );
   }

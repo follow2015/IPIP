@@ -27,29 +27,33 @@ import { useMonitorConfig, useUpdateMonitorConfig } from '@/services/monitor';
 import { useRoomOptions } from '@/services/room';
 import { useVirtualRooms } from '@/services/virtual-room';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 type ConfigValue = number | string | boolean;
 
-const CONFIG_GROUPS: { key: string; title: string; fields: string[] }[] = [
+const getConfigGroups = (
+  t: TFunction<'monitor'>
+): { key: string; title: string; fields: string[] }[] => [
   {
     key: 'probe',
-    title: '探测参数',
+    title: t('settings.group.probe'),
     fields: ['consecutive_failures_threshold', 'timeout_seconds', 'thread_pool_size']
   },
   {
     key: 'interval',
-    title: '轮询间隔',
+    title: t('settings.group.interval'),
     fields: ['interval_snmp', 'interval_bmc', 'interval_zabbix', 'outbox_interval']
   },
   {
     key: 'alert',
-    title: '告警规则',
+    title: t('settings.group.alert'),
     fields: ['realert_interval_minutes', 'fallback_role', 'blindspot_role']
   },
-  { key: 'advanced', title: '高级', fields: ['worker_in_process'] },
+  { key: 'advanced', title: t('settings.group.advanced'), fields: ['worker_in_process'] },
   {
     key: 'scan',
-    title: '自动扫描',
+    title: t('settings.group.scan'),
     fields: [
       'scan_auto_enabled',
       'scan_auto_interval',
@@ -61,27 +65,30 @@ const CONFIG_GROUPS: { key: string; title: string; fields: string[] }[] = [
   }
 ];
 
-const FIELD_LABELS: Record<string, string> = {
-  consecutive_failures_threshold: '连续失败阈值',
-  timeout_seconds: '探测超时(秒)',
-  thread_pool_size: '线程池大小',
-  interval_snmp: 'SNMP 轮询间隔(秒)',
-  interval_bmc: 'BMC 轮询间隔(秒)',
-  interval_zabbix: 'Zabbix 轮询间隔(秒)',
-  outbox_interval: '告警发件箱间隔(秒)',
-  realert_interval_minutes: '重告警间隔(分钟)',
-  fallback_role: '兜底角色',
-  blindspot_role: '盲区应急组',
-  worker_in_process: '进程内 Worker',
-  scan_auto_enabled: '自动扫描总开关',
-  scan_auto_interval: '扫描间隔(秒)',
-  scan_auto_room_ids: '物理机房范围',
-  scan_auto_vr_ids: '虚拟机房范围',
-  scan_auto_cleanup_interval: '陈旧度清理间隔(秒)',
-  scan_auto_grace_period: 'INACTIVE降级宽限期(秒)'
-};
+const getFieldLabel = (key: string, t: TFunction<'monitor'>) =>
+  ({
+    consecutive_failures_threshold: t('settings.field.consecutiveFailuresThreshold'),
+    timeout_seconds: t('settings.field.timeoutSeconds'),
+    thread_pool_size: t('settings.field.threadPoolSize'),
+    interval_snmp: t('settings.field.intervalSnmp'),
+    interval_bmc: t('settings.field.intervalBmc'),
+    interval_zabbix: t('settings.field.intervalZabbix'),
+    outbox_interval: t('settings.field.outboxInterval'),
+    realert_interval_minutes: t('settings.field.realertIntervalMinutes'),
+    fallback_role: t('settings.field.fallbackRole'),
+    blindspot_role: t('settings.field.blindspotRole'),
+    worker_in_process: t('settings.field.workerInProcess'),
+    scan_auto_enabled: t('settings.field.scanAutoEnabled'),
+    scan_auto_interval: t('settings.field.scanAutoInterval'),
+    scan_auto_room_ids: t('settings.field.scanAutoRoomIds'),
+    scan_auto_vr_ids: t('settings.field.scanAutoVrIds'),
+    scan_auto_cleanup_interval: t('settings.field.scanAutoCleanupInterval'),
+    scan_auto_grace_period: t('settings.field.scanAutoGracePeriod')
+  })[key] ?? key;
 
 export default function MonitorSettings() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
   const { data: config, isLoading } = useMonitorConfig();
   const updateConfig = useUpdateMonitorConfig();
   const [values, setValues] = useState<Record<string, ConfigValue>>({});
@@ -111,7 +118,7 @@ export default function MonitorSettings() {
   }
 
   if (!config) {
-    return <Alert type="warning" message="无法加载监控运行配置" />;
+    return <Alert type="warning" message={t('settings.loadFailed')} />;
   }
 
   const handleChange = (key: string, val: ConfigValue) => {
@@ -134,10 +141,11 @@ export default function MonitorSettings() {
     try {
       const res = await updateConfig.mutateAsync(updates);
       message.success(
-        `已保存 ${res.updated.length} 项配置，Worker 将热重载${res.requires_restart.length ? '（部分需重启）' : ''}`
+        t('settings.message.saved', { count: res.updated.length }) +
+          (res.requires_restart.length ? t('settings.message.savedRestartSuffix') : '')
       );
     } catch (e) {
-      message.error((e as Error)?.message || '保存失败');
+      message.error((e as Error)?.message || t('settings.message.saveFailed'));
     }
   };
 
@@ -157,14 +165,16 @@ export default function MonitorSettings() {
 
     if (!item.editable) {
       return (
-        <Descriptions.Item key={key} label={FIELD_LABELS[key] ?? key}>
+        <Descriptions.Item key={key} label={getFieldLabel(key, t)}>
           <Space>
             {item.type === 'bool' ? (
-              <Tag color={item.value ? 'green' : 'default'}>{item.value ? '已启用' : '已禁用'}</Tag>
+              <Tag color={item.value ? 'green' : 'default'}>
+                {item.value ? t('settings.enabled') : t('settings.disabled')}
+              </Tag>
             ) : (
               <span>{String(item.value)}</span>
             )}
-            <Tag color="default">需重启</Tag>
+            <Tag color="default">{t('settings.needRestart')}</Tag>
           </Space>
         </Descriptions.Item>
       );
@@ -194,7 +204,7 @@ export default function MonitorSettings() {
       control = (
         <Select
           mode="multiple"
-          placeholder="选择机房（留空则不启用自动扫描）"
+          placeholder={t('settings.selectRoomPlaceholder')}
           options={opts}
           value={arrVal}
           onChange={(selected: number[]) => handleChange(key, selected.join(','))}
@@ -215,11 +225,11 @@ export default function MonitorSettings() {
     }
 
     return (
-      <Descriptions.Item key={key} label={FIELD_LABELS[key] ?? key}>
+      <Descriptions.Item key={key} label={getFieldLabel(key, t)}>
         <Space orientation="vertical" size={2} style={{ width: '100%' }}>
           <Space>
             {control}
-            {isDirty && <Tag color="orange">未保存</Tag>}
+            {isDirty && <Tag color="orange">{t('settings.unsaved')}</Tag>}
           </Space>
           {item.description && (
             <span style={{ color: token.colorTextDescription, fontSize: 12 }}>
@@ -231,7 +241,7 @@ export default function MonitorSettings() {
     );
   };
 
-  const tabItems = CONFIG_GROUPS.map((g) => ({
+  const tabItems = getConfigGroups(t).map((g) => ({
     key: g.key,
     label: g.title,
     children: (
@@ -248,7 +258,7 @@ export default function MonitorSettings() {
       <Alert
         type="info"
         showIcon
-        message="可在线修改的参数保存后立即对 Worker 生效（热重载），无需重启；标「需重启」的参数需重启服务。"
+        message={t('settings.hint')}
       />
 
       <Tabs items={tabItems} />
@@ -261,9 +271,9 @@ export default function MonitorSettings() {
             disabled={dirty.size === 0 || updateConfig.isPending}
             loading={updateConfig.isPending}
           >
-            保存修改{dirty.size > 0 ? ` (${dirty.size})` : ''}
+            {`${t('settings.save')}${dirty.size > 0 ? ` (${dirty.size})` : ''}`}
           </Button>
-          {dirty.size > 0 && <Button onClick={handleReset}>重置</Button>}
+          {dirty.size > 0 && <Button onClick={handleReset}>{tc('action.reset')}</Button>}
         </Space>
       </div>
     </div>

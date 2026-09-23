@@ -16,12 +16,25 @@ import {
   PORT_TYPE_TAG_COLOR,
   PORT_TYPE_BAR_COLOR,
   getBlockWidth,
-  getBlockFontSize
+  getBlockFontSize,
+  getPortTypeLabel
 } from '@/utils/portType';
-import { PORT_STATUS_BG_COLOR, PORT_USAGE_STATUS_MAP } from '@/types/enums';
+import { PORT_STATUS_BG_COLOR } from '@/types/enums';
+import { getPortUsageLegend, getPortUsageMeta, type DeviceT } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { SwitchPort } from '@/types/models';
 
-export function renderPortDetail(port: SwitchPort | undefined, portName: string) {
+const FALLBACK_BAR_COLOR = PORT_TYPE_BAR_COLOR[classifyPortType('')];
+
+export type NetworkT = TFunction<'network'>;
+
+export interface PortDetailT {
+  n: NetworkT;
+  d: DeviceT;
+}
+
+export function renderPortDetail(port: SwitchPort | undefined, portName: string, t: PortDetailT) {
   const type = classifyPortType(portName);
   if (!port) {
     return (
@@ -29,8 +42,8 @@ export function renderPortDetail(port: SwitchPort | undefined, portName: string)
         <div>
           <b>{portName}</b>
         </div>
-        <div>类型：{type}</div>
-        <div style={{ color: '#8c8c8c' }}>暂无端口详情数据</div>
+        <div>{t.n('portField.type', { value: type })}</div>
+        <div style={{ color: '#8c8c8c' }}>{t.n('portMember.noDetailData')}</div>
       </div>
     );
   }
@@ -39,14 +52,18 @@ export function renderPortDetail(port: SwitchPort | undefined, portName: string)
       <div>
         <b>{port.port_name}</b>
       </div>
-      <div>类型：{type}</div>
-      <div>占用：{PORT_USAGE_STATUS_MAP[port.usage_status]?.label ?? port.usage_status}</div>
-      {port.link_status && <div>链路：{port.link_status}</div>}
-      <div>速率：{port.speed || '-'}</div>
-      <div>VLAN：{port.vlan ?? '-'}</div>
-      {port.ip_address && <div>IP：{port.ip_address}</div>}
-      {port.customer_name && <div>客户：{port.customer_name}</div>}
-      {port.notes && <div>备注：{port.notes}</div>}
+      <div>{t.n('portField.type', { value: type })}</div>
+      <div>
+        {t.n('portField.usage', {
+          value: getPortUsageMeta(port.usage_status, t.d)?.label ?? port.usage_status
+        })}
+      </div>
+      {port.link_status && <div>{t.n('portField.link', { value: port.link_status })}</div>}
+      <div>{t.n('portField.speed', { value: port.speed || '-' })}</div>
+      <div>{t.n('portField.vlan', { value: port.vlan ?? '-' })}</div>
+      {port.ip_address && <div>{t.n('portField.ip', { value: port.ip_address })}</div>}
+      {port.customer_name && <div>{t.n('portField.customer', { value: port.customer_name })}</div>}
+      {port.notes && <div>{t.n('portField.notes', { value: port.notes })}</div>}
     </div>
   );
 }
@@ -59,6 +76,8 @@ export function GroupedMemberPorts({
   portMap: Map<string, SwitchPort>;
 }) {
   const { token } = theme.useToken();
+  const { t } = useTranslation('network');
+  const { t: td } = useTranslation('device');
   const groups = useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const name of memberPorts) {
@@ -84,7 +103,7 @@ export function GroupedMemberPorts({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {groups.map(({ type, ports: groupPorts }) => {
-        const barColor = PORT_TYPE_BAR_COLOR[type] ?? PORT_TYPE_BAR_COLOR['其他'];
+        const barColor = PORT_TYPE_BAR_COLOR[type] ?? FALLBACK_BAR_COLOR;
         return (
           <div key={type}>
             {/* 分组标题 */}
@@ -99,10 +118,10 @@ export function GroupedMemberPorts({
                   padding: '0 4px'
                 }}
               >
-                {type}
+                {getPortTypeLabel(type, td)}
               </Tag>
               <span style={{ fontSize: 11, color: token.colorTextSecondary }}>
-                {groupPorts.length} 口
+                {t('portMember.groupCount', { count: groupPorts.length })}
               </span>
             </div>
             {/* 色块面板 */}
@@ -160,8 +179,8 @@ export function GroupedMemberPorts({
                 return (
                   <Popover
                     key={portName}
-                    content={renderPortDetail(port, portName)}
-                    title="端口详情"
+                    content={renderPortDetail(port, portName, { n: t, d: td })}
+                    title={t('portMember.detailTitle')}
                     trigger="click"
                     mouseEnterDelay={0.1}
                   >
@@ -179,19 +198,25 @@ export function GroupedMemberPorts({
 
 export function PortLegend() {
   const { token } = theme.useToken();
+  const { t } = useTranslation('network');
+  const { t: td } = useTranslation('device');
   return (
     <div
       style={{ marginBottom: 8, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}
     >
-      <span style={{ fontSize: 12, color: token.colorTextSecondary }}>占用：</span>
+      <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
+        {t('portMember.legend.usage')}
+      </span>
       <Space size={4} wrap>
-        {Object.values(PORT_USAGE_STATUS_MAP).map((cfg) => (
-          <Tag key={cfg.label} color={cfg.color} style={{ fontSize: 11, margin: 0 }}>
+        {getPortUsageLegend(td).map((cfg) => (
+          <Tag key={cfg.value} color={cfg.color} style={{ fontSize: 11, margin: 0 }}>
             {cfg.label}
           </Tag>
         ))}
       </Space>
-      <span style={{ fontSize: 12, color: token.colorTextSecondary, marginLeft: 8 }}>类型：</span>
+      <span style={{ fontSize: 12, color: token.colorTextSecondary, marginLeft: 8 }}>
+        {t('portMember.legend.type')}
+      </span>
       <Space size={4} wrap>
         <Tag color="blue" style={{ fontSize: 11, margin: 0 }}>
           GE

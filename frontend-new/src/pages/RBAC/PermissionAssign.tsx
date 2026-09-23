@@ -9,6 +9,7 @@ import type { TreeProps } from 'antd';
 import { useRolePermissions, useSetRolePermissions } from '@/services/rbac';
 import type { Role, Permission } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 interface PermissionAssignProps {
   open: boolean;
@@ -19,6 +20,7 @@ interface PermissionAssignProps {
 }
 
 function PermissionAssign({ open, role, permissions, onClose, onSuccess }: PermissionAssignProps) {
+  const { t } = useTranslation('settings');
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const { data: rolePerms, isLoading: permsLoading } = useRolePermissions(role?.id ?? 0);
   const setRolePermissions = useSetRolePermissions();
@@ -27,7 +29,7 @@ function PermissionAssign({ open, role, permissions, onClose, onSuccess }: Permi
   const treeData = useMemo<TreeProps['treeData']>(() => {
     const categoryMap = new Map<string, Permission[]>();
     permissions.forEach((p) => {
-      const cat = p.category ?? '未分类';
+      const cat = p.category ?? t('permission.uncategorized');
       const list = categoryMap.get(cat) ?? [];
       list.push(p);
       categoryMap.set(cat, list);
@@ -40,7 +42,7 @@ function PermissionAssign({ open, role, permissions, onClose, onSuccess }: Permi
         key: p.code,
       })),
     }));
-  }, [permissions]);
+  }, [permissions, t]);
 
   const categoryKeys = useMemo(
     () => new Set((treeData ?? []).map((n) => n.key as string)),
@@ -61,17 +63,17 @@ function PermissionAssign({ open, role, permissions, onClose, onSuccess }: Permi
     const permCodes = checkedKeys.filter((k) => !categoryKeys.has(k));
     try {
       await setRolePermissions.mutateAsync({ roleId: role.id, permissions: permCodes });
-      message.success('权限更新成功');
+      message.success(t('permission.message.updated'));
       onSuccess();
       onClose();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '权限更新失败');
+      message.error(err instanceof Error ? err.message : t('permission.message.updateFailed'));
     }
   };
 
   return (
     <Modal
-      title={`权限分配 - ${role?.display_name ?? ''}`}
+      title={t('permission.assignTitle', { name: role?.display_name ?? '' })}
       open={open}
       onOk={handleSubmit}
       onCancel={onClose}
@@ -80,7 +82,7 @@ function PermissionAssign({ open, role, permissions, onClose, onSuccess }: Permi
       destroyOnHidden
     >
       {permsLoading ? (
-        <Spin description="加载权限中..." />
+        <Spin description={t('permission.loading')} />
       ) : (
         <Tree
           checkable

@@ -18,6 +18,7 @@ import {
 } from 'antd';
 import { ClusterOutlined, DatabaseOutlined, SearchOutlined } from '@ant-design/icons';
 import { useRoomOverview } from '@/services/room';
+import { useTranslation } from 'react-i18next';
 import { CABINET_STATUS_MAP } from '@/types/enums';
 import type { RoomOverviewGroup, RoomOverviewItem } from '@/types/models';
 import {
@@ -35,6 +36,7 @@ function usageColor(percent: number, token: ReturnType<typeof theme.useToken>['t
 }
 
 function StatusDots({ distribution }: { distribution: RoomOverviewItem['status_distribution'] }) {
+  const { t: td } = useTranslation('device');
   const { token } = theme.useToken();
   const entries = useMemo(
     () =>
@@ -54,7 +56,7 @@ function StatusDots({ distribution }: { distribution: RoomOverviewItem['status_d
         return (
           <span
             key={code}
-            title={`${meta?.label ?? code}：${count}`}
+            title={`${meta ? td(meta.labelKey) : code}：${count}`}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}
           >
             <span
@@ -66,7 +68,7 @@ function StatusDots({ distribution }: { distribution: RoomOverviewItem['status_d
               }}
             />
             <span style={{ color: token.colorTextSecondary }}>
-              {meta?.label ?? code} {count}
+              {meta ? td(meta.labelKey) : code} {count}
             </span>
           </span>
         );

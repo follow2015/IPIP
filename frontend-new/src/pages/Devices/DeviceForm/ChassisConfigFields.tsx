@@ -7,6 +7,7 @@
  */
 import { Form, Input, InputNumber, Row, Col, Divider, Checkbox, Alert } from 'antd';
 import type { FormInstance } from 'antd';
+import { useTranslation } from 'react-i18next';
 import HardwareConfigFields from '@/components/HardwareConfigFields';
 import NicConfigFields from '@/components/NicConfigFields';
 
@@ -25,21 +26,22 @@ export default function ChassisConfigFields({
   onGenerateNodesChange,
   isEdit
 }: ChassisConfigFieldsProps) {
+  const { t } = useTranslation('device');
   return (
     <>
-      <Divider plain>机箱节点配置</Divider>
+      <Divider plain>{t('form.section.chassis')}</Divider>
       <Row gutter={16}>
         <Col xs={12} md={6}>
           <Form.Item
             name="node_rows"
-            label="节点行数"
-            rules={[{ required: true, message: '请输入行数' }]}
+            label={t('form.chassis.rows.label')}
+            rules={[{ required: true, message: t('form.chassis.rows.required') }]}
           >
             <InputNumber
               min={1}
               max={16}
               style={{ width: '100%' }}
-              placeholder="行数"
+              placeholder={t('form.chassis.rows.placeholder')}
               onChange={() => {
                 const rows = form.getFieldValue('node_rows');
                 const cols = form.getFieldValue('node_cols');
@@ -51,14 +53,14 @@ export default function ChassisConfigFields({
         <Col xs={12} md={6}>
           <Form.Item
             name="node_cols"
-            label="节点列数"
-            rules={[{ required: true, message: '请输入列数' }]}
+            label={t('form.chassis.cols.label')}
+            rules={[{ required: true, message: t('form.chassis.cols.required') }]}
           >
             <InputNumber
               min={1}
               max={16}
               style={{ width: '100%' }}
-              placeholder="列数"
+              placeholder={t('form.chassis.cols.placeholder')}
               onChange={() => {
                 const rows = form.getFieldValue('node_rows');
                 const cols = form.getFieldValue('node_cols');
@@ -68,18 +70,18 @@ export default function ChassisConfigFields({
           </Form.Item>
         </Col>
         <Col xs={12} md={6}>
-          <Form.Item name="total_nodes" label="总节点数">
+          <Form.Item name="total_nodes" label={t('form.chassis.totalNodes.label')}>
             <InputNumber
               min={1}
               max={256}
               style={{ width: '100%' }}
               disabled
-              placeholder="自动计算"
+              placeholder={t('form.chassis.totalNodes.placeholder')}
             />
           </Form.Item>
         </Col>
         <Col xs={12} md={6}>
-          <Form.Item name="node_naming_pattern" label="命名规则">
+          <Form.Item name="node_naming_pattern" label={t('form.chassis.namingPattern.label')}>
             <Input placeholder="{NAME}-Node{POS}" />
           </Form.Item>
         </Col>
@@ -90,16 +92,17 @@ export default function ChassisConfigFields({
             checked={generateNodes}
             onChange={(e) => onGenerateNodesChange(e.target.checked)}
           >
-            生成子节点（保存时自动按行×列规格生成所有子节点
-            {isEdit ? '，已有子节点将被覆盖' : ''}）
+            {t('form.chassis.generateNodes.label', {
+              suffix: isEdit ? t('form.chassis.generateNodes.overwriteSuffix') : ''
+            })}
           </Checkbox>
           {generateNodes && (
             <Alert
               type={isEdit ? 'warning' : 'info'}
               title={
                 isEdit
-                  ? '保存时将删除已有子节点并重新生成所有子节点，使用下方硬件配置统一设置'
-                  : '保存时将自动创建所有子节点，并使用下方硬件配置统一设置所有子节点硬件信息'
+                  ? t('form.chassis.generateNodes.alertOverwrite')
+                  : t('form.chassis.generateNodes.alertCreate')
               }
               style={{ marginTop: 8 }}
               showIcon

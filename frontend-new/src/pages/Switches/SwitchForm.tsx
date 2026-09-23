@@ -7,13 +7,14 @@
 import { useEffect } from 'react';
 import { Modal, Form, Input, Select, InputNumber, Row, Col, Switch as AntSwitch } from 'antd';
 import { useUpdateSwitch } from '@/services/switch';
+import { SSH_PROTOCOL_OPTIONS } from '@/types/enums';
 import {
-  SWITCH_ROLE_MAP,
-  SWITCH_DEVICE_TYPE_OPTIONS,
-  AUTH_METHOD_OPTIONS,
-  SSH_PROTOCOL_OPTIONS,
-  NETWORK_LAYER_OPTIONS
-} from '@/types/enums';
+  getAuthMethodOptions,
+  getNetworkLayerOptions,
+  getSwitchDeviceTypeOptions,
+  getSwitchRoleOptions
+} from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { Switch } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
 
@@ -24,6 +25,8 @@ interface SwitchFormProps {
 }
 
 function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const [form] = Form.useForm();
   const message = useMessage();
   const updateSwitch = useUpdateSwitch();
@@ -68,7 +71,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
         payload.password = values.password;
       }
       await updateSwitch.mutateAsync({ id: editRecord!.device_id, data: payload });
-      message.success('更新成功');
+      message.success(tc('message.updateSuccess'));
       onClose();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -77,7 +80,7 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
 
   return (
     <Modal
-      title="编辑交换机"
+      title={td('switch.form.editTitle')}
       open={open}
       onOk={handleSubmit}
       onCancel={onClose}
@@ -91,43 +94,50 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
           <Col xs={24} md={12}>
             <Form.Item
               name="name"
-              label="交换机名称"
-              rules={[{ required: true, message: '请输入名称' }]}
+              label={td('switch.form.name')}
+              rules={[{ required: true, message: td('switch.form.nameRequired') }]}
             >
-              <Input placeholder="交换机名称" />
+              <Input placeholder={td('switch.form.name')} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
               name="ip"
-              label="管理IP"
+              label={td('field.managementIp')}
               rules={[
-                { required: true, message: '请输入管理IP' },
-                { pattern: /^(\d{1,3}\.){3}\d{1,3}$/, message: 'IP格式不正确' }
+                { required: true, message: td('switch.form.managementIpRequired') },
+                {
+                  pattern: /^(\d{1,3}\.){3}\d{1,3}$/,
+                  message: td('switch.form.ipFormatInvalid')
+                }
               ]}
             >
-              <Input placeholder="管理IP地址" />
+              <Input placeholder={td('switch.form.managementIpPlaceholder')} />
             </Form.Item>
           </Col>
 
           {/* 第二行：端口号 + 协议 */}
           <Col xs={24} md={12}>
-            <Form.Item name="port" label="端口号" extra="留空则按协议自动填充：SSH→22，Telnet→23">
+            <Form.Item
+              name="port"
+              label={td('switch.form.port')}
+              extra={td('switch.form.portExtra')}
+            >
               <InputNumber
                 min={1}
                 max={65535}
                 style={{ width: '100%' }}
-                placeholder="默认按协议自动填充"
+                placeholder={td('switch.form.portPlaceholder')}
               />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
               name="protocol"
-              label="协议"
-              rules={[{ required: true, message: '请选择协议' }]}
+              label={td('switch.field.protocol')}
+              rules={[{ required: true, message: td('switch.form.protocolRequired') }]}
             >
-              <Select placeholder="请选择" options={SSH_PROTOCOL_OPTIONS} />
+              <Select placeholder={tc('message.selectRequired')} options={SSH_PROTOCOL_OPTIONS} />
             </Form.Item>
           </Col>
 
@@ -135,15 +145,19 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
           <Col xs={24} md={12}>
             <Form.Item
               name="username"
-              label="用户名"
-              rules={[{ required: true, message: '请输入用户名' }]}
+              label={td('credential.form.username')}
+              rules={[{ required: true, message: td('switch.form.usernameRequired') }]}
             >
-              <Input placeholder="登录用户名" />
+              <Input placeholder={td('switch.form.usernamePlaceholder')} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="password" label="密码" extra="留空则不修改密码">
-              <Input.Password placeholder="留空则不修改" />
+            <Form.Item
+              name="password"
+              label={td('switch.form.password')}
+              extra={td('switch.form.passwordExtra')}
+            >
+              <Input.Password placeholder={td('switch.form.passwordPlaceholder')} />
             </Form.Item>
           </Col>
 
@@ -151,15 +165,15 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
           <Col xs={24} md={12}>
             <Form.Item
               name="device_type"
-              label="设备类型"
-              rules={[{ required: true, message: '请选择设备类型' }]}
+              label={td('basic.field.deviceType')}
+              rules={[{ required: true, message: td('switch.form.deviceTypeRequired') }]}
             >
-              <Select placeholder="请选择" options={SWITCH_DEVICE_TYPE_OPTIONS} />
+              <Select placeholder={tc('message.selectRequired')} options={getSwitchDeviceTypeOptions(td)} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="device_model" label="型号">
-              <Input placeholder="型号" />
+            <Form.Item name="device_model" label={td('basic.field.model')}>
+              <Input placeholder={td('basic.field.model')} />
             </Form.Item>
           </Col>
 
@@ -167,26 +181,20 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
           <Col xs={24} md={12}>
             <Form.Item
               name="switch_role"
-              label="交换机类型"
-              rules={[{ required: true, message: '请选择交换机类型' }]}
+              label={td('switch.form.switchType')}
+              rules={[{ required: true, message: td('switch.form.switchTypeRequired') }]}
             >
-              <Select
-                placeholder="请选择"
-                options={Object.entries(SWITCH_ROLE_MAP).map(([k, v]) => ({
-                  label: v.label,
-                  value: Number(k)
-                }))}
-              />
+              <Select placeholder={tc('message.selectRequired')} options={getSwitchRoleOptions(td)} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
               name="layer"
-              label="网络层级"
-              rules={[{ required: true, message: '请选择网络层级' }]}
+              label={td('switch.form.networkLayer')}
+              rules={[{ required: true, message: td('switch.form.networkLayerRequired') }]}
               initialValue={2}
             >
-              <Select placeholder="请选择" options={NETWORK_LAYER_OPTIONS} />
+              <Select placeholder={tc('message.selectRequired')} options={getNetworkLayerOptions(td)} />
             </Form.Item>
           </Col>
 
@@ -194,15 +202,23 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
           <Col xs={24} md={12}>
             <Form.Item
               name="authentication_method"
-              label="认证方法"
-              rules={[{ required: true, message: '请选择认证方法' }]}
+              label={td('switch.form.authMethod')}
+              rules={[{ required: true, message: td('switch.form.authMethodRequired') }]}
             >
-              <Select placeholder="请选择" options={AUTH_METHOD_OPTIONS} />
+              <Select placeholder={tc('message.selectRequired')} options={getAuthMethodOptions(td)} />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="has_ssh" label="管理权限" valuePropName="checked" initialValue={false}>
-              <AntSwitch checkedChildren="开" unCheckedChildren="关" />
+            <Form.Item
+              name="has_ssh"
+              label={td('form.network.managementAccess.label')}
+              valuePropName="checked"
+              initialValue={false}
+            >
+              <AntSwitch
+                checkedChildren={td('port.state.on')}
+                unCheckedChildren={td('port.state.off')}
+              />
             </Form.Item>
           </Col>
         </Row>

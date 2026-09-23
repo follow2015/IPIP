@@ -8,6 +8,7 @@
  * （事件监听由 useG6Graph 在 Graph 创建后绑定）。
  */
 import type { GraphOptions } from '@antv/g6';
+import type { TFunction } from 'i18next';
 import type { TopologyNode, TopologyEdge } from '@/types/models';
 import { escapeHtml } from '@/utils/escapeHtml';
 import {
@@ -22,6 +23,11 @@ import {
   type LayoutType,
   type TopologyComboDatum
 } from './graphBuilders';
+
+export interface GraphT {
+  n: TFunction<'network'>;
+  d: TFunction<'device'>;
+}
 
 interface G6StyleDatum {
   data?: {
@@ -49,22 +55,28 @@ const TOOLTIP_BOX_STYLE = `
  * 判定顺序：device_type → cabinetId → 否则视为边。
  */
 export function buildTooltipContent(
-  data: TopologyNode | TopologyEdge | TopologyComboDatum
+  data: TopologyNode | TopologyEdge | TopologyComboDatum,
+  t: GraphT
 ): string {
   if ('device_type' in data) {
     const node = data;
-    const role = node.switch_role === 0 ? '核心' : node.switch_role === 1 ? '接入' : '-';
+    const role =
+      node.switch_role === 0
+        ? t.d('form.networkTopology.roleOption.core')
+        : node.switch_role === 1
+          ? t.d('form.networkTopology.roleOption.access')
+          : '-';
     const statusColor = node.status === 'online' ? '#52c41a' : '#d9d9d9';
     return `<div style="min-width:160px; ${TOOLTIP_BOX_STYLE}">
       <div style="font-weight:600;font-size:13px;margin-bottom:4px">${escapeHtml(node.name)}</div>
       <div style="color:#8c8c8c">
         <span style="display:inline-block;width:6px;height:6px;border-radius:50%;
           background:${statusColor};margin-right:4px;vertical-align:middle"></span>
-        ${node.status === 'online' ? '在线' : '离线'}
+        ${escapeHtml(node.status === 'online' ? t.d('status.ONLINE') : t.d('status.OFFLINE'))}
       </div>
       ${node.ip ? `<div>IP: <span style="color:#1677ff">${escapeHtml(node.ip)}</span></div>` : ''}
-      ${node.switch_role != null ? `<div>角色: ${role}</div>` : ''}
-      ${node.layer != null ? `<div>层级: L${node.layer}</div>` : ''}
+      ${node.switch_role != null ? `<div>${escapeHtml(t.n('topology.tooltip.role', { value: role }))}</div>` : ''}
+      ${node.layer != null ? `<div>${escapeHtml(t.n('topology.tooltip.layer', { value: node.layer }))}</div>` : ''}
       ${node.room_name ? `<div style="color:#8c8c8c;margin-top:2px">${escapeHtml(node.room_name)}</div>` : ''}
     </div>`;
   }
@@ -75,9 +87,9 @@ export function buildTooltipContent(
   }
   const edge = data;
   return `<div style="${TOOLTIP_BOX_STYLE}">
-    <div>类型: ${escapeHtml(edge.edge_type ?? '-')}</div>
-    <div>带宽: ${escapeHtml(edge.bandwidth ?? '-')}</div>
-    <div>状态: ${escapeHtml(edge.status ?? '-')}</div>
+    <div>${escapeHtml(t.n('topology.tooltip.type', { value: edge.edge_type ?? '-' }))}</div>
+    <div>${escapeHtml(t.n('topology.tooltip.bandwidth', { value: edge.bandwidth ?? '-' }))}</div>
+    <div>${escapeHtml(t.n('topology.tooltip.status', { value: edge.status ?? '-' }))}</div>
   </div>`;
 }
 
@@ -86,6 +98,7 @@ interface BuildGraphOptionsParams {
   width: number;
   height: number;
   layout: LayoutType;
+  t: GraphT;
 }
 
 /**
@@ -95,7 +108,8 @@ export function buildGraphOptions({
   container,
   width,
   height,
-  layout
+  layout,
+  t
 }: BuildGraphOptionsParams): GraphOptions {
   return {
     container,
@@ -214,7 +228,7 @@ export function buildGraphOptions({
           if (!items.length) return '';
           const data = items[0]?.model?.data;
           if (!data) return '';
-          return buildTooltipContent(data as unknown as TopologyNode);
+          return buildTooltipContent(data as unknown as TopologyNode, t);
         }
       },
       {

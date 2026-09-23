@@ -206,8 +206,15 @@ def publish_monitor_alert_event(
 ) -> None:
     """G1: 入箱后 best-effort publish 到 Redis global channel，驱动 SSE 实时推送。
 
-    target_user_ids 由 data_scope_service 按设备可见用户反查（多用户隔离）；
-    为 None 视为全局广播。publish 失败不影响 outbox 落库与后续投递。
+    `target_user_ids` 由 data_scope_service 按设备可见用户反查（多用户隔离）。
+    传 `None` **不等于全局广播**——本函数会就地反查（见下方 `if ... is None`）；
+    反查结果为空则投递给「无人」。
+
+    ⚠️ **空列表 `[]` 必须原样透传，不得归一成 `None`**（P0-1，2026-09-23）：
+    网关口径（`realtime_gateway/redis_bus.py`）是 `target_user_ids is None` ⇒ 全局
+    广播、`[]` ⇒ 无人命中。若在此把 `[]`（= 查不到有权限的接收人）归一成 `None`，
+    「无权限者」会被静默升级为「跨数据域全量投递」——与 fail-open 同源的泄露口子。
+    （原文写作"为 None 视为全局广播"与实现不符：`None` 会先被反查覆盖，故此句已撤回。）
     """
     try:
         from app.utils.time_utils import now_iso_utc
@@ -228,7 +235,7 @@ def publish_monitor_alert_event(
             "dedup_key": idempotency_key,
             "outbox_id": outbox_id,
             "timestamp": now_iso_utc(),
-            "target_user_ids": target_user_ids if target_user_ids else None,
+            "target_user_ids": target_user_ids,  # None=广播；[]=无人接收（不可混同）
             "payload": payload,
         }, ensure_ascii=False))
     except Exception:

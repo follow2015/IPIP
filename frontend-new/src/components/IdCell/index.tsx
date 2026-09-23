@@ -1,4 +1,5 @@
 import { CopyOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useMessage } from '@/hooks/useMessage';
 
 interface IdCellProps {
@@ -7,6 +8,7 @@ interface IdCellProps {
 
 export default function IdCell({ value }: IdCellProps) {
   const message = useMessage();
+  const { t } = useTranslation();
 
   if (value === null || value === undefined || value === '') {
     return <span>-</span>;
@@ -17,17 +19,17 @@ export default function IdCell({ value }: IdCellProps) {
     if (navigator.clipboard?.writeText) {
       navigator.clipboard
         .writeText(text)
-        .then(() => message.success('ID 已复制'))
-        .catch(() => message.error('复制失败，请手动复制'));
+        .then(() => message.success(t('message.idCopied')))
+        .catch(() => message.error(t('message.copyFailedManual')));
     } else {
-      message.error('当前环境不支持自动复制');
+      message.error(t('message.copyUnsupported'));
     }
   };
 
   return (
     <span
       onClick={handleCopy}
-      title="点击复制 ID"
+      title={t('action.copyId')}
       style={{
         cursor: 'pointer',
         fontFamily: 'monospace',

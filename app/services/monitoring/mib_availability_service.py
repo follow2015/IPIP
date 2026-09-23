@@ -64,6 +64,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Tuple
@@ -126,9 +127,41 @@ REASON_LABELS: Dict[str, str] = {
 
 _builder = None
 _builder_lock = threading.RLock()
-_loaded: Dict[str, bool] = {}
-_resolved: Dict[Tuple[str, str], Tuple[Optional[str], str]] = {}
+_loaded: Dict[str, Tuple[bool, float]] = {}
+_resolved: Dict[Tuple[str, str], Tuple[Tuple[Optional[str], str], float]] = {}
 _vendor_registered = False
+
+_MIB_CACHE_TTL_SECONDS = 300.0
+_MIB_CACHE_MAXSIZE = 512
+
+_now = time.monotonic
+
+_CACHE_MISS = object()
+
+
+def _cache_get(cache: dict, key: Any) -> Any:
+    """TTL 感知读：过期即视为未命中，并**顺手删掉**（否则过期项仍会无界占位）。"""
+    entry = cache.get(key)
+    if entry is None:
+        return _CACHE_MISS
+    value, expires_at = entry
+    if expires_at <= _now():
+        cache.pop(key, None)
+        return _CACHE_MISS
+    return value
+
+
+def _cache_put(cache: dict, key: Any, value: Any) -> None:
+    """写入并维持容量上限：先清过期项，仍超限则丢"最早过期"的那条。"""
+    now = _now()
+    cache[key] = (value, now + _MIB_CACHE_TTL_SECONDS)
+    if len(cache) <= _MIB_CACHE_MAXSIZE:
+        return
+    for stale in [k for k, (_v, exp) in cache.items() if exp <= now]:
+        cache.pop(stale, None)
+    while len(cache) > _MIB_CACHE_MAXSIZE:
+        oldest = min(cache.items(), key=lambda kv: kv[1][1])[0]
+        cache.pop(oldest, None)
 
 
 def ensure_vendor_mib_source() -> Optional[str]:
@@ -228,18 +261,20 @@ def mib_loadable(mib: str) -> bool:
     为真、这里是空转。但 **P2-6 的审计端点是全新入口**，它不走适配器那条路径 ⇒
     进程内第一次审计就会永久挂住。这条注释就是防它被"优化"回去。
     """
-    if mib in _loaded:
-        return _loaded[mib]
+    cached = _cache_get(_loaded, mib)
+    if cached is not _CACHE_MISS:
+        return cached
     with _builder_lock:
         ensure_vendor_mib_source()
-        if mib in _loaded:  # 双检：锁外那次检查可能被别的线程抢先
-            return _loaded[mib]
+        cached = _cache_get(_loaded, mib)  # 双检：锁外那次检查可能被别的线程抢先
+        if cached is not _CACHE_MISS:
+            return cached
         try:
             _get_builder().load_modules(mib)
             ok = True
         except Exception:  # noqa: BLE001 - MibNotFoundError / SmiError 均视为不可用
             ok = False
-        _loaded[mib] = ok
+        _cache_put(_loaded, mib, ok)
     return ok
 
 
@@ -255,8 +290,8 @@ def resolve_symbol_oid(mib: Optional[str], symbol: Optional[str]) -> Tuple[Optio
     if not mib:
         return None, REASON_SYMBOL_WITHOUT_MIB
     key = (mib, symbol)
-    cached = _resolved.get(key)
-    if cached is not None:
+    cached = _cache_get(_resolved, key)
+    if cached is not _CACHE_MISS:
         return cached
 
     if not mib_loadable(mib):
@@ -276,7 +311,7 @@ def resolve_symbol_oid(mib: Optional[str], symbol: Optional[str]) -> Tuple[Optio
             result = (".".join(str(x) for x in oid), REASON_LOCAL_MIB)
         except Exception:  # noqa: BLE001 - 符号不在该 MIB 里
             result = (None, REASON_SYMBOL_NOT_IN_MIB)
-    _resolved[key] = result
+    _cache_put(_resolved, key, result)
     return result
 
 

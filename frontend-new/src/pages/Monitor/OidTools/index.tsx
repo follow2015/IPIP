@@ -12,6 +12,7 @@
 import { lazy, Suspense } from 'react';
 import { Tabs } from 'antd';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 const MibScan = lazy(() => import('@/pages/Monitor/MibScan'));
 const OidRuleConfig = lazy(() => import('@/pages/Monitor/OidRuleConfig'));
@@ -21,6 +22,7 @@ const DEFAULT_TAB: OidTabKey = 'mib';
 const VALID_TABS: OidTabKey[] = ['mib', 'oid-rules'];
 
 export default function OidTools() {
+  const { t } = useTranslation('monitor');
   const [params, setParams] = useSearchParams();
   const raw = params.get('tab');
   const activeKey: OidTabKey = VALID_TABS.includes(raw as OidTabKey)
@@ -39,7 +41,7 @@ export default function OidTools() {
       items={[
         {
           key: 'mib',
-          label: 'MIB 探测',
+          label: t('tab.mib'),
           children: (
             <Suspense fallback={null}>
               <MibScan />
@@ -48,7 +50,7 @@ export default function OidTools() {
         },
         {
           key: 'oid-rules',
-          label: 'OID 规则',
+          label: t('tab.oidRules'),
           children: (
             <Suspense fallback={null}>
               <OidRuleConfig />

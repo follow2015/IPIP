@@ -1,9 +1,13 @@
+import { useTranslation } from 'react-i18next';
+
 function NotFound() {
+  const { t } = useTranslation('common');
+
   return (
     <div style={{ textAlign: 'center', padding: '100px 0' }}>
       <h1>404</h1>
-      <p>抱歉，您访问的页面不存在</p>
-      <a href="/">返回首页</a>
+      <p>{t('error.notFound')}</p>
+      <a href="/">{t('error.backHome')}</a>
     </div>
   );
 }

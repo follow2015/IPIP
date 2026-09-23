@@ -1,0 +1,2219 @@
+{
+  "field": {
+    "name": "Device Name",
+    "managementIp": "Management IP",
+    "brandModel": "Brand / Model",
+    "memory": "Memory",
+    "power": "Power",
+    "cabinet": "Cabinet",
+    "uPosition": "U Position",
+    "portOverview": "Port Overview",
+    "monitor": "Monitoring"
+  },
+  "status": {
+    "unknown": "Unknown",
+    "notConfigured": "Not Configured",
+    "pending": "Pending",
+    "reachable": "Reachable",
+    "unreachable": "Unreachable",
+    "interrupted": "Monitoring Interrupted",
+    "alerting": "{{count}} Alerts",
+    "SCRAPPED": "Scrapped",
+    "AVAILABLE": "Available",
+    "ONLINE": "Online",
+    "OFFLINE": "Offline",
+    "MAINTENANCE": "Under Maintenance",
+    "RESERVED": "Reserved",
+    "PENDING_ONLINE": "Pending Online",
+    "TESTING": "Testing"
+  },
+  "tooltip": {
+    "notPinged": "Not pinged",
+    "pingOk": "Management IP is pingable",
+    "pingFailed": "Management IP is not pingable",
+    "interrupted": "Monitoring interrupted: no probe data for a long time",
+    "unreachable": "Unreachable (protocol: {{protocol}})",
+    "reachable": "Reachable (protocol: {{protocol}})",
+    "alerting": "Reachable but {{count}} metric alerts",
+    "pending": "Credentials configured, awaiting first probe",
+    "portUsage": "Used: {{used}}, Free: {{free}}",
+    "hasCredential": "Has management access",
+    "recordOnly": "Record only"
+  },
+  "port": {
+    "summary": "{{total}} ports ({{used}} used / {{free}} free)",
+    "unknown": "{{count}} ports",
+    "type": {
+      "mgmt": "Mgmt",
+      "other": "Other"
+    },
+    "template": {
+      "ge": "GE (Gigabit)",
+      "ge10": "10GE (10 Gigabit)",
+      "custom": "Custom"
+    },
+    "action": {
+      "add": "Add Port",
+      "syncData": "Sync Data"
+    },
+    "mode": {
+      "batch": "Batch Add",
+      "single": "Single Add"
+    },
+    "column": {
+      "usageStatus": "Usage Status",
+      "linkStatus": "Link Status",
+      "ipAddress": "IP Address"
+    },
+    "ipRole": {
+      "primary": "Primary",
+      "secondary": "Secondary"
+    },
+    "filter": {
+      "usageStatus": "Usage Status"
+    },
+    "switch": {
+      "sync": "Sync",
+      "statusSync": "Status Sync",
+      "notSync": "No Sync"
+    },
+    "state": {
+      "on": "On",
+      "off": "Off"
+    },
+    "namingRule": "Naming rule: prefix + slot/card/port number (multiple groups supported)",
+    "namingExample": "{{prefix}} + slot {{slot}}/card {{card}}/{{start}}~{{end}}",
+    "preview": {
+      "count": "Will create {{count}} ports:",
+      "count_one": "Will create {{count}} port:",
+      "count_other": "Will create {{count}} ports:"
+    },
+    "field": {
+      "portNameHint": "e.g. GE1/0/1",
+      "portTypeHint": "e.g. GE",
+      "speedHint": "e.g. 1G",
+      "speedHintMulti": "e.g. 1G, 10G",
+      "vlanHint": "e.g. 100",
+      "macHint": "e.g. 00:1A:2B:3C:4D:5E",
+      "ipHint": "e.g. 192.168.1.1",
+      "descriptionHint": "Port description",
+      "remarksHint": "Port remarks",
+      "selectCustomer": "Select customer"
+    },
+    "validation": {
+      "inputPortName": "Please enter the port name"
+    },
+    "confirm": {
+      "deleteTitle": "Delete Port",
+      "deleteContent": "Delete port \"{{name}}\"?",
+      "enableTitle": "Enable Port",
+      "enableContent": "Enable port \"{{name}}\"?",
+      "disableTitle": "Disable Port",
+      "disableContent": "Disable port \"{{name}}\"?",
+      "syncTitle": "Confirm Sync",
+      "syncContent": "All port information will be fetched from the device and updated. It runs in the background and refreshes automatically when done."
+    },
+    "message": {
+      "createSuccess": "Port created",
+      "updated": "Port updated",
+      "deleted": "Port deleted",
+      "noPortsToCreate": "No ports to create",
+      "enabled": "Port enabled",
+      "disabled": "Port disabled",
+      "syncEnabled": "Port auto-sync enabled",
+      "syncDisabled": "Port auto-sync disabled",
+      "statusSyncEnabled": "Port status auto-sync enabled",
+      "statusSyncDisabled": "Port status auto-sync disabled",
+      "toggleFailed": "Failed to update the switch",
+      "resetToGlobal": "Reset to follow the global switch",
+      "syncSubmitted": "Port sync submitted; you will be notified when it completes",
+      "batchCreated": "Successfully created {{count}} ports",
+      "batchCreated_one": "Successfully created {{count}} port",
+      "batchCreated_other": "Successfully created {{count}} ports",
+      "batchCreatedWithSkipped": "Successfully created {{count}} ports, {{skipped}} already existed and were skipped",
+      "batchCreatedWithSkipped_one": "Successfully created {{count}} port, {{skipped}} already existed and were skipped",
+      "batchCreatedWithSkipped_other": "Successfully created {{count}} ports, {{skipped}} already existed and were skipped",
+      "batchUpdated": "Updated {{count}} ports",
+      "batchUpdated_one": "Updated {{count}} port",
+      "batchUpdated_other": "Updated {{count}} ports",
+      "batchUpdatePartialFailed": "Batch operation completed, {{count}} ports failed to update",
+      "batchUpdatePartialFailed_one": "Batch operation completed, {{count}} port failed to update",
+      "batchUpdatePartialFailed_other": "Batch operation completed, {{count}} ports failed to update"
+    },
+    "tooltip": {
+      "needCredential": "Add an SNMP or Zabbix monitoring credential before enabling port auto-sync",
+      "needCredentialStatus": "Add an SNMP or Zabbix monitoring credential before enabling port status auto-sync",
+      "followGlobal": "Following the global switch (current: {{state}}); click to switch to a device-level forced setting",
+      "followGlobalStatus": "Following the global switch (current: {{state}}); click to switch to a device-level forced setting. When enabled, port status is updated with the SNMP/Zabbix credential during monitoring polls; SSH sync still performs a full replace",
+      "deviceOverride": "Device-level switch is forced; click \"{{follow}}\" to restore",
+      "deviceOverrideStatus": "Device-level switch is forced; when enabled only port status is updated during monitoring polls, while SSH sync still performs a full replace. Click \"{{follow}}\" to restore"
+    },
+    "alert": {
+      "credentialTip": "If monitoring credentials are available, add an SNMP or Zabbix monitoring credential first to fetch ports automatically",
+      "credentialTipDesc": "After adding a monitoring credential, enable the port sync switch above and ports will be synced automatically during monitoring polls. The switch stays disabled until a credential is added."
+    }
+  },
+  "action": {
+    "clone": "Clone"
+  },
+  "filter": {
+    "mainType": "Main Type",
+    "subType": "Sub Type",
+    "sshAccess": "Management Access",
+    "byStatus": "Filter by Status",
+    "byRoom": "Filter by Data Center",
+    "byCustomer": "Filter by Customer",
+    "byCabinet": "Filter by Cabinet"
+  },
+  "batch": {
+    "addDevice": "Add Device",
+    "batchAdd": "Batch Add",
+    "manualBatchAdd": "Manual Batch Add",
+    "cloneCopy": "Clone",
+    "changeStatus": "Change Status",
+    "updateAsset": "Update Asset Info",
+    "updateAssetTitle": "Update Asset Information ({{count}} devices)",
+    "updateConfig": "Update Config",
+    "updateMonitor": "Update Monitoring",
+    "crossPageWarning": "\"{{action}}\" reads each selected item individually and only supports selections on the current page: {{count}} {{unit}} selected are on other pages. Clear the cross-page selection, re-select on this page, then retry.",
+    "unit": "devices",
+    "message": {
+      "updateResult": "Updated {{updated}} devices, skipped {{skipped}}"
+    }
+  },
+  "confirm": {
+    "deleteContent": "Delete device \"{{name}}\"?",
+    "batchDeleteContent": "Delete the selected {{count}} devices? This action cannot be undone.",
+    "batchDeleteContent_one": "Delete the selected device? This action cannot be undone.",
+    "batchDeleteContent_other": "Delete the selected {{count}} devices? This action cannot be undone.",
+    "batchStatusContent": "Change the status of the selected {{count}} devices to \"{{status}}\"?",
+    "batchStatusContent_one": "Change the status of the selected device to \"{{status}}\"?",
+    "batchStatusContent_other": "Change the status of the selected {{count}} devices to \"{{status}}\"?",
+    "deleteOk": "Delete"
+  },
+  "message": {
+    "batchDeleteSuccess": "Deleted {{count}} devices",
+    "batchDeleteSuccess_one": "Deleted {{count}} device",
+    "batchDeleteSuccess_other": "Deleted {{count}} devices",
+    "batchDeleteFailed": "Batch delete failed",
+    "batchStatusSuccess": "Changed the status of {{count}} devices",
+    "batchStatusSuccess_one": "Changed the status of {{count}} device",
+    "batchStatusSuccess_other": "Changed the status of {{count}} devices",
+    "batchStatusFailed": "Batch status change failed",
+    "noDeviceSelected": "No device found for the current selection, please re-select",
+    "configSubtypeRequired": "Batch config update requires all selected devices to share the same subtype",
+    "monitorSubtypeRequired": "Batch monitoring update requires all selected devices to share the same subtype"
+  },
+  "metric": {
+    "title": "Monitoring Data",
+    "sectionTitle": "Metrics",
+    "trafficTitle": "Port Traffic",
+    "trafficLoadFailed": "Failed to load the traffic chart, please refresh and retry",
+    "templateGroup": "Metric template group: {{name}}",
+    "lastError": "Error details: {{error}}",
+    "lastChecked": "Last polled: {{time}}",
+    "activeAlertCount": "{{count}} active metric alerts",
+    "groupAlertCount": "{{count}} alerts",
+    "itemCount": "{{count}}",
+    "activeAlertDetail": "Active Alert Details",
+    "emptyGroup": "This template group contains no metrics",
+    "needCredential": "Credential required",
+    "needCredentialHint": "Go to the \"Monitoring Credentials\" tab and link at least one credential (SNMP / IPMI / Zabbix) to view monitoring data",
+    "column": {
+      "name": "Metric",
+      "source": "Source",
+      "value": "Current",
+      "status": "Status",
+      "alert": "Alert",
+      "collectedAt": "Collected At",
+      "instance": "Instance",
+      "severity": "Severity",
+      "updatedAt": "Updated At"
+    },
+    "severity": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "status": {
+      "normal": "Normal",
+      "noData": "No Data",
+      "interrupted": "Monitoring Interrupted",
+      "waitingProbe": "Pending Probe"
+    },
+    "overall": {
+      "noCredential": "No monitoring credential is linked to this device",
+      "notProbed": "Credentials configured, awaiting first probe",
+      "unreachable": "Device is currently unreachable, no metric data available",
+      "credentialError": "Monitoring credential or configuration error, metrics cannot be collected",
+      "noData": "No metric data collected yet",
+      "breached": "Some metrics exceeded thresholds, please review",
+      "normal": "Metrics are being collected normally"
+    },
+    "group": {
+      "temperature": "Temperature",
+      "portStatus": "Port Status",
+      "ifInErrors": "Inbound Errors",
+      "ifOutErrors": "Outbound Errors",
+      "ifInDiscards": "Inbound Discards",
+      "ifOutDiscards": "Outbound Discards",
+      "ifUtilization": "Port Utilization",
+      "cpuUsage": "CPU Usage",
+      "memoryUsage": "Memory Usage",
+      "sysUptime": "System Uptime",
+      "fanSpeed": "Fan Speed",
+      "zabbixCpuUsage": "CPU Usage (Zabbix)",
+      "zabbixMemoryUsage": "Memory Usage (Zabbix)",
+      "zabbixTemperature": "Temperature (Zabbix)",
+      "zabbixSysUptime": "System Uptime (Zabbix)",
+      "zabbixIfInErrors": "Inbound Errors (Zabbix)",
+      "zabbixIfOutErrors": "Outbound Errors (Zabbix)",
+      "zabbixIfInDiscards": "Inbound Discards (Zabbix)",
+      "zabbixIfOutDiscards": "Outbound Discards (Zabbix)",
+      "raidFailure": "RAID",
+      "diskFailure": "Disk",
+      "monitorInterrupted": "Monitoring Interrupted"
+    }
+  },
+  "credential": {
+    "monitorSwitchTitle": "Device Monitoring Switch",
+    "monitorEnabled": "Enable Monitoring Probe",
+    "monitorEnabledHint": "Once disabled, this device is excluded from monitoring polls (affects this device only)",
+    "templateGroupTitle": "Metric Template Group",
+    "currentBinding": "Currently bound:",
+    "autoMatch": "Auto Match",
+    "templateGroupHint": "Bind a metric template group explicitly to this device; saving with an empty value clears the binding and falls back to auto matching by device type + vendor + protocol",
+    "selectTemplateGroup": "Select a metric template group (empty = unbind)",
+    "currentType": "current type",
+    "noMatchedGroup": "No metric template group matches {{type}}",
+    "createInMonitorCenter": "You can create one in \"Monitoring Center → Metric Templates\"",
+    "linkedTitle": "Credentials Linked to This Device",
+    "notLinked": "No monitoring credential linked to this device",
+    "editSecret": "Edit Secret",
+    "unlink": "Unlink",
+    "linkExistingTitle": "Link an Existing Shared Credential",
+    "protocolExclusive": "Protocol Conflict",
+    "protocolExclusiveDesc": "A device can use only one monitoring protocol at a time. Linking a credential with a new protocol will automatically unlink the {{protocols}} protocol from this device.",
+    "protocolExclusiveDescCreate": "A device can use only one monitoring protocol at a time. Creating and linking a credential with a different protocol will automatically unlink the {{protocols}} protocol from this device.",
+    "selectShared": "Select a shared credential",
+    "noAvailable": "No credential available to link",
+    "sharedOption": "[{{protocol}}] {{name}} (linked to {{count}} devices)",
+    "linkThisDevice": "Link to This Device",
+    "createAndLinkTitle": "Create a Shared Credential and Link It",
+    "createAndLink": "Create and Link",
+    "editSecretTitle": "Edit credential secret for this device ({{protocol}})",
+    "onlyThisDevice": "Affects this device only",
+    "onlyThisDeviceDesc": "This credential may be shared by other devices; this edit only migrates this device to a dedicated credential row and does not affect other devices.",
+    "name": "Credential Name",
+    "namePlaceholder": "Please enter a credential name",
+    "nameHint": "e.g. Room A SNMP read-only community string",
+    "protocol": "Protocol",
+    "separator": ", ",
+    "selectSharedFirst": "Please select the shared credential to link",
+    "replaceTitle": "Linking a New Protocol Replaces the Old One",
+    "replaceContent": "A device can use only one monitoring protocol at a time. Linking a credential with a new protocol will automatically unlink the {{protocols}} protocol from this device. Continue?",
+    "confirmReplace": "Replace",
+    "clearGroupTitle": "Clear Metric Template Group Binding",
+    "clearGroupContent": "After clearing, the group will be auto matched by device type + vendor + protocol. Continue?",
+    "confirmClear": "Clear",
+    "form": {
+      "keepUnchanged": "Leave blank to keep unchanged",
+      "username": "Username",
+      "password": "Password",
+      "none": "None",
+      "snmpVersion": "SNMP Version",
+      "authKey": "Auth Key",
+      "authProtocol": "Auth Protocol",
+      "privKey": "Priv Key",
+      "privKeyPlaceholder": "Leave blank when encryption is not used",
+      "privProtocol": "Priv Protocol",
+      "apiUrl": "API URL",
+      "apiToken": "API Token",
+      "verifySsl": "Verify SSL",
+      "verifySslIpmi": "Verify SSL Certificate",
+      "verifySslTooltip": "BMCs usually use self-signed certificates, so this is disabled by default",
+      "matchBy": {
+        "label": "Match By",
+        "placeholder": "Default: host",
+        "host": "Hostname",
+        "ip": "IP Address"
+      }
+    },
+    "message": {
+      "linked": "Linked to the shared credential",
+      "unlinked": "Unlinked the {{protocol}} credential",
+      "monitorResumed": "Monitoring resumed for this device",
+      "monitorPaused": "Monitoring paused for this device",
+      "groupCleared": "Metric template group binding cleared (back to auto match)",
+      "groupUpdated": "Metric template group binding updated",
+      "saveFailed": "Failed to save",
+      "createdAndLinked": "Shared credential created and linked",
+      "updated": "Credential for this device updated",
+      "updateFailed": "Failed to update"
+    }
+  },
+  "hardware": {
+    "cpu": {
+      "model": "CPU Model",
+      "modelPlaceholder": "Select a CPU template (searchable by brand/model)",
+      "way": "CPU Sockets",
+      "wayPlaceholder": "Sockets",
+      "cores": "Cores per CPU",
+      "coresPlaceholder": "Cores"
+    },
+    "memory": {
+      "model": "Memory Model",
+      "modelPlaceholder": "Select a memory template",
+      "dimmCount": "DIMM Count",
+      "dimmCountPlaceholder": "Count",
+      "dimmCountUnit": "sticks",
+      "totalCapacity": "Total Memory"
+    },
+    "os": {
+      "label": "Operating System",
+      "placeholder": "e.g. CentOS 7.9"
+    },
+    "gpu": {
+      "model": "GPU Model",
+      "modelPlaceholder": "Select a GPU template (searchable by brand/model)",
+      "count": "GPU Count",
+      "countUnit": "cards",
+      "description": "GPU Description",
+      "descriptionPlaceholder": "e.g. NVIDIA A100 80GB × 8"
+    },
+    "ipmi": {
+      "address": "IPMI Address",
+      "addressPlaceholder": "IPMI management address",
+      "username": "IPMI Username",
+      "usernamePlaceholder": "IPMI login username",
+      "password": "IPMI Password",
+      "passwordPlaceholder": "IPMI login password"
+    },
+    "storage": {
+      "title": "Storage Configuration",
+      "model": "Disk Model",
+      "placeholder": "Select a disk template",
+      "count": "Count",
+      "countUnit": "drives",
+      "optional": "Optional",
+      "add": "Add Disk",
+      "templateDefault": "(template default)"
+    }
+  },
+  "storage": {
+    "unit": "storage entries",
+    "totalCapacity": "Total capacity: {{capacity}}",
+    "blockCount": "{{count}} x {{capacity}}",
+    "confirmDelete": "Delete this storage entry?",
+    "confirmBatchDelete": "Delete the selected {{count}} storage entries?",
+    "confirmBatchDelete_one": "Delete the selected storage entry?",
+    "confirmBatchDelete_other": "Delete the selected {{count}} storage entries?",
+    "templateConfig": "Template Config",
+    "templateTitle": "Storage Template Configuration",
+    "confirmCreate": "Confirm Create",
+    "editTitle": "Edit Storage",
+    "selectType": "Please select a storage type",
+    "column": {
+      "capacity": "Capacity",
+      "interface": "Interface",
+      "slot": "Slot",
+      "vendor": "Vendor",
+      "model": "Model",
+      "serial": "Serial Number"
+    },
+    "status": {
+      "normal": "Normal",
+      "fault": "Fault",
+      "warning": "Warning"
+    },
+    "field": {
+      "type": "Storage Type",
+      "capacityGb": "Capacity (GB)",
+      "capacityGbHint": "Used for total capacity calculation only, not shown in the list",
+      "capacityPlaceholder": "Please enter the capacity",
+      "capacityHint": "e.g. 2TB",
+      "capacityGbConvertHint": "Converted to GB, e.g. 2TB = 2048",
+      "vendorHint": "e.g. Samsung",
+      "modelHint": "e.g. PM983"
+    },
+    "message": {
+      "deleted": "Deleted {{count}} storage entries",
+      "deleted_one": "Deleted {{count}} storage entry",
+      "deleted_other": "Deleted {{count}} storage entries",
+      "batchDeleteFailed": "Batch delete failed",
+      "needOneConfig": "Please configure at least one storage entry",
+      "created": "Created {{count}} storage entries from the template",
+      "created_one": "Created {{count}} storage entry from the template",
+      "created_other": "Created {{count}} storage entries from the template",
+      "createFailed": "Failed to create"
+    }
+  },
+  "nic": {
+    "unit": "ports",
+    "itemLabel": "NIC {{index}}",
+    "templatePlaceholder": "Select a NIC template (ports are expanded automatically)",
+    "templateOption": "{{brand}} {{model}} ({{ports}}×{{speed}} {{type}})",
+    "add": "Add NIC",
+    "autoNicName": "NIC {{index}}",
+    "autoPortName": "{{model}}: Port {{index}}",
+    "preview": {
+      "summary_one": "Total {{count}} port across {{nics}} NICs",
+      "summary_other": "Total {{count}} ports across {{nics}} NICs"
+    },
+    "column": {
+      "displayName": "Display Name",
+      "nicIndex": "NIC No.",
+      "portIndex": "Port No.",
+      "portName": "Port Name",
+      "portType": "Port Type",
+      "speed": "Speed",
+      "portStatus": "Port Status",
+      "description": "Description"
+    },
+    "portType": {
+      "rj45": "RJ45 (Copper)",
+      "sfp": "SFP (1G Fiber)",
+      "sfpPlus": "SFP+ (10G Fiber)",
+      "sfp28": "SFP28 (25G Fiber)",
+      "qsfpPlus": "QSFP+ (40G Fiber)",
+      "qsfp28": "QSFP28 (100G Fiber)",
+      "qsfp56": "QSFP56 (200G Fiber)",
+      "qsfpdd": "QSFP-DD (400G Fiber)"
+    },
+    "status": {
+      "free": "Free",
+      "occupied": "Occupied",
+      "disabled": "Disabled"
+    },
+    "confirmDelete": "Delete this port?",
+    "confirmBatchDelete": "Delete the selected {{count}} ports?",
+    "confirmBatchDelete_one": "Delete the selected port?",
+    "confirmBatchDelete_other": "Delete the selected {{count}} ports?",
+    "templateConfig": "Template Config",
+    "editTitle": "Edit Port",
+    "confirmCreate": "Confirm Create",
+    "field": {
+      "nicIndexPlaceholder": "Please enter the NIC number",
+      "nicIndexHint": "NIC number",
+      "portIndexPlaceholder": "Please enter the port number",
+      "portIndexHint": "Port number",
+      "portNameHint": "e.g. port1"
+    },
+    "message": {
+      "deleted": "Deleted {{count}} ports",
+      "deleted_one": "Deleted {{count}} port",
+      "deleted_other": "Deleted {{count}} ports",
+      "skipped": "{{count}} ports were skipped because they are occupied or invalid",
+      "skipped_one": "{{count}} port was skipped because it is occupied or invalid",
+      "skipped_other": "{{count}} ports were skipped because they are occupied or invalid",
+      "batchDeleteFailed": "Batch delete failed",
+      "needTemplate": "Please select at least one NIC template",
+      "created": "Created {{count}} ports from the template",
+      "created_one": "Created {{count}} port from the template",
+      "created_other": "Created {{count}} ports from the template",
+      "createFailed": "Failed to create"
+    }
+  },
+  "node": {
+    "notesTemplate": "{{name}} node {{position}}",
+    "positionFull": "All node slots in this chassis are occupied, cannot add more child nodes",
+    "deleteContent": "Delete node \"{{name}}\"?",
+    "createSuccess": "Node created",
+    "noVacant": "No free node slot available",
+    "countMustPositive": "The count must be greater than 0",
+    "countExceed": "The count cannot exceed the remaining free slots ({{count}})",
+    "generated": "Generated {{count}} child nodes",
+    "generated_one": "Generated {{count}} child node",
+    "generated_other": "Generated {{count}} child nodes",
+    "column": {
+      "position": "Node Position",
+      "name": "Device Name",
+      "hostname": "Hostname",
+      "memory": "Memory",
+      "os": "OS"
+    },
+    "memorySummary": "{{single}}GB each × {{count}} = ",
+    "layout": "Node layout: {{rows}} rows × {{cols}} cols = {{total}} nodes ({{used}} occupied, {{vacant}} free) — drag a node to swap its position",
+    "dragTooltip": "Drag to swap position · click to view {{name}}",
+    "vacantSlot": "Empty slot R{{row}}C{{col}} (drop a node here)",
+    "regenerateHint": "To regenerate all nodes (overwriting existing ones), check \"Generate child nodes\" when editing the chassis",
+    "fillTooltip": "Fill all free node slots ({{count}} currently free)",
+    "fillButton": "Fill Free Slots",
+    "chassisFull": "All node slots in this chassis are occupied",
+    "addChildTooltip": "Add a child node to a free slot",
+    "addButton": "Add Node",
+    "field": {
+      "name": "Node Name",
+      "namePlaceholder": "Please enter a node name",
+      "nameHint": "e.g. Chassis-01-Node1",
+      "position": "Node Position",
+      "positionPlaceholder": "Please enter the node position",
+      "positionHint": "Position number",
+      "hostname": "Hostname",
+      "hardware": "Hardware Config",
+      "nic": "NIC Config"
+    },
+    "generateTitle": "Fill All Free Node Slots",
+    "generateDesc": "This chassis has {{total}} node slots in total, {{existing}} child nodes already exist, and {{vacant}} slots are free. Free slots will be filled in order; existing child nodes are not affected.",
+    "generateCount": "Number of Nodes to Generate",
+    "generateCountPlaceholder": "Please enter the count",
+    "generateCountMin": "Generate at least 1 node",
+    "generateCountMax": "Cannot exceed the remaining free slots ({{count}})",
+    "generateCountMaxShort": "At most {{count}}",
+    "message": {
+      "swapFailed": "Failed to swap node positions"
+    }
+  },
+  "basic": {
+    "field": {
+      "deviceType": "Device Type",
+      "deviceSubtype": "Device Subtype",
+      "brand": "Brand",
+      "model": "Model",
+      "serialNumber": "Serial Number",
+      "businessIp": "Business IP",
+      "room": "Data Center",
+      "occupiedU": "Occupied U",
+      "owner": "Owner",
+      "cpu": "CPU",
+      "gpu": "GPU",
+      "power": "Power Consumption",
+      "memoryPerDimm": "{{size}}GB per DIMM × {{count}} = "
+    },
+    "cpu": {
+      "way": "{{count}}-way",
+      "cores": "{{count}} cores",
+      "cores_one": "{{count}} core",
+      "cores_other": "{{count}} cores"
+    },
+    "invalidFormat": "(Invalid format)",
+    "clearAll": "Clear All",
+    "confirmClear": "Clear all business IPs?",
+    "message": {
+      "ipDeleted": "Deleted",
+      "cleared": "All business IPs cleared",
+      "clearFailed": "Failed to clear"
+    }
+  },
+  "detail": {
+    "invalidParam": "Invalid parameter",
+    "invalidDeviceId": "Invalid device ID",
+    "backToList": "Back to List",
+    "changeStatus": "Change Status",
+    "refreshInfo": "Refresh Device Info",
+    "refreshInfoContent": "Model, version, serial number and other information will be fetched from the device in real time and refreshed automatically once the background task completes.",
+    "refreshInfoSubmitted": "Device info refresh submitted; you will be notified when it completes",
+    "notFound": "Device not found",
+    "statusChanged": "Status updated",
+    "statusChangeFailed": "Failed to change status"
+  },
+  "config": {
+    "tab": {
+      "backups": "Config Backups",
+      "changes": "Config Change Approval"
+    },
+    "backupType": {
+      "manual": "Manual",
+      "scheduled": "Scheduled",
+      "preChange": "Pre-change"
+    },
+    "changeStatus": {
+      "draft": "Draft",
+      "pending": "Pending Approval",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "applied": "Applied"
+    },
+    "column": {
+      "fileSize": "File Size",
+      "configHash": "Config Hash",
+      "summary": "Summary"
+    },
+    "action": {
+      "diff": "Diff",
+      "approve": "Approve",
+      "reject": "Reject",
+      "triggerBackup": "Trigger Backup"
+    },
+    "confirmApprove": "Approve this change?",
+    "confirmReject": "Reject this change?",
+    "viewTitle": "Config Content",
+    "diffTitle": "Config Diff",
+    "oldConfig": "Old Config",
+    "newConfig": "New Config",
+    "message": {
+      "backupSubmitted": "Config backup submitted; you will be notified when it completes",
+      "backupFailed": "Backup failed",
+      "noDiff": "No configuration to compare"
+    }
+  },
+  "connection": {
+    "type": {
+      "ethernet": "Ethernet",
+      "fiber": "Fiber",
+      "management": "Management Port",
+      "serial": "Serial",
+      "other": "Other"
+    },
+    "linkType": {
+      "deviceToNetwork": "Device→Network",
+      "networkToNetwork": "Network→Network"
+    },
+    "column": {
+      "connectionType": "Connection Type",
+      "linkType": "Link Mode",
+      "localPort": "Local Port",
+      "peerDevice": "Peer Device",
+      "peerPort": "Peer Port",
+      "vlan": "VLAN",
+      "bandwidth": "Bandwidth",
+      "lagGroup": "LAG Group"
+    },
+    "form": {
+      "peerDeviceRoom": "Data Center of Peer Device",
+      "localNicPort": "Local NIC Port",
+      "selectLocalPort": "Please select a local port",
+      "selectRoom": "Please select a data center",
+      "selectCabinet": "Please select a cabinet",
+      "selectPeerDevice": "Please select a peer device",
+      "selectDevice": "Please select a device",
+      "selectPeerPort": "Please select a peer port",
+      "selectPort": "Please select a port",
+      "selectPeerDeviceFirst": "Please select a peer device first",
+      "selectNicPort": "Please select a NIC port",
+      "selectVlan": "Select VLAN",
+      "bandwidthHint": "e.g. 10G",
+      "selectLagGroup": "Select LAG group"
+    },
+    "action": {
+      "add": "Add Connection"
+    },
+    "editTitle": "Edit Connection",
+    "confirmDeleteContent": "Delete this connection?",
+    "confirmDisconnect": "Confirm Disconnect",
+    "confirmDisconnectContent": "Disconnect this port link? Ports on both ends will be released.",
+    "unnamed": "Unnamed",
+    "loadFailed": "Failed to load connection data",
+    "loadFailedDesc": "Please check your network and retry, or contact an administrator.",
+    "message": {
+      "disconnected": "Disconnected",
+      "disconnectFailed": "Failed to disconnect"
+    }
+  },
+  "memberPort": {
+    "column": "Member Ports",
+    "selectPlaceholder": "Select member ports",
+    "editTitle": "Edit Member Ports - {{name}}",
+    "updateSuccess": "Member ports updated",
+    "syncSubmitted": "Member port sync submitted; you will be notified when it completes",
+    "purposeHint": "This only records the purpose and does not operate the switch. To operate the switch, use the corresponding port action in the port list."
+  },
+  "portAction": {
+    "action": {
+      "enablePort": "Enable Port",
+      "disablePort": "Disable Port",
+      "updatePortInfo": "Update Port Info",
+      "setPortSpeed": "Set Port Rate Limit",
+      "setPortVlan": "Configure VLAN",
+      "setPortIp": "Configure IP",
+      "deletePortIp": "Delete IP",
+      "clearPortConfig": "Clear Port Config",
+      "deleteInterface": "Delete Interface",
+      "addPortToTrunk": "Add to Link Aggregation",
+      "deleteTrunk": "Delete Link Aggregation",
+      "createPortChannel": "Create Link Aggregation",
+      "removePortFromChannel": "Remove Link Aggregation Member",
+      "deleteVlan": "Delete VLAN"
+    },
+    "message": {
+      "success": "{{action}} completed",
+      "failed": "{{action}} failed",
+      "submitted": "{{action}} submitted; you will be notified when it completes",
+      "submitFailed": "Failed to submit {{action}}: {{message}}"
+    }
+  },
+  "lag": {
+    "pageTitle": "Link Aggregation Groups",
+    "managed": "Managed",
+    "column": {
+      "lagName": "Aggregation Group Name",
+      "algorithm": "Load Balancing Algorithm",
+      "memberCount": "Member Count"
+    },
+    "type": {
+      "lacp": "LACP",
+      "lacpDynamic": "LACP (Dynamic)",
+      "static": "Static"
+    },
+    "action": {
+      "members": "Members",
+      "syncMembers": "Sync Members",
+      "create": "Create Link Aggregation Group"
+    },
+    "confirmDelete": "Delete Link Aggregation Group",
+    "confirmDeleteContent": "Delete link aggregation group \"{{name}}\"?",
+    "confirmSync": "Sync Link Aggregation Member Ports",
+    "confirmSyncContent": "All Eth-Trunk configurations will be fetched from the device over SSH and their member port lists parsed. This may take a while. Continue?",
+    "form": {
+      "selectSwitch": "Select a switch",
+      "lagType": "Aggregation Type",
+      "inputLagName": "Please enter the aggregation group name",
+      "lagNamePlaceholder": "e.g. Eth-Trunk1",
+      "purposePlaceholder": "e.g. Uplink, Server Interconnect"
+    },
+    "editPurposeTitle": "Edit Purpose - {{name}}",
+    "message": {
+      "created": "Link aggregation group created",
+      "deleted": "Link aggregation group deleted",
+      "purposeUpdated": "Purpose updated"
+    }
+  },
+  "vlan": {
+    "searchPlaceholder": "Search VLAN ID / name / purpose...",
+    "managed": "Managed",
+    "deviceFallback": "Device #{{id}}",
+    "roomFallback": "Data Center #{{id}}",
+    "column": {
+      "vlanId": "VLAN ID"
+    },
+    "action": {
+      "members": "Members",
+      "syncMembers": "Sync Members",
+      "add": "Add VLAN"
+    },
+    "editTitle": "Edit VLAN",
+    "confirmDelete": "Delete VLAN",
+    "confirmDeleteContent": "Delete VLAN {{id}} ({{name}})?",
+    "confirmSync": "Sync VLAN Member Ports",
+    "confirmSyncContent": "All VLANIF configurations will be fetched from the device over SSH and their member port lists parsed. This may take a while. Continue?",
+    "form": {
+      "switch": "Switch",
+      "room": "Data Center",
+      "selectSwitch": "Select a switch",
+      "selectRoom": "Select a data center",
+      "selectStatus": "Select a status",
+      "inputPurpose": "Please enter the purpose",
+      "inputVlanId": "Please enter the VLAN ID",
+      "inputName": "Please enter a name",
+      "namePlaceholder": "e.g. VLAN100",
+      "purposePlaceholder": "e.g. Office Network"
+    },
+    "message": {
+      "created": "VLAN created",
+      "updated": "VLAN updated",
+      "deleted": "VLAN deleted"
+    }
+  },
+  "asset": {
+    "field": {
+      "assetNumber": "Asset Number",
+      "warrantyStatus": "Warranty Status",
+      "supplier": "Supplier",
+      "supplierContact": "Supplier Contact",
+      "contractNumber": "Contract Number",
+      "purchaseDate": "Purchase Date",
+      "purchasePrice": "Purchase Price",
+      "invoiceNumber": "Invoice Number",
+      "warrantyType": "Warranty Type",
+      "warrantyPeriod": "Warranty Period",
+      "onlineDate": "Online Date",
+      "offlineDate": "Offline Date",
+      "lifecycleYears": "Expected Service Life",
+      "years": "{{count}} years",
+      "years_one": "{{count}} year",
+      "years_other": "{{count}} years"
+    },
+    "warranty": {
+      "notSet": "Not Set",
+      "expired": "Expired",
+      "expiring": "Expiring in {{count}} days",
+      "expiring_one": "Expiring in {{count}} day",
+      "expiring_other": "Expiring in {{count}} days",
+      "active": "Under Warranty"
+    },
+    "editTitle": "Edit Asset Information",
+    "confirmResetTitle": "Reset Asset Information",
+    "confirmResetContent": "Clear all asset information of device \"{{name}}\"? This action cannot be undone.",
+    "confirmResetOk": "Confirm Reset",
+    "message": {
+      "updated": "Asset information updated",
+      "resetSuccess": "Asset information reset",
+      "resetFailed": "Failed to reset"
+    }
+  },
+  "batchMonitor": {
+    "title": "Batch Update Monitoring ({{count}} devices · {{subtype}})",
+    "monitorSwitch": "Monitoring Switch",
+    "monitorStatus": "Monitoring Status",
+    "paused": "Paused",
+    "enableHint": "Once enabled, the monitoring worker will include these devices in the next poll",
+    "pauseHint": "Once paused, these devices will not be polled by the monitoring worker until re-enabled",
+    "credentialTitle": "Monitoring Credential",
+    "configCredential": "Configure Credential",
+    "config": "Configure",
+    "skip": "Skip",
+    "credentialHint": "The same monitoring credential will be configured for all selected devices (shared credential mode)",
+    "credentialNameOptional": "Credential Name (optional)",
+    "skipCredentialHint": "Skip credential configuration and only change the monitoring switch",
+    "configGroup": "Configure Metric Template Group",
+    "groupHint": "Bind a unified metric template group to all selected devices; if none is selected, the auto matching rules apply",
+    "groupClearHint": "Leave empty to clear the binding (back to auto matching by device type + vendor + protocol); if this switch is off, nothing changes",
+    "portSyncTitle": "Port Sync Switch",
+    "configPortSync": "Configure Port Sync",
+    "portSyncHintWithSkip": "Batch set the automatic port sync switch for network devices ({{count}} non-network devices in the selection will be skipped). Unmanaged devices are fully replaced; managed devices only get port status updates. Requires an SNMP or Zabbix monitoring credential to take effect.",
+    "portSyncHint": "Batch set the automatic port sync switch for network devices. Unmanaged devices are fully replaced; managed devices only get port status updates. Requires an SNMP or Zabbix monitoring credential to take effect.",
+    "syncMode": "Sync Mode",
+    "syncModeHint": "Follow global = use the default switch from the runtime config center; force on/off = override the global setting for these devices only",
+    "modeFollow": "Follow Global",
+    "modeForceOn": "Force On",
+    "modeForceOff": "Force Off",
+    "skipPortSyncHint": "Skip port sync configuration and keep each device's current setting",
+    "separator": ", ",
+    "message": {
+      "toggleResult": {
+        "enabled": "Monitoring enabled: {{updated}} updated, {{skipped}} skipped",
+        "paused": "Monitoring paused: {{updated}} updated, {{skipped}} skipped"
+      },
+      "toggleFailed": "Failed to batch toggle monitoring",
+      "credentialConfigured": "Configured the {{protocol}} credential for {{count}} devices",
+      "credentialConfigured_one": "Configured the {{protocol}} credential for {{count}} device",
+      "credentialConfigured_other": "Configured the {{protocol}} credential for {{count}} devices",
+      "credentialFailed": "Failed to batch configure credentials",
+      "groupBound": "Bound the metric template group for {{count}} devices",
+      "groupBound_one": "Bound the metric template group for {{count}} device",
+      "groupBound_other": "Bound the metric template group for {{count}} devices",
+      "groupCleared": "Cleared the metric template group binding for {{count}} devices",
+      "groupCleared_one": "Cleared the metric template group binding for {{count}} device",
+      "groupCleared_other": "Cleared the metric template group binding for {{count}} devices",
+      "groupFailed": "Failed to batch update the metric template group",
+      "portSyncDone": {
+        "forceOn_one": "Enabled port sync for {{count}} network device",
+        "forceOn_other": "Enabled port sync for {{count}} network devices",
+        "forceOff_one": "Disabled port sync for {{count}} network device",
+        "forceOff_other": "Disabled port sync for {{count}} network devices",
+        "follow_one": "Set port sync to follow the global setting for {{count}} network device",
+        "follow_other": "Set port sync to follow the global setting for {{count}} network devices"
+      },
+      "withCredential": "{{count}} devices have a monitoring credential and take effect immediately",
+      "withCredential_one": "{{count}} device has a monitoring credential and takes effect immediately",
+      "withCredential_other": "{{count}} devices have a monitoring credential and take effect immediately",
+      "withoutCredential": "{{count}} devices need an SNMP/Zabbix credential before they can sync",
+      "withoutCredential_one": "{{count}} device needs an SNMP/Zabbix credential before it can sync",
+      "withoutCredential_other": "{{count}} devices need an SNMP/Zabbix credential before they can sync",
+      "skipNonNetwork": "Skipped {{count}} non-network devices",
+      "skipNonNetwork_one": "Skipped {{count}} non-network device",
+      "skipNonNetwork_other": "Skipped {{count}} non-network devices",
+      "portSyncFailed": "Failed to batch update the port sync switch"
+    }
+  },
+  "batchConfig": {
+    "title": "Update Configuration ({{count}} devices · {{subtype}})",
+    "section": {
+      "general": "General Information",
+      "hardware": "Hardware Configuration (Server)"
+    },
+    "alert": {
+      "ipmiBatchHint": "Only the IPMI username/password can be updated in bulk; the IPMI management address will not be overwritten",
+      "managedNetworkLimited": "For managed network devices, only common fields can be updated in bulk (brand/model/power consumption/owner/customer)",
+      "uplinkPortPerDevice": "Uplink ports must be edited per device on its detail page",
+      "chassisNotSupported": "Bulk hardware/port updates are not supported for chassis devices; only the common fields above can be edited"
+    },
+    "separator": ", ",
+    "message": {
+      "nicPortsCreated_one": "Generated {{count}} NIC port",
+      "nicPortsCreated_other": "Generated {{count}} NIC ports",
+      "switchPortsCreated_one": "Generated {{count}} switch port",
+      "switchPortsCreated_other": "Generated {{count}} switch ports",
+      "storageCreated_one": "Generated {{count}} storage record",
+      "storageCreated_other": "Generated {{count}} storage records"
+    }
+  },
+  "batchResult": {
+    "title": "Batch Operation Result",
+    "column": {
+      "index": "No.",
+      "reason": "Failure Reason"
+    },
+    "unknownError": "Unknown error",
+    "summary": {
+      "success": "Succeeded:",
+      "failed": "Failed:",
+      "unit_one": "device",
+      "unit_other": "devices"
+    },
+    "exportFailed": "Export Failed Records",
+    "retryFailed": "Retry Failed Items"
+  },
+  "deviceType": {
+    "SERVER": "Server",
+    "NETWORK": "Network Device",
+    "OTHER": "Other Device"
+  },
+  "deviceSubtype": {
+    "STANDALONE": "Standalone Server",
+    "CHASSIS": "Chassis",
+    "NODE": "Node",
+    "STORAGE": "Storage Server",
+    "GPU": "GPU Server",
+    "SWITCH": "Switch",
+    "ROUTER": "Router",
+    "FIREWALL": "Firewall",
+    "PDU": "PDU",
+    "UPS": "UPS",
+    "OTHER": "Other"
+  },
+  "ipStatus": {
+    "ACTIVE": "Active",
+    "INACTIVE": "Inactive",
+    "BANNED": "Banned",
+    "UNUSED": "Unused",
+    "PENDING_BAN": "Banning",
+    "PENDING_UNBAN": "Unbanning"
+  },
+  "routeNote": {
+    "DEFAULT": "Default Route",
+    "INTERCONNECT": "Interconnect Address",
+    "SUBNET": "Subnet Route",
+    "NETWORK": "Network Route",
+    "BLACKHOLE": "Blackhole Route",
+    "GATEWAY": "Gateway Address",
+    "NEXTHOP": "Next Hop Address"
+  },
+  "switchRole": {
+    "CORE": "Core Switch",
+    "ACCESS": "Access Switch"
+  },
+  "switchDeviceType": {
+    "HUAWEI": "Huawei",
+    "H3C": "H3C",
+    "CISCO": "Cisco"
+  },
+  "customerStatus": {
+    "ACTIVE": "Active",
+    "DISABLED": "Disabled",
+    "PENDING": "Pending Review",
+    "TERMINATED": "Terminated"
+  },
+  "customer": {
+    "detailTitle": "Customer Detail - {{name}}",
+    "notFound": "Customer not found",
+    "invalidId": "Invalid customer ID",
+    "add": "Add Customer",
+    "edit": "Edit Customer",
+    "infoTitle": "Customer Information",
+    "exportExcel": "Export Excel",
+    "resourceStats": "Resource Statistics",
+    "field": {
+      "name": "Customer Name",
+      "status": "Customer Status",
+      "contactPerson": "Contact",
+      "contactPhone": "Contact Phone",
+      "email": "Email",
+      "address": "Address"
+    },
+    "form": {
+      "namePlaceholder": "Please enter the customer name",
+      "nameRequired": "Please enter the customer name",
+      "contactPersonPlaceholder": "Please enter the contact",
+      "contactPhonePlaceholder": "Please enter the contact phone",
+      "emailPlaceholder": "Please enter the email",
+      "emailInvalid": "Invalid email format",
+      "addressPlaceholder": "Please enter the address",
+      "notesPlaceholder": "Please enter remarks"
+    },
+    "stats": {
+      "roomCount": "Rooms",
+      "cabinetCount": "Cabinets",
+      "fullCabinets": "Full Cabinets Leased",
+      "partialCabinets": "Partially Used",
+      "fullCabinetDevices": "Full-Cabinet Devices",
+      "partialCabinetDevices": "Partial-Cabinet Devices",
+      "networkCount": "Networks",
+      "fullNetworks": "Full Networks Leased",
+      "ipTotal": "Total IPs"
+    },
+    "archive": {
+      "title": "Termination Archive",
+      "empty": "No termination archive",
+      "terminatedAt": "Terminated At",
+      "operator": "Operator",
+      "reason": "Termination Reason",
+      "size": "Size",
+      "generated": "Generated",
+      "notGenerated": "Not Generated",
+      "download": "Download"
+    },
+    "action": {
+      "resources": "Resources",
+      "terminate": "Terminate"
+    },
+    "terminate": {
+      "title": "Terminate Customer",
+      "ok": "Confirm Termination",
+      "confirmContent": "Termination irrevocably releases all resources under this customer. Continue?",
+      "reasonPlaceholder": "Please enter the termination reason (optional)"
+    },
+    "message": {
+      "copied": "Customer information copied",
+      "terminated": "Customer terminated",
+      "terminateFailed": "Failed to terminate customer",
+      "exportFailed": "Failed to export",
+      "downloadFailed": "Failed to download"
+    }
+  },
+  "roomStatus": {
+    "NORMAL": "Normal",
+    "DISABLED": "Disabled"
+  },
+  "cabinetStatus": {
+    "DISABLED": "Disabled",
+    "AVAILABLE": "Available",
+    "IN_USE": "In Use",
+    "MAINTENANCE": "Under Maintenance",
+    "RESERVED": "Reserved"
+  },
+  "vlanStatus": {
+    "INACTIVE": "Disabled",
+    "ACTIVE": "Normal",
+    "RESERVED": "Reserved"
+  },
+  "userStatus": {
+    "ACTIVE": "Active",
+    "INACTIVE": "Disabled"
+  },
+  "lagStatus": {
+    "INACTIVE": "Disabled",
+    "ACTIVE": "Normal",
+    "DEGRADED": "Degraded"
+  },
+  "portUsage": {
+    "FREE": "Free",
+    "OCCUPIED": "Occupied",
+    "DISABLED": "Disabled",
+    "ERROR": "Error"
+  },
+  "linkStatus": {
+    "UP": "Up",
+    "DOWN": "Down",
+    "ADMIN_DOWN": "Administratively Down",
+    "DISABLED": "Disabled"
+  },
+  "nodeStatus": {
+    "ONLINE": "Online",
+    "OFFLINE": "Offline",
+    "WARNING": "Warning"
+  },
+  "connectionStatus": {
+    "ACTIVE": "Active",
+    "INACTIVE": "Inactive"
+  },
+  "probeError": {
+    "TIMEOUT": "Timeout",
+    "PROBE_TIMEOUT": "Probe Timeout",
+    "PROBE_ERROR": "Probe Error",
+    "NO_MANAGEMENT_IP": "No Management IP",
+    "DNS_RESOLVE_TIMEOUT": "DNS Resolve Timeout",
+    "AUTH_FAILED": "Authentication Failed",
+    "AUTH_ERROR": "Authentication Failed",
+    "CONNECTION_REFUSED": "Connection Refused",
+    "CONNECTION_ERROR": "Connection Error",
+    "NETWORK_ERROR": "Network Error",
+    "SSL_ERROR": "SSL Error",
+    "TLS_INCOMPATIBLE": "TLS Incompatible",
+    "IPMI_ERROR": "IPMI Error",
+    "IPMI_NO_DATA": "IPMI No Data",
+    "UNKNOWN": "Unknown Error",
+    "NO_HOST_REF": "No Host Reference",
+    "NO_API_URL": "No API URL",
+    "ZABBIX_API_ERROR": "Zabbix API Error",
+    "ZABBIX_EMPTY_HOST_LIST": "Zabbix Host List Is Empty",
+    "HOST_NOT_IN_ZABBIX": "Host Not in Zabbix"
+  },
+  "ipAuditAction": {
+    "ALLOCATE": "Allocate",
+    "RELEASE": "Release",
+    "BAN": "Ban",
+    "UNBAN": "Unban"
+  },
+  "notificationType": {
+    "DEVICE_UNREACHABLE": "Device Unreachable",
+    "DEVICE_RECOVERED": "Device Recovered",
+    "TEMPERATURE_ALERT": "Temperature Alert",
+    "DISK_FAILURE_ALERT": "Disk Failure",
+    "PORT_STATUS_CHANGED": "Port Status Changed",
+    "MONITOR_INTERRUPTED": "Monitoring Interrupted",
+    "RAID_FAILURE_ALERT": "RAID Failure",
+    "BATCH_CREATE_DEVICES": "Batch Create Devices",
+    "BATCH_BAN_IP": "Batch Ban IP",
+    "BATCH_UNBAN_IP": "Batch Unban IP",
+    "IP_SCAN_COMPLETE": "IP Scan Complete",
+    "IP_SCAN_FAILED": "IP Scan Failed",
+    "ROOM_SCAN_COMPLETE": "Room Scan Complete",
+    "ROOM_SCAN_FAILED": "Room Scan Failed",
+    "VIRTUAL_ROOM_SCAN_COMPLETE": "Virtual Room Scan Complete",
+    "VIRTUAL_ROOM_SCAN_FAILED": "Virtual Room Scan Failed",
+    "PORT_ACTION": "Port Operation Result",
+    "ASYNC_ACTION": "Async Operation Result",
+    "RATE_LIMIT_EXCEEDED": "Rate Limit Exceeded",
+    "SERVICE_UNHEALTHY": "Service Unhealthy",
+    "SERVICE_RECOVERED": "Service Recovered",
+    "ASSET_WARRANTY_ALERT": "Asset Warranty Reminder"
+  },
+  "notificationGroup": {
+    "MONITOR": "Monitoring Alerts",
+    "OPERATION": "Operation Results",
+    "SCAN": "Scan Complete",
+    "PORT_ASYNC": "Port / Async Operations",
+    "OPS": "Ops Alerts",
+    "ASSET": "Asset Reminders"
+  },
+  "loginType": {
+    "WEB": "Web",
+    "WECHAT": "WeChat",
+    "API": "API",
+    "MOBILE": "Mobile",
+    "TOKEN": "Token"
+  },
+  "authMethod": {
+    "PASSWORD": "Password",
+    "CERTIFICATE": "Certificate"
+  },
+  "networkLayer": {
+    "L2": "Layer 2 Switch (L2)",
+    "L3": "Layer 3 Switch (L3)"
+  },
+  "severity": {
+    "CRITICAL": "Critical",
+    "WARNING": "Warning",
+    "INFO": "Info"
+  },
+  "channel": {
+    "INBOX": "Inbox",
+    "EMAIL": "Email",
+    "VOICE": "Voice Call",
+    "WECHAT_WORK": "WeCom",
+    "FEISHU": "Feishu",
+    "DINGTALK": "DingTalk",
+    "CUSTOM": "Custom"
+  },
+  "monitorStatus": {
+    "no_credential": "No monitoring credential is linked to this device",
+    "not_probed": "Credentials configured, awaiting first probe",
+    "credential_error": "Monitoring credential or configuration is invalid, metrics cannot be collected",
+    "unreachable": "Device is currently unreachable, no metric data available",
+    "normal": "Metrics are being collected normally",
+    "normal_no_group": "No metric template group matched, collecting with default rules",
+    "no_data": "No metric data collected yet",
+    "no_data_template": "Metric template group matched but no metric data collected yet",
+    "breached": "Some metrics are over threshold, please take note"
+  },
+  "health": {
+    "unreachableSince": "Unreachable (last reachable: {{time}})",
+    "metricAlertCount": "{{count}} Metric Alerts"
+  },
+  "tab": {
+    "basic": "Basic Information",
+    "nics": "NICs",
+    "ports": "Ports",
+    "vlans": "VLAN",
+    "lag": "Link Aggregation",
+    "connections": "Connections",
+    "storage": "Storage",
+    "asset": "Asset Information",
+    "nodes": "Child Nodes",
+    "credentials": "Monitoring Credentials"
+  },
+  "form": {
+    "title": {
+      "edit": "Edit Device"
+    },
+    "section": {
+      "nodeAssoc": "Node Association",
+      "location": "Location",
+      "network": "Network",
+      "networkTopology": "Network Topology",
+      "switchConfig": "Switch Configuration",
+      "portGeneration": "Port Generation",
+      "chassis": "Chassis Node Configuration"
+    },
+    "select": {
+      "room": "Select a room",
+      "chassis": "Select a chassis",
+      "position": "Select a position",
+      "cabinet": "Select a cabinet"
+    },
+    "hint": {
+      "selectRoomFirst": "Select a room first",
+      "selectChassisFirst": "Select a chassis first",
+      "selectCabinetFirst": "Select a cabinet first",
+      "selectUplinkDeviceFirst": "Select the uplink device first"
+    },
+    "basicInfo": {
+      "deviceName": {
+        "placeholder": "Enter a device name"
+      },
+      "autoGenerateTitle": "Auto-generate",
+      "mainType": {
+        "label": "Primary Device Type",
+        "required": "Select a primary device type"
+      },
+      "owner": {
+        "placeholder": "Select an owner"
+      },
+      "brand": {
+        "placeholder": "Select a brand"
+      },
+      "model": {
+        "placeholder": "Model"
+      },
+      "power": {
+        "label": "Power (W)",
+        "placeholder": "Power draw"
+      },
+      "metricTemplateGroup": {
+        "label": "Metric Template Group (monitoring display rules)",
+        "autoMatchHint": "If left unset, a template group is matched automatically by device type + vendor + protocol",
+        "priorityHint": "Once set, only metrics included in that group are shown",
+        "placeholder": "Leave unset = match automatically"
+      },
+      "serialNumber": {
+        "label": "Serial Number (as printed on the device label)",
+        "placeholder": "Enter the serial number printed on the device"
+      },
+      "hostname": {
+        "placeholder": "Hostname"
+      },
+      "customer": {
+        "placeholder": "Select a customer"
+      },
+      "notes": {
+        "placeholder": "Remarks"
+      }
+    },
+    "nodeAssoc": {
+      "chassis": {
+        "label": "Parent Chassis",
+        "required": "A node must have a parent chassis",
+        "option": "{{name}} ({{used}}/{{max}} nodes)"
+      },
+      "position": {
+        "required": "Select a node position",
+        "option": "Node {{position}}"
+      },
+      "vacantPositions": "Vacant positions: {{count}} ({{list}}{{ellipsis}})",
+      "vacantCount": "Vacant positions: {{count}}",
+      "noVacantPosition": "This chassis has no vacant node position"
+    },
+    "location": {
+      "cabinet": {
+        "label": "Cabinet",
+        "required": "Select a cabinet"
+      },
+      "occupiedU": {
+        "placeholder": "Occupied U"
+      },
+      "deviceGap": {
+        "label": "Device Gap (U)",
+        "extra": "Applied when U positions are assigned automatically",
+        "placeholder": "Gap"
+      },
+      "uPosition": {
+        "placeholder": "Enter manually or assign automatically",
+        "autoAssignTooltip": "Assign a U position automatically",
+        "conflict": "U position conflict: U{{positions}}",
+        "assigned": "Assigned U{{start}}~U{{end}}",
+        "allocateFailed": "Allocation failed: no U position available"
+      },
+      "availableUPositions": "Available U positions: {{count}}",
+      "noAvailableUPosition": "No U position available in this cabinet"
+    },
+    "network": {
+      "managementIp": {
+        "placeholder": "Management IP address"
+      },
+      "macAddress": {
+        "label": "MAC Address",
+        "placeholder": "MAC address"
+      },
+      "businessIp": {
+        "tooltip": "Several formats are supported: single IP, comma-separated, CIDR, subnet mask, range",
+        "formatError": "Invalid format: {{list}}"
+      },
+      "managementAccess": {
+        "label": "Management Access",
+        "on": "On",
+        "off": "Off"
+      }
+    },
+    "networkTopology": {
+      "role": {
+        "label": "Role"
+      },
+      "roleOption": {
+        "core": "Core",
+        "access": "Access"
+      },
+      "layer": {
+        "label": "Network Layer"
+      },
+      "layerOption": {
+        "l2": "Layer 2 (L2)",
+        "l3": "Layer 3 (L3)"
+      },
+      "portCount": {
+        "label": "Port Count",
+        "placeholder": "Port count"
+      },
+      "uplinkDevice": {
+        "label": "Uplink Device",
+        "placeholder": "Select an uplink device"
+      },
+      "peerPorts": {
+        "label": "Peer Interconnect Ports",
+        "placeholder": "Select peer ports"
+      },
+      "uplinkPorts": {
+        "label": "Uplink Ports",
+        "placeholder": "Select local uplink ports",
+        "placeholderAfterSave": "Available once saved"
+      },
+      "coreDevice": {
+        "label": "Core Switch",
+        "placeholder": "Select a core switch"
+      }
+    },
+    "switchConfig": {
+      "managementIp": {
+        "placeholder": "Management IP"
+      },
+      "sshPort": {
+        "label": "SSH Port",
+        "placeholder": "Default 22"
+      },
+      "username": {
+        "placeholder": "Login username"
+      },
+      "password": {
+        "keepUnchanged": "Leave blank to keep unchanged",
+        "placeholder": "Login password"
+      },
+      "authMethod": {
+        "label": "Authentication Method"
+      },
+      "driver": {
+        "label": "Device Driver"
+      }
+    },
+    "chassis": {
+      "rows": {
+        "label": "Node Rows",
+        "required": "Enter the number of rows",
+        "placeholder": "Rows"
+      },
+      "cols": {
+        "label": "Node Columns",
+        "required": "Enter the number of columns",
+        "placeholder": "Columns"
+      },
+      "totalNodes": {
+        "label": "Total Nodes",
+        "placeholder": "Calculated automatically"
+      },
+      "namingPattern": {
+        "label": "Naming Pattern"
+      },
+      "generateNodes": {
+        "label": "Generate child nodes (all of them are created from rows × columns on save{{suffix}})",
+        "overwriteSuffix": ", existing child nodes will be overwritten",
+        "alertOverwrite": "On save the existing child nodes are deleted and re-created using the hardware configuration below",
+        "alertCreate": "On save all child nodes are created and the hardware configuration below is applied to every child node",
+        "confirmTitle": "Generate Child Nodes",
+        "confirmContent": "When enabled, all child nodes (including the existing ones) are created on save, and the hardware configuration entered below is applied to all of them. Continue?"
+      }
+    },
+    "portGeneration": {
+      "intro": "Multiple port groups are supported, e.g. 48×GE + 4×10GE. Naming rule: prefix + slot/card/port number",
+      "template": {
+        "label": "Port Type",
+        "placeholder": "Select a type"
+      },
+      "slot": {
+        "label": "Slot"
+      },
+      "card": {
+        "label": "Card"
+      },
+      "start": {
+        "label": "Start"
+      },
+      "end": {
+        "label": "End"
+      },
+      "addGroup": "Add Port Group",
+      "preview_one": "Will generate {{count}} port: {{list}}{{ellipsis}}",
+      "preview_other": "Will generate {{count}} ports: {{list}}{{ellipsis}}"
+    },
+    "submit": {
+      "n2n": {
+        "deleteOldLinkFailed": "Failed to delete the old uplink connection:",
+        "noLocalPorts": "An uplink device and peer interconnect ports were selected, but no local uplink port could be determined, so the uplink connection was not created (select uplink ports as well)",
+        "noPeerPorts": "An uplink device was selected but no peer interconnect port, so the uplink connection was not created",
+        "portPairError": "Port pair {{index}}: {{message}}",
+        "partialFailed": "Some uplink connections could not be created: {{errors}}"
+      },
+      "portsCreated_one": "Generated {{count}} port",
+      "portsCreated_other": "Generated {{count}} ports",
+      "nicPortsCreated_one": "Created {{count}} NIC port",
+      "nicPortsCreated_other": "Created {{count}} NIC ports"
+    }
+  },
+  "uPosition": {
+    "view": {
+      "title": "U position view:"
+    },
+    "legend": {
+      "available": "Available",
+      "occupied": "Allocated",
+      "current": "Currently allocated"
+    },
+    "tooltip": {
+      "current": "Current device U{{u}}",
+      "available": "U{{u}} available"
+    }
+  },
+  "room": {
+    "name": "Data Center",
+    "add": "Add Data Center",
+    "edit": "Edit Data Center",
+    "notFound": "Data center not found",
+    "invalidId": "Invalid data center ID",
+    "detailTitle": "Data Center Details - {{name}}",
+    "floorPlanTitle": "Data Center Floor Plan",
+    "action": {
+      "floorPlan": "Floor Plan",
+      "viewCabinets": "View Cabinets",
+      "viewCabinetList": "View Cabinet List"
+    },
+    "field": {
+      "name": "Data Center Name",
+      "roomNumber": "Room number",
+      "building": "Building",
+      "floor": "Floor",
+      "buildingOwn": "Building",
+      "floorOwn": "Floor"
+    },
+    "form": {
+      "namePlaceholder": "Enter data center name",
+      "locationPlaceholder": "Enter data center location",
+      "contactPlaceholder": "Contact (optional)",
+      "contactPhonePlaceholder": "Contact phone (optional)",
+      "buildingPlaceholder": "e.g. Building A (optional; blank goes to \"Ungrouped\")",
+      "namePlaceholderGroup": "Room name (same name groups rooms together)",
+      "mergeHint": "Will merge into room group \"{{name}}\" ({{count}} records)",
+      "floorPlaceholder": "e.g. 3F (optional; blank means unspecified)",
+      "roomNumberPlaceholder": "e.g. 01 (must be unique within the same room name)",
+      "newGroupTitle": "Create a new room group",
+      "newGroupContent": "Room group \"{{name}}\" does not exist; saving will create it. Rooms in the same physical data center should share the same room name."
+    },
+    "stats": {
+      "title": "Statistics Overview",
+      "avgUUsage": "Average U Position Utilization",
+      "positionedCabinets": "Positioned Cabinets"
+    },
+    "filter": {
+      "allRooms": "All rooms",
+      "allBuildings": "All buildings",
+      "allFloors": "All floors",
+      "floorNeedsBuilding": "Floor (pick a building first)",
+      "allStatus": "All statuses",
+      "searchName": "Search room name"
+    },
+    "overview": {
+      "title": "Room Overview",
+      "loadFailed": "Failed to load the room overview",
+      "empty": "No rooms yet",
+      "noneMatched": "No rooms match the filters ({{count}} rooms in total{{filtered}})",
+      "filtered": "; filters are active",
+      "clearFilter": "Clear filters",
+      "utilTooltip": "Utilization is room-wide; it cannot be weighted by room capacity while filtered, so it is hidden",
+      "uAvg": "Average U utilization",
+      "uAvgDisabled": "Average U utilization (unavailable while filtered)",
+      "roomLabel": "Room {{number}}",
+      "buildingTag": "Building {{value}}",
+      "floorTag": "Floor {{value}}",
+      "groupRoom": "Room {{name}}",
+      "roomCount": "{{count}} rooms",
+      "cabinetCount": "{{count}} cabinets",
+      "uUsage": "U utilization",
+      "powerUsage": "Power utilization"
+    }
+  },
+  "virtualRoom": {
+    "name": "Virtual Data Center",
+    "add": "Add Virtual Data Center",
+    "edit": "Edit Virtual Data Center",
+    "searchPlaceholder": "Search virtual data center name",
+    "notScanned": "Not Scanned",
+    "scanProgressTooltip": "Phase: {{phase}} | Completed: {{completed}}/{{total}} | Failed: {{failed}}",
+    "field": {
+      "name": "Virtual Data Center Name",
+      "lastScan": "Last Scan"
+    },
+    "action": {
+      "manageMembers": "Manage Members",
+      "scan": "Trigger Scan",
+      "startScan": "Start Scan"
+    },
+    "confirm": {
+      "scanTitle": "Confirm scan?",
+      "scanContent": "A full scan will run on all switches in the virtual data center \"{{name}}\""
+    },
+    "message": {
+      "scanSubmitted": "Virtual data center scan submitted; you will be notified when it completes",
+      "loadSwitchesFailed": "Failed to load the switch list",
+      "membersUpdated": "Members updated"
+    },
+    "members": {
+      "title": "Manage Members - {{name}}",
+      "deviceFallback": "Device #{{id}}",
+      "loading": "Loading switch list...",
+      "empty": "No switches available",
+      "availableTitle": "Available Switches",
+      "selectedTitle": "Selected Members"
+    },
+    "form": {
+      "namePlaceholder": "Enter virtual data center name",
+      "descriptionPlaceholder": "Enter a description (optional)"
+    }
+  },
+  "cabinet": {
+    "number": "Cabinet Number",
+    "add": "Add Cabinet",
+    "edit": "Edit Cabinet",
+    "batchAdd": "Batch Add Cabinets",
+    "notFound": "Cabinet not found",
+    "invalidId": "Invalid cabinet ID",
+    "detailTitle": "Cabinet Detail - {{number}}",
+    "viewDevices": "View Devices",
+    "field": {
+      "location": "Location",
+      "rowCol": "Row {{row}} Col {{col}}",
+      "roomLocation": "Data Center Location",
+      "exactLocation": "Exact Location",
+      "leaseCustomer": "Leased Customer",
+      "totalU": "Total U",
+      "usedU": "Used U",
+      "availableU": "Available U",
+      "deviceCount": "Devices",
+      "ratedPower": "Rated Power",
+      "ratedPowerUnit": "Rated Power (W)",
+      "usedPower": "Used Power",
+      "maxWeight": "Load Bearing"
+    },
+    "message": {
+      "uPositionUpdated": "U position updated",
+      "uPositionUpdateFailed": "Failed to update U position"
+    },
+    "form": {
+      "roomRequired": "Please select the data center",
+      "totalURequired": "Please enter the total U",
+      "location": "Cabinet Location",
+      "locationPlaceholder": "Cabinet location (optional)",
+      "row": "Row Number",
+      "col": "Column Number",
+      "rowTooltip": "Row coordinate in the floor plan, starting from 1. E.g.: 1, 2, 3",
+      "colTooltip": "Column coordinate in the floor plan, starting from 1. E.g.: 1, 2, 3",
+      "rowColPlaceholder": "E.g.: 1",
+      "leaseCustomerPlaceholder": "Full-cabinet leased customer (optional)",
+      "notesPlaceholder": "Cabinet notes (optional)",
+      "numberExpression": "Cabinet Number Expression",
+      "name": "Cabinet Name",
+      "numberExpressionRequired": "Please enter the cabinet number expression",
+      "nameRequired": "Please enter the cabinet name",
+      "numberExpressionPlaceholder": "E.g.: m11,m13,n10 or h1-10 or m01-05",
+      "namePlaceholder": "Please enter the cabinet name/number",
+      "statusPlaceholder": "Please select a status"
+    },
+    "batch": {
+      "modeBatch": "Batch",
+      "modeSingle": "Single",
+      "hintRange": "Supports comma separation and range expansion",
+      "hintSingle": "Add cabinets one by one",
+      "preview_one": "Will create {{count}} cabinet:",
+      "preview_other": "Will create {{count}} cabinets:",
+      "invalidNumber": "Please enter a valid cabinet number",
+      "maxLimit": "At most 100 cabinets can be created at once",
+      "created_one": "Successfully created {{count}} cabinet",
+      "created_other": "Successfully created {{count}} cabinets",
+      "createFailed": "Failed to create these cabinets: {{list}}{{more}}",
+      "moreCount": " ({{count}} in total)"
+    }
+  },
+  "addModal": {
+    "title": "Batch Add Devices",
+    "tab": {
+      "manual": "Manual Batch"
+    },
+    "section": {
+      "hardware": "Hardware Configuration (applied to all)",
+      "chassisNodes": "Chassis Node Configuration"
+    },
+    "managedSwitch": "Managed switch (SSH management access)",
+    "chassis": {
+      "autoCreateNodes": "Generate all child nodes by rows × columns on creation"
+    },
+    "port": {
+      "selectType": "Select a port type",
+      "start": "Start Port",
+      "end": "End Port",
+      "customPrefix": "Custom Prefix",
+      "prefixRequired": "Please enter a prefix",
+      "prefixPlaceholder": "e.g. GE"
+    },
+    "column": {
+      "heightU": "Height (U)",
+      "layout": "Rows × Columns",
+      "nodeRow": "Row",
+      "nodeCol": "Column",
+      "rowPlaceholder": "Row",
+      "colPlaceholder": "Col"
+    },
+    "row": {
+      "add": "Add Rows",
+      "copy": "Copy Row",
+      "delete": "Delete Row",
+      "count": "{{count}} rows in total"
+    },
+    "uGap": "U Gap",
+    "action": {
+      "setHeightU": "Set Height (U)",
+      "regenerateNames": "Regenerate Names",
+      "prev": "Previous",
+      "next": "Next"
+    },
+    "hint": {
+      "selectDeviceTypeFirst": "Please select a device main type first",
+      "noCabinetUPosition": "U position will not be saved when no cabinet is selected. Select a room and a cabinet first if you need to specify positions.",
+      "autoNodesSuffix": " (child nodes were generated automatically for each chassis)"
+    },
+    "submitBatch": "Batch Create ({{count}})",
+    "resultTitle": "Batch Add Result",
+    "unassigned": "Unassigned",
+    "conflict": {
+      "u": "U position conflict: \"{{nameA}}\" (U{{uA}}, {{heightA}}U high) overlaps \"{{nameB}}\" (U{{uB}})",
+      "nodePosition": "Node position conflict: \"{{nameA}}\" and \"{{nameB}}\" both use row {{row}} column {{col}}"
+    },
+    "message": {
+      "maxRows": "At most 50 rows",
+      "heightURange": "Height (U) must be between 1 and 42",
+      "selectChassisRequired": "Please select the parent chassis",
+      "nodeSlotInsufficient_one": "Not enough free node slots in the chassis: only {{count}} slot left, current {{rows}} rows",
+      "nodeSlotInsufficient_other": "Not enough free node slots in the chassis: only {{count}} slots left, current {{rows}} rows",
+      "cabinetSpaceInsufficient": "Not enough cabinet space, allocation failed",
+      "autoAssignDone": "Auto-allocation completed",
+      "allocateFailed": "U position allocation request failed, please retry",
+      "batchCreateSuccess_one": "Batch created: {{count}} device{{hint}}",
+      "batchCreateSuccess_other": "Batch created: {{count}} devices{{hint}}",
+      "portGenPartial": "Port generation: {{success}} succeeded, {{failed}} failed, please check",
+      "portGenDone_one": "Generated {{count}} port for each of {{devices}} devices",
+      "portGenDone_other": "Generated {{count}} ports for each of {{devices}} devices",
+      "nodePositionOutOfRange_one": "Node position of {{count}} row is out of range for the new chassis and has been cleared",
+      "nodePositionOutOfRange_other": "Node position of {{count}} rows are out of range for the new chassis and have been cleared",
+      "submitFailed": "Submission failed",
+      "retryHint": "Failed items are kept, please fix and submit again"
+    },
+    "confirm": {
+      "partialNoU": {
+        "title": "Some devices have no U position",
+        "content_one": "{{count}} device has no U position specified. It will be placed in the cabinet without U position information. Continue?",
+        "content_other": "{{count}} devices have no U position specified. They will be placed in the cabinet without U position information. Continue?",
+        "ok": "Continue Creating"
+      }
+    },
+    "clone": {
+      "step": {
+        "source": "Select Template",
+        "edit": "Configure Differences"
+      },
+      "templateDevice": "Template Device",
+      "searchPlaceholder": "Search device name...",
+      "noMatchDevice": "No matching devices",
+      "loadingTemplate": "Loading template details...",
+      "deviceOption": "{{name}} ({{cabinet}} / {{status}})",
+      "preview": {
+        "uPositionHeight": "U Position / Height (U)",
+        "nodeLayout": "Node Layout",
+        "nodeLayoutValue": "{{rows}} rows × {{cols}} columns = {{total}} nodes"
+      },
+      "chassisHint": "Cloning a chassis device generates child nodes with the same layout as the template",
+      "count": "Clone Count",
+      "maxCount": "At most 50",
+      "targetChassis": "Target Chassis",
+      "selectTargetChassis": "Select the target chassis",
+      "targetCabinet": "Target Cabinet",
+      "selectTargetCabinet": "Select the target cabinet",
+      "defaultPrefix": "Default: {{name}}",
+      "selectTemplateFirst": "Please select a template device first",
+      "countRange": "Clone count must be between 1 and 50",
+      "nodeNeedChassis": "Cloning a node device requires selecting a target chassis",
+      "nodeSlotInsufficient_one": "Not enough free node slots in the target chassis: only {{count}} slot left, {{required}} needed",
+      "nodeSlotInsufficient_other": "Not enough free node slots in the target chassis: only {{count}} slots left, {{required}} needed",
+      "noAvailableU": "No available U position in the current cabinet",
+      "duplicateNodePosition": "Duplicate node positions found, please check",
+      "success_one": "Cloned: {{count}} device{{hint}}",
+      "success_other": "Cloned: {{count}} devices{{hint}}",
+      "submit": "Start Cloning ({{count}})",
+      "resultTitle": "Clone Result",
+      "totalCount": "{{count}} in total",
+      "chassisVacant": "Chassis free slots: {{count}}",
+      "noCabinetHint": "U position will not be saved when no cabinet is selected. You can select a target cabinet in the previous step."
+    }
+  },
+  "switch": {
+    "invalidIdSubTitle": "Invalid switch ID",
+    "copyDetail": "Copy Details",
+    "detailCopied": "Details copied",
+    "remoteInfo": "Remote Info",
+    "sshEnabled": "SSH Access",
+    "deleteContent": "Delete network device \"{{name}}\"? Its credentials and port data will be removed as well.",
+    "refreshInfoSubmitFailed": "Failed to submit device info refresh",
+    "field": {
+      "sshPort": "SSH Port",
+      "protocol": "Protocol",
+      "deviceDriver": "Device Driver",
+      "layer": "Layer",
+      "version": "Version",
+      "uptime": "Uptime",
+      "mac": "MAC Address",
+      "connectedDevices": "Connected Devices"
+    },
+    "copy": {
+      "header": "Switch Details",
+      "name": "Name: {{value}}",
+      "ip": "IP Address: {{value}}",
+      "port": "Port: {{value}}",
+      "username": "Username: {{value}}",
+      "protocol": "Protocol: {{value}}",
+      "role": "Type: {{value}}",
+      "deviceType": "Device Type: {{value}}",
+      "deviceModel": "Device Model: {{value}}",
+      "room": "Room: {{value}}",
+      "version": "Device Version: {{value}}",
+      "serial": "Serial Number: {{value}}",
+      "uptime": "Uptime: {{value}}",
+      "mac": "MAC Address: {{value}}"
+    },
+    "action": {
+      "add": "Add Network Device",
+      "scanRoom": "Scan Room",
+      "exportCsv": "Export CSV",
+      "batchUpdate": "Batch Update",
+      "viewDetail": "View Details"
+    },
+    "message": {
+      "selectRoomFirst": "Please select a room first",
+      "scanSubmitted": "Room scan submitted. You will be notified when it finishes.",
+      "scanSubmitFailed": "Failed to submit room scan",
+      "copied": "Copied",
+      "noDataToExport": "No data to export"
+    },
+    "confirm": {
+      "scanRoomContent": "A full scan will run against every network device in the room. This may take a while."
+    },
+    "view": {
+      "group": "Grouped View",
+      "flat": "Flat View"
+    },
+    "group": {
+      "managed": "Managed",
+      "unmanaged": "Unmanaged"
+    },
+    "search": {
+      "placeholder": "Search network devices..."
+    },
+    "tooltip": {
+      "connectedDevices": "{{name}} connected devices"
+    },
+    "tag": {
+      "connectedDevices": "Connected devices: {{count}}"
+    },
+    "form": {
+      "editTitle": "Edit Switch",
+      "name": "Switch Name",
+      "nameRequired": "Please enter a name",
+      "managementIpRequired": "Please enter the management IP",
+      "managementIpPlaceholder": "Management IP address",
+      "ipFormatInvalid": "Invalid IP format",
+      "port": "Port Number",
+      "portExtra": "Leave empty to auto-fill by protocol: SSH→22, Telnet→23",
+      "portPlaceholder": "Auto-filled by protocol",
+      "protocolRequired": "Please select a protocol",
+      "usernameRequired": "Please enter a username",
+      "usernamePlaceholder": "Login username",
+      "password": "Password",
+      "passwordExtra": "Leave empty to keep the current password",
+      "passwordPlaceholder": "Leave empty to keep unchanged",
+      "deviceTypeRequired": "Please select a device type",
+      "switchType": "Switch Type",
+      "switchTypeRequired": "Please select a switch type",
+      "switchRoleRequired": "Please select a device role",
+      "networkLayer": "Network Layer",
+      "networkLayerRequired": "Please select a network layer",
+      "authMethod": "Authentication Method",
+      "authMethodRequired": "Please select an authentication method"
+    },
+    "batchField": {
+      "port": "Port Number",
+      "protocol": "Protocol",
+      "username": "Username",
+      "password": "Password",
+      "deviceType": "Device Type",
+      "switchRole": "Device Role",
+      "layer": "Network Layer",
+      "authenticationMethod": "Authentication Method"
+    },
+    "batchUpdate": {
+      "title": "Batch Update Remote Info ({{count}} selected)",
+      "selectFieldRequired": "Select at least one field to update",
+      "passwordEmptySkipped": "The password field is selected but empty; the password update will be skipped",
+      "partialSuccess": "Partially updated: {{success}} succeeded, {{failed}} failed",
+      "success_one": "Batch update succeeded: {{count}} network device updated",
+      "success_other": "Batch update succeeded: {{count}} network devices updated",
+      "resultSummary": "{{success}} updated, {{failed}} failed",
+      "failedItem": "Device ID {{id}}: {{error}}"
+    },
+    "batch": {
+      "portUnit_one": "port",
+      "portUnit_other": "ports",
+      "action": "Batch Actions",
+      "sshOnlyTip": "Requires an SSH connection; not supported on unmanaged devices",
+      "confirmTitle": "Confirm Batch Action",
+      "confirmContent_one": "Apply \"{{action}}\" to {{count}} port?",
+      "confirmContent_other": "Apply \"{{action}}\" to {{count}} ports?",
+      "submitted": "Batch action submitted. You will be notified when it finishes.",
+      "submitFailed": "Failed to submit batch action: {{error}}",
+      "failed": "Batch action failed: {{error}}",
+      "enable": "Enable",
+      "disable": "Disable",
+      "setVlan": "Configure VLAN",
+      "updateInfo": "Edit Description",
+      "assignCustomer": "Assign Customer",
+      "addToTrunk": "Add to Link Aggregation",
+      "removeFromChannel": "Remove from Link Aggregation",
+      "clearConfig": "Restore Defaults",
+      "setSpeed": "Set Speed Limit",
+      "cancelSpeed": "Cancel Speed Limit",
+      "modal": {
+        "setVlanTitle": "Configure VLAN in Bulk",
+        "descTitle": "Edit Port Description in Bulk",
+        "trunkTitle": "Add to Link Aggregation in Bulk",
+        "customerTitle": "Assign Customer in Bulk",
+        "speedTitle": "Set Speed Limit in Bulk",
+        "cancelSpeedTitle": "Cancel Speed Limit in Bulk"
+      },
+      "form": {
+        "vlanId": "VLAN ID",
+        "vlanIdRequired": "Please enter a VLAN ID",
+        "vlanIdPlaceholder": "e.g. 100",
+        "mode": "Mode",
+        "allowedVlans": "Allowed VLANs (e.g. 200-210,300)",
+        "allowedVlansPlaceholder": "e.g. 200-210,300",
+        "description": "Port Description",
+        "descriptionPlaceholder": "Enter a new port description (leave empty to clear it)",
+        "trunkId": "Eth-Trunk ID",
+        "trunkIdRequired": "Please enter an Eth-Trunk ID",
+        "trunkIdPlaceholder": "e.g. 10",
+        "customer": "Select Customer",
+        "customerPlaceholder": "Select the customer to assign (leave empty to clear)",
+        "inbound": "Inbound Limit (Mbps)",
+        "inboundExtra": "Upstream limit; leave empty to keep unset",
+        "inboundPlaceholder": "e.g. 1000",
+        "outbound": "Outbound Limit (Mbps)",
+        "outboundExtra": "Downstream limit; leave empty to keep unset",
+        "outboundPlaceholder": "e.g. 1200",
+        "cancelInbound": "Cancel inbound limit (upstream)",
+        "cancelOutbound": "Cancel outbound limit (downstream)"
+      },
+      "alert": {
+        "speedPolicy": "Speed-limit policies are shared by direction plus limit value: ports with the same limit reuse one policy instead of creating duplicates on the device.",
+        "cancelSpeedTip": "Cancelling removes the applied speed-limit policy reference port by port and direction (Huawei CE requires the policy name). Ports without a limit are skipped automatically."
+      },
+      "warning": {
+        "speedRequired": "Enter at least one limit greater than 0 (inbound/outbound)",
+        "directionRequired": "Select at least one direction to cancel (inbound/outbound)"
+      }
+    },
+    "port": {
+      "assign": "Assign",
+      "enable": "Enable",
+      "disable": "Disable",
+      "speedLimit": "Speed Limit",
+      "aggregate": "Aggregate",
+      "enableTitle": "Confirm Enable Port",
+      "disableTitle": "Confirm Disable Port",
+      "enableContent": "Enable port {{name}}? The operation runs over SSH.",
+      "disableContent": "Disable port {{name}}? The operation runs over SSH.",
+      "speedNegative": "Speed limit cannot be negative",
+      "vlanRange": "VLAN ID range: 1-4094",
+      "trunkIdInvalid": "Trunk ID must be a non-negative integer",
+      "detailNotLoaded": "Port details are not loaded yet, please retry later",
+      "cannotDeletePrimaryIp": "Cannot Delete Primary IP",
+      "cannotDeletePrimaryIpContent": "This port has multiple IP addresses. Delete all secondary IPs before removing the primary IP.",
+      "deleteIpTitle": "Confirm Delete IP",
+      "deleteIpContent": "Delete IP address {{ip}}/{{mask}} from port \"{{name}}\"?",
+      "configRefreshed": "Configuration refreshed and synced",
+      "configFromCache": "Configuration loaded from cache",
+      "configFetched": "Configuration fetched from device and synced",
+      "clearConfigTitle": "Confirm Clear Port Configuration",
+      "clearConfigContent": "Clear the device configuration of port \"{{name}}\"? The port configuration is reset to its initial state. This cannot be undone!",
+      "clearConfigOk": "Confirm Clear",
+      "vlanIdUnparsable": "Cannot parse VLAN ID",
+      "deleteVlanIfTitle": "Confirm Delete VLAN Interface",
+      "deleteVlanIfContent": "Delete VLAN interface \"{{name}}\" (VLAN {{vlanId}})? The matching VLAN configuration and VLANIF interface will be removed. This cannot be undone!",
+      "trunkIdUnparsable": "Cannot parse Trunk ID",
+      "deleteTrunkIfTitle": "Confirm Delete Link Aggregation Interface",
+      "deleteTrunkIfContent": "Delete Eth-Trunk interface \"{{name}}\" (Trunk {{trunkId}})? The matching link aggregation group and all member port configurations will be removed. This cannot be undone!",
+      "deleteInterfaceTitle": "Confirm Delete Interface",
+      "deleteInterfaceContent": "Delete interface \"{{name}}\"? This cannot be undone!",
+      "trunkIpBlocked": "The port belongs to Eth-Trunk {{id}} and cannot be assigned an IP directly. Configure it on the Eth-Trunk {{id}} port instead.",
+      "vlanIpBlocked": "The port belongs to VLAN {{vlan}} and cannot be assigned an IP directly. Clear the configuration on the port details page first."
+    },
+    "portConfigWarning": "⚠ Warning: this action clears the current port configuration and causes one port up/down flap.",
+    "portDetail": {
+      "title": "Port Details — {{name}}",
+      "portNumber": "Port Number",
+      "speed": "Speed",
+      "noMembers": "No member ports",
+      "vlanMembers": "VLAN Member Ports",
+      "trunkMembers": "Trunk Member Ports",
+      "configTitle": "Port Configuration",
+      "viewConfig": "View Config",
+      "fetchConfig": "Fetch Config",
+      "clear": "Clear",
+      "cached": " (cached)",
+      "cachedConfig": "Cached configuration available ({{time}})",
+      "unknownTime": "unknown time",
+      "noConfig": "No configuration data yet. Click \"Fetch Config\" to read it from the device.",
+      "notFound": "Port details not found"
+    },
+    "ipConfig": {
+      "title": "Configure Port IP — {{name}}",
+      "currentLabel": "Currently configured IP:",
+      "replaceHint": "To change the IP, delete the existing one from the IP address field on the port details page first, then configure the new IP.",
+      "addressRequired": "Please enter an IP address",
+      "addressInvalid": "Please enter a valid IPv4 address",
+      "subnetMask": "Subnet Mask",
+      "subnetMaskRequired": "Please select a subnet mask",
+      "ipType": "IP Type",
+      "helpHasPrimary": "The port already has a primary IP; the new one is added as secondary.",
+      "helpNoPrimary": "The port has no IP yet; the new one becomes the primary IP.",
+      "typePrimary": "Primary IP (ip address)",
+      "typeSecondary": "Secondary IP (ip address sub/secondary)"
+    },
+    "vlanConfig": {
+      "title": "Configure VLAN — {{name}}",
+      "info1": "If the entered VLAN ID does not exist on the switch, it will be created automatically.",
+      "info2": "Access mode suits end-device connectivity; Trunk mode suits switch interconnection.",
+      "info3": "In Trunk mode, every VLAN in the allowed list is created automatically as well.",
+      "pvidLabel": "PVID / Native VLAN (1-4094)",
+      "vlanIdLabel": "VLAN ID (1-4094)",
+      "vlanIdRequired": "Please enter a VLAN ID",
+      "pvidPlaceholder": "Default VLAN of the trunk port",
+      "vlanIdPlaceholder": "e.g. 100",
+      "portMode": "Port Mode",
+      "modeAccess": "Access (single VLAN, for end devices)",
+      "modeTrunk": "Trunk (multiple VLANs, for switch interconnection)",
+      "allowedVlans": "Allowed VLANs (Trunk mode)",
+      "allowedVlansRequired": "Trunk mode requires an allowed VLAN range",
+      "allowedVlansHelp": "e.g. 10-12,14. Missing VLANs are created automatically"
+    },
+    "trunk": {
+      "title": "Port Aggregation — {{name}}",
+      "info1": "Add the current port to the specified link aggregation group (Eth-Trunk).",
+      "info2": "If the entered Eth-Trunk ID does not exist on the switch, it will be created.",
+      "trunkIdRequired": "Please enter a Trunk ID",
+      "trunkIdPlaceholder": "e.g. 1"
+    },
+    "assign": {
+      "title": "Assign Customer",
+      "port": "Port",
+      "none": "None",
+      "description": "Description / Remarks",
+      "descriptionPlaceholder": "Port description..."
+    },
+    "speed": {
+      "title": "Set Port Speed Limit — {{name}}",
+      "infoPolicy": "Speed limiting via QoS policy (traffic-policy / qos policy)",
+      "inboundLabel": "Inbound",
+      "inboundDesc": ": traffic entering the switch port, i.e. the direction of user upload",
+      "outboundLabel": "Outbound",
+      "outboundDesc": ": traffic leaving the switch port, i.e. the direction of user download",
+      "zeroPrefix": "Enter ",
+      "zeroSuffix": " to cancel the limit for that direction. Port speed ceiling: {{max}} Mbps",
+      "inbound": "Inbound Limit (Mbps)",
+      "inboundRequired": "Please enter the inbound limit",
+      "rangePlaceholder": "0-{{max}}, 0 cancels the limit",
+      "outbound": "Outbound Limit (Mbps)",
+      "outboundRequired": "Please enter the outbound limit"
+    }
+  },
+  "importExport": {
+    "tab": {
+      "import": "Data Import",
+      "export": "Data Export"
+    },
+    "type": {
+      "device": "Device"
+    },
+    "step": {
+      "selectType": "Select Data Type",
+      "downloadTemplate": "Download the template and fill in the data",
+      "uploadFile": "Upload the completed file"
+    },
+    "panel": {
+      "importTitle": "Import",
+      "exportTitle": "Export"
+    },
+    "action": {
+      "downloadTemplate": "Download {{type}} Import Template",
+      "reselect": "Reselect",
+      "selectFile": "Select File",
+      "startImport": "Start Import",
+      "continueImport": "Continue Import",
+      "exportData": "Export {{type}} Data"
+    },
+    "message": {
+      "templateDownloaded": "Template downloaded",
+      "templateDownloadFailed": "Failed to download the template",
+      "importedWithFailed": "Imported {{imported}} entries, {{failed}} failed",
+      "imported": "Imported {{count}} entries",
+      "imported_one": "Imported {{count}} entry",
+      "imported_other": "Imported {{count}} entries",
+      "importDone": "Import completed",
+      "importFailed": "Import failed. Check whether the file format matches the template",
+      "exportSuccess": "Export successful",
+      "exportFailed": "Export failed"
+    },
+    "guide": {
+      "title": "Instructions",
+      "step1": "1. Select the data type to import",
+      "step2": "2. Download the matching template and fill in the data",
+      "step3": "3. Upload the completed file; the system validates and imports it automatically",
+      "supportedFormats": "Supported formats: .xlsx, .xls, .csv",
+      "keepHeader": "Do not modify the template header, or the import may fail",
+      "deviceTemplateTitle": "Device template types:"
+    },
+    "template": {
+      "server": {
+        "desc": "Hardware configuration must be specified by component template ID; {{cpu}} and {{mem}} are required",
+        "hardwareByTemplate": "Hardware configuration must be specified by component template ID"
+      },
+      "network": {
+        "desc": "Includes management credentials, SSH configuration and switch topology fields"
+      },
+      "other": {
+        "desc": "PDU, UPS, etc.; basic information and asset ownership only"
+      },
+      "header": {
+        "cpuTemplateId": "CPU模板ID",
+        "memoryTemplateId": "内存模板ID",
+        "storageTemplateId": "存储模板ID",
+        "nicTemplateId": "网卡模板ID"
+      },
+      "cpuMemoryRequired": "{{cpu}} and {{mem}} are required",
+      "storageNicOptional": "{{storage}} and {{nic}} are optional; the corresponding child records are created automatically once filled in"
+    },
+    "result": {
+      "title": "Import Result",
+      "success": "Imported",
+      "failed": "Failed",
+      "column": {
+        "row": "Row",
+        "errorReason": "Error Reason"
+      }
+    },
+    "export": {
+      "guideTitle": "Export Notes",
+      "filterTitle": "Filters (Optional)",
+      "cabinetId": "Cabinet ID",
+      "customerId": "Customer ID",
+      "all": "All",
+      "noFilterHint": "Leave blank to export all data",
+      "excelFormat": "Data is exported as Excel (.xlsx)",
+      "deviceFilterTitle": "Device export supports filtering by:",
+      "filterByCabinet": "- Specify a cabinet ID: export only the devices in that cabinet",
+      "filterByCustomer": "- Specify a customer ID: export only the devices belonging to that customer",
+      "filterBoth": "- Both conditions can be used together"
+    }
+  },
+  "recycleBin": {
+    "column": {
+      "originalCabinet": "Original Cabinet",
+      "originalUPosition": "Original U Position",
+      "deletedAt": "Deleted At"
+    },
+    "action": {
+      "restore": "Restore",
+      "permanentDelete": "Permanently Delete",
+      "batchRestore": "Batch Restore",
+      "batchPermanentDelete": "Batch Permanent Delete"
+    },
+    "confirm": {
+      "permanentDeleteTitle": "Permanently Delete",
+      "permanentDeleteContent": "This cannot be undone. Permanently delete this device?",
+      "irreversible": "This operation cannot be undone!",
+      "batchPermanentDeleteTitle": "Batch Permanent Delete",
+      "batchPermanentDeleteContent": "Permanently delete the selected {{count}} devices?",
+      "batchPermanentDeleteContent_one": "Permanently delete the selected {{count}} device?",
+      "batchPermanentDeleteContent_other": "Permanently delete the selected {{count}} devices?",
+      "batchPermanentDeleteOk": "Delete Permanently"
+    },
+    "message": {
+      "restoreSuccess": "Device restored",
+      "autoAssigned": ", automatically assigned to U{{u}}",
+      "childrenRestored": ", {{count}} child nodes rebuilt",
+      "childrenRestored_one": ", {{count}} child node rebuilt",
+      "childrenRestored_other": ", {{count}} child nodes rebuilt",
+      "restoreFailed": "Restore failed",
+      "conflictSelectCabinet": "The original U position conflicts. Select a target cabinet (U position is optional; the system assigns one automatically)",
+      "nodePositionOccupied": "The original node position is occupied (conflicting devices: {{devices}}). Delete or move the conflicting nodes before restoring",
+      "uPositionOccupied": "The original U position is occupied (conflicting devices: {{devices}}). Select a target cabinet",
+      "batchRestoreSuccess": "Restored {{count}} devices",
+      "batchRestoreSuccess_one": "Restored {{count}} device",
+      "batchRestoreSuccess_other": "Restored {{count}} devices",
+      "batchRestoreFailed": "Batch restore failed",
+      "permanentDeleted": "Device permanently deleted",
+      "permanentDeleteFailed": "Permanent delete failed",
+      "batchPermanentDeleteSuccess": "Permanently deleted {{count}} devices",
+      "batchPermanentDeleteSuccess_one": "Permanently deleted {{count}} device",
+      "batchPermanentDeleteSuccess_other": "Permanently deleted {{count}} devices",
+      "batchPermanentDeleteFailed": "Batch permanent delete failed"
+    },
+    "filter": {
+      "deletedDate": "Deletion Date",
+      "deletedStart": "Deleted From",
+      "deletedEnd": "Deleted To"
+    },
+    "modal": {
+      "restoreTitle": "Restore Device",
+      "confirmRestore": "Confirm Restore",
+      "deviceName": "Device Name:",
+      "childNodeOnlyTitle": "Child node devices can only be restored to their original chassis",
+      "childNodeOnlyDesc": "The child node is restored to the chassis it belonged to before deletion; no cabinet selection needed",
+      "uPositionOccupiedTitle": "Original U Position Occupied",
+      "nodePositionOccupiedTitle": "Original Node Position Occupied",
+      "restoreToOriginalTitle": "Will be restored to the original position",
+      "restoreToOriginalDesc": "Cabinet: {{cabinet}}, U position: U{{u}}",
+      "uAutoAssignTitle": "U Position Will Be Auto-Assigned",
+      "uAutoAssignDesc": "If no U position is given, the system looks for an available U position in the selected cabinet",
+      "uAutoAssignBatchDesc": "If no starting U position is given, the system assigns available U positions in the selected cabinet one by one",
+      "selectTargetCabinet": "Select target cabinet (leave empty to restore to the original position)",
+      "uStartAuto": "Starting U position (leave empty for auto-assignment)",
+      "uStartOriginal": "Starting U position (leave empty to use the original U position)",
+      "batchRestoreTitle": "Batch Restore",
+      "batchRestoreCount": "Will restore the selected {{count}} devices",
+      "batchRestoreCount_one": "Will restore the selected {{count}} device",
+      "batchRestoreCount_other": "Will restore the selected {{count}} devices"
+    }
+  }
+}

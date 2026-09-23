@@ -8,7 +8,7 @@
 多进程/多实例下各自 Redis leader 选举（心跳续约 + token 校验主动释放）。
 续约失败时通过 lock_lost Event 联动中止主流程。
 
-设计文档：docs/AUTO_SCAN_DESIGN.md（v5）
+设计文档：docs/_archive/AUTO_SCAN_DESIGN.md（v5）
 """
 import threading
 import time

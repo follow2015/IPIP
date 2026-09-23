@@ -31,8 +31,12 @@ import { formatDateTime } from '@/utils/format';
 import { useMessage } from '@/hooks/useMessage';
 import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
 import type { GlobalEvent } from '@/hooks/useGlobalEvents';
+import { useTranslation } from 'react-i18next';
 
 function VirtualRooms() {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
+  const { t: tn } = useTranslation('network');
   const confirm = useConfirm();
   const members = useDisclosure();
   const [membersRecord, setMembersRecord] = useState<VirtualRoom | null>(null);
@@ -44,7 +48,7 @@ function VirtualRooms() {
     useList: useVirtualRooms,
     useDelete: useDeleteVirtualRoom,
     nameKey: 'name',
-    nameLabel: '虚拟机房'
+    nameLabel: td('virtualRoom.name')
   });
   const {
     table,
@@ -98,18 +102,18 @@ function VirtualRooms() {
     try {
       await scanVirtualRoom.mutateAsync(record.id);
       setScanningId(record.id);
-      message.info('虚拟机房扫描已提交，完成后将通过消息通知您');
+      message.info(td('virtualRoom.message.scanSubmitted'));
     } catch (err: unknown) {
       const errorMsg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        (err instanceof Error ? err.message : '扫描启动失败');
+        (err instanceof Error ? err.message : tn('ip.message.scanNetworkFailed'));
       message.error(errorMsg);
     }
   };
 
   const columns = [
     {
-      title: '虚拟机房名称',
+      title: td('virtualRoom.field.name'),
       dataIndex: 'name',
       key: 'name',
       render: (name: string, record: VirtualRoom) => (
@@ -119,21 +123,21 @@ function VirtualRooms() {
       )
     },
     {
-      title: '描述',
+      title: tc('field.description'),
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
       render: (v: string | null) => v || '-'
     },
     {
-      title: '成员数',
+      title: td('lag.column.memberCount'),
       key: 'member_count',
       width: 80,
       align: 'center' as const,
       render: (_: unknown, record: VirtualRoom) => record.member_count ?? 0
     },
     {
-      title: '最近扫描',
+      title: td('virtualRoom.field.lastScan'),
       key: 'last_scan',
       width: 180,
       render: (_: unknown, record: VirtualRoom) => {
@@ -146,7 +150,12 @@ function VirtualRooms() {
               : 0;
           return (
             <Tooltip
-              title={`阶段: ${scanProgress.phase} | 完成: ${scanProgress.completed}/${scanProgress.total} | 失败: ${scanProgress.failed}`}
+              title={td('virtualRoom.scanProgressTooltip', {
+                phase: scanProgress.phase,
+                completed: scanProgress.completed,
+                total: scanProgress.total,
+                failed: scanProgress.failed
+              })}
             >
               <Progress
                 percent={percent}
@@ -169,23 +178,23 @@ function VirtualRooms() {
             </span>
           );
         }
-        return <Tag>未扫描</Tag>;
+        return <Tag>{td('virtualRoom.notScanned')}</Tag>;
       }
     },
     {
-      title: '创建时间',
+      title: tc('field.createdAt'),
       dataIndex: 'created_at',
       key: 'created_at',
       width: 160,
       render: (v: string) => formatDateTime(v)
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 240,
       render: (_: unknown, record: VirtualRoom) => (
         <Space size="small">
-          <Tooltip title="管理成员">
+          <Tooltip title={td('virtualRoom.action.manageMembers')}>
             <Button
               type="link"
               size="small"
@@ -193,7 +202,7 @@ function VirtualRooms() {
               onClick={() => handleMembers(record)}
             />
           </Tooltip>
-          <Tooltip title="触发扫描">
+          <Tooltip title={td('virtualRoom.action.scan')}>
             <Button
               type="link"
               size="small"
@@ -202,16 +211,16 @@ function VirtualRooms() {
               disabled={scanningId !== null && scanningId !== record.id}
               onClick={() =>
                 confirm({
-                  title: '确认扫描？',
-                  content: `将对虚拟机房「${record.name}」下的所有交换机执行全量扫描`,
-                  okText: '开始扫描',
-                  cancelText: '取消',
+                  title: td('virtualRoom.confirm.scanTitle'),
+                  content: td('virtualRoom.confirm.scanContent', { name: record.name }),
+                  okText: td('virtualRoom.action.startScan'),
+                  cancelText: tc('action.cancel'),
                   onOk: () => handleScan(record)
                 })
               }
             />
           </Tooltip>
-          <Tooltip title="编辑">
+          <Tooltip title={tc('action.edit')}>
             <Button
               type="link"
               size="small"
@@ -219,7 +228,7 @@ function VirtualRooms() {
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
-          <Tooltip title="删除">
+          <Tooltip title={tc('action.delete')}>
             <Button
               type="link"
               size="small"
@@ -253,14 +262,14 @@ function VirtualRooms() {
           setScanningId(null);
           refetch();
         }}
-        searchPlaceholder="搜索虚拟机房名称"
+        searchPlaceholder={td('virtualRoom.searchPlaceholder')}
         toolbar={
           <Space>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              新增虚拟机房
+              {td('virtualRoom.add')}
             </Button>
             <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
-              刷新
+              {tc('action.refresh')}
             </Button>
           </Space>
         }

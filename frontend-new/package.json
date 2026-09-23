@@ -15,6 +15,9 @@
     "coverage": "vitest run --coverage",
     "check:circular": "node scripts/check-circular-deps.mjs",
     "check:circular:static": "node scripts/check-circular-deps.mjs --static-only",
+    "i18n:scan": "node scripts/i18n-check.mjs scan",
+    "i18n:keys": "node scripts/i18n-check.mjs keys",
+    "i18n:orphan": "node scripts/i18n-check.mjs orphan",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{ts,tsx,js,cjs,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{ts,tsx,js,cjs,json,md}\"",
     "prepare": "git config core.hooksPath .husky || true",
@@ -31,9 +34,12 @@
     "antd": "^6.6.2",
     "axios": "^1.20.0",
     "dayjs": "^1.11.11",
+    "i18next": "^26.4.2",
+    "i18next-browser-languagedetector": "^8.2.1",
     "ipaddr.js": "^2.2.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-i18next": "^17.0.14",
     "react-router-dom": "^7.14.1",
     "zustand": "^5.0.12"
   },
@@ -54,6 +60,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "husky": "^9.1.7",
+    "i18next-parser": "^9.4.0",
     "jsdom": "^25.0.1",
     "lint-staged": "^15.5.2",
     "madge": "^8.0.0",
@@ -67,10 +74,14 @@
   "lint-staged": {
     "*.{ts,tsx}": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix",
+      "node scripts/i18n-check.mjs scan --files"
     ],
     "*.{js,cjs,json,md,css}": [
       "prettier --write"
+    ],
+    "src/locales/**/*.json": [
+      "node scripts/i18n-check.mjs keys"
     ]
   }
 }

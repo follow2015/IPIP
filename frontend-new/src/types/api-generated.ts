@@ -2825,6 +2825,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rooms/{room_id}/layout-markers/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    room_id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        items: {
+                            marker_id: number;
+                            expected_version: number;
+                            row_number?: number;
+                            col_number?: number;
+                            marker_type?: string;
+                            label?: string;
+                            notes?: string;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/rooms/{room_id}/stats": {
         parameters: {
             query?: never;
@@ -21979,6 +22053,7 @@ export interface components {
             metric_status?: components["schemas"]["DeviceMetricDashboardItem"][];
             overall_status?: string;
             status_reason?: string | null;
+            monitor_status_code?: string | null;
             reachable?: boolean | null;
             last_error?: string | null;
             last_checked_at?: string | null;

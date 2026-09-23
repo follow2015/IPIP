@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { Form, Card, Row, Col, Input, InputNumber, Checkbox } from 'antd';
+import { useTranslation } from 'react-i18next';
 import HardwareConfigFields from '@/components/HardwareConfigFields';
 import NicConfigFields from '@/components/NicConfigFields';
 
@@ -15,39 +16,40 @@ interface ChassisConfigPanelProps {
 }
 
 const ChassisConfigPanel: React.FC<ChassisConfigPanelProps> = ({ form }) => {
+  const { t } = useTranslation('device');
   const autoCreate = Form.useWatch('auto_create_nodes', form);
 
   return (
     <Card
-      title="机箱子节点配置"
+      title={t('addModal.section.chassisNodes')}
       size="small"
       style={{ marginBottom: 12 }}
       styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
     >
       <Row gutter={16}>
         <Col xs={12} md={6}>
-          <Form.Item name="node_rows" label="节点行数" initialValue={2}>
+          <Form.Item name="node_rows" label={t('form.chassis.rows.label')} initialValue={2}>
             <InputNumber min={1} max={16} style={{ width: '100%' }} />
           </Form.Item>
         </Col>
         <Col xs={12} md={6}>
-          <Form.Item name="node_cols" label="节点列数" initialValue={2}>
+          <Form.Item name="node_cols" label={t('form.chassis.cols.label')} initialValue={2}>
             <InputNumber min={1} max={16} style={{ width: '100%' }} />
           </Form.Item>
         </Col>
         <Col xs={24} md={12}>
-          <Form.Item name="node_naming_pattern" label="命名规则">
+          <Form.Item name="node_naming_pattern" label={t('form.chassis.namingPattern.label')}>
             <Input placeholder="{NAME}-Node{POS}" />
           </Form.Item>
         </Col>
       </Row>
       <Form.Item
         name="auto_create_nodes"
-        label="生成子节点"
+        label={t('form.chassis.generateNodes.confirmTitle')}
         valuePropName="checked"
         initialValue={true}
       >
-        <Checkbox>创建时自动按行×列规格生成所有子节点</Checkbox>
+        <Checkbox>{t('addModal.chassis.autoCreateNodes')}</Checkbox>
       </Form.Item>
       {/* 勾选生成子节点后，显示硬件配置和网卡配置 */}
       {autoCreate !== false && (

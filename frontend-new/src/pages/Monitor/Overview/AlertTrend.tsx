@@ -8,10 +8,12 @@ import { Card, Empty, Space, Tooltip, Typography, DatePicker, theme } from 'antd
 import dayjs, { Dayjs } from 'dayjs';
 import { parseServerTime } from '@/utils/format';
 import { useMonitorAlerts } from '@/services/monitor';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
 export default function AlertTrend() {
+  const { t } = useTranslation('monitor');
   const { token } = theme.useToken();
   const [trendRange, setTrendRange] = useState<[Dayjs, Dayjs]>([
     dayjs().subtract(6, 'day'),
@@ -46,7 +48,7 @@ export default function AlertTrend() {
 
   return (
     <Card
-      title="告警趋势"
+      title={t('trend.title')}
       variant="borderless"
       style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
       extra={
@@ -57,9 +59,15 @@ export default function AlertTrend() {
               if (v && v[0] && v[1]) setTrendRange([v[0], v[1]]);
             }}
             presets={[
-              { label: '今日', value: [dayjs(), dayjs()] as [Dayjs, Dayjs] },
-              { label: '近 7 天', value: [dayjs().subtract(6, 'day'), dayjs()] as [Dayjs, Dayjs] },
-              { label: '近 30 天', value: [dayjs().subtract(29, 'day'), dayjs()] as [Dayjs, Dayjs] }
+              { label: t('trend.presetToday'), value: [dayjs(), dayjs()] as [Dayjs, Dayjs] },
+              {
+                label: t('trend.presetLast7'),
+                value: [dayjs().subtract(6, 'day'), dayjs()] as [Dayjs, Dayjs]
+              },
+              {
+                label: t('trend.presetLast30'),
+                value: [dayjs().subtract(29, 'day'), dayjs()] as [Dayjs, Dayjs]
+              }
             ]}
             size="small"
           />
@@ -67,13 +75,13 @@ export default function AlertTrend() {
       }
     >
       {trendByDay.length === 0 ? (
-        <Empty description="所选时间范围无告警" />
+        <Empty description={t('trend.empty')} />
       ) : (
         <div
           style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120, padding: '8px 0' }}
         >
           {trendByDay.map((d) => (
-            <Tooltip key={d.day} title={`${d.day}：${d.count} 条`}>
+            <Tooltip key={d.day} title={t('trend.tooltip', { day: d.day, count: d.count })}>
               <div
                 style={{
                   flex: 1,
@@ -94,7 +102,7 @@ export default function AlertTrend() {
           {trendRange[0].format('YYYY-MM-DD')}
         </Text>
         <Text type="secondary" style={{ fontSize: 11 }}>
-          共 {trendByDay.reduce((s, d) => s + d.count, 0)} 条告警
+          {t('trend.total', { count: trendByDay.reduce((s, d) => s + d.count, 0) })}
         </Text>
         <Text type="secondary" style={{ fontSize: 11 }}>
           {trendRange[1].format('YYYY-MM-DD')}

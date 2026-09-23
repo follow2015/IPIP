@@ -2,10 +2,11 @@ import React from 'react';
 import { Tag, Tooltip } from 'antd';
 import type { GlobalToken } from 'antd';
 import { WarningFilled } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { Cabinet } from '@/types/models';
 import { CABINET_STATUS_MAP } from '@/types/enums';
 import {
-  CHANNEL_TYPE_LABEL,
+  CHANNEL_TYPE_LABEL_KEYS,
   DEFAULT_STATUS,
   getStatusPalette,
   paletteKeyOf,
@@ -13,6 +14,8 @@ import {
 } from './palette';
 
 export function StatusLegend({ statuses, token }: { statuses: number[]; token: GlobalToken }) {
+  const { t: td } = useTranslation('device');
+  const { t: ta } = useTranslation('asset');
   return (
     <div
       style={{
@@ -23,7 +26,9 @@ export function StatusLegend({ statuses, token }: { statuses: number[]; token: G
         marginBottom: 12
       }}
     >
-      <span style={{ fontSize: 12, color: token.colorTextTertiary }}>状态</span>
+      <span style={{ fontSize: 12, color: token.colorTextTertiary }}>
+        {ta('roomLayout.legend.status')}
+      </span>
       {statuses.map((status) => {
         const palette = getStatusPalette(token, status);
         const info = CABINET_STATUS_MAP[status as keyof typeof CABINET_STATUS_MAP];
@@ -48,7 +53,7 @@ export function StatusLegend({ statuses, token }: { statuses: number[]; token: G
                 display: 'inline-block'
               }}
             />
-            {info?.label ?? status}
+            {info ? td(info.labelKey) : status}
           </span>
         );
       })}
@@ -57,6 +62,7 @@ export function StatusLegend({ statuses, token }: { statuses: number[]; token: G
 }
 
 export function ChannelLegend({ token }: { token: GlobalToken }) {
+  const { t: ta } = useTranslation('asset');
   return (
     <div
       style={{
@@ -67,7 +73,9 @@ export function ChannelLegend({ token }: { token: GlobalToken }) {
         marginBottom: 12
       }}
     >
-      <span style={{ fontSize: 12, color: token.colorTextTertiary }}>通道</span>
+      <span style={{ fontSize: 12, color: token.colorTextTertiary }}>
+        {ta('roomLayout.legend.channel')}
+      </span>
       {(['cold', 'hot', 'mixed'] as const).map((type) => {
         const key = paletteKeyOf(type);
         return (
@@ -90,12 +98,12 @@ export function ChannelLegend({ token }: { token: GlobalToken }) {
                 border: `1px solid ${token[`${key}6`]}`
               }}
             />
-            {CHANNEL_TYPE_LABEL[type]}
+            {ta(CHANNEL_TYPE_LABEL_KEYS[type])}
           </span>
         );
       })}
       <span style={{ fontSize: 12, color: token.colorTextTertiary }}>
-        （实线+封头 = 封闭，虚线 = 开放）
+        {ta('roomLayout.legend.channelHint')}
       </span>
     </div>
   );
@@ -112,20 +120,21 @@ export function DuplicatedCabinetList({
   onOpen: (cabinetId: number) => void;
   token: GlobalToken;
 }) {
+  const { t: ta } = useTranslation('asset');
   if (cabinets.length === 0) return null;
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ fontSize: 13, color: token.colorWarning, marginBottom: 8 }}>
-        位置冲突的机柜（{cabinets.length}个）：与同机房其它机柜填了相同的行列号，
-        未在平面图上显示，请修正行列号
+        {ta('roomLayout.conflict.listTitle', { count: cabinets.length })}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {cabinets.map((c) => (
           <Tooltip
             key={c.id}
-            title={`${c.cabinet_number}（${positionLabel(c.row ?? 0, c.col ?? 0)}）与图上机柜位置重复${
-              readOnly ? '' : '，点击查看详情'
-            }`}
+            title={`${ta('roomLayout.conflict.tagTip', {
+              cabinet: c.cabinet_number,
+              position: positionLabel(c.row ?? 0, c.col ?? 0, ta)
+            })}${readOnly ? '' : ta('roomLayout.conflict.tagTipDetail')}`}
           >
             <Tag
               icon={<WarningFilled />}
@@ -161,15 +170,18 @@ export function UnpositionedCabinetList({
   onSelect: (cabinetId: number) => void;
   onOpen: (cabinetId: number) => void;
 }) {
+  const { t: td } = useTranslation('device');
+  const { t: ta } = useTranslation('asset');
   if (cabinets.length === 0) return null;
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ fontSize: 13, color: token.colorTextSecondary, marginBottom: 8 }}>
-        未设置位置的机柜（{cabinets.length}个）
+        {ta('roomLayout.unpositioned', { count: cabinets.length })}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {cabinets.map((c) => {
           const status = c.status ?? DEFAULT_STATUS;
+          const cabMeta = CABINET_STATUS_MAP[status as keyof typeof CABINET_STATUS_MAP];
           const palette = getStatusPalette(token, status);
           const dimmed = matchedIds != null && !matchedIds.has(c.id);
           const selected = selectedId === c.id;
@@ -177,7 +189,7 @@ export function UnpositionedCabinetList({
             <Tooltip
               key={c.id}
               title={`${c.cabinet_number} - ${
-                CABINET_STATUS_MAP[status as keyof typeof CABINET_STATUS_MAP]?.label ?? ''
+                cabMeta?.labelKey ? td(cabMeta.labelKey) : ''
               }`}
             >
               <div

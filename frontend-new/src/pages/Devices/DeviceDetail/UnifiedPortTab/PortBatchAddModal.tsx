@@ -5,11 +5,12 @@
 import { useMemo, useState } from 'react';
 import { Modal, Button, Form, Input, InputNumber, Select, Tag, Space, Row, Col } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useCreateNetworkPort, useBatchCreateNetworkPorts } from '@/services/network-port';
 import { useMessage } from '@/hooks/useMessage';
 import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
 import { expandPortGroups, previewPortNames } from './portNameBuilder';
-import { USAGE_STATUS_FORM_OPTIONS } from './constants';
+import { getUsageStatusFormOptions } from './constants';
 
 interface PortBatchAddModalProps {
   deviceId: number;
@@ -18,6 +19,8 @@ interface PortBatchAddModalProps {
 }
 
 export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModalProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const message = useMessage();
   const [addMode, setAddMode] = useState<'batch' | 'single'>('batch');
   const [addForm] = Form.useForm();
@@ -27,6 +30,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
 
   const batchGroups = Form.useWatch('groups', batchForm);
   const batchPreview = useMemo(() => previewPortNames(batchGroups), [batchGroups]);
+  const usageStatusOptions = getUsageStatusFormOptions(t);
 
   const resetAndClose = () => {
     onClose();
@@ -38,7 +42,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
     try {
       const values = await addForm.validateFields();
       await createPort.mutateAsync(values);
-      message.success('端口创建成功');
+      message.success(t('port.message.createSuccess'));
       resetAndClose();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -50,16 +54,16 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
       const values = await batchForm.validateFields();
       const allPorts = expandPortGroups(values.groups);
       if (allPorts.length === 0) {
-        message.error('没有可创建的端口');
+        message.error(t('port.message.noPortsToCreate'));
         return;
       }
       const result = await batchCreatePort.mutateAsync(allPorts);
       const created = result.data?.created_count ?? allPorts.length;
       const skipped = allPorts.length - created;
       if (skipped > 0) {
-        message.success(`成功创建 ${created} 个端口，${skipped} 个已存在被跳过`);
+        message.success(t('port.message.batchCreatedWithSkipped', { count: created, skipped }));
       } else {
-        message.success(`成功创建 ${created} 个端口`);
+        message.success(t('port.message.batchCreated', { count: created }));
       }
       resetAndClose();
     } catch (err) {
@@ -69,7 +73,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
 
   return (
     <Modal
-      title="新增端口"
+      title={t('port.action.add')}
       open={open}
       onOk={addMode === 'batch' ? handleBatchAdd : handleAdd}
       onCancel={resetAndClose}
@@ -84,14 +88,14 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
             size="small"
             onClick={() => setAddMode('batch')}
           >
-            批量添加
+            {t('port.mode.batch')}
           </Button>
           <Button
             type={addMode === 'single' ? 'primary' : 'default'}
             size="small"
             onClick={() => setAddMode('single')}
           >
-            单条添加
+            {t('port.mode.single')}
           </Button>
         </Space>
       </div>
@@ -111,14 +115,16 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
             }}
           >
             <div style={{ fontWeight: 500, color: '#262626', marginBottom: 2 }}>
-              命名规则：前缀 + 槽位/卡号/端口号（支持多组）
+              {t('port.namingRule')}
             </div>
             <div>
-              GE + 槽0/卡0/1~48 → <Tag style={{ margin: 0, fontSize: 11 }}>GE0/0/1</Tag> ~{' '}
+              {t('port.namingExample', { prefix: 'GE', slot: 0, card: 0, start: 1, end: 48 })} →{' '}
+              <Tag style={{ margin: 0, fontSize: 11 }}>GE0/0/1</Tag> ~{' '}
               <Tag style={{ margin: 0, fontSize: 11 }}>GE0/0/48</Tag>
             </div>
             <div>
-              10GE + 槽0/卡0/1~4 → <Tag style={{ margin: 0, fontSize: 11 }}>10GE0/0/1</Tag> ~{' '}
+              {t('port.namingExample', { prefix: '10GE', slot: 0, card: 0, start: 1, end: 4 })} →{' '}
+              <Tag style={{ margin: 0, fontSize: 11 }}>10GE0/0/1</Tag> ~{' '}
               <Tag style={{ margin: 0, fontSize: 11 }}>10GE0/0/4</Tag>
             </div>
           </div>
@@ -152,13 +158,13 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                         <Form.Item
                           {...restField}
                           name={[name, 'template']}
-                          label="端口类型"
+                          label={t('nic.column.portType')}
                           initialValue="GE"
                           style={{ marginBottom: 8 }}
                         >
                           <Select
                             options={PORT_TYPE_TEMPLATES}
-                            placeholder="选择类型"
+                            placeholder={t('form.portGeneration.template.placeholder')}
                             size="small"
                           />
                         </Form.Item>
@@ -167,7 +173,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                         <Form.Item
                           {...restField}
                           name={[name, 'slot']}
-                          label="槽位"
+                          label={t('form.portGeneration.slot.label')}
                           initialValue={0}
                           style={{ marginBottom: 8 }}
                         >
@@ -178,7 +184,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                         <Form.Item
                           {...restField}
                           name={[name, 'card']}
-                          label="卡号"
+                          label={t('form.portGeneration.card.label')}
                           initialValue={0}
                           style={{ marginBottom: 8 }}
                         >
@@ -189,7 +195,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                         <Form.Item
                           {...restField}
                           name={[name, 'start_port']}
-                          label="起始"
+                          label={t('form.portGeneration.start.label')}
                           initialValue={1}
                           style={{ marginBottom: 8 }}
                         >
@@ -200,7 +206,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                         <Form.Item
                           {...restField}
                           name={[name, 'end_port']}
-                          label="结束"
+                          label={t('form.portGeneration.end.label')}
                           initialValue={24}
                           style={{ marginBottom: 8 }}
                         >
@@ -237,7 +243,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                   size="small"
                   style={{ marginBottom: 8 }}
                 >
-                  添加端口组
+                  {t('form.portGeneration.addGroup')}
                 </Button>
               </>
             )}
@@ -255,7 +261,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
               }}
             >
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
-                将创建 {batchPreview.length} 个端口：
+                {t('port.preview.count', { count: batchPreview.length })}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {batchPreview.map((name, idx) => (
@@ -274,22 +280,22 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
         <Form form={addForm} layout="vertical">
           <Form.Item
             name="port_name"
-            label="端口名称"
-            rules={[{ required: true, message: '请输入端口名称' }]}
+            label={t('nic.column.portName')}
+            rules={[{ required: true, message: t('port.validation.inputPortName') }]}
           >
-            <Input placeholder="如 GE1/0/1" />
+            <Input placeholder={t('port.field.portNameHint')} />
           </Form.Item>
-          <Form.Item name="port_type" label="端口类型">
-            <Input placeholder="如 GE" />
+          <Form.Item name="port_type" label={t('nic.column.portType')}>
+            <Input placeholder={t('port.field.portTypeHint')} />
           </Form.Item>
-          <Form.Item name="speed" label="速率">
-            <Input placeholder="如 1G" />
+          <Form.Item name="speed" label={t('nic.column.speed')}>
+            <Input placeholder={t('port.field.speedHint')} />
           </Form.Item>
-          <Form.Item name="usage_status" label="占用状态" initialValue="free">
-            <Select options={USAGE_STATUS_FORM_OPTIONS} />
+          <Form.Item name="usage_status" label={t('port.column.usageStatus')} initialValue="free">
+            <Select options={usageStatusOptions} />
           </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input placeholder="端口描述" />
+          <Form.Item name="description" label={tCommon('field.description')}>
+            <Input placeholder={t('port.field.descriptionHint')} />
           </Form.Item>
         </Form>
       )}

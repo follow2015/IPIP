@@ -13,6 +13,7 @@
 import { lazy, Suspense } from 'react';
 import { Tabs } from 'antd';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 const SilenceRules = lazy(() => import('@/pages/Monitor/SilenceRules'));
 const AlertDependencyRules = lazy(() => import('@/pages/Monitor/AlertDependencyRules'));
@@ -23,6 +24,7 @@ const DEFAULT_TAB: AlertRuleTabKey = 'silence';
 const VALID_TABS: AlertRuleTabKey[] = ['silence', 'dependency', 'escalation'];
 
 export default function AlertRules() {
+  const { t } = useTranslation('monitor');
   const [params, setParams] = useSearchParams();
   const raw = params.get('tab');
   const activeKey: AlertRuleTabKey = VALID_TABS.includes(raw as AlertRuleTabKey)
@@ -41,7 +43,7 @@ export default function AlertRules() {
       items={[
         {
           key: 'silence',
-          label: '静默规则',
+          label: t('tab.silence'),
           children: (
             <Suspense fallback={null}>
               <SilenceRules />
@@ -50,7 +52,7 @@ export default function AlertRules() {
         },
         {
           key: 'dependency',
-          label: '依赖抑制',
+          label: t('tab.dependency'),
           children: (
             <Suspense fallback={null}>
               <AlertDependencyRules />
@@ -59,7 +61,7 @@ export default function AlertRules() {
         },
         {
           key: 'escalation',
-          label: '升级策略',
+          label: t('tab.escalation'),
           children: (
             <Suspense fallback={null}>
               <EscalationPolicies />

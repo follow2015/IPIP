@@ -2,15 +2,20 @@
 """
 核心枚举定义（前端枚举的单一真相源）
 
-本文件是后端状态枚举的唯一真相源。前端枚举由
+本文件是后端状态枚举的唯一真相源。
+
+前端枚举 frontend-new/src/types/status-codes.generated.ts 由
 scripts/generate_frontend_enums.py 读取本文件的 GENERATED_ENUMS / STATUS_DISPLAY
-注册表自动生成 frontend-new/src/types/status-codes.generated.ts。
+注册表自动生成（`make sync-enums` 重新生成，`make check-enums` 做 CI 防漂移校验）。
 
-修改状态编码/中文标签/颜色，请只改此处，然后运行：
-    python scripts/generate_frontend_enums.py            # 重新生成前端枚举
-    python scripts/generate_frontend_enums.py --check    # CI 校验，不写文件
+i18n 契约：生成文件里不存中文 label，只存 labelKey（device 命名空间，译文见
+frontend-new/src/locales/*/device.json）；本文件 STATUS_DISPLAY 的中文 label
+仅作后端日志/导出兜底。前端展示一律经 src/types/statusMeta.ts 的
+getXxxMeta(code, t) 统一翻译出口。因此修改**状态编码/颜色**后运行
+`make sync-enums` 即可；新增/删除**枚举成员**还必须同步语言包的对应节点，
+否则英文界面会露 key（漂移由 tests/test_frontend_enum_drift.py 一并看守）。
 
-注意：只有放进 GENERATED_ENUMS 的枚举才会同步到前端；其余（如 DataSource）仅后端使用，不进生成。
+注意：只有放进 GENERATED_ENUMS 的枚举才需要同步到前端；其余（如 DataSource）仅后端使用。
 """
 from enum import IntEnum, Enum
 from typing import List
@@ -243,6 +248,7 @@ class ProbeErrorCode(str, Enum):
     PROBE_TIMEOUT = "probe_timeout"      # 线程级超时（base_adapter.run_with_timeout 守卫）
     PROBE_ERROR = "probe_error"          # 线程级异常（适配器内部未分类异常）
     NO_MANAGEMENT_IP = "no_management_ip"  # 设备无管理 IP
+    INVALID_TARGET_IP = "invalid_target_ip"  # 管理 IP 字段不是合法的 IP 字面量（如 999.1.1.1 / 域名 / 带端口）
     DNS_RESOLVE_TIMEOUT = "dns_resolve_timeout"  # DNS 解析超时
     AUTH_FAILED = "auth_failed"          # 认证失败（SNMP community/Redfish token/IPMI 密码错误）
     AUTH_ERROR = "auth_error"            # Redfish HTTP 401 认证失败
@@ -373,6 +379,7 @@ STATUS_DISPLAY = {
         ProbeErrorCode.PROBE_TIMEOUT: ("探测超时", "red"),
         ProbeErrorCode.PROBE_ERROR: ("探测异常", "red"),
         ProbeErrorCode.NO_MANAGEMENT_IP: ("无管理IP", "default"),
+        ProbeErrorCode.INVALID_TARGET_IP: ("目标IP非法", "red"),
         ProbeErrorCode.DNS_RESOLVE_TIMEOUT: ("DNS解析超时", "orange"),
         ProbeErrorCode.AUTH_FAILED: ("认证失败", "red"),
         ProbeErrorCode.AUTH_ERROR: ("认证失败", "red"),
@@ -409,20 +416,20 @@ STATUS_DISPLAY = {
 
 
 GENERATED_ENUMS = [
-    (IPStatus, "IPStatusCode", "IP_STATUS_MAP", "IP_STATUS_OPTIONS", "IPStatusCode"),
+    (IPStatus, "IPStatusCode", "IP_STATUS_MAP", None, "IPStatusCode"),
     (RouteNotes, "RouteNotesCode", "ROUTE_NOTES_MAP", None, "number"),
     (SwitchStatus, "SwitchRoleCode", "SWITCH_ROLE_MAP", None, "SwitchRoleCode"),
-    (DeviceStatus, "DeviceStatusCode", "DEVICE_STATUS_MAP", "DEVICE_STATUS_OPTIONS", "DeviceStatusCode"),
-    (CustomerStatus, "CustomerStatusCode", "CUSTOMER_STATUS_MAP", "CUSTOMER_STATUS_OPTIONS", "CustomerStatusCode"),
-    (RoomStatus, "RoomStatusCode", "ROOM_STATUS_MAP", "ROOM_STATUS_OPTIONS", "RoomStatusCode"),
-    (CabinetStatus, "CabinetStatusCode", "CABINET_STATUS_MAP", "CABINET_STATUS_OPTIONS", "CabinetStatusCode"),
+    (DeviceStatus, "DeviceStatusCode", "DEVICE_STATUS_MAP", None, "DeviceStatusCode"),
+    (CustomerStatus, "CustomerStatusCode", "CUSTOMER_STATUS_MAP", None, "CustomerStatusCode"),
+    (RoomStatus, "RoomStatusCode", "ROOM_STATUS_MAP", None, "RoomStatusCode"),
+    (CabinetStatus, "CabinetStatusCode", "CABINET_STATUS_MAP", None, "CabinetStatusCode"),
     (VLANStatus, "VLANStatusCode", "VLAN_STATUS_MAP", None, "number"),
-    (UserStatus, "UserStatusCode", "USER_STATUS_MAP", "USER_STATUS_OPTIONS", "UserStatusCode"),
+    (UserStatus, "UserStatusCode", "USER_STATUS_MAP", None, "UserStatusCode"),
     (LAGStatus, "LAGStatusCode", "LAG_STATUS_MAP", None, "number"),
-    (NotificationTypeCode, "NotificationTypeCode", None, "NOTIFICATION_TYPE_OPTIONS", "NotificationTypeCode"),
+    (NotificationTypeCode, "NotificationTypeCode", None, None, "NotificationTypeCode"),
     (ProbeErrorCode, "ProbeErrorCode", "PROBE_ERROR_MAP", None, "ProbeErrorCode"),
-    (IPAuditAction, "IPAuditAction", "IP_AUDIT_ACTION_MAP", "IP_AUDIT_ACTION_OPTIONS", "IPAuditAction"),
-    (SwitchDeviceTypeCode, "SwitchDeviceType", None, "SWITCH_DEVICE_TYPE_OPTIONS", "SwitchDeviceType"),
+    (IPAuditAction, "IPAuditAction", "IP_AUDIT_ACTION_MAP", None, "IPAuditAction"),
+    (SwitchDeviceTypeCode, "SwitchDeviceType", None, None, "SwitchDeviceType"),
     (SSHProtocolCode, "SSHProtocol", None, "SSH_PROTOCOL_OPTIONS", "SSHProtocol"),
 ]
 

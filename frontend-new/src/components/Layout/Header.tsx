@@ -6,16 +6,20 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout, Button, Dropdown, Avatar, Space, theme } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
   UserOutlined,
   BulbOutlined,
-  SettingOutlined
+  SettingOutlined,
+  TranslationOutlined,
 } from '@ant-design/icons';
 import type { User } from '@/types/models';
 import NotificationBell from '@/components/Notification/NotificationBell';
+import { changeLanguage } from '@/i18n';
+import { SUPPORTED_LANGUAGES, type AppLanguage } from '@/i18n/config';
 
 interface HeaderProps {
   sidebarCollapsed: boolean;
@@ -40,6 +44,13 @@ function Header({
 }: HeaderProps) {
   const { token } = theme.useToken();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
+  const { t: tAuth } = useTranslation('auth');
+
+  const currentLang = (i18n.resolvedLanguage || i18n.language) as AppLanguage;
+  const currentLangMeta =
+    SUPPORTED_LANGUAGES.find((l) => l.key === currentLang) ?? SUPPORTED_LANGUAGES[0];
+  const nextLang = SUPPORTED_LANGUAGES.find((l) => l.key !== currentLang)?.key ?? 'zh-CN';
 
   const userMenuItems = [
     ...(isMobile
@@ -47,17 +58,24 @@ function Header({
           {
             key: 'theme',
             icon: <BulbOutlined />,
-            label: themeMode === 'light' ? '切换深色模式' : '切换浅色模式',
-            onClick: onToggleTheme
+            label: themeMode === 'light' ? t('theme.switchDark') : t('theme.switchLight'),
+            onClick: onToggleTheme,
           },
-          { key: 'divider-theme', type: 'divider' as const }
+          { key: 'divider-theme', type: 'divider' as const },
+          {
+            key: 'language',
+            icon: <TranslationOutlined />,
+            label: t('language.switchTo'),
+            onClick: () => changeLanguage(nextLang),
+          },
+          { key: 'divider-language', type: 'divider' as const },
         ]
       : []),
     {
       key: 'profile',
       icon: <SettingOutlined />,
-      label: '用户中心',
-      onClick: () => navigate('/profile')
+      label: t('user.profile'),
+      onClick: () => navigate('/profile'),
     },
     {
       key: 'divider-account',
@@ -66,9 +84,9 @@ function Header({
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: '退出登录',
-      onClick: onLogout
-    }
+      label: tAuth('action.logout'),
+      onClick: onLogout,
+    },
   ];
 
   return (
@@ -82,7 +100,7 @@ function Header({
         borderBottom: `1px solid ${token.colorBorderSecondary}`,
         position: 'sticky',
         top: 0,
-        zIndex: 1
+        zIndex: 1,
       }}
     >
       <Space>
@@ -99,13 +117,24 @@ function Header({
             type="text"
             icon={<BulbOutlined />}
             onClick={onToggleTheme}
-            title={themeMode === 'light' ? '切换深色模式' : '切换浅色模式'}
+            title={themeMode === 'light' ? t('theme.switchDark') : t('theme.switchLight')}
           />
+        )}
+        {!isMobile && (
+          <Button
+            type="text"
+            icon={<TranslationOutlined />}
+            onClick={() => changeLanguage(nextLang)}
+            title={t('language.switchTo')}
+            aria-label={t('language.switchTo')}
+          >
+            {currentLangMeta.short}
+          </Button>
         )}
         <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
           <Space style={{ cursor: 'pointer' }} size={4}>
             <Avatar size="small" icon={<UserOutlined />} />
-            {!isMobile && <span>{user?.username ?? '未登录'}</span>}
+            {!isMobile && <span>{user?.username ?? t('user.notLoggedIn')}</span>}
           </Space>
         </Dropdown>
       </Space>

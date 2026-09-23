@@ -13,6 +13,7 @@
  * 不适用：需要 Row/Col 布局、字段联动、动态显隐、自定义渲染的复杂表单（用 useCrudForm + 手写 JSX）
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Form,
@@ -119,10 +120,11 @@ function SchemaForm({
   loading = false,
   layout = 'vertical',
   formRef,
-  submitText = '确定',
-  cancelText = '取消',
+  submitText,
+  cancelText,
   modalProps,
 }: SchemaFormProps) {
+  const { t } = useTranslation();
   const [form] = Form.useForm();
 
   React.useImperativeHandle(formRef, () => form, [form]);
@@ -148,7 +150,7 @@ function SchemaForm({
           valuePropName={f.type === 'switch' ? 'checked' : 'value'}
           rules={
             f.required
-              ? [{ required: true, message: `请输入${f.label}` }, ...(f.rules ?? [])]
+              ? [{ required: true, message: t('validation.inputRequiredField', { field: f.label }) }, ...(f.rules ?? [])]
               : f.rules
           }
         >
@@ -161,10 +163,10 @@ function SchemaForm({
         <Form.Item>
           <Space>
             <Button type="primary" htmlType="submit" loading={loading}>
-              {submitText}
+              {submitText ?? t('action.ok')}
             </Button>
             {onCancel && (
-              <Button onClick={onCancel}>{cancelText}</Button>
+              <Button onClick={onCancel}>{cancelText ?? t('action.cancel')}</Button>
             )}
           </Space>
         </Form.Item>

@@ -8,6 +8,7 @@
 import { useMemo } from 'react';
 import { Card, Empty, theme } from 'antd';
 import { Pie } from '@ant-design/charts';
+import { useTranslation } from 'react-i18next';
 
 const { useToken } = theme;
 
@@ -28,18 +29,24 @@ export default function StatusPie({
   alertBlindspot,
   loading
 }: StatusPieProps) {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
   const { token } = useToken();
 
   const chartData = useMemo(() => {
-    const base = [
-      { name: '可达', value: reachable ?? 0, color: token.colorSuccess },
-      { name: '不可达', value: unreachable ?? 0, color: token.colorError },
-      { name: '抖动中', value: flapping ?? 0, color: token.colorWarning },
-      { name: '从未可达', value: neverReachable ?? 0, color: token.colorTextDisabled },
-      { name: '告警盲区', value: alertBlindspot ?? 0, color: token.colorErrorActive }
+    const raw = [
+      { name: t('status.reachable'), value: reachable ?? 0, color: token.colorSuccess },
+      { name: t('status.unreachable'), value: unreachable ?? 0, color: token.colorError },
+      { name: t('status.flappingOngoing'), value: flapping ?? 0, color: token.colorWarning },
+      {
+        name: t('status.neverReachable'),
+        value: neverReachable ?? 0,
+        color: token.colorTextDisabled
+      },
+      { name: t('status.blindspot'), value: alertBlindspot ?? 0, color: token.colorErrorActive }
     ];
-    return base.filter((d) => d.value > 0);
-  }, [reachable, unreachable, flapping, neverReachable, alertBlindspot, token]);
+    return raw.filter((d) => d.value > 0);
+  }, [reachable, unreachable, flapping, neverReachable, alertBlindspot, token, t]);
 
   const total = useMemo(() => chartData.reduce((s, d) => s + d.value, 0), [chartData]);
   const isEmpty = chartData.length === 0;
@@ -47,7 +54,9 @@ export default function StatusPie({
   const config = useMemo(
     () => ({
       appendPadding: [8, 8, 8, 8] as [number, number, number, number],
-      data: isEmpty ? [{ name: '暂无数据', value: 1, color: token.colorBgContainer }] : chartData,
+      data: isEmpty
+        ? [{ name: tc('message.noData'), value: 1, color: token.colorBgContainer }]
+        : chartData,
       angleField: 'value',
       colorField: 'name',
       color: isEmpty ? [token.colorBgContainer] : chartData.map((d) => d.color),
@@ -56,11 +65,11 @@ export default function StatusPie({
       label: { type: 'outer' as const },
       tooltip: {
         title: 'name',
-        items: [{ field: 'value', name: '数量' }]
+        items: [{ field: 'value', name: t('chart.count') }]
       },
       statistic: {
         title: {
-          content: '设备总数',
+          content: t('chart.deviceTotal'),
           style: { fontSize: '12px', color: token.colorTextSecondary, lineHeight: '16px' }
         },
         content: {
@@ -77,19 +86,19 @@ export default function StatusPie({
       animation: { appear: { duration: 600, easing: 'easeQuadOut' } },
       pieStyle: { lineWidth: 2, stroke: token.colorBgElevated }
     }),
-    [chartData, isEmpty, total, token]
+    [chartData, isEmpty, total, token, t, tc]
   );
 
   return (
     <Card
-      title="状态分布"
+      title={t('chart.statusDistribution')}
       size="small"
       loading={loading}
       variant="borderless"
       style={{ height: '100%' }}
     >
       {isEmpty ? (
-        <Empty description="暂无数据" style={{ padding: '48px 0' }} />
+        <Empty description={tc('message.noData')} style={{ padding: '48px 0' }} />
       ) : (
         <Pie {...config} height={260} />
       )}

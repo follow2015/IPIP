@@ -1,4 +1,5 @@
 import type { GlobalToken } from 'antd';
+import type { TFunction } from 'i18next';
 import { CabinetStatusCode } from '@/types/enums';
 
 export type StatusPaletteKey = 'red' | 'green' | 'blue' | 'orange' | 'purple';
@@ -31,16 +32,26 @@ export function getStatusPalette(token: GlobalToken, status: number): StatusPale
 }
 
 
-export const CHANNEL_TYPE_LABEL: Record<string, string> = {
-  cold: '冷通道',
-  hot: '热通道',
-  mixed: '混合通道'
+export type ChannelTypeKey =
+  | 'roomLayout.channelType.cold'
+  | 'roomLayout.channelType.hot'
+  | 'roomLayout.channelType.mixed';
+
+export const CHANNEL_TYPE_LABEL_KEYS: Record<string, ChannelTypeKey> = {
+  cold: 'roomLayout.channelType.cold',
+  hot: 'roomLayout.channelType.hot',
+  mixed: 'roomLayout.channelType.mixed'
 };
 
-export const SUPPLY_LABEL: Record<string, string> = {
-  floor: '地板下送风',
-  direct: '上送风直吹（非推荐）',
-  none: '无'
+export type SupplyKey =
+  | 'roomLayout.supply.floor'
+  | 'roomLayout.supply.direct'
+  | 'roomLayout.supply.none';
+
+export const SUPPLY_LABEL_KEYS: Record<string, SupplyKey> = {
+  floor: 'roomLayout.supply.floor',
+  direct: 'roomLayout.supply.direct',
+  none: 'roomLayout.supply.none'
 };
 
 export type ChannelPaletteKey = 'blue' | 'orange' | 'gold';
@@ -52,16 +63,23 @@ export function paletteKeyOf(channelType: string): ChannelPaletteKey {
 }
 
 
-export const MARKER_TYPE_LABEL: Record<string, string> = {
-  ac: '空调',
-  pdu: 'PDU',
-  pillar: '立柱',
-  door: '门',
-  other: '其他'
+export const MARKER_TYPE_LABEL_KEYS: Record<string, MarkerTypeKey> = {
+  ac: 'roomLayout.markerType.ac',
+  pdu: 'roomLayout.markerType.pdu',
+  pillar: 'roomLayout.markerType.pillar',
+  door: 'roomLayout.markerType.door',
+  other: 'roomLayout.markerType.other'
 };
 
-export function positionLabel(row: number, col: number): string {
-  const rowText = row === 0 ? '第 1 行外侧' : `第 ${row} 行`;
-  const colText = col === 0 ? '第 1 列外侧' : `第 ${col} 列`;
+export type MarkerTypeKey =
+  | 'roomLayout.markerType.ac'
+  | 'roomLayout.markerType.pdu'
+  | 'roomLayout.markerType.pillar'
+  | 'roomLayout.markerType.door'
+  | 'roomLayout.markerType.other';
+
+export function positionLabel(row: number, col: number, t: TFunction<'asset'>): string {
+  const rowText = row === 0 ? t('roomLayout.outsideRow') : t('roomLayout.positionRow', { row });
+  const colText = col === 0 ? t('roomLayout.outsideCol') : t('roomLayout.positionCol', { col });
   return `${rowText} ${colText}`;
 }

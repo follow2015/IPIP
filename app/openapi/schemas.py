@@ -1783,7 +1783,11 @@ class DeviceMetricDashboardResponseSchema(Schema):
     grouped = fields.Bool()
     metric_status = fields.List(fields.Nested(DeviceMetricDashboardItemSchema))
     overall_status = fields.Str()
-    status_reason = fields.Str(allow_none=True, metadata={"description": "整体状态中文说明，供前端直接展示"})
+    status_reason = fields.Str(allow_none=True, metadata={"description": "整体状态中文说明，供前端直接展示（兜底）"})
+    monitor_status_code = fields.Str(
+        allow_none=True,
+        metadata={"description": "整体状态细粒度代码，前端据此映射 device:monitorStatus.<code>；缺省时回落到 status_reason"},
+    )
     reachable = fields.Bool(allow_none=True)
     last_error = fields.Str(allow_none=True)
     last_checked_at = fields.Str(allow_none=True)

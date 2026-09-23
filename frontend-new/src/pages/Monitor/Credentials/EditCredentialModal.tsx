@@ -12,6 +12,7 @@ import {
 } from '@/services/monitor';
 import MonitorCredentialForm from '@/components/MonitorCredentialForm';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 interface EditCredentialModalProps {
   open: boolean;
@@ -28,6 +29,8 @@ export default function EditCredentialModal({
 }: EditCredentialModalProps) {
   const updateShared = useUpdateSharedCredentialPayload();
   const msg = useMessage();
+  const { t } = useTranslation('monitor');
+  const { t: td } = useTranslation('device');
 
   const editInitialValues = (() => {
     const meta = editCred?.payload_meta || {};
@@ -67,16 +70,20 @@ export default function EditCredentialModal({
         payload,
         name: (values.name as string) || undefined
       });
-      msg.success(res.credential_migrated ? '已更新密文（已为该凭据生成独立行）' : '凭据已更新');
+      msg.success(
+        res.credential_migrated
+          ? t('credential.message.secretUpdatedMigrated')
+          : t('credential.message.updated')
+      );
       onClose();
     } catch (err) {
-      msg.error(err instanceof Error ? err.message : '更新失败');
+      msg.error(err instanceof Error ? err.message : td('credential.message.updateFailed'));
     }
   };
 
   return (
     <Modal
-      title="编辑凭据密文"
+      title={t('credential.editSecretTitle')}
       open={open}
       onCancel={onClose}
       onOk={handleSubmitEdit}
@@ -90,17 +97,17 @@ export default function EditCredentialModal({
           showIcon
           icon={<WarningOutlined />}
           style={{ marginBottom: 16 }}
-          message={`此操作将影响 ${editCred.linked_count ?? 0} 台关联设备`}
-          description="密文字段留空表示「保持不变」；提交后所有关联设备将用新凭据重新探测。"
+          message={t('credential.alert.affectDevices', { count: editCred.linked_count ?? 0 })}
+          description={t('credential.alert.secretEditHint')}
         />
       )}
       <Form form={editForm} layout="vertical" initialValues={editInitialValues}>
         <Form.Item
-          label="凭据名称"
+          label={td('credential.name')}
           name="name"
-          rules={[{ required: true, message: '请输入凭据名称' }]}
+          rules={[{ required: true, message: td('credential.namePlaceholder') }]}
         >
-          <Input placeholder="如：机房A SNMP只读团体字" />
+          <Input placeholder={td('credential.nameHint')} />
         </Form.Item>
         {editCred && (
           <MonitorCredentialForm

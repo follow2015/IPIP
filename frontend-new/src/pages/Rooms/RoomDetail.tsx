@@ -25,16 +25,19 @@ import RoomLayout from '@/components/RoomLayout';
 import ChannelConfigModal from '@/components/RoomLayout/ChannelConfigModal';
 import MarkerConfigModal from '@/components/RoomLayout/MarkerConfigModal';
 import { usePermission } from '@/hooks/usePermission';
-import { ROOM_STATUS_MAP } from '@/types/enums';
+import { getRoomStatusMeta, type DeviceT } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '@/utils/format';
 import type { Cabinet } from '@/types/models';
 
-function renderStatus(v: number) {
-  const s = ROOM_STATUS_MAP[v as keyof typeof ROOM_STATUS_MAP];
+function renderStatus(v: number, t: DeviceT) {
+  const s = getRoomStatusMeta(v, t);
   return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{v}</Tag>;
 }
 
 function RoomDetail() {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const roomId = Number(id);
@@ -43,9 +46,9 @@ function RoomDetail() {
     return (
       <Result
         status="404"
-        title="参数无效"
-        subTitle="机房 ID 无效"
-        extra={<Button onClick={() => navigate(-1)}>返回</Button>}
+        title={td('detail.invalidParam')}
+        subTitle={td('room.invalidId')}
+        extra={<Button onClick={() => navigate(-1)}>{tc('action.back')}</Button>}
       />
     );
   }
@@ -54,6 +57,9 @@ function RoomDetail() {
 }
 
 function RoomDetailContent({ roomId }: { roomId: number }) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
+  const { t: tm } = useTranslation('monitor');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -69,7 +75,7 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
   const [markerModalOpen, setMarkerModalOpen] = useState(false);
 
   if (!room) {
-    return <div>机房不存在</div>;
+    return <div>{td('room.notFound')}</div>;
   }
 
   const cabinetList = (cabinets ?? []) as Cabinet[];
@@ -85,42 +91,62 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
     <div>
       <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/rooms')}>
-          返回列表
+          {td('detail.backToList')}
         </Button>
         <Button type="primary" onClick={() => navigate(`/cabinets?roomId=${roomId}`)}>
-          查看机柜列表
+          {td('room.action.viewCabinetList')}
         </Button>
       </div>
 
-      <Card title={`机房详情 - ${room.name}`}>
+      <Card title={td('room.detailTitle', { name: room.name })}>
         <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
-          <Descriptions.Item label="机房名称">{room.name}</Descriptions.Item>
+          <Descriptions.Item label={td('room.field.name')}>{room.name}</Descriptions.Item>
           <Descriptions.Item label="房间号">{room.room_number || '-'}</Descriptions.Item>
-          <Descriptions.Item label="状态">{renderStatus(room.status)}</Descriptions.Item>
-          {/* 楼栋 / 楼层：总览页按它们分组与过滤，详情页也理应能看到——
-              否则从总览点进来会"看不到刚才那个分组依据"，像是信息丢了 */}
+          <Descriptions.Item label={tc('field.status')}>
+            {renderStatus(room.status, td)}
+          </Descriptions.Item>
           <Descriptions.Item label="楼栋">{room.building || '-'}</Descriptions.Item>
           <Descriptions.Item label="楼层">{room.floor || '-'}</Descriptions.Item>
-          <Descriptions.Item label="位置">{room.location || '-'}</Descriptions.Item>
-          <Descriptions.Item label="机柜数">{totalCabinets}</Descriptions.Item>
-          <Descriptions.Item label="联系人">{room.contact || '-'}</Descriptions.Item>
-          <Descriptions.Item label="联系电话">{room.contact_phone || '-'}</Descriptions.Item>
-          <Descriptions.Item label="创建时间">{formatDateTime(room.created_at)}</Descriptions.Item>
-          <Descriptions.Item label="更新时间">{formatDateTime(room.updated_at)}</Descriptions.Item>
+          <Descriptions.Item label={td('cabinet.field.location')}>
+            {room.location || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label={td('customer.stats.cabinetCount')}>
+            {totalCabinets}
+          </Descriptions.Item>
+          <Descriptions.Item label={td('customer.field.contactPerson')}>
+            {room.contact || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label={td('customer.field.contactPhone')}>
+            {room.contact_phone || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label={tc('field.createdAt')}>
+            {formatDateTime(room.created_at)}
+          </Descriptions.Item>
+          <Descriptions.Item label={tc('field.updatedAt')}>
+            {formatDateTime(room.updated_at)}
+          </Descriptions.Item>
         </Descriptions>
       </Card>
 
-      <Card title="统计概览" style={{ marginTop: 16 }}>
+      <Card title={td('room.stats.title')} style={{ marginTop: 16 }}>
         <Row gutter={16}>
           <Col xs={12} md={6}>
-            <Statistic title="机柜总数" value={totalCabinets} prefix={<DatabaseOutlined />} />
-          </Col>
-          <Col xs={12} md={6}>
-            <Statistic title="设备总数" value={totalDevices} prefix={<AppstoreOutlined />} />
+            <Statistic
+              title={tm('dashboard.metric.cabinetTotal')}
+              value={totalCabinets}
+              prefix={<DatabaseOutlined />}
+            />
           </Col>
           <Col xs={12} md={6}>
             <Statistic
-              title="平均U位利用率"
+              title={tm('chart.deviceTotal')}
+              value={totalDevices}
+              prefix={<AppstoreOutlined />}
+            />
+          </Col>
+          <Col xs={12} md={6}>
+            <Statistic
+              title={td('room.stats.avgUUsage')}
               value={avgUUsage}
               suffix="%"
               prefix={<ThunderboltOutlined />}
@@ -128,13 +154,17 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
             />
           </Col>
           <Col xs={12} md={6}>
-            <Statistic title="已定位机柜" value={positionedCount} suffix={`/ ${totalCabinets}`} />
+            <Statistic
+              title={td('room.stats.positionedCabinets')}
+              value={positionedCount}
+              suffix={`/ ${totalCabinets}`}
+            />
           </Col>
         </Row>
       </Card>
 
       <Card
-        title="机房平面图"
+        title={td('room.floorPlanTitle')}
         style={{ marginTop: 16 }}
         extra={
           canConfigLayout ? (

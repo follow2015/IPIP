@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { Card, Empty, theme } from 'antd';
 import { Pie } from '@ant-design/charts';
 import { MONITOR_PROTOCOL_PALETTE } from '@/types/enums';
+import { useTranslation } from 'react-i18next';
 
 const { useToken } = theme;
 
@@ -18,6 +19,8 @@ interface ProtocolPieProps {
 }
 
 export default function ProtocolPie({ data, total, loading }: ProtocolPieProps) {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
   const { token } = useToken();
 
   const chartData = useMemo(
@@ -37,7 +40,9 @@ export default function ProtocolPie({ data, total, loading }: ProtocolPieProps) 
   const config = useMemo(
     () => ({
       appendPadding: [8, 8, 8, 8] as [number, number, number, number],
-      data: isEmpty ? [{ name: '暂无数据', value: 1, color: token.colorBgContainer }] : chartData,
+      data: isEmpty
+        ? [{ name: tc('message.noData'), value: 1, color: token.colorBgContainer }]
+        : chartData,
       angleField: 'value',
       colorField: 'name',
       color: isEmpty ? [token.colorBgContainer] : chartData.map((d) => d.color),
@@ -46,11 +51,11 @@ export default function ProtocolPie({ data, total, loading }: ProtocolPieProps) 
       label: { type: 'outer' as const },
       tooltip: {
         title: 'name',
-        items: [{ field: 'value', name: '数量' }]
+        items: [{ field: 'value', name: t('chart.count') }]
       },
       statistic: {
         title: {
-          content: '协议总数',
+          content: t('chart.protocolTotal'),
           style: { fontSize: '12px', color: token.colorTextSecondary, lineHeight: '16px' }
         },
         content: {
@@ -67,19 +72,19 @@ export default function ProtocolPie({ data, total, loading }: ProtocolPieProps) 
       animation: { appear: { duration: 600, easing: 'easeQuadOut' } },
       pieStyle: { lineWidth: 2, stroke: token.colorBgElevated }
     }),
-    [chartData, isEmpty, total, token]
+    [chartData, isEmpty, total, token, t, tc]
   );
 
   return (
     <Card
-      title="协议分布"
+      title={t('chart.protocolDistribution')}
       size="small"
       loading={loading}
       variant="borderless"
       style={{ height: '100%' }}
     >
       {isEmpty ? (
-        <Empty description="暂无数据" style={{ padding: '48px 0' }} />
+        <Empty description={tc('message.noData')} style={{ padding: '48px 0' }} />
       ) : (
         <Pie {...config} height={260} />
       )}

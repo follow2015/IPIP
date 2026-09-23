@@ -43,10 +43,13 @@ import {
   type MonitorSlaTarget,
   type MonitorSlaTargetInput
 } from '@/services/monitor';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
 export default function SlaTargetsPage() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
   const { data, isLoading } = useSlaTargets();
   const { data: achievementsData } = useSlaAchievements();
   const createMut = useCreateSlaTarget();
@@ -96,7 +99,7 @@ export default function SlaTargetsPage() {
         .map((s) => parseInt(s.trim(), 10))
         .filter((n) => !Number.isNaN(n));
       if (deviceIds.length === 0) {
-        message.error('请输入至少一个设备 ID');
+        message.error(t('sla.validation.deviceIdsRequired'));
         return;
       }
       const payload: MonitorSlaTargetInput = {
@@ -109,10 +112,10 @@ export default function SlaTargetsPage() {
       };
       if (editing) {
         await updateMut.mutateAsync({ id: editing.id, ...payload });
-        message.success('已更新');
+        message.success(t('crud.updated'));
       } else {
         await createMut.mutateAsync(payload);
-        message.success('已创建');
+        message.success(t('crud.created'));
       }
       modal.close();
     } catch (err: unknown) {
@@ -123,64 +126,64 @@ export default function SlaTargetsPage() {
   const handleDelete = async (id: number) => {
     try {
       await deleteMut.mutateAsync(id);
-      message.success('已删除');
+      message.success(t('crud.deleted'));
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '删除失败');
+      message.error(err instanceof Error ? err.message : t('crud.deleteFailed'));
     }
   };
 
   const columns = [
     {
-      title: '名称',
+      title: tc('field.name'),
       dataIndex: 'name',
       key: 'name',
       render: (v: string, r: MonitorSlaTarget) => (
         <Space>
           <Text strong>{v}</Text>
-          {!r.enabled && <Tag color="default">已停用</Tag>}
+          {!r.enabled && <Tag color="default">{t('credential.status.disabled')}</Tag>}
         </Space>
       )
     },
     {
-      title: '目标设备',
+      title: t('sla.column.targetDevices'),
       dataIndex: 'target_device_ids',
       key: 'target_device_ids',
-      render: (v: number[]) => `${v.length} 台`
+      render: (v: number[]) => `${v.length} ${t('stat.unitDevice', { count: v.length })}`
     },
     {
-      title: '可用率目标',
+      title: t('sla.column.targetRatio'),
       dataIndex: 'target_ratio',
       key: 'target_ratio',
       render: (v: number) => <Tag color="blue">{(v * 100).toFixed(2)}%</Tag>
     },
     {
-      title: '评估窗口',
+      title: t('sla.column.window'),
       dataIndex: 'window_days',
       key: 'window_days',
-      render: (v: number) => `${v} 天`
+      render: (v: number) => t('sla.windowDays', { count: v })
     },
     {
-      title: '描述',
+      title: tc('field.description'),
       dataIndex: 'description',
       key: 'description',
       ellipsis: true
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       render: (_: unknown, r: MonitorSlaTarget) => (
         <Space>
           <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(r)}>
-            编辑
+            {tc('action.edit')}
           </Button>
           <ConfirmButton
             type="link"
             icon={<DeleteOutlined />}
-            title="确认删除"
-            content="确定要删除该 SLA 目标吗？此操作不可恢复。"
+            title={tc('confirm.deleteTitle')}
+            content={t('sla.confirm.deleteContent')}
             onConfirm={() => handleDelete(r.id)}
           >
-            删除
+            {tc('action.delete')}
           </ConfirmButton>
         </Space>
       )
@@ -192,13 +195,13 @@ export default function SlaTargetsPage() {
       <Alert
         type="info"
         showIcon
-        message="SLA/SLO 监控"
-        description="定义设备/设备组的可用率 SLA 目标，系统基于探测时序小时聚合（device_monitor_timeseries_hourly 的 reachable 指标）计算实际达成度。"
+        message={t('sla.alert.title')}
+        description={t('sla.alert.description')}
       />
 
-      <Card title="SLA 达成度报表">
+      <Card title={t('sla.achievementTitle')}>
         {achievements.length === 0 ? (
-          <Text type="secondary">暂无启用的 SLA 目标</Text>
+          <Text type="secondary">{t('sla.achievementEmpty')}</Text>
         ) : (
           <Row gutter={[16, 16]}>
             {achievements.map((a) => {
@@ -211,7 +214,7 @@ export default function SlaTargetsPage() {
                 <Col xs={24} sm={12} md={8} key={a.target_id}>
                   <Card size="small" title={a.name}>
                     <Statistic
-                      title="实际可用率"
+                      title={t('sla.stat.actualRatio')}
                       value={actualPct !== null ? actualPct.toFixed(2) : '—'}
                       suffix={actualPct !== null ? '%' : ''}
                       prefix={
@@ -226,12 +229,15 @@ export default function SlaTargetsPage() {
                       percent={actualPct ?? 0}
                       success={{ percent: a.met_sla ? (actualPct ?? 0) : 0 }}
                       status={a.met_sla ? 'success' : 'exception'}
-                      format={() => `目标 ${targetPct.toFixed(2)}%`}
+                      format={() => t('sla.stat.targetAt', { pct: targetPct.toFixed(2) })}
                       size="small"
                     />
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      样本数: {a.sample_count} | 窗口: {a.window_start?.slice(0, 10)} ~{' '}
-                      {a.window_end?.slice(0, 10)}
+                      {t('sla.stat.sampleSummary', {
+                        count: a.sample_count,
+                        start: a.window_start?.slice(0, 10),
+                        end: a.window_end?.slice(0, 10)
+                      })}
                     </Text>
                   </Card>
                 </Col>
@@ -242,10 +248,10 @@ export default function SlaTargetsPage() {
       </Card>
 
       <Card
-        title="SLA 目标管理"
+        title={t('sla.title')}
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建目标
+            {t('sla.action.create')}
           </Button>
         }
       >
@@ -255,7 +261,7 @@ export default function SlaTargetsPage() {
           loading={isLoading}
           rowKey={(r) => String(r.id)}
           total={items.length}
-          emptyText="暂无 SLA 目标"
+          emptyText={t('sla.empty')}
           searchable={false}
           showCard={false}
           tableProps={table}
@@ -263,7 +269,7 @@ export default function SlaTargetsPage() {
       </Card>
 
       <Modal
-        title={editing ? '编辑 SLA 目标' : '新建 SLA 目标'}
+        title={editing ? t('sla.modal.editTitle') : t('sla.modal.createTitle')}
         open={modal.isOpen}
         onOk={handleSubmit}
         onCancel={() => modal.close()}
@@ -274,22 +280,24 @@ export default function SlaTargetsPage() {
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item
             name="name"
-            label="目标名称"
-            rules={[{ required: true, message: '请输入名称' }]}
+            label={t('sla.field.name')}
+            rules={[
+              { required: true, message: tc('validation.inputRequiredField', { field: tc('field.name') }) }
+            ]}
           >
-            <Input placeholder="如：核心设备月度可用率 SLA" maxLength={128} />
+            <Input placeholder={t('sla.placeholder.name')} maxLength={128} />
           </Form.Item>
           <Form.Item
             name="target_device_ids"
-            label="目标设备 ID（逗号分隔）"
-            rules={[{ required: true, message: '请输入设备 ID' }]}
+            label={t('sla.field.targetDeviceIds')}
+            rules={[{ required: true, message: t('thresholdOverride.validation.deviceIdRequired') }]}
           >
-            <Input placeholder="如：1,2,3" />
+            <Input placeholder={t('sla.placeholder.deviceIds')} />
           </Form.Item>
           <Form.Item
             name="target_ratio"
-            label="可用率目标（0~1，如 0.99=99%）"
-            rules={[{ required: true, message: '请输入可用率目标' }]}
+            label={t('sla.field.targetRatio')}
+            rules={[{ required: true, message: t('sla.validation.targetRatioRequired') }]}
           >
             <InputNumber
               placeholder="0.99"
@@ -301,15 +309,15 @@ export default function SlaTargetsPage() {
           </Form.Item>
           <Form.Item
             name="window_days"
-            label="评估窗口（天）"
-            rules={[{ required: true, message: '请输入评估窗口' }]}
+            label={t('sla.field.windowDays')}
+            rules={[{ required: true, message: t('sla.validation.windowDaysRequired') }]}
           >
             <InputNumber placeholder="30" style={{ width: '100%' }} min={1} max={365} />
           </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={2} placeholder="如：月度可用率 ≥ 99%" maxLength={255} />
+          <Form.Item name="description" label={tc('field.description')}>
+            <Input.TextArea rows={2} placeholder={t('sla.placeholder.description')} maxLength={255} />
           </Form.Item>
-          <Form.Item name="enabled" label="启用" valuePropName="checked">
+          <Form.Item name="enabled" label={tc('action.enable')} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

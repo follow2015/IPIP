@@ -18,8 +18,16 @@ import {
 } from '@/services/monitor';
 import { useMessage } from '@/hooks/useMessage';
 import { relativeTime } from '@/utils/format';
-import { ALERT_TYPE_LABEL, ALERT_TYPE_COLOR } from '@/constants/monitor';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { ALERT_TYPE_COLOR } from '@/constants/monitor';
+import { NOTIFICATION_TYPE_LABEL_KEYS, type NotificationTypeCode } from '@/types';
 import AlertInterpret from './AlertInterpret';
+
+const alertTypeLabel = (type: string, td: TFunction<'device'>) => {
+  const key = NOTIFICATION_TYPE_LABEL_KEYS[type as NotificationTypeCode];
+  return key ? td(key) : type;
+};
 
 const { Text } = Typography;
 
@@ -40,6 +48,9 @@ interface RecentAlertsProps {
 }
 
 export default function RecentAlerts({ loading }: RecentAlertsProps) {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
+  const { t: td } = useTranslation('device');
   const { token } = theme.useToken();
   const message = useMessage();
   const { data: recentAlerts } = useMonitorAlerts({ per_page: 8 });
@@ -49,18 +60,18 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
   const handleAck = async (id: number) => {
     try {
       await ackAlert.mutateAsync({ alertId: id });
-      message.success('已确认');
+      message.success(t('alerts.acknowledged'));
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '确认失败');
+      message.error(err instanceof Error ? err.message : t('alerts.message.ackFailed'));
     }
   };
 
   const handleClose = async (id: number) => {
     try {
       await closeAlert.mutateAsync({ alertId: id });
-      message.success('已关闭');
+      message.success(t('alerts.message.closed'));
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '关闭失败');
+      message.error(err instanceof Error ? err.message : t('alerts.message.closeFailed'));
     }
   };
 
@@ -68,12 +79,12 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
 
   return (
     <Card
-      title="最近告警"
+      title={t('recent.title')}
       loading={loading}
       extra={
         <Link to="/monitor/alerts">
           <Button type="link" size="small" icon={<RightOutlined />}>
-            查看全部
+            {t('recent.viewAll')}
           </Button>
         </Link>
       }
@@ -89,7 +100,7 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
           rowClassName={(r) => (r.severity === 'critical' ? 'alert-row-critical' : '')}
           columns={[
             {
-              title: '设备',
+              title: t('column.device'),
               key: 'device',
               render: (_: unknown, r: MonitorAlertItem) =>
                 r.device_id ? (
@@ -99,17 +110,17 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
                 )
             },
             {
-              title: '告警类型',
+              title: t('column.alertType'),
               key: 'alert_type',
               width: 140,
               render: (_: unknown, r: MonitorAlertItem) => (
                 <Tag color={ALERT_TYPE_COLOR[r.alert_type] || 'default'}>
-                  {ALERT_TYPE_LABEL[r.alert_type] || r.alert_type}
+                  {alertTypeLabel(r.alert_type, td)}
                 </Tag>
               )
             },
             {
-              title: '级别',
+              title: tc('field.level'),
               key: 'severity',
               width: 90,
               render: (_: unknown, r: MonitorAlertItem) => (
@@ -128,7 +139,7 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
               )
             },
             {
-              title: '内容',
+              title: t('column.content'),
               key: 'content',
               ellipsis: true,
               render: (_: unknown, r: MonitorAlertItem) => {
@@ -141,14 +152,14 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
               }
             },
             {
-              title: '时间',
+              title: tc('field.time'),
               dataIndex: 'created_at',
               key: 'created_at',
               width: 120,
-              render: relativeTime
+              render: (v: string | null) => relativeTime(v, tc)
             },
             {
-              title: '操作',
+              title: tc('field.actions'),
               key: 'action',
               width: 120,
               render: (_: unknown, r: MonitorAlertItem) => {
@@ -158,7 +169,7 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
                     <Space size={4}>
                       {isPending ? (
                         <>
-                          <Tooltip title="确认">
+                          <Tooltip title={tc('action.confirm')}>
                             <Button
                               type="text"
                               size="small"
@@ -168,7 +179,7 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
                               style={{ color: token.colorSuccess }}
                             />
                           </Tooltip>
-                          <Tooltip title="关闭">
+                          <Tooltip title={tc('action.close')}>
                             <Button
                               type="text"
                               size="small"
@@ -180,7 +191,7 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
                           </Tooltip>
                         </>
                       ) : (
-                        <Text type="secondary">已处理</Text>
+                        <Text type="secondary">{t('recent.handled')}</Text>
                       )}
                     </Space>
                     <AlertInterpret
@@ -197,7 +208,7 @@ export default function RecentAlerts({ loading }: RecentAlertsProps) {
           ]}
         />
       ) : (
-        <Empty description="暂无最近告警" />
+        <Empty description={t('recent.empty')} />
       )}
     </Card>
   );

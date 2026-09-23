@@ -23,6 +23,7 @@ import { LAG_STATUS_MAP } from '@/types/enums';
 import type { LinkAggregationGroup } from '@/services/link-aggregation';
 import type { SwitchPort } from '@/types/models';
 import { isPhysicalPort } from '@/utils/portType';
+import { useTranslation } from 'react-i18next';
 
 interface LagTabProps {
   deviceId: number;
@@ -30,6 +31,8 @@ interface LagTabProps {
 }
 
 function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const { data: lagGroups, isLoading } = useLinkAggregationGroups(deviceId);
   const createLag = useCreateLinkAggregationGroup();
@@ -64,7 +67,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
     try {
       const values = await addForm.validateFields();
       await createLag.mutateAsync({ deviceId, data: values });
-      message.success('链路聚合组创建成功');
+      message.success(t('lag.message.created'));
       addModal.close();
       addForm.resetFields();
     } catch (err) {
@@ -74,12 +77,12 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
 
   const handleDelete = (lag: LinkAggregationGroup) => {
     confirm({
-      title: '确认删除链路聚合组',
-      content: `确定要删除链路聚合组「${lag.lag_name}」吗？`,
+      title: t('lag.confirmDelete'),
+      content: t('lag.confirmDeleteContent', { name: lag.lag_name }),
       okButtonProps: { danger: true },
       onOk: async () => {
         await deleteLag.mutateAsync({ deviceId, lagId: lag.id });
-        message.success('链路聚合组已删除');
+        message.success(t('lag.message.deleted'));
       }
     });
   };
@@ -103,7 +106,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
         lagId: editingMemberLag.id,
         portIds: values.member_port_ids ?? []
       });
-      message.success('成员端口更新成功');
+      message.success(t('memberPort.updateSuccess'));
       memberModal.close();
       setEditingMemberLag(null);
     } catch (err) {
@@ -125,7 +128,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
         lagId: editingLag.id,
         data: { purpose: values.purpose ?? '' }
       });
-      message.success('用途更新成功');
+      message.success(t('lag.message.purposeUpdated'));
       purposeModal.close();
       setEditingLag(null);
     } catch (err) {
@@ -141,23 +144,29 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
     }));
 
   const columns = [
-    { title: '聚合组名称', dataIndex: 'lag_name', key: 'lag_name' },
+    { title: t('lag.column.lagName'), dataIndex: 'lag_name', key: 'lag_name' },
     {
-      title: '类型',
+      title: tCommon('field.type'),
       dataIndex: 'lag_type',
       key: 'lag_type',
-      render: (v: string) => (v === 'lacp' ? <Tag color="blue">LACP</Tag> : <Tag>静态</Tag>)
+      render: (v: string) =>
+        v === 'lacp' ? <Tag color="blue">{t('lag.type.lacp')}</Tag> : <Tag>{t('lag.type.static')}</Tag>
     },
     {
-      title: '负载算法',
+      title: t('lag.column.algorithm'),
       dataIndex: 'algorithm',
       key: 'algorithm',
       render: (v: string | null) => v || '-'
     },
-    { title: '用途', dataIndex: 'purpose', key: 'purpose', render: (v: string) => v || '-' },
-    { title: '成员数', dataIndex: 'member_count', key: 'member_count' },
     {
-      title: '成员端口',
+      title: tCommon('field.purpose'),
+      dataIndex: 'purpose',
+      key: 'purpose',
+      render: (v: string) => v || '-'
+    },
+    { title: t('lag.column.memberCount'), dataIndex: 'member_count', key: 'member_count' },
+    {
+      title: t('memberPort.column'),
       dataIndex: 'member_ports',
       key: 'member_ports',
       render: (memberPorts: string[]) => {
@@ -166,13 +175,13 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
       }
     },
     {
-      title: '状态',
+      title: tCommon('field.status'),
       dataIndex: 'status',
       key: 'status',
       render: (v: number) => <StatusTag status={v} statusMap={LAG_STATUS_MAP} />
     },
     {
-      title: '操作',
+      title: tCommon('field.actions'),
       key: 'action',
       width: hasSsh ? 80 : 200,
       render: (_: unknown, record: LinkAggregationGroup) => (
@@ -183,7 +192,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
             icon={<EditOutlined />}
             onClick={() => handleEditPurpose(record)}
           >
-            用途
+            {tCommon('field.purpose')}
           </Button>
           {!hasSsh && (
             <>
@@ -193,7 +202,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
                 icon={<EditOutlined />}
                 onClick={() => handleEditMembers(record)}
               >
-                成员
+                {t('lag.action.members')}
               </Button>
               <Button
                 type="link"
@@ -202,7 +211,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
                 icon={<DeleteOutlined />}
                 onClick={() => handleDelete(record)}
               >
-                删除
+                {tCommon('action.delete')}
               </Button>
             </>
           )}
@@ -223,13 +232,12 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
             loading={syncMembers.isPending}
             onClick={() => {
               confirm({
-                title: '同步链路聚合成员端口',
-                content:
-                  '将从设备 SSH 获取所有 Eth-Trunk 配置并解析成员端口列表，可能需要较长时间。确定继续？',
+                title: t('lag.confirmSync'),
+                content: t('lag.confirmSyncContent'),
                 onOk: async () => {
                   try {
                     await syncMembers.mutateAsync(deviceId);
-                    message.info('成员端口同步已提交，完成后将通过消息通知您');
+                    message.info(t('memberPort.syncSubmitted'));
                   } catch {
                   }
                 }
@@ -237,12 +245,12 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
             }}
             style={{ marginRight: 8 }}
           >
-            同步成员
+            {t('lag.action.syncMembers')}
           </Button>
         )}
         {!hasSsh && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => addModal.open()}>
-            创建链路聚合组
+            {t('lag.action.create')}
           </Button>
         )}
       </div>
@@ -260,7 +268,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
 
       {/* 创建链路聚合组弹窗 */}
       <Modal
-        title="创建链路聚合组"
+        title={t('lag.action.create')}
         open={addModal.isOpen}
         onOk={handleAdd}
         onCancel={() => {
@@ -272,16 +280,21 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
         <Form form={addForm} layout="vertical">
           <Form.Item
             name="lag_name"
-            label="聚合组名称"
-            rules={[{ required: true, message: '请输入聚合组名称' }]}
+            label={t('lag.column.lagName')}
+            rules={[{ required: true, message: t('lag.form.inputLagName') }]}
           >
-            <Input placeholder="如 Eth-Trunk1" />
+            <Input placeholder={t('lag.form.lagNamePlaceholder')} />
           </Form.Item>
-          <Form.Item name="lag_type" label="类型" initialValue="lacp" rules={[{ required: true }]}>
+          <Form.Item
+            name="lag_type"
+            label={tCommon('field.type')}
+            initialValue="lacp"
+            rules={[{ required: true }]}
+          >
             <Select
               options={[
-                { value: 'lacp', label: 'LACP（动态）' },
-                { value: 'static', label: '静态' }
+                { value: 'lacp', label: t('lag.type.lacpDynamic') },
+                { value: 'static', label: t('lag.type.static') }
               ]}
             />
           </Form.Item>
@@ -291,7 +304,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
       {/* hasSsh=false 模式：成员端口编辑弹窗 */}
       {!hasSsh && (
         <Modal
-          title={`编辑成员端口 - ${editingMemberLag?.lag_name ?? ''}`}
+          title={t('memberPort.editTitle', { name: editingMemberLag?.lag_name ?? '' })}
           open={memberModal.isOpen}
           onOk={handleMemberSubmit}
           onCancel={() => {
@@ -301,10 +314,10 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
           destroyOnHidden
         >
           <Form form={memberForm} layout="vertical">
-            <Form.Item name="member_port_ids" label="成员端口">
+            <Form.Item name="member_port_ids" label={t('memberPort.column')}>
               <Select
                 mode="multiple"
-                placeholder="选择成员端口"
+                placeholder={t('memberPort.selectPlaceholder')}
                 options={portOptions}
                 showSearch
                 filterOption={(input, option) =>
@@ -318,7 +331,7 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
 
       {/* 用途编辑弹窗（所有交换机可用） */}
       <Modal
-        title={`编辑用途 - ${editingLag?.lag_name ?? ''}`}
+        title={t('lag.editPurposeTitle', { name: editingLag?.lag_name ?? '' })}
         open={purposeModal.isOpen}
         onOk={handlePurposeSubmit}
         onCancel={() => {
@@ -327,12 +340,10 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
         }}
         destroyOnHidden
       >
-        <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
-          此处仅记录用途信息，不操作交换机。操作交换机需要在端口列表对应的端口操作。
-        </p>
+        <p style={{ color: '#8c8c8c', marginBottom: 16 }}>{t('memberPort.purposeHint')}</p>
         <Form form={purposeForm} layout="vertical">
-          <Form.Item name="purpose" label="用途">
-            <Input placeholder="如 上行链路、服务器互联" maxLength={255} />
+          <Form.Item name="purpose" label={tCommon('field.purpose')}>
+            <Input placeholder={t('lag.form.purposePlaceholder')} maxLength={255} />
           </Form.Item>
         </Form>
       </Modal>

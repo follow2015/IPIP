@@ -17,6 +17,10 @@ VOICE_CONCLUDED_STATUSES = frozenset({
 
 VOICE_RESULT_EVENTS: tuple[str, ...] = ("acked", "delivered", "answered", "no_answer")
 
+TERMINAL_OVERRIDE_ALLOWED = frozenset({
+    "failed:cancelled",  # 保护点在任务启动幂等（不得重呼），回调覆盖无害——见上
+})
+
 VOICE_FAILED_PREFIX = "failed:"
 
 

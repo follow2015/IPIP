@@ -44,7 +44,8 @@ import {
   type MetricTemplateItem,
   useVendorBrands
 } from '@/services/monitor';
-import { DEVICE_TYPE_OPTIONS, SOURCE_OPTIONS, DEVICE_TYPE_LABEL, SOURCE_LABEL } from './shared';
+import { SOURCE_OPTIONS, SOURCE_LABEL, deviceTypeLabel, buildDeviceTypeOptions } from './shared';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
@@ -55,6 +56,9 @@ interface GroupFormValues extends Omit<MetricTemplateGroupUpsert, 'vendor'> {
 export default function MetricTemplateGroupsSection() {
   const confirm = useConfirm();
   const message = useMessage();
+  const { t } = useTranslation('monitor');
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const { data: groups, isLoading } = useMetricTemplateGroups();
   const { data: templates, isLoading: templatesLoading } = useMetricTemplates();
   const { data: vendorBrands } = useVendorBrands();
@@ -79,6 +83,7 @@ export default function MetricTemplateGroupsSection() {
   );
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<number[]>([]);
 
+  const deviceTypeOptions = buildDeviceTypeOptions(td);
   const allGroups = groups ?? [];
 
   const openCreateGroup = () => {
@@ -121,24 +126,24 @@ export default function MetricTemplateGroupsSection() {
     try {
       if (editingGroup) {
         await updateGroup.mutateAsync({ id: editingGroup.id, ...payload });
-        message.success('模板组已更新');
+        message.success(t('metricTemplate.group.message.updated'));
       } else {
         await createGroup.mutateAsync(payload);
-        message.success('模板组已创建');
+        message.success(t('metricTemplate.group.message.created'));
       }
       groupModal.close();
       groupForm.resetFields();
     } catch (e) {
-      message.error(e instanceof Error ? e.message : '保存模板组失败');
+      message.error(e instanceof Error ? e.message : t('metricTemplate.group.message.saveFailed'));
     }
   };
 
   const handleDeleteGroup = async (id: number) => {
     try {
       await deleteGroup.mutateAsync(id);
-      message.success('模板组已删除');
+      message.success(t('metricTemplate.group.message.deleted'));
     } catch (e) {
-      message.error(e instanceof Error ? e.message : '删除模板组失败');
+      message.error(e instanceof Error ? e.message : t('metricTemplate.group.message.deleteFailed'));
     }
   };
 
@@ -152,15 +157,15 @@ export default function MetricTemplateGroupsSection() {
     const inGroupIds = new Set((groupDetail?.templates ?? []).map((t) => t.id));
     const newIds = selectedTemplateIds.filter((id) => !inGroupIds.has(id));
     if (newIds.length === 0) {
-      message.info('所选模板均已在组内');
+      message.info(t('metricTemplate.group.message.allAlreadyInGroup'));
       return;
     }
     try {
       await addTemplates.mutateAsync({ groupId: manageGroupId, templateIds: newIds });
-      message.success(`已将 ${newIds.length} 个模板加入分组`);
+      message.success(t('metricTemplate.group.message.added', { count: newIds.length }));
       setSelectedTemplateIds([]);
     } catch (e) {
-      message.error(e instanceof Error ? e.message : '加入分组失败');
+      message.error(e instanceof Error ? e.message : t('metricTemplate.group.message.addFailed'));
     }
   };
 
@@ -168,9 +173,9 @@ export default function MetricTemplateGroupsSection() {
     if (!manageGroupId) return;
     try {
       await removeTemplate.mutateAsync({ groupId: manageGroupId, templateId });
-      message.success('已从分组移除');
+      message.success(t('metricTemplate.group.message.removed'));
     } catch (e) {
-      message.error(e instanceof Error ? e.message : '移除失败');
+      message.error(e instanceof Error ? e.message : t('metricTemplate.group.message.removeFailed'));
     }
   };
 
@@ -189,51 +194,60 @@ export default function MetricTemplateGroupsSection() {
 
   const groupColumns = [
     {
-      title: '名称',
+      title: tc('field.name'),
       dataIndex: 'name',
       width: 160,
       render: (v: string, r: MetricTemplateGroupItem) => (
         <Space size={4}>
           <FolderOutlined style={{ color: '#1677ff' }} />
           <Text strong>{v}</Text>
-          {r.enabled === false && <Tag color="default">停用</Tag>}
+          {r.enabled === false && <Tag color="default">{t('metricTemplate.group.status.disabled')}</Tag>}
         </Space>
       )
     },
     {
-      title: '设备类型',
+      title: td('switch.batchField.deviceType'),
       dataIndex: 'device_type',
       width: 100,
-      render: (v: string) => <Tag>{DEVICE_TYPE_LABEL[v] ?? v}</Tag>
+      render: (v: string) => <Tag>{deviceTypeLabel(v, td)}</Tag>
     },
     {
-      title: '来源',
+      title: tc('field.source'),
       dataIndex: 'source',
       width: 90,
       render: (v: string) => <Tag color="blue">{SOURCE_LABEL[v] ?? v}</Tag>
     },
     {
-      title: '厂商约束',
+      title: t('metricTemplate.group.column.vendorConstraint'),
       dataIndex: 'vendor',
       width: 100,
       render: (v: string | null) =>
-        v ? <Tag color="geekblue">{v}</Tag> : <Text type="secondary">不限</Text>
+        v ? (
+          <Tag color="geekblue">{v}</Tag>
+        ) : (
+          <Text type="secondary">{t('metricTemplate.group.vendorUnlimited')}</Text>
+        )
     },
     {
-      title: '模板数',
+      title: t('metricTemplate.group.column.templateCount'),
       dataIndex: 'template_count',
       width: 80,
       render: (v: number) => v ?? 0
     },
-    { title: '说明', dataIndex: 'description', ellipsis: true, render: (v: string) => v ?? '-' },
     {
-      title: '操作',
+      title: tc('field.description'),
+      dataIndex: 'description',
+      ellipsis: true,
+      render: (v: string) => v ?? '-'
+    },
+    {
+      title: tc('field.actions'),
       key: 'action',
       width: 220,
       render: (_: unknown, r: MetricTemplateGroupItem) => (
         <Space size={4}>
           <Button size="small" onClick={() => openManage(r.id)}>
-            管理模板
+            {t('metricTemplate.group.action.manage')}
           </Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEditGroup(r)} />
           <Button
@@ -242,10 +256,10 @@ export default function MetricTemplateGroupsSection() {
             icon={<DeleteOutlined />}
             onClick={() =>
               confirm({
-                title: '确认删除该模板组？',
-                content: '删除后设备将回到自动匹配模板组。',
-                okText: '删除',
-                cancelText: '取消',
+                title: t('metricTemplate.group.confirm.deleteTitle'),
+                content: t('metricTemplate.group.confirm.deleteContent'),
+                okText: tc('action.delete'),
+                cancelText: tc('action.cancel'),
                 okButtonProps: { danger: true },
                 onOk: () => handleDeleteGroup(r.id)
               })
@@ -258,10 +272,10 @@ export default function MetricTemplateGroupsSection() {
 
   return (
     <Card
-      title="指标模板组"
+      title={t('metricTemplate.group.title')}
       extra={
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreateGroup}>
-          新增模板组
+          {t('metricTemplate.group.action.create')}
         </Button>
       }
     >
@@ -272,13 +286,25 @@ export default function MetricTemplateGroupsSection() {
         loading={isLoading}
         pagination={false}
         size="small"
-        locale={{ emptyText: <Empty description="暂无指标模板组，点击右上角「新增模板组」创建" /> }}
+        locale={{
+          emptyText: (
+            <Empty
+              description={t('metricTemplate.group.empty', {
+                action: t('metricTemplate.group.action.create')
+              })}
+            />
+          )
+        }}
         scroll={{ x: 'max-content' }}
       />
 
       {/* 组新增/编辑弹窗 */}
       <Modal
-        title={editingGroup ? '编辑指标模板组' : '新增指标模板组'}
+        title={
+          editingGroup
+            ? t('metricTemplate.group.modal.editTitle')
+            : t('metricTemplate.group.modal.createTitle')
+        }
         open={groupModal.isOpen}
         onOk={handleGroupSubmit}
         onCancel={() => {
@@ -291,47 +317,51 @@ export default function MetricTemplateGroupsSection() {
         <Form form={groupForm} layout="vertical" preserve={false}>
           <Form.Item
             name="name"
-            label="组名称"
-            rules={[{ required: true, message: '请输入组名称' }]}
+            label={t('metricTemplate.group.field.name')}
+            rules={[{ required: true, message: t('metricTemplate.group.validation.nameRequired') }]}
           >
-            <Input placeholder="如：H3C 网络设备标准指标集" />
+            <Input placeholder={t('metricTemplate.group.placeholder.name')} />
           </Form.Item>
           <Form.Item
             name="device_type"
-            label="设备类型"
-            rules={[{ required: true, message: '请选择设备类型' }]}
+            label={td('switch.batchField.deviceType')}
+            rules={[{ required: true, message: td('switch.form.deviceTypeRequired') }]}
           >
-            <Select options={DEVICE_TYPE_OPTIONS} />
+            <Select options={deviceTypeOptions} />
           </Form.Item>
           <Form.Item
             name="source"
-            label="采集协议"
-            rules={[{ required: true, message: '请选择采集协议' }]}
+            label={t('metricTemplate.group.field.source')}
+            rules={[{ required: true, message: t('metricTemplate.group.validation.sourceRequired') }]}
           >
             <Select options={SOURCE_OPTIONS} />
           </Form.Item>
           <Form.Item
             name="vendor"
-            label="厂商约束（可选）"
-            extra="声明厂商后，仅允许同厂商的模板加入本组；留空表示不限厂商"
+            label={t('metricTemplate.group.field.vendorConstraintOptional')}
+            extra={t('metricTemplate.group.extra.vendorConstraint')}
           >
-            <Select options={vendorOptions} placeholder="选择厂商（留空表示不限）" allowClear />
+            <Select
+              options={vendorOptions}
+              placeholder={t('metricTemplate.group.placeholder.vendor')}
+              allowClear
+            />
           </Form.Item>
-          <Form.Item name="display_order" label="排序权重（越小越靠前）">
+          <Form.Item name="display_order" label={t('metricTemplate.group.field.displayOrder')}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="enabled" label="启用" valuePropName="checked">
+          <Form.Item name="enabled" label={tc('action.enable')} valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item name="description" label="说明">
-            <Input.TextArea rows={2} placeholder="可选" />
+          <Form.Item name="description" label={tc('field.description')}>
+            <Input.TextArea rows={2} placeholder={t('metricTemplate.group.placeholder.description')} />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* 组内模板管理弹窗 */}
       <Modal
-        title={`管理模板组「${groupDetail?.name ?? ''}」`}
+        title={t('metricTemplate.group.modal.manageTitle', { name: groupDetail?.name ?? '' })}
         open={manageGroupId != null}
         onCancel={() => setManageGroupId(null)}
         footer={
@@ -341,7 +371,7 @@ export default function MetricTemplateGroupsSection() {
             loading={addTemplates.isPending}
             onClick={handleAddTemplates}
           >
-            将选中模板加入分组（{selectedTemplateIds.length}）
+            {t('metricTemplate.group.action.addSelected', { count: selectedTemplateIds.length })}
           </Button>
         }
         width={760}
@@ -349,9 +379,9 @@ export default function MetricTemplateGroupsSection() {
       >
         <Space direction="vertical" style={{ width: '100%' }} size={16}>
           <Space wrap>
-            <Text strong>可加入的模板（已过滤兼容性）</Text>
+            <Text strong>{t('metricTemplate.group.candidateTitle')}</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              仅设备类型、协议、厂商（组声明时）一致的可加入
+              {t('metricTemplate.group.candidateHint')}
             </Text>
           </Space>
           <Table<MetricTemplateItem>
@@ -366,7 +396,7 @@ export default function MetricTemplateGroupsSection() {
             }}
             columns={[
               {
-                title: '指标',
+                title: t('metricTemplate.column.metric'),
                 dataIndex: 'metric_key',
                 width: 160,
                 render: (v: string, r) => (
@@ -379,31 +409,37 @@ export default function MetricTemplateGroupsSection() {
                 )
               },
               {
-                title: '分类',
+                title: t('metricTemplate.column.category'),
                 dataIndex: 'category',
                 width: 100,
                 render: (v: string) => (v ? <Tag color="geekblue">{v}</Tag> : '-')
               },
               {
-                title: '来源',
+                title: tc('field.source'),
                 dataIndex: 'source',
                 width: 80,
                 render: (v: string) => <Tag color="blue">{SOURCE_LABEL[v] ?? v}</Tag>
               },
               {
-                title: '厂商',
+                title: t('metricTemplate.field.vendor'),
                 dataIndex: 'vendor',
                 width: 90,
                 render: (v: string | null) => v ?? <Text type="secondary">—</Text>
               }
             ]}
-            locale={{ emptyText: <Empty description="没有符合兼容性校验的模板可供加入" /> }}
+            locale={{
+              emptyText: <Empty description={t('metricTemplate.group.candidateEmpty')} />
+            }}
             scroll={{ x: 'max-content' }}
           />
 
           <Divider />
 
-          <Text strong>组内已有模板（{groupDetail?.templates?.length ?? 0}）</Text>
+          <Text strong>
+            {t('metricTemplate.group.memberTitle', {
+              count: groupDetail?.templates?.length ?? 0
+            })}
+          </Text>
           {groupDetail && groupDetail.templates.length > 0 ? (
             <Table<MetricTemplateItem>
               dataSource={groupDetail.templates}
@@ -412,24 +448,24 @@ export default function MetricTemplateGroupsSection() {
               pagination={false}
               columns={[
                 {
-                  title: '指标',
+                  title: t('metricTemplate.column.metric'),
                   dataIndex: 'metric_key',
                   render: (v: string, r) => r.display_name ?? v
                 },
                 {
-                  title: '来源',
+                  title: tc('field.source'),
                   dataIndex: 'source',
                   width: 80,
                   render: (v: string) => <Tag color="blue">{SOURCE_LABEL[v] ?? v}</Tag>
                 },
                 {
-                  title: '厂商',
+                  title: t('metricTemplate.field.vendor'),
                   dataIndex: 'vendor',
                   width: 90,
                   render: (v: string | null) => v ?? <Text type="secondary">—</Text>
                 },
                 {
-                  title: '操作',
+                  title: tc('field.actions'),
                   key: 'action',
                   width: 80,
                   render: (_: unknown, r: MetricTemplateItem) => (
@@ -439,9 +475,9 @@ export default function MetricTemplateGroupsSection() {
                       icon={<DeleteOutlined />}
                       onClick={() =>
                         confirm({
-                          title: '确认从分组移除该模板？',
-                          okText: '移除',
-                          cancelText: '取消',
+                          title: t('metricTemplate.group.confirm.removeTitle'),
+                          okText: t('metricTemplate.group.action.remove'),
+                          cancelText: tc('action.cancel'),
                           okButtonProps: { danger: true },
                           onOk: () => handleRemoveTemplate(r.id!)
                         })
@@ -454,7 +490,7 @@ export default function MetricTemplateGroupsSection() {
             />
           ) : (
             <Empty
-              description="该组暂无模板，请在上方选择模板加入"
+              description={t('metricTemplate.group.memberEmpty')}
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           )}

@@ -21,13 +21,9 @@ import { useMessage } from '@/hooks/useMessage';
 import { post } from '@/services/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useComponentTemplates } from '@/services/component-template';
-import {
-  DeviceType,
-  DeviceSubtype,
-  DEVICE_SUBTYPE_MAP,
-  DEVICE_SUBTYPE_LABELS,
-  DeviceStatusCode
-} from '@/types/enums';
+import { DeviceType, DeviceSubtype, DEVICE_SUBTYPE_MAP, DeviceStatusCode } from '@/types/enums';
+import { getDeviceSubtypeOptions } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { Device, BatchCreateItemResult } from '@/types/models';
 import { useConfirm } from '@/utils/confirm';
 import { type DeviceBatchRow, genBatchName, extractMaxIndex } from '../shared';
@@ -93,6 +89,8 @@ export interface UseBatchAddTabResult {
 }
 
 export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const [form] = Form.useForm();
   const message = useMessage();
@@ -168,11 +166,15 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
         const currentNodeCount = allNodes.filter((n) => n.parent_device_id === chassis.id).length;
         const maxNodes = chassis.total_nodes ?? '∞';
         return {
-          label: `${chassis.device_name} (${currentNodeCount}/${maxNodes}节点)`,
+          label: t('form.nodeAssoc.chassis.option', {
+            name: chassis.device_name,
+            used: currentNodeCount,
+            max: maxNodes
+          }),
           value: chassis.id
         };
       });
-  }, [chassisData, batchChassisNodesData]);
+  }, [chassisData, batchChassisNodesData, t]);
 
   const selectedChassis = useMemo(
     () => chassisData?.items?.find((d: Device) => d.id === selectedChassisId),
@@ -205,11 +207,8 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
 
   const subtypeOptions = useMemo(() => {
     if (!deviceType) return [];
-    return (DEVICE_SUBTYPE_MAP[deviceType as DeviceType] ?? []).map((st) => ({
-      label: DEVICE_SUBTYPE_LABELS[st],
-      value: st
-    }));
-  }, [deviceType]);
+    return getDeviceSubtypeOptions(DEVICE_SUBTYPE_MAP[deviceType as DeviceType] ?? [], t);
+  }, [deviceType, t]);
 
   const prevActiveRef = useRef(false);
   useEffect(() => {
@@ -276,7 +275,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     const dt = deviceType ?? DeviceType.SERVER;
     const count = Math.max(1, Math.min(addRowCount, 50 - rows.length));
     if (count <= 0) {
-      message.warning('最多 50 行');
+      message.warning(t('addModal.message.maxRows'));
       return;
     }
     const newRows: Omit<DeviceBatchRow, 'key'>[] = Array.from({ length: count }, (_, i) => ({
@@ -295,7 +294,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
 
   const handleAutoAssignU = () => {
     if (!selectedCabinetId) {
-      message.warning('请先选择机柜');
+      message.warning(t('form.hint.selectCabinetFirst'));
       return;
     }
     assignUMutation.mutate(
@@ -311,7 +310,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       {
         onSuccess: (res) => {
           if (!res.success) {
-            message.warning(res.message || '机柜空间不足，分配失败');
+            message.warning(res.message || t('addModal.message.cabinetSpaceInsufficient'));
             return;
           }
           const uByKey = new Map(res.allocations.map((a) => [a.key, a.u_position]));
@@ -323,9 +322,9 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
               })
               .map(({ key: _key, ...rest }) => rest)
           );
-          message.success(res.message || '自动分配完成');
+          message.success(res.message || t('addModal.message.autoAssignDone'));
         },
-        onError: () => message.error('U位分配请求失败，请重试')
+        onError: () => message.error(t('addModal.message.allocateFailed'))
       }
     );
   };
@@ -338,7 +337,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
 
   const handleBatchSetHeightU = () => {
     if (batchHeightU < 1 || batchHeightU > 42) {
-      message.warning('U高须在 1-42 之间');
+      message.warning(t('addModal.message.heightURange'));
       return;
     }
     transformRows((row) => ({ ...row, height_u: batchHeightU }));
@@ -353,7 +352,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     }
 
     if (isNodeMode && !selectedChassisId) {
-      message.error('请选择所属机箱');
+      message.error(t('addModal.message.selectChassisRequired'));
       return;
     }
 
@@ -365,14 +364,17 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       const availableCount = maxNodes - occupiedCount;
       if (rows.length > availableCount) {
         message.error(
-          `机箱空余节点位置不足：仅剩 ${availableCount} 个空位，当前 ${rows.length} 行`
+          t('addModal.message.nodeSlotInsufficient', {
+            count: availableCount,
+            rows: rows.length
+          })
         );
         return;
       }
     }
 
     if (isNodeMode) {
-      const conflict = checkNodePositionConflict(rows);
+      const conflict = checkNodePositionConflict(rows, t);
       if (conflict) {
         message.error(conflict);
         return;
@@ -380,7 +382,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     }
 
     if (!isNodeMode) {
-      const conflict = checkUConflict(rows);
+      const conflict = checkUConflict(rows, t);
       if (conflict) {
         message.error(conflict);
         return;
@@ -393,10 +395,12 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       if (noUPositionRows.length > 0 && values.cabinet_id) {
         const confirmed = await new Promise<boolean>((resolve) => {
           confirm({
-            title: '部分设备未分配U位',
-            content: `有 ${noUPositionRows.length} 台设备未指定U位，创建后将放入机柜但无U位信息。是否继续？`,
-            okText: '继续创建',
-            cancelText: '取消',
+            title: t('addModal.confirm.partialNoU.title'),
+            content: t('addModal.confirm.partialNoU.content', {
+              count: noUPositionRows.length
+            }),
+            okText: t('addModal.confirm.partialNoU.ok'),
+            cancelText: tCommon('action.cancel'),
             onOk: () => resolve(true),
             onCancel: () => resolve(false)
           });
@@ -413,14 +417,20 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       isChassisMode,
       isServerType,
       selectedChassis,
-      nicComponentTemplates: nicComponentTemplates ?? []
+      nicComponentTemplates: nicComponentTemplates ?? [],
+      t
     });
 
     try {
       const result = await batchCreate.submit(devices);
       if (result?.failed_count === 0) {
-        const nodeHint = isChassisMode ? '（已为每台机箱自动生成子节点）' : '';
-        message.success(`批量创建成功：${result.success_count} 台${nodeHint}`);
+        const nodeHint = isChassisMode ? t('addModal.hint.autoNodesSuffix') : '';
+        message.success(
+          t('addModal.message.batchCreateSuccess', {
+            count: result.success_count,
+            hint: nodeHint
+          })
+        );
       }
       queryClient.invalidateQueries({ queryKey: ['cabinets'] });
 
@@ -455,10 +465,18 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
             }
             if (portFailCount > 0) {
               message.warning(
-                `端口生成：${createdIds.length - portFailCount} 台成功，${portFailCount} 台失败，请检查`
+                t('addModal.message.portGenPartial', {
+                  success: createdIds.length - portFailCount,
+                  failed: portFailCount
+                })
               );
             } else {
-              message.success(`已为 ${createdIds.length} 台设备各生成 ${ports.length} 个端口`);
+              message.success(
+                t('addModal.message.portGenDone', {
+                  count: ports.length,
+                  devices: createdIds.length
+                })
+              );
             }
           } catch {
             /* 端口创建失败不阻断 */
@@ -467,7 +485,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       }
 
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '提交失败');
+      message.error(err instanceof Error ? err.message : t('addModal.message.submitFailed'));
     }
   };
 
@@ -475,7 +493,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
     batchCreate.closeResult();
     const failedIdx = batchCreate.getFailedIndices(failedItems);
     resetRows(rows.filter((_, i) => failedIdx.has(i)).map(({ key: _k, ...r }) => r));
-    message.info('已保留失败项，请修正后重新提交');
+    message.info(t('addModal.message.retryHint'));
   };
 
   const handleChassisChange = useCallback(
@@ -512,10 +530,10 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
         };
       });
       if (outOfRangeCount > 0) {
-        message.warning(`${outOfRangeCount} 行的节点位置超出新机箱范围，已清空`);
+        message.warning(t('addModal.message.nodePositionOutOfRange', { count: outOfRangeCount }));
       }
     },
-    [chassisData, transformRows, message]
+    [chassisData, transformRows, message, t]
   );
 
   return {

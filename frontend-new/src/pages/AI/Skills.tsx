@@ -39,13 +39,28 @@ import {
 import { usePermission } from '@/hooks/usePermission';
 import { useMessage } from '@/hooks/useMessage';
 import SkillEditForm from './SkillEditForm';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 const { Text, Paragraph } = Typography;
 
 const SOURCE_COLOR: Record<string, string> = { builtin: 'blue', custom: 'green' };
-const SOURCE_LABEL: Record<string, string> = { builtin: '内置', custom: '自定义' };
+
+type SkillSourceLabelKey = 'skills.source.builtin' | 'skills.source.custom';
+
+const SOURCE_LABEL_KEYS: Record<string, SkillSourceLabelKey> = {
+  builtin: 'skills.source.builtin',
+  custom: 'skills.source.custom'
+};
+
+const sourceLabel = (source: string, t: TFunction<'ai'>) => {
+  const key = SOURCE_LABEL_KEYS[source];
+  return key ? t(key) : source;
+};
 
 export default function Skills() {
+  const { t } = useTranslation('ai');
+  const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
   const [skills, setSkills] = useState<SkillSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,12 +88,12 @@ export default function Skills() {
       if (mountedRef.current) setSkills(data);
     } catch (err) {
       if (mountedRef.current) {
-        message.error(err instanceof Error ? err.message : '加载技能列表失败');
+        message.error(err instanceof Error ? err.message : t('skills.message.loadFailed'));
       }
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [message]);
+  }, [message, t]);
 
   useEffect(() => {
     fetchSkills();
@@ -86,15 +101,15 @@ export default function Skills() {
 
   const handleToggle = async (name: string, enabled: boolean, source: string) => {
     if (source === 'builtin') {
-      message.warning('内置技能不可禁用');
+      message.warning(t('skills.message.builtinCannotDisable'));
       return;
     }
     try {
       await toggleSkill(name, enabled);
       setSkills((prev) => prev.map((s) => (s.name === name ? { ...s, enabled } : s)));
-      message.success(enabled ? '已启用' : '已禁用');
+      message.success(enabled ? t('skills.message.enabled') : t('skills.message.disabled'));
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '操作失败');
+      message.error(err instanceof Error ? err.message : tc('message.operationFailed'));
     }
   };
 
@@ -106,7 +121,7 @@ export default function Skills() {
       if (mountedRef.current) setDetail(data);
     } catch (err) {
       if (mountedRef.current) {
-        message.error(err instanceof Error ? err.message : '加载详情失败');
+        message.error(err instanceof Error ? err.message : t('skills.message.loadDetailFailed'));
       }
     } finally {
       if (mountedRef.current) setDetailLoading(false);
@@ -116,10 +131,10 @@ export default function Skills() {
   const handleReload = async () => {
     try {
       const count = await reloadSkills();
-      message.success(`已重新加载 ${count} 个技能`);
+      message.success(t('skills.message.reloaded', { count }));
       fetchSkills();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '热加载失败');
+      message.error(err instanceof Error ? err.message : t('skills.message.reloadFailed'));
     }
   };
 
@@ -142,17 +157,17 @@ export default function Skills() {
       setEditInitial(payload as SkillWritePayload);
       edit.open();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '加载技能详情失败');
+      message.error(err instanceof Error ? err.message : t('skills.message.loadSkillDetailFailed'));
     }
   };
 
   const handleDelete = async (name: string) => {
     try {
       await deleteSkill(name);
-      message.success('已删除');
+      message.success(tc('message.deleteSuccess'));
       fetchSkills();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '删除失败');
+      message.error(err instanceof Error ? err.message : tc('message.deleteFailed'));
     }
   };
 
@@ -161,15 +176,15 @@ export default function Skills() {
     try {
       if (editMode === 'create') {
         await createSkill(payload);
-        message.success('已创建');
+        message.success(tc('message.createSuccess'));
       } else {
         await updateSkillContent(payload.name, payload);
-        message.success('已保存');
+        message.success(t('skills.message.saved'));
       }
       edit.close();
       fetchSkills();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '保存失败');
+      message.error(err instanceof Error ? err.message : t('skills.message.saveFailed'));
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }
@@ -177,7 +192,7 @@ export default function Skills() {
 
   const columns: ColumnsType<SkillSummary> = [
     {
-      title: '技能名称',
+      title: t('skills.column.name'),
       dataIndex: 'name',
       key: 'name',
       width: 180,
@@ -189,36 +204,36 @@ export default function Skills() {
       )
     },
     {
-      title: '标识',
+      title: t('skills.field.identifier'),
       dataIndex: 'name',
       key: 'nameKey',
       width: 180,
       render: (name: string) => <Text code>{name}</Text>
     },
     {
-      title: '描述',
+      title: tc('field.description'),
       dataIndex: 'description',
       key: 'description',
       ellipsis: true
     },
     {
-      title: '分类',
+      title: t('skills.field.category'),
       dataIndex: 'category',
       key: 'category',
       width: 120,
       render: (cat: string) => <Tag>{cat}</Tag>
     },
     {
-      title: '来源',
+      title: tc('field.source'),
       dataIndex: 'source',
       key: 'source',
       width: 90,
       render: (source: string) => (
-        <Tag color={SOURCE_COLOR[source]}>{SOURCE_LABEL[source] || source}</Tag>
+        <Tag color={SOURCE_COLOR[source]}>{sourceLabel(source, t)}</Tag>
       )
     },
     {
-      title: '触发词',
+      title: t('skills.field.triggers'),
       dataIndex: 'triggers',
       key: 'triggers',
       width: 200,
@@ -236,7 +251,7 @@ export default function Skills() {
         )
     },
     {
-      title: '启用',
+      title: tc('action.enable'),
       dataIndex: 'enabled',
       key: 'enabled',
       width: 80,
@@ -244,9 +259,9 @@ export default function Skills() {
         <Tooltip
           title={
             !canManage
-              ? '需要 ai:admin 权限'
+              ? t('skills.tooltip.needAdmin')
               : record.source === 'builtin'
-                ? '内置技能不可禁用'
+                ? t('skills.tooltip.builtinCannotDisable')
                 : ''
           }
         >
@@ -259,18 +274,18 @@ export default function Skills() {
       )
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 200,
       render: (_, record) => (
         <Space size="small">
           <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewDetail(record.name)}>
-            详情
+            {tc('action.detail')}
           </Button>
           {canManage && record.source === 'custom' && (
             <>
               <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record.name)}>
-                编辑
+                {tc('action.edit')}
               </Button>
               <Button
                 type="link"
@@ -278,16 +293,16 @@ export default function Skills() {
                 icon={<DeleteOutlined />}
                 onClick={() =>
                   confirm({
-                    title: '确认删除该技能？',
-                    content: `将永久删除 ${record.name}，此操作不可恢复。`,
-                    okText: '删除',
-                    cancelText: '取消',
+                    title: t('skills.deleteConfirm.title'),
+                    content: t('skills.deleteConfirm.content', { name: record.name }),
+                    okText: tc('action.delete'),
+                    cancelText: tc('action.cancel'),
                     okButtonProps: { danger: true },
                     onOk: () => handleDelete(record.name)
                   })
                 }
               >
-                删除
+                {tc('action.delete')}
               </Button>
             </>
           )}
@@ -301,22 +316,22 @@ export default function Skills() {
       title={
         <Space>
           <ThunderboltOutlined />
-          <span>AI 技能管理</span>
+          <span>{t('skills.title')}</span>
         </Space>
       }
       extra={
         <Space>
           <Button icon={<ReloadOutlined />} onClick={fetchSkills} loading={loading}>
-            刷新
+            {tc('action.refresh')}
           </Button>
           {/* 回归复查 F1 修复：热加载为 ai:admin 写操作，无权限者不展示 */}
           {canManage && (
             <>
               <Button icon={<PlusOutlined />} onClick={handleCreate}>
-                新建技能
+                {t('skills.action.create')}
               </Button>
               <Button type="primary" icon={<ReloadOutlined />} onClick={handleReload}>
-                热加载
+                {t('skills.action.reload')}
               </Button>
             </>
           )}
@@ -338,7 +353,7 @@ export default function Skills() {
       />
 
       <Drawer
-        title="技能详情"
+        title={t('skills.detail.title')}
         open={drawer.isOpen}
         onClose={() => {
           drawer.close();
@@ -352,25 +367,25 @@ export default function Skills() {
           <Space direction="vertical" size="middle" style={{ display: 'flex' }}>
             {/* F12 修复：原固定 2 列在移动端过窄，改为按断点自适应 */}
             <Descriptions column={{ xs: 1, sm: 1, md: 2 }} bordered size="small">
-              <Descriptions.Item label="名称" span={2}>
+              <Descriptions.Item label={tc('field.name')} span={2}>
                 {detail.title || detail.name}
               </Descriptions.Item>
-              <Descriptions.Item label="标识">
+              <Descriptions.Item label={t('skills.field.identifier')}>
                 <Text code>{detail.name}</Text>
               </Descriptions.Item>
-              <Descriptions.Item label="版本">{detail.version}</Descriptions.Item>
-              <Descriptions.Item label="分类">
+              <Descriptions.Item label={t('skills.field.version')}>
+                {detail.version}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('skills.field.category')}>
                 <Tag>{detail.category}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="来源">
-                <Tag color={SOURCE_COLOR[detail.source]}>
-                  {SOURCE_LABEL[detail.source] || detail.source}
-                </Tag>
+              <Descriptions.Item label={tc('field.source')}>
+                <Tag color={SOURCE_COLOR[detail.source]}>{sourceLabel(detail.source, t)}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="描述" span={2}>
+              <Descriptions.Item label={tc('field.description')} span={2}>
                 {detail.description}
               </Descriptions.Item>
-              <Descriptions.Item label="触发词" span={2}>
+              <Descriptions.Item label={t('skills.field.triggers')} span={2}>
                 {(detail.triggers ?? []).length ? (
                   <Space size={[4, 4]} wrap>
                     {(detail.triggers ?? []).map((t) => (
@@ -383,7 +398,7 @@ export default function Skills() {
                   <Text type="secondary">-</Text>
                 )}
               </Descriptions.Item>
-              <Descriptions.Item label="参数" span={2}>
+              <Descriptions.Item label={t('skills.field.params')} span={2}>
                 {(detail.params ?? []).length ? (
                   <Space direction="vertical" size="small">
                     {(detail.params ?? []).map((p) => (
@@ -395,12 +410,12 @@ export default function Skills() {
                     ))}
                   </Space>
                 ) : (
-                  <Text type="secondary">无</Text>
+                  <Text type="secondary">{t('skills.field.none')}</Text>
                 )}
               </Descriptions.Item>
             </Descriptions>
 
-            <Card size="small" title="执行步骤" type="inner">
+            <Card size="small" title={t('skills.detail.steps')} type="inner">
               <Space direction="vertical" size="small" style={{ display: 'flex' }}>
                 {(detail.steps ?? []).map((step, idx) => (
                   <div key={step.id}>
@@ -409,12 +424,12 @@ export default function Skills() {
                     </Text>{' '}
                     <Tag color="cyan">{step.call}</Tag>
                     {step.output && (
-                      <Tooltip title="输出变量">
+                      <Tooltip title={t('skills.detail.outputVar')}>
                         <Tag color="gold">→ {step.output}</Tag>
                       </Tooltip>
                     )}
                     {step.when && (
-                      <Tooltip title="条件">
+                      <Tooltip title={t('skills.detail.condition')}>
                         <Tag color="orange">when: {step.when}</Tag>
                       </Tooltip>
                     )}
@@ -424,7 +439,7 @@ export default function Skills() {
             </Card>
 
             {detail._path && (
-              <Card size="small" title="文件路径" type="inner">
+              <Card size="small" title={t('skills.detail.filePath')} type="inner">
                 <Paragraph code copyable>
                   {detail._path}
                 </Paragraph>
@@ -436,7 +451,7 @@ export default function Skills() {
 
       {/* 创建/编辑技能 Modal（方案 §4.3） */}
       <Modal
-        title={editMode === 'create' ? '新建技能' : '编辑技能'}
+        title={editMode === 'create' ? t('skills.action.create') : t('skills.detail.editTitle')}
         open={edit.isOpen}
         onCancel={() => edit.close()}
         footer={null}

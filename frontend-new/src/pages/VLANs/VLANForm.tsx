@@ -11,7 +11,8 @@ import type { FormSchema } from '@/components/SchemaForm';
 import { useCreateVLAN, type CreateVLANRequest } from '@/services/vlan';
 import { useRoomOptions } from '@/services/room';
 import { useSwitchList } from '@/services/switch';
-import { VLAN_STATUS_MAP } from '@/types/enums';
+import { getVlanStatusOptions } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import { useMessage } from '@/hooks/useMessage';
 
 interface VLANFormProps {
@@ -21,6 +22,8 @@ interface VLANFormProps {
 }
 
 function useVLANFormSchema() {
+  const { t } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const { data: roomOptions } = useRoomOptions();
   const { data: switchList } = useSwitchList();
 
@@ -32,14 +35,7 @@ function useVLANFormSchema() {
     [switchList]
   );
 
-  const statusOptions = useMemo(
-    () =>
-      Object.entries(VLAN_STATUS_MAP).map(([k, v]) => ({
-        label: v.label,
-        value: Number(k)
-      })),
-    []
-  );
+  const statusOptions = useMemo(() => getVlanStatusOptions(t), [t]);
 
   const schema: FormSchema = useMemo(
     () => ({
@@ -55,55 +51,56 @@ function useVLANFormSchema() {
         },
         {
           name: 'name',
-          label: '名称',
+          label: tc('field.name'),
           type: 'input',
           required: true,
-          placeholder: '请输入 VLAN 名称'
+          placeholder: t('vlan.form.inputName')
         },
         {
           name: 'purpose',
-          label: '用途',
+          label: tc('field.purpose'),
           type: 'input',
-          placeholder: '请输入用途'
+          placeholder: t('vlan.form.inputPurpose')
         },
         {
           name: 'device_id',
-          label: '所属交换机',
+          label: t('vlan.form.switch'),
           type: 'select',
           required: true,
-          placeholder: '请选择交换机',
+          placeholder: t('vlan.form.selectSwitch'),
           options: unmanagedSwitchOptions
         },
         {
           name: 'room_id',
-          label: '所属机房',
+          label: t('vlan.form.room'),
           type: 'select',
-          placeholder: '请选择机房',
+          placeholder: t('vlan.form.selectRoom'),
           options: roomOptions ?? []
         },
         {
           name: 'status',
-          label: '状态',
+          label: tc('field.status'),
           type: 'select',
-          placeholder: '请选择状态',
+          placeholder: t('vlan.form.selectStatus'),
           options: statusOptions
         }
       ]
     }),
-    [unmanagedSwitchOptions, roomOptions, statusOptions]
+    [unmanagedSwitchOptions, roomOptions, statusOptions, t, tc]
   );
 
   return schema;
 }
 
 function VLANForm({ open, onCancel, onSuccess }: VLANFormProps) {
+  const { t } = useTranslation('device');
   const schema = useVLANFormSchema();
   const createVLAN = useCreateVLAN();
   const message = useMessage();
 
   const handleSubmit = async (values: Record<string, unknown>) => {
     await createVLAN.mutateAsync(values as CreateVLANRequest);
-    message.success('VLAN 已创建');
+    message.success(t('vlan.message.created'));
   };
 
   return (
@@ -115,7 +112,7 @@ function VLANForm({ open, onCancel, onSuccess }: VLANFormProps) {
       loading={createVLAN.isPending}
       modalProps={{
         open,
-        title: '新增 VLAN',
+        title: t('vlan.action.add'),
         width: 520,
         destroyOnHidden: true
       }}

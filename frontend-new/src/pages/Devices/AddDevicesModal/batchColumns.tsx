@@ -9,6 +9,7 @@ import { Input, InputNumber } from 'antd';
 import type { TableProps } from 'antd';
 import { type DeviceBatchRow } from './shared';
 import type { EditableRowsApi } from './BatchAddTab/useBatchAddTab';
+import type { DeviceT } from '@/types/statusMeta';
 
 export type { EditableRowsApi };
 export type BatchColumns = NonNullable<TableProps<DeviceBatchRow>['columns']>;
@@ -18,6 +19,7 @@ export interface CommonColumnDeps {
   genNodeName: (nodeRow?: number, nodeCol?: number) => string;
   isChassis: boolean;
   isNode: boolean;
+  t: DeviceT;
   widths?: {
     serial?: number;
     layout?: number;
@@ -38,12 +40,13 @@ export function buildCommonBatchColumns({
   genNodeName,
   isChassis,
   isNode,
+  t,
   widths
 }: CommonColumnDeps): BatchColumns {
   const w = { ...DEFAULT_WIDTHS, ...widths };
   const columns: BatchColumns = [
     {
-      title: '序列号',
+      title: t('basic.field.serialNumber'),
       dataIndex: 'serial_number',
       width: w.serial,
       render: (value, record) => (
@@ -51,7 +54,7 @@ export function buildCommonBatchColumns({
           size="small"
           value={value}
           onChange={(e) => updateRow(record.key, 'serial_number', e.target.value)}
-          placeholder="序列号"
+          placeholder={t('basic.field.serialNumber')}
         />
       )
     }
@@ -59,7 +62,7 @@ export function buildCommonBatchColumns({
 
   if (isChassis) {
     columns.push({
-      title: '行×列',
+      title: t('addModal.column.layout'),
       key: 'node_layout',
       width: w.layout,
       render: (_value, record) => (
@@ -89,7 +92,7 @@ export function buildCommonBatchColumns({
   if (isNode) {
     columns.push(
       {
-        title: '行号',
+        title: t('addModal.column.nodeRow'),
         key: 'node_row',
         width: w.row,
         render: (_value, record) => (
@@ -105,12 +108,12 @@ export function buildCommonBatchColumns({
               const name = genNodeName(row, record.node_col);
               if (name) updateRow(record.key, 'device_name', name);
             }}
-            placeholder="行"
+            placeholder={t('addModal.column.rowPlaceholder')}
           />
         )
       },
       {
-        title: '列号',
+        title: t('addModal.column.nodeCol'),
         key: 'node_col',
         width: w.col,
         render: (_value, record) => (
@@ -126,7 +129,7 @@ export function buildCommonBatchColumns({
               const name = genNodeName(record.node_row, col);
               if (name) updateRow(record.key, 'device_name', name);
             }}
-            placeholder="列"
+            placeholder={t('addModal.column.colPlaceholder')}
           />
         )
       }
@@ -135,7 +138,7 @@ export function buildCommonBatchColumns({
 
   if (!isNode) {
     columns.push({
-      title: 'U位',
+      title: t('field.uPosition'),
       dataIndex: 'u_position',
       width: w.u,
       render: (value, record) => (
@@ -145,7 +148,7 @@ export function buildCommonBatchColumns({
           min={1}
           max={42}
           style={{ width: '100%' }}
-          placeholder="U位"
+          placeholder={t('field.uPosition')}
           onChange={(val) => updateRow(record.key, 'u_position', val)}
         />
       )

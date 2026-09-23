@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { vi } from 'vitest';
+import { beforeAll, vi } from 'vitest';
+import i18n from '../i18n';
 
 if (!window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {
@@ -51,3 +52,7 @@ if (typeof globalThis.localStorage === 'undefined') {
     value: createMemoryStorage()
   });
 }
+
+beforeAll(async () => {
+  await i18n.changeLanguage('zh-CN');
+});

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Select, InputNumber, Space, Alert, Spin, Descriptions, Tag } from 'antd';
-import { DEVICE_TYPE_MAP, DEVICE_SUBTYPE_LABELS } from '@/types/enums';
+import { getDeviceSubtypeLabel, getDeviceTypeMeta } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { Device } from '@/types/models';
 import { getStatusLabel, getStatusColor } from '../shared';
 
@@ -45,42 +46,49 @@ const StepSource: React.FC<StepSourceProps> = ({
   cloneAvailablePositions,
   cabinetOptions
 }) => {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const templatePreviewItems = useMemo(() => {
     if (!templateDetail) return [];
     const d = templateDetail;
     const typeLabel =
-      DEVICE_TYPE_MAP[d.device_type as keyof typeof DEVICE_TYPE_MAP]?.label ?? d.device_type;
+      getDeviceTypeMeta(d.device_type, t)?.label ?? d.device_type;
     const subtypeLabel = d.device_subtype
-      ? (DEVICE_SUBTYPE_LABELS[d.device_subtype as keyof typeof DEVICE_SUBTYPE_LABELS] ??
-        d.device_subtype)
+      ? (getDeviceSubtypeLabel(d.device_subtype, t) ?? d.device_subtype)
       : '-';
     const items = [
-      { label: '设备名称', children: d.device_name },
-      { label: '设备类型', children: `${typeLabel} / ${subtypeLabel}` },
-      { label: '品牌/型号', children: `${d.brand ?? '-'} / ${d.device_model ?? '-'}` },
-      { label: '机柜', children: d.cabinet_number ?? '未分配' },
+      { label: t('field.name'), children: d.device_name },
+      { label: t('basic.field.deviceType'), children: `${typeLabel} / ${subtypeLabel}` },
+      { label: t('field.brandModel'), children: `${d.brand ?? '-'} / ${d.device_model ?? '-'}` },
+      { label: t('field.cabinet'), children: d.cabinet_number ?? t('addModal.unassigned') },
       {
-        label: 'U位/U高',
+        label: t('addModal.clone.preview.uPositionHeight'),
         children: `${d.u_position != null ? `U${d.u_position}` : '-'} / ${d.height_u}U`
       },
       {
-        label: '状态',
-        children: <Tag color={getStatusColor(d.status)}>{getStatusLabel(d.status)}</Tag>
+        label: tCommon('field.status'),
+        children: <Tag color={getStatusColor(d.status)}>{getStatusLabel(d.status, t)}</Tag>
       }
     ];
     if (d.is_chassis && d.node_rows && d.node_cols) {
       items.push({
-        label: '节点布局',
-        children: `${d.node_rows}行 × ${d.node_cols}列 = ${d.node_rows * d.node_cols}节点`
+        label: t('addModal.clone.preview.nodeLayout'),
+        children: t('addModal.clone.preview.nodeLayoutValue', {
+          rows: d.node_rows,
+          cols: d.node_cols,
+          total: d.node_rows * d.node_cols
+        })
       });
     }
     return items;
-  }, [templateDetail]);
+  }, [templateDetail, t, tCommon]);
 
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>模板设备</label>
+        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
+          {t('addModal.clone.templateDevice')}
+        </label>
         <Select
           value={templateId}
           onChange={setTemplateId}
@@ -88,16 +96,16 @@ const StepSource: React.FC<StepSourceProps> = ({
           options={deviceSelectOptions}
           showSearch
           filterOption={false}
-          placeholder="搜索设备名称..."
+          placeholder={t('addModal.clone.searchPlaceholder')}
           style={{ width: '100%' }}
           loading={isDeviceListLoading}
-          notFoundContent={isTemplateLoading ? <Spin size="small" /> : '无匹配设备'}
+          notFoundContent={isTemplateLoading ? <Spin size="small" /> : t('addModal.clone.noMatchDevice')}
         />
       </div>
 
       {templateId && isTemplateLoading && (
         <div style={{ textAlign: 'center', padding: '24px 0' }}>
-          <Spin description="加载模板详情..." />
+          <Spin description={t('addModal.clone.loadingTemplate')} />
         </div>
       )}
 
@@ -114,7 +122,7 @@ const StepSource: React.FC<StepSourceProps> = ({
       {isChassisTemplate && (
         <Alert
           type="info"
-          title="机箱设备克隆将自动生成与模板相同布局的子节点"
+          title={t('addModal.clone.chassisHint')}
           showIcon
           style={{ marginBottom: 16 }}
         />
@@ -122,7 +130,9 @@ const StepSource: React.FC<StepSourceProps> = ({
 
       <Space size="large" wrap>
         <div>
-          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>克隆数量</label>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
+            {t('addModal.clone.count')}
+          </label>
           <Space>
             <InputNumber
               value={cloneCount}
@@ -131,40 +141,42 @@ const StepSource: React.FC<StepSourceProps> = ({
               max={50}
               style={{ width: 120 }}
             />
-            <span style={{ color: '#8c8c8c', fontSize: 12 }}>最多 50 台</span>
+            <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('addModal.clone.maxCount')}</span>
           </Space>
         </div>
         {/* 节点模式：选择目标机箱；非节点模式：选择目标机柜 */}
         {isNodeTemplate ? (
           <div>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
-              目标机箱 <span style={{ color: '#ff4d4f' }}>*</span>
+              {t('addModal.clone.targetChassis')} <span style={{ color: '#ff4d4f' }}>*</span>
             </label>
             <Select
               value={cloneChassisId}
               onChange={setCloneChassisId}
               options={cloneChassisOptions}
-              placeholder="请选择目标机箱"
+              placeholder={t('addModal.clone.selectTargetChassis')}
               style={{ width: 280 }}
               allowClear
             />
             {cloneChassisId && (
               <span style={{ color: '#8c8c8c', fontSize: 12, marginLeft: 8 }}>
-                空余位置：{cloneAvailablePositions.length} 个
+                {t('form.nodeAssoc.vacantCount', { count: cloneAvailablePositions.length })}
               </span>
             )}
           </div>
         ) : (
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>目标机柜</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
+              {t('addModal.clone.targetCabinet')}
+            </label>
             <Select
               value={targetCabinetId}
               onChange={setTargetCabinetId}
               options={cabinetOptions}
               placeholder={
                 templateDetail?.cabinet_number
-                  ? `默认：${templateDetail.cabinet_number}`
-                  : '选择目标机柜'
+                  ? t('addModal.clone.defaultPrefix', { name: templateDetail.cabinet_number })
+                  : t('addModal.clone.selectTargetCabinet')
               }
               style={{ width: 220 }}
               allowClear

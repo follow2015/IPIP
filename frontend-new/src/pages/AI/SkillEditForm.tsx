@@ -1,6 +1,7 @@
 import { Form, Input, InputNumber, Select, Switch, Button, Space, Card } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import type { SkillWritePayload } from '@/services/ai';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   initial?: SkillWritePayload;
@@ -25,6 +26,8 @@ const safeJsonParse = (v: unknown): unknown => {
 };
 
 export default function SkillEditForm({ initial, onSubmit, onCancel, submitting }: Props) {
+  const { t } = useTranslation('ai');
+  const { t: tc } = useTranslation('common');
   const [form] = Form.useForm<SkillWritePayload>();
 
   const handleFinish = async (values: SkillWritePayload) => {
@@ -58,35 +61,39 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
     >
       <Form.Item
         name="name"
-        label="标识"
+        label={t('skills.field.identifier')}
         rules={[
-          { required: true, message: '必填' },
+          { required: true, message: tc('validation.required') },
           {
             pattern: /^[a-z0-9][a-z0-9_-]{0,63}$/,
-            message: '小写字母/数字/下划线/连字符，1-64 字符'
+            message: t('skills.form.namePattern')
           }
         ]}
       >
         <Input disabled={!!initial} placeholder="my_skill" />
       </Form.Item>
-      <Form.Item name="title" label="展示名">
+      <Form.Item name="title" label={t('skills.field.displayName')}>
         <Input />
       </Form.Item>
-      <Form.Item name="description" label="描述" rules={[{ required: true }]}>
+      <Form.Item
+        name="description"
+        label={tc('field.description')}
+        rules={[{ required: true }]}
+      >
         <Input.TextArea rows={2} />
       </Form.Item>
-      <Form.Item name="category" label="分类">
+      <Form.Item name="category" label={t('skills.field.category')}>
         <Input placeholder="general" />
       </Form.Item>
-      <Form.Item name="version" label="版本">
+      <Form.Item name="version" label={t('skills.field.version')}>
         <InputNumber min={1} max={100} />
       </Form.Item>
-      <Form.Item name="max_llm_steps" label="LLM 步骤上限">
+      <Form.Item name="max_llm_steps" label={t('skills.form.maxLlmSteps')}>
         <InputNumber min={1} max={20} />
       </Form.Item>
 
       {/* params 动态列表 */}
-      <Card size="small" title="参数声明">
+      <Card size="small" title={t('skills.form.paramSection')}>
         <Form.List name="params">
           {(fields, { add, remove }) => (
             <>
@@ -94,9 +101,9 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
                 <Space key={field.key} align="baseline" wrap>
                   <Form.Item
                     name={[field.name, 'name']}
-                    rules={[{ required: true, message: '必填' }]}
+                    rules={[{ required: true, message: tc('validation.required') }]}
                   >
-                    <Input placeholder="参数名" />
+                    <Input placeholder={t('skills.form.paramNamePlaceholder')} />
                   </Form.Item>
                   <Form.Item name={[field.name, 'type']}>
                     <Select
@@ -105,16 +112,19 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
                     />
                   </Form.Item>
                   <Form.Item name={[field.name, 'required']} valuePropName="checked">
-                    <Switch checkedChildren="必填" unCheckedChildren="可选" />
+                    <Switch
+                      checkedChildren={t('skills.form.requiredLabel')}
+                      unCheckedChildren={t('skills.form.optionalLabel')}
+                    />
                   </Form.Item>
                   <Form.Item name={[field.name, 'description']}>
-                    <Input placeholder="说明" />
+                    <Input placeholder={t('skills.form.remarkPlaceholder')} />
                   </Form.Item>
                   <MinusCircleOutlined onClick={() => remove(field.name)} />
                 </Space>
               ))}
               <Button icon={<PlusOutlined />} onClick={() => add({})}>
-                添加参数
+                {t('skills.form.addParam')}
               </Button>
             </>
           )}
@@ -122,7 +132,7 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
       </Card>
 
       {/* steps 动态列表（B1 修复：必须完整渲染，否则编辑提交会清空 steps） */}
-      <Card size="small" title="执行步骤">
+      <Card size="small" title={t('skills.form.stepSection')}>
         <Form.List name="steps">
           {(fields, { add, remove }) => (
             <>
@@ -131,9 +141,9 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
                   <Space align="baseline" wrap>
                     <Form.Item
                       name={[field.name, 'id']}
-                      rules={[{ required: true, message: '必填' }]}
+                      rules={[{ required: true, message: tc('validation.required') }]}
                     >
-                      <Input placeholder="步骤 id" />
+                      <Input placeholder={t('skills.form.stepIdPlaceholder')} />
                     </Form.Item>
                     <Form.Item name={[field.name, 'type']}>
                       <Select
@@ -143,24 +153,24 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
                     </Form.Item>
                     <Form.Item
                       name={[field.name, 'call']}
-                      rules={[{ required: true, message: '必填' }]}
+                      rules={[{ required: true, message: tc('validation.required') }]}
                     >
-                      <Input placeholder="capability/prompt 名" />
+                      <Input placeholder={t('skills.form.stepCallPlaceholder')} />
                     </Form.Item>
                     <MinusCircleOutlined onClick={() => remove(field.name)} />
                   </Space>
-                  <Form.Item name={[field.name, 'output']} label="输出别名">
+                  <Form.Item name={[field.name, 'output']} label={t('skills.form.outputAlias')}>
                     <Input placeholder="result" />
                   </Form.Item>
-                  <Form.Item name={[field.name, 'when']} label="条件（可选）">
-                    <Input placeholder="true/false 表达式" />
+                  <Form.Item name={[field.name, 'when']} label={t('skills.form.conditionOptional')}>
+                    <Input placeholder={t('skills.form.conditionPlaceholder')} />
                   </Form.Item>
                   <Form.Item name={[field.name, 'max_tokens']} label="max_tokens">
                     <InputNumber min={100} max={4096} />
                   </Form.Item>
                   <Form.Item
                     name={[field.name, 'args']}
-                    label="args（JSON）"
+                    label={t('skills.form.args')}
                     getValueFromEvent={normalizeJson}
                     rules={[
                       {
@@ -173,7 +183,7 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
                   </Form.Item>
                   <Form.Item
                     name={[field.name, 'branches']}
-                    label="branches（JSON，route 专用）"
+                    label={t('skills.form.branches')}
                     getValueFromEvent={normalizeJson}
                     rules={[
                       {
@@ -190,7 +200,7 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
                 icon={<PlusOutlined />}
                 onClick={() => add({ type: 'capability', max_tokens: 500 })}
               >
-                添加步骤
+                {t('skills.form.addStep')}
               </Button>
             </>
           )}
@@ -198,14 +208,14 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
       </Card>
 
       {/* triggers 标签输入（B1 修复：必须渲染，否则清空） */}
-      <Form.Item name="triggers" label="触发词">
-        <Select mode="tags" placeholder="输入触发词后回车" />
+      <Form.Item name="triggers" label={t('skills.field.triggers')}>
+        <Select mode="tags" placeholder={t('skills.form.triggerPlaceholder')} />
       </Form.Item>
 
       {/* return JSON 编辑器（B1 修复：必须渲染，否则清空） */}
       <Form.Item
         name="return"
-        label="返回值（Jinja 表达式或 JSON）"
+        label={t('skills.form.returnValue')}
         getValueFromEvent={normalizeJson}
         rules={[
           {
@@ -218,10 +228,10 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
 
       <Space>
         <Button type="primary" htmlType="submit" loading={submitting}>
-          保存
+          {tc('action.save')}
         </Button>
         <Button onClick={onCancel} disabled={submitting}>
-          取消
+          {tc('action.cancel')}
         </Button>
       </Space>
     </Form>

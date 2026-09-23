@@ -12,12 +12,16 @@ import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAllLoginLogs, type LoginLogQueryParams, type LoginLog } from '@/services/user';
 import { useUserList } from '@/services/user';
-import { LOGIN_TYPE_MAP } from '@/types/enums';
+import { getLoginTypeMeta } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '@/utils/format';
 
 const { RangePicker } = DatePicker;
 
 function LoginLogs() {
+  const { t } = useTranslation('device');
+  const { t: ts } = useTranslation('settings');
+  const { t: tc } = useTranslation('common');
   const [searchParams] = useSearchParams();
   const [userId, setUserId] = useState<number | undefined>();
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
@@ -55,45 +59,45 @@ function LoginLogs() {
 
   const columns = [
     {
-      title: '登录时间',
+      title: ts('loginLog.column.loginTime'),
       dataIndex: 'login_time',
       key: 'login_time',
       width: 180,
       render: (v: string) => formatDateTime(v)
     },
     {
-      title: '用户姓名',
+      title: ts('loginLog.column.userFullName'),
       dataIndex: 'name',
       key: 'name',
       width: 120,
       render: (v: string | null) => v || '-'
     },
     {
-      title: '用户名',
+      title: ts('loginLog.column.username'),
       dataIndex: 'username',
       key: 'username',
       width: 120,
       render: (v: string | null) => v || '-'
     },
     {
-      title: 'IP地址',
+      title: ts('loginLog.column.ipAddress'),
       dataIndex: 'login_ip',
       key: 'login_ip',
       width: 140,
       render: (v: string | null) => v || '-'
     },
     {
-      title: '登录类型',
+      title: ts('loginLog.column.loginType'),
       dataIndex: 'login_type',
       key: 'login_type',
       width: 100,
       render: (v: string) => {
-        const m = LOGIN_TYPE_MAP[v];
+        const m = getLoginTypeMeta(v, t);
         return <Tag color={m?.color ?? 'default'}>{(m?.label ?? v) || 'Web'}</Tag>;
       }
     },
     {
-      title: '设备/浏览器',
+      title: ts('loginLog.column.userAgent'),
       dataIndex: 'user_agent',
       key: 'user_agent',
       render: (v: string | null) => v || '-',
@@ -105,19 +109,19 @@ function LoginLogs() {
     <Card>
       {/* 筛选栏 */}
       <Space style={{ marginBottom: 16 }} wrap>
-        <span style={{ color: '#666' }}>用户：</span>
+        <span style={{ color: '#666' }}>{ts('loginLog.filter.user')}</span>
         <Select
           value={userId}
           onChange={(v) => {
             setUserId(v);
             setPage(1);
           }}
-          placeholder="全部用户"
+          placeholder={ts('loginLog.filter.allUsers')}
           allowClear
           style={{ width: 200 }}
           options={userOptions}
         />
-        <span style={{ color: '#666' }}>时间：</span>
+        <span style={{ color: '#666' }}>{ts('loginLog.filter.time')}</span>
         <RangePicker
           value={dateRange}
           onChange={(dates) => {
@@ -134,10 +138,10 @@ function LoginLogs() {
             refetch();
           }}
         >
-          查询
+          {tc('action.search')}
         </Button>
         <Button icon={<ReloadOutlined />} onClick={handleReset}>
-          重置
+          {tc('action.reset')}
         </Button>
       </Space>
 
@@ -151,6 +155,8 @@ function LoginLogs() {
           current: page,
           pageSize,
           total: data?.total ?? 0,
+          showTotal: (total) => tc('pagination.total', { count: total }),
+          showSizeChanger: true,
           onChange: (p, ps) => {
             setPage(p);
             setPageSize(ps);

@@ -8,17 +8,21 @@ import React from 'react';
 import { Form, Input, Button, Card, Typography, Checkbox } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth';
 import { useMessage } from '@/hooks/useMessage';
 import type { LoginRequest } from '@/types/api';
 
 const { Title } = Typography;
 
+const REMEMBER_DAYS = 30;
+
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isAuthenticated } = useAuthStore();
   const message = useMessage();
+  const { t } = useTranslation('auth');
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
@@ -33,12 +37,12 @@ function Login() {
     setLoading(true);
     try {
       await login(values);
-      message.success('登录成功');
+      message.success(t('message.loginSuccess'));
       const from =
         (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
       navigate(from, { replace: true });
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '登录失败，请检查用户名和密码');
+      message.error(err instanceof Error ? err.message : t('message.loginFailed'));
     } finally {
       setLoading(false);
     }
@@ -57,27 +61,33 @@ function Login() {
       <Card style={{ width: 400, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <Title level={3} style={{ margin: 0 }}>
-            IPIP 数据中心管理系统
+            {t('title')}
           </Title>
-          <p style={{ color: '#999', marginTop: 8 }}>请输入账号和密码登录</p>
+          <p style={{ color: '#999', marginTop: 8 }}>{t('subtitle')}</p>
         </div>
         <Form<LoginRequest> onFinish={handleLogin} autoComplete="off" size="large">
-          <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
-            <Input prefix={<UserOutlined />} placeholder="用户名" autoComplete="username" />
+          <Form.Item
+            name="username"
+            rules={[{ required: true, message: t('validation.usernameRequired') }]}
+          >
+            <Input prefix={<UserOutlined />} placeholder={t('field.username')} autoComplete="username" />
           </Form.Item>
-          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
+          <Form.Item
+            name="password"
+            rules={[{ required: true, message: t('validation.passwordRequired') }]}
+          >
             <Input.Password
               prefix={<LockOutlined />}
-              placeholder="密码"
+              placeholder={t('field.password')}
               autoComplete="current-password"
             />
           </Form.Item>
           <Form.Item name="remember" valuePropName="checked" initialValue={false}>
-            <Checkbox>记住我（30 天内免重新登录）</Checkbox>
+            <Checkbox>{t('field.remember', { days: REMEMBER_DAYS })}</Checkbox>
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading} block>
-              登录
+              {t('action.login')}
             </Button>
           </Form.Item>
         </Form>

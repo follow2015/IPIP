@@ -13,6 +13,18 @@ from sqlalchemy.orm import relationship
 from app.models.base import BaseModel, TINYINT
 from extensions import db
 
+SNAPSHOT_KEY_LOCATION = "deleted_location_snapshot"
+SNAPSHOT_KEY_NICS = "deleted_nics_snapshot"
+SNAPSHOT_KEY_STORAGE = "deleted_storage_snapshot"
+SNAPSHOT_KEY_CHILDREN = "deleted_children_snapshot"
+
+SNAPSHOT_KEYS = frozenset({
+    SNAPSHOT_KEY_LOCATION,
+    SNAPSHOT_KEY_NICS,
+    SNAPSHOT_KEY_STORAGE,
+    SNAPSHOT_KEY_CHILDREN,
+})
+
 
 class DeviceHardware(BaseModel):
     """设备硬件规格（1:1 扩展）"""

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { AutoComplete, Form, Typography } from 'antd';
 import SchemaForm from '@/components/SchemaForm';
 import type { FormSchema } from '@/components/SchemaForm/SchemaForm';
@@ -15,6 +15,8 @@ import {
 import type { Room } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
 import { useConfirm } from '@/utils/confirm';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 interface RoomFormProps {
   open: boolean;
@@ -87,37 +89,52 @@ function FloorInput(props: { value?: string | null; onChange?: (value: string) =
   );
 }
 
-const ROOM_SCHEMA: FormSchema = {
-  fields: [
-    {
-      name: 'name',
-      label: '机房名称',
-      type: 'custom',
-      component: NameInput,
-      required: true
-    },
-    {
-      name: 'room_number',
-      label: '房间号',
-      type: 'input',
-      required: true,
-      placeholder: '如：01（同一机房名称下不可重复）'
-    },
-    {
-      name: 'location',
-      label: '机房位置',
-      type: 'input',
-      required: true,
-      placeholder: '请输入机房位置'
-    },
-    { name: 'building', label: '所属楼栋', type: 'custom', component: BuildingInput },
-    { name: 'floor', label: '所属楼层', type: 'custom', component: FloorInput },
-    { name: 'contact', label: '联系人', type: 'input', placeholder: '联系人（可选）' },
-    { name: 'contact_phone', label: '联系电话', type: 'input', placeholder: '联系电话（可选）' }
-  ]
-};
+function buildRoomSchema(d: TFunction<'device'>): FormSchema {
+  return {
+    fields: [
+      {
+        name: 'name',
+        label: d('room.field.name'),
+        type: 'custom',
+        component: NameInput,
+        required: true,
+        placeholder: d('room.form.namePlaceholder')
+      },
+      {
+        name: 'room_number',
+        label: '房间号',
+        type: 'input',
+        required: true,
+        placeholder: '如：01（同一机房名称下不可重复）'
+      },
+      {
+        name: 'location',
+        label: d('cabinet.field.roomLocation'),
+        type: 'input',
+        required: true,
+        placeholder: d('room.form.locationPlaceholder')
+      },
+      { name: 'building', label: '所属楼栋', type: 'custom', component: BuildingInput },
+      { name: 'floor', label: '所属楼层', type: 'custom', component: FloorInput },
+      {
+        name: 'contact',
+        label: d('customer.field.contactPerson'),
+        type: 'input',
+        placeholder: d('room.form.contactPlaceholder')
+      },
+      {
+        name: 'contact_phone',
+        label: d('customer.field.contactPhone'),
+        type: 'input',
+        placeholder: d('room.form.contactPhonePlaceholder')
+      }
+    ]
+  };
+}
 
 function RoomForm({ open, editRecord, onClose }: RoomFormProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const formRef = useRef<FormInstance>(null);
   const message = useMessage();
   const confirm = useConfirm();
@@ -125,6 +142,8 @@ function RoomForm({ open, editRecord, onClose }: RoomFormProps) {
   const updateRoom = useUpdateRoom();
   const nameOptions = useRoomNameOptions();
   const isEdit = !!editRecord;
+
+  const schema = useMemo(() => buildRoomSchema(td), [td]);
 
   useEffect(() => {
     if (open && formRef.current) {
@@ -146,10 +165,10 @@ function RoomForm({ open, editRecord, onClose }: RoomFormProps) {
     try {
       if (isEdit) {
         await updateRoom.mutateAsync({ id: editRecord!.id, ...values } as UpdateRoomRequest);
-        message.success('更新成功');
+        message.success(tc('message.updateSuccess'));
       } else {
         await createRoom.mutateAsync(values as CreateRoomRequest);
-        message.success('创建成功');
+        message.success(tc('message.createSuccess'));
       }
       onClose();
     } catch (err) {
@@ -178,15 +197,15 @@ function RoomForm({ open, editRecord, onClose }: RoomFormProps) {
 
   return (
     <SchemaForm
-      schema={ROOM_SCHEMA}
+      schema={schema}
       formRef={formRef}
       onSubmit={handleSubmit}
       onCancel={onClose}
       loading={createRoom.isPending || updateRoom.isPending}
       modalProps={{
         open,
-        title: isEdit ? '编辑机房' : '新增机房',
-        destroyOnHidden: true
+        title: isEdit ? td('room.edit') : td('room.add'),
+        destroyOnHidden: true,
       }}
     />
   );

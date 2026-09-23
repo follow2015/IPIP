@@ -19,6 +19,14 @@ capability 的函数签名统一是 `fn(args)`，没有 user_id 形参（改签�
 - `False`（默认）：data_scope 服务故障时放行，适用只读查询；
 - `True`：服务故障时拒绝，适用向真实设备下发命令的设备操作类能力——
   鉴权服务不可用不能成为绕过数据域的通道。
+
+⚠️ **P0-1（2026-09-23）：本模块的 fail-closed 分支此前是死代码**——
+`get_visible_device_ids` 内部把异常吞掉并 `return None`（= 无限制），异常
+根本传不到这里，于是「拒绝」从来没执行过。现服务改为抛
+`DataScopeUnavailableError`，本模块的语义才真正生效。改动本模块时请注意：
+**故障语义由调用方显式决定**（`check_device_access(fail_closed=...)`），
+不要让默认值替你决定——门禁 `tests/test_data_scope_fail_open_guard.py`
+要求每个调用点显式传参。
 """
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -73,6 +81,10 @@ def resolve_visible_scope() -> "tuple[bool, Optional[set], str]":
     DB），DB 抖动若按 fail-open 放行，受限用户会瞬间获得全量设备与拓扑可见性
     ——属静默提权，且只读能力足以问出任意客户的设备清单和拓扑结构。故一律拒绝，
     并记 error 级日志保证该事件可观测（此前是 warning + 放行，无人察觉）。
+
+    ⚠️ 此处的 `except` 在 2026-09-23（P0-1）之前**不可达**：旧实现的
+    `get_visible_device_ids` 会吞掉异常并 `return None`，而 None 又被解释为
+    "无限制"。现由该服务抛 `DataScopeUnavailableError`，本分支才真正生效。
     """
     user_id = _resolve_user_id()
     if not user_id:
@@ -94,8 +106,10 @@ def check_device_access(device_id: int, *, fail_closed: bool = False) -> "tuple[
     Args:
         device_id: 目标设备 ID。
         fail_closed: data_scope 服务故障时的降级语义。
-            False（默认）= 放行，适用只读查询；
+            False = 放行，适用只读查询；
             True = 拒绝，适用设备操作类能力（会触达真实设备）。
+            ⚠️ 门禁要求**每个调用点显式传参**（默认值不得替你决定）——
+            见 `tests/test_data_scope_fail_open_guard.py`。
 
     Returns:
         (True, "") 有权限；(False, reason) 无权限/服务故障拒绝。
@@ -112,10 +126,16 @@ def check_device_access(device_id: int, *, fail_closed: bool = False) -> "tuple[
             return True, ""
         return False, f"无权访问设备 {device_id}（数据域隔离）"
     except Exception:  # noqa: BLE001
-        logger.warning(
-            "ai.capability.device_scope_check_failed user=%s device=%s fail_closed=%s",
-            user_id, device_id, fail_closed,
-        )
         if fail_closed:
+            logger.error(
+                "ai.capability.device_scope_check_failed user=%s device=%s"
+                "（fail-closed：拒绝本次操作）",
+                user_id, device_id, exc_info=True,
+            )
             return False, "设备权限服务暂不可用，已拒绝该操作"
+        logger.warning(
+            "ai.capability.device_scope_check_failed user=%s device=%s"
+            "（显式 fail-open：只读路径放行）",
+            user_id, device_id, exc_info=True,
+        )
         return True, ""

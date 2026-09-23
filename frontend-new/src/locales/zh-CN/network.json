@@ -1,0 +1,391 @@
+{
+  "portField": {
+    "type": "类型：{{value}}",
+    "usage": "占用：{{value}}",
+    "usageStatus": "占用状态：{{value}}",
+    "link": "链路：{{value}}",
+    "speed": "速率：{{value}}",
+    "vlan": "VLAN：{{value}}",
+    "ip": "IP：{{value}}",
+    "ipWithRole": "IP{{role}}：{{value}}",
+    "customer": "客户：{{value}}",
+    "notes": "备注：{{value}}"
+  },
+  "switchPort": {
+    "legend": {
+      "caption": "状态：",
+      "reducedSpeed": "降速"
+    },
+    "group": {
+      "total": "共 {{count}} 口"
+    },
+    "tooltip": {
+      "linkStatus": "链路状态：{{value}}",
+      "linkStatusUnderspeed": "链路状态：{{value}}（降速）",
+      "underspeed": "降速：{{type}} 口实际运行 {{speed}}",
+      "ipRolePrimary": "（主）",
+      "ipRoleSecondary": "（从）"
+    }
+  },
+  "portMember": {
+    "detailTitle": "端口详情",
+    "noDetailData": "暂无端口详情数据",
+    "groupCount": "{{count}} 口",
+    "legend": {
+      "usage": "占用：",
+      "type": "类型："
+    }
+  },
+  "ip": {
+    "unit": "个IP",
+    "field": {
+      "ipAddress": "IP地址",
+      "status": "状态",
+      "switch": "交换机",
+      "port": "端口",
+      "customer": "客户",
+      "room": "机房",
+      "macAddress": "MAC地址",
+      "notes": "备注",
+      "actions": "操作"
+    },
+    "action": {
+      "detail": "详情",
+      "edit": "编辑",
+      "scan": "扫描",
+      "batchBan": "批量封禁",
+      "batchUnban": "批量解封",
+      "batchAssignCustomer": "批量分配客户",
+      "batchEditNotes": "批量修改备注",
+      "exportCsv": "导出CSV",
+      "stats": "统计",
+      "scanNetwork": "扫描网段"
+    },
+    "tooltip": {
+      "unban": "解封IP",
+      "ban": "封禁IP（黑洞路由）",
+      "banning": "封禁中，请稍候",
+      "unbanning": "解封中，请稍候",
+      "privateUnreachable": "私网地址跨网不可达"
+    },
+    "confirm": {
+      "banTitle": "确认封禁",
+      "banContent": "确定要封禁 IP「{{address}}」吗？将通过核心交换机下发黑洞路由。",
+      "unbanTitle": "确认解封",
+      "unbanContent": "确定要解封 IP「{{address}}」吗？将撤销封禁规则。",
+      "batchBanTitle": "确认批量封禁",
+      "batchBanContent_one": "确定要封禁选中的 {{count}} 个IP吗？将通过核心交换机下发黑洞路由。",
+      "batchBanContent_other": "确定要封禁选中的 {{count}} 个IP吗？将通过核心交换机下发黑洞路由。",
+      "batchUnbanTitle": "确认批量解封",
+      "batchUnbanContent_one": "确定要解封选中的 {{count}} 个IP吗？将撤销封禁规则。",
+      "batchUnbanContent_other": "确定要解封选中的 {{count}} 个IP吗？将撤销封禁规则。",
+      "scanNetworkTitle": "扫描网段内所有IP",
+      "scanNetworkContent": "将扫描网段 {{network}} 内所有IP状态，扫描在后台执行，完成后自动刷新。"
+    },
+    "message": {
+      "banned": "IP {{address}} 已封禁",
+      "unbanned": "IP {{address}} 已解封",
+      "banFailed": "封禁失败",
+      "unbanFailed": "解封失败",
+      "batchBanSubmitted": "批量封禁已提交，完成后将通过消息通知您",
+      "batchUnbanSubmitted": "批量解封已提交，完成后将通过消息通知您",
+      "batchBanFailed": "批量封禁失败",
+      "batchUnbanFailed": "批量解封失败",
+      "batchCustomerAssigned_one": "已为 {{count}} 个 IP 分配客户",
+      "batchCustomerAssigned_other": "已为 {{count}} 个 IP 分配客户",
+      "batchNotesUpdated_one": "已更新 {{count}} 个 IP 的备注",
+      "batchNotesUpdated_other": "已更新 {{count}} 个 IP 的备注",
+      "batchUpdateFailed": "批量更新失败",
+      "selectIpFirst": "请先选择IP",
+      "inputIpRequired": "请输入IP地址",
+      "pingReachable": "{{address}} 可达",
+      "pingUnreachable": "{{address}} 不可达",
+      "pingFailed": "Ping 失败",
+      "scanFailed": "扫描失败",
+      "selectRoomFirst": "请先选择机房",
+      "inputNetworkFirst": "请先在搜索框输入网段地址（如 10.10.1.0/24）",
+      "privateNetworkUnreachable": "私网地址跨网不可达，状态由ARP表判断",
+      "scanNetworkSubmitted": "网段扫描已提交，完成后将通过消息通知您",
+      "scanNetworkFailed": "扫描启动失败",
+      "noDataToExport": "无数据可导出"
+    },
+    "searchPlaceholder": "按IP或MAC地址搜索",
+    "scanResult": {
+      "title": "扫描结果 - {{address}}",
+      "openPorts": "开放端口: {{ports}}",
+      "none": "无"
+    },
+    "copy": {
+      "ip": "IP: {{value}}",
+      "mac": "MAC: {{value}}",
+      "switch": "交换机: {{value}}",
+      "port": "端口: {{value}}",
+      "room": "机房: {{value}}",
+      "customer": "客户: {{value}}",
+      "status": "状态: {{value}}"
+    },
+    "filter": {
+      "byStatus": "按状态筛选",
+      "byRoom": "按机房筛选",
+      "byCustomer": "按客户筛选",
+      "bySwitch": "按交换机筛选"
+    },
+    "detail": {
+      "title": "IP 详情 - {{address}}",
+      "notFound": "未找到详情"
+    },
+    "edit": {
+      "title": "编辑 IP",
+      "selectCustomer": "选择客户"
+    },
+    "batchBan": {
+      "title": "批量封禁IP",
+      "description": "每行一个IP地址，将通过核心交换机下发黑洞路由进行封禁。"
+    },
+    "batchEdit": {
+      "titleCustomer": "批量分配客户",
+      "titleNotes": "批量修改备注",
+      "descCustomer_one": "将对选中的 {{count}} 个 IP 分配客户。",
+      "descCustomer_other": "将对选中的 {{count}} 个 IP 分配客户。",
+      "descNotes_one": "将对选中的 {{count}} 个 IP 修改备注。",
+      "descNotes_other": "将对选中的 {{count}} 个 IP 修改备注。",
+      "customerRequired": "请选择客户",
+      "notesPlaceholder": "输入备注内容"
+    },
+    "stats": {
+      "title": "IP 状态统计",
+      "total": "总计",
+      "active": "活跃",
+      "inactive": "非活跃",
+      "blocked": "封禁",
+      "unused": "未使用",
+      "scopeLabel": "统计范围：{{scope}}",
+      "scopeRoom": "机房筛选 + ",
+      "scopeSearch": "搜索\"{{value}}\"",
+      "scopeAll": "全部"
+    }
+  },
+  "audit": {
+    "field": {
+      "time": "时间",
+      "operator": "操作人",
+      "ipAddress": "IP 地址",
+      "room": "机房",
+      "action": "动作",
+      "customer": "归属客户",
+      "detail": "详情"
+    },
+    "action": {
+      "view": "查看"
+    },
+    "searchPlaceholder": "搜索 IP 地址...",
+    "detail": {
+      "title": "审计记录详情",
+      "source": "来源",
+      "sourceAllocation": "归属变更",
+      "sourceBan": "封禁/解封",
+      "banMode": "封禁方式",
+      "detailTitle": "详情（detail）"
+    },
+    "userFallback": "用户 #{{id}}",
+    "roomFallback": "机房 #{{id}}"
+  },
+  "allocation": {
+    "field": {
+      "time": "时间",
+      "actionType": "操作类型",
+      "oldStatus": "原状态",
+      "newStatus": "新状态",
+      "operator": "操作人"
+    },
+    "action": {
+      "allocate": "分配",
+      "release": "释放",
+      "changeStatus": "状态变更"
+    },
+    "userFallback": "用户 #{{id}}",
+    "operator": "操作人: 用户 #{{id}}"
+  },
+  "networkList": {
+    "field": {
+      "network": "网段",
+      "switch": "交换机",
+      "port": "端口",
+      "room": "机房",
+      "customer": "客户",
+      "nexthop": "下一跳",
+      "notes": "备注",
+      "actions": "操作",
+      "destination": "目标网段",
+      "outInterface": "出接口"
+    },
+    "action": {
+      "assignCustomer": "分配客户",
+      "delete": "删除",
+      "routeList": "路由列表",
+      "fullScan": "全量扫描"
+    },
+    "filter": {
+      "searchPlaceholder": "搜索网段/交换机/客户..."
+    },
+    "tooltip": {
+      "defaultRouteNotScannable": "默认路由网段（{{route}}）不可扫描"
+    },
+    "confirm": {
+      "deleteContent": "确定要删除网段 {{network}} 吗？",
+      "scanTitle": "确认扫描",
+      "scanContent": "确定要扫描网段 {{network}} 吗？扫描将在后台执行，完成后自动刷新。",
+      "fullScanContent": "将对当前机房内所有交换机执行全量扫描（端口采集+路由同步+MAC索引+ARP同步+IP对账+补充探测），可能需要较长时间。扫描在后台执行，完成后自动刷新。"
+    },
+    "message": {
+      "missingParams": "缺少必要参数（room_id/switch_id/notes/nexthop），无法删除",
+      "customerUpdated": "客户更新成功",
+      "updateFailed": "更新失败",
+      "missingRoomForScan": "该网段缺少机房信息，无法扫描",
+      "scanSubmitted": "网段 {{network}} 扫描已提交，完成后将通过消息通知您",
+      "fullScanRoomRequired": "请先选择机房，全量扫描需限定机房范围",
+      "fullScanSubmitted": "全量扫描已提交，完成后将通过消息通知您"
+    },
+    "form": {
+      "ipSyncPolicy": "IP同步策略",
+      "ipSyncPolicyTooltip": "选择覆盖所有IP可一步完成换客户，会清空网段内所有IP的原客户归属",
+      "policyNullOnly": "仅填充未分配IP",
+      "policyAll": "覆盖所有IP"
+    },
+    "scan": {
+      "failed": "失败{{count}}",
+      "phase": {
+        "preparing": "准备中",
+        "collecting": "采集数据",
+        "portInfo": "端口采集",
+        "deviceInfo": "设备信息",
+        "routeSync": "路由同步",
+        "macIndex": "MAC索引",
+        "arpSync": "ARP同步",
+        "locationVerify": "定位校验",
+        "nexthopInfer": "路由推断",
+        "degrade": "降级处理",
+        "ipReconcile": "IP对账",
+        "supplementDetect": "补充探测",
+        "done": "完成"
+      }
+    }
+  },
+  "networkDetail": {
+    "title": "网段详情 - {{network}}",
+    "notFound": "网段不存在",
+    "action": {
+      "viewIps": "查看网段IP"
+    },
+    "field": {
+      "gateway": "网关",
+      "usableIps": "可用IP数",
+      "ipRange": "IP范围",
+      "flags": "标志"
+    },
+    "usage": {
+      "title": "使用率",
+      "totalIps": "总IP数",
+      "usedIps": "已使用",
+      "availableIps": "可用"
+    },
+    "routeInfo": {
+      "title": "路由信息"
+    }
+  },
+  "topology": {
+    "view": {
+      "network": "网络拓扑",
+      "device": "设备拓扑"
+    },
+    "filter": {
+      "roomPlaceholder": "选择机房",
+      "groupPhysicalRoom": "物理机房",
+      "groupVirtualRoom": "虚拟机房"
+    },
+    "action": {
+      "lldpDiscovery": "LLDP 发现",
+      "autoDetect": "自动推断"
+    },
+    "stats": {
+      "node": "节点",
+      "link": "连接"
+    },
+    "loading": "加载拓扑数据...",
+    "empty": "暂无拓扑数据，请确保已配置交换机和连接关系",
+    "mobileHint": "拓扑图支持单指拖动、双指缩放；节点较密集时建议在桌面端查看",
+    "autoDetect": {
+      "needPhysicalRoom": "请先选择物理机房（自动推断不支持虚拟机房）",
+      "noChanges": "未发现需要推断的字段",
+      "updatedRecords_one": "已更新 {{count}} 条记录",
+      "updatedRecords_other": "已更新 {{count}} 条记录",
+      "previewTitle": "自动推断结果预览",
+      "applyChanges": "应用变更",
+      "previewAlert": "以下为推断结果预览，点击「{{action}}」将写入数据库",
+      "column": {
+        "device": "设备",
+        "changedFields": "变更字段"
+      }
+    },
+    "toolbar": {
+      "layout": "布局",
+      "searchPlaceholder": "搜索设备名",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "fitView": "适配画布"
+    },
+    "layout": {
+      "force": "力导向",
+      "hierarchical": "分层",
+      "concentric": "同心圆",
+      "radial": "辐射"
+    },
+    "node": {
+      "connectionCount": "连接数",
+      "connectionList": "连接列表",
+      "deviceFallback": "设备 {{id}}"
+    },
+    "edgeType": {
+      "uplink": "上行"
+    },
+    "combo": {
+      "cabinetFallback": "机柜 {{id}}"
+    },
+    "tooltip": {
+      "role": "角色: {{value}}",
+      "layer": "层级: L{{value}}",
+      "type": "类型: {{value}}",
+      "bandwidth": "带宽: {{value}}",
+      "status": "状态: {{value}}"
+    },
+    "discovery": {
+      "title": "LLDP/CDP 拓扑发现",
+      "notice": "发现结果仅作建议：只有两端设备与端口全部匹配且端口未被占用的条目才会建立连接，手工录入的连接关系不会被覆盖。",
+      "selectPlaceholderInRoom": "选择本机房要探测的交换机",
+      "selectPlaceholder": "选择要探测的交换机（可先选机房过滤）",
+      "start": "开始发现",
+      "selectSwitchFirst": "请先选择要探测的交换机",
+      "noSuggestions": "未发现新的邻居建议",
+      "selectMatchedOnly": "请勾选「{{status}}」状态的建议",
+      "createdLinks_one": "已建立 {{count}} 条连接",
+      "createdLinks_other": "已建立 {{count}} 条连接",
+      "createdLinksWithSkipped_one": "已建立 {{count}} 条连接，{{skipped}} 条被安全跳过",
+      "createdLinksWithSkipped_other": "已建立 {{count}} 条连接，{{skipped}} 条被安全跳过",
+      "applySelected": "应用勾选建议",
+      "applySelectedWithCount": "应用勾选建议（{{count}}）",
+      "partialFailed": "部分交换机探测失败（SSH 超时或无凭据），详见说明列；其余结果不受影响。",
+      "emptyText": "选择交换机后点击「{{action}}」",
+      "column": {
+        "peer": "对端",
+        "reason": "说明"
+      },
+      "status": {
+        "existing": "已存在",
+        "matched": "可建立",
+        "partial": "部分匹配",
+        "unknownPeer": "未知对端",
+        "portOccupied": "端口被占用"
+      }
+    }
+  }
+}

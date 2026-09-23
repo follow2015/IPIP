@@ -21,6 +21,7 @@ import { GroupedMemberPorts, PortLegend } from '@/components/PortMemberBlocks';
 import { StatusTag } from '@/components/StatusTag';
 import { VLAN_STATUS_MAP } from '@/types/enums';
 import type { VLAN, SwitchPort } from '@/types/models';
+import { useTranslation } from 'react-i18next';
 
 interface VlanTabProps {
   deviceId: number;
@@ -28,6 +29,8 @@ interface VlanTabProps {
 }
 
 function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const { data: vlans, isLoading } = useVLANsByDevice(deviceId);
   const createVLAN = useCreateDeviceVLAN(deviceId);
@@ -71,7 +74,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
     try {
       const values = await addForm.validateFields();
       await createVLAN.mutateAsync(values);
-      message.success('VLAN 创建成功');
+      message.success(t('vlan.message.created'));
       addModal.close();
       addForm.resetFields();
     } catch (err) {
@@ -98,7 +101,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         vlanId: editingVlan.id,
         data: { purpose: values.purpose ?? '', name: values.name }
       });
-      message.success('VLAN 更新成功');
+      message.success(t('vlan.message.updated'));
       editModal.close();
       setEditingVlan(null);
     } catch (err) {
@@ -108,12 +111,12 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
 
   const handleDelete = (vlan: VLAN) => {
     confirm({
-      title: '确认删除 VLAN',
-      content: `确定要删除 VLAN ${vlan.vlan_id}（${vlan.name}）吗？`,
+      title: t('vlan.confirmDelete'),
+      content: t('vlan.confirmDeleteContent', { id: vlan.vlan_id, name: vlan.name }),
       okButtonProps: { danger: true },
       onOk: async () => {
         await deleteVLAN.mutateAsync(vlan.id);
-        message.success('VLAN 已删除');
+        message.success(t('vlan.message.deleted'));
       }
     });
   };
@@ -137,7 +140,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         vlanId: editingMemberVlan.id,
         portIds: values.member_port_ids ?? []
       });
-      message.success('成员端口更新成功');
+      message.success(t('memberPort.updateSuccess'));
       memberModal.close();
       setEditingMemberVlan(null);
     } catch (err) {
@@ -151,17 +154,22 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
   }));
 
   const columns = [
-    { title: 'VLAN ID', dataIndex: 'vlan_id', key: 'vlan_id' },
-    { title: '名称', dataIndex: 'name', key: 'name' },
-    { title: '用途', dataIndex: 'purpose', key: 'purpose', render: (v: string | null) => v || '-' },
+    { title: t('vlan.column.vlanId'), dataIndex: 'vlan_id', key: 'vlan_id' },
+    { title: tCommon('field.name'), dataIndex: 'name', key: 'name' },
     {
-      title: '状态',
+      title: tCommon('field.purpose'),
+      dataIndex: 'purpose',
+      key: 'purpose',
+      render: (v: string | null) => v || '-'
+    },
+    {
+      title: tCommon('field.status'),
       dataIndex: 'status',
       key: 'status',
       render: (v: number) => <StatusTag status={v} statusMap={VLAN_STATUS_MAP} />
     },
     {
-      title: '成员端口',
+      title: t('memberPort.column'),
       dataIndex: 'member_ports',
       key: 'member_ports',
       render: (memberPorts: string[]) => {
@@ -170,7 +178,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
       }
     },
     {
-      title: '操作',
+      title: tCommon('field.actions'),
       key: 'action',
       width: hasSsh ? 80 : 220,
       render: (_: unknown, record: VLAN) => (
@@ -181,12 +189,12 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
           >
-            用途
+            {tCommon('field.purpose')}
           </Button>
           {!hasSsh && (
             <>
               <Button type="link" size="small" onClick={() => handleEditMembers(record)}>
-                成员
+                {t('vlan.action.members')}
               </Button>
               <Button
                 type="link"
@@ -195,7 +203,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
                 icon={<DeleteOutlined />}
                 onClick={() => handleDelete(record)}
               >
-                删除
+                {tCommon('action.delete')}
               </Button>
             </>
           )}
@@ -216,13 +224,12 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
             loading={syncMembers.isPending}
             onClick={() => {
               confirm({
-                title: '同步 VLAN 成员端口',
-                content:
-                  '将从设备 SSH 获取所有 VLANIF 配置并解析成员端口列表，可能需要较长时间。确定继续？',
+                title: t('vlan.confirmSync'),
+                content: t('vlan.confirmSyncContent'),
                 onOk: async () => {
                   try {
                     await syncMembers.mutateAsync(deviceId);
-                    message.info('成员端口同步已提交，完成后将通过消息通知您');
+                    message.info(t('memberPort.syncSubmitted'));
                   } catch {
                   }
                 }
@@ -230,12 +237,12 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
             }}
             style={{ marginRight: 8 }}
           >
-            同步成员
+            {t('vlan.action.syncMembers')}
           </Button>
         )}
         {!hasSsh && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => addModal.open()}>
-            新增 VLAN
+            {t('vlan.action.add')}
           </Button>
         )}
       </div>
@@ -253,7 +260,7 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
 
       {/* 新增 VLAN 弹窗 */}
       <Modal
-        title="新增 VLAN"
+        title={t('vlan.action.add')}
         open={addModal.isOpen}
         onOk={handleAdd}
         onCancel={() => {
@@ -265,23 +272,27 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         <Form form={addForm} layout="vertical">
           <Form.Item
             name="vlan_id"
-            label="VLAN ID"
-            rules={[{ required: true, message: '请输入 VLAN ID' }]}
+            label={t('vlan.column.vlanId')}
+            rules={[{ required: true, message: t('vlan.form.inputVlanId') }]}
           >
             <InputNumber min={1} max={4094} style={{ width: '100%' }} placeholder="1-4094" />
           </Form.Item>
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-            <Input placeholder="如 VLAN100" />
+          <Form.Item
+            name="name"
+            label={tCommon('field.name')}
+            rules={[{ required: true, message: t('vlan.form.inputName') }]}
+          >
+            <Input placeholder={t('vlan.form.namePlaceholder')} />
           </Form.Item>
-          <Form.Item name="purpose" label="用途">
-            <Input placeholder="如 办公网络" />
+          <Form.Item name="purpose" label={tCommon('field.purpose')}>
+            <Input placeholder={t('vlan.form.purposePlaceholder')} />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* 编辑 VLAN 弹窗 */}
       <Modal
-        title="编辑 VLAN"
+        title={t('vlan.editTitle')}
         open={editModal.isOpen}
         onOk={handleEditSubmit}
         onCancel={() => {
@@ -290,21 +301,23 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         }}
         destroyOnHidden
       >
-        <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
-          此处仅记录用途信息，不操作交换机。操作交换机需要在端口列表对应的端口操作。
-        </p>
+        <p style={{ color: '#8c8c8c', marginBottom: 16 }}>{t('memberPort.purposeHint')}</p>
         <Form form={editForm} layout="vertical">
           <Form.Item
             name="vlan_id"
-            label="VLAN ID"
-            rules={[{ required: true, message: '请输入 VLAN ID' }]}
+            label={t('vlan.column.vlanId')}
+            rules={[{ required: true, message: t('vlan.form.inputVlanId') }]}
           >
             <InputNumber min={1} max={4094} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
+          <Form.Item
+            name="name"
+            label={tCommon('field.name')}
+            rules={[{ required: true, message: t('vlan.form.inputName') }]}
+          >
             <Input />
           </Form.Item>
-          <Form.Item name="purpose" label="用途">
+          <Form.Item name="purpose" label={tCommon('field.purpose')}>
             <Input />
           </Form.Item>
         </Form>
@@ -313,7 +326,9 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
       {/* hasSsh=false 模式：成员端口编辑弹窗 */}
       {!hasSsh && (
         <Modal
-          title={`编辑成员端口 - VLAN ${editingMemberVlan?.vlan_id ?? ''}`}
+          title={t('memberPort.editTitle', {
+            name: `VLAN ${editingMemberVlan?.vlan_id ?? ''}`
+          })}
           open={memberModal.isOpen}
           onOk={handleMemberSubmit}
           onCancel={() => {
@@ -323,10 +338,10 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
           destroyOnHidden
         >
           <Form form={memberForm} layout="vertical">
-            <Form.Item name="member_port_ids" label="成员端口">
+            <Form.Item name="member_port_ids" label={t('memberPort.column')}>
               <Select
                 mode="multiple"
-                placeholder="选择成员端口"
+                placeholder={t('memberPort.selectPlaceholder')}
                 options={portOptions}
                 showSearch
                 filterOption={(input, option) =>

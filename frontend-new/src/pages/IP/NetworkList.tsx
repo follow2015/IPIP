@@ -1,6 +1,7 @@
 import { useConfirm } from '@/utils/confirm';
 import { Table, Button, Space, Select } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useNetworkList, useDeleteNetwork, useUpdateNetworkCustomer } from '@/services/network';
 import { useAllocatableCustomerOptions } from '@/services/customer';
 import type { IPNetwork } from '@/types/models';
@@ -8,6 +9,8 @@ import { useMessage } from '@/hooks/useMessage';
 import { serverPagination } from '@/components/DataTable/serverPagination';
 
 function NetworkList() {
+  const { t } = useTranslation('network');
+  const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
   const deleteNetwork = useDeleteNetwork();
   const updateCustomer = useUpdateNetworkCustomer();
@@ -18,18 +21,18 @@ function NetworkList() {
 
   const handleDelete = (record: IPNetwork) => {
     if (!record.room_id || !record.switch_id || !record.notes || !record.nexthop) {
-      message.warning('缺少必要参数（room_id/switch_id/notes/nexthop），无法删除');
+      message.warning(t('networkList.message.missingParams'));
       return;
     }
     confirm({
-      title: '确认删除',
-      content: `确定要删除网段 ${record.ip_network} 吗？`,
+      title: tc('confirm.deleteTitle'),
+      content: t('networkList.confirm.deleteContent', { network: record.ip_network }),
       onOk: async () => {
         await deleteNetwork.mutateAsync({
           ipNetwork: record.ip_network,
           networkId: record.id
         });
-        message.success('删除成功');
+        message.success(tc('message.deleteSuccess'));
         refetch();
       }
     });
@@ -42,42 +45,57 @@ function NetworkList() {
         data: { network_id: record.id, customer_id: customerId }
       })
       .then(() => {
-        message.success('客户更新成功');
+        message.success(t('networkList.message.customerUpdated'));
         refetch();
       })
-      .catch(() => message.error('更新失败'));
+      .catch(() => message.error(t('networkList.message.updateFailed')));
   };
 
   const columns = [
-    { title: '网段', dataIndex: 'ip_network', key: 'ip_network' },
+    { title: t('networkList.field.network'), dataIndex: 'ip_network', key: 'ip_network' },
     {
-      title: '交换机',
+      title: t('networkList.field.switch'),
       dataIndex: 'switch_name',
       key: 'switch_name',
       render: (v: string | null) => v || '-'
     },
-    { title: '端口', dataIndex: 'port', key: 'port', render: (v: string | null) => v || '-' },
     {
-      title: '机房',
+      title: t('networkList.field.port'),
+      dataIndex: 'port',
+      key: 'port',
+      render: (v: string | null) => v || '-'
+    },
+    {
+      title: t('networkList.field.room'),
       dataIndex: 'room_name',
       key: 'room_name',
       render: (v: string | null) => v || '-'
     },
     {
-      title: '客户',
+      title: t('networkList.field.customer'),
       dataIndex: 'customer_name',
       key: 'customer_name',
       render: (v: string | null) => v || '-'
     },
-    { title: '下一跳', dataIndex: 'nexthop', key: 'nexthop', render: (v: string) => v || '-' },
-    { title: '备注', dataIndex: 'notes', key: 'notes', render: (v: string | null) => v || '-' },
     {
-      title: '操作',
+      title: t('networkList.field.nexthop'),
+      dataIndex: 'nexthop',
+      key: 'nexthop',
+      render: (v: string) => v || '-'
+    },
+    {
+      title: t('networkList.field.notes'),
+      dataIndex: 'notes',
+      key: 'notes',
+      render: (v: string | null) => v || '-'
+    },
+    {
+      title: t('networkList.field.actions'),
       key: 'action',
       render: (_: unknown, record: IPNetwork) => (
         <Space>
           <Select
-            placeholder="分配客户"
+            placeholder={t('networkList.action.assignCustomer')}
             options={customerOptions}
             allowClear
             style={{ width: 120 }}
@@ -91,7 +109,7 @@ function NetworkList() {
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record)}
           >
-            删除
+            {t('networkList.action.delete')}
           </Button>
         </Space>
       )
@@ -109,7 +127,8 @@ function NetworkList() {
         showSizeChanger: false,
         current: data?.page ?? 1,
         pageSize: data?.per_page ?? 20,
-        total: data?.total ?? 0
+        total: data?.total ?? 0,
+        showTotal: (total) => tc('pagination.total', { count: total })
       })}
       scroll={{ x: 'max-content' }}
     />

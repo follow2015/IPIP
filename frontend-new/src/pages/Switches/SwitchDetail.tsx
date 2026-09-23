@@ -14,17 +14,15 @@ import {
 import { useDeviceSuspenseDetail, useDeleteDevice, useUpdateDeviceStatus } from '@/services/device';
 import { useSwitchWithPorts, useSyncSwitchInfo } from '@/services/switch';
 
+import { DEVICE_SUBTYPE_COLORS, DeviceType, DeviceSubtype } from '@/types/enums';
 import {
-  DEVICE_STATUS_MAP,
-  DeviceStatusCode,
-  DEVICE_SUBTYPE_LABELS,
-  DEVICE_SUBTYPE_COLORS,
-  DEVICE_TYPE_MAP,
-  DeviceType,
-  DeviceSubtype,
-  SWITCH_ROLE_MAP,
-  SwitchRoleCode
-} from '@/types/enums';
+  getDeviceStatusMeta,
+  getDeviceStatusOptions,
+  getDeviceSubtypeLabel,
+  getDeviceTypeMeta,
+  getSwitchRoleMeta
+} from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import { useMessage } from '@/hooks/useMessage';
 import { useDeviceEvents } from '@/hooks/useDeviceEvents';
 import type { RenderPortActionsFn, RenderBatchActionsFn } from '@/types/port';
@@ -45,15 +43,16 @@ import MetricsTab from '@/pages/Devices/DeviceDetail/MetricsTab';
 function SwitchDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation('device');
   const switchId = Number(id);
 
   if (Number.isNaN(switchId)) {
     return (
       <Result
         status="404"
-        title="参数无效"
-        subTitle="交换机 ID 无效"
-        extra={<Button onClick={() => navigate(-1)}>返回</Button>}
+        title={t('detail.invalidParam')}
+        subTitle={t('switch.invalidIdSubTitle')}
+        extra={<Button onClick={() => navigate(-1)}>{t('detail.backToList')}</Button>}
       />
     );
   }
@@ -62,6 +61,8 @@ function SwitchDetail() {
 }
 
 function SwitchDetailContent({ switchId }: { switchId: number }) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
   const location = useLocation();
   const navigate = useNavigate();
@@ -90,14 +91,16 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
   const syncSwitchInfo = useSyncSwitchInfo();
   const handleRefreshDeviceInfo = () => {
     confirm({
-      title: '刷新设备信息',
-      content: '将从设备实时获取型号、版本、序列号等信息，后台执行完成后自动刷新。',
+      title: td('detail.refreshInfo'),
+      content: td('detail.refreshInfoContent'),
+      okText: tc('action.ok'),
+      cancelText: tc('action.cancel'),
       onOk: async () => {
         try {
           await syncSwitchInfo.mutateAsync(switchId);
-          message.info('刷新设备信息已提交，完成后将通过消息通知您');
+          message.info(td('detail.refreshInfoSubmitted'));
         } catch {
-          message.error('刷新设备信息提交失败');
+          message.error(td('switch.refreshInfoSubmitFailed'));
         }
       }
     });
@@ -148,18 +151,18 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
 
   if (switchLoading)
     return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
-  if (!device) return <div>设备不存在</div>;
+  if (!device) return <div>{td('detail.notFound')}</div>;
 
   const handleDelete = () => {
     confirm({
-      title: '确认删除',
-      content: `确定要删除网络设备「${device.device_name}」吗？将同时删除关联的凭据和端口数据。`,
-      okText: '确定',
-      cancelText: '取消',
+      title: tc('confirm.deleteTitle'),
+      content: td('switch.deleteContent', { name: device.device_name }),
+      okText: tc('action.ok'),
+      cancelText: tc('action.cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
         await deleteDevice.mutateAsync(device.id);
-        message.success('删除成功');
+        message.success(tc('message.deleteSuccess'));
         navigate('/switches');
       }
     });
@@ -167,7 +170,7 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
 
   const handleStatusChange = (newStatus: number) => {
     updateStatus.mutateAsync({ id: device.id, status: newStatus }).then(() => {
-      message.success('状态已变更');
+      message.success(td('detail.statusChanged'));
       refetch();
     });
   };
@@ -175,78 +178,100 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
   const handleCopyDetail = () => {
     if (!switchData) return;
     const text = [
-      '交换机详细信息',
+      td('switch.copy.header'),
       '==================',
-      `名称: ${switchData.name}`,
-      `IP地址: ${switchData.ip_address ?? '-'}`,
-      `端口: ${switchData.port ?? 22}`,
-      `用户名: ${switchData.username ?? '-'}`,
-      `协议: ${switchData.protocol ?? 'SSH'}`,
-      `设备类型: ${switchData.device_type ?? '-'}`,
-      `设备型号: ${switchData.device_model ?? '-'}`,
-      `所在机房: ${switchData.room_name ?? '-'}`,
-      `设备版本: ${switchData.device_version ?? '-'}`,
-      `序列号: ${switchData.device_serial ?? '-'}`,
-      `运行时间: ${switchData.device_uptime ?? '-'}`,
-      `MAC地址: ${switchData.mac_address?.length ? switchData.mac_address.join(', ') : '-'}`
+      td('switch.copy.name', { value: switchData.name }),
+      td('switch.copy.ip', { value: switchData.ip_address ?? '-' }),
+      td('switch.copy.port', { value: switchData.port ?? 22 }),
+      td('switch.copy.username', { value: switchData.username ?? '-' }),
+      td('switch.copy.protocol', { value: switchData.protocol ?? 'SSH' }),
+      td('switch.copy.deviceType', { value: switchData.device_type ?? '-' }),
+      td('switch.copy.deviceModel', { value: switchData.device_model ?? '-' }),
+      td('switch.copy.room', { value: switchData.room_name ?? '-' }),
+      td('switch.copy.version', { value: switchData.device_version ?? '-' }),
+      td('switch.copy.serial', { value: switchData.device_serial ?? '-' }),
+      td('switch.copy.uptime', { value: switchData.device_uptime ?? '-' }),
+      td('switch.copy.mac', {
+        value: switchData.mac_address?.length ? switchData.mac_address.join(', ') : '-'
+      })
     ].join('\n');
-    navigator.clipboard.writeText(text).then(() => message.success('详情已复制'));
+    navigator.clipboard.writeText(text).then(() =>
+      message.success(td('switch.detailCopied'))
+    );
   };
 
   const tabItems = [];
 
   tabItems.push({
     key: 'basic',
-    label: '基本信息',
+    label: td('tab.basic'),
     children: (
       <div>
         <BasicTab device={device} />
         {/* 交换机专属信息 */}
         {switchData && (
           <Descriptions
-            title="交换机配置"
+            title={td('form.section.switchConfig')}
             column={{ xs: 1, md: 2 }}
             bordered
             size="small"
             style={{ marginTop: 16 }}
           >
-            <Descriptions.Item label="管理IP">{switchData.ip_address ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="SSH端口">{switchData.port ?? 22}</Descriptions.Item>
-            <Descriptions.Item label="协议">{switchData.protocol ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="用户名">{switchData.username ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="设备驱动">{switchData.device_type ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="角色">
-              {SWITCH_ROLE_MAP[switchData.switch_role as SwitchRoleCode]?.label ?? '-'}
+            <Descriptions.Item label={td('field.managementIp')}>
+              {switchData.ip_address ?? '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="层级">
+            <Descriptions.Item label={td('switch.field.sshPort')}>
+              {switchData.port ?? 22}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('switch.field.protocol')}>
+              {switchData.protocol ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('credential.form.username')}>
+              {switchData.username ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('switch.field.deviceDriver')}>
+              {switchData.device_type ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('form.networkTopology.role.label')}>
+              {getSwitchRoleMeta(switchData.switch_role, td)?.label ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('switch.field.layer')}>
               {switchData.layer != null ? `L${switchData.layer}` : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="端口数">{switchData.port_num ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="上行设备">
+            <Descriptions.Item label={td('form.networkTopology.portCount.placeholder')}>
+              {switchData.port_num ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('form.networkTopology.uplinkDevice.label')}>
               {switchData.uplink_device_name ??
                 (switchData.uplink_device_id ? `ID:${switchData.uplink_device_id}` : '-')}
             </Descriptions.Item>
-            <Descriptions.Item label="上行端口">
+            <Descriptions.Item label={td('form.networkTopology.uplinkPorts.label')}>
               {switchData.uplink_port_names?.length ? switchData.uplink_port_names.join(', ') : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="对端互联端口">
+            <Descriptions.Item label={td('form.networkTopology.peerPorts.label')}>
               {switchData.peer_port_names?.length ? switchData.peer_port_names.join(', ') : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="核心交换机">
+            <Descriptions.Item label={td('form.networkTopology.coreDevice.label')}>
               {switchData.core_device_name ??
                 (switchData.core_device_id ? `ID:${switchData.core_device_id}` : '-')}
             </Descriptions.Item>
-            <Descriptions.Item label="主机名">{switchData.hostname ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="版本">{switchData.device_version ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="序列号">{switchData.device_serial ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="运行时间">
+            <Descriptions.Item label={td('node.column.hostname')}>
+              {switchData.hostname ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('switch.field.version')}>
+              {switchData.device_version ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('basic.field.serialNumber')}>
+              {switchData.device_serial ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('switch.field.uptime')}>
               {switchData.device_uptime ?? '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="MAC地址">
+            <Descriptions.Item label={td('switch.field.mac')}>
               {switchData.mac_address?.length ? switchData.mac_address.join(', ') : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="管理权限">
-              {hasSsh ? <Tag color="green">有SSH权限</Tag> : <Tag>仅记录</Tag>}
+            <Descriptions.Item label={td('form.network.managementAccess.label')}>
+              {hasSsh ? <Tag color="green">{td('switch.sshEnabled')}</Tag> : <Tag>{td('tooltip.recordOnly')}</Tag>}
             </Descriptions.Item>
           </Descriptions>
         )}
@@ -256,7 +281,7 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
 
   tabItems.push({
     key: 'ports',
-    label: '端口',
+    label: td('tab.ports'),
     children: (
       <UnifiedPortTab
         deviceId={switchId}
@@ -269,58 +294,58 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
 
   tabItems.push({
     key: 'vlans',
-    label: 'VLAN',
+    label: td('tab.vlans'),
     children: <VlanTab deviceId={switchId} hasSsh={hasSsh} />
   });
 
   tabItems.push({
     key: 'lag',
-    label: '链路聚合',
+    label: td('tab.lag'),
     children: <LagTab deviceId={switchId} hasSsh={hasSsh} />
   });
 
   tabItems.push({
     key: 'connections',
-    label: '连接',
+    label: td('tab.connections'),
     children: <ConnectionTab device={device} />
   });
 
   tabItems.push({
     key: 'storage',
-    label: '存储',
+    label: td('tab.storage'),
     children: <StorageTab deviceId={switchId} />
   });
 
   tabItems.push({
     key: 'asset',
-    label: '资产信息',
+    label: td('tab.asset'),
     children: <AssetTab device={device} />
   });
 
   tabItems.push({
     key: 'metrics',
-    label: '监控数据',
+    label: td('metric.title'),
     children: <MetricsTab deviceId={switchId} />
   });
 
   tabItems.push({
     key: 'credentials',
-    label: '监控凭据',
+    label: td('tab.credentials'),
     children: <CredentialTab device={device} />
   });
 
-  const statusInfo = DEVICE_STATUS_MAP[device.status as DeviceStatusCode];
+  const statusInfo = getDeviceStatusMeta(device.status, td);
 
-  const statusMenuItems = Object.entries(DEVICE_STATUS_MAP)
-    .filter(([k]) => Number(k) !== device.status)
-    .map(([k, v]) => ({
-      key: k,
-      label: v.label
+  const statusMenuItems = getDeviceStatusOptions(td)
+    .filter((o) => o.value !== device.status)
+    .map((o) => ({
+      key: String(o.value),
+      label: o.label
     }));
 
   const subtypeTag = device.device_subtype ? (
     <Tag color={DEVICE_SUBTYPE_COLORS[device.device_subtype as DeviceSubtype] ?? 'default'}>
-      {DEVICE_SUBTYPE_LABELS[device.device_subtype as DeviceSubtype] ?? device.device_subtype}
+      {getDeviceSubtypeLabel(device.device_subtype, td) ?? device.device_subtype}
     </Tag>
   ) : null;
 
@@ -336,16 +361,16 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
         }}
       >
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/switches')}>
-          返回列表
+          {td('detail.backToList')}
         </Button>
         <Space>
           <Button icon={<CopyOutlined />} onClick={handleCopyDetail}>
-            复制详情
+            {td('switch.copyDetail')}
           </Button>
           <Dropdown
             menu={{ items: statusMenuItems, onClick: ({ key }) => handleStatusChange(Number(key)) }}
           >
-            <Button icon={<SwapOutlined />}>变更状态</Button>
+            <Button icon={<SwapOutlined />}>{td('detail.changeStatus')}</Button>
           </Dropdown>
           {hasSsh && (
             <Button
@@ -353,38 +378,39 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
               onClick={handleRefreshDeviceInfo}
               loading={syncSwitchInfo.isPending}
             >
-              刷新设备信息
+              {td('detail.refreshInfo')}
             </Button>
           )}
           {hasSsh && (
             <Button type="primary" icon={<EditOutlined />} onClick={() => form.open()}>
-              远程信息管理
+              {td('switch.remoteInfo')}
             </Button>
           )}
           <Button icon={<EditOutlined />} onClick={() => deviceForm.open()}>
-            编辑
+            {tc('action.edit')}
           </Button>
           <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
-            删除
+            {tc('action.delete')}
           </Button>
         </Space>
       </div>
 
       {/* 设备概要 */}
       <Descriptions column={{ xs: 1, md: 3 }} size="small" style={{ marginBottom: 16 }}>
-        <Descriptions.Item label="设备名称">
+        <Descriptions.Item label={td('field.name')}>
           <strong style={{ fontSize: 16 }}>{device.device_name}</strong>
         </Descriptions.Item>
-        <Descriptions.Item label="类型">
+        <Descriptions.Item label={tc('field.type')}>
           <Space>
             <Tag>
-              {DEVICE_TYPE_MAP[device.device_type as DeviceType]?.label ?? device.device_type}
+              {getDeviceTypeMeta(device.device_type as DeviceType, td)?.label ??
+                device.device_type}
             </Tag>
             {subtypeTag}
           </Space>
         </Descriptions.Item>
-        <Descriptions.Item label="状态">
-          <Tag color={statusInfo?.color}>{statusInfo?.label ?? '未知'}</Tag>
+        <Descriptions.Item label={tc('field.status')}>
+          <Tag color={statusInfo?.color}>{statusInfo?.label ?? td('status.unknown')}</Tag>
         </Descriptions.Item>
       </Descriptions>
 

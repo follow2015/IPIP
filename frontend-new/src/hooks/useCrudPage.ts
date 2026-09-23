@@ -1,5 +1,6 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useDisclosure } from './useDisclosure';
 import { useTable, type UseTableReturn } from './useTable';
@@ -44,6 +45,7 @@ export function useCrudPage<
   T extends { id: number },
   TListParams extends object = PaginationParams
 >(options: UseCrudPageOptions<T, TListParams>): UseCrudPageReturn<T> {
+  const { t } = useTranslation();
   const confirm = useConfirm();
   const { useList, useDelete, nameKey, nameLabel, buildListParams } = options;
 
@@ -72,22 +74,22 @@ export function useCrudPage<
     (record: T) => {
       const displayName = String(record[nameKey] ?? '');
       confirm({
-        title: '确认删除',
-        content: `确定要删除${nameLabel}「${displayName}」吗？`,
-        okText: '确定',
-        cancelText: '取消',
+        title: t('confirm.deleteTitle'),
+        content: t('confirm.deleteNamed', { label: nameLabel, name: displayName }),
+        okText: t('action.ok'),
+        cancelText: t('action.cancel'),
         onOk: async () => {
           try {
             await deleteMutation.mutateAsync(record.id);
-            message.success('删除成功');
+            message.success(t('message.deleteSuccess'));
             refetch();
           } catch (err) {
-            message.error(err instanceof Error ? err.message : '删除失败');
+            message.error(err instanceof Error ? err.message : t('message.deleteFailed'));
           }
         }
       });
     },
-    [confirm, deleteMutation, nameKey, nameLabel, message, refetch]
+    [confirm, deleteMutation, nameKey, nameLabel, message, refetch, t]
   );
 
   const closeForm = useCallback(() => {

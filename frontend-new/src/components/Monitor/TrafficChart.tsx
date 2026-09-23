@@ -8,14 +8,23 @@
 import { useMemo, useState } from 'react';
 import { Card, Empty, Segmented, Select, Button, Space } from 'antd';
 import { Line } from '@ant-design/charts';
+import { useTranslation } from 'react-i18next';
 import { useDeviceTrafficPorts, useDeviceTraffic } from '@/services/monitor';
 import { useMessage } from '@/hooks/useMessage';
 
-const RANGE_MAP: Record<string, number> = {
-  '1小时': 3600,
-  '6小时': 6 * 3600,
-  '24小时': 24 * 3600
+type RangeKey = 'h1' | 'h6' | 'h24';
+
+const RANGE_MAP: Record<RangeKey, number> = {
+  h1: 3600,
+  h6: 6 * 3600,
+  h24: 24 * 3600
 };
+
+const RANGE_LABEL_KEY = {
+  h1: 'traffic.range.h1',
+  h6: 'traffic.range.h6',
+  h24: 'traffic.range.h24'
+} as const;
 
 function pickUnit(max: number): { label: string; divisor: number } {
   const a = Math.abs(max);
@@ -32,8 +41,10 @@ function fmt(n: number): string {
 }
 
 export default function TrafficChart({ deviceId }: { deviceId: number }) {
+  const { t } = useTranslation('monitor');
+  const { t: tCommon } = useTranslation('common');
   const message = useMessage();
-  const [rangeKey, setRangeKey] = useState('1小时');
+  const [rangeKey, setRangeKey] = useState<RangeKey>('h1');
   const [selectedPort, setSelectedPort] = useState<string | undefined>(undefined);
   const [shouldFetch, setShouldFetch] = useState(false);
 
@@ -60,26 +71,26 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
     const u = pickUnit(max);
     const rows: { time: string; value: number | null; direction: string }[] = [];
     data.time.forEach((ts, i) => {
-      const t = new Date(ts * 1000).toLocaleTimeString('zh-CN', { hour12: false });
+      const timeLabel = new Date(ts * 1000).toLocaleTimeString('zh-CN', { hour12: false });
       const rv = rx[i];
       const tv = tx[i];
       rows.push({
-        time: t,
+        time: timeLabel,
         value: rv != null && isFinite(rv) ? rv / u.divisor : null,
-        direction: '接收'
+        direction: t('traffic.direction.rx')
       });
       rows.push({
-        time: t,
+        time: timeLabel,
         value: tv != null && isFinite(tv) ? tv / u.divisor : null,
-        direction: '发送'
+        direction: t('traffic.direction.tx')
       });
     });
     return { series: rows, unit: u };
-  }, [data]);
+  }, [data, t]);
 
   const handleFetch = () => {
     if (!selectedPort) {
-      message.warning('请先选择端口');
+      message.warning(t('traffic.selectPortFirst'));
       return;
     }
     setShouldFetch(true);
@@ -87,8 +98,8 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
 
   if (portsLoading) {
     return (
-      <Card title="端口流量">
-        <div style={{ textAlign: 'center', padding: 48 }}>加载中...</div>
+      <Card title={t('traffic.title')}>
+        <div style={{ textAlign: 'center', padding: 48 }}>{tCommon('message.loading')}</div>
       </Card>
     );
   }
@@ -96,12 +107,12 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
   if (portsData && !portsData.configured) {
     const errorMsg =
       portsData.error === 'credential_error'
-        ? 'Zabbix 凭据解密失败，请检查凭据配置'
+        ? t('traffic.error.credential')
         : portsData.error === 'fetch_error'
-          ? 'Zabbix 端口列表拉取失败，请检查网络或 Zabbix 服务'
-          : '该设备未配置 Zabbix 凭据，无法拉取端口流量';
+          ? t('traffic.error.fetch')
+          : t('traffic.error.noCredential');
     return (
-      <Card title="端口流量">
+      <Card title={t('traffic.title')}>
         <Empty description={errorMsg} />
       </Card>
     );
@@ -109,13 +120,16 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
 
   return (
     <Card
-      title="端口流量"
+      title={t('traffic.title')}
       extra={
         <Segmented
-          options={Object.keys(RANGE_MAP)}
+          options={(Object.keys(RANGE_MAP) as RangeKey[]).map((k) => ({
+            label: t(RANGE_LABEL_KEY[k]),
+            value: k
+          }))}
           value={rangeKey}
           onChange={(v) => {
-            setRangeKey(v as string);
+            setRangeKey(v as RangeKey);
             setShouldFetch(false);
           }}
         />
@@ -126,7 +140,7 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
         <Space wrap>
           <Select
             style={{ width: 320 }}
-            placeholder="选择端口"
+            placeholder={t('traffic.selectPortPlaceholder')}
             value={selectedPort}
             onChange={(v) => {
               setSelectedPort(v);
@@ -138,17 +152,19 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
             optionFilterProp="label"
           />
           <Button type="primary" onClick={handleFetch} loading={isFetching}>
-            获取流量图
+            {t('traffic.fetch')}
           </Button>
         </Space>
 
         {/* 图表 */}
         {isLoading || isFetching ? (
-          <div style={{ textAlign: 'center', padding: 48 }}>加载中...</div>
+          <div style={{ textAlign: 'center', padding: 48 }}>{tCommon('message.loading')}</div>
         ) : !shouldFetch || !series.length ? (
           <Empty
             description={
-              shouldFetch ? 'Zabbix 暂无该端口流量数据' : '请选择端口并点击「获取流量图」'
+              shouldFetch
+                ? t('traffic.noData')
+                : t('traffic.emptyHint', { action: t('traffic.fetch') })
             }
           />
         ) : (
@@ -167,10 +183,10 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
             tooltip={{
               title: 'time',
               items: [
-                { field: 'direction', name: '方向' },
+                { field: 'direction', name: t('traffic.tooltip.direction') },
                 {
                   field: 'value',
-                  name: `流量 (${unit.label})`,
+                  name: t('traffic.tooltip.value', { unit: unit.label }),
                   valueFormatter: (v: number) => fmt(v)
                 }
               ]

@@ -1,5 +1,6 @@
 import React from 'react';
 import { theme } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { uToTop, displayLabel } from './geometry';
 import DeviceBlock from './DeviceBlock';
 import type { LayoutMetrics } from './layout';
@@ -53,6 +54,7 @@ const RackBody: React.FC<RackBodyProps> = ({
   onNodeReorder
 }) => {
   const { token } = theme.useToken();
+  const { t } = useTranslation('asset');
 
   return (
     <div
@@ -77,9 +79,10 @@ const RackBody: React.FC<RackBodyProps> = ({
           alignItems: 'center'
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 500 }}>U 位布局</span>
+        <span style={{ fontSize: 13, fontWeight: 500 }}>{t('uposition.header.title')}</span>
         <span style={{ fontSize: 11, color: token.colorTextSecondary }}>
-          {totalU}U · {deviceCount} 台{!readOnly && ' · 可拖拽'}
+          {t('uposition.header.stats', { totalU, count: deviceCount })}
+          {!readOnly && t('uposition.header.draggable')}
         </span>
       </div>
 
@@ -172,9 +175,12 @@ const RackBody: React.FC<RackBodyProps> = ({
         }}
       >
         {[
-          { label: 'U位', val: `${usedU}/${totalU}` },
-          { label: '功率', val: `${usedP}W` },
-          { label: '设备', val: `${deviceCount}台` }
+          { label: t('uposition.label.u'), val: `${usedU}/${totalU}` },
+          { label: t('uposition.label.power'), val: `${usedP}W` },
+          {
+            label: t('uposition.label.devices'),
+            val: t('uposition.footer.deviceValue', { count: deviceCount })
+          }
         ].map(({ label, val }) => (
           <span key={label} style={{ fontSize: 11, color: token.colorTextSecondary }}>
             {label} <strong style={{ color: token.colorText, fontWeight: 500 }}>{val}</strong>

@@ -22,6 +22,7 @@ import HardwareConfigFields, {
   type StorageItem
 } from '@/components/HardwareConfigFields';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
 import BatchActionBar from '@/components/BatchActionBar';
 import type { DeviceStorageDetail } from '@/types/models';
@@ -30,12 +31,16 @@ interface StorageTabProps {
   deviceId: number;
 }
 
+type StorageStatusKey = 'storage.status.normal' | 'storage.status.fault' | 'storage.status.warning';
+
 function formatGb(gb: number): string {
   if (gb >= 1024) return `${(gb / 1024).toFixed(1)}TB`;
   return `${Math.round(gb)}GB`;
 }
 
 function StorageTab({ deviceId }: StorageTabProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const { data: storageList, isLoading } = useDeviceStorageDetail(deviceId);
   const createStorage = useCreateStorage(deviceId);
@@ -67,7 +72,7 @@ function StorageTab({ deviceId }: StorageTabProps) {
       const values = await form.validateFields();
       if (editingStorage) {
         await updateStorage.mutateAsync({ storageId: editingStorage.id, data: values });
-        message.success('更新成功');
+        message.success(tCommon('message.updateSuccess'));
       }
       formDisclosure.close();
     } catch (err) {
@@ -82,10 +87,10 @@ function StorageTab({ deviceId }: StorageTabProps) {
         storage_ids: batch.selectedKeys.map(Number)
       });
       const deleted = res.data?.deleted.length ?? 0;
-      message.success(`已删除 ${deleted} 条存储`);
+      message.success(t('storage.message.deleted', { count: deleted }));
       batch.clear();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '批量删除失败');
+      message.error(err instanceof Error ? err.message : t('storage.message.batchDeleteFailed'));
     }
   };
 
@@ -99,18 +104,18 @@ function StorageTab({ deviceId }: StorageTabProps) {
     const storageItems = values.storage_items as StorageItem[] | undefined;
     const list = buildStorageList(storageItems);
     if (list.length === 0) {
-      message.warning('请至少配置一项存储');
+      message.warning(t('storage.message.needOneConfig'));
       return;
     }
     try {
       for (const item of list) {
         await createStorage.mutateAsync(item);
       }
-      message.success(`已按模板创建 ${list.length} 条存储`);
+      message.success(t('storage.message.created', { count: list.length }));
       template.close();
       templateForm.resetFields();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '创建失败');
+      message.error(err instanceof Error ? err.message : t('storage.message.createFailed'));
     }
   };
 
@@ -121,17 +126,17 @@ function StorageTab({ deviceId }: StorageTabProps) {
     for (const item of details) {
       const gb = item.capacity_gb ?? 0;
       totalGb += gb;
-      const type = item.storage_type || '未知';
+      const type = item.storage_type || tCommon('field.unknown');
       if (!byType[type]) byType[type] = { count: 0, totalGb: 0 };
       byType[type].count += 1;
       byType[type].totalGb += gb;
     }
     return { totalGb, byType };
-  }, [details]);
+  }, [details, tCommon]);
 
   const columns = [
     {
-      title: '类型',
+      title: tCommon('field.type'),
       dataIndex: 'storage_type',
       key: 'storage_type',
       width: 80,
@@ -139,59 +144,59 @@ function StorageTab({ deviceId }: StorageTabProps) {
         <Tag color={v === 'SSD' ? 'blue' : v === 'NVMe' ? 'green' : 'orange'}>{v}</Tag>
       )
     },
-    { title: '容量', dataIndex: 'capacity', key: 'capacity', width: 80 },
+    { title: t('storage.column.capacity'), dataIndex: 'capacity', key: 'capacity', width: 80 },
     {
-      title: '接口类型',
+      title: t('storage.column.interface'),
       dataIndex: 'interface_type',
       key: 'interface_type',
       width: 80,
       render: (v: string) => v || '-'
     },
     {
-      title: '插槽号',
+      title: t('storage.column.slot'),
       dataIndex: 'slot_number',
       key: 'slot_number',
       width: 70,
       render: (v: number) => v ?? '-'
     },
     {
-      title: '厂商',
+      title: t('storage.column.vendor'),
       dataIndex: 'manufacturer',
       key: 'manufacturer',
       width: 100,
       render: (v: string) => v || '-'
     },
     {
-      title: '型号',
+      title: t('storage.column.model'),
       dataIndex: 'model',
       key: 'model',
       width: 100,
       render: (v: string) => v || '-'
     },
     {
-      title: '序列号',
+      title: t('storage.column.serial'),
       dataIndex: 'serial_number',
       key: 'serial_number',
       width: 120,
       render: (v: string) => v || '-'
     },
     {
-      title: '状态',
+      title: tCommon('field.status'),
       dataIndex: 'status',
       key: 'status',
       width: 70,
       render: (v: string) => {
-        const map: Record<string, { color: string; label: string }> = {
-          normal: { color: 'green', label: '正常' },
-          fault: { color: 'red', label: '故障' },
-          warning: { color: 'orange', label: '预警' }
+        const map: Record<string, { color: string; labelKey: StorageStatusKey }> = {
+          normal: { color: 'green', labelKey: 'storage.status.normal' },
+          fault: { color: 'red', labelKey: 'storage.status.fault' },
+          warning: { color: 'orange', labelKey: 'storage.status.warning' }
         };
         const info = map[v];
-        return info ? <Tag color={info.color}>{info.label}</Tag> : v || '-';
+        return info ? <Tag color={info.color}>{t(info.labelKey)}</Tag> : v || '-';
       }
     },
     {
-      title: '操作',
+      title: tCommon('field.actions'),
       key: 'action',
       width: 80,
       render: (_: unknown, record: DeviceStorageDetail) => (
@@ -209,15 +214,15 @@ function StorageTab({ deviceId }: StorageTabProps) {
             icon={<DeleteOutlined />}
             onClick={() =>
               confirm({
-                title: '确定删除该存储？',
-                okText: '删除',
+                title: t('storage.confirmDelete'),
+                okText: tCommon('action.delete'),
                 okButtonProps: { danger: true },
                 onOk: async () => {
                   try {
                     await deleteStorage.mutateAsync(record.id);
-                    message.success('删除成功');
+                    message.success(tCommon('message.deleteSuccess'));
                   } catch (err) {
-                    message.error(err instanceof Error ? err.message : '删除失败');
+                    message.error(err instanceof Error ? err.message : tCommon('message.deleteFailed'));
                   }
                 }
               })
@@ -242,7 +247,7 @@ function StorageTab({ deviceId }: StorageTabProps) {
           }}
         >
           <span style={{ fontWeight: 500, fontSize: 14 }}>
-            总容量：{formatGb(storageSummary.totalGb)}
+            {t('storage.totalCapacity', { capacity: formatGb(storageSummary.totalGb) })}
           </span>
           <Divider orientation="vertical" />
           {Object.entries(storageSummary.byType).map(([type, info]) => (
@@ -254,26 +259,26 @@ function StorageTab({ deviceId }: StorageTabProps) {
               >
                 {type}
               </Tag>
-              {info.count}块 {formatGb(info.totalGb)}
+              {t('storage.blockCount', { count: info.count, capacity: formatGb(info.totalGb) })}
             </span>
           ))}
         </div>
       )}
 
-      <BatchActionBar count={batch.count} unit="条存储" onClear={batch.clear}>
+      <BatchActionBar count={batch.count} unit={t('storage.unit')} onClear={batch.clear}>
         <Button
           danger
           icon={<DeleteOutlined />}
           onClick={() =>
             confirm({
-              title: `确定删除选中的 ${batch.count} 条存储？`,
-              okText: '删除',
+              title: t('storage.confirmBatchDelete', { count: batch.count }),
+              okText: tCommon('action.delete'),
               okButtonProps: { danger: true },
               onOk: handleBatchDelete
             })
           }
         >
-          批量删除
+          {tCommon('action.batchDelete')}
         </Button>
       </BatchActionBar>
 
@@ -286,7 +291,7 @@ function StorageTab({ deviceId }: StorageTabProps) {
               templateForm.resetFields();
             }}
           >
-            模板配置
+            {t('storage.templateConfig')}
           </Button>
         </Space>
       </div>
@@ -299,14 +304,14 @@ function StorageTab({ deviceId }: StorageTabProps) {
         size="small"
         scroll={{ x: 900 }}
         rowSelection={batch.rowSelection}
-        showCard={false}
         searchable={false}
-        pagination={DENSE_PAGINATION}
+        showCard={false}
+        pagination={false}
       />
 
       {/* ─── 编辑 Modal ─── */}
       <Modal
-        title="编辑存储"
+        title={t('storage.editTitle')}
         open={formDisclosure.isOpen}
         onOk={handleSubmit}
         onCancel={() => formDisclosure.close()}
@@ -315,11 +320,11 @@ function StorageTab({ deviceId }: StorageTabProps) {
         <Form form={form} layout="vertical">
           <Form.Item
             name="storage_type"
-            label="存储类型"
-            rules={[{ required: true, message: '请选择存储类型' }]}
+            label={t('storage.field.type')}
+            rules={[{ required: true, message: t('storage.selectType') }]}
           >
             <Select
-              placeholder="请选择"
+              placeholder={tCommon('message.selectRequired')}
               options={[
                 { label: 'SSD', value: 'SSD' },
                 { label: 'HDD', value: 'HDD' },
@@ -329,17 +334,17 @@ function StorageTab({ deviceId }: StorageTabProps) {
           </Form.Item>
           <Form.Item
             name="capacity"
-            label="容量"
-            rules={[{ required: true, message: '请输入容量' }]}
+            label={t('storage.column.capacity')}
+            rules={[{ required: true, message: t('storage.field.capacityPlaceholder') }]}
           >
-            <Input placeholder="如 2TB" />
+            <Input placeholder={t('storage.field.capacityHint')} />
           </Form.Item>
-          <Form.Item name="capacity_gb" label="容量(GB)" extra="仅用于计算总容量，不会在列表中显示">
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="换算为GB，如 2TB填2048" />
+          <Form.Item name="capacity_gb" label={t('storage.field.capacityGb')} extra={t('storage.field.capacityGbHint')}>
+            <InputNumber min={1} style={{ width: '100%' }} placeholder={t('storage.field.capacityGbConvertHint')} />
           </Form.Item>
-          <Form.Item name="interface_type" label="接口类型">
+          <Form.Item name="interface_type" label={t('storage.column.interface')}>
             <Select
-              placeholder="请选择"
+              placeholder={tCommon('message.selectRequired')}
               options={[
                 { label: 'SATA', value: 'SATA' },
                 { label: 'SAS', value: 'SAS' },
@@ -348,25 +353,25 @@ function StorageTab({ deviceId }: StorageTabProps) {
               allowClear
             />
           </Form.Item>
-          <Form.Item name="slot_number" label="插槽号">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="插槽号" />
+          <Form.Item name="slot_number" label={t('storage.column.slot')}>
+            <InputNumber min={0} style={{ width: '100%' }} placeholder={t('storage.column.slot')} />
           </Form.Item>
-          <Form.Item name="manufacturer" label="厂商">
-            <Input placeholder="如 Samsung" />
+          <Form.Item name="manufacturer" label={t('storage.column.vendor')}>
+            <Input placeholder={t('storage.field.vendorHint')} />
           </Form.Item>
-          <Form.Item name="model" label="型号">
-            <Input placeholder="如 PM983" />
+          <Form.Item name="model" label={t('storage.column.model')}>
+            <Input placeholder={t('storage.field.modelHint')} />
           </Form.Item>
-          <Form.Item name="serial_number" label="序列号">
-            <Input placeholder="序列号" />
+          <Form.Item name="serial_number" label={t('storage.column.serial')}>
+            <Input placeholder={t('storage.column.serial')} />
           </Form.Item>
-          <Form.Item name="status" label="状态">
+          <Form.Item name="status" label={tCommon('field.status')}>
             <Select
-              placeholder="请选择"
+              placeholder={tCommon('message.selectRequired')}
               options={[
-                { label: '正常', value: 'normal' },
-                { label: '故障', value: 'fault' },
-                { label: '预警', value: 'warning' }
+                { label: t('storage.status.normal'), value: 'normal' },
+                { label: t('storage.status.fault'), value: 'fault' },
+                { label: t('storage.status.warning'), value: 'warning' }
               ]}
               allowClear
             />
@@ -376,11 +381,11 @@ function StorageTab({ deviceId }: StorageTabProps) {
 
       {/* ─── 模板配置 Modal（复用 HardwareConfigFields 存储部分） ─── */}
       <Modal
-        title="存储模板配置"
+        title={t('storage.templateTitle')}
         open={template.isOpen}
         onCancel={() => template.close()}
         onOk={handleTemplateSubmit}
-        okText="确认创建"
+        okText={t('storage.confirmCreate')}
         confirmLoading={createStorage.isPending}
         width={700}
         destroyOnHidden

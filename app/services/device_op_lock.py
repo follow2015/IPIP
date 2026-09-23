@@ -79,13 +79,37 @@ class DeviceOpLock:
                 raise DeviceOperationConflict(
                     f"设备 {device_id} 当前有 SSH 操作正在执行，请稍后重试（超时 {timeout}s）"
                 )
+            stop_renew = threading.Event()
+            renew_period = max((timeout * 2) / 4.0, 0.05)
+
+            def _renew_lease():
+                while not stop_renew.wait(renew_period):
+                    try:
+                        lock.extend(timeout * 2, replace_ttl=True)
+                    except Exception:
+                        logger.error(
+                            "设备 %s 锁租约续期失败 key=%s —— 锁可能已过期，互斥失效",
+                            device_id, lock_key, exc_info=True,
+                        )
+                        return
+
+            renew_thread = threading.Thread(
+                target=_renew_lease, daemon=True,
+                name=f"device-op-lock-renew-{device_id}",
+            )
+            renew_thread.start()
             try:
                 yield
             finally:
+                stop_renew.set()
+                renew_thread.join(timeout=1)
                 try:
                     lock.release()
                 except Exception:
-                    logger.warning("释放设备 %s 分布式锁失败 key=%s", device_id, lock_key, exc_info=True)
+                    logger.error(
+                        "释放设备 %s 分布式锁失败 key=%s —— 锁将依赖 TTL 过期",
+                        device_id, lock_key, exc_info=True,
+                    )
         else:
             lock = self._get_local_lock(lock_key)
             acquired = lock.acquire(timeout=timeout)

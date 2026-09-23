@@ -1,0 +1,1184 @@
+{
+  "traffic": {
+    "title": "端口流量",
+    "selectPortPlaceholder": "选择端口",
+    "fetch": "获取流量图",
+    "selectPortFirst": "请先选择端口",
+    "emptyHint": "请选择端口并点击「{{action}}」",
+    "noData": "Zabbix 暂无该端口流量数据",
+    "range": {
+      "h1": "1小时",
+      "h6": "6小时",
+      "h24": "24小时"
+    },
+    "direction": {
+      "rx": "接收",
+      "tx": "发送"
+    },
+    "tooltip": {
+      "direction": "方向",
+      "value": "流量 ({{unit}})"
+    },
+    "error": {
+      "credential": "Zabbix 凭据解密失败，请检查凭据配置",
+      "fetch": "Zabbix 端口列表拉取失败，请检查网络或 Zabbix 服务",
+      "noCredential": "该设备未配置 Zabbix 凭据，无法拉取端口流量"
+    }
+  },
+  "alertPopover": {
+    "title": "指标告警明细",
+    "count": "{{count}} 条告警",
+    "normal": "正常",
+    "empty": "暂无活跃告警",
+    "column": {
+      "metric": "指标",
+      "instance": "实例",
+      "severity": "级别",
+      "value": "当前值"
+    },
+    "metric": {
+      "temperature": "温度",
+      "portUpdown": "端口状态",
+      "diskFailure": "硬盘故障",
+      "raidFailure": "RAID故障",
+      "monitorInterrupted": "监控中断"
+    }
+  },
+  "column": {
+    "device": "设备",
+    "managementIp": "管理IP",
+    "protocol": "协议",
+    "alertType": "告警类型",
+    "metricInstance": "指标实例",
+    "deliveryStatus": "投递状态",
+    "attempts": "重试次数",
+    "alertTime": "告警时间",
+    "lastError": "最后错误",
+    "alertCount": "告警数",
+    "firstAt": "首次",
+    "lastAt": "最近",
+    "sampleIds": "样本告警 ID",
+    "probedAt": "探测时间",
+    "latency": "延迟(ms)",
+    "consecutiveFailures": "连续失败",
+    "alert": "告警",
+    "error": "错误",
+    "metricKey": "指标键",
+    "instance": "实例",
+    "currentValue": "当前值",
+    "collectedAt": "采集时间",
+    "connectivity": "连通状态",
+    "metricAlert": "指标告警",
+    "failureCount": "失败次数",
+    "lastCheck": "最近检查",
+    "content": "内容",
+    "yes": "是"
+  },
+  "filter": {
+    "all": "全部"
+  },
+  "status": {
+    "reachable": "可达",
+    "unreachable": "不可达",
+    "connected": "连通",
+    "flapping": "抖动",
+    "flappingOngoing": "抖动中",
+    "neverReachable": "从未可达",
+    "blindspot": "告警盲区",
+    "blindspotShort": "盲区",
+    "blindspotTooltip": "告警已触发但无接收人",
+    "probePaused": "已暂停探测",
+    "probeNormal": "正常探测"
+  },
+  "export": {
+    "csv": "导出 CSV",
+    "failed": "导出失败"
+  },
+  "alerts": {
+    "title": "告警历史",
+    "aggregationTitle": "告警聚合（风暴组）",
+    "empty": "暂无告警记录",
+    "deletedDevice": "已删除设备",
+    "acknowledged": "已确认",
+    "viewTrend": "查看历史趋势",
+    "deliveryStatus": {
+      "pending": "待投递",
+      "sent": "已投递",
+      "failed": "失败"
+    },
+    "filter": {
+      "scopeAll": "全部可见",
+      "scopeMine": "我负责的",
+      "metricKey": "指标键（metric_key）",
+      "indexKey": "实例键（index_key）"
+    },
+    "view": {
+      "list": "列表视图",
+      "aggregation": "聚合视图"
+    },
+    "batch": {
+      "ack": "批量确认",
+      "retry": "批量重试",
+      "close": "批量关闭"
+    },
+    "message": {
+      "batchAck_one": "已确认 {{count}} 条",
+      "batchAck_other": "已确认 {{count}} 条",
+      "batchAckFailed": "批量确认失败",
+      "batchRetry_one": "已重试 {{count}} 条",
+      "batchRetry_other": "已重试 {{count}} 条",
+      "batchRetryFailed": "批量重试失败",
+      "batchClose_one": "已关闭 {{count}} 条",
+      "batchClose_other": "已关闭 {{count}} 条",
+      "batchCloseFailed": "批量关闭失败",
+      "notFoundSuffix_one": "，{{count}} 条不存在",
+      "notFoundSuffix_other": "，{{count}} 条不存在",
+      "skipSuffix_one": "，{{count}} 条非 failed 状态已跳过",
+      "skipSuffix_other": "，{{count}} 条非 failed 状态已跳过",
+      "closed": "告警已关闭",
+      "closeFailed": "关闭失败",
+      "retryQueued": "已重新加入投递队列",
+      "retryNotNeeded": "该告警非失败状态，无需重试",
+      "retryFailed": "重试请求失败",
+      "acknowledgedDone": "已确认告警",
+      "ackFailed": "确认请求失败"
+    },
+    "ackModal": {
+      "title": "确认告警",
+      "prompt": "确认告警 #{{id}}（{{type}}）",
+      "acknowledgedBy": " · 已由 {{user}} 确认",
+      "notePlaceholder": "确认备注（可选）"
+    },
+    "detail": {
+      "title": "告警详情",
+      "id": "告警ID",
+      "deviceDeleted": "已删除",
+      "noIp": "无IP",
+      "dedupKey": "去重键",
+      "sentAt": "发送时间",
+      "attempts": "尝试次数",
+      "ackSection": "确认信息",
+      "ackBy": "确认人",
+      "ackAt": "确认时间",
+      "ackNote": "确认备注",
+      "notAcknowledged": "未确认",
+      "payloadSection": "告警载荷"
+    }
+  },
+  "history": {
+    "selectDevice": "选择监控设备",
+    "noDevice": "暂无可监控设备",
+    "timeRange": "时间范围",
+    "pleaseSelectDevice": "请先选择一台监控设备查看历史趋势",
+    "protocolAll": "全部协议",
+    "range": {
+      "h1": "1 小时",
+      "h24": "24 小时",
+      "d7": "7 天",
+      "d30": "30 天"
+    },
+    "stat": {
+      "uptime": "可用率",
+      "probes": "探测次数",
+      "downEpisodes": "宕机周期",
+      "avgLatency": "平均延迟",
+      "maxLatency": "最大延迟",
+      "p95Latency": "P95 延迟"
+    },
+    "chart": {
+      "trendTitle": "延迟趋势与可达状态（双轴）",
+      "latencyAxis": "延迟 (ms)",
+      "reachAxis": "可达状态",
+      "noLatencyData": "暂无延迟数据"
+    },
+    "latest": {
+      "title": "指标当前值",
+      "breached": "越限"
+    },
+    "trend": {
+      "title": "指标趋势",
+      "selectMetric": "选择指标",
+      "valueAxis": "值",
+      "indexName": "索引",
+      "valueName": "值",
+      "noData": "该指标在所选时间范围内无数据",
+      "pleaseSelect": "请选择一个指标查看趋势"
+    },
+    "recentProbes": "最近探测明细",
+    "cardSummary": "延迟 {{latency}} · 连续失败 {{failures}}",
+    "axis": {
+      "lossPct": "丢包率 (%)",
+      "jitterMs": "抖动 (ms)"
+    },
+    "col": {
+      "lossPct": "丢包率",
+      "jitterMs": "抖动(ms)",
+      "samples": "采样包数"
+    },
+    "tooltip": {
+      "lossSuffix": " · 丢包 {{pct}}%",
+      "jitterSuffix": " · 抖动 {{ms}} ms"
+    },
+    "card": {
+      "avgLoss": "平均丢包率",
+      "maxLoss": "最大丢包率",
+      "avgJitter": "平均抖动",
+      "samples": "质量采样次数",
+      "pingTrend": "Ping 质量趋势（丢包率 / 抖动）"
+    },
+    "empty": {
+      "loss": "暂无丢包率数据",
+      "jitter": "暂无抖动数据"
+    }
+  },
+  "stat": {
+    "devices": "监控设备",
+    "availability": "可用率",
+    "activeAlerts": "活跃告警",
+    "health": "健康度",
+    "notificationSettings": "通知配置",
+    "unitDevice_one": "台",
+    "unitDevice_other": "台",
+    "unitAlert_one": "条",
+    "unitAlert_other": "条"
+  },
+  "chart": {
+    "count": "数量",
+    "protocolTotal": "协议总数",
+    "deviceTotal": "设备总数",
+    "protocolDistribution": "协议分布",
+    "statusDistribution": "状态分布",
+    "deviceTypeDistribution": "设备类型分布"
+  },
+  "dashboard": {
+    "status": {
+      "normal": "正常",
+      "warning": "警告",
+      "critical": "异常"
+    },
+    "systemStatus": "系统状态",
+    "perf": {
+      "disk": "磁盘"
+    },
+    "recentActivity": "最近活动",
+    "noActivity": "暂无活动记录",
+    "utilization": {
+      "title": "资源利用率",
+      "cabinet": "机柜利用率",
+      "ip": "IP 利用率",
+      "deviceOnline": "设备在线率"
+    },
+    "chart": {
+      "deviceStatus": "设备状态分布",
+      "cabinetStatus": "机柜状态分布",
+      "ipStatus": "IP 状态分布"
+    },
+    "ip": {
+      "publicActive": "公网-活跃",
+      "publicInactive": "公网-非活跃",
+      "publicBlocked": "公网-封禁",
+      "publicUnused": "公网-未使用",
+      "privateActive": "私网-活跃",
+      "privateInactive": "私网-非活跃",
+      "privateBlocked": "私网-封禁",
+      "privateUnused": "私网-未使用"
+    },
+    "metric": {
+      "roomTotal": "机房总数",
+      "cabinetTotal": "机柜总数",
+      "customerTotal": "客户总数",
+      "publicIp": "公网 IP",
+      "privateIp": "私网 IP"
+    },
+    "subtitle": {
+      "active": "{{count}} 活跃",
+      "available": "{{count}} 可用",
+      "online": "{{count}} 在线",
+      "segments": "{{count}} 网络段",
+      "onlineRatio": "{{online}} / {{total}} 在线"
+    }
+  },
+  "trend": {
+    "title": "告警趋势",
+    "presetToday": "今日",
+    "presetLast7": "近 7 天",
+    "presetLast30": "近 30 天",
+    "empty": "所选时间范围无告警",
+    "tooltip_one": "{{day}}：{{count}} 条",
+    "tooltip_other": "{{day}}：{{count}} 条",
+    "total_one": "共 {{count}} 条告警",
+    "total_other": "共 {{count}} 条告警"
+  },
+  "recent": {
+    "title": "最近告警",
+    "viewAll": "查看全部",
+    "handled": "已处理",
+    "empty": "暂无最近告警"
+  },
+  "interpret": {
+    "run": "AI 解读",
+    "failed": "AI 解读失败"
+  },
+  "deviceStatus": {
+    "title": "设备监控状态",
+    "searchPlaceholder": "搜索设备名 / IP / BMC",
+    "filter": {
+      "connectivity": "连通异常",
+      "metricAlerting": "指标告警",
+      "interrupted": "监控中断"
+    },
+    "batch": {
+      "probe": "批量探测",
+      "enableMonitor": "批量开启监控",
+      "pauseMonitor": "批量暂停监控"
+    },
+    "probe": {
+      "action": "探测",
+      "success": "探测成功，延迟 {{value}} ms",
+      "failure": "探测失败：{{error}}",
+      "unknownError": "未知错误",
+      "coolingDown": "该设备探测冷却中，请稍后再试",
+      "requestFailed": "探测请求失败",
+      "probing_one": "正在探测 {{count}} 台设备...",
+      "probing_other": "正在探测 {{count}} 台设备...",
+      "complete": "探测完成：可达 {{reachable}} 台，不可达 {{unreachable}} 台",
+      "completeWithSkipped": "探测完成：可达 {{reachable}} 台，不可达 {{unreachable}} 台，跳过（冷却/不存在）{{skipped}} 台",
+      "batchFailed": "批量探测请求失败",
+      "toggling": {
+        "enabled_one": "正在开启 {{count}} 台设备的监控...",
+        "enabled_other": "正在开启 {{count}} 台设备的监控...",
+        "disabled_one": "正在暂停 {{count}} 台设备的监控...",
+        "disabled_other": "正在暂停 {{count}} 台设备的监控..."
+      },
+      "toggleDone": {
+        "enabled_one": "已开启 {{count}} 台设备监控，跳过 {{skipped}} 台",
+        "enabled_other": "已开启 {{count}} 台设备监控，跳过 {{skipped}} 台",
+        "disabled_one": "已暂停 {{count}} 台设备监控，跳过 {{skipped}} 台",
+        "disabled_other": "已暂停 {{count}} 台设备监控，跳过 {{skipped}} 台"
+      },
+      "batchToggleFailed": {
+        "enabled": "批量开启监控失败",
+        "disabled": "批量暂停监控失败"
+      },
+      "toggleSingle": {
+        "enabled": "已恢复该设备监控",
+        "disabled": "已暂停该设备监控"
+      }
+    }
+  },
+  "noc": {
+    "title": "NOC 监控大屏",
+    "backToAlerts": "返回告警中心",
+    "fullscreen": "全屏",
+    "exitFullscreen": "退出全屏",
+    "refreshOff": "关闭",
+    "activeAlertCount_one": "活跃告警 {{count}} 条",
+    "activeAlertCount_other": "活跃告警 {{count}} 条",
+    "kpi": {
+      "total": "活跃告警总数",
+      "critical": "严重告警",
+      "warning": "警告告警",
+      "info": "提示告警"
+    },
+    "wallTitle": "活跃告警墙（按级别排序，critical 置顶）",
+    "noActiveAlerts": "暂无活跃告警",
+    "bySeverity": "按级别分布",
+    "byType": "按类型分布",
+    "densityTitle": "告警密度时序（按小时）",
+    "alertCountAxis": "告警数"
+  },
+  "settings": {
+    "hint": "可在线修改的参数保存后立即对 Worker 生效（热重载），无需重启；标「需重启」的参数需重启服务。",
+    "group": {
+      "probe": "探测参数",
+      "interval": "轮询间隔",
+      "alert": "告警规则",
+      "advanced": "高级",
+      "scan": "自动扫描"
+    },
+    "field": {
+      "consecutiveFailuresThreshold": "连续失败阈值",
+      "timeoutSeconds": "探测超时(秒)",
+      "threadPoolSize": "线程池大小",
+      "intervalSnmp": "SNMP 轮询间隔(秒)",
+      "intervalBmc": "BMC 轮询间隔(秒)",
+      "intervalZabbix": "Zabbix 轮询间隔(秒)",
+      "outboxInterval": "告警发件箱间隔(秒)",
+      "realertIntervalMinutes": "重告警间隔(分钟)",
+      "fallbackRole": "兜底角色",
+      "blindspotRole": "盲区应急组",
+      "workerInProcess": "进程内 Worker",
+      "scanAutoEnabled": "自动扫描总开关",
+      "scanAutoInterval": "扫描间隔(秒)",
+      "scanAutoRoomIds": "物理机房范围",
+      "scanAutoVrIds": "虚拟机房范围",
+      "scanAutoCleanupInterval": "陈旧度清理间隔(秒)",
+      "scanAutoGracePeriod": "INACTIVE降级宽限期(秒)"
+    },
+    "loadFailed": "无法加载监控运行配置",
+    "needRestart": "需重启",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "unsaved": "未保存",
+    "selectRoomPlaceholder": "选择机房（留空则不启用自动扫描）",
+    "save": "保存修改",
+    "message": {
+      "saved_one": "已保存 {{count}} 项配置，Worker 将热重载",
+      "saved_other": "已保存 {{count}} 项配置，Worker 将热重载",
+      "savedRestartSuffix": "（部分需重启）",
+      "saveFailed": "保存失败"
+    }
+  },
+  "metricTemplate": {
+    "title": "监控指标模板",
+    "empty": "暂无指标模板",
+    "searchPlaceholder": "搜索指标 / 显示名 / 分类 / OID / 说明",
+    "vendorAll": "全适用",
+    "action": {
+      "create": "新增指标"
+    },
+    "status": {
+      "enabled": "已启用",
+      "disabled": "已停用"
+    },
+    "stat": {
+      "total": "模板总数"
+    },
+    "alert": {
+      "message": "指标模板与阈值是告警生效的前置条件",
+      "description": "设备需先启用监控并绑定凭据，再在此页面对应指标模板启用并配置阈值后，采集到的异常值才会触发告警。仅创建模板但未启用、或未配置阈值，均不会产生告警。"
+    },
+    "column": {
+      "metric": "指标",
+      "category": "分类",
+      "threshold": "阈值"
+    },
+    "field": {
+      "metricKey": "指标 Key",
+      "displayName": "显示名称",
+      "categoryKey": "分类 category",
+      "vendor": "厂商",
+      "vendorKey": "厂商 vendor",
+      "pollInterval": "采集频率(秒)",
+      "oidSymbol": "OID 符号",
+      "numericOid": "数字 OID",
+      "indexKind": "索引维度",
+      "warn": "告警阈值 (warn)",
+      "crit": "严重阈值 (crit)",
+      "expected": "期望值 (expected)",
+      "thresholdJson": "阈值 JSON",
+      "severityDefault": "默认告警级别",
+      "unit": "单位",
+      "runbookUrl": "处置预案 URL",
+      "runbookTitle": "预案标题"
+    },
+    "severity": {
+      "warn": "告警 (warn)",
+      "crit": "严重 (crit)"
+    },
+    "metricType": {
+      "gauge": "瞬时值",
+      "counter": "累加计数",
+      "state": "状态",
+      "event": "事件"
+    },
+    "metricTypeOption": {
+      "gauge": "瞬时值（gauge）",
+      "counter": "累加计数（counter）",
+      "state": "状态（state）",
+      "event": "事件（event）"
+    },
+    "threshold": {
+      "notConfigured": "未配置",
+      "warnAt": "告警≥{{value}}",
+      "critAt": "严重≥{{value}}",
+      "expected": "期望={{value}}"
+    },
+    "modal": {
+      "createTitle": "新增指标模板",
+      "editTitle": "编辑指标模板"
+    },
+    "tooltip": {
+      "metricKey": "与 OID 分类规则 category 对齐的技术标识",
+      "displayName": "中文显示名，表格优先展示；为空时回退 metric_key",
+      "category": "关联 OID 分类规则，MIB 扫描导入时自动填充",
+      "vendor": "厂家约束（如 Huawei / H3C / Dell），声明时仅匹配同厂商设备；留空=全适用",
+      "oidSymbol": "MIB 符号名，如 ifOperStatus",
+      "numericOid": "完整数字 OID，与 oid_symbol 互补；MIB 扫描导入时承接",
+      "zabbixItemKey": "Zabbix item key，如 system.cpu.util / vm.memory.size[pavailable]",
+      "warn": "达到该值触发告警",
+      "crit": "达到该值触发严重告警",
+      "expected": "实际值不等于该值时告警",
+      "thresholdJson": "事件类型阈值，自由 JSON 结构",
+      "severityDefault": "未配置阈值时回退使用的告警级别",
+      "runbookUrl": "告警触发时在告警详情展示的处置文档链接（内部 wiki 等）"
+    },
+    "placeholder": {
+      "metricKey": "如 if_status / temperature / disk_failure",
+      "displayName": "如 端口状态 / 温度 / 硬盘故障",
+      "category": "如 if_status / temperature",
+      "vendor": "如 Dell / Huawei（留空=全适用）",
+      "oidSymbol": "如 ifOperStatus / entPhySensorValue",
+      "numericOid": "如 1.3.6.1.2.1.2.2.1.7",
+      "zabbixItemKey": "如 system.cpu.util / vm.memory.size[pavailable]",
+      "indexKind": "如 ifIndex（端口）",
+      "mib": "如 IF-MIB",
+      "warn": "如 60",
+      "crit": "如 70",
+      "expected": "如 up / 1",
+      "severityDefault": "选择默认级别",
+      "unit": "如 Celsius / Mbps",
+      "description": "指标含义、采集对象说明等",
+      "runbookUrl": "如 https://wiki.internal/runbook/temp-high",
+      "runbookTitle": "如 温度过高处置流程"
+    },
+    "validation": {
+      "metricKeyRequired": "请输入指标 Key",
+      "zabbixItemKeyRequired": "source=zabbix 时 item key 必填"
+    },
+    "message": {
+      "saved": "指标模板已保存",
+      "updated": "指标模板已更新",
+      "saveFailed": "保存失败，请检查输入",
+      "deleted": "指标模板已删除",
+      "deleteFailed": "删除失败，请重试",
+      "actionFailed": "操作失败，请重试",
+      "invalidThresholdJson": "阈值 JSON 格式不合法，请检查"
+    },
+    "confirm": {
+      "deleteTitle": "确认删除该指标模板？",
+      "deleteContent": "删除后不可恢复，关联的指标告警规则将一并失效。"
+    },
+    "batch": {
+      "unit": "个模板",
+      "enable": "批量启用",
+      "disable": "批量停用",
+      "confirm": {
+        "deleteTitle_one": "确认删除选中的 {{count}} 个指标模板？",
+        "deleteTitle_other": "确认删除选中的 {{count}} 个指标模板？",
+        "enableTitle_one": "确认启用选中的 {{count}} 个指标模板？",
+        "enableTitle_other": "确认启用选中的 {{count}} 个指标模板？",
+        "disableTitle_one": "确认停用选中的 {{count}} 个指标模板？",
+        "disableTitle_other": "确认停用选中的 {{count}} 个指标模板？",
+        "enableContent": "启用后对应指标将恢复采集与告警判定。",
+        "disableContent": "停用后对应指标将停止采集，已产生的告警不受影响。"
+      },
+      "message": {
+        "deleted_one": "已删除 {{count}} 个指标模板",
+        "deleted_other": "已删除 {{count}} 个指标模板",
+        "deleteFailed": "批量删除失败，请重试",
+        "enabled_one": "已启用 {{count}} 个指标模板",
+        "enabled_other": "已启用 {{count}} 个指标模板",
+        "disabled_one": "已停用 {{count}} 个指标模板",
+        "disabled_other": "已停用 {{count}} 个指标模板",
+        "toggleFailed": "批量操作失败，请重试"
+      }
+    },
+    "group": {
+      "title": "指标模板组",
+      "empty": "暂无指标模板组，点击右上角「{{action}}」创建",
+      "vendorUnlimited": "不限",
+      "action": {
+        "create": "新增模板组",
+        "manage": "管理模板",
+        "addSelected": "将选中模板加入分组（{{count}}）",
+        "remove": "移除"
+      },
+      "status": {
+        "disabled": "停用"
+      },
+      "column": {
+        "templateCount": "模板数",
+        "vendorConstraint": "厂商约束"
+      },
+      "modal": {
+        "createTitle": "新增指标模板组",
+        "editTitle": "编辑指标模板组",
+        "manageTitle": "管理模板组「{{name}}」"
+      },
+      "field": {
+        "name": "组名称",
+        "source": "采集协议",
+        "vendorConstraintOptional": "厂商约束（可选）",
+        "displayOrder": "排序权重（越小越靠前）"
+      },
+      "extra": {
+        "vendorConstraint": "声明厂商后，仅允许同厂商的模板加入本组；留空表示不限厂商"
+      },
+      "placeholder": {
+        "name": "如：H3C 网络设备标准指标集",
+        "vendor": "选择厂商（留空表示不限）",
+        "description": "可选"
+      },
+      "validation": {
+        "nameRequired": "请输入组名称",
+        "sourceRequired": "请选择采集协议"
+      },
+      "candidateTitle": "可加入的模板（已过滤兼容性）",
+      "candidateHint": "仅设备类型、协议、厂商（组声明时）一致的可加入",
+      "candidateEmpty": "没有符合兼容性校验的模板可供加入",
+      "memberTitle": "组内已有模板（{{count}}）",
+      "memberEmpty": "该组暂无模板，请在上方选择模板加入",
+      "confirm": {
+        "deleteTitle": "确认删除该模板组？",
+        "deleteContent": "删除后设备将回到自动匹配模板组。",
+        "removeTitle": "确认从分组移除该模板？"
+      },
+      "message": {
+        "created": "模板组已创建",
+        "updated": "模板组已更新",
+        "deleted": "模板组已删除",
+        "saveFailed": "保存模板组失败",
+        "deleteFailed": "删除模板组失败",
+        "allAlreadyInGroup": "所选模板均已在组内",
+        "added_one": "已将 {{count}} 个模板加入分组",
+        "added_other": "已将 {{count}} 个模板加入分组",
+        "addFailed": "加入分组失败",
+        "removed": "已从分组移除",
+        "removeFailed": "移除失败"
+      }
+    },
+    "oidAudit": {
+      "notCollected": "采不到",
+      "unresolved": "有 {{count}} 条指标模板解析不出 OID，永远不会采到数据",
+      "allResolved": "全部 {{count}} 条指标模板的 OID 均可解析",
+      "reaudit": "重新审计",
+      "unresolvedIntro": "这些模板解析不出数字 OID，采集侧不会向设备发出任何请求 ⇒",
+      "unresolvedStrong": "永远采不到数据，且不会报错。",
+      "missingMibPrefix": "缺少 MIB",
+      "missingMibSuffix": "，影响 {{count}} 条：",
+      "moreItems": " 等 {{count}} 条",
+      "uncompiledMibs": "厂商 MIB 目录里已有 {{list}}（源文件在、但没有 .py 编译产物 ⇒ 需先编译；pysnmp 不会自动编译文本 MIB）。",
+      "fixHintPrefix": "处理办法：把厂商 MIB 文件放进",
+      "fixHintSuffix": "（注意厂商再分发许可，请从设备官网自行获取），并编译成 pysnmp 能加载的 .py；或直接给该模板填上数字 OID。",
+      "allCovered": "本地 MIB 树与内置兜底表已覆盖全部模板；与采集侧用的是同一个解析器。",
+      "listSeparator": "、"
+    }
+  },
+  "oid": {
+    "tab": {
+      "rules": "分类规则",
+      "recommend": "推荐配置"
+    },
+    "deviceType": {
+      "all": "全适用",
+      "network": "network（网络设备）",
+      "server": "server（服务器）",
+      "other": "other（其他）"
+    },
+    "vendor": {
+      "generic": "通用"
+    },
+    "rule": {
+      "title": "OID 分类规则",
+      "empty": "暂无分类规则",
+      "action": {
+        "create": "新增规则"
+      },
+      "modal": {
+        "createTitle": "新增规则",
+        "editTitle": "编辑规则"
+      },
+      "field": {
+        "oidPrefix": "OID 前缀",
+        "label": "标签",
+        "priority": "优先级"
+      },
+      "validation": {
+        "prefixRequired": "请输入 OID 前缀",
+        "categoryRequired": "请输入 category"
+      },
+      "placeholder": {
+        "label": "温度探头",
+        "vendor": "选择厂商或留空通用"
+      },
+      "confirm": {
+        "deleteContent": "确定要删除该分类规则吗？此操作不可恢复。"
+      },
+      "message": {
+        "saveFailed": "保存失败"
+      }
+    },
+    "recommend": {
+      "title": "设备类型推荐配置",
+      "column": {
+        "categories": "推荐 category 列表"
+      },
+      "modal": {
+        "editTitle": "编辑推荐配置：{{type}}"
+      },
+      "hint": "勾选该设备类型探测后\"推荐勾选\"按钮会自动选中的 category"
+    }
+  },
+  "credential": {
+    "title": "共享凭据",
+    "searchPlaceholder": "搜索凭据名称",
+    "searchDevicePlaceholder": "搜索设备名称或 IP",
+    "empty": "暂无共享凭据",
+    "action": {
+      "create": "新建凭据"
+    },
+    "column": {
+      "linkedDevices": "关联设备"
+    },
+    "status": {
+      "enabled": "启用",
+      "disabled": "已停用",
+      "unlinked": "无关联"
+    },
+    "summary": {
+      "total_one": "共 {{count}} 条凭据",
+      "total_other": "共 {{count}} 条凭据",
+      "linked_one": "关联 {{count}} 台设备",
+      "linked_other": "关联 {{count}} 台设备",
+      "disabled_one": "{{count}} 条已停用",
+      "disabled_other": "{{count}} 条已停用"
+    },
+    "tooltip": {
+      "editSecret": "编辑密文（影响全部关联设备）",
+      "deleteLinked": "请先取消所有设备关联",
+      "deleteShared": "删除共享凭据"
+    },
+    "confirm": {
+      "deleteTitle": "确认删除此共享凭据？",
+      "deleteLinkedContent_one": "仍关联 {{count}} 台设备，无法删除",
+      "deleteLinkedContent_other": "仍关联 {{count}} 台设备，无法删除",
+      "batchDeleteTitle": "确认批量删除？",
+      "batchDeleteContent": "仅删除无关联设备的凭据，有关联的将跳过。",
+      "unlinkTitle": "确认取消关联",
+      "unlinkContent": "确定要取消该设备与此凭据的关联吗？"
+    },
+    "batch": {
+      "selected_one": "已选 {{count}} 项",
+      "selected_other": "已选 {{count}} 项"
+    },
+    "detail": {
+      "selectHint": "请从左侧选择一个共享凭据查看详情",
+      "id": "凭据 ID"
+    },
+    "selectedDevices_one": "已选 {{count}} 台设备",
+    "selectedDevices_other": "已选 {{count}} 台设备",
+    "linkTitle": "关联设备到共享凭据",
+    "linkHint": "选择要关联到「{{name}}」的设备，已关联的设备不会出现在列表中。",
+    "createTitle": "新建共享凭据",
+    "editSecretTitle": "编辑凭据密文",
+    "alert": {
+      "affectDevices_one": "此操作将影响 {{count}} 台关联设备",
+      "affectDevices_other": "此操作将影响 {{count}} 台关联设备",
+      "secretEditHint": "密文字段留空表示「保持不变」；提交后所有关联设备将用新凭据重新探测。"
+    },
+    "message": {
+      "renamed": "已更新名称",
+      "renameFailed": "改名失败",
+      "deleted": "凭据已删除",
+      "allLinked": "所选凭据均有关联设备，无法删除",
+      "deleteItemFailed": "凭据 #{{id}} 删除失败：{{reason}}",
+      "batchDeleted_one": "已删除 {{count}} 条凭据",
+      "batchDeleted_other": "已删除 {{count}} 条凭据",
+      "batchDeletedSkipped_one": "已删除 {{count}} 条凭据，跳过 {{skipped}} 条（有关联设备）",
+      "batchDeletedSkipped_other": "已删除 {{count}} 条凭据，跳过 {{skipped}} 条（有关联设备）",
+      "batchDeletedFailed_one": "已删除 {{count}} 条凭据，{{failed}} 条失败",
+      "batchDeletedFailed_other": "已删除 {{count}} 条凭据，{{failed}} 条失败",
+      "batchDeletedSkippedFailed_one": "已删除 {{count}} 条凭据，跳过 {{skipped}} 条（有关联设备），{{failed}} 条失败",
+      "batchDeletedSkippedFailed_other": "已删除 {{count}} 条凭据，跳过 {{skipped}} 条（有关联设备），{{failed}} 条失败",
+      "batchDeleteFailed": "批量删除失败",
+      "created": "凭据已创建",
+      "createFailed": "创建失败",
+      "updated": "凭据已更新",
+      "secretUpdatedMigrated": "已更新密文（已为该凭据生成独立行）",
+      "unlinked": "已取消关联",
+      "selectDeviceRequired": "请选择至少一台设备",
+      "linkedDevices_one": "已关联 {{count}} 台设备",
+      "linkedDevices_other": "已关联 {{count}} 台设备",
+      "linkFailed": "关联失败",
+      "linkedEmpty": "暂无关联设备"
+    }
+  },
+  "escalation": {
+    "title": "升级策略管理",
+    "empty": "暂无升级策略",
+    "action": {
+      "create": "新建策略"
+    },
+    "column": {
+      "match": "匹配条件",
+      "mode": "升级模式"
+    },
+    "matchAllTypes": "全部类型",
+    "matchAllSeverities": "全部级别",
+    "mode": {
+      "multiStep": "多级链({{count}}步)",
+      "singleStep": "单级 {{minutes}}min",
+      "role": "角色#{{id}}",
+      "repeat": "每{{minutes}}min重复"
+    },
+    "section": {
+      "multiStepTitle": "多级升级链（可选）",
+      "multiStepHint": "配置后按步骤顺序渐进升级；留空则使用下方单级模式。",
+      "singleStepTitle": "单级模式（无多级链时生效）"
+    },
+    "step": {
+      "label": "步骤{{index}}",
+      "waitMinutesPlaceholder": "等待分钟",
+      "escalateSeverityPlaceholder": "升级级别",
+      "roleIdPlaceholder": "角色ID",
+      "webhookPlaceholder": "webhook URL（可选）",
+      "empty": "未配置多级链",
+      "add": "添加升级步骤"
+    },
+    "field": {
+      "name": "策略名称",
+      "alertType": "匹配告警类型",
+      "severity": "匹配级别",
+      "waitMinutes": "未确认等待分钟数",
+      "escalateSeverity": "升级后级别",
+      "escalateToRoleId": "升级通知角色 ID",
+      "webhookUrl": "升级 Webhook URL（可选）",
+      "repeatMinutes": "重复升级间隔分钟（0=只升一次）",
+      "repeatMinutesExtra": "设为 N 时，每 N 分钟再次升级未确认告警"
+    },
+    "placeholder": {
+      "name": "如：未确认告警 30 分钟升级",
+      "waitMinutes": "如 30",
+      "escalateSeverity": "不升级级别",
+      "roleId": "如 5（运维主管）"
+    },
+    "validation": {
+      "nameRequired": "请输入名称",
+      "waitMinutesRequired": "请输入等待分钟数"
+    },
+    "modal": {
+      "createTitle": "新建升级策略",
+      "editTitle": "编辑升级策略"
+    },
+    "confirm": {
+      "deleteContent": "确定要删除该升级策略吗？此操作不可恢复。"
+    },
+    "message": {
+      "created": "策略已创建",
+      "updated": "策略已更新",
+      "deleted": "策略已删除"
+    }
+  },
+  "thresholdOverride": {
+    "title": "设备级阈值覆盖",
+    "empty": "暂无阈值覆盖",
+    "action": {
+      "create": "新建覆盖"
+    },
+    "column": {
+      "deviceId": "设备 ID"
+    },
+    "field": {
+      "deviceId": "设备 ID",
+      "metricKey": "指标标识",
+      "metricType": "指标类型"
+    },
+    "tooltip": {
+      "metricType": "决定阈值字段结构。编辑时自动从关联模板读取，可手动调整"
+    },
+    "placeholder": {
+      "metricKey": "如 temperature / disk_failure",
+      "note": "如：高温机房，阈值上调"
+    },
+    "validation": {
+      "deviceIdRequired": "请输入设备 ID",
+      "metricKeyRequired": "请输入指标标识"
+    },
+    "modal": {
+      "createTitle": "新建阈值覆盖",
+      "editTitle": "编辑阈值覆盖"
+    },
+    "confirm": {
+      "deleteContent": "确定要删除该阈值覆盖吗？删除后回退到全局模板。"
+    },
+    "message": {
+      "created": "阈值覆盖已创建",
+      "updated": "阈值覆盖已更新",
+      "deleted": "阈值覆盖已删除",
+      "thresholdRequired": "请至少配置一个阈值字段"
+    }
+  },
+  "tab": {
+    "alertList": "告警列表",
+    "reports": "统计报表",
+    "noc": "NOC 大屏",
+    "silence": "静默规则",
+    "dependency": "依赖抑制",
+    "escalation": "升级策略",
+    "mib": "MIB 探测",
+    "oidRules": "OID 规则",
+    "templates": "指标模板",
+    "overrides": "设备覆盖",
+    "sla": "SLA/SLO"
+  },
+  "crud": {
+    "created": "已创建",
+    "updated": "已更新",
+    "deleted": "已删除",
+    "deleteFailed": "删除失败"
+  },
+  "placeholder": {
+    "alertTypesOptional": "选择告警类型（留空=全部）"
+  },
+  "sla": {
+    "title": "SLA 目标管理",
+    "achievementTitle": "SLA 达成度报表",
+    "achievementEmpty": "暂无启用的 SLA 目标",
+    "empty": "暂无 SLA 目标",
+    "action": {
+      "create": "新建目标"
+    },
+    "alert": {
+      "title": "SLA/SLO 监控",
+      "description": "定义设备/设备组的可用率 SLA 目标，系统基于探测时序小时聚合（device_monitor_timeseries_hourly 的 reachable 指标）计算实际达成度。"
+    },
+    "column": {
+      "targetDevices": "目标设备",
+      "targetRatio": "可用率目标",
+      "window": "评估窗口"
+    },
+    "stat": {
+      "actualRatio": "实际可用率",
+      "targetAt": "目标 {{pct}}%",
+      "sampleSummary": "样本数: {{count}} | 窗口: {{start}} ~ {{end}}"
+    },
+    "windowDays_one": "{{count}} 天",
+    "windowDays_other": "{{count}} 天",
+    "field": {
+      "name": "目标名称",
+      "targetDeviceIds": "目标设备 ID（逗号分隔）",
+      "targetRatio": "可用率目标（0~1，如 0.99=99%）",
+      "windowDays": "评估窗口（天）"
+    },
+    "validation": {
+      "deviceIdsRequired": "请输入至少一个设备 ID",
+      "targetRatioRequired": "请输入可用率目标",
+      "windowDaysRequired": "请输入评估窗口"
+    },
+    "placeholder": {
+      "name": "如：核心设备月度可用率 SLA",
+      "deviceIds": "如：1,2,3",
+      "description": "如：月度可用率 ≥ 99%"
+    },
+    "modal": {
+      "createTitle": "新建 SLA 目标",
+      "editTitle": "编辑 SLA 目标"
+    },
+    "confirm": {
+      "deleteContent": "确定要删除该 SLA 目标吗？此操作不可恢复。"
+    }
+  },
+  "incident": {
+    "title": "事件中心",
+    "detailTitle": "事件详情",
+    "column": {
+      "title": "事件标题",
+      "deviceCount": "影响设备数",
+      "reasonCode": "归并原因",
+      "firstAlertAt": "首告时间",
+      "lastAlertAt": "末告时间",
+      "id": "ID",
+      "upstreamDevice": "上游设备"
+    },
+    "filter": {
+      "status": "状态过滤"
+    },
+    "status": {
+      "active": "活跃",
+      "closed": "已关闭"
+    },
+    "reason": {
+      "L1_rule": "规则聚合",
+      "L2_topology": "拓扑聚合",
+      "L2_manual_rule": "手动规则聚合",
+      "L3_change": "变更关联"
+    },
+    "cardSummary": "告警 {{alerts}} · 影响设备 {{devices}}",
+    "cardTime": "首告 {{first}} · 末告 {{last}}",
+    "detail": {
+      "rootDevice": "根因设备",
+      "relatedAlerts": "关联告警（{{count}}）",
+      "suppressedDevices": "被抑制的下游设备（{{count}}）"
+    }
+  },
+  "mib": {
+    "title": "MIB 自动探测",
+    "oidListTitle": "OID 清单",
+    "empty": "未发现 OID",
+    "emptyHint": "选择设备后点击「{{action}}」，将自动发现设备支持的 OID 清单",
+    "alert": {
+      "message": "对设备做 MIB walk，自动发现可采集的 OID 清单",
+      "description": "勾选感兴趣的 OID + 填写 metric_key，一键导入指标模板。无需手敲 OID，无需 MIB 文件。"
+    },
+    "action": {
+      "scan": "开始探测",
+      "recommend": "推荐勾选",
+      "clear": "清空选择",
+      "saveAsRule": "存为规则",
+      "import_one": "导入 {{count}} 个指标模板",
+      "import_other": "导入 {{count}} 个指标模板"
+    },
+    "stat": {
+      "deviceIp": "设备 IP",
+      "oidCount": "发现 OID 数",
+      "typeDistribution": "类型分布"
+    },
+    "count": {
+      "selected": "{{count}} 已选",
+      "recommendCategory": "{{count}} 推荐类别"
+    },
+    "column": {
+      "category": "类别",
+      "sampleValue": "采样值"
+    },
+    "placeholder": {
+      "searchDevice": "搜索设备名称/IP",
+      "selectDevice": "选择设备",
+      "filterOid": "筛选 OID / 采样值",
+      "filterType": "类型筛选"
+    },
+    "metricTypeOption": {
+      "gauge": "gauge（瞬时值）",
+      "counter": "counter（累加计数）",
+      "state": "state（状态）",
+      "event": "event（事件）"
+    },
+    "message": {
+      "selectDeviceFirst": "请先选择设备",
+      "selectOidFirst": "请先勾选要导入的 OID",
+      "scanning": "探测中，MIB walk 预计 10-40s，请稍候...",
+      "scanDone": "探测完成，耗时 {{seconds}}s",
+      "scanFailed": "探测失败",
+      "noRecommend": "当前探测结果无匹配的推荐指标",
+      "recommendSelected_one": "已勾选 {{count}} 个推荐指标并置顶",
+      "recommendSelected_other": "已勾选 {{count}} 个推荐指标并置顶",
+      "ruleSaved": "已将「{{name}}」保存为该设备的分类规则",
+      "saveRuleFailed": "保存规则失败",
+      "imported_one": "已导入 {{count}} 个指标模板",
+      "imported_other": "已导入 {{count}} 个指标模板",
+      "autoFilledNote_one": "（其中 {{count}} 个自动推断 metric_key）",
+      "autoFilledNote_other": "（其中 {{count}} 个自动推断 metric_key）",
+      "importFailed": "导入失败"
+    }
+  },
+  "report": {
+    "title": "告警统计报表",
+    "filter": {
+      "severity": "告警级别"
+    },
+    "range": {
+      "startTime": "开始时间",
+      "endTime": "结束时间"
+    },
+    "bucket": {
+      "hour": "按小时",
+      "day": "按日"
+    },
+    "stat": {
+      "total": "总告警数",
+      "closed": "已关闭",
+      "ackCloseRate": "确认率 / 关闭率"
+    },
+    "mttr": {
+      "seconds": "{{value}} 秒",
+      "minutes": "{{value}} 分钟",
+      "hours": "{{value}} 小时"
+    },
+    "column": {
+      "rank": "排名"
+    },
+    "chart": {
+      "byStatus": "按状态分布",
+      "densityHour": "告警密度时序（按小时）",
+      "densityDay": "告警密度时序（按日）",
+      "topDevices": "Top {{count}} 告警设备",
+      "topTypes": "Top {{count}} 告警类型"
+    }
+  },
+  "silence": {
+    "title": "静默规则管理",
+    "empty": "暂无静默规则",
+    "action": {
+      "create": "新建规则"
+    },
+    "alert": {
+      "title": "维护模式自动静默",
+      "description": "设备状态为「维护中」时，系统自动跳过该设备的告警生成（连通性告警 + 指标告警均静默），但仍会采集指标数据供维护后对比。无需在此手动创建静默规则。"
+    },
+    "column": {
+      "deviceScope": "设备范围",
+      "window": "静默窗口",
+      "reason": "原因",
+      "createdBy": "创建人"
+    },
+    "allDevices": "全部设备",
+    "field": {
+      "name": "规则名称",
+      "window": "静默时间窗口",
+      "deviceIds": "静默设备 ID（逗号分隔，留空=全部设备）",
+      "alertTypes": "静默告警类型（留空=全部类型）",
+      "reason": "静默原因"
+    },
+    "validation": {
+      "windowRequired": "请选择静默时间窗口",
+      "windowPickerRequired": "请选择时间窗口"
+    },
+    "placeholder": {
+      "name": "如：核心交换机维护窗口",
+      "deviceIds": "如：1,2,3（留空表示全部设备）",
+      "reason": "如：计划内维护"
+    },
+    "modal": {
+      "createTitle": "新建静默规则",
+      "editTitle": "编辑静默规则"
+    },
+    "confirm": {
+      "deleteContent": "确定要删除该静默规则吗？此操作不可恢复。"
+    }
+  },
+  "dependency": {
+    "title": "告警依赖抑制规则",
+    "empty": "暂无依赖抑制规则",
+    "action": {
+      "create": "新建规则"
+    },
+    "alert": {
+      "title": "自动拓扑抑制 + 手动规则",
+      "description": "系统自动基于设备父子拓扑（DeviceServerExt.parent_device_id）抑制下游告警：父设备有 active 告警时，子设备同类型告警自动抑制。本页规则用于手动覆盖或补充自动推断（如网络设备间的依赖）。"
+    },
+    "column": {
+      "upstreamDeviceId": "上游设备 ID",
+      "downstreamDeviceId": "下游设备 ID",
+      "reason": "说明"
+    },
+    "field": {
+      "name": "规则名称",
+      "alertTypes": "受抑制告警类型（留空=全部类型）",
+      "reason": "规则说明"
+    },
+    "validation": {
+      "sameDevice": "上游与下游设备不能相同",
+      "upstreamRequired": "请输入上游设备 ID",
+      "downstreamRequired": "请输入下游设备 ID"
+    },
+    "placeholder": {
+      "name": "如：核心交换机→接入交换机依赖",
+      "upstreamId": "如：1",
+      "downstreamId": "如：2",
+      "reason": "如：核心交换机 down 时抑制下游接入交换机告警"
+    },
+    "modal": {
+      "createTitle": "新建依赖抑制规则",
+      "editTitle": "编辑依赖抑制规则"
+    },
+    "confirm": {
+      "deleteContent": "确定要删除该依赖抑制规则吗？此操作不可恢复。"
+    }
+  },
+  "incidents": {
+    "deletedTooltip": "设备已被彻底删除；本行由设备名快照保留（引用列已置空）",
+    "deleted": "已删除",
+    "searchPlaceholder": "按设备名搜历史事件"
+  }
+}

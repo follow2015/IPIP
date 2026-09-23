@@ -1,0 +1,326 @@
+{
+  "assetInfo": {
+    "section": {
+      "purchase": "Purchase Information",
+      "warranty": "Warranty Information",
+      "lifecycle": "Lifecycle"
+    },
+    "assetNumber": {
+      "label": "Asset Number",
+      "tooltip": "Enter it manually, or enable auto-generation",
+      "placeholderManual": "Enter the asset number",
+      "placeholder": "Asset number (can be auto-generated)",
+      "autoGenerate": "Auto-generate"
+    },
+    "autoGenerate": {
+      "label": "Auto-generate asset numbers",
+      "tooltip": "When enabled, each device gets a different unique number (ZC-YYYYMMDD-HHmmss-XXXX)",
+      "hintBatch": "A unique number will be generated for each device (ZC-YYYYMMDD-HHmmss-XXXX)",
+      "hint": "A unique number will be generated automatically (ZC-YYYYMMDD-HHmmss-XXXX)",
+      "on": "On",
+      "off": "Off",
+      "auto": "Auto",
+      "manual": "Manual"
+    },
+    "supplier": {
+      "label": "Supplier",
+      "placeholder": "Supplier name"
+    },
+    "supplierContact": {
+      "label": "Supplier Contact",
+      "placeholder": "Contact"
+    },
+    "contractNumber": {
+      "label": "Contract Number",
+      "placeholder": "Purchase contract number"
+    },
+    "invoiceNumber": {
+      "label": "Invoice Number",
+      "placeholder": "Invoice number"
+    },
+    "purchaseDate": {
+      "label": "Purchase Date",
+      "placeholder": "Purchase date"
+    },
+    "purchasePrice": {
+      "label": "Purchase Price (CNY)",
+      "placeholder": "Price"
+    },
+    "warrantyType": {
+      "label": "Warranty Type",
+      "placeholder": "e.g. OEM warranty"
+    },
+    "warrantyStart": {
+      "label": "Warranty Start",
+      "placeholder": "Start date"
+    },
+    "warrantyEnd": {
+      "label": "Warranty Expiry",
+      "placeholder": "Select the expiry date",
+      "tooltip": "Pick a date directly, or click the \"Quick\" button on the right to derive it from \"Warranty Start\" by 1/2/3/5 years",
+      "popoverTitle": "Derive the expiry date from \"Warranty Start\"",
+      "quick": "Quick",
+      "quickYear": "{{count}} years"
+    },
+    "onlineDate": {
+      "label": "Online Date",
+      "placeholder": "Commissioning date",
+      "tooltipDefault": "Defaults to the time the device is added and can be changed manually; clearing it recalculates the lifecycle from the edit date",
+      "tooltip": "Clearing it recalculates the lifecycle from the edit date"
+    },
+    "offlineDate": {
+      "label": "Offline Date",
+      "placeholder": "Decommission / retirement date",
+      "tooltip": "Once filled in, \"Expected Lifespan\" is derived automatically; when both are set, the longer one wins and is synced"
+    },
+    "lifecycleYears": {
+      "label": "Expected Lifespan",
+      "placeholder": "years",
+      "unit": "years",
+      "tooltip": "Once filled in, \"Offline Date\" is derived automatically; when both are set, the longer one wins and is synced"
+    }
+  },
+  "roomLayout": {
+    "density": {
+      "compact": "Compact",
+      "standard": "Standard",
+      "large": "Large"
+    },
+    "searchPlaceholder": "Search cabinet number or customer",
+    "matched": "{{count}} matched",
+    "empty": {
+      "noPosition": "No cabinet positions yet. Set the row and column in the cabinet form.",
+      "noCabinetOrMarker": "No cabinets or placeholders in this room yet"
+    },
+    "action": {
+      "viewDetail": "View details",
+      "clearSelection": "Clear selection"
+    },
+    "readOnlyHint": "(Read-only mode, navigation disabled)",
+    "colHeader": "Col {{index}}",
+    "tooltip": {
+      "status": "Status: {{value}}",
+      "u": "U: {{used}}/{{total}}U ({{pct}}%)",
+      "power": "Power: {{used}}/{{total}}W ({{pct}}%)",
+      "position": "Position: {{value}}",
+      "positionUnset": "Position: Unpositioned",
+      "customer": "Customer: {{value}}",
+      "notes": "Remarks: {{value}}"
+    },
+    "position": "Row {{row}}, Col {{col}}",
+    "positionUnset": "Unpositioned",
+    "devices": "Devices: {{count}}",
+    "cellDeviceCount": "{{count}}",
+    "uUsage": "U: {{pct}}%",
+    "unpositioned": "Cabinets without position ({{count}})",
+    "channelType": {
+      "cold": "Cold aisle",
+      "hot": "Hot aisle",
+      "mixed": "Mixed aisle"
+    },
+    "supply": {
+      "floor": "Underfloor air supply",
+      "direct": "Overhead direct blow (not recommended)",
+      "none": "None"
+    },
+    "markerType": {
+      "ac": "Air conditioner",
+      "pdu": "PDU",
+      "pillar": "Pillar",
+      "door": "Door",
+      "other": "Other"
+    },
+    "outsideRow": "Outside row 1",
+    "outsideCol": "Outside column 1",
+    "positionRow": "Row {{row}}",
+    "positionCol": "Col {{col}}",
+    "legend": {
+      "status": "Status",
+      "channel": "Channels",
+      "channelHint": "(Solid with end caps = enclosed, dashed = open)"
+    },
+    "zoom": {
+      "out": "Zoom out",
+      "in": "Zoom in",
+      "reset": "Reset zoom",
+      "level": "Zoom {{pct}}%"
+    },
+    "conflict": {
+      "listSeparator": ", ",
+      "separator": "; ",
+      "verify": ". Please verify and fix.",
+      "cellCabinets": "{{count}} cabinets at this position: {{list}}",
+      "cellMarkers": "Placeholders also marked at this position: {{list}}",
+      "listTitle": "Conflicting cabinets ({{count}}): share the same row/column with another cabinet in this room and are not shown on the plan; please fix their position",
+      "tagTip": "{{cabinet}} ({{position}}) duplicates a cabinet position on the plan",
+      "tagTipDetail": ", click to view details"
+    },
+    "cabinetForm": {
+      "occupied": "Row {{row}}, Col {{col}} is already occupied by cabinet {{cabinet}}",
+      "occupiedHint": "Only one cabinet per cell in a room. Change the row/column or the submission will be rejected.",
+      "markerOccupied": "This position is marked as a facility placeholder ({{type}})",
+      "markerOccupiedHint": "Placeholders usually mean no cabinet goes in this cell. You may still submit; the plan will flag a conflict badge."
+    },
+    "planPosition": "Plan position",
+    "viewOnPlan": "View on plan",
+    "positionNotSet": "Not set (fill in row and column in the cabinet form)",
+    "channel": {
+      "title": "Configure Channels",
+      "hint": "Channels sit between adjacent columns: N means between column N and N+1, and 0 means outside the first column. Enclosure is the main visual cue distinguishing legacy rooms from modular ones.",
+      "add": "Add Channel",
+      "empty": "No channels configured; no bands are drawn on the plan",
+      "position": "Position",
+      "colSlot": "Slot {{col}}",
+      "enclosed": "Enclosed",
+      "enclosedTag": "Enclosed",
+      "openTag": "Open",
+      "supply": "Air supply",
+      "confirmDelete": "Delete this channel configuration?",
+      "editTitle": "Edit Channel Configuration",
+      "createTitle": "Add Channel Configuration",
+      "colNumber": "Column slot",
+      "colNumberExtra": "N = between column N and N+1; 0 = outside the first column (outside the cabinet grid)",
+      "colNumberRequired": "Please enter the column slot",
+      "colNumberNegative": "Column slot cannot be negative",
+      "type": "Channel type",
+      "typeRequired": "Please select a channel type",
+      "enclosedField": "Enclosed channel",
+      "enclosedExtra": "Enclosed channel with end doors/top panels, such as the enclosed cold aisle of modular rooms",
+      "enclosedWrap": " (enclosed)",
+      "openWrap": " (open)",
+      "supplyField": "Air supply method",
+      "supplyExtra": "Overhead direct blow mixes airflows; not recommended and only for low-density areas",
+      "supplyUnset": "Not specified",
+      "displayName": "Display name",
+      "displayNameExtra": "Leave blank to auto-generate from the slot, e.g. \"between column 1 and 2\"",
+      "displayNamePlaceholder": "e.g. A-B cold aisle",
+      "sideLeft": "Left ",
+      "sideRight": "Right ",
+      "enclosedDot": " ·enclosed",
+      "openDot": " ·open",
+      "unmarked": "Channel not specified",
+      "message": {
+        "updated": "Channel configuration updated",
+        "created": "Channel configuration created",
+        "deleted": "Channel configuration deleted",
+        "saveFailed": "Failed to save the channel configuration",
+        "deleteFailed": "Failed to delete the channel configuration"
+      }
+    },
+    "marker": {
+      "title": "Manage Placeholders",
+      "hint": "Placeholders mark cells that cannot hold cabinets — doors, precision AC, PDU, pillars. Row/col 0 means outside the cabinet grid (e.g. a door outside column 1). This is a positioning aid only, not an asset register.",
+      "add": "Add Placeholder",
+      "empty": "No placeholders yet",
+      "position": "Position",
+      "confirmDelete": "Delete this placeholder?",
+      "editTitle": "Edit Placeholder",
+      "createTitle": "Add Placeholder",
+      "facilityType": "Facility type",
+      "facilityTypeRequired": "Please select a facility type",
+      "rowNumber": "Row",
+      "rowExtra": "0 means outside the cabinet grid (e.g. an end-of-row AC)",
+      "rowRequired": "Please enter the row",
+      "rowNegative": "Row cannot be negative",
+      "colNumber": "Column",
+      "colExtra": "0 means outside the cabinet grid (e.g. an end AC or door)",
+      "colRequired": "Please enter the column",
+      "colNegative": "Column cannot be negative",
+      "label": "Label",
+      "labelExtra": "Leave blank to show the type, e.g. \"Air conditioner\"",
+      "labelPlaceholder": "e.g. AC-01",
+      "occupiedTitle": "A cabinet already occupies this position",
+      "occupiedContent": "{{position}} already has cabinet {{cabinet}}. Adding a placeholder will share the same cell and the plan will show a conflict badge. Continue?",
+      "stillAdd": "Add anyway",
+      "message": {
+        "updated": "Placeholder updated",
+        "created": "Placeholder created",
+        "deleted": "Placeholder deleted",
+        "saveFailed": "Failed to save the placeholder",
+        "deleteFailed": "Failed to delete the placeholder"
+      }
+    }
+  },
+  "uposition": {
+    "header": {
+      "title": "U Position Layout",
+      "stats": "{{totalU}}U · {{count}} devices",
+      "draggable": " · draggable"
+    },
+    "label": {
+      "u": "U",
+      "power": "Power",
+      "devices": "Devices"
+    },
+    "footer": {
+      "deviceValue": "{{count}}"
+    },
+    "type": {
+      "server": "Server",
+      "switch": "Network Device",
+      "storage": "Storage",
+      "multinode": "Multi-node Server",
+      "pdu": "PDU Power",
+      "kvm": "KVM Console"
+    },
+    "detail": {
+      "empty": "Select a device to see its details",
+      "uPosition": "U Position",
+      "model": "Model",
+      "sn": "Serial Number",
+      "uRange": "U{{end}}–U{{start}} ({{size}}U)",
+      "viewDetail": "View device details",
+      "nodeSummary": "{{online}}/{{total}} nodes online · {{fault}} faulty"
+    },
+    "node": {
+      "status": "Status: {{value}}",
+      "online": "Online",
+      "offline": "Offline",
+      "fault": "Faulty"
+    },
+    "side": {
+      "uUsage": "U Usage",
+      "powerUsage": "Power Usage"
+    },
+    "drop": {
+      "conflict": "{{range}} position conflict",
+      "place": "Place at {{range}}",
+      "conflictCancel": "Position conflict, move cancelled",
+      "moved": "{{device}} moved to {{range}}"
+    },
+    "device": {
+      "onlineSummary": "{{online}}/{{total}} online",
+      "powerSuffix": " · {{power}}W"
+    }
+  },
+  "vendorBrand": {
+    "title": "Vendor Brands",
+    "add": "Add Brand",
+    "edit": "Edit Brand",
+    "empty": "No vendor brands yet",
+    "field": {
+      "enterpriseNo": "enterprise No.",
+      "brandName": "Full Brand Name",
+      "displayName": "Display Name",
+      "labelPlaceholder": "DELL (Server)",
+      "sortOrder": "Sort Order"
+    },
+    "deviceType": {
+      "network": "network (Network)",
+      "server": "server (Server)",
+      "storage": "storage (Storage)",
+      "other": "other (Other)"
+    },
+    "validation": {
+      "enterpriseNoRequired": "Please enter the enterprise number",
+      "deviceTypeRequired": "Please select a device type",
+      "brandNameRequired": "Please enter the full brand name",
+      "displayNameRequired": "Please enter the display name"
+    },
+    "confirmDeleteContent": "Are you sure you want to delete this vendor brand? This action cannot be undone.",
+    "message": {
+      "created": "Created successfully",
+      "saveFailed": "Failed to save"
+    }
+  }
+}

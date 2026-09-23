@@ -12,6 +12,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.utils.time_utils import now_utc_naive
 
 from app.models.device import Device
+from app.models.device_hardware import (
+    SNAPSHOT_KEY_CHILDREN,
+    SNAPSHOT_KEY_LOCATION,
+    SNAPSHOT_KEY_NICS,
+    SNAPSHOT_KEY_STORAGE,
+)
 from app.core.enums import DeviceStatus
 from app.persistence.device_repository import DeviceRepository
 from app.utils.cache import cache_manager, cached
@@ -2223,11 +2229,11 @@ class DeviceService:
             device.hardware = hardware
 
         existing_config = hardware.device_config or {}
-        existing_config["deleted_location_snapshot"] = location_snapshot
+        existing_config[SNAPSHOT_KEY_LOCATION] = location_snapshot
         if nics_snapshot:
-            existing_config["deleted_nics_snapshot"] = nics_snapshot
+            existing_config[SNAPSHOT_KEY_NICS] = nics_snapshot
         if storage_snapshot:
-            existing_config["deleted_storage_snapshot"] = storage_snapshot
+            existing_config[SNAPSHOT_KEY_STORAGE] = storage_snapshot
         hardware.device_config = existing_config
 
         from sqlalchemy.orm.attributes import flag_modified
@@ -2313,9 +2319,9 @@ class DeviceService:
             chassis.hardware = hardware
 
         existing_config = hardware.device_config or {}
-        existing_children = existing_config.get("deleted_children_snapshot", [])
+        existing_children = existing_config.get(SNAPSHOT_KEY_CHILDREN, [])
         existing_children.extend(children_snapshot)
-        existing_config["deleted_children_snapshot"] = existing_children
+        existing_config[SNAPSHOT_KEY_CHILDREN] = existing_children
         hardware.device_config = existing_config
 
         from sqlalchemy.orm.attributes import flag_modified
@@ -2347,17 +2353,20 @@ class DeviceService:
     ) -> Dict[str, Any]:
         """恢复已软删除的设备
 
-        1. 读取 device_config 中的位置快照
-        2. 确定目标机柜和U位：
-           - 未选机柜 → 恢复到原位置（快照）
-           - 选了机柜 + 填了U位 → 使用指定位置
-           - 选了机柜 + 未填U位 → 自动分配U位
-        3. 检查U位冲突（仅原位置恢复时检测）
-        4. 恢复设备（清 deleted_at）
-        5. 回填位置
-        6. 清理 device_config 快照
-        7. 若是机箱 → 从快照重建子节点
-        8. 更新机柜使用情况
+        步骤（每一步一个私有助手，实现见各自 docstring；本方法只负责编排）：
+
+          1. 读取 `device_config` 里的位置快照
+          2. `_resolve_restore_target` —— 确定目标机柜与 U 位
+          3. `_detect_restore_u_conflict` —— 原位置 U 位冲突检测
+          4. `_check_child_node_restore_preconditions` —— 子节点侧机箱前置检查
+          5. 有冲突 ⇒ `_restore_conflict_response` 早返回（交前端提示，本次不恢复）
+          6. 写入（全程 `begin_nested` 包裹，保证原子）：
+             - `_apply_restore_state` 清 `deleted_at` / 恢复状态 / 回填位置与子节点字段
+             - `_restore_nics_and_storage_from_snapshot` 从快照重建网卡与存储
+             - `_restore_chassis_children_from_snapshot` 机箱则重建子节点
+             - `_cleanup_device_config_snapshots` 清快照（最后执行）
+             - `session.flush()`
+          7. 更新机柜使用情况、失效缓存、广播资源变更
 
         Returns:
             {"restored": bool, "location_conflict": bool, "conflict_devices": list,
@@ -2374,10 +2383,9 @@ class DeviceService:
         hardware = device.hardware
         snapshot = {}
         if hardware and hardware.device_config:
-            snapshot = hardware.device_config.get("deleted_location_snapshot", {})
+            snapshot = hardware.device_config.get(SNAPSHOT_KEY_LOCATION, {})
 
         height_u = snapshot.get("height_u") or device.height_u or 1
-        auto_assigned_u_position = None
 
         snapshot_parent_id = snapshot.get("parent_device_id")
         is_child_node = (device.server_ext is not None) and (
@@ -2386,196 +2394,42 @@ class DeviceService:
         if is_child_node and cabinet_id is not None:
             raise ValidationError("子节点设备只能恢复到原机箱，不能指定其他机柜")
 
-        if cabinet_id is not None:
-            from app.persistence.cabinet_repository import CabinetRepository
+        target_cabinet_id, target_u_position, auto_assigned_u_position = (
+            self._resolve_restore_target(session, cabinet_id, u_position, snapshot, height_u)
+        )
 
-            if not CabinetRepository(session).exists_by_id(cabinet_id):
-                raise ValidationError(f"机柜不存在 (ID: {cabinet_id})，无法恢复")
-            target_cabinet_id = cabinet_id
-            if u_position is not None:
-                target_u_position = u_position
-            else:
-                try:
-                    from app.services.cabinet_service import cabinet_service
-                    target_u_position = cabinet_service.auto_allocate_u_position(
-                        cabinet_id, height_u
-                    )
-                except ImportError:
-                    target_u_position = None
-                if target_u_position is None:
-                    raise ValidationError(f"机柜 {cabinet_id} 无可用U位，无法自动分配")
-                auto_assigned_u_position = target_u_position
-        else:
-            target_cabinet_id = snapshot.get("cabinet_id")
-            target_u_position = snapshot.get("u_position")
-
-        location_conflict = False
-        conflict_devices = []
-        if cabinet_id is None and target_cabinet_id and target_u_position:
-            from app.persistence.cabinet_repository import CabinetRepository
-
-            cabinet = CabinetRepository(session).find_by_id(target_cabinet_id)
-            if cabinet is None:
-                raise ValidationError(
-                    f"原机柜已不存在 (ID: {target_cabinet_id})，无法恢复到原位置，"
-                    "请指定其他机柜恢复"
-                )
-            conflicts = self.device_repository.check_u_position_conflict(
-                target_cabinet_id, target_u_position, height_u, exclude_id=device_id
-            )
-            if conflicts:
-                location_conflict = True
-                conflict_devices = [
-                    {
-                        "id":         d.id,
-                        "name":       d.device_name,
-                        "u_position": d.u_position,
-                        "height_u":   d.height_u,
-                    }
-                    for d in conflicts
-                ]
+        location_conflict, conflict_devices = self._detect_restore_u_conflict(
+            session, cabinet_id, target_cabinet_id, target_u_position, height_u, device_id
+        )
 
         if location_conflict:
-            return {
-                "restored": False,
-                "location_conflict": True,
-                "conflict_devices": conflict_devices,
-                "original_cabinet_id": target_cabinet_id,
-                "original_u_position": target_u_position,
-            }
+            return self._restore_conflict_response(
+                conflict_devices, target_cabinet_id, target_u_position
+            )
 
         if is_child_node:
-            original_parent_id = snapshot.get("parent_device_id")
-            original_node_position = snapshot.get("node_position")
-            if not original_parent_id:
-                raise ValidationError("子节点缺少原机箱信息，无法恢复")
-            parent_device = self.device_repository.find_by_id_including_deleted(original_parent_id)
-            if not parent_device:
-                raise ValidationError(f"原机箱不存在 (ID: {original_parent_id})，无法恢复")
-            if parent_device.deleted_at is not None:
-                raise ValidationError(f"原机箱已被删除，请先恢复机箱后再恢复子节点")
-            if not (parent_device.server_ext and parent_device.server_ext.is_chassis):
-                raise ValidationError(f"原所属设备已不是机箱类型 (ID: {original_parent_id})")
-            if parent_device.total_nodes and original_node_position is not None and original_node_position > parent_device.total_nodes:
-                raise ValidationError(
-                    f"节点位置 {original_node_position} 超出机箱当前容量 {parent_device.total_nodes}，"
-                    f"机箱可能在删除后被缩小"
-                )
-            if original_node_position is not None:
-                conflict_node = self.device_repository.find_node_by_position(
-                    original_parent_id, original_node_position, exclude_id=device_id
-                )
-                if conflict_node:
-                    location_conflict = True
-                    conflict_devices = [{"id": conflict_node.id, "name": conflict_node.device_name}]
+            node_conflict, node_conflict_devices = (
+                self._check_child_node_restore_preconditions(snapshot, device_id)
+            )
+            if node_conflict:
+                location_conflict = True
+                conflict_devices = node_conflict_devices
 
         if location_conflict:
-            return {
-                "restored": False,
-                "location_conflict": True,
-                "conflict_devices": conflict_devices,
-                "original_cabinet_id": target_cabinet_id,
-                "original_u_position": target_u_position,
-            }
+            return self._restore_conflict_response(
+                conflict_devices, target_cabinet_id, target_u_position
+            )
 
         restored_children = []
         try:
             with self.session.begin_nested():
-                device.deleted_at = None
-                original_status = snapshot.get("original_status", DeviceStatus.AVAILABLE)
-                safe_statuses = {DeviceStatus.AVAILABLE, DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.MAINTENANCE}
-                device.status = original_status if original_status in safe_statuses else DeviceStatus.AVAILABLE
+                self._apply_restore_state(
+                    device, snapshot, target_cabinet_id, target_u_position, is_child_node
+                )
 
-                if target_cabinet_id and target_u_position:
-                    device.cabinet_id = target_cabinet_id
-                    device.u_position = target_u_position
-                elif target_cabinet_id and not target_u_position:
-                    device.cabinet_id = target_cabinet_id
+                self._restore_nics_and_storage_from_snapshot(session, device_id, hardware)
 
-                if is_child_node and device.server_ext:
-                    original_parent_id = snapshot.get("parent_device_id")
-                    original_node_position = snapshot.get("node_position")
-                    original_node_row = snapshot.get("node_row")
-                    original_node_col = snapshot.get("node_col")
-                    if original_parent_id:
-                        device.server_ext.parent_device_id = original_parent_id
-                    if original_node_position is not None:
-                        device.server_ext.node_position = original_node_position
-                    if original_node_row is not None:
-                        device.server_ext.node_row = original_node_row
-                    if original_node_col is not None:
-                        device.server_ext.node_col = original_node_col
-
-                if hardware and hardware.device_config:
-                    from app.models.device_nics_port import DeviceNicsPort
-                    from app.models.device_storage import DeviceStorage
-                    from app.persistence.device_nics_port_repository import (
-                        DeviceNicsPortRepository,
-                    )
-                    from app.persistence.device_storage_repository import (
-                        DeviceStorageRepository,
-                    )
-
-                    nics_snap = hardware.device_config.get("deleted_nics_snapshot", [])
-                    for ns in nics_snap:
-                        existing = DeviceNicsPortRepository(self.session).find_port_by_nic_port_orm(
-                            device_id, ns.get("nic_number"), ns.get("port_number"),
-                        )
-                        if not existing:
-                            nic_port = DeviceNicsPort(
-                                device_id=device_id,
-                                nic_number=ns.get("nic_number"),
-                                nic_name=ns.get("nic_name", ""),
-                                port_number=ns.get("port_number"),
-                                port_name=ns.get("port_name"),
-                                port_type=ns.get("port_type", "RJ45"),
-                                port_speed=ns.get("port_speed", "1G"),
-                                port_status=ns.get("port_status", "free"),
-                                template_id=ns.get("template_id"),
-                            )
-                            session.add(nic_port)
-
-                    storage_snap = hardware.device_config.get("deleted_storage_snapshot", [])
-                    for ss in storage_snap:
-                        existing = None
-                        if ss.get("serial_number"):
-                            existing = DeviceStorageRepository(self.session).serial_number_exists(
-                                ss["serial_number"]
-                            )
-                        if not existing:
-                            storage = DeviceStorage(
-                                device_id=device_id,
-                                storage_type=ss.get("storage_type", "HDD"),
-                                capacity=ss.get("capacity", ""),
-                                capacity_gb=ss.get("capacity_gb"),
-                                interface_type=ss.get("interface_type"),
-                                slot_number=ss.get("slot_number"),
-                                manufacturer=ss.get("manufacturer"),
-                                model=ss.get("model"),
-                                template_id=ss.get("template_id"),
-                                serial_number=ss.get("serial_number"),
-                            )
-                            session.add(storage)
-
-                is_chassis = device.server_ext and device.server_ext.is_chassis
-                if is_chassis and hardware and hardware.device_config:
-                    children_snapshot = hardware.device_config.get("deleted_children_snapshot", [])
-                    if children_snapshot:
-                        restored_children = self._restore_children_from_snapshot(
-                            device, children_snapshot
-                        )
-                        remaining = [
-                            s for s in children_snapshot
-                            if s.get("device_id") not in [c.id for c in restored_children]
-                        ]
-                        config = hardware.device_config or {}
-                        if remaining:
-                            config["deleted_children_snapshot"] = remaining
-                        else:
-                            config.pop("deleted_children_snapshot", None)
-                        hardware.device_config = config
-                        from sqlalchemy.orm.attributes import flag_modified
-                        flag_modified(hardware, "device_config")
+                restored_children = self._restore_chassis_children_from_snapshot(device, hardware)
 
                 self._cleanup_device_config_snapshots(device)
 
@@ -2605,6 +2459,264 @@ class DeviceService:
             "children_restored": len(restored_children),
             "auto_assigned_u_position": auto_assigned_u_position,
         }
+
+    def _resolve_restore_target(
+        self, session, cabinet_id: Optional[int], u_position: Optional[int],
+        snapshot: Dict[str, Any], height_u: int,
+    ) -> Tuple[Optional[int], Optional[int], Optional[int]]:
+        """确定恢复的目标机柜与 U 位（`restore_device` 第一步）。
+
+        - 选了机柜 + 填了 U 位 → 用指定位置（不标记为自动分配）
+        - 选了机柜 + 未填 U 位 → 自动分配；无可用位则抛 `ValidationError`
+        - 未选机柜 → 回到快照里的原位置
+
+        用户指定的机柜先校验存在（防 API 传过期 ID 写出悬空引用，B-44）。
+
+        Returns:
+            `(target_cabinet_id, target_u_position, auto_assigned_u_position)`
+        """
+        auto_assigned_u_position = None
+        if cabinet_id is not None:
+            from app.persistence.cabinet_repository import CabinetRepository
+
+            if not CabinetRepository(session).exists_by_id(cabinet_id):
+                raise ValidationError(f"机柜不存在 (ID: {cabinet_id})，无法恢复")
+            target_cabinet_id = cabinet_id
+            if u_position is not None:
+                target_u_position = u_position
+            else:
+                try:
+                    from app.services.cabinet_service import cabinet_service
+                    target_u_position = cabinet_service.auto_allocate_u_position(
+                        cabinet_id, height_u
+                    )
+                except ImportError:
+                    target_u_position = None
+                if target_u_position is None:
+                    raise ValidationError(f"机柜 {cabinet_id} 无可用U位，无法自动分配")
+                auto_assigned_u_position = target_u_position
+        else:
+            target_cabinet_id = snapshot.get("cabinet_id")
+            target_u_position = snapshot.get("u_position")
+        return target_cabinet_id, target_u_position, auto_assigned_u_position
+
+    def _detect_restore_u_conflict(
+        self, session, cabinet_id: Optional[int], target_cabinet_id: Optional[int],
+        target_u_position: Optional[int], height_u: int, device_id: int,
+    ) -> Tuple[bool, List[Dict[str, Any]]]:
+        """原位置恢复时的 U 位冲突检测（`restore_device` 第二步）。
+
+        只在「未指定机柜 ⇒ 回到原位置」这条路径上检测；指定机柜/自动分配不检测。
+        原机柜已被物理删除时抛 `ValidationError`（拒绝静默回填悬空 cabinet_id）。
+
+        Returns:
+            `(是否冲突, 冲突设备清单)`；清单结构与前端消费口径见内层注释。
+        """
+        location_conflict = False
+        conflict_devices = []
+        if cabinet_id is None and target_cabinet_id and target_u_position:
+            from app.persistence.cabinet_repository import CabinetRepository
+
+            cabinet = CabinetRepository(session).find_by_id(target_cabinet_id)
+            if cabinet is None:
+                raise ValidationError(
+                    f"原机柜已不存在 (ID: {target_cabinet_id})，无法恢复到原位置，"
+                    "请指定其他机柜恢复"
+                )
+            conflicts = self.device_repository.check_u_position_conflict(
+                target_cabinet_id, target_u_position, height_u, exclude_id=device_id
+            )
+            if conflicts:
+                location_conflict = True
+                conflict_devices = [
+                    {
+                        "id":         d.id,
+                        "name":       d.device_name,
+                        "u_position": d.u_position,
+                        "height_u":   d.height_u,
+                    }
+                    for d in conflicts
+                ]
+        return location_conflict, conflict_devices
+
+    def _check_child_node_restore_preconditions(
+        self, snapshot: Dict[str, Any], device_id: int,
+    ) -> Tuple[bool, List[Dict[str, Any]]]:
+        """子节点恢复前的机箱侧前置检查（`restore_device` 第三步）。
+
+        原机箱缺失/已删除/不再是机箱/容量缩小 ⇒ 抛 `ValidationError`；
+        节点位置被占 ⇒ 返回冲突（不抛异常，与 U 位冲突的处置口径一致）。
+
+        Returns:
+            `(是否冲突, 冲突设备清单)`
+        """
+        location_conflict = False
+        conflict_devices = []
+        original_parent_id = snapshot.get("parent_device_id")
+        original_node_position = snapshot.get("node_position")
+        if not original_parent_id:
+            raise ValidationError("子节点缺少原机箱信息，无法恢复")
+        parent_device = self.device_repository.find_by_id_including_deleted(original_parent_id)
+        if not parent_device:
+            raise ValidationError(f"原机箱不存在 (ID: {original_parent_id})，无法恢复")
+        if parent_device.deleted_at is not None:
+            raise ValidationError(f"原机箱已被删除，请先恢复机箱后再恢复子节点")
+        if not (parent_device.server_ext and parent_device.server_ext.is_chassis):
+            raise ValidationError(f"原所属设备已不是机箱类型 (ID: {original_parent_id})")
+        if parent_device.total_nodes and original_node_position is not None and original_node_position > parent_device.total_nodes:
+            raise ValidationError(
+                f"节点位置 {original_node_position} 超出机箱当前容量 {parent_device.total_nodes}，"
+                f"机箱可能在删除后被缩小"
+            )
+        if original_node_position is not None:
+            conflict_node = self.device_repository.find_node_by_position(
+                original_parent_id, original_node_position, exclude_id=device_id
+            )
+            if conflict_node:
+                location_conflict = True
+                conflict_devices = [{"id": conflict_node.id, "name": conflict_node.device_name}]
+        return location_conflict, conflict_devices
+
+    @staticmethod
+    def _restore_conflict_response(
+        conflict_devices: List[Dict[str, Any]],
+        target_cabinet_id: Optional[int], target_u_position: Optional[int],
+    ) -> Dict[str, Any]:
+        """位置冲突时的统一响应体（两处早返回共用，`restore_device`）。
+
+        前端 `DeviceRecycleBin` 只消费 `conflict_devices` 里的 id/name；
+        `original_*` 两个字段是既有响应契约的一部分，一并保留。
+        """
+        return {
+            "restored": False,
+            "location_conflict": True,
+            "conflict_devices": conflict_devices,
+            "original_cabinet_id": target_cabinet_id,
+            "original_u_position": target_u_position,
+        }
+
+
+    def _apply_restore_state(
+        self, device, snapshot: Dict[str, Any],
+        target_cabinet_id: Optional[int], target_u_position: Optional[int],
+        is_child_node: bool,
+    ) -> None:
+        """清 `deleted_at`、恢复状态、回填位置与子节点字段（`restore_device` 第四步）。
+
+        状态只在快照值属**合法集合**时复用，否则回落 `AVAILABLE`
+        （避免把设备恢复成 SCRAPPED 之类异常状态）。
+        """
+        device.deleted_at = None
+        original_status = snapshot.get("original_status", DeviceStatus.AVAILABLE)
+        safe_statuses = {DeviceStatus.AVAILABLE, DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.MAINTENANCE}
+        device.status = original_status if original_status in safe_statuses else DeviceStatus.AVAILABLE
+
+        if target_cabinet_id and target_u_position:
+            device.cabinet_id = target_cabinet_id
+            device.u_position = target_u_position
+        elif target_cabinet_id and not target_u_position:
+            device.cabinet_id = target_cabinet_id
+
+        if is_child_node and device.server_ext:
+            original_parent_id = snapshot.get("parent_device_id")
+            original_node_position = snapshot.get("node_position")
+            original_node_row = snapshot.get("node_row")
+            original_node_col = snapshot.get("node_col")
+            if original_parent_id:
+                device.server_ext.parent_device_id = original_parent_id
+            if original_node_position is not None:
+                device.server_ext.node_position = original_node_position
+            if original_node_row is not None:
+                device.server_ext.node_row = original_node_row
+            if original_node_col is not None:
+                device.server_ext.node_col = original_node_col
+
+    def _restore_nics_and_storage_from_snapshot(self, session, device_id: int, hardware) -> None:
+        """从 `device_config` 快照重建网卡端口与存储（`restore_device` 第五步）。
+
+        幂等：网卡按 (nic_number, port_number) 去重、存储按 serial_number 去重，
+        已存在的跳过（重复调用不会产生重复行）。
+        """
+        if hardware and hardware.device_config:
+            from app.models.device_nics_port import DeviceNicsPort
+            from app.models.device_storage import DeviceStorage
+            from app.persistence.device_nics_port_repository import (
+                DeviceNicsPortRepository,
+            )
+            from app.persistence.device_storage_repository import (
+                DeviceStorageRepository,
+            )
+
+            nics_snap = hardware.device_config.get(SNAPSHOT_KEY_NICS, [])
+            for ns in nics_snap:
+                existing = DeviceNicsPortRepository(self.session).find_port_by_nic_port_orm(
+                    device_id, ns.get("nic_number"), ns.get("port_number"),
+                )
+                if not existing:
+                    nic_port = DeviceNicsPort(
+                        device_id=device_id,
+                        nic_number=ns.get("nic_number"),
+                        nic_name=ns.get("nic_name", ""),
+                        port_number=ns.get("port_number"),
+                        port_name=ns.get("port_name"),
+                        port_type=ns.get("port_type", "RJ45"),
+                        port_speed=ns.get("port_speed", "1G"),
+                        port_status=ns.get("port_status", "free"),
+                        template_id=ns.get("template_id"),
+                    )
+                    session.add(nic_port)
+
+            storage_snap = hardware.device_config.get(SNAPSHOT_KEY_STORAGE, [])
+            for ss in storage_snap:
+                existing = None
+                if ss.get("serial_number"):
+                    existing = DeviceStorageRepository(self.session).serial_number_exists(
+                        ss["serial_number"]
+                    )
+                if not existing:
+                    storage = DeviceStorage(
+                        device_id=device_id,
+                        storage_type=ss.get("storage_type", "HDD"),
+                        capacity=ss.get("capacity", ""),
+                        capacity_gb=ss.get("capacity_gb"),
+                        interface_type=ss.get("interface_type"),
+                        slot_number=ss.get("slot_number"),
+                        manufacturer=ss.get("manufacturer"),
+                        model=ss.get("model"),
+                        template_id=ss.get("template_id"),
+                        serial_number=ss.get("serial_number"),
+                    )
+                    session.add(storage)
+
+    def _restore_chassis_children_from_snapshot(self, device, hardware) -> List[Any]:
+        """机箱恢复时从快照重建子节点，并清理**已恢复**的子节点快照（`restore_device` 第六步）。
+
+        未恢复成功的子节点保留在快照里，供下次重试；全部恢复则移除该 key。
+
+        Returns:
+            已恢复的子节点对象列表。
+        """
+        restored_children = []
+        is_chassis = device.server_ext and device.server_ext.is_chassis
+        if is_chassis and hardware and hardware.device_config:
+            children_snapshot = hardware.device_config.get(SNAPSHOT_KEY_CHILDREN, [])
+            if children_snapshot:
+                restored_children = self._restore_children_from_snapshot(
+                    device, children_snapshot
+                )
+                remaining = [
+                    s for s in children_snapshot
+                    if s.get("device_id") not in [c.id for c in restored_children]
+                ]
+                config = hardware.device_config or {}
+                if remaining:
+                    config[SNAPSHOT_KEY_CHILDREN] = remaining
+                else:
+                    config.pop(SNAPSHOT_KEY_CHILDREN, None)
+                hardware.device_config = config
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(hardware, "device_config")
+        return restored_children
 
     def permanent_delete_device(self, device_id: int) -> bool:
         """永久删除设备（物理 DELETE，不可恢复）
@@ -2659,7 +2771,7 @@ class DeviceService:
                 snapshot_parent = None
                 if dev and dev.hardware and dev.hardware.device_config:
                     snapshot_parent = dev.hardware.device_config.get(
-                        "deleted_location_snapshot", {}
+                        SNAPSHOT_KEY_LOCATION, {}
                     ).get("parent_device_id")
                 is_child = (dev and dev.server_ext and dev.server_ext.parent_device_id is not None) or snapshot_parent is not None
                 effective_cabinet_id = None if is_child else cabinet_id
@@ -2777,10 +2889,10 @@ class DeviceService:
             return
 
         config = dict(hardware.device_config)
-        config.pop("deleted_location_snapshot", None)
-        config.pop("deleted_nics_snapshot", None)
-        config.pop("deleted_storage_snapshot", None)
-        config.pop("deleted_children_snapshot", None)
+        config.pop(SNAPSHOT_KEY_LOCATION, None)
+        config.pop(SNAPSHOT_KEY_NICS, None)
+        config.pop(SNAPSHOT_KEY_STORAGE, None)
+        config.pop(SNAPSHOT_KEY_CHILDREN, None)
         hardware.device_config = config
         flag_modified(hardware, "device_config")
         self.session.flush()

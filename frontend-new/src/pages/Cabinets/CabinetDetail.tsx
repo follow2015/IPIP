@@ -10,7 +10,11 @@ import { useUpdateDevice } from '@/services/device';
 import { useVendorBrands } from '@/services/monitor';
 import { queryKeys } from '@/services/query-keys';
 import UPositionSelector from '@/components/UPositionSelector';
-import { CHANNEL_TYPE_LABEL, paletteKeyOf } from '@/components/RoomLayout/palette';
+import {
+  CHANNEL_TYPE_LABEL_KEYS,
+  paletteKeyOf,
+  positionLabel
+} from '@/components/RoomLayout/palette';
 import type {
   OccupiedPosition,
   RackDeviceType,
@@ -19,21 +23,27 @@ import type {
 } from '@/components/UPositionSelector/UPositionSelector';
 import { formatDateTime } from '@/utils/format';
 import { useMessage } from '@/hooks/useMessage';
-import { CABINET_STATUS_MAP, DeviceStatusCode } from '@/types/enums';
+import { DeviceStatusCode } from '@/types/enums';
 import type { Cabinet, Device, RoomChannel } from '@/types/models';
+import { getCabinetStatusMeta, type DeviceT } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 
-function renderStatus(v: number) {
-  const s = CABINET_STATUS_MAP[v as keyof typeof CABINET_STATUS_MAP];
+function renderStatus(v: number, t: DeviceT) {
+  const s = getCabinetStatusMeta(v, t);
   return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{v}</Tag>;
 }
 
-function ChannelTag({ channel, side }: { channel: RoomChannel; side: string }) {
-  const typeLabel = CHANNEL_TYPE_LABEL[channel.channel_type] ?? channel.channel_type;
+function ChannelTag({ channel, side }: { channel: RoomChannel; side: 'left' | 'right' }) {
+  const { t: ta } = useTranslation('asset');
+  const typeKey = CHANNEL_TYPE_LABEL_KEYS[channel.channel_type];
+  const typeLabel = typeKey ? ta(typeKey) : channel.channel_type;
   return (
     <Tag color={paletteKeyOf(channel.channel_type)}>
-      {side}
+      {side === 'left' ? ta('roomLayout.channel.sideLeft') : ta('roomLayout.channel.sideRight')}
       {typeLabel}
-      {channel.enclosed ? '·封闭' : '·开放'}
+      {channel.enclosed
+        ? ta('roomLayout.channel.enclosedDot')
+        : ta('roomLayout.channel.openDot')}
     </Tag>
   );
 }
@@ -41,15 +51,17 @@ function ChannelTag({ channel, side }: { channel: RoomChannel; side: string }) {
 function CabinetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const cabinetId = Number(id);
 
   if (Number.isNaN(cabinetId)) {
     return (
       <Result
         status="404"
-        title="参数无效"
-        subTitle="机柜 ID 无效"
-        extra={<Button onClick={() => navigate(-1)}>返回</Button>}
+        title={td('detail.invalidParam')}
+        subTitle={td('cabinet.invalidId')}
+        extra={<Button onClick={() => navigate(-1)}>{tc('action.back')}</Button>}
       />
     );
   }
@@ -58,6 +70,9 @@ function CabinetDetail() {
 }
 
 function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
+  const { t: ta } = useTranslation('asset');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -86,19 +101,19 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
         { id: deviceId, u_position: newUPos } as Parameters<typeof updateDevice.mutate>[0],
         {
           onSuccess: () => {
-            message.success('U位更新成功');
+            message.success(td('cabinet.message.uPositionUpdated'));
             queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.detail(cabinetId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.withDevices(cabinetId) });
           },
-          onError: () => message.error('U位更新失败')
+          onError: () => message.error(td('cabinet.message.uPositionUpdateFailed'))
         }
       );
     },
-    [updateDevice, cabinetId, queryClient]
+    [updateDevice, cabinetId, queryClient, td]
   );
 
   if (!cabinet) {
-    return <div>机柜不存在</div>;
+    return <div>{td('cabinet.notFound')}</div>;
   }
 
   function mapDeviceType(d: Device): RackDeviceType {
@@ -173,35 +188,37 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
     <div>
       <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/cabinets')}>
-          返回列表
+          {td('detail.backToList')}
         </Button>
         <Button type="primary" onClick={() => navigate(`/devices?cabinetId=${cabinetId}`)}>
-          查看设备
+          {td('cabinet.viewDevices')}
         </Button>
       </div>
 
-      <Card title={`机柜详情 - ${c.cabinet_number}`}>
+      <Card title={td('cabinet.detailTitle', { number: c.cabinet_number })}>
         <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
-          <Descriptions.Item label="机柜编号">{c.cabinet_number}</Descriptions.Item>
-          <Descriptions.Item label="状态">{renderStatus(c.status)}</Descriptions.Item>
-          <Descriptions.Item label="所属机房">{c.room_name}</Descriptions.Item>
-          <Descriptions.Item label="机房位置">{c.room_location ?? '-'}</Descriptions.Item>
-          <Descriptions.Item label="具体位置">{c.location ?? '-'}</Descriptions.Item>
+          <Descriptions.Item label={td('cabinet.number')}>{c.cabinet_number}</Descriptions.Item>
+          <Descriptions.Item label={tc('field.status')}>{renderStatus(c.status, td)}</Descriptions.Item>
+          <Descriptions.Item label={td('basic.field.room')}>{c.room_name}</Descriptions.Item>
+          <Descriptions.Item label={td('cabinet.field.roomLocation')}>
+            {c.room_location ?? '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label={td('cabinet.field.exactLocation')}>
+            {c.location ?? '-'}
+          </Descriptions.Item>
           {/*
             平面图位置（设计文档 §3.4）：此前 row/col 填了却完全不展示，运维想知道
             机柜在第几行第几列只能跳回平面图自己找；加了通道后这个缺口更明显
             （冷/热通道信息理应跟着位置一起露出）。
           */}
-          <Descriptions.Item label="平面图位置">
+          <Descriptions.Item label={ta('roomLayout.planPosition')}>
             {hasPosition ? (
               <Space size={4} wrap>
-                <span>
-                  第 {c.row} 行 第 {c.col} 列
-                </span>
-                {leftChannel ? <ChannelTag channel={leftChannel} side="左侧" /> : null}
-                {rightChannel ? <ChannelTag channel={rightChannel} side="右侧" /> : null}
+                <span>{positionLabel(c.row ?? 0, c.col ?? 0, ta)}</span>
+                {leftChannel ? <ChannelTag channel={leftChannel} side="left" /> : null}
+                {rightChannel ? <ChannelTag channel={rightChannel} side="right" /> : null}
                 {!leftChannel && !rightChannel ? (
-                  <span style={{ color: '#8c8c8c' }}>通道未标注</span>
+                  <span style={{ color: '#8c8c8c' }}>{ta('roomLayout.channel.unmarked')}</span>
                 ) : null}
                 <Button
                   type="link"
@@ -209,48 +226,50 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
                   icon={<EnvironmentOutlined />}
                   onClick={() => navigate(`/rooms/${c.room_id}?cabinetId=${c.id}`)}
                 >
-                  在平面图中查看
+                  {ta('roomLayout.viewOnPlan')}
                 </Button>
               </Space>
             ) : (
-              <span style={{ color: '#8c8c8c' }}>未设置（可在机柜表单中填写行号与列号）</span>
+              <span style={{ color: '#8c8c8c' }}>{ta('roomLayout.positionNotSet')}</span>
             )}
           </Descriptions.Item>
-          <Descriptions.Item label="租赁客户">{c.customer_name ?? '-'}</Descriptions.Item>
-          <Descriptions.Item label="U位容量">{c.total_u}U</Descriptions.Item>
-          <Descriptions.Item label="已用U位">
+          <Descriptions.Item label={td('cabinet.field.leaseCustomer')}>
+            {c.customer_name ?? '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label={td('cabinet.field.totalU')}>{c.total_u}U</Descriptions.Item>
+          <Descriptions.Item label={td('cabinet.field.usedU')}>
             <Tag color={c.used_u > c.total_u * 0.8 ? 'red' : 'green'}>{c.used_u}U</Tag>
           </Descriptions.Item>
-          <Descriptions.Item label="可用U位">{c.available_u}U</Descriptions.Item>
-          <Descriptions.Item label="U位利用率">{c.u_usage_rate}%</Descriptions.Item>
-          <Descriptions.Item label="额定功率">
+          <Descriptions.Item label={td('cabinet.field.availableU')}>{c.available_u}U</Descriptions.Item>
+          <Descriptions.Item label={ta('uposition.side.uUsage')}>{c.u_usage_rate}%</Descriptions.Item>
+          <Descriptions.Item label={td('cabinet.field.ratedPowerUnit')}>
             {c.total_power ? `${c.total_power}W` : '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="已用功率">
+          <Descriptions.Item label={td('cabinet.field.usedPower')}>
             {c.total_power ? (
               <Tag color={c.power_usage_rate > 80 ? 'red' : 'green'}>{c.used_power}W</Tag>
             ) : (
               '-'
             )}
           </Descriptions.Item>
-          <Descriptions.Item label="功率利用率">
+          <Descriptions.Item label={ta('uposition.side.powerUsage')}>
             {c.total_power ? `${c.power_usage_rate}%` : '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="最大承重">
+          <Descriptions.Item label={td('cabinet.field.maxWeight')}>
             {c.max_weight ? `${c.max_weight}KG` : '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="设备数">{c.device_count}</Descriptions.Item>
-          <Descriptions.Item label="创建时间">{formatDateTime(c.created_at)}</Descriptions.Item>
-          <Descriptions.Item label="更新时间" span={1}>
+          <Descriptions.Item label={td('cabinet.field.deviceCount')}>{c.device_count}</Descriptions.Item>
+          <Descriptions.Item label={tc('field.createdAt')}>{formatDateTime(c.created_at)}</Descriptions.Item>
+          <Descriptions.Item label={tc('field.updatedAt')} span={1}>
             {formatDateTime(c.updated_at)}
           </Descriptions.Item>
-          <Descriptions.Item label="备注" span={1}>
+          <Descriptions.Item label={tc('field.remarks')} span={1}>
             {c.notes || '-'}
           </Descriptions.Item>
         </Descriptions>
       </Card>
 
-      <Card title="U位布局" style={{ marginTop: 16 }}>
+      <Card title={ta('uposition.header.title')} style={{ marginTop: 16 }}>
         <UPositionSelector
           totalU={c.total_u}
           ratedPower={c.total_power ?? undefined}
@@ -258,7 +277,7 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
           readOnly={false}
           onPositionChange={handlePositionChange}
           onNodeReorder={(chassisId, newOrderedNodeIds) => {
-            console.log('机箱子节点重排:', chassisId, newOrderedNodeIds);
+            console.log('Chassis node reorder:', chassisId, newOrderedNodeIds);
           }}
           onSelect={() => {}}
         />

@@ -38,23 +38,34 @@ import type {
   LinkAggregationGroup
 } from '@/types/models';
 import { isPhysicalPort } from '@/utils/portType';
+import { useTranslation } from 'react-i18next';
 
-const CONNECTION_TYPE_OPTIONS = [
-  { label: '以太网', value: 'ethernet' },
-  { label: '光纤', value: 'fiber' },
-  { label: '管理口', value: 'management' },
-  { label: '串口', value: 'serial' },
-  { label: '其他', value: 'other' }
+type ConnectionTypeKey =
+  | 'connection.type.ethernet'
+  | 'connection.type.fiber'
+  | 'connection.type.management'
+  | 'connection.type.serial'
+  | 'connection.type.other';
+
+const CONNECTION_TYPE_OPTIONS: { labelKey: ConnectionTypeKey; value: string }[] = [
+  { labelKey: 'connection.type.ethernet', value: 'ethernet' },
+  { labelKey: 'connection.type.fiber', value: 'fiber' },
+  { labelKey: 'connection.type.management', value: 'management' },
+  { labelKey: 'connection.type.serial', value: 'serial' },
+  { labelKey: 'connection.type.other', value: 'other' }
 ];
 
-const CONNECTION_TYPE_LABEL_MAP: Record<string, string> = Object.fromEntries(
-  CONNECTION_TYPE_OPTIONS.map(({ label, value }) => [value, label])
-);
+const CONNECTION_TYPE_LABEL_KEYS: Record<string, ConnectionTypeKey> = Object.fromEntries(
+  CONNECTION_TYPE_OPTIONS.map(({ labelKey, value }) => [value, labelKey])
+) as Record<string, ConnectionTypeKey>;
+
 interface ConnectionTabProps {
   device: Device;
 }
 
 function ConnectionTab({ device }: ConnectionTabProps) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const deviceId = device.id;
   const isNetworkDevice = device.device_type === DeviceType.NETWORK;
@@ -186,14 +197,19 @@ function ConnectionTab({ device }: ConnectionTabProps) {
       }));
   }, [localPorts]);
 
+  const connectionTypeOptions = useMemo(
+    () => CONNECTION_TYPE_OPTIONS.map(({ labelKey, value }) => ({ label: t(labelKey), value })),
+    [t]
+  );
+
   const { data: deviceVlans } = useVLANsByDevice(deviceId);
   const vlanOptions = useMemo(
     () =>
       (deviceVlans ?? []).map((v: VLAN) => ({
-        label: `${v.vlan_id} - ${v.name || '未命名'}`,
+        label: `${v.vlan_id} - ${v.name || t('connection.unnamed')}`,
         value: v.vlan_id
       })),
-    [deviceVlans]
+    [deviceVlans, t]
   );
 
   const { data: deviceLags } = useLinkAggregationGroups(deviceId);
@@ -216,8 +232,8 @@ function ConnectionTab({ device }: ConnectionTabProps) {
   );
 
   const linkTypeOptions = isNetworkDevice
-    ? [{ label: '网络→网络', value: LinkType.NETWORK_TO_NETWORK }]
-    : [{ label: '设备→网络', value: LinkType.DEVICE_TO_NETWORK }];
+    ? [{ label: t('connection.linkType.networkToNetwork'), value: LinkType.NETWORK_TO_NETWORK }]
+    : [{ label: t('connection.linkType.deviceToNetwork'), value: LinkType.DEVICE_TO_NETWORK }];
 
   const handleAdd = () => {
     form.resetFields();
@@ -233,37 +249,37 @@ function ConnectionTab({ device }: ConnectionTabProps) {
   const handleDelete = useCallback(
     (connId: number, switchDeviceId?: number) => {
       confirm({
-        title: '确认删除',
-        content: '确定要删除该连接吗？',
+        title: tCommon('confirm.deleteTitle'),
+        content: t('connection.confirmDeleteContent'),
         onOk: async () => {
           try {
             await deleteConnection.mutateAsync({ connId, switchDeviceId });
-            message.success('删除成功');
+            message.success(tCommon('message.deleteSuccess'));
           } catch (err) {
-            message.error(err instanceof Error ? err.message : '删除失败');
+            message.error(err instanceof Error ? err.message : tCommon('message.deleteFailed'));
           }
         }
       });
     },
-    [confirm, deleteConnection, message]
+    [confirm, deleteConnection, message, t, tCommon]
   );
 
   const handleDeletePortLink = useCallback(
     (portId: number) => {
       confirm({
-        title: '确认断开',
-        content: '确定要断开该端口互联吗？将双向释放端口。',
+        title: t('connection.confirmDisconnect'),
+        content: t('connection.confirmDisconnectContent'),
         onOk: async () => {
           try {
             await disconnectPortLink.mutateAsync(portId);
-            message.success('断开成功');
+            message.success(t('connection.message.disconnected'));
           } catch (err) {
-            message.error(err instanceof Error ? err.message : '断开失败');
+            message.error(err instanceof Error ? err.message : t('connection.message.disconnectFailed'));
           }
         }
       });
     },
-    [confirm, disconnectPortLink, message]
+    [confirm, disconnectPortLink, message, t]
   );
 
   const handleSubmit = async () => {
@@ -271,7 +287,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
       const values = await form.validateFields();
       const { room_id, cabinet_id, ...payload } = values;
       await createConnection.mutateAsync(payload);
-      message.success('创建成功');
+      message.success(tCommon('message.createSuccess'));
       formDisclosure.close();
     } catch (err) {
       if (err instanceof Error) message.error(err.message);
@@ -313,7 +329,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
           }
         });
       }
-      message.success('更新成功');
+      message.success(tCommon('message.updateSuccess'));
       editFormDisclosure.close();
       setEditRecord(null);
     } catch (err) {
@@ -324,23 +340,28 @@ function ConnectionTab({ device }: ConnectionTabProps) {
   const columns = useMemo(
     () => [
       {
-        title: '连接类型',
+        title: t('connection.column.connectionType'),
         dataIndex: 'connection_type',
         key: 'connection_type',
-        render: (v: string) => (v ? (CONNECTION_TYPE_LABEL_MAP[v] ?? v) : '-')
+        render: (v: string) => {
+          const labelKey = CONNECTION_TYPE_LABEL_KEYS[v];
+          return labelKey ? t(labelKey) : v || '-';
+        }
       },
       {
-        title: '连接模式',
+        title: t('connection.column.linkType'),
         dataIndex: 'link_type',
         key: 'link_type',
         render: (v: string) => (
           <Tag color={v === 'device_to_network' ? 'blue' : 'purple'}>
-            {v === 'device_to_network' ? '设备→网络' : '网络→网络'}
+            {v === 'device_to_network'
+              ? t('connection.linkType.deviceToNetwork')
+              : t('connection.linkType.networkToNetwork')}
           </Tag>
         )
       },
       {
-        title: '本机端口',
+        title: t('connection.column.localPort'),
         key: 'local_port',
         render: (_: unknown, record: DeviceConnection | PortLink) => {
           if (record.link_type === 'network_to_network') {
@@ -361,7 +382,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         }
       },
       {
-        title: '对端设备',
+        title: t('connection.column.peerDevice'),
         key: 'peer_device',
         render: (_: unknown, record: DeviceConnection | PortLink) => {
           if (record.link_type === 'network_to_network') {
@@ -388,7 +409,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         }
       },
       {
-        title: '对端端口',
+        title: t('connection.column.peerPort'),
         key: 'peer_port',
         render: (_: unknown, record: DeviceConnection | PortLink) => {
           if (record.link_type === 'network_to_network') {
@@ -404,30 +425,30 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         }
       },
       {
-        title: '状态',
+        title: tCommon('field.status'),
         key: 'status',
         render: (_: unknown, record: DeviceConnection | PortLink) => (
           <StatusTag status={record.status} statusMap={CONNECTION_STATUS_MAP} />
         )
       },
       {
-        title: 'VLAN',
+        title: t('connection.column.vlan'),
         key: 'vlan_id',
         render: (_: unknown, record: DeviceConnection | PortLink) => {
           const vid = (record as PortLink).vlan_id;
           if (!vid) return '-';
           const vlan = vlanMap.get(vid);
-          return vlan ? `${vid} - ${vlan.name || '未命名'}` : String(vid);
+          return vlan ? `${vid} - ${vlan.name || t('connection.unnamed')}` : String(vid);
         }
       },
       {
-        title: '带宽',
+        title: t('connection.column.bandwidth'),
         key: 'bandwidth',
         render: (_: unknown, record: DeviceConnection | PortLink) =>
           (record as PortLink).bandwidth ?? '-'
       },
       {
-        title: 'LAG 组',
+        title: t('connection.column.lagGroup'),
         key: 'lag_group_id',
         render: (_: unknown, record: DeviceConnection | PortLink) => {
           const lagId = (record as PortLink).lag_group_id;
@@ -436,9 +457,14 @@ function ConnectionTab({ device }: ConnectionTabProps) {
           return lag ? lag.lag_name || `LAG ${lagId}` : String(lagId);
         }
       },
-      { title: '备注', dataIndex: 'notes', key: 'notes', render: (v: string) => v || '-' },
       {
-        title: '操作',
+        title: tCommon('field.remarks'),
+        dataIndex: 'notes',
+        key: 'notes',
+        render: (v: string) => v || '-'
+      },
+      {
+        title: tCommon('field.actions'),
         key: 'action',
         render: (_: unknown, record: DeviceConnection | PortLink) => {
           if (record.link_type === 'network_to_network') {
@@ -485,14 +511,14 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         }
       }
     ],
-    [isNetworkDevice, vlanMap, lagMap, handleEdit, handleDelete, handleDeletePortLink]
+    [isNetworkDevice, vlanMap, lagMap, handleEdit, handleDelete, handleDeletePortLink, t, tCommon]
   );
 
   return (
     <div>
       <div style={{ marginBottom: 16, textAlign: 'right' }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增连接
+          {t('connection.action.add')}
         </Button>
       </div>
       {isErrorConnections && (
@@ -500,8 +526,8 @@ function ConnectionTab({ device }: ConnectionTabProps) {
           type="error"
           showIcon
           style={{ marginBottom: 16 }}
-          message="连接数据加载失败"
-          description="请检查网络后重试，或联系管理员。"
+          message={t('connection.loadFailed')}
+          description={t('connection.loadFailedDesc')}
         />
       )}
       <DataTable
@@ -522,7 +548,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         form={form}
         isNetworkDevice={isNetworkDevice}
         linkTypeOptions={linkTypeOptions}
-        connectionTypeOptions={CONNECTION_TYPE_OPTIONS}
+        connectionTypeOptions={connectionTypeOptions}
         roomOptions={roomOptions}
         cabinetOptions={cabinetOptions}
         switchOptions={switchOptions}
@@ -541,7 +567,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         }}
         form={editForm}
         editRecord={editRecord}
-        connectionTypeOptions={CONNECTION_TYPE_OPTIONS}
+        connectionTypeOptions={connectionTypeOptions}
         vlanOptions={vlanOptions}
         lagOptions={lagOptions}
       />

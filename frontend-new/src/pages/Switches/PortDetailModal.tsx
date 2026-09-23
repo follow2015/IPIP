@@ -1,5 +1,6 @@
 import { Button, Tag, Descriptions, Spin, Divider, Modal, Space } from 'antd';
 import { EyeOutlined, RedoOutlined, ClearOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { StatusTag } from '@/components/StatusTag';
 import { LINK_STATUS_MAP } from '@/types/enums';
 import type { SwitchPort, SwitchPortDetail, SwitchPortIP, PortConfigResult } from '@/types/models';
@@ -36,6 +37,8 @@ export function PortDetailModal({
   onClearConfig,
   onDeleteIP
 }: PortDetailModalProps) {
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const renderIPList = (ipList: SwitchPortIP[]) => {
     if (!ipList || ipList.length === 0) return <span style={{ color: '#999' }}>-</span>;
     return (
@@ -43,7 +46,7 @@ export function PortDetailModal({
         {ipList.map((ip, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
             <Tag color={ip.is_primary ? 'blue' : 'default'} style={{ fontSize: 10, margin: 0 }}>
-              {ip.is_primary ? '主' : '从'}
+              {ip.is_primary ? td('port.ipRole.primary') : td('port.ipRole.secondary')}
             </Tag>
             <code style={{ fontSize: 12 }}>
               {ip.ip_address}
@@ -67,7 +70,7 @@ export function PortDetailModal({
 
   const renderMembers = (members: string[]) => {
     if (!members || members.length === 0)
-      return <span style={{ color: '#999' }}>暂无成员端口</span>;
+      return <span style={{ color: '#999' }}>{td('switch.portDetail.noMembers')}</span>;
     return (
       <div>
         {members.map((m, i) => (
@@ -81,7 +84,7 @@ export function PortDetailModal({
 
   return (
     <Modal
-      title={<span>端口详情 — {portName}</span>}
+      title={<span>{td('switch.portDetail.title', { name: portName })}</span>}
       open={open}
       onCancel={onClose}
       footer={null}
@@ -93,16 +96,16 @@ export function PortDetailModal({
       ) : portDetail ? (
         <div>
           <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
-            <Descriptions.Item label="端口号">
+            <Descriptions.Item label={td('switch.portDetail.portNumber')}>
               <code>{portName}</code>
             </Descriptions.Item>
-            <Descriptions.Item label="状态">
+            <Descriptions.Item label={tc('field.status')}>
               <StatusTag
                 status={portDetail.status ?? port.link_status}
                 statusMap={LINK_STATUS_MAP}
               />
             </Descriptions.Item>
-            <Descriptions.Item label="速率">
+            <Descriptions.Item label={td('switch.portDetail.speed')}>
               {portDetail.speed ?? port.speed ?? '-'}
             </Descriptions.Item>
             <Descriptions.Item label="VLAN">
@@ -111,12 +114,16 @@ export function PortDetailModal({
             <Descriptions.Item label="MAC">
               {portDetail.port_mac ?? port.mac_address ?? '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="IP地址">{renderIPList(portDetail.ip_list)}</Descriptions.Item>
-            <Descriptions.Item label="客户">{port.customer_name ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="描述">
+            <Descriptions.Item label={td('port.column.ipAddress')}>
+              {renderIPList(portDetail.ip_list)}
+            </Descriptions.Item>
+            <Descriptions.Item label={tc('field.customer')}>
+              {port.customer_name ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label={tc('field.description')}>
               {port.notes ?? portDetail.description ?? '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="更新时间" span={2}>
+            <Descriptions.Item label={tc('field.updatedAt')} span={2}>
               {portDetail.updated_at ? formatDateTime(portDetail.updated_at) : '-'}
             </Descriptions.Item>
           </Descriptions>
@@ -124,7 +131,7 @@ export function PortDetailModal({
           {portType === 'vlan' &&
             (portDetail?.vlan_ports?.length ?? portConfig?.vlan_ports?.length ?? 0) > 0 && (
               <div style={{ marginTop: 12 }}>
-                <h5>VLAN 成员端口</h5>
+                <h5>{td('switch.portDetail.vlanMembers')}</h5>
                 {renderMembers(portDetail?.vlan_ports ?? portConfig?.vlan_ports ?? [])}
               </div>
             )}
@@ -132,7 +139,7 @@ export function PortDetailModal({
           {portType === 'trunk' &&
             (portDetail?.trunk_members?.length ?? portConfig?.trunk_members?.length ?? 0) > 0 && (
               <div style={{ marginTop: 12 }}>
-                <h5>Trunk 成员端口</h5>
+                <h5>{td('switch.portDetail.trunkMembers')}</h5>
                 {renderMembers(portDetail?.trunk_members ?? portConfig?.trunk_members ?? [])}
               </div>
             )}
@@ -147,7 +154,7 @@ export function PortDetailModal({
                 marginBottom: 8
               }}
             >
-              <span style={{ fontWeight: 500 }}>端口配置</span>
+              <span style={{ fontWeight: 500 }}>{td('switch.portDetail.configTitle')}</span>
               <Space size={4}>
                 {!portConfig ? (
                   <Button
@@ -156,7 +163,9 @@ export function PortDetailModal({
                     onClick={() => onGetConfig(false)}
                     loading={getConfigPending}
                   >
-                    {portDetail?.has_port_config ? '查看配置' : '获取配置'}
+                    {portDetail?.has_port_config
+                      ? td('switch.portDetail.viewConfig')
+                      : td('switch.portDetail.fetchConfig')}
                   </Button>
                 ) : (
                   <Button
@@ -165,11 +174,11 @@ export function PortDetailModal({
                     onClick={() => onGetConfig(true)}
                     loading={refreshConfigPending}
                   >
-                    刷新
+                    {tc('action.refresh')}
                   </Button>
                 )}
                 <Button size="small" icon={<ClearOutlined />} danger onClick={onClearConfig}>
-                  清除
+                  {td('switch.portDetail.clear')}
                 </Button>
               </Space>
             </div>
@@ -177,8 +186,8 @@ export function PortDetailModal({
               <>
                 {portConfig.updated_at && (
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 4 }}>
-                    更新时间：{formatDateTime(portConfig.updated_at)}
-                    {portConfig.from_cache && ' (缓存)'}
+                    {tc('field.updatedAt')}：{formatDateTime(portConfig.updated_at)}
+                    {portConfig.from_cache && td('switch.portDetail.cached')}
                   </div>
                 )}
                 <pre
@@ -197,21 +206,21 @@ export function PortDetailModal({
               </>
             ) : portDetail?.has_port_config ? (
               <span style={{ fontSize: 12, color: '#999' }}>
-                已有缓存配置（
-                {portDetail.port_config_updated_at
-                  ? formatDateTime(portDetail.port_config_updated_at)
-                  : '未知时间'}
-                ）
+                {td('switch.portDetail.cachedConfig', {
+                  time: portDetail.port_config_updated_at
+                    ? formatDateTime(portDetail.port_config_updated_at)
+                    : td('switch.portDetail.unknownTime')
+                })}
               </span>
             ) : (
               <span style={{ fontSize: 12, color: '#999' }}>
-                暂无配置数据，点击"获取配置"从设备读取
+                {td('switch.portDetail.noConfig')}
               </span>
             )}
           </div>
         </div>
       ) : (
-        <div>未找到端口详情</div>
+        <div>{td('switch.portDetail.notFound')}</div>
       )}
     </Modal>
   );

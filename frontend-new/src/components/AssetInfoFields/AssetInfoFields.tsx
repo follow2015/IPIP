@@ -38,6 +38,7 @@ import {
 import { ThunderboltOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
+import { useTranslation } from 'react-i18next';
 
 export function generateAssetNumber(prefix = 'ZC'): string {
   const now = new Date();
@@ -168,10 +169,11 @@ function OnlineDateControl({
   form: FormInstance;
   prefix?: string;
 }) {
+  const { t } = useTranslation('asset');
   return (
     <DatePicker
       style={{ width: '100%' }}
-      placeholder="上线投产日期"
+      placeholder={t('assetInfo.onlineDate.placeholder')}
       value={value ?? null}
       onChange={(d) => {
         onChange?.(d);
@@ -192,6 +194,7 @@ function WarrantyEndControl({
   form: FormInstance;
   prefix?: string;
 }) {
+  const { t } = useTranslation('asset');
   const [popOpen, setPopOpen] = useState(false);
 
   const quick = (y: number) => {
@@ -205,7 +208,7 @@ function WarrantyEndControl({
     <Space.Compact style={{ width: '100%' }}>
       <DatePicker
         style={{ flex: 1, minWidth: 0 }}
-        placeholder="选择到期日"
+        placeholder={t('assetInfo.warrantyEnd.placeholder')}
         value={value ?? null}
         onChange={(d) => onChange?.(d)}
       />
@@ -213,18 +216,18 @@ function WarrantyEndControl({
         trigger="click"
         open={popOpen}
         onOpenChange={setPopOpen}
-        title="从「保修开始」快速推算到期日"
+        title={t('assetInfo.warrantyEnd.popoverTitle')}
         content={
           <Space wrap>
             {[1, 2, 3, 5].map((y) => (
               <Button key={y} size="small" onClick={() => quick(y)}>
-                {y} 年
+                {t('assetInfo.warrantyEnd.quickYear', { count: y })}
               </Button>
             ))}
           </Space>
         }
       >
-        <Button>快捷</Button>
+        <Button>{t('assetInfo.warrantyEnd.quick')}</Button>
       </Popover>
     </Space.Compact>
   );
@@ -241,10 +244,11 @@ function LifecycleOfflineControl({
   form: FormInstance;
   prefix?: string;
 }) {
+  const { t } = useTranslation('asset');
   return (
     <DatePicker
       style={{ width: '100%' }}
-      placeholder="下线/报废日期"
+      placeholder={t('assetInfo.offlineDate.placeholder')}
       value={value ?? null}
       onChange={(d) => {
         onChange?.(d);
@@ -265,14 +269,15 @@ function LifecycleYearsControl({
   form: FormInstance;
   prefix?: string;
 }) {
+  const { t } = useTranslation('asset');
   return (
     <InputNumber
       min={1}
       max={30}
       precision={0}
       style={{ width: '100%' }}
-      placeholder="年"
-      addonAfter="年"
+      placeholder={t('assetInfo.lifecycleYears.placeholder')}
+      addonAfter={t('assetInfo.lifecycleYears.unit')}
       value={value ?? null}
       onChange={(v) => {
         const n = toNumber(v);
@@ -296,6 +301,7 @@ function AssetNumberSection({
   autoGenerate?: boolean;
   onAutoGenerateChange?: (value: boolean) => void;
 }) {
+  const { t } = useTranslation('asset');
   if (mode === 'none') return null;
   const name = (key: string) => buildName(prefix, key);
 
@@ -304,12 +310,12 @@ function AssetNumberSection({
       <Row gutter={16} align="middle">
         <Col xs={24} md={16}>
           <Form.Item
-            label="自动生成资产编号"
-            tooltip="开启后，每个设备将获得不同的唯一编号（ZC-YYYYMMDD-HHmmss-XXXX）"
+            label={t('assetInfo.autoGenerate.label')}
+            tooltip={t('assetInfo.autoGenerate.tooltip')}
           >
             <Switch
-              checkedChildren="开启"
-              unCheckedChildren="关闭"
+              checkedChildren={t('assetInfo.autoGenerate.on')}
+              unCheckedChildren={t('assetInfo.autoGenerate.off')}
               checked={autoGenerate}
               onChange={onAutoGenerateChange}
             />
@@ -318,7 +324,7 @@ function AssetNumberSection({
         <Col xs={24} md={8} style={{ paddingTop: 4 }}>
           {autoGenerate && (
             <span style={{ color: '#8c8c8c', fontSize: 12 }}>
-              将为每台设备自动生成唯一编号（ZC-YYYYMMDD-HHmmss-XXXX）
+              {t('assetInfo.autoGenerate.hintBatch')}
             </span>
           )}
         </Col>
@@ -332,16 +338,16 @@ function AssetNumberSection({
         <Col xs={24} md={16}>
           <Form.Item
             name={name('asset_number')}
-            label="资产编号"
-            tooltip="可手动输入，或开启自动生成"
+            label={t('assetInfo.assetNumber.label')}
+            tooltip={t('assetInfo.assetNumber.tooltip')}
           >
             <Input
-              placeholder="手动输入资产编号"
+              placeholder={t('assetInfo.assetNumber.placeholderManual')}
               disabled={autoGenerate}
               addonAfter={
                 <Switch
-                  checkedChildren="自动"
-                  unCheckedChildren="手动"
+                  checkedChildren={t('assetInfo.autoGenerate.auto')}
+                  unCheckedChildren={t('assetInfo.autoGenerate.manual')}
                   checked={autoGenerate}
                   onChange={onAutoGenerateChange}
                   size="small"
@@ -354,7 +360,7 @@ function AssetNumberSection({
         <Col xs={24} md={8} style={{ paddingTop: 30 }}>
           {autoGenerate && (
             <span style={{ color: '#8c8c8c', fontSize: 12 }}>
-              将自动生成唯一编号（ZC-YYYYMMDD-HHmmss-XXXX）
+              {t('assetInfo.autoGenerate.hint')}
             </span>
           )}
         </Col>
@@ -365,16 +371,16 @@ function AssetNumberSection({
   return (
     <Row gutter={16}>
       <Col xs={24} md={16}>
-        <Form.Item name={name('asset_number')} label="资产编号">
+        <Form.Item name={name('asset_number')} label={t('assetInfo.assetNumber.label')}>
           <Input
-            placeholder="资产编号（可自动生成）"
+            placeholder={t('assetInfo.assetNumber.placeholder')}
             addonAfter={
               <Button
                 type="text"
                 size="small"
                 icon={<ThunderboltOutlined />}
                 onClick={() => form.setFieldValue(name('asset_number'), generateAssetNumber())}
-                title="自动生成"
+                title={t('assetInfo.assetNumber.autoGenerate')}
               />
             }
           />
@@ -392,12 +398,13 @@ export default function AssetInfoFields({
   onAutoGenerateChange,
   defaultOnlineDateNow = false
 }: AssetInfoFieldsProps) {
+  const { t } = useTranslation('asset');
   const name = (key: string) => buildName(prefix, key);
 
   return (
     <>
       {/* 资产编号 */}
-      <Divider plain>资产编号</Divider>
+      <Divider plain>{t('assetInfo.assetNumber.label')}</Divider>
       <AssetNumberSection
         form={form}
         prefix={prefix}
@@ -407,62 +414,76 @@ export default function AssetInfoFields({
       />
 
       {/* 采购信息 */}
-      <Divider plain>采购信息</Divider>
+      <Divider plain>{t('assetInfo.section.purchase')}</Divider>
       <Row gutter={16}>
         <Col xs={24} md={12}>
-          <Form.Item name={name('supplier')} label="供应商">
-            <Input placeholder="供应商名称" />
+          <Form.Item name={name('supplier')} label={t('assetInfo.supplier.label')}>
+            <Input placeholder={t('assetInfo.supplier.placeholder')} />
           </Form.Item>
         </Col>
         <Col xs={24} md={12}>
-          <Form.Item name={name('supplier_contact')} label="供应商联系人">
-            <Input placeholder="联系人" />
+          <Form.Item
+            name={name('supplier_contact')}
+            label={t('assetInfo.supplierContact.label')}
+          >
+            <Input placeholder={t('assetInfo.supplierContact.placeholder')} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} md={12}>
-          <Form.Item name={name('contract_number')} label="合同编号">
-            <Input placeholder="采购合同编号" />
+          <Form.Item name={name('contract_number')} label={t('assetInfo.contractNumber.label')}>
+            <Input placeholder={t('assetInfo.contractNumber.placeholder')} />
           </Form.Item>
         </Col>
         <Col xs={24} md={12}>
-          <Form.Item name={name('invoice_number')} label="发票号码">
-            <Input placeholder="发票号码" />
+          <Form.Item name={name('invoice_number')} label={t('assetInfo.invoiceNumber.label')}>
+            <Input placeholder={t('assetInfo.invoiceNumber.placeholder')} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} md={8}>
-          <Form.Item name={name('purchase_date')} label="采购日期">
-            <DatePicker style={{ width: '100%' }} placeholder="采购日期" />
+          <Form.Item name={name('purchase_date')} label={t('assetInfo.purchaseDate.label')}>
+            <DatePicker
+              style={{ width: '100%' }}
+              placeholder={t('assetInfo.purchaseDate.placeholder')}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name={name('purchase_price')} label="采购价格(元)">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="价格" precision={2} />
+          <Form.Item name={name('purchase_price')} label={t('assetInfo.purchasePrice.label')}>
+            <InputNumber
+              min={0}
+              style={{ width: '100%' }}
+              placeholder={t('assetInfo.purchasePrice.placeholder')}
+              precision={2}
+            />
           </Form.Item>
         </Col>
       </Row>
 
       {/* 保修信息 */}
-      <Divider plain>保修信息</Divider>
+      <Divider plain>{t('assetInfo.section.warranty')}</Divider>
       <Row gutter={16}>
         <Col xs={24} md={8}>
-          <Form.Item name={name('warranty_type')} label="保修类型">
-            <Input placeholder="如：原厂保修" />
+          <Form.Item name={name('warranty_type')} label={t('assetInfo.warrantyType.label')}>
+            <Input placeholder={t('assetInfo.warrantyType.placeholder')} />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name={name('warranty_start')} label="保修开始">
-            <DatePicker style={{ width: '100%' }} placeholder="开始日期" />
+          <Form.Item name={name('warranty_start')} label={t('assetInfo.warrantyStart.label')}>
+            <DatePicker
+              style={{ width: '100%' }}
+              placeholder={t('assetInfo.warrantyStart.placeholder')}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
           <Form.Item
             name={name('warranty_end')}
-            label="保修到期"
-            tooltip="可直接选择日期，或点右侧「快捷」按钮从「保修开始」按 1/2/3/5 年自动推算"
+            label={t('assetInfo.warrantyEnd.label')}
+            tooltip={t('assetInfo.warrantyEnd.tooltip')}
           >
             <WarrantyEndControl form={form} prefix={prefix} />
           </Form.Item>
@@ -470,16 +491,16 @@ export default function AssetInfoFields({
       </Row>
 
       {/* 生命周期 */}
-      <Divider plain>生命周期</Divider>
+      <Divider plain>{t('assetInfo.section.lifecycle')}</Divider>
       <Row gutter={16}>
         <Col xs={24} md={8}>
           <Form.Item
             name={name('online_date')}
-            label="上线日期"
+            label={t('assetInfo.onlineDate.label')}
             tooltip={
               defaultOnlineDateNow
-                ? '默认填充为设备添加时间，可手动修改；清空后生命周期按编辑当天重新计算'
-                : '清空后生命周期按编辑当天重新计算'
+                ? t('assetInfo.onlineDate.tooltipDefault')
+                : t('assetInfo.onlineDate.tooltip')
             }
             initialValue={defaultOnlineDateNow ? dayjs() : undefined}
           >
@@ -489,8 +510,8 @@ export default function AssetInfoFields({
         <Col xs={24} md={8}>
           <Form.Item
             name={name('offline_date')}
-            label="下线日期"
-            tooltip="填写后将自动推算「预计使用年限」；两者都有时取更久的一方并同步对齐"
+            label={t('assetInfo.offlineDate.label')}
+            tooltip={t('assetInfo.offlineDate.tooltip')}
           >
             <LifecycleOfflineControl form={form} prefix={prefix} />
           </Form.Item>
@@ -498,8 +519,8 @@ export default function AssetInfoFields({
         <Col xs={24} md={8}>
           <Form.Item
             name={name('lifecycle_years')}
-            label="预计使用年限"
-            tooltip="填写后将自动推算「下线日期」；两者都有时取更久的一方并同步对齐"
+            label={t('assetInfo.lifecycleYears.label')}
+            tooltip={t('assetInfo.lifecycleYears.tooltip')}
           >
             <LifecycleYearsControl form={form} prefix={prefix} />
           </Form.Item>

@@ -40,15 +40,17 @@ import DataTable from '@/components/DataTable';
 import BatchActionBar from '@/components/BatchActionBar/BatchActionBar';
 import MetricAlertPopover from '@/components/Monitor/MetricAlertPopover';
 import { relativeTime } from '@/utils/format';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 const { Text } = Typography;
 
-const FILTER_OPTIONS = [
-  { label: '全部', value: '' },
-  { label: '连通异常', value: 'unreachable' },
-  { label: '指标告警', value: 'metric_alerting' },
-  { label: '监控中断', value: 'interrupted' },
-  { label: '告警盲区', value: 'blindspot' }
+const getFilterOptions = (t: TFunction<'monitor'>) => [
+  { label: t('filter.all'), value: '' },
+  { label: t('deviceStatus.filter.connectivity'), value: 'unreachable' },
+  { label: t('deviceStatus.filter.metricAlerting'), value: 'metric_alerting' },
+  { label: t('deviceStatus.filter.interrupted'), value: 'interrupted' },
+  { label: t('status.blindspot'), value: 'blindspot' }
 ];
 
 const PROBE_COOLDOWN_SECONDS = 30;
@@ -57,11 +59,13 @@ const CooldownButton = memo(function CooldownButton({
   deviceId,
   cooldownEnd,
   isProbing,
+  probeLabel,
   onProbe
 }: {
   deviceId: number;
   cooldownEnd: number;
   isProbing: boolean;
+  probeLabel: string;
   onProbe: (id: number) => void;
 }) {
   const [remaining, setRemaining] = useState(0);
@@ -84,12 +88,15 @@ const CooldownButton = memo(function CooldownButton({
       disabled={remaining > 0 && !isProbing}
       onClick={() => onProbe(deviceId)}
     >
-      {remaining > 0 && !isProbing ? `${remaining}s` : '探测'}
+      {remaining > 0 && !isProbing ? `${remaining}s` : probeLabel}
     </Button>
   );
 });
 
 export default function DeviceStatusTable() {
+  const { t } = useTranslation('monitor');
+  const { t: tc } = useTranslation('common');
+  const { t: td } = useTranslation('device');
   const checkDevice = useCheckDeviceNow();
   const checkBatch = useCheckBatchDevices();
   const toggleMonitor = useToggleDeviceMonitor();
@@ -120,16 +127,22 @@ export default function DeviceStatusTable() {
       try {
         const result = await checkDevice.mutateAsync(deviceId);
         if (result.reachable) {
-          message.success(`探测成功，延迟 ${result.latency_ms ?? '—'} ms`);
+          message.success(t('deviceStatus.probe.success', { value: result.latency_ms ?? '—' }));
         } else {
-          message.warning(`探测失败：${result.error ?? '未知错误'}`);
+          message.warning(
+            t('deviceStatus.probe.failure', {
+              error: result.error ?? t('deviceStatus.probe.unknownError')
+            })
+          );
         }
       } catch (err: unknown) {
         const axiosErr = err as { response?: { status?: number } };
         if (axiosErr?.response?.status === 429) {
-          message.warning('该设备探测冷却中，请稍后再试');
+          message.warning(t('deviceStatus.probe.coolingDown'));
         } else {
-          message.error(err instanceof Error ? err.message : '探测请求失败');
+          message.error(
+            err instanceof Error ? err.message : t('deviceStatus.probe.requestFailed')
+          );
         }
       } finally {
         setProbingId(null);
@@ -139,13 +152,13 @@ export default function DeviceStatusTable() {
         }));
       }
     },
-    [checkDevice, message]
+    [checkDevice, message, t]
   );
 
   const handleBatchProbe = async () => {
     if (batch.count === 0) return;
     const ids = batch.selectedKeys.map((k) => Number(k));
-    const hide = message.loading(`正在探测 ${ids.length} 台设备...`, 0);
+    const hide = message.loading(t('deviceStatus.probe.probing', { count: ids.length }), 0);
     try {
       const res = await checkBatch.mutateAsync(ids);
       const reachable = res.results.filter((r) => r.reachable === true).length;
@@ -154,46 +167,60 @@ export default function DeviceStatusTable() {
       hide();
       if (skipped > 0) {
         message.success(
-          `探测完成：可达 ${reachable} 台，不可达 ${unreachable} 台，跳过（冷却/不存在）${skipped} 台`
+          t('deviceStatus.probe.completeWithSkipped', { reachable, unreachable, skipped })
         );
       } else {
-        message.success(`探测完成：可达 ${reachable} 台，不可达 ${unreachable} 台`);
+        message.success(t('deviceStatus.probe.complete', { reachable, unreachable }));
       }
       batch.clear();
     } catch (err: unknown) {
       hide();
-      message.error(err instanceof Error ? err.message : '批量探测请求失败');
+      message.error(err instanceof Error ? err.message : t('deviceStatus.probe.batchFailed'));
     }
   };
 
   const handleBatchToggleMonitor = async (enabled: boolean) => {
     if (batch.count === 0) return;
     const ids = batch.selectedKeys.map((k) => Number(k));
-    const action = enabled ? '开启' : '暂停';
-    const hide = message.loading(`正在${action} ${ids.length} 台设备的监控...`, 0);
+    const toggleKey = enabled ? 'enabled' : 'disabled';
+    const hide = message.loading(
+      t(`deviceStatus.probe.toggling.${toggleKey}`, { count: ids.length }),
+      0
+    );
     try {
       const res = await batchToggleMonitor.mutateAsync({ deviceIds: ids, enabled });
       hide();
-      message.success(`已${action} ${res.updated} 台设备监控，跳过 ${res.skipped} 台`);
+      message.success(
+        t(`deviceStatus.probe.toggleDone.${toggleKey}`, {
+          count: res.updated,
+          skipped: res.skipped
+        })
+      );
       batch.clear();
     } catch (err: unknown) {
       hide();
-      message.error(err instanceof Error ? err.message : `批量${action}监控失败`);
+      message.error(
+        err instanceof Error
+          ? err.message
+          : t(`deviceStatus.probe.batchToggleFailed.${toggleKey}`)
+      );
     }
   };
 
   const handleToggleMonitorEnabled = async (deviceId: number, enabled: boolean) => {
     try {
       await toggleMonitor.mutateAsync({ deviceId, enabled });
-      message.success(enabled ? '已恢复该设备监控' : '已暂停该设备监控');
+      message.success(
+        t(`deviceStatus.probe.toggleSingle.${enabled ? 'enabled' : 'disabled'}`)
+      );
     } catch (err: unknown) {
-      message.error(err instanceof Error ? err.message : '操作失败');
+      message.error(err instanceof Error ? err.message : tc('message.operationFailed'));
     }
   };
 
   const columns = [
     {
-      title: '设备名称',
+      title: td('field.name'),
       dataIndex: 'device_name',
       key: 'device_name',
       render: (name: string, record: MonitorStatusItem) => (
@@ -201,21 +228,21 @@ export default function DeviceStatusTable() {
       )
     },
     {
-      title: '类型',
+      title: tc('field.type'),
       dataIndex: 'device_type',
       key: 'device_type',
       width: 100,
-      render: (t: string) => <Tag>{t}</Tag>
+      render: (deviceType: string) => <Tag>{deviceType}</Tag>
     },
     {
-      title: '管理IP',
+      title: t('column.managementIp'),
       dataIndex: 'management_ip',
       key: 'management_ip',
       width: 140,
       render: (ip: string | null) => ip || '—'
     },
     {
-      title: '协议',
+      title: t('column.protocol'),
       dataIndex: 'protocol',
       key: 'protocol',
       width: 90,
@@ -224,28 +251,30 @@ export default function DeviceStatusTable() {
       )
     },
     {
-      title: '连通状态',
+      title: t('column.connectivity'),
       key: 'reachable',
       width: 110,
       render: (_: unknown, record: MonitorStatusItem) => {
         if (record.alert_blindspot) {
           return (
-            <Tooltip title="告警已触发但无接收人">
+            <Tooltip title={t('status.blindspotTooltip')}>
               <Tag color="red" icon={<EyeInvisibleOutlined />}>
-                盲区
+                {t('status.blindspotShort')}
               </Tag>
             </Tooltip>
           );
         }
-        if (record.monitor_interrupted) return <Tag color="orange">监控中断</Tag>;
-        if (record.reachable) return <Tag color="success">连通</Tag>;
-        if (record.down_alerted) return <Tag color="error">不可达</Tag>;
-        if (record.consecutive_failures > 0) return <Tag color="warning">抖动</Tag>;
-        return <Tag>未知</Tag>;
+        if (record.monitor_interrupted)
+          return <Tag color="orange">{t('deviceStatus.filter.interrupted')}</Tag>;
+        if (record.reachable) return <Tag color="success">{t('status.connected')}</Tag>;
+        if (record.down_alerted) return <Tag color="error">{t('status.unreachable')}</Tag>;
+        if (record.consecutive_failures > 0)
+          return <Tag color="warning">{t('status.flapping')}</Tag>;
+        return <Tag>{tc('field.unknown')}</Tag>;
       }
     },
     {
-      title: '指标告警',
+      title: t('column.metricAlert'),
       key: 'metric_alerts',
       width: 130,
       render: (_: unknown, record: MonitorStatusItem) => (
@@ -257,12 +286,18 @@ export default function DeviceStatusTable() {
       )
     },
     {
-      title: '监控',
+      title: td('field.monitor'),
       key: 'monitor_enabled',
       width: 80,
       align: 'center' as const,
       render: (_: unknown, record: MonitorStatusItem) => (
-        <Tooltip title={record.monitor_enabled === false ? '已暂停探测' : '正常探测'}>
+        <Tooltip
+          title={
+            record.monitor_enabled === false
+              ? t('status.probePaused')
+              : t('status.probeNormal')
+          }
+        >
           <Switch
             size="small"
             checked={record.monitor_enabled !== false}
@@ -275,7 +310,7 @@ export default function DeviceStatusTable() {
       )
     },
     {
-      title: '失败次数',
+      title: t('column.failureCount'),
       dataIndex: 'consecutive_failures',
       key: 'consecutive_failures',
       width: 90,
@@ -283,14 +318,14 @@ export default function DeviceStatusTable() {
       render: (n: number) => (n > 0 ? <Text type="danger">{n}</Text> : '—')
     },
     {
-      title: '最近检查',
+      title: t('column.lastCheck'),
       dataIndex: 'last_checked_at',
       key: 'last_checked_at',
       width: 110,
-      render: relativeTime
+      render: (v: string | null) => relativeTime(v, tc)
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       width: 100,
       render: (_: unknown, record: MonitorStatusItem) => (
@@ -298,6 +333,7 @@ export default function DeviceStatusTable() {
           deviceId={record.device_id}
           cooldownEnd={cooldownMap[record.device_id] ?? 0}
           isProbing={probingId === record.device_id}
+          probeLabel={t('deviceStatus.probe.action')}
           onProbe={handleProbe}
         />
       )
@@ -306,12 +342,12 @@ export default function DeviceStatusTable() {
 
   return (
     <Card
-      title="设备监控状态"
+      title={t('deviceStatus.title')}
       extra={
         <Space>
           <Input.Search
             allowClear
-            placeholder="搜索设备名 / IP / BMC"
+            placeholder={t('deviceStatus.searchPlaceholder')}
             style={{ width: 220 }}
             onSearch={(v) => {
               setKeyword(v);
@@ -319,7 +355,7 @@ export default function DeviceStatusTable() {
             }}
           />
           <Segmented
-            options={FILTER_OPTIONS}
+            options={getFilterOptions(t)}
             value={statusFilter || ''}
             onChange={(v) => {
               setStatusFilter((v || undefined) as MonitorStatusFilter);
@@ -327,12 +363,16 @@ export default function DeviceStatusTable() {
             }}
           />
           <Button icon={<ReloadOutlined />} onClick={() => table.setPage(table.page)}>
-            刷新
+            {tc('action.refresh')}
           </Button>
         </Space>
       }
     >
-      <BatchActionBar count={batch.count} unit="台设备" onClear={batch.clear}>
+      <BatchActionBar
+        count={batch.count}
+        unit={t('stat.unitDevice', { count: batch.count })}
+        onClear={batch.clear}
+      >
         <Button
           size="small"
           type="primary"
@@ -340,7 +380,7 @@ export default function DeviceStatusTable() {
           loading={checkBatch.isPending}
           onClick={handleBatchProbe}
         >
-          批量探测
+          {t('deviceStatus.batch.probe')}
         </Button>
         <Button
           size="small"
@@ -348,7 +388,7 @@ export default function DeviceStatusTable() {
           loading={batchToggleMonitor.isPending}
           onClick={() => handleBatchToggleMonitor(true)}
         >
-          批量开启监控
+          {t('deviceStatus.batch.enableMonitor')}
         </Button>
         <Button
           size="small"
@@ -357,7 +397,7 @@ export default function DeviceStatusTable() {
           loading={batchToggleMonitor.isPending}
           onClick={() => handleBatchToggleMonitor(false)}
         >
-          批量暂停监控
+          {t('deviceStatus.batch.pauseMonitor')}
         </Button>
       </BatchActionBar>
       <DataTable<MonitorStatusItem>

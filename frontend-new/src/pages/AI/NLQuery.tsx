@@ -3,10 +3,12 @@ import { Card, Input, Button, Typography, Space } from 'antd';
 import { SendOutlined, RobotOutlined } from '@ant-design/icons';
 import { ask } from '@/services/ai';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 const { Paragraph, Text } = Typography;
 
 export default function NLQuery() {
+  const { t } = useTranslation('ai');
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,11 +27,11 @@ export default function NLQuery() {
 
   const handleAsk = async () => {
     if (!question.trim()) {
-      message.warning('请输入问题');
+      message.warning(t('validation.enterQuestion'));
       return;
     }
     if (question.length > 2000) {
-      message.warning('问题过长，请控制在 2000 字以内');
+      message.warning(t('nlq.validation.questionTooLong'));
       return;
     }
     abortRef.current?.abort();
@@ -45,7 +47,7 @@ export default function NLQuery() {
     } catch (err) {
       if (controller.signal.aborted) return;
       if (!mountedRef.current) return;
-      message.error(err instanceof Error ? err.message : '查询失败');
+      message.error(err instanceof Error ? err.message : t('nlq.message.queryFailed'));
     } finally {
       if (mountedRef.current && !controller.signal.aborted) {
         setLoading(false);
@@ -58,19 +60,17 @@ export default function NLQuery() {
       title={
         <Space>
           <RobotOutlined />
-          <span>AI 智能查询</span>
+          <span>{t('nlq.title')}</span>
         </Space>
       }
     >
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
-        <Paragraph type="secondary">
-          用自然语言查询运维数据，例如：「哪台设备 CPU 最高」「各机房有多少设备」「巡检异常设备」
-        </Paragraph>
+        <Paragraph type="secondary">{t('nlq.description')}</Paragraph>
         <Space.Compact style={{ width: '100%' }}>
           <Input
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="输入你的问题..."
+            placeholder={t('nlq.placeholder')}
             onPressEnter={handleAsk}
             disabled={loading}
             size="large"
@@ -84,11 +84,11 @@ export default function NLQuery() {
             loading={loading}
             size="large"
           >
-            查询
+            {t('nlq.action')}
           </Button>
         </Space.Compact>
         {answer && (
-          <Card type="inner" title="查询结果">
+          <Card type="inner" title={t('nlq.result')}>
             <Text style={{ whiteSpace: 'pre-wrap' }}>{answer}</Text>
           </Card>
         )}

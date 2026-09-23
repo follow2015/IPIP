@@ -40,9 +40,58 @@ import {
   SafetyCertificateOutlined
 } from '@ant-design/icons';
 
+export type MenuLabelKey =
+  | 'menu.dashboard'
+  | 'menu.asset'
+  | 'menu.rooms'
+  | 'menu.cabinets'
+  | 'menu.devices'
+  | 'menu.deviceRecycleBin'
+  | 'menu.customers'
+  | 'menu.componentTemplates'
+  | 'menu.vendorBrands'
+  | 'menu.networkGroup'
+  | 'menu.ip'
+  | 'menu.ipAudit'
+  | 'menu.switches'
+  | 'menu.network'
+  | 'menu.vlans'
+  | 'menu.linkAggregations'
+  | 'menu.topology'
+  | 'menu.virtualRooms'
+  | 'menu.monitor'
+  | 'menu.monitorOverview'
+  | 'menu.monitorAlerts'
+  | 'menu.monitorIncidents'
+  | 'menu.monitorHistory'
+  | 'menu.monitorCredentials'
+  | 'menu.monitorSettings'
+  | 'menu.monitorAlertRules'
+  | 'menu.monitorThresholds'
+  | 'menu.monitorOidTools'
+  | 'menu.ai'
+  | 'menu.aiNlq'
+  | 'menu.aiSkills'
+  | 'menu.aiConfig'
+  | 'menu.aiMonitor'
+  | 'menu.aiAudit'
+  | 'menu.aiRag'
+  | 'menu.aiDiagnosis'
+  | 'menu.system'
+  | 'menu.users'
+  | 'menu.rbac'
+  | 'menu.loginLogs'
+  | 'menu.auditLogs'
+  | 'menu.notificationPreferences'
+  | 'menu.webhookConfigs'
+  | 'menu.mailSettings'
+  | 'menu.voiceSettings'
+  | 'menu.importExport'
+  | 'menu.licenses';
+
 export interface MenuConfig {
   key: string;
-  label: string;
+  labelKey: MenuLabelKey;
   icon: React.ReactNode;
   path: string;
   permission?: string;
@@ -50,59 +99,59 @@ export interface MenuConfig {
 }
 
 export const MENU_CONFIGS: MenuConfig[] = [
-  { key: 'dashboard', label: '仪表盘', icon: <DashboardOutlined />, path: '/dashboard' },
+  { key: 'dashboard', labelKey: 'menu.dashboard', icon: <DashboardOutlined />, path: '/dashboard' },
   {
     key: 'asset',
-    label: '资产管理',
+    labelKey: 'menu.asset',
     icon: <HomeOutlined />,
     path: '/rooms',
     permission: 'room:view',
     children: [
       {
         key: 'rooms',
-        label: '机房管理',
+        labelKey: 'menu.rooms',
         icon: <HomeOutlined />,
         path: '/rooms',
         permission: 'room:view'
       },
       {
         key: 'cabinets',
-        label: '机柜管理',
+        labelKey: 'menu.cabinets',
         icon: <DatabaseOutlined />,
         path: '/cabinets',
         permission: 'cabinet:view'
       },
       {
         key: 'devices',
-        label: '设备管理',
+        labelKey: 'menu.devices',
         icon: <CloudServerOutlined />,
         path: '/devices',
         permission: 'device:view'
       },
       {
         key: 'device-recycle-bin',
-        label: '设备回收站',
+        labelKey: 'menu.deviceRecycleBin',
         icon: <DeleteOutlined />,
         path: '/device-recycle-bin',
         permission: 'device:view'
       },
       {
         key: 'customers',
-        label: '客户管理',
+        labelKey: 'menu.customers',
         icon: <TeamOutlined />,
         path: '/customers',
         permission: 'customer:view'
       },
       {
         key: 'component-templates',
-        label: '配件模板管理',
+        labelKey: 'menu.componentTemplates',
         icon: <AppstoreOutlined />,
         path: '/settings/component-templates',
         permission: 'customer:view'
       },
       {
         key: 'vendor-brands',
-        label: '厂商品牌',
+        labelKey: 'menu.vendorBrands',
         icon: <SafetyOutlined />,
         path: '/asset/vendor-brands',
         permission: 'monitor:config'
@@ -111,63 +160,63 @@ export const MENU_CONFIGS: MenuConfig[] = [
   },
   {
     key: 'network-group',
-    label: '网络管理',
+    labelKey: 'menu.networkGroup',
     icon: <ApartmentOutlined />,
     path: '/ip',
     permission: 'ip:view',
     children: [
       {
         key: 'ip',
-        label: 'IP管理',
+        labelKey: 'menu.ip',
         icon: <GlobalOutlined />,
         path: '/ip',
         permission: 'ip:view'
       },
       {
         key: 'ip-audit',
-        label: 'IP分配审计',
+        labelKey: 'menu.ipAudit',
         icon: <FileSearchOutlined />,
         path: '/ip/audit',
         permission: 'ip:view'
       },
       {
         key: 'switches',
-        label: '网络设备管理',
+        labelKey: 'menu.switches',
         icon: <SwapOutlined />,
         path: '/switches',
         permission: 'switch:view'
       },
       {
         key: 'network',
-        label: '网段管理',
+        labelKey: 'menu.network',
         icon: <ApartmentOutlined />,
         path: '/network',
         permission: 'network:view'
       },
       {
         key: 'vlans',
-        label: 'VLAN管理',
+        labelKey: 'menu.vlans',
         icon: <PartitionOutlined />,
         path: '/vlans',
         permission: 'switch:view'
       },
       {
         key: 'link-aggregations',
-        label: '链路聚合',
+        labelKey: 'menu.linkAggregations',
         icon: <GroupOutlined />,
         path: '/link-aggregations',
         permission: 'switch:view'
       },
       {
         key: 'topology',
-        label: '网络拓扑',
+        labelKey: 'menu.topology',
         icon: <DeploymentUnitOutlined />,
         path: '/topology',
         permission: 'switch:view'
       },
       {
         key: 'virtual-rooms',
-        label: '虚拟机房',
+        labelKey: 'menu.virtualRooms',
         icon: <ClusterOutlined />,
         path: '/virtual-rooms',
         permission: 'switch:view'
@@ -176,70 +225,70 @@ export const MENU_CONFIGS: MenuConfig[] = [
   },
   {
     key: 'monitor',
-    label: '监控中心',
+    labelKey: 'menu.monitor',
     icon: <MonitorOutlined />,
     path: '/monitor',
     permission: 'monitor:view',
     children: [
       {
         key: 'monitor-overview',
-        label: '总览',
+        labelKey: 'menu.monitorOverview',
         icon: <MonitorOutlined />,
         path: '/monitor/overview',
         permission: 'monitor:view'
       },
       {
         key: 'monitor-alerts',
-        label: '告警中心',
+        labelKey: 'menu.monitorAlerts',
         icon: <BellOutlined />,
         path: '/monitor/alerts',
         permission: 'monitor:view'
       },
       {
         key: 'monitor-incidents',
-        label: '事件中心',
+        labelKey: 'menu.monitorIncidents',
         icon: <ThunderboltOutlined />,
         path: '/monitor/incidents',
         permission: 'monitor:view'
       },
       {
         key: 'monitor-history',
-        label: '历史趋势',
+        labelKey: 'menu.monitorHistory',
         icon: <LineChartOutlined />,
         path: '/monitor/history',
         permission: 'monitor:view'
       },
       {
         key: 'monitor-credentials',
-        label: '凭据管理',
+        labelKey: 'menu.monitorCredentials',
         icon: <SafetyOutlined />,
         path: '/monitor/credentials',
         permission: 'monitor:view'
       },
       {
         key: 'monitor-settings',
-        label: '运行配置',
+        labelKey: 'menu.monitorSettings',
         icon: <ApiOutlined />,
         path: '/monitor/settings',
         permission: 'monitor:view'
       },
       {
         key: 'monitor-alert-rules',
-        label: '告警规则',
+        labelKey: 'menu.monitorAlertRules',
         icon: <AlertOutlined />,
         path: '/monitor/alert-rules',
         permission: 'monitor:config'
       },
       {
         key: 'monitor-thresholds',
-        label: '阈值与目标',
+        labelKey: 'menu.monitorThresholds',
         icon: <ControlOutlined />,
         path: '/monitor/thresholds',
         permission: 'monitor:config'
       },
       {
         key: 'monitor-oid-tools',
-        label: 'OID 工具箱',
+        labelKey: 'menu.monitorOidTools',
         icon: <ReadOutlined />,
         path: '/monitor/oid-tools',
         permission: 'monitor:config'
@@ -248,56 +297,56 @@ export const MENU_CONFIGS: MenuConfig[] = [
   },
   {
     key: 'ai',
-    label: 'AI 助手',
+    labelKey: 'menu.ai',
     icon: <RobotOutlined />,
     path: '/ai/nlq',
     permission: 'ai:use',
     children: [
       {
         key: 'ai-nlq',
-        label: '智能查询',
+        labelKey: 'menu.aiNlq',
         icon: <RobotOutlined />,
         path: '/ai/nlq',
         permission: 'ai:use'
       },
       {
         key: 'ai-skills',
-        label: '技能管理',
+        labelKey: 'menu.aiSkills',
         icon: <ApiOutlined />,
         path: '/ai/skills',
         permission: 'ai:admin'
       },
       {
         key: 'ai-config',
-        label: 'AI 配置',
+        labelKey: 'menu.aiConfig',
         icon: <SettingOutlined />,
         path: '/ai/config',
         permission: 'ai:admin'
       },
       {
         key: 'ai-monitor',
-        label: '运行监控',
+        labelKey: 'menu.aiMonitor',
         icon: <MonitorOutlined />,
         path: '/ai/monitor',
         permission: 'ai:admin'
       },
       {
         key: 'ai-audit',
-        label: '审计日志',
+        labelKey: 'menu.aiAudit',
         icon: <SafetyCertificateOutlined />,
         path: '/ai/audit',
         permission: 'ai:admin'
       },
       {
         key: 'ai-rag',
-        label: '知识库',
+        labelKey: 'menu.aiRag',
         icon: <DatabaseOutlined />,
         path: '/ai/rag',
         permission: 'ai:use'
       },
       {
         key: 'ai-diagnosis',
-        label: '智能诊断',
+        labelKey: 'menu.aiDiagnosis',
         icon: <MedicineBoxOutlined />,
         path: '/ai/diagnosis',
         permission: 'ai:agentic'
@@ -306,76 +355,76 @@ export const MENU_CONFIGS: MenuConfig[] = [
   },
   {
     key: 'system',
-    label: '系统管理',
+    labelKey: 'menu.system',
     icon: <SettingOutlined />,
     path: '/users',
     permission: 'user:view',
     children: [
       {
         key: 'users',
-        label: '用户管理',
+        labelKey: 'menu.users',
         icon: <UserOutlined />,
         path: '/users',
         permission: 'user:view'
       },
       {
         key: 'rbac',
-        label: '角色管理',
+        labelKey: 'menu.rbac',
         icon: <SafetyOutlined />,
         path: '/rbac',
         permission: 'rbac:view'
       },
       {
         key: 'login-logs',
-        label: '日志管理',
+        labelKey: 'menu.loginLogs',
         icon: <FileSearchOutlined />,
         path: '/login-logs',
         permission: 'user:view'
       },
       {
         key: 'audit-logs',
-        label: '审计日志',
+        labelKey: 'menu.auditLogs',
         icon: <AuditOutlined />,
         path: '/audit-logs',
         permission: 'audit:view'
       },
       {
         key: 'notification-preferences',
-        label: '通知偏好',
+        labelKey: 'menu.notificationPreferences',
         icon: <BellOutlined />,
         path: '/settings/notification-preferences'
       },
       {
         key: 'webhook-configs',
-        label: 'Webhook配置',
+        labelKey: 'menu.webhookConfigs',
         icon: <ApiOutlined />,
         path: '/settings/webhook-configs',
         permission: 'user:view'
       },
       {
         key: 'mail-settings',
-        label: '邮件配置',
+        labelKey: 'menu.mailSettings',
         icon: <MailOutlined />,
         path: '/settings/mail',
         permission: 'user:view'
       },
       {
         key: 'voice-settings',
-        label: '语音配置',
+        labelKey: 'menu.voiceSettings',
         icon: <PhoneOutlined />,
         path: '/settings/voice',
         permission: 'user:view'
       },
       {
         key: 'import-export',
-        label: '导入导出',
+        labelKey: 'menu.importExport',
         icon: <ImportOutlined />,
         path: '/import-export',
         permission: 'import:view'
       },
       {
         key: 'licenses',
-        label: '开源授权',
+        labelKey: 'menu.licenses',
         icon: <SafetyCertificateOutlined />,
         path: '/settings/licenses'
       }

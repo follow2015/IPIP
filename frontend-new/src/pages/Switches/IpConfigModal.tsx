@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal, Form, Input, Select, Tag } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { SwitchPortIP } from '@/types/models';
 
 export interface IpConfigValues {
@@ -39,6 +40,7 @@ export function IpConfigModal({
   hasPrimary,
   onSubmit
 }: IpConfigModalProps) {
+  const { t } = useTranslation('device');
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -66,7 +68,7 @@ export function IpConfigModal({
 
   return (
     <Modal
-      title={`配置端口 IP — ${portName}`}
+      title={t('switch.ipConfig.title', { name: portName })}
       open={open}
       onOk={handleOk}
       onCancel={onClose}
@@ -82,45 +84,46 @@ export function IpConfigModal({
             fontSize: 12
           }}
         >
-          <div style={{ marginBottom: 4, color: '#666' }}>当前已配置IP：</div>
+          <div style={{ marginBottom: 4, color: '#666' }}>{t('switch.ipConfig.currentLabel')}</div>
           {currentIpList.map((ip, i) => (
             <Tag key={i} color={ip.is_primary ? 'blue' : 'default'} style={{ marginBottom: 2 }}>
-              {ip.is_primary ? '主' : '从'} {ip.ip_address}
+              {ip.is_primary ? t('port.ipRole.primary') : t('port.ipRole.secondary')}{' '}
+              {ip.ip_address}
               {ip.prefix ? `/${ip.prefix}` : ip.subnet_mask ? `/${ip.subnet_mask}` : ''}
             </Tag>
           ))}
-          <div style={{ marginTop: 6, color: '#faad14' }}>
-            如需更换IP，请先在端口详情页IP地址栏删除原IP，再配置新IP。
-          </div>
+          <div style={{ marginTop: 6, color: '#faad14' }}>{t('switch.ipConfig.replaceHint')}</div>
         </div>
       )}
       <Form form={form} layout="vertical">
         <Form.Item
           name="ip_address"
-          label="IP 地址"
+          label={t('port.column.ipAddress')}
           rules={[
-            { required: true, message: '请输入IP地址' },
-            { pattern: /^(\d{1,3}\.){3}\d{1,3}$/, message: '请输入有效的IPv4地址' }
+            { required: true, message: t('switch.ipConfig.addressRequired') },
+            { pattern: /^(\d{1,3}\.){3}\d{1,3}$/, message: t('switch.ipConfig.addressInvalid') }
           ]}
         >
           <Input placeholder="192.168.1.1" />
         </Form.Item>
         <Form.Item
           name="subnet_mask"
-          label="子网掩码"
-          rules={[{ required: true, message: '请选择子网掩码' }]}
+          label={t('switch.ipConfig.subnetMask')}
+          rules={[{ required: true, message: t('switch.ipConfig.subnetMaskRequired') }]}
         >
           <Select options={SUBNET_MASK_OPTIONS} />
         </Form.Item>
         <Form.Item
           name="ip_type"
-          label="IP 类型"
-          help={hasPrimary ? '该端口已有主IP，默认添加为从IP' : '该端口暂无IP，将配置为主IP'}
+          label={t('switch.ipConfig.ipType')}
+          help={
+            hasPrimary ? t('switch.ipConfig.helpHasPrimary') : t('switch.ipConfig.helpNoPrimary')
+          }
         >
           <Select
             options={[
-              { value: 'primary', label: '主 IP（ip address）' },
-              { value: 'secondary', label: '从 IP（ip address sub/secondary）' }
+              { value: 'primary', label: t('switch.ipConfig.typePrimary') },
+              { value: 'secondary', label: t('switch.ipConfig.typeSecondary') }
             ]}
           />
         </Form.Item>

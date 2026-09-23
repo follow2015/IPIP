@@ -14,6 +14,7 @@
  * />
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Select, Space, DatePicker } from 'antd';
 import type { UseTableReturn } from '@/hooks/useTable';
 
@@ -39,6 +40,7 @@ export interface FilterBarProps {
 }
 
 function FilterBar({ filters, table, extra, prefix }: FilterBarProps) {
+  const { t } = useTranslation();
   const { filters: filterValues, updateFilter } = table;
 
   return (
@@ -78,7 +80,7 @@ function FilterBar({ filters, table, extra, prefix }: FilterBarProps) {
           return (
             <RangePicker
               key={item.key}
-              placeholder={item.placeholders ?? ['开始日期', '结束日期']}
+              placeholder={item.placeholders ?? [t('range.startDate'), t('range.endDate')]}
               onChange={(dates) => {
                 if (dates && dates[0] && dates[1]) {
                   updateFilter(item.key, `${dates[0].format('YYYY-MM-DD')}~${dates[1].format('YYYY-MM-DD')}`);

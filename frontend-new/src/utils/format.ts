@@ -4,7 +4,9 @@
  */
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import type { TFunction } from 'i18next';
 import { PROBE_ERROR_MAP, ProbeErrorCode } from '@/types/enums';
+import { getProbeErrorMeta, type DeviceT } from '@/types/statusMeta';
 
 dayjs.extend(utc);
 
@@ -56,13 +58,13 @@ export function formatUPosition(uPosition: number | null, heightU: number): stri
   return `U${uPosition}` + (heightU > 1 ? ` - U${uPosition + heightU - 1}` : '');
 }
 
-export function translateProbeError(error: string | null): string {
+export function translateProbeError(error: string | null, t: DeviceT): string {
   if (!error) return '-';
   const code = Object.values(ProbeErrorCode).find((c) => c === error);
-  if (code) return PROBE_ERROR_MAP[code].label;
+  if (code) return getProbeErrorMeta(code, t)?.label ?? error;
   const lower = error.toLowerCase().trim();
-  for (const [key, entry] of Object.entries(PROBE_ERROR_MAP)) {
-    if (lower.includes(key)) return entry.label;
+  for (const [key] of Object.entries(PROBE_ERROR_MAP)) {
+    if (lower.includes(key)) return getProbeErrorMeta(key, t)?.label ?? error;
   }
   return error;
 }
@@ -71,13 +73,12 @@ export function translateProbeError(error: string | null): string {
  * 相对时间格式化（统一版，供监控总览页 / 告警页共用）。
  * P1 修复：原在 Overview 和 Alerts 两个文件重复定义且逻辑有差异，抽到 utils/format.ts 统一。
  */
-export function relativeTime(iso: string | null): string {
+export function relativeTime(iso: string | null, t: TFunction<'common'>): string {
   if (!iso) return '-';
   const utcIso = ensureUtc(iso);
   const diff = Date.now() - new Date(utcIso).getTime();
-  if (diff < 0) return '刚刚';
-  if (diff < 60_000) return '刚刚';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}分钟前`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}小时前`;
-  return `${Math.floor(diff / 86_400_000)}天前`;
+  if (diff < 60_000) return t('time.justNow');
+  if (diff < 3_600_000) return t('time.minutesAgo', { count: Math.floor(diff / 60_000) });
+  if (diff < 86_400_000) return t('time.hoursAgo', { count: Math.floor(diff / 3_600_000) });
+  return t('time.daysAgo', { count: Math.floor(diff / 86_400_000) });
 }

@@ -3,18 +3,20 @@
  * 仅渲染 Form.Item，依赖父级 <Form> 上下文（Form.useWatch 取 snmp_version）。
  */
 import { Form, Input, Select } from 'antd';
+import { useTranslation } from 'react-i18next';
 const { Password } = Input;
 
-const KEEP_PLACEHOLDER = '留空保持不变';
-
 export default function SnmpForm({ mode }: { mode: 'create' | 'edit' }) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const snmpVersion = (Form.useWatch('snmp_version') as string) || 'v2c';
   const isEdit = mode === 'edit';
-  const required = isEdit ? [] : [{ required: true, message: '此项必填' }];
+  const keepPlaceholder = t('credential.form.keepUnchanged');
+  const required = isEdit ? [] : [{ required: true, message: tCommon('validation.required') }];
 
   return (
     <>
-      <Form.Item label="SNMP 版本" name="snmp_version">
+      <Form.Item label={t('credential.form.snmpVersion')} name="snmp_version">
         <Select
           options={[
             { value: 'v2c', label: 'v2c' },
@@ -25,38 +27,42 @@ export default function SnmpForm({ mode }: { mode: 'create' | 'edit' }) {
 
       {snmpVersion === 'v2c' ? (
         <Form.Item label="Community" name="community" rules={required}>
-          <Password placeholder={isEdit ? KEEP_PLACEHOLDER : 'public'} />
+          <Password placeholder={isEdit ? keepPlaceholder : 'public'} />
         </Form.Item>
       ) : (
         <>
-          <Form.Item label="用户名" name="username" rules={required}>
+          <Form.Item label={t('credential.form.username')} name="username" rules={required}>
             <Input />
           </Form.Item>
-          <Form.Item label="认证密钥 (Auth Key)" name="auth_key" rules={required}>
-            <Password placeholder={isEdit ? KEEP_PLACEHOLDER : undefined} />
+          <Form.Item label={t('credential.form.authKey')} name="auth_key" rules={required}>
+            <Password placeholder={isEdit ? keepPlaceholder : undefined} />
           </Form.Item>
-          <Form.Item label="认证协议" name="auth_protocol">
+          <Form.Item label={t('credential.form.authProtocol')} name="auth_protocol">
             <Select
               options={[
                 { value: 'sha', label: 'SHA' },
                 { value: 'sha256', label: 'SHA-256' },
                 { value: 'sha512', label: 'SHA-512' },
                 { value: 'md5', label: 'MD5' },
-                { value: 'none', label: '无' }
+                { value: 'none', label: t('credential.form.none') }
               ]}
             />
           </Form.Item>
-          <Form.Item label="加密密钥 (Priv Key)" name="priv_key">
-            <Password placeholder={isEdit ? KEEP_PLACEHOLDER : '无加密时留空'} />
+          <Form.Item label={t('credential.form.privKey')} name="priv_key">
+            <Password
+              placeholder={
+                isEdit ? keepPlaceholder : t('credential.form.privKeyPlaceholder')
+              }
+            />
           </Form.Item>
-          <Form.Item label="加密协议" name="priv_protocol">
+          <Form.Item label={t('credential.form.privProtocol')} name="priv_protocol">
             <Select
               options={[
                 { value: 'aes', label: 'AES' },
                 { value: 'aes256', label: 'AES-256' },
                 { value: 'des', label: 'DES' },
                 { value: '3des', label: '3DES' },
-                { value: 'none', label: '无' }
+                { value: 'none', label: t('credential.form.none') }
               ]}
             />
           </Form.Item>

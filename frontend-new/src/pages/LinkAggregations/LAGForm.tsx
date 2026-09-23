@@ -10,6 +10,7 @@ import type { FormSchema } from '@/components/SchemaForm';
 import { useCreateLinkAggregationGroup } from '@/services/link-aggregation';
 import { useSwitchList } from '@/services/switch';
 import { useMessage } from '@/hooks/useMessage';
+import { useTranslation } from 'react-i18next';
 
 interface LAGFormProps {
   open: boolean;
@@ -18,6 +19,7 @@ interface LAGFormProps {
 }
 
 function useLAGFormSchema() {
+  const { t: td } = useTranslation('device');
   const { data: switchList } = useSwitchList();
 
   const unmanagedSwitchOptions = useMemo(
@@ -33,38 +35,39 @@ function useLAGFormSchema() {
       fields: [
         {
           name: 'device_id',
-          label: '交换机',
+          label: td('deviceSubtype.SWITCH'),
           type: 'select',
           required: true,
-          placeholder: '请选择交换机',
+          placeholder: td('lag.form.selectSwitch'),
           options: unmanagedSwitchOptions
         },
         {
           name: 'lag_name',
-          label: '聚合组名称',
+          label: td('lag.column.lagName'),
           type: 'input',
           required: true,
-          placeholder: '如: Eth-Trunk1'
+          placeholder: td('lag.form.lagNamePlaceholder')
         },
         {
           name: 'lag_type',
-          label: '聚合类型',
+          label: td('lag.form.lagType'),
           type: 'select',
           required: true,
           options: [
-            { label: 'LACP（动态）', value: 'lacp' },
-            { label: '静态', value: 'static' }
+            { label: td('lag.type.lacpDynamic'), value: 'lacp' },
+            { label: td('lag.type.static'), value: 'static' }
           ]
         }
       ]
     }),
-    [unmanagedSwitchOptions]
+    [unmanagedSwitchOptions, td]
   );
 
   return schema;
 }
 
 function LAGForm({ open, onCancel, onSuccess }: LAGFormProps) {
+  const { t: td } = useTranslation('device');
   const schema = useLAGFormSchema();
   const createLag = useCreateLinkAggregationGroup();
   const message = useMessage();
@@ -77,7 +80,7 @@ function LAGForm({ open, onCancel, onSuccess }: LAGFormProps) {
         lag_type: values.lag_type as 'lacp' | 'static'
       }
     });
-    message.success('链路聚合组已创建');
+    message.success(td('lag.message.created'));
   };
 
   return (
@@ -89,7 +92,7 @@ function LAGForm({ open, onCancel, onSuccess }: LAGFormProps) {
       loading={createLag.isPending}
       modalProps={{
         open,
-        title: '创建链路聚合组',
+        title: td('lag.action.create'),
         destroyOnHidden: true
       }}
     />

@@ -15,6 +15,7 @@ import { lazy, Suspense } from 'react';
 import { Tabs } from 'antd';
 import { useSearchParams } from 'react-router-dom';
 import { PermissionRoute } from '@/router/guards';
+import { useTranslation } from 'react-i18next';
 
 const MetricTemplates = lazy(() => import('@/pages/Monitor/MetricTemplates'));
 const ThresholdOverrides = lazy(() => import('@/pages/Monitor/ThresholdOverrides'));
@@ -25,6 +26,7 @@ const DEFAULT_TAB: ThresholdTabKey = 'templates';
 const VALID_TABS: ThresholdTabKey[] = ['templates', 'overrides', 'sla'];
 
 export default function Thresholds() {
+  const { t } = useTranslation('monitor');
   const [params, setParams] = useSearchParams();
   const raw = params.get('tab');
   const activeKey: ThresholdTabKey = VALID_TABS.includes(raw as ThresholdTabKey)
@@ -43,7 +45,7 @@ export default function Thresholds() {
       items={[
         {
           key: 'templates',
-          label: '指标模板',
+          label: t('tab.templates'),
           children: (
             <Suspense fallback={null}>
               <MetricTemplates />
@@ -52,7 +54,7 @@ export default function Thresholds() {
         },
         {
           key: 'overrides',
-          label: '设备覆盖',
+          label: t('tab.overrides'),
           children: (
             <Suspense fallback={null}>
               <ThresholdOverrides />
@@ -61,7 +63,7 @@ export default function Thresholds() {
         },
         {
           key: 'sla',
-          label: 'SLA/SLO',
+          label: t('tab.sla'),
           children: (
             <PermissionRoute requiredPermission="monitor:view">
               <Suspense fallback={null}>

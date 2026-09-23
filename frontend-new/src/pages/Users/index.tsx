@@ -28,8 +28,12 @@ import type { User, Role } from '@/types/models';
 import { useCrudPage } from '@/hooks/useCrudPage';
 import { useMessage } from '@/hooks/useMessage';
 import { formatDateTime } from '@/utils/format';
+import { useTranslation } from 'react-i18next';
 
 function Users() {
+  const { t } = useTranslation('settings');
+  const { t: tc } = useTranslation('common');
+  const { t: ta } = useTranslation('auth');
   const confirm = useConfirm();
   const navigate = useNavigate();
   const roleDrawer = useDisclosure();
@@ -39,7 +43,7 @@ function Users() {
     useList: useUserList,
     useDelete: useDeleteUser,
     nameKey: 'username',
-    nameLabel: '用户'
+    nameLabel: t('user.label')
   });
 
   const createUser = useCreateUser();
@@ -51,20 +55,20 @@ function Users() {
 
   const handleResetPassword = (r: User) => {
     confirm({
-      title: '重置密码',
-      content: `确定要重置用户「${r.username}」的密码吗？系统将随机生成新密码。`,
-      okText: '确定重置',
-      cancelText: '取消',
+      title: t('user.action.resetPassword'),
+      content: t('user.resetPasswordConfirm', { username: r.username }),
+      okText: t('user.action.confirmReset'),
+      cancelText: tc('action.cancel'),
       onOk: async () => {
         try {
           const res = await resetPassword.mutateAsync(r.id);
           const newPassword = res.data?.new_password;
           if (newPassword) {
             Modal.success({
-              title: '密码重置成功',
+              title: t('user.message.resetPasswordSuccess'),
               content: (
                 <div>
-                  <p>用户「{r.username}」的新密码：</p>
+                  <p>{t('user.newPasswordLabel', { username: r.username })}</p>
                   <Input.TextArea
                     value={newPassword}
                     readOnly
@@ -72,20 +76,20 @@ function Users() {
                     style={{ marginTop: 8, fontFamily: 'monospace' }}
                   />
                   <p style={{ marginTop: 8, color: '#999', fontSize: 12 }}>
-                    请妥善保管此密码，关闭后无法再次查看。
+                    {t('user.passwordKeepSafeHint')}
                   </p>
                 </div>
               ),
-              okText: '已复制并关闭',
+              okText: t('user.action.copiedAndClose'),
               onOk: () => {
                 navigator.clipboard?.writeText(newPassword);
               }
             });
           } else {
-            message.success('密码已重置');
+            message.success(t('user.message.passwordReset'));
           }
         } catch (err) {
-          message.error(err instanceof Error ? err.message : '重置失败');
+          message.error(err instanceof Error ? err.message : t('user.message.resetFailed'));
         }
       }
     });
@@ -107,21 +111,21 @@ function Users() {
           id: crud.editRecord.id,
           data: values as unknown as CreateUserRequest
         });
-        message.success('更新成功');
+        message.success(tc('message.updateSuccess'));
       } else {
         await createUser.mutateAsync(values as unknown as CreateUserRequest);
-        message.success('创建成功');
+        message.success(tc('message.createSuccess'));
       }
       crud.closeForm();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '操作失败');
+      message.error(err instanceof Error ? err.message : tc('message.operationFailed'));
     }
   };
 
   const handleToggle = (r: User) => {
     const newStatus = r.status === 1 ? 0 : 1;
     toggleStatus.mutateAsync({ id: r.id, status: newStatus }).then(() => {
-      message.success('状态已更新');
+      message.success(t('user.message.statusUpdated'));
       crud.refetch();
     });
   };
@@ -134,48 +138,53 @@ function Users() {
       width: 80,
       render: (id: number) => <IdCell value={id} />
     },
-    { title: '用户名', dataIndex: 'username', key: 'username' },
-    { title: '姓名', dataIndex: 'name', key: 'name', render: (v: string) => v || '-' },
-    { title: '邮箱', dataIndex: 'email', key: 'email', render: (v: string) => v || '-' },
-    { title: '部门', dataIndex: 'department', key: 'department', render: (v: string) => v || '-' },
+    { title: ta('field.username'), dataIndex: 'username', key: 'username' },
+    { title: t('user.field.fullName'), dataIndex: 'name', key: 'name', render: (v: string) => v || '-' },
+    { title: t('user.field.email'), dataIndex: 'email', key: 'email', render: (v: string) => v || '-' },
     {
-      title: '联系电话',
+      title: t('user.field.department'),
+      dataIndex: 'department',
+      key: 'department',
+      render: (v: string) => v || '-'
+    },
+    {
+      title: t('user.field.contactPhone'),
       dataIndex: 'contact_phone',
       key: 'contact_phone',
       render: (v: string) => v || '-'
     },
     {
-      title: '角色',
+      title: t('role.label'),
       dataIndex: 'roles',
       key: 'roles',
       render: (v: string[]) => v?.map((r) => <Tag key={r}>{r}</Tag>) ?? '-'
     },
     {
-      title: '状态',
+      title: tc('field.status'),
       dataIndex: 'status',
       key: 'status',
       render: (_: number, r: User) => (
         <Switch
           checked={r.is_active}
           onChange={() => handleToggle(r)}
-          checkedChildren="启用"
-          unCheckedChildren="禁用"
+          checkedChildren={tc('action.enable')}
+          unCheckedChildren={tc('action.disable')}
         />
       )
     },
     {
-      title: '更新时间',
+      title: tc('field.updatedAt'),
       dataIndex: 'updated_at',
       key: 'updated_at',
       render: (v: string) => formatDateTime(v)
     },
     {
-      title: '操作',
+      title: tc('field.actions'),
       key: 'action',
       render: (_: unknown, r: User) => (
         <Space>
           <Button type="link" size="small" onClick={() => crud.handleEdit(r)}>
-            编辑
+            {tc('action.edit')}
           </Button>
           <Button
             type="link"
@@ -183,7 +192,7 @@ function Users() {
             icon={<TeamOutlined />}
             onClick={() => handleAssignRole(r)}
           >
-            角色
+            {t('role.label')}
           </Button>
           <Button
             type="link"
@@ -191,7 +200,7 @@ function Users() {
             icon={<KeyOutlined />}
             onClick={() => handleResetPassword(r)}
           >
-            重置密码
+            {t('user.action.resetPassword')}
           </Button>
           <Button
             type="link"
@@ -199,10 +208,10 @@ function Users() {
             icon={<HistoryOutlined />}
             onClick={() => handleViewLoginLogs(r)}
           >
-            登录记录
+            {t('user.action.loginLogs')}
           </Button>
           <Button type="link" size="small" danger onClick={() => crud.handleDelete(r)}>
-            删除
+            {tc('action.delete')}
           </Button>
         </Space>
       )
@@ -228,7 +237,7 @@ function Users() {
         onRefresh={() => crud.refetch()}
         toolbar={
           <Button type="primary" icon={<PlusOutlined />} onClick={crud.handleAdd}>
-            新增用户
+            {t('user.action.add')}
           </Button>
         }
       />
@@ -265,6 +274,8 @@ interface RoleAssignDrawerProps {
 }
 
 function RoleAssignDrawer({ open, user, onClose, onSuccess }: RoleAssignDrawerProps) {
+  const { t } = useTranslation('settings');
+  const { t: tc } = useTranslation('common');
   const { data: userRoles, isLoading: rolesLoading } = useUserRoles(user?.id ?? 0);
   const { data: allRolesData } = useRoleList();
   const setUserRoles = useSetUserRoles();
@@ -284,29 +295,29 @@ function RoleAssignDrawer({ open, user, onClose, onSuccess }: RoleAssignDrawerPr
     if (!user) return;
     try {
       await setUserRoles.mutateAsync({ userId: user.id, roles: selectedNames });
-      message.success('角色更新成功');
+      message.success(t('role.message.updated'));
       onSuccess();
       onClose();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '角色更新失败');
+      message.error(err instanceof Error ? err.message : t('role.message.updateFailed'));
     }
   };
 
   return (
     <Drawer
-      title={`${user?.username ?? ''} - 分配角色`}
+      title={t('role.assignTitle', { username: user?.username ?? '' })}
       open={open}
       onClose={onClose}
       size={400}
       afterOpenChange={handleOpenChange}
       extra={
         <Button type="primary" loading={setUserRoles.isPending} onClick={handleSubmit}>
-          保存
+          {tc('action.save')}
         </Button>
       }
     >
       {rolesLoading ? (
-        <div style={{ textAlign: 'center', padding: 24 }}>加载中...</div>
+        <div style={{ textAlign: 'center', padding: 24 }}>{tc('message.loading')}...</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {allRoles.map((role) => (

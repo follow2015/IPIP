@@ -6,6 +6,7 @@
  */
 import {
   useEffect,
+  useMemo,
   useRef,
   useCallback,
   useState,
@@ -13,6 +14,7 @@ import {
   type ForwardedRef,
   type RefObject
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Graph } from '@antv/g6';
 import type { GraphData } from '@antv/g6';
 import type { TopologyNode, TopologyEdge } from '@/types/models';
@@ -22,7 +24,7 @@ import {
   type TopologyGraphHandle,
   type TopologyGraphProps
 } from './graphBuilders';
-import { buildGraphOptions } from './graphConfig';
+import { buildGraphOptions, type GraphT } from './graphConfig';
 
 export interface UseG6GraphParams extends TopologyGraphProps {
   ref: ForwardedRef<TopologyGraphHandle>;
@@ -37,9 +39,13 @@ export function useG6Graph({
   highlightNodeId,
   ref
 }: UseG6GraphParams): { containerRef: RefObject<HTMLDivElement | null> } {
+  const { t: tn } = useTranslation('network');
+  const { t: td } = useTranslation('device');
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+
+  const tt = useMemo<GraphT>(() => ({ n: tn, d: td }), [tn, td]);
 
   const nodesRef = useRef<TopologyNode[]>(nodes);
   const edgesRef = useRef<TopologyEdge[]>(edges);
@@ -106,7 +112,7 @@ export function useG6Graph({
       graphRef.current = null;
     }
 
-    const graph = new Graph(buildGraphOptions({ container, width, height, layout }));
+    const graph = new Graph(buildGraphOptions({ container, width, height, layout, t: tt }));
 
     graph.on('node:click', (evt) => {
       const nodeId = (evt as unknown as { target?: { id?: string } }).target?.id;
@@ -129,7 +135,7 @@ export function useG6Graph({
     let destroyed = false;
     if (nodesRef.current.length > 0) {
       graph.setData(
-        transformDataFromRefs(nodesRef.current, edgesRef.current) as unknown as GraphData
+        transformDataFromRefs(nodesRef.current, edgesRef.current, tn) as unknown as GraphData
       );
       graph.render().catch((e: unknown) => {
         if (!destroyed) console.warn('[TopologyGraph] render error:', e);
@@ -141,19 +147,19 @@ export function useG6Graph({
       graph.destroy();
       graphRef.current = null;
     };
-  }, [containerSize, layout]);
+  }, [containerSize, layout, tt]);
 
   useEffect(() => {
     const graph = graphRef.current;
     if (!graph || !nodesRef.current.length) return;
     try {
       graph.setData(
-        transformDataFromRefs(nodesRef.current, edgesRef.current) as unknown as GraphData
+        transformDataFromRefs(nodesRef.current, edgesRef.current, tn) as unknown as GraphData
       );
       graph.render();
     } catch {
     }
-  }, [nodes, edges]);
+  }, [nodes, edges, tn]);
 
   const prevAffectedRef = useRef<{ nodes: Set<string>; edges: Set<string> }>({
     nodes: new Set(),

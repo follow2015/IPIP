@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, Select, Button, Table, Tag, Alert, Space, Typography } from 'antd';
 import { NodeIndexOutlined, CheckOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { useDiscoverTopology, useApplyDiscoveredTopology } from '@/services/topology';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useMessage } from '@/hooks/useMessage';
@@ -13,12 +14,27 @@ import type {
 
 const { Text } = Typography;
 
-const STATUS_META: Record<DiscoveryMatchStatus, { label: string; color: string }> = {
-  existing: { label: '已存在', color: 'green' },
-  matched: { label: '可建立', color: 'geekblue' },
-  partial: { label: '部分匹配', color: 'orange' },
-  unknown_peer: { label: '未知对端', color: 'default' },
-  port_occupied: { label: '端口被占用', color: 'volcano' }
+type DiscoveryStatusKey =
+  | 'topology.discovery.status.existing'
+  | 'topology.discovery.status.matched'
+  | 'topology.discovery.status.partial'
+  | 'topology.discovery.status.unknownPeer'
+  | 'topology.discovery.status.portOccupied';
+
+const STATUS_COLOR: Record<DiscoveryMatchStatus, string> = {
+  existing: 'green',
+  matched: 'geekblue',
+  partial: 'orange',
+  unknown_peer: 'default',
+  port_occupied: 'volcano'
+};
+
+const STATUS_LABEL_KEY: Record<DiscoveryMatchStatus, DiscoveryStatusKey> = {
+  existing: 'topology.discovery.status.existing',
+  matched: 'topology.discovery.status.matched',
+  partial: 'topology.discovery.status.partial',
+  unknown_peer: 'topology.discovery.status.unknownPeer',
+  port_occupied: 'topology.discovery.status.portOccupied'
 };
 
 interface RowType extends TopologyDiscoverySuggestion {
@@ -37,6 +53,9 @@ interface LldpDiscoveryModalProps {
 const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, roomId }) => {
   const message = useMessage();
   const { isMobile } = useResponsive();
+  const { t: tn } = useTranslation('network');
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
   const [selectedSwitchIds, setSelectedSwitchIds] = useState<number[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [results, setResults] = useState<TopologyDiscoverySwitchResult[]>([]);
@@ -63,7 +82,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
 
   const handleDiscover = () => {
     if (selectedSwitchIds.length === 0) {
-      message.warning('请先选择要探测的交换机');
+      message.warning(tn('topology.discovery.selectSwitchFirst'));
       return;
     }
     setSelectedRowKeys([]);
@@ -73,7 +92,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
         onSuccess: (data) => {
           setResults(data.results ?? []);
           if ((data.total_suggestions ?? 0) === 0) {
-            message.success('未发现新的邻居建议');
+            message.success(tn('topology.discovery.noSuggestions'));
           }
         }
       }
@@ -83,7 +102,11 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
   const handleApply = () => {
     const chosen = matchedRows.filter((r) => selectedRowKeys.includes(r._key));
     if (chosen.length === 0) {
-      message.warning('请勾选"可建立"状态的建议');
+      message.warning(
+        tn('topology.discovery.selectMatchedOnly', {
+          status: tn('topology.discovery.status.matched')
+        })
+      );
       return;
     }
     const byDevice = new Map<number, TopologyDiscoverySuggestion[]>();
@@ -105,8 +128,12 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
             if (done === total) {
               const skippedCount = chosen.length - created;
               message.success(
-                `已建立 ${created} 条连接` +
-                  (skippedCount > 0 ? `，${skippedCount} 条被安全跳过` : '')
+                skippedCount > 0
+                  ? tn('topology.discovery.createdLinksWithSkipped', {
+                      count: created,
+                      skipped: skippedCount
+                    })
+                  : tn('topology.discovery.createdLinks', { count: created })
               );
               onClose();
             }
@@ -121,10 +148,10 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
   };
 
   const columns = [
-    { title: '交换机', dataIndex: '_switch_name', width: 110 },
-    { title: '本机端口', dataIndex: 'local_port_name', width: 130 },
+    { title: tn('ip.field.switch'), dataIndex: '_switch_name', width: 110 },
+    { title: td('connection.column.localPort'), dataIndex: 'local_port_name', width: 130 },
     {
-      title: '对端',
+      title: tn('topology.discovery.column.peer'),
       dataIndex: 'peer_name',
       width: 150,
       render: (name: string, r: RowType) => (
@@ -138,28 +165,28 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
         </Space>
       )
     },
-    { title: '对端端口', dataIndex: 'peer_port_name', width: 140 },
+    { title: td('connection.column.peerPort'), dataIndex: 'peer_port_name', width: 140 },
     {
-      title: '协议',
+      title: td('credential.protocol'),
       dataIndex: '_source',
       width: 70,
       render: (s: string) => <Tag style={{ fontSize: 10 }}>{s.toUpperCase()}</Tag>
     },
     {
-      title: '状态',
+      title: tc('field.status'),
       dataIndex: 'match_status',
       width: 100,
       render: (s: DiscoveryMatchStatus) => {
-        const meta = STATUS_META[s] ?? { label: s, color: 'default' };
+        const key = STATUS_LABEL_KEY[s];
         return (
-          <Tag color={meta.color} style={{ fontSize: 10 }}>
-            {meta.label}
+          <Tag color={STATUS_COLOR[s] ?? 'default'} style={{ fontSize: 10 }}>
+            {key ? tn(key) : s}
           </Tag>
         );
       }
     },
     {
-      title: '说明',
+      title: tn('topology.discovery.column.reason'),
       dataIndex: 'reason',
       render: (reason: string) => (
         <Text type="secondary" style={{ fontSize: 11 }}>
@@ -174,7 +201,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
       title={
         <Space size={6}>
           <NodeIndexOutlined />
-          LLDP/CDP 拓扑发现
+          {tn('topology.discovery.title')}
         </Space>
       }
       open={open}
@@ -182,7 +209,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
       width={isMobile ? 'calc(100vw - 24px)' : 860}
       footer={[
         <Button key="cancel" onClick={onClose}>
-          关闭
+          {tc('action.close')}
         </Button>,
         <Button
           key="apply"
@@ -192,7 +219,9 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
           onClick={handleApply}
           loading={applyMutation.isPending}
         >
-          应用勾选建议{selectedRowKeys.length > 0 ? `（${selectedRowKeys.length}）` : ''}
+          {selectedRowKeys.length > 0
+            ? tn('topology.discovery.applySelectedWithCount', { count: selectedRowKeys.length })
+            : tn('topology.discovery.applySelected')}
         </Button>
       ]}
     >
@@ -200,14 +229,16 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
         <Alert
           type="info"
           showIcon
-          message="发现结果仅作建议：只有两端设备与端口全部匹配且端口未被占用的条目才会建立连接，手工录入的连接关系不会被覆盖。"
+          message={tn('topology.discovery.notice')}
         />
         <Space.Compact style={{ width: '100%' }}>
           <Select
             mode="multiple"
             allowClear
             placeholder={
-              roomId ? '选择本机房要探测的交换机' : '选择要探测的交换机（可先选机房过滤）'
+              roomId
+                ? tn('topology.discovery.selectPlaceholderInRoom')
+                : tn('topology.discovery.selectPlaceholder')
             }
             style={{ flex: 1 }}
             maxTagCount={5}
@@ -222,7 +253,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
             onClick={handleDiscover}
             loading={discoverMutation.isPending}
           >
-            开始发现
+            {tn('topology.discovery.start')}
           </Button>
         </Space.Compact>
 
@@ -230,7 +261,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
           <Alert
             type="warning"
             showIcon
-            message="部分交换机探测失败（SSH 超时或无凭据），详见说明列；其余结果不受影响。"
+            message={tn('topology.discovery.partialFailed')}
           />
         )}
 
@@ -248,7 +279,11 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
               disabled: r.match_status !== 'matched'
             })
           }}
-          locale={{ emptyText: '选择交换机后点击"开始发现"' }}
+          locale={{
+            emptyText: tn('topology.discovery.emptyText', {
+              action: tn('topology.discovery.start')
+            })
+          }}
           scroll={{ x: 'max-content' }}
         />
       </Space>

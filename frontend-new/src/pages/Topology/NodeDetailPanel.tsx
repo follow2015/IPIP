@@ -5,6 +5,7 @@ import React from 'react';
 import { Drawer, Descriptions, Tag, Space, Button } from 'antd';
 import { CloudServerOutlined, SwapOutlined, LinkOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { StatusTag } from '@/components/StatusTag';
 import { SWITCH_ROLE_MAP, NODE_STATUS_MAP } from '@/types/enums';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -29,6 +30,9 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
+  const { t: tn } = useTranslation('network');
+  const { t: td } = useTranslation('device');
+  const { t: tc } = useTranslation('common');
 
   if (!node) return null;
 
@@ -56,37 +60,41 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
       onClose={onClose}
       extra={
         <Button type="link" icon={<LinkOutlined />} onClick={handleNavigate}>
-          查看详情
+          {td('switch.action.viewDetail')}
         </Button>
       }
     >
       <Descriptions column={1} size="small" bordered>
-        <Descriptions.Item label="设备类型">
-          {node.device_type === 'network' ? '网络设备' : '服务器'}
+        <Descriptions.Item label={td('basic.field.deviceType')}>
+          {node.device_type === 'network' ? td('deviceType.NETWORK') : td('deviceType.SERVER')}
         </Descriptions.Item>
-        <Descriptions.Item label="IP 地址">{node.ip ?? '-'}</Descriptions.Item>
-        <Descriptions.Item label="状态">
+        <Descriptions.Item label={tn('ip.field.ipAddress')}>{node.ip ?? '-'}</Descriptions.Item>
+        <Descriptions.Item label={tc('field.status')}>
           <StatusTag status={node.status} statusMap={NODE_STATUS_MAP} />
         </Descriptions.Item>
         {node.device_type === 'network' && (
           <>
-            <Descriptions.Item label="角色">
+            <Descriptions.Item label={td('form.networkTopology.role.label')}>
               <StatusTag status={node.switch_role} statusMap={SWITCH_ROLE_MAP} />
             </Descriptions.Item>
-            <Descriptions.Item label="层级">
+            <Descriptions.Item label={td('switch.field.layer')}>
               {node.layer != null ? `L${node.layer}` : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="端口数">{node.port_num ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label={td('form.networkTopology.portCount.placeholder')}>
+              {node.port_num ?? '-'}
+            </Descriptions.Item>
           </>
         )}
-        <Descriptions.Item label="机房">{node.room_name ?? '-'}</Descriptions.Item>
-        <Descriptions.Item label="机柜">{node.cabinet_name ?? '-'}</Descriptions.Item>
-        <Descriptions.Item label="连接数">{connectedEdges.length}</Descriptions.Item>
+        <Descriptions.Item label={tn('ip.field.room')}>{node.room_name ?? '-'}</Descriptions.Item>
+        <Descriptions.Item label={td('field.cabinet')}>{node.cabinet_name ?? '-'}</Descriptions.Item>
+        <Descriptions.Item label={tn('topology.node.connectionCount')}>
+          {connectedEdges.length}
+        </Descriptions.Item>
       </Descriptions>
 
       {connectedEdges.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <h4 style={{ marginBottom: 8 }}>连接列表</h4>
+          <h4 style={{ marginBottom: 8 }}>{tn('topology.node.connectionList')}</h4>
           {connectedEdges.map((edge) => {
             const isSource = edge.source === node.id;
             const peerId = isSource ? edge.target : edge.source;
@@ -98,7 +106,7 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
                 : edge.edge_type === 'd2n'
                   ? 'D2N'
                   : edge.edge_type === 'uplink'
-                    ? '上行'
+                    ? tn('topology.edgeType.uplink')
                     : edge.edge_type;
 
             return (
@@ -135,10 +143,16 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
                       style={{ padding: 0, height: 'auto', fontSize: 12 }}
                       onClick={() => onLocateNode(peerId)}
                     >
-                      → {nodeMap[peerId]?.name ?? `设备 ${peerId}`}
+                      →{' '}
+                      {nodeMap[peerId]?.name ??
+                        tn('topology.node.deviceFallback', { id: peerId })}
                     </Button>
                   ) : (
-                    <span>→ {nodeMap[peerId]?.name ?? `设备 ${peerId}`}</span>
+                    <span>
+                      →{' '}
+                      {nodeMap[peerId]?.name ??
+                        tn('topology.node.deviceFallback', { id: peerId })}
+                    </span>
                   )}
                   {peerPort && <span style={{ color: '#8c8c8c', marginLeft: 4 }}>:{peerPort}</span>}
                 </Space>

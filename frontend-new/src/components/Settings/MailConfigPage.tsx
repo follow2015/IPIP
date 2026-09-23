@@ -43,25 +43,41 @@ import {
   type MailConfig,
   type MailConfigUpdate
 } from '@/services/mail-settings';
+import { useTranslation } from 'react-i18next';
 
 const { Title, Text } = Typography;
 
 const SSL_MODE_MAP = {
-  tls: { label: 'STARTTLS', color: 'blue' },
-  ssl: { label: 'SSL', color: 'green' },
-  none: { label: '无加密', color: 'default' }
+  tls: { labelKey: 'mail.encryption.tls', color: 'blue' },
+  ssl: { labelKey: 'mail.encryption.ssl', color: 'green' },
+  none: { labelKey: 'mail.encryption.none', color: 'default' }
 } as const;
 
-const PROVIDERS = [
-  { label: '腾讯企业邮', server: 'smtp.exmail.qq.com', port: 465, mode: 'ssl' as const },
-  { label: '阿里企业邮', server: 'smtp.qiye.aliyun.com', port: 465, mode: 'ssl' as const },
-  { label: 'QQ 邮箱', server: 'smtp.qq.com', port: 465, mode: 'ssl' as const },
-  { label: '163 邮箱', server: 'smtp.163.com', port: 465, mode: 'ssl' as const },
-  { label: 'Gmail', server: 'smtp.gmail.com', port: 587, mode: 'tls' as const },
-  { label: 'SendGrid', server: 'smtp.sendgrid.net', port: 587, mode: 'tls' as const }
+type ProviderKey =
+  | 'tencentExmail'
+  | 'aliyunExmail'
+  | 'qq'
+  | 'netease163'
+  | 'gmail'
+  | 'sendgrid';
+
+const PROVIDERS: Array<{
+  labelKey: ProviderKey;
+  server: string;
+  port: number;
+  mode: 'tls' | 'ssl' | 'none';
+}> = [
+  { labelKey: 'tencentExmail', server: 'smtp.exmail.qq.com', port: 465, mode: 'ssl' },
+  { labelKey: 'aliyunExmail', server: 'smtp.qiye.aliyun.com', port: 465, mode: 'ssl' },
+  { labelKey: 'qq', server: 'smtp.qq.com', port: 465, mode: 'ssl' },
+  { labelKey: 'netease163', server: 'smtp.163.com', port: 465, mode: 'ssl' },
+  { labelKey: 'gmail', server: 'smtp.gmail.com', port: 587, mode: 'tls' },
+  { labelKey: 'sendgrid', server: 'smtp.sendgrid.net', port: 587, mode: 'tls' }
 ];
 
 const MailConfigPage: React.FC = () => {
+  const { t } = useTranslation('settings');
+  const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const { data: config, isLoading } = useMailConfig();
   const updateMutation = useUpdateMailConfig();
@@ -121,26 +137,26 @@ const MailConfigPage: React.FC = () => {
       };
       try {
         await updateMutation.mutateAsync(update);
-        messageApi.success('邮件配置已保存');
+        messageApi.success(t('mail.message.saved'));
         setEditing(false);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : '保存失败，请重试';
+        const msg = err instanceof Error ? err.message : t('saveFailed');
         messageApi.error(msg);
       }
     },
-    [updateMutation, messageApi]
+    [updateMutation, messageApi, t]
   );
 
   const handleDelete = useCallback(async () => {
     try {
       await deleteMutation.mutateAsync();
-      messageApi.success('邮件配置已删除');
+      messageApi.success(t('mail.message.deleted'));
       setEditing(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '删除失败，请重试';
+      const msg = err instanceof Error ? err.message : t('mail.message.deleteFailed');
       messageApi.error(msg);
     }
-  }, [deleteMutation, messageApi]);
+  }, [deleteMutation, messageApi, t]);
 
   const openTestModal = useCallback(() => {
     testForm.resetFields();
@@ -159,10 +175,10 @@ const MailConfigPage: React.FC = () => {
       }
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'message' in err) {
-        messageApi.error((err as { message: string }).message || '测试请求失败');
+        messageApi.error((err as { message: string }).message || t('testRequestFailed'));
       }
     }
-  }, [testMutation, testForm, messageApi]);
+  }, [testMutation, testForm, messageApi, t]);
 
   const handleEdit = useCallback(() => {
     if (config) {
@@ -184,31 +200,34 @@ const MailConfigPage: React.FC = () => {
 
   const testModal = (
     <Modal
-      title="发送测试邮件"
+      title={t('mail.test.modalTitle')}
       open={testModalDisclosure.isOpen}
       onOk={handleTestSend}
       onCancel={() => testModalDisclosure.close()}
-      okText="发送"
-      cancelText="取消"
+      okText={t('mail.action.send')}
+      cancelText={tCommon('action.cancel')}
       confirmLoading={testMutation.isPending}
       destroyOnClose
     >
       <Form form={testForm} layout="vertical" style={{ marginTop: 16 }}>
         <Form.Item
           name="recipient"
-          label="收件人邮箱"
+          label={t('mail.test.recipient')}
           rules={[
-            { required: true, message: '请输入收件人邮箱地址' },
-            { type: 'email', message: '请输入有效的邮箱地址' }
+            { required: true, message: t('mail.validation.recipientRequired') },
+            { type: 'email', message: t('mail.validation.emailInvalid') }
           ]}
         >
-          <Input placeholder="请输入收件人邮箱地址" prefix={<MailOutlined />} />
+          <Input
+            placeholder={t('mail.test.recipientPlaceholder')}
+            prefix={<MailOutlined />}
+          />
         </Form.Item>
       </Form>
       <Alert
         type="info"
         showIcon
-        message="将使用当前已保存的 SMTP 配置发送测试邮件到上方地址。"
+        message={t('mail.test.hint')}
         style={{ marginTop: 8 }}
       />
     </Modal>
@@ -234,18 +253,18 @@ const MailConfigPage: React.FC = () => {
             <Space>
               <MailOutlined style={{ fontSize: 18 }} />
               <Title level={5} style={{ margin: 0 }}>
-                邮件服务器配置
+                {t('mail.title')}
               </Title>
               <Tag color="green" icon={<CheckCircleOutlined />}>
-                已配置
+                {t('mail.tagConfigured')}
               </Tag>
             </Space>
             <Space>
               <Button type="primary" icon={<SendOutlined />} onClick={openTestModal}>
-                发送测试邮件
+                {t('mail.action.sendTest')}
               </Button>
               <Button icon={<EditOutlined />} onClick={handleEdit}>
-                编辑
+                {tCommon('action.edit')}
               </Button>
               <Button
                 danger
@@ -253,16 +272,16 @@ const MailConfigPage: React.FC = () => {
                 loading={deleteMutation.isPending}
                 onClick={() =>
                   confirm({
-                    title: '确认删除邮件配置？',
-                    content: '删除后邮件通知将不可用，需要重新配置。',
-                    okText: '确认删除',
-                    cancelText: '取消',
+                    title: t('mail.action.deleteConfirmTitle'),
+                    content: t('mail.action.deleteConfirmContent'),
+                    okText: tCommon('confirm.deleteTitle'),
+                    cancelText: tCommon('action.cancel'),
                     okButtonProps: { danger: true },
                     onOk: handleDelete
                   })
                 }
               >
-                删除
+                {tCommon('action.delete')}
               </Button>
             </Space>
           </div>
@@ -271,27 +290,35 @@ const MailConfigPage: React.FC = () => {
             type="info"
             showIcon
             style={{ marginBottom: 24 }}
-            message="配置保存后即时生效，无需重启服务。"
+            message={t('mail.takeEffectHint')}
           />
 
           <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
-            <Descriptions.Item label="SMTP 服务器">{config.mail_server}</Descriptions.Item>
-            <Descriptions.Item label="端口">{config.mail_port}</Descriptions.Item>
-            <Descriptions.Item label="加密方式">
-              <Tag color={modeInfo.color}>{modeInfo.label}</Tag>
+            <Descriptions.Item label={t('mail.descriptions.server')}>
+              {config.mail_server}
             </Descriptions.Item>
-            <Descriptions.Item label="超时">{config.mail_timeout} 秒</Descriptions.Item>
-            <Descriptions.Item label="用户名">{config.mail_username}</Descriptions.Item>
-            <Descriptions.Item label="密码">
+            <Descriptions.Item label={t('mail.field.port')}>
+              {config.mail_port}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('mail.field.encryption')}>
+              <Tag color={modeInfo.color}>{t(modeInfo.labelKey)}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label={t('mail.field.timeoutView')}>
+              {t('mail.field.timeoutValue', { seconds: config.mail_timeout })}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('mail.field.username')}>
+              {config.mail_username}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('mail.field.passwordView')}>
               {config.mail_password_set ? (
                 <Text type="secondary">••••••••</Text>
               ) : (
                 <Tag color="warning" icon={<CloseCircleOutlined />}>
-                  未设置
+                  {t('mail.field.passwordUnset')}
                 </Tag>
               )}
             </Descriptions.Item>
-            <Descriptions.Item label="发件人地址" span={2}>
+            <Descriptions.Item label={t('mail.field.sender')} span={2}>
               {config.mail_default_sender}
             </Descriptions.Item>
           </Descriptions>
@@ -316,39 +343,41 @@ const MailConfigPage: React.FC = () => {
           <Space>
             <MailOutlined style={{ fontSize: 18 }} />
             <Title level={5} style={{ margin: 0 }}>
-              {hasConfig ? '编辑邮件服务器配置' : '配置邮件服务器'}
+              {hasConfig ? t('mail.editTitle') : t('mail.createTitle')}
             </Title>
-            {hasConfig && <Tag color="blue">编辑中</Tag>}
+            {hasConfig && <Tag color="blue">{t('mail.tagEditing')}</Tag>}
           </Space>
-          <Space>{hasConfig && <Button onClick={handleCancelEdit}>取消</Button>}</Space>
+          <Space>
+            {hasConfig && <Button onClick={handleCancelEdit}>{tCommon('action.cancel')}</Button>}
+          </Space>
         </div>
 
         <Alert
           type="info"
           showIcon
           style={{ marginBottom: 24 }}
-          message="配置保存后即时生效，无需重启服务。"
+          message={t('mail.takeEffectHint')}
         />
 
         <Form form={form} layout="vertical" onFinish={handleSave}>
           {/* ─── 服务器连接 ──────────────────────────────────────── */}
           <Title level={5} style={{ marginBottom: 16 }}>
-            服务器连接
+            {t('mail.section.connection')}
           </Title>
 
           <Form.Item
-            label="SMTP 服务器地址"
+            label={t('mail.field.server')}
             name="mail_server"
-            rules={[{ required: true, message: '请输入 SMTP 服务器地址' }]}
+            rules={[{ required: true, message: t('mail.validation.serverRequired') }]}
           >
-            <Input placeholder="如：smtp.exmail.qq.com" />
+            <Input placeholder={t('mail.field.serverPlaceholder')} />
           </Form.Item>
 
           <Space size={16} style={{ width: '100%' }} align="start">
             <Form.Item
-              label="端口"
+              label={t('mail.field.port')}
               name="mail_port"
-              rules={[{ required: true, message: '请输入端口号' }]}
+              rules={[{ required: true, message: t('mail.validation.portRequired') }]}
               style={{ width: 120, marginBottom: 24 }}
             >
               <InputNumber min={1} max={65535} style={{ width: '100%' }} />
@@ -357,24 +386,24 @@ const MailConfigPage: React.FC = () => {
             <Form.Item
               label={
                 <Space size={4}>
-                  <span>加密方式</span>
-                  <Tooltip title="STARTTLS：端口 587，先明文连接再升级加密（Gmail/SendGrid）；SSL：端口 465，全程加密（腾讯企业邮/阿里企业邮）">
+                  <span>{t('mail.field.encryption')}</span>
+                  <Tooltip title={t('mail.field.encryptionTooltip')}>
                     <QuestionCircleOutlined style={{ color: '#999' }} />
                   </Tooltip>
                 </Space>
               }
               name="ssl_mode"
-              rules={[{ required: true, message: '请选择加密方式' }]}
+              rules={[{ required: true, message: t('mail.validation.encryptionRequired') }]}
               style={{ width: 200, marginBottom: 24 }}
             >
               <Input
                 readOnly
                 value={
                   sslMode === 'tls'
-                    ? 'STARTTLS (587)'
+                    ? t('mail.encryption.tlsWithPort')
                     : sslMode === 'ssl'
-                      ? 'SSL (465)'
-                      : '无加密 (25)'
+                      ? t('mail.encryption.sslWithPort')
+                      : t('mail.encryption.noneWithPort')
                 }
                 onClick={() => {
                   const next = sslMode === 'tls' ? 'ssl' : sslMode === 'ssl' ? 'none' : 'tls';
@@ -389,7 +418,7 @@ const MailConfigPage: React.FC = () => {
             </Form.Item>
 
             <Form.Item
-              label="超时（秒）"
+              label={t('mail.field.timeout')}
               name="mail_timeout"
               style={{ width: 120, marginBottom: 24 }}
             >
@@ -402,47 +431,53 @@ const MailConfigPage: React.FC = () => {
           {/* ─── 认证信息 ──────────────────────────────────────── */}
           <Title level={5} style={{ marginBottom: 16 }}>
             <LockOutlined style={{ marginRight: 8 }} />
-            认证信息
+            {t('mail.section.auth')}
           </Title>
 
           <Form.Item
-            label="用户名"
+            label={t('mail.field.username')}
             name="mail_username"
-            rules={[{ required: true, message: '请输入 SMTP 认证用户名' }]}
+            rules={[{ required: true, message: t('mail.validation.usernameRequired') }]}
           >
-            <Input placeholder="如：alert@yourcompany.com" />
+            <Input placeholder={t('mail.field.usernamePlaceholder')} />
           </Form.Item>
 
           <Form.Item
             label={
               <Space size={4}>
-                <span>密码/授权码</span>
+                <span>{t('mail.field.password')}</span>
                 {config?.mail_password_set && (
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    (已设置，留空则保持原值)
+                    {t('mail.field.passwordSetHint')}
                   </Text>
                 )}
               </Space>
             }
             name="mail_password"
             rules={
-              config?.mail_password_set ? [] : [{ required: true, message: '请输入 SMTP 认证密码' }]
+              config?.mail_password_set
+                ? []
+                : [{ required: true, message: t('mail.validation.passwordRequired') }]
             }
           >
             <Input.Password
-              placeholder={config?.mail_password_set ? '留空保持原密码' : 'SMTP 认证密码或授权码'}
+              placeholder={
+                config?.mail_password_set
+                  ? t('mail.field.passwordKeepPlaceholder')
+                  : t('mail.field.passwordPlaceholder')
+              }
             />
           </Form.Item>
 
           <Form.Item
-            label="发件人地址"
+            label={t('mail.field.sender')}
             name="mail_default_sender"
             rules={[
-              { required: true, message: '请输入发件人地址' },
-              { type: 'email', message: '请输入有效的邮箱地址' }
+              { required: true, message: t('mail.validation.senderRequired') },
+              { type: 'email', message: t('mail.validation.emailInvalid') }
             ]}
           >
-            <Input placeholder="如：alert@yourcompany.com" />
+            <Input placeholder={t('mail.field.usernamePlaceholder')} />
           </Form.Item>
 
           <Divider />
@@ -450,13 +485,13 @@ const MailConfigPage: React.FC = () => {
           {/* ─── 常见服务商快捷配置 ──────────────────────────────── */}
           <Title level={5} style={{ marginBottom: 16 }}>
             <SafetyCertificateOutlined style={{ marginRight: 8 }} />
-            常见服务商快捷配置
+            {t('mail.section.providerPresets')}
           </Title>
 
           <Space wrap style={{ marginBottom: 24 }}>
             {PROVIDERS.map((provider) => (
               <Button
-                key={provider.label}
+                key={provider.labelKey}
                 size="small"
                 onClick={() => {
                   setSslMode(provider.mode);
@@ -467,7 +502,7 @@ const MailConfigPage: React.FC = () => {
                   });
                 }}
               >
-                {provider.label}
+                {t(`mail.provider.${provider.labelKey}`)}
               </Button>
             ))}
           </Space>
@@ -477,12 +512,14 @@ const MailConfigPage: React.FC = () => {
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit" loading={updateMutation.isPending}>
-                保存配置
+                {t('saveConfig')}
               </Button>
               <Button onClick={openTestModal} disabled={!form.getFieldValue('mail_server')}>
-                发送测试邮件
+                {t('mail.action.sendTest')}
               </Button>
-              {hasConfig && <Button onClick={handleCancelEdit}>取消</Button>}
+              {hasConfig && (
+                <Button onClick={handleCancelEdit}>{tCommon('action.cancel')}</Button>
+              )}
             </Space>
           </Form.Item>
         </Form>

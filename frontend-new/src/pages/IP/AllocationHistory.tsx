@@ -7,13 +7,19 @@
 import { Table, Tag, Timeline } from 'antd';
 import { useIPAllocationLogs } from '@/services/ip-allocation';
 import type { IPAllocationLog } from '@/types/models';
-import { IP_STATUS_MAP, IPStatusCode } from '@/types/enums';
+import { getIPStatusMeta, type DeviceT } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '@/utils/format';
 
-const ACTION_LABEL_MAP: Record<string, { label: string; color: string }> = {
-  allocate: { label: '分配', color: 'green' },
-  release: { label: '释放', color: 'orange' },
-  change_status: { label: '状态变更', color: 'blue' },
+type AllocationActionKey =
+  | 'allocation.action.allocate'
+  | 'allocation.action.release'
+  | 'allocation.action.changeStatus';
+
+const ACTION_LABEL_MAP: Record<string, { labelKey: AllocationActionKey; color: string }> = {
+  allocate: { labelKey: 'allocation.action.allocate', color: 'green' },
+  release: { labelKey: 'allocation.action.release', color: 'orange' },
+  change_status: { labelKey: 'allocation.action.changeStatus', color: 'blue' },
 };
 
 interface AllocationHistoryProps {
@@ -21,54 +27,56 @@ interface AllocationHistoryProps {
   roomId?: number;
 }
 
-function renderStatusValue(v: number | null) {
+function renderStatusValue(v: number | null, t: DeviceT) {
   if (v === null) return '-';
-  const info = IP_STATUS_MAP[v as IPStatusCode];
+  const info = getIPStatusMeta(v, t);
   return info ? <Tag color={info.color}>{info.label}</Tag> : <Tag>{v}</Tag>;
 }
 
 function AllocationHistory({ ipAddress, roomId }: AllocationHistoryProps) {
+  const { t: td } = useTranslation('device');
+  const { t } = useTranslation('network');
   const { data, isLoading } = useIPAllocationLogs(ipAddress, roomId);
   const logs = data ?? [];
 
   const columns = [
     {
-      title: '时间',
+      title: t('allocation.field.time'),
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
       render: (v: string) => formatDateTime(v),
     },
     {
-      title: '操作类型',
+      title: t('allocation.field.actionType'),
       dataIndex: 'action',
       key: 'action',
       width: 100,
       render: (v: string) => {
         const info = ACTION_LABEL_MAP[v];
-        return info ? <Tag color={info.color}>{info.label}</Tag> : <Tag>{v}</Tag>;
+        return info ? <Tag color={info.color}>{t(info.labelKey)}</Tag> : <Tag>{v}</Tag>;
       },
     },
     {
-      title: '原状态',
+      title: t('allocation.field.oldStatus'),
       dataIndex: 'old_status',
       key: 'old_status',
       width: 80,
-      render: renderStatusValue,
+      render: (v: number | null) => renderStatusValue(v, td),
     },
     {
-      title: '新状态',
+      title: t('allocation.field.newStatus'),
       dataIndex: 'new_status',
       key: 'new_status',
       width: 80,
-      render: renderStatusValue,
+      render: (v: number | null) => renderStatusValue(v, td),
     },
     {
-      title: '操作人',
+      title: t('allocation.field.operator'),
       dataIndex: 'operator_id',
       key: 'operator_id',
       width: 100,
-      render: (v: number) => `用户 #${v}`,
+      render: (v: number) => t('allocation.userFallback', { id: v }),
     },
   ];
 
@@ -79,11 +87,15 @@ function AllocationHistory({ ipAddress, roomId }: AllocationHistoryProps) {
       color: actionInfo?.color ?? 'gray',
       children: (
         <div>
-          <Tag color={actionInfo?.color}>{actionInfo?.label ?? log.action}</Tag>
+          <Tag color={actionInfo?.color}>
+            {actionInfo ? t(actionInfo.labelKey) : log.action}
+          </Tag>
           <span style={{ color: '#999', marginLeft: 8 }}>{formatDateTime(log.created_at)}</span>
           <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
-            {renderStatusValue(log.old_status)} → {renderStatusValue(log.new_status)}
-            <span style={{ marginLeft: 8 }}>操作人: 用户 #{log.operator_id}</span>
+            {renderStatusValue(log.old_status, td)} → {renderStatusValue(log.new_status, td)}
+            <span style={{ marginLeft: 8 }}>
+              {t('allocation.operator', { id: log.operator_id })}
+            </span>
           </div>
         </div>
       ),

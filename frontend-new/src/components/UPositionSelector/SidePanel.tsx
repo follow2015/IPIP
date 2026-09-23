@@ -1,5 +1,6 @@
 import React from 'react';
 import { Tag, theme } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { TYPE_CONFIG, pctColor } from './constants';
 import DetailPanel from './DetailPanel';
 import type { DropMsg } from './useRackLayout';
@@ -27,6 +28,7 @@ const SidePanel: React.FC<SidePanelProps> = ({
   dropMsg
 }) => {
   const { token } = theme.useToken();
+  const { t } = useTranslation('asset');
 
   return (
     <>
@@ -54,7 +56,7 @@ const SidePanel: React.FC<SidePanelProps> = ({
                 display: 'inline-block'
               }}
             />
-            {cfg.label}
+            {t(cfg.labelKey)}
           </span>
         ))}
       </div>
@@ -72,8 +74,8 @@ const SidePanel: React.FC<SidePanelProps> = ({
         }}
       >
         {[
-          { label: 'U位利用率', pct: uPct, detail: `${usedU}/${totalU}U` },
-          { label: '功率利用率', pct: pPct, detail: `${usedP}/${ratedPower}W` }
+          { label: t('uposition.side.uUsage'), pct: uPct, detail: `${usedU}/${totalU}U` },
+          { label: t('uposition.side.powerUsage'), pct: pPct, detail: `${usedP}/${ratedPower}W` }
         ].map(({ label, pct, detail }) => (
           <div key={label} style={{ marginBottom: 8 }}>
             <div

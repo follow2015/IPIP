@@ -13,6 +13,22 @@ scope_mode 策略：
 
 缓存：用户→可见设备集 + 设备→可见用户集，TTL 5 分钟。
 注意：本服务只读 DB，不修改任何状态。
+
+
+`None` 在本服务里是「**无限制**（data_scope=all 或任一角色豁免）」的**合法取值**。
+因此**故障绝不能也返回 `None`** —— 两者一旦不可区分，「鉴权服务不可用」就静默
+退化成「全放行」，受限用户在 DB 抖动期间拿到全量设备与拓扑可见性。
+本缺陷已被登记三次（`2026-09-08` 复核文档、`IPIP-仓库增量评审报告-32cd10f`
+P0-1），收口方式：
+
+1. **依赖故障** ⇒ 抛 `DataScopeUnavailableError`（**不再** `return None`），
+   由调用方显式选择放行或拒绝；
+2. **未知 `role.data_scope`** ⇒ 空集（最小权限，**不再**回落无限制）；
+3. 故障**不写缓存**（避免把故障态固化 5 分钟）。
+
+⚠️ 反面教材：把 `get_visible_device_ids` 整体打桩成抛异常，测的是「调用方的
+except 分支写得对不对」，**绕过了本服务内部的吞异常点** ⇒ 全绿也证明不了根因已修。
+详见 `tests/test_data_scope_fault_contract.py` 的「注入深度」说明。
 """
 from app.utils.logging import get_logger
 import threading
@@ -21,6 +37,16 @@ from typing import List, Optional, Set
 
 from app.persistence.device_repository import DeviceRepository
 from app.persistence.rbac_repository import RoleRepository, PermissionRepository
+
+
+class DataScopeUnavailableError(RuntimeError):
+    """数据域服务不可用：可见集无法判定（内部依赖故障）。
+
+    仓内同款惯用法见 `app/services/ai/task_idempotency.IdempotencyUnavailableError`
+    —— 故障信号用**专用异常**表达，使调用方无法在不知情的情况下把它当作正常值
+    （这里的"正常值"就是 `None` = 无限制）。
+    """
+
 
 logger = get_logger(__name__)
 
@@ -69,7 +95,11 @@ def _resolve_visible_by_role(role, user_id: int) -> Optional[Set[int]]:
         device_ids = config.get("device_ids") or []
         return set(device_ids)
 
-    return None  # 未知 scope 兜底为无限制
+    logger.error(
+        "data_scope 未知取值，按最小权限处理 role=%s scope=%r",
+        getattr(role, "id", None), scope,
+    )
+    return set()
 
 
 def get_visible_device_ids(user_id: int) -> Optional[Set[int]]:
@@ -78,6 +108,10 @@ def get_visible_device_ids(user_id: int) -> Optional[Set[int]]:
     返回 None 表示无限制（data_scope=all 或任一角色豁免）。
     返回 set 表示受限（仅可见这些设备）。
     多角色取并集；任一角色为 all 则整体无限制。
+
+    Raises:
+        DataScopeUnavailableError: 内部依赖故障，可见集**无法判定**。
+            调用方必须显式选择放行（`except → True/None`）或拒绝；**不得**忽略。
     """
     with _cache_lock:
         cached = _visible_devices_cache.get(user_id)
@@ -102,14 +136,24 @@ def get_visible_device_ids(user_id: int) -> Optional[Set[int]]:
             _visible_devices_cache[user_id] = (result, _now() + _CACHE_TTL)
         return result
     except Exception as exc:
-        logger.warning("get_visible_device_ids 失败 user_id=%s: %s", user_id, exc)
-        return None  # 失败时无限制（避免误拦）
+        logger.error(
+            "data_scope 解析失败（fail-closed 信号，交由调用方裁决放行/拒绝）"
+            " user_id=%s: %s",
+            user_id, exc, exc_info=True,
+        )
+        raise DataScopeUnavailableError(
+            f"数据域服务不可用，无法判定用户 {user_id} 的可见设备集"
+        ) from exc
 
 
 def get_users_with_device_access(device_id: int) -> List[int]:
     """反查能访问该设备的用户 id 列表（供 G1 target_user_ids）。
 
     按各用户的 data_scope 判定是否可见该设备，任一角色可见即命中。
+
+    返回 `[]` 表示「**无人有权接收**」。⚠️ 调用方**不得**把 `[]` 归一成 `None`：
+    网关口径（`realtime_gateway/redis_bus.py`）里 `None` = 全局广播 ⇒ 归一即
+    「无权限者」静默升级为「跨数据域全量投递」（见 `alert_ingress` 的固化用例）。
     """
     with _cache_lock:
         cached = _users_with_device_cache.get(device_id)
@@ -127,7 +171,14 @@ def get_users_with_device_access(device_id: int) -> List[int]:
             MONITOR_VIEW_PERMISSION
         )
         for uid in monitor_user_ids:
-            visible = get_visible_device_ids(uid)
+            try:
+                visible = get_visible_device_ids(uid)
+            except DataScopeUnavailableError as exc:
+                logger.error(
+                    "data_scope 故障：接收人本次不可判定，跳过 uid=%s device_id=%s: %s",
+                    uid, device_id, exc,
+                )
+                continue
             if visible is None or device_id in visible:
                 user_ids.add(uid)
 

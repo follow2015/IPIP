@@ -3,7 +3,8 @@ import { StopOutlined, ExportOutlined, BarChartOutlined, SearchOutlined } from '
 import FilterBar from '@/components/FilterBar';
 import type { SelectOption } from '@/services';
 import type { UseTableReturn } from '@/hooks/useTable';
-import { IP_STATUS_MAP } from '@/types/enums';
+import { getIPStatusOptions } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 
 interface IPTableToolbarProps {
   table: UseTableReturn;
@@ -18,6 +19,8 @@ interface IPTableToolbarProps {
 }
 
 export function IPTableToolbar(props: IPTableToolbarProps) {
+  const { t: td } = useTranslation('device');
+  const { t } = useTranslation('network');
   const {
     table,
     roomOptions,
@@ -36,25 +39,28 @@ export function IPTableToolbar(props: IPTableToolbarProps) {
         filters={[
           {
             key: 'status',
-            label: '按状态筛选',
+            label: t('ip.filter.byStatus'),
             type: 'select',
             width: 140,
-            options: Object.entries(IP_STATUS_MAP).map(([k, v]) => ({
-              label: v.label,
-              value: Number(k)
-            }))
+            options: getIPStatusOptions(td)
           },
-          { key: 'room_id', label: '按机房筛选', type: 'select', options: roomOptions, width: 160 },
+          {
+            key: 'room_id',
+            label: t('ip.filter.byRoom'),
+            type: 'select',
+            options: roomOptions,
+            width: 160
+          },
           {
             key: 'customer_id',
-            label: '按客户筛选',
+            label: t('ip.filter.byCustomer'),
             type: 'select',
             options: customerOptions,
             width: 160
           },
           {
             key: 'switch_id',
-            label: '按交换机筛选',
+            label: t('ip.filter.bySwitch'),
             type: 'select',
             options: switchOptions,
             width: 160
@@ -64,16 +70,16 @@ export function IPTableToolbar(props: IPTableToolbarProps) {
         extra={
           <>
             <Button icon={<ExportOutlined />} onClick={onExport}>
-              导出CSV
+              {t('ip.action.exportCsv')}
             </Button>
             <Button icon={<StopOutlined />} danger onClick={onOpenBatchBan}>
-              批量封禁
+              {t('ip.action.batchBan')}
             </Button>
             <Button icon={<BarChartOutlined />} onClick={onOpenStats}>
-              统计
+              {t('ip.action.stats')}
             </Button>
             <Button icon={<SearchOutlined />} onClick={onScanNetwork} loading={scanNetworkPending}>
-              扫描网段
+              {t('ip.action.scanNetwork')}
             </Button>
           </>
         }

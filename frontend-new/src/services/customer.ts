@@ -5,6 +5,7 @@
  * 对齐后端 /api/customers/* 端点
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import i18next from 'i18next';
 import apiClient, { get, post } from './api-client';
 import { createCrudHooks } from './crud-factory';
 import { queryKeys } from './query-keys';
@@ -120,7 +121,7 @@ export async function exportCustomerAssets(id: number, customerName: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${customerName}_资源统计.xlsx`;
+  a.download = `${customerName}_${i18next.t('export.assetStats')}.xlsx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -175,7 +176,7 @@ export async function downloadTerminationArchive(id: number, customerName: strin
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${customerName}_终止存档.pdf`;
+  a.download = `${customerName}_${i18next.t('export.terminationArchive')}.pdf`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

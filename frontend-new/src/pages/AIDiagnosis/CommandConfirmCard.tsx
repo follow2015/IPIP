@@ -11,6 +11,7 @@ import {
 import { subscribeTaskProgress } from '@/services/ai';
 import { useMessage } from '@/hooks/useMessage';
 import { useConfirm } from '@/utils/confirm';
+import { useTranslation } from 'react-i18next';
 
 const { Text, Paragraph } = Typography;
 
@@ -36,6 +37,8 @@ export default function CommandConfirmCard({
 }: CommandConfirmCardProps) {
   const confirm = useConfirm();
   const message = useMessage();
+  const { t } = useTranslation('ai');
+  const { t: tc } = useTranslation('common');
   const [loading, setLoading] = useState<number | null>(null);
   const [executed, setExecuted] = useState<Record<number, boolean>>({});
   const [previewing, setPreviewing] = useState<number | null>(null);
@@ -56,7 +59,7 @@ export default function CommandConfirmCard({
 
   const renderPreview = (preview: RemedialPreview) => (
     <div>
-      <Paragraph style={{ marginBottom: 4 }}>即将在设备上执行：</Paragraph>
+      <Paragraph style={{ marginBottom: 4 }}>{t('command.preview.intro')}</Paragraph>
       <pre
         style={{
           background: '#f5f5f5',
@@ -73,7 +76,7 @@ export default function CommandConfirmCard({
       {preview.platform_note && (
         <Alert
           type="warning"
-          message="执行前须知"
+          message={t('command.preview.noticeTitle')}
           description={preview.platform_note}
           showIcon
           style={{ marginBottom: 8 }}
@@ -82,14 +85,15 @@ export default function CommandConfirmCard({
       {preview.risk === 'high' && (
         <Alert
           type="error"
-          message="高危操作"
-          description="此命令风险等级为 high，执行前已自动备份 running-config，失败将自动回滚。"
+          message={t('command.preview.highRiskTitle')}
+          description={t('command.preview.highRiskDesc')}
           showIcon
         />
       )}
       {preview.rollback_command_key && (
         <Paragraph type="secondary" style={{ marginTop: 8 }}>
-          回滚命令：<Text code>{preview.rollback_command_key}</Text>
+          {t('command.preview.rollbackLabel')}
+          <Text code>{preview.rollback_command_key}</Text>
         </Paragraph>
       )}
     </div>
@@ -104,23 +108,25 @@ export default function CommandConfirmCard({
           return;
         }
         if (event.type === 'done') {
-          message.success('命令执行完成');
+          message.success(t('command.message.executed'));
           setExecuted((prev) => ({ ...prev, [index]: true }));
           setLoading(null);
           onExecuted?.();
         } else if (event.type === 'error') {
           if (event.message === 'task not found') {
-            message.info('任务已完成，请刷新状态');
+            message.info(t('command.message.taskFinished'));
           } else {
             message.error(
-              `执行失败：${event.message || event.result || '未知错误'}（如为临时故障，请重试）`
+              t('command.message.execFailedHint', {
+                reason: event.message || event.result || t('error.unknown')
+              })
             );
           }
           setLoading(null);
         }
       },
       () => {
-        message.error('进度订阅断开，请检查网络');
+        message.error(t('command.message.progressDisconnected'));
         setLoading(null);
       }
     );
@@ -132,7 +138,7 @@ export default function CommandConfirmCard({
     try {
       preview = await previewRemedial(deviceId, cmd.command_key, cmd.params || {});
     } catch (e) {
-      message.error(`命令不可用：${e instanceof Error ? e.message : String(e)}`);
+      message.error(t('command.message.unavailable', { reason: e instanceof Error ? e.message : String(e) }));
       return;
     } finally {
       setPreviewing(null);
@@ -144,13 +150,13 @@ export default function CommandConfirmCard({
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     confirm({
-      title: '确认执行修复命令',
+      title: t('command.confirm.title'),
       icon: <ExclamationCircleOutlined />,
       width: 560,
       content: renderPreview(preview),
-      okText: '确认执行',
+      okText: t('command.confirm.okText'),
       okType: 'danger',
-      cancelText: '取消',
+      cancelText: tc('action.cancel'),
       onOk: async () => {
         setLoading(index);
         try {
@@ -163,15 +169,17 @@ export default function CommandConfirmCard({
           );
           if (resp.duplicate) {
             if (resp.finished) {
-              message.info('任务已完成，请刷新状态');
+              message.info(t('command.message.taskFinished'));
               setLoading(null);
               return;
             }
-            message.info('检测到重复请求，已复用首次任务');
+            message.info(t('command.message.duplicateReused'));
           }
           subscribeProgress(resp.task_id, index);
         } catch (e) {
-          message.error(`执行失败：${e instanceof Error ? e.message : String(e)}`);
+          message.error(
+            t('command.message.execFailed', { reason: e instanceof Error ? e.message : String(e) })
+          );
           setLoading(null);
         }
       }
@@ -181,27 +189,29 @@ export default function CommandConfirmCard({
   const handleRollback = async (cmd: ProposedCommand, index: number) => {
     if (!cmd.rollback_command_key) return;
     if (!executed[index]) {
-      message.warning('该命令尚未执行，无需回滚');
+      message.warning(t('command.message.notExecutedNoRollback'));
       return;
     }
     setLoading(index);
     try {
       await rollbackRemedial(deviceId, cmd.rollback_command_key, cmd.params || {}, sessionId);
-      message.success('回滚成功');
+      message.success(t('command.message.rollbackSuccess'));
       setExecuted((prev) => ({ ...prev, [index]: false }));
       onExecuted?.();
     } catch (e) {
-      message.error(`回滚失败：${e instanceof Error ? e.message : String(e)}`);
+      message.error(
+        t('command.message.rollbackFailed', { reason: e instanceof Error ? e.message : String(e) })
+      );
     } finally {
       setLoading(null);
     }
   };
 
   return (
-    <Card title="待确认命令" size="small" style={{ marginTop: 12 }}>
+    <Card title={t('command.title')} size="small" style={{ marginTop: 12 }}>
       {diagnosticCommands.length > 0 && (
         <div style={{ marginBottom: 12 }}>
-          <Text type="secondary">诊断命令（只读，可安全执行）：</Text>
+          <Text type="secondary">{t('command.diagnosticLabel')}</Text>
           <Space wrap style={{ marginTop: 4 }}>
             {diagnosticCommands.map((cmd, i) => (
               <Tag key={i} icon={<ToolOutlined />} color="blue">
@@ -216,8 +226,8 @@ export default function CommandConfirmCard({
         <div>
           <Alert
             type="warning"
-            message="修复命令需人工确认"
-            description="以下命令将变更设备配置，执行前已自动备份。高危命令失败将自动回滚。"
+            message={t('command.alert.title')}
+            description={t('command.alert.description')}
             showIcon
             style={{ marginBottom: 12 }}
           />
@@ -234,7 +244,7 @@ export default function CommandConfirmCard({
                   onClick={() => handleExecute(cmd, i)}
                   icon={<ToolOutlined />}
                 >
-                  执行
+                  {t('command.action.execute')}
                 </Button>,
                 cmd.rollback_command_key && (
                   <Button
@@ -243,7 +253,7 @@ export default function CommandConfirmCard({
                     onClick={() => handleRollback(cmd, i)}
                     icon={<RollbackOutlined />}
                   >
-                    回滚
+                    {t('command.action.rollback')}
                   </Button>
                 )
               ].filter(Boolean)}
@@ -260,11 +270,13 @@ export default function CommandConfirmCard({
                 description={
                   <div>
                     {cmd.params && Object.keys(cmd.params).length > 0 && (
-                      <Text type="secondary">参数：{JSON.stringify(cmd.params)}</Text>
+                      <Text type="secondary">
+                        {t('command.field.params', { params: JSON.stringify(cmd.params) })}
+                      </Text>
                     )}
                     {cmd.rollback_command_key && (
                       <div style={{ marginTop: 4 }}>
-                        <Text type="secondary">回滚：</Text>
+                        <Text type="secondary">{t('command.field.rollback')}</Text>
                         <Text code>{cmd.rollback_command_key}</Text>
                       </div>
                     )}

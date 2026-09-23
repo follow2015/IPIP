@@ -8,6 +8,7 @@
 
 import { useMemo } from 'react';
 import { Card, Row, Col, Form, Select, InputNumber } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useSwitchList } from '@/services/switch';
 import { useNetworkPorts } from '@/services/network-port';
 import type { Device, Switch, SwitchPort } from '@/types/models';
@@ -21,6 +22,8 @@ export default function NetworkTopologyFields({
   isEdit: boolean;
   editRecord: Device | null;
 }) {
+  const { t } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
   const { data: switchPage } = useSwitchList({ page: 1, page_size: 500 });
   const switchOptions = useMemo(
     () =>
@@ -51,47 +54,57 @@ export default function NetworkTopologyFields({
 
   return (
     <Card
-      title="网络拓扑"
+      title={t('form.section.networkTopology')}
       size="small"
       style={{ marginBottom: 16 }}
       styles={{ body: { paddingTop: 8, paddingBottom: 0 } }}
     >
       <Row gutter={16}>
         <Col xs={24} md={8}>
-          <Form.Item name={['switch_config', 'switch_role']} label="角色">
+          <Form.Item name={['switch_config', 'switch_role']} label={t('form.networkTopology.role.label')}>
             <Select
-              placeholder="请选择"
+              placeholder={tCommon('message.selectRequired')}
               allowClear
               options={[
-                { label: '核心', value: 0 },
-                { label: '接入', value: 1 }
+                { label: t('form.networkTopology.roleOption.core'), value: 0 },
+                { label: t('form.networkTopology.roleOption.access'), value: 1 }
               ]}
             />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name={['switch_config', 'layer']} label="网络层">
+          <Form.Item name={['switch_config', 'layer']} label={t('form.networkTopology.layer.label')}>
             <Select
-              placeholder="请选择"
+              placeholder={tCommon('message.selectRequired')}
               allowClear
               options={[
-                { label: '二层 (L2)', value: 2 },
-                { label: '三层 (L3)', value: 3 }
+                { label: t('form.networkTopology.layerOption.l2'), value: 2 },
+                { label: t('form.networkTopology.layerOption.l3'), value: 3 }
               ]}
             />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name={['switch_config', 'port_num']} label="端口数量">
-            <InputNumber placeholder="端口数" style={{ width: '100%' }} min={0} />
+          <Form.Item
+            name={['switch_config', 'port_num']}
+            label={t('form.networkTopology.portCount.label')}
+          >
+            <InputNumber
+              placeholder={t('form.networkTopology.portCount.placeholder')}
+              style={{ width: '100%' }}
+              min={0}
+            />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} md={8}>
-          <Form.Item name={['switch_config', 'uplink_device_id']} label="上行设备">
+          <Form.Item
+            name={['switch_config', 'uplink_device_id']}
+            label={t('form.networkTopology.uplinkDevice.label')}
+          >
             <Select
-              placeholder="选择上行设备"
+              placeholder={t('form.networkTopology.uplinkDevice.placeholder')}
               allowClear
               showSearch
               optionFilterProp="label"
@@ -103,9 +116,16 @@ export default function NetworkTopologyFields({
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name={['switch_config', 'peer_port_ids']} label="对端互联端口">
+          <Form.Item
+            name={['switch_config', 'peer_port_ids']}
+            label={t('form.networkTopology.peerPorts.label')}
+          >
             <Select
-              placeholder={uplinkDeviceId ? '选择对端端口' : '先选择上行设备'}
+              placeholder={
+                uplinkDeviceId
+                  ? t('form.networkTopology.peerPorts.placeholder')
+                  : t('form.hint.selectUplinkDeviceFirst')
+              }
               allowClear
               mode="multiple"
               showSearch
@@ -116,9 +136,16 @@ export default function NetworkTopologyFields({
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item name={['switch_config', 'uplink_port_ids']} label="上行端口">
+          <Form.Item
+            name={['switch_config', 'uplink_port_ids']}
+            label={t('form.networkTopology.uplinkPorts.label')}
+          >
             <Select
-              placeholder={currentDeviceId ? '选择本机上行端口' : '保存后可选端口'}
+              placeholder={
+                currentDeviceId
+                  ? t('form.networkTopology.uplinkPorts.placeholder')
+                  : t('form.networkTopology.uplinkPorts.placeholderAfterSave')
+              }
               allowClear
               mode="multiple"
               showSearch
@@ -131,9 +158,12 @@ export default function NetworkTopologyFields({
       </Row>
       <Row gutter={16}>
         <Col xs={24} md={8}>
-          <Form.Item name={['switch_config', 'core_device_id']} label="核心交换机">
+          <Form.Item
+            name={['switch_config', 'core_device_id']}
+            label={t('form.networkTopology.coreDevice.label')}
+          >
             <Select
-              placeholder="选择核心交换机"
+              placeholder={t('form.networkTopology.coreDevice.placeholder')}
               allowClear
               showSearch
               optionFilterProp="label"

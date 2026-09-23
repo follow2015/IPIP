@@ -1,8 +1,9 @@
 import React from 'react';
 import type { GlobalToken } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { RoomChannel } from '@/types/models';
 import { bandLeft, gridHeight, gridWidth, BAND_WIDTH_RATIO } from './geometry';
-import { CHANNEL_TYPE_LABEL, SUPPLY_LABEL, paletteKeyOf } from './palette';
+import { CHANNEL_TYPE_LABEL_KEYS, SUPPLY_LABEL_KEYS, paletteKeyOf } from './palette';
 
 export interface ChannelLayerProps {
   channels: RoomChannel[];
@@ -25,6 +26,8 @@ function ChannelLayer({
   token,
   colOffset = 0
 }: ChannelLayerProps) {
+  const { t: ta } = useTranslation('asset');
+
   if (channels.length === 0 || rows <= 0 || cols <= 0) return null;
 
   const width = gridWidth(cols, cellWidth, gap);
@@ -43,15 +46,19 @@ function ChannelLayer({
         const fill = token[`${key}1`];
         const stroke = token[`${key}6`];
         const x = bandLeft(channel.col_number - colOffset, cellWidth, gap, bandWidth);
-        const typeLabel = CHANNEL_TYPE_LABEL[channel.channel_type] ?? channel.channel_type;
+        const typeKey = CHANNEL_TYPE_LABEL_KEYS[channel.channel_type];
+        const typeLabel = typeKey ? ta(typeKey) : channel.channel_type;
+        const supplyKey = channel.supply ? SUPPLY_LABEL_KEYS[channel.supply] : undefined;
         const name = channel.label ?? channel.display_name ?? '';
 
         return (
           <g key={channel.id}>
             <title>
               {`${name} ${typeLabel}`.trim()}
-              {channel.enclosed ? '（封闭）' : '（开放）'}
-              {channel.supply ? ` · ${SUPPLY_LABEL[channel.supply] ?? channel.supply}` : ''}
+              {channel.enclosed
+                ? ta('roomLayout.channel.enclosedWrap')
+                : ta('roomLayout.channel.openWrap')}
+              {supplyKey ? ` · ${ta(supplyKey)}` : ''}
             </title>
             <rect
               x={x}

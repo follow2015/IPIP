@@ -52,12 +52,9 @@ import {
   useDashboardActivities,
   useSystemStatus
 } from '@/services/dashboard';
-import {
-  DEVICE_STATUS_MAP,
-  IP_STATUS_MAP,
-  CABINET_STATUS_MAP,
-  CabinetStatusCode
-} from '@/types/enums';
+import { CabinetStatusCode } from '@/types/enums';
+import { getCabinetStatusMeta, getDeviceStatusEntries } from '@/types/statusMeta';
+import { useTranslation } from 'react-i18next';
 import type { DeviceStatusCode, IPStatusCode } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -73,6 +70,8 @@ interface RingChartProps {
 
 function RingChart({ data, title, height = 240 }: RingChartProps) {
   const { token } = useToken();
+  const { t } = useTranslation('monitor');
+  const { t: tCommon } = useTranslation('common');
   const validData = useMemo(() => data.filter((d) => d.value > 0), [data]);
   const total = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data]);
 
@@ -82,13 +81,13 @@ function RingChart({ data, title, height = 240 }: RingChartProps) {
       data:
         validData.length > 0
           ? validData
-          : [{ type: '暂无数据', value: 1, color: token.colorBgContainer }],
+          : [{ type: tCommon('message.noData'), value: 1, color: token.colorBgContainer }],
       angleField: 'value',
       colorField: 'type',
       color: validData.length > 0 ? validData.map((d) => d.color) : [token.colorBgContainer],
       tooltip: {
         title: 'type',
-        items: [{ field: 'value', name: '数量' }]
+        items: [{ field: 'value', name: t('chart.count') }]
       },
       radius: 0.88,
       innerRadius: 0.68,
@@ -124,7 +123,7 @@ function RingChart({ data, title, height = 240 }: RingChartProps) {
       animation: { appear: { duration: 600, easing: 'easeQuadOut' } },
       pieStyle: { lineWidth: 2, stroke: token.colorBgElevated }
     }),
-    [validData, title, total, token]
+    [validData, title, total, token, t, tCommon]
   );
 
   return <Pie {...config} height={height} />;
@@ -201,12 +200,31 @@ function MetricCard({ title, value, suffix, icon, color, subtitle }: MetricCardP
 function SystemStatusCard() {
   const { data: status } = useSystemStatus();
   const { token } = useToken();
+  const { t } = useTranslation('monitor');
+  const { t: tDevice } = useTranslation('device');
+  const { t: tCommon } = useTranslation('common');
 
   const overallConfig: Record<string, { color: string; icon: React.ReactNode; text: string }> = {
-    healthy: { color: token.colorSuccess, icon: <CheckCircleOutlined />, text: '正常' },
-    warning: { color: token.colorWarning, icon: <WarningOutlined />, text: '警告' },
-    critical: { color: token.colorError, icon: <CloseCircleOutlined />, text: '异常' },
-    unknown: { color: token.colorTextDisabled, icon: <QuestionCircleOutlined />, text: '未知' }
+    healthy: {
+      color: token.colorSuccess,
+      icon: <CheckCircleOutlined />,
+      text: t('dashboard.status.normal')
+    },
+    warning: {
+      color: token.colorWarning,
+      icon: <WarningOutlined />,
+      text: t('dashboard.status.warning')
+    },
+    critical: {
+      color: token.colorError,
+      icon: <CloseCircleOutlined />,
+      text: t('dashboard.status.critical')
+    },
+    unknown: {
+      color: token.colorTextDisabled,
+      icon: <QuestionCircleOutlined />,
+      text: tCommon('field.unknown')
+    }
   };
 
   const current = overallConfig[status?.overall || 'unknown'] || overallConfig.unknown;
@@ -217,7 +235,7 @@ function SystemStatusCard() {
       title={
         <Space>
           <DashboardOutlined />
-          <span>系统状态</span>
+          <span>{t('dashboard.systemStatus')}</span>
         </Space>
       }
       size="small"
@@ -238,12 +256,12 @@ function SystemStatusCard() {
           {[
             { label: 'CPU', value: perf.cpu, detail: `${perf.cpu.toFixed(1)}%` },
             {
-              label: '内存',
+              label: tDevice('field.memory'),
               value: perf.memory,
               detail: `${perf.memory_used?.toFixed(1) ?? '--'}G / ${perf.memory_total?.toFixed(1) ?? '--'}G`
             },
             {
-              label: '磁盘',
+              label: t('dashboard.perf.disk'),
               value: perf.disk,
               detail: `${perf.disk_used?.toFixed(1) ?? '--'}G / ${perf.disk_total?.toFixed(1) ?? '--'}G`
             }
@@ -285,7 +303,7 @@ function SystemStatusCard() {
         </div>
       ) : (
         <div style={{ textAlign: 'center', padding: '24px 0', color: token.colorTextDisabled }}>
-          暂无数据
+          {tCommon('message.noData')}
         </div>
       )}
     </Card>
@@ -296,6 +314,7 @@ function SystemStatusCard() {
 function ActivityTimeline() {
   const { data: activityData, isLoading } = useDashboardActivities(3);
   const { token } = useToken();
+  const { t } = useTranslation('monitor');
 
   const colorMap: Record<string, string> = {
     blue: token.colorPrimary,
@@ -313,7 +332,7 @@ function ActivityTimeline() {
       title={
         <Space>
           <ClockCircleOutlined />
-          <span>最近活动</span>
+          <span>{t('dashboard.recentActivity')}</span>
         </Space>
       }
       size="small"
@@ -341,7 +360,7 @@ function ActivityTimeline() {
           />
         ) : (
           <div style={{ textAlign: 'center', padding: '24px 0', color: token.colorTextDisabled }}>
-            暂无活动记录
+            {t('dashboard.noActivity')}
           </div>
         )}
       </Spin>
@@ -353,22 +372,23 @@ function ActivityTimeline() {
 function UtilizationGauges() {
   const { data: stats } = useDashboardSuspenseStats();
   const { token } = useToken();
+  const { t } = useTranslation('monitor');
 
   const gauges = [
     {
-      label: '机柜利用率',
+      label: t('dashboard.utilization.cabinet'),
       value: stats?.percentages?.cabinet_utilization ?? 0,
       color: token.colorPrimary,
       detail: `${stats?.cabinets?.occupied ?? 0} / ${stats?.cabinets?.total ?? 0}`
     },
     {
-      label: 'IP 利用率',
+      label: t('dashboard.utilization.ip'),
       value: stats?.percentages?.ip_utilization ?? 0,
       color: token.colorSuccess,
       detail: `${stats?.networks?.ips_used ?? 0} / ${stats?.networks?.ips_total ?? 0}`
     },
     {
-      label: '设备在线率',
+      label: t('dashboard.utilization.deviceOnline'),
       value: stats?.percentages?.device_online_rate ?? 0,
       color: token.colorWarning,
       detail: `${stats?.devices?.online ?? 0} / ${stats?.devices?.total ?? 0}`
@@ -380,7 +400,7 @@ function UtilizationGauges() {
       title={
         <Space>
           <DashboardOutlined />
-          <span>资源利用率</span>
+          <span>{t('dashboard.utilization.title')}</span>
         </Space>
       }
       size="small"
@@ -417,6 +437,8 @@ function UtilizationGauges() {
 
 
 function Dashboard() {
+  const { t } = useTranslation('monitor');
+  const { t: tDevice } = useTranslation('device');
   const { isMobile } = useResponsive();
   const { data: stats } = useDashboardSuspenseStats();
   const { token } = useToken();
@@ -438,114 +460,118 @@ function Dashboard() {
 
   const deviceChartData = useMemo(() => {
     const dist = stats?.devices?.status_distribution ?? {};
-    return Object.entries(DEVICE_STATUS_MAP).map(([code, { label, color }]) => ({
+    return getDeviceStatusEntries(tDevice).map(({ code, label, color }) => ({
       type: label,
       value: dist[code] ?? 0,
       color
     }));
-  }, [stats?.devices?.status_distribution]);
+  }, [stats?.devices?.status_distribution, tDevice]);
 
   const cabinetChartData = useMemo(() => {
     const c = stats?.cabinets;
+    const m = (code: CabinetStatusCode) => getCabinetStatusMeta(code, tDevice);
     return [
       {
-        type: CABINET_STATUS_MAP[CabinetStatusCode.AVAILABLE].label,
+        type: m(CabinetStatusCode.AVAILABLE)?.label ?? '',
         value: c?.available ?? 0,
-        color: CABINET_STATUS_MAP[CabinetStatusCode.AVAILABLE].color
+        color: m(CabinetStatusCode.AVAILABLE)?.color ?? 'default'
       },
       {
-        type: CABINET_STATUS_MAP[CabinetStatusCode.IN_USE].label,
+        type: m(CabinetStatusCode.IN_USE)?.label ?? '',
         value: c?.occupied ?? 0,
-        color: CABINET_STATUS_MAP[CabinetStatusCode.IN_USE].color
+        color: m(CabinetStatusCode.IN_USE)?.color ?? 'default'
       },
       {
-        type: CABINET_STATUS_MAP[CabinetStatusCode.MAINTENANCE].label,
+        type: m(CabinetStatusCode.MAINTENANCE)?.label ?? '',
         value: c?.maintenance ?? 0,
-        color: CABINET_STATUS_MAP[CabinetStatusCode.MAINTENANCE].color
+        color: m(CabinetStatusCode.MAINTENANCE)?.color ?? 'default'
       },
       {
-        type: CABINET_STATUS_MAP[CabinetStatusCode.RESERVED].label,
+        type: m(CabinetStatusCode.RESERVED)?.label ?? '',
         value: c?.reserved ?? 0,
-        color: CABINET_STATUS_MAP[CabinetStatusCode.RESERVED].color
+        color: m(CabinetStatusCode.RESERVED)?.color ?? 'default'
       },
       {
-        type: CABINET_STATUS_MAP[CabinetStatusCode.DISABLED].label,
+        type: m(CabinetStatusCode.DISABLED)?.label ?? '',
         value: c?.disabled ?? 0,
-        color: CABINET_STATUS_MAP[CabinetStatusCode.DISABLED].color
+        color: m(CabinetStatusCode.DISABLED)?.color ?? 'default'
       }
     ];
-  }, [stats?.cabinets]);
+  }, [stats?.cabinets, tDevice]);
 
   const ipChartData = useMemo(() => {
     return [
-      { type: '公网-活跃', value: publicGroup.active, color: '#1890ff' },
-      { type: '公网-非活跃', value: publicGroup.inactive, color: '#69c0ff' },
-      { type: '公网-封禁', value: publicGroup.blocked, color: '#ff4d4f' },
-      { type: '公网-未使用', value: publicGroup.unused, color: '#bae7ff' },
-      { type: '私网-活跃', value: privateGroup.active, color: '#52c41a' },
-      { type: '私网-非活跃', value: privateGroup.inactive, color: '#95de64' },
-      { type: '私网-封禁', value: privateGroup.blocked, color: '#ff7875' },
-      { type: '私网-未使用', value: privateGroup.unused, color: '#d9f7be' }
+      { type: t('dashboard.ip.publicActive'), value: publicGroup.active, color: '#1890ff' },
+      { type: t('dashboard.ip.publicInactive'), value: publicGroup.inactive, color: '#69c0ff' },
+      { type: t('dashboard.ip.publicBlocked'), value: publicGroup.blocked, color: '#ff4d4f' },
+      { type: t('dashboard.ip.publicUnused'), value: publicGroup.unused, color: '#bae7ff' },
+      { type: t('dashboard.ip.privateActive'), value: privateGroup.active, color: '#52c41a' },
+      { type: t('dashboard.ip.privateInactive'), value: privateGroup.inactive, color: '#95de64' },
+      { type: t('dashboard.ip.privateBlocked'), value: privateGroup.blocked, color: '#ff7875' },
+      { type: t('dashboard.ip.privateUnused'), value: privateGroup.unused, color: '#d9f7be' }
     ].filter((d) => d.value > 0);
-  }, [publicGroup, privateGroup]);
+  }, [publicGroup, privateGroup, t]);
 
   const metricCards = [
     {
-      title: '机房总数',
+      title: t('dashboard.metric.roomTotal'),
       value: stats?.rooms?.total ?? 0,
       icon: <HomeOutlined />,
       color: '#1890ff',
-      subtitle: `${stats?.rooms?.active ?? 0} 活跃`
+      subtitle: t('dashboard.subtitle.active', { count: stats?.rooms?.active ?? 0 })
     },
     {
-      title: '机柜总数',
+      title: t('dashboard.metric.cabinetTotal'),
       value: stats?.cabinets?.total ?? 0,
       icon: <DatabaseOutlined />,
       color: '#722ed1',
-      subtitle: `${stats?.cabinets?.available ?? 0} 可用`
+      subtitle: t('dashboard.subtitle.available', { count: stats?.cabinets?.available ?? 0 })
     },
     {
-      title: '设备总数',
+      title: t('chart.deviceTotal'),
       value: stats?.devices?.total ?? 0,
       icon: <CloudServerOutlined />,
       color: '#13c2c2',
-      subtitle: `${stats?.devices?.online ?? 0} 在线`
+      subtitle: t('dashboard.subtitle.online', { count: stats?.devices?.online ?? 0 })
     },
     {
-      title: '客户总数',
+      title: t('dashboard.metric.customerTotal'),
       value: stats?.customers?.total ?? 0,
       icon: <TeamOutlined />,
       color: '#fa8c16',
-      subtitle: `${stats?.customers?.active ?? 0} 活跃`
+      subtitle: t('dashboard.subtitle.active', { count: stats?.customers?.active ?? 0 })
     },
     {
-      title: '公网 IP',
+      title: t('dashboard.metric.publicIp'),
       value: publicGroup.total,
       icon: <GlobalOutlined />,
       color: '#1890ff',
-      subtitle: `${publicGroup.active} 活跃`
+      subtitle: t('dashboard.subtitle.active', { count: publicGroup.active })
     },
     {
-      title: '私网 IP',
+      title: t('dashboard.metric.privateIp'),
       value: privateGroup.total,
       icon: <LockOutlined />,
       color: '#52c41a',
-      subtitle: `${privateGroup.active} 活跃`
+      subtitle: t('dashboard.subtitle.active', { count: privateGroup.active })
     },
     {
-      title: '交换机',
+      title: tDevice('deviceSubtype.SWITCH'),
       value: stats?.switches?.total ?? 0,
       icon: <SwapOutlined />,
       color: '#eb2f96',
-      subtitle: `${stats?.networks?.segments ?? 0} 网络段`
+      subtitle: t('dashboard.subtitle.segments', { count: stats?.networks?.segments ?? 0 })
     },
     {
-      title: '设备在线率',
+      title: t('dashboard.utilization.deviceOnline'),
       value: stats?.percentages?.device_online_rate ?? 0,
       suffix: '%',
       icon: <CheckCircleOutlined />,
       color: (stats?.percentages?.device_online_rate ?? 0) > 80 ? '#52c41a' : '#faad14',
-      subtitle: `${stats?.devices?.online ?? 0} / ${stats?.devices?.total ?? 0} 在线`
+      subtitle: t('dashboard.subtitle.onlineRatio', {
+        online: stats?.devices?.online ?? 0,
+        total: stats?.devices?.total ?? 0
+      })
     }
   ];
 
@@ -570,17 +596,25 @@ function Dashboard() {
       {/* 第二行：三列环形图 — 设备/机柜/IP 状态分布 */}
       <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
         <Col xs={24} lg={8}>
-          <Card size="small" title="设备状态分布" style={{ height: '100%' }}>
-            <RingChart data={deviceChartData} title="设备" height={isMobile ? 220 : 280} />
+          <Card size="small" title={t('dashboard.chart.deviceStatus')} style={{ height: '100%' }}>
+            <RingChart
+              data={deviceChartData}
+              title={t('column.device')}
+              height={isMobile ? 220 : 280}
+            />
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <Card size="small" title="机柜状态分布" style={{ height: '100%' }}>
-            <RingChart data={cabinetChartData} title="机柜" height={isMobile ? 220 : 280} />
+          <Card size="small" title={t('dashboard.chart.cabinetStatus')} style={{ height: '100%' }}>
+            <RingChart
+              data={cabinetChartData}
+              title={tDevice('field.cabinet')}
+              height={isMobile ? 220 : 280}
+            />
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <Card size="small" title="IP 状态分布" style={{ height: '100%' }}>
+          <Card size="small" title={t('dashboard.chart.ipStatus')} style={{ height: '100%' }}>
             <RingChart data={ipChartData} title="IP" height={isMobile ? 220 : 280} />
           </Card>
         </Col>

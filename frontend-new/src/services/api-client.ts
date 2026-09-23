@@ -4,6 +4,7 @@ import axios, {
   type AxiosResponse,
   type AxiosRequestConfig
 } from 'axios';
+import i18next from 'i18next';
 import type { ApiResponse, ApiResponseMaybe, BackendPaginatedData } from '@/types/api';
 import { adaptPaginatedResponse } from '@/types/api';
 
@@ -11,7 +12,49 @@ interface ApiErrorData {
   message?: string;
   error_code?: string;
   details?: unknown;
+  i18n_key?: string;
+  params?: Record<string, unknown>;
   response?: AxiosResponse;
+}
+
+let backendNsPromise: Promise<void> | null = null;
+
+function ensureBackendNs(): Promise<void> {
+  if (!backendNsPromise) {
+    backendNsPromise = (async () => {
+      const [{ default: i18n }, zh, en] = await Promise.all([
+        import('@/i18n'),
+        import('@/locales/zh-CN/backend.json'),
+        import('@/locales/en-US/backend.json')
+      ]);
+      i18n.addResourceBundle('zh-CN', 'backend', zh, true, true);
+      i18n.addResourceBundle('en-US', 'backend', en, true, true);
+    })().catch((err) => {
+      backendNsPromise = null; // 失败就允许下次重试
+      throw err;
+    });
+  }
+  return backendNsPromise;
+}
+
+async function localizeBackendError(
+  errorData: ApiErrorData | undefined,
+  fallback: string | undefined
+): Promise<string | undefined> {
+  const i18nKey = errorData?.i18n_key;
+  if (!i18nKey) return fallback;
+  try {
+    const [{ default: i18n }] = await Promise.all([import('@/i18n'), ensureBackendNs()]);
+    const translate = i18n.t as unknown as (
+      key: string,
+      options?: Record<string, unknown>
+    ) => string;
+    const params =
+      errorData?.params && typeof errorData.params === 'object' ? errorData.params : {};
+    return translate(i18nKey, { ...params, defaultValue: fallback ?? '' }) || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 const apiClient = axios.create({
@@ -117,7 +160,7 @@ apiClient.interceptors.response.use(
             try {
               newToken = await refreshAccessToken();
             } catch {
-              refreshFailure = new Error('Token 刷新异常，请重新登录');
+              refreshFailure = new Error(i18next.t('message.tokenRefreshFailed', { ns: 'auth' }));
             } finally {
               isRefreshing = false;
             }
@@ -130,7 +173,8 @@ apiClient.interceptors.response.use(
               return apiClient(originalRequest);
             }
 
-            const refreshErr = refreshFailure ?? new Error('Token 刷新失败，请重新登录');
+            const refreshErr =
+              refreshFailure ?? new Error(i18next.t('message.tokenRefreshFailed', { ns: 'auth' }));
             rejectPendingRequests(refreshErr);
             handleUnauthorized();
             return Promise.reject(refreshErr);
@@ -158,8 +202,12 @@ apiClient.interceptors.response.use(
 
     const errorData = error.response?.data as ApiErrorData | undefined;
     const backendMsg = errorData?.message;
-    if (backendMsg && typeof backendMsg === 'string') {
-      const enhanced = new Error(backendMsg);
+    const message = await localizeBackendError(
+      errorData,
+      typeof backendMsg === 'string' ? backendMsg : undefined
+    );
+    if (message) {
+      const enhanced = new Error(message);
       enhanced.name = `Http${error.response?.status ?? 'Error'}`;
       (enhanced as ApiErrorData & Error).response = error.response;
       return Promise.reject(enhanced);
