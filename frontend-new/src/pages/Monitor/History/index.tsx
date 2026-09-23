@@ -230,14 +230,14 @@ export default function MonitorHistory() {
       point: { size: 3 },
       style: { stroke: token.colorError },
       axis: {
-        y: { title: '丢包率 (%)' },
+        y: { title: t('history.axis.lossPct') },
         x: { title: false }
       },
       tooltip: { title: 'time' },
       legend: false,
       animation: false
     }),
-    [lossData, token.colorError]
+    [lossData, t, token.colorError]
   );
 
   const jitterConfig = useMemo(
@@ -249,14 +249,14 @@ export default function MonitorHistory() {
       point: { size: 3 },
       style: { stroke: token.colorWarning },
       axis: {
-        y: { title: '抖动 (ms)' },
+        y: { title: t('history.axis.jitterMs') },
         x: { title: false }
       },
       tooltip: { title: 'time' },
       legend: false,
       animation: false
     }),
-    [jitterData, token.colorWarning]
+    [jitterData, t, token.colorWarning]
   );
 
   const renderLoss = (v: number | null) =>
@@ -312,8 +312,7 @@ export default function MonitorHistory() {
         y: {
           title: t('history.chart.reachAxis'),
           tickCount: 2,
-          labelFormatter: (v: number) =>
-            v === 1 ? t('status.reachable') : t('status.unreachable')
+          labelFormatter: (v: number) => (v === 1 ? t('status.reachable') : t('status.unreachable'))
         },
         x: { title: false }
       },
@@ -359,21 +358,21 @@ export default function MonitorHistory() {
       render: (v: number | null) => (v == null ? '—' : v)
     },
     {
-      title: '丢包率',
+      title: t('history.col.lossPct'),
       dataIndex: 'loss_pct',
       key: 'loss_pct',
       width: 110,
       render: (v: number | null) => renderLoss(v)
     },
     {
-      title: '抖动(ms)',
+      title: t('history.col.jitterMs'),
       dataIndex: 'jitter_ms',
       key: 'jitter_ms',
       width: 110,
       render: (v: number | null) => renderJitter(v)
     },
     {
-      title: '采样包数',
+      title: t('history.col.samples'),
       dataIndex: 'samples',
       key: 'samples',
       width: 100,
@@ -420,8 +419,8 @@ export default function MonitorHistory() {
           latency: r.latency_ms == null ? '—' : `${r.latency_ms} ms`,
           failures: r.consecutive_failures
         })}
-        {r.loss_pct != null && ` · 丢包 ${r.loss_pct}%`}
-        {r.jitter_ms != null && ` · 抖动 ${r.jitter_ms} ms`}
+        {r.loss_pct != null && t('history.tooltip.lossSuffix', { pct: r.loss_pct })}
+        {r.jitter_ms != null && t('history.tooltip.jitterSuffix', { ms: r.jitter_ms })}
       </Text>
       {r.error && (
         <Text type="danger" style={{ fontSize: 12 }}>
@@ -577,7 +576,7 @@ export default function MonitorHistory() {
               <Col xs={12} sm={8} md={6}>
                 <Card size="small" variant="borderless">
                   <Statistic
-                    title="平均丢包率"
+                    title={t('history.card.avgLoss')}
                     value={formatPct(qualityTrends.avg_loss_pct)}
                     valueStyle={{
                       fontFamily: 'Fira Code, monospace',
@@ -593,7 +592,7 @@ export default function MonitorHistory() {
               <Col xs={12} sm={8} md={6}>
                 <Card size="small" variant="borderless">
                   <Statistic
-                    title="最大丢包率"
+                    title={t('history.card.maxLoss')}
                     value={formatPct(qualityTrends.max_loss_pct)}
                     valueStyle={{ fontFamily: 'Fira Code, monospace', fontWeight: 600 }}
                   />
@@ -602,7 +601,7 @@ export default function MonitorHistory() {
               <Col xs={12} sm={8} md={6}>
                 <Card size="small" variant="borderless">
                   <Statistic
-                    title="平均抖动"
+                    title={t('history.card.avgJitter')}
                     value={
                       qualityTrends.avg_jitter_ms == null
                         ? '—'
@@ -615,7 +614,7 @@ export default function MonitorHistory() {
               <Col xs={12} sm={8} md={6}>
                 <Card size="small" variant="borderless">
                   <Statistic
-                    title="质量采样次数"
+                    title={t('history.card.samples')}
                     value={qualityTrends.quality_samples}
                     valueStyle={{ fontFamily: 'Fira Code, monospace', fontWeight: 600 }}
                   />
@@ -658,7 +657,7 @@ export default function MonitorHistory() {
             <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
               <Col xs={24} lg={24}>
                 <Card
-                  title="Ping 质量趋势（丢包率 / 抖动）"
+                  title={t('history.card.pingTrend')}
                   size="small"
                   variant="borderless"
                   extra={<LineChartOutlined style={{ color: token.colorTextSecondary }} />}
@@ -666,13 +665,16 @@ export default function MonitorHistory() {
                   {lossData.length > 0 ? (
                     <Line {...lossConfig} />
                   ) : (
-                    <Empty description="暂无丢包率数据" style={{ padding: '24px 0' }} />
+                    <Empty description={t('history.empty.loss')} style={{ padding: '24px 0' }} />
                   )}
                   <div style={{ marginTop: 8 }}>
                     {jitterData.length > 0 ? (
                       <Line {...jitterConfig} />
                     ) : (
-                      <Empty description="暂无抖动数据" style={{ padding: '24px 0' }} />
+                      <Empty
+                        description={t('history.empty.jitter')}
+                        style={{ padding: '24px 0' }}
+                      />
                     )}
                   </div>
                 </Card>

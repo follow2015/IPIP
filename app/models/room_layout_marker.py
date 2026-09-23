@@ -39,10 +39,6 @@ class RoomLayoutMarker(BaseModel):
     )
     label = db.Column(db.String(100), nullable=True, comment="展示文本,如'空调-01'")
     notes = db.Column(db.String(500), nullable=True, comment="备注")
-    version = db.Column(
-        db.Integer, nullable=False, default=0, server_default="0",
-        comment="乐观锁版本号（每次编辑+1）",
-    )
 
     def __repr__(self) -> str:
         return (

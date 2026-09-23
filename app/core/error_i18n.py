@@ -12,7 +12,7 @@ CI 可用 `--check` 校验产物与源码是否一致。
 2) 双表 —— LITERAL 精确匹配 + PATTERNS 正则匹配（具名组回填 params）。
 3) 只查表不翻译 —— 译文在 frontend-new/src/locales/*/backend.json，与本表同源生成。
 
-覆盖：592/888 条（66%）
+覆盖：594/896 条（66%）
 """
 from __future__ import annotations
 
@@ -59,6 +59,7 @@ LITERAL: Dict[str, str] = {
     "查找端口列表失败": "failed-to-query-port-list",
     "请求数据格式错误": "invalid-request-data-format",
     "未选择文件": "no-file-selected",
+    "占位标记": "placeholder-marker",
     "请上传文件": "please-upload-a-file",
     "端口列表不能为空": "port-list-cannot-be-empty",
     "二维码不存在或已过期": "qr-code-does-not-exist-or-has-expired",
@@ -110,7 +111,6 @@ LITERAL: Dict[str, str] = {
     "无有效更新字段": "no-valid-fields-to-update",
     "OID 分类规则不存在": "oid-category-rule-not-found",
     "密码不能为空": "password-cannot-be-empty",
-    "占位标记": "placeholder-marker",
     "占位标记不存在": "placeholder-marker-not-found",
     "端口更新失败": "port-update-failed",
     "二维码生成失败": "qr-code-generate-failed",
@@ -200,6 +200,7 @@ LITERAL: Dict[str, str] = {
     "批量查找端口(ORM)失败": "failed-to-batch-query-port-orm",
     "批量恢复设备失败": "failed-to-batch-restore-device",
     "批量更新失败": "failed-to-batch-update",
+    "批量更新占位标记失败": "failed-to-batch-update-placeholder-marker",
     "批量更新状态失败": "failed-to-batch-update-status",
     "检查N2N连接存在性失败": "failed-to-check-n2n-connection-existence",
     "检查 U 位冲突失败": "failed-to-check-u-position-conflict",
@@ -557,6 +558,7 @@ PATTERNS: List[Tuple[str, str, Tuple[str, ...]]] = [
     ("机柜编号 '{p0}' 已存在", "cabinet-number-x-already-exists", ("p0",)),
     ("聚合组 ID {p0} 不存在", "link-aggregation-group-id-x-not-found", ("p0",)),
     ("虚拟机房 '{p0}' 已存在", "virtual-data-center-x-already-exists", ("p0",)),
+    ("占位标记 #{p0} 不存在", "placeholder-marker-x-not-found", ("p0",)),
     ("参数 {p0}={p1} 超过上限 {p2}", "parameter-x-x-exceed-limit-x", ("p0", "p1", "p2",)),
     ("查询参数校验失败: {p0}", "query-parameter-validate-failed-x", ("p0",)),
     ("用户名 '{p0}' 已存在", "username-x-already-exists", ("p0",)),

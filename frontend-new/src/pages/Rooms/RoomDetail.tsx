@@ -60,6 +60,7 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
   const { t: tm } = useTranslation('monitor');
+  const { t: ta } = useTranslation('asset');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -101,12 +102,16 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
       <Card title={td('room.detailTitle', { name: room.name })}>
         <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
           <Descriptions.Item label={td('room.field.name')}>{room.name}</Descriptions.Item>
-          <Descriptions.Item label="房间号">{room.room_number || '-'}</Descriptions.Item>
+          <Descriptions.Item label={td('room.field.roomNumber')}>
+            {room.room_number || '-'}
+          </Descriptions.Item>
           <Descriptions.Item label={tc('field.status')}>
             {renderStatus(room.status, td)}
           </Descriptions.Item>
-          <Descriptions.Item label="楼栋">{room.building || '-'}</Descriptions.Item>
-          <Descriptions.Item label="楼层">{room.floor || '-'}</Descriptions.Item>
+          <Descriptions.Item label={td('room.field.building')}>
+            {room.building || '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label={td('room.field.floor')}>{room.floor || '-'}</Descriptions.Item>
           <Descriptions.Item label={td('cabinet.field.location')}>
             {room.location || '-'}
           </Descriptions.Item>
@@ -170,10 +175,10 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
           canConfigLayout ? (
             <Space>
               <Button icon={<SettingOutlined />} onClick={() => setChannelModalOpen(true)}>
-                配置通道
+                {ta('roomLayout.channel.title')}
               </Button>
               <Button icon={<AppstoreAddOutlined />} onClick={() => setMarkerModalOpen(true)}>
-                管理占位标记
+                {ta('roomLayout.marker.title')}
               </Button>
             </Space>
           ) : null

@@ -12,7 +12,7 @@ from marshmallow import Schema
 from app.exceptions import PresetResponseError
 from app.exceptions.base import BaseAppException
 from app.exceptions.validation import ValidationError
-from app.exceptions.business import LayoutMarkerVersionConflict, ResourceConflictError
+from app.exceptions.business import ResourceConflictError
 from app.services.room_service import RoomService
 from app.services.device_service import DeviceService
 from app.api.base import APIResponse
@@ -680,125 +680,6 @@ def update_room_layout_marker(room_id, marker_id):
         logger.error(f"更新机房占位标记失败: {e}", exc_info=True)
         raise PresetResponseError(
             message="更新机房占位标记失败", error_code="ROOM_MARKER_UPDATE_ERROR", status_code=500
-        ) from e
-
-
-@room_bp.route("/<int:room_id>/layout-markers/batch", methods=["POST"])
-@doc(
-    summary="批量编辑机房占位标记（乐观锁）",
-    tags=["机房"],
-    request_body={"content": {"application/json": {"schema": {
-        "type": "object",
-        "required": ["items"],
-        "properties": {
-            "items": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["marker_id", "expected_version"],
-                    "properties": {
-                        "marker_id": {"type": "integer"},
-                        "expected_version": {"type": "integer"},
-                        "row_number": {"type": "integer"},
-                        "col_number": {"type": "integer"},
-                        "marker_type": {"type": "string"},
-                        "label": {"type": "string"},
-                        "notes": {"type": "string"},
-                    },
-                },
-            },
-        },
-    }}}},
-    parameters=[{"name": "room_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
-    responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError", 409: "ApiError"},
-)
-@login_required
-@permission_required("room:layout_config")
-@rate_limit_api
-@transactional
-def batch_update_room_layout_markers(room_id):
-    """批量编辑占位标记（WP-7：单一事务 + 乐观锁 CAS，消 lost-update）
-
-    每项携带 expected_version（GET 接口随 marker 下发）。版本判据在 UPDATE
-    谓词内——MySQL RR 下先读后比会被事务快照骗过。任一项版本过期 ⇒
-    整批回滚并返回 409 ROOM_MARKER_VERSION_CONFLICT（可编程识别，消息
-    定位每个冲突标记）。前端收到后应重新拉取布局再合并提交。
-
-    Request Body: {items: [{marker_id, expected_version, ...字段}, ...]}
-    """
-    _, err = _get_room_or_404(room_id)
-    if err:
-        return err
-
-    payload = request.get_json(silent=True) or {}
-    items = payload.get("items")
-    if not isinstance(items, list) or not items:
-        return APIResponse.error(
-            message="请提供非空 items 数组",
-            error_code="ROOM_MARKER_BATCH_EMPTY",
-            status_code=400,
-        )
-
-    UPDATABLE = ("row_number", "col_number", "marker_type", "label", "notes")
-    normalized = []
-    for idx, raw in enumerate(items):
-        if not isinstance(raw, dict) or not isinstance(raw.get("marker_id"), int):
-            return APIResponse.error(
-                message=f"items[{idx}] 缺少合法的 marker_id",
-                error_code="ROOM_MARKER_BATCH_BAD_ITEM",
-                status_code=400,
-            )
-        expected = raw.get("expected_version")
-        if not isinstance(expected, int) or expected < 0:
-            return APIResponse.error(
-                message=f"items[{idx}] 缺少合法的 expected_version（GET 接口下发的 version）",
-                error_code="ROOM_MARKER_BATCH_BAD_ITEM",
-                status_code=400,
-            )
-        fields = validation_manager.validate_schema(
-            {k: raw[k] for k in UPDATABLE if k in raw},
-            RoomLayoutMarkerUpdateSchema(),
-        )
-        if not fields:
-            return APIResponse.error(
-                message=f"items[{idx}] 没有提供有效的更新字段",
-                error_code="ROOM_MARKER_NO_UPDATE",
-                status_code=400,
-            )
-        normalized.append(
-            {"marker_id": raw["marker_id"], "expected_version": expected, "fields": fields}
-        )
-
-    try:
-        updated = _room_service.batch_update_layout_markers(room_id, normalized)
-        on_commit(lambda: (
-            cache_manager.invalidate_pattern(f"room:markers:{room_id}"),
-            emit_resource_change_global("room_layout_marker", "update", ids=[room_id]),
-        ))
-        return APIResponse.success(
-            data={"updated": [m.to_dict() for m in updated]},
-            message="占位标记批量更新成功",
-        )
-    except LayoutMarkerVersionConflict as e:
-        raise PresetResponseError(
-            message=e.message, error_code="ROOM_MARKER_VERSION_CONFLICT", status_code=409
-        ) from e
-    except ResourceConflictError as e:
-        raise PresetResponseError(
-            message=e.message, error_code="ROOM_MARKER_CONFLICT", status_code=409
-        ) from e
-    except ValidationError as e:
-        raise PresetResponseError(
-            message=e.message, error_code="ROOM_MARKER_NOT_FOUND", status_code=404
-        ) from e
-    except BaseAppException:
-        raise
-    except Exception as e:
-        logger.error(f"批量更新机房占位标记失败: {e}", exc_info=True)
-        raise PresetResponseError(
-            message="批量更新占位标记失败",
-            error_code="ROOM_MARKER_BATCH_UPDATE_ERROR",
-            status_code=500,
         ) from e
 
 

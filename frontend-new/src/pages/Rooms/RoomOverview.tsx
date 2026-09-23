@@ -78,6 +78,7 @@ function StatusDots({ distribution }: { distribution: RoomOverviewItem['status_d
 }
 
 function RoomCard({ room }: { room: RoomOverviewItem }) {
+  const { t: td } = useTranslation('device');
   const navigate = useNavigate();
   const { token } = theme.useToken();
 
@@ -89,7 +90,9 @@ function RoomCard({ room }: { room: RoomOverviewItem }) {
       style={{ height: '100%' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span style={{ fontWeight: 600 }}>房间 {room.room_number}</span>
+        <span style={{ fontWeight: 600 }}>
+          {td('room.overview.roomLabel', { number: room.room_number })}
+        </span>
         <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
           <DatabaseOutlined /> {room.cabinet_count}
         </span>
@@ -105,18 +108,30 @@ function RoomCard({ room }: { room: RoomOverviewItem }) {
         {/* 楼栋/楼层是组内房间卡片的区分维度（组标题已承载机房名称）。
             带"楼栋"/"楼层"前缀而非只显示裸值——楼栋/楼层的值是自由文本
             （可能填 "7"、"7F"、"B1"），单看一个数字无法判断它代表什么。 */}
-        {room.building ? <Tag style={{ marginInlineEnd: 4 }}>楼栋 {room.building}</Tag> : null}
-        {room.floor ? <Tag style={{ marginInlineEnd: 4 }}>楼层 {room.floor}</Tag> : null}
+        {room.building ? (
+          <Tag style={{ marginInlineEnd: 4 }}>
+            {td('room.overview.buildingTag', { value: room.building })}
+          </Tag>
+        ) : null}
+        {room.floor ? (
+          <Tag style={{ marginInlineEnd: 4 }}>
+            {td('room.overview.floorTag', { value: room.floor })}
+          </Tag>
+        ) : null}
         {room.location}
       </div>
 
-      <div style={{ fontSize: 12, color: token.colorTextSecondary }}>U 位利用率</div>
+      <div style={{ fontSize: 12, color: token.colorTextSecondary }}>
+        {td('room.overview.uUsage')}
+      </div>
       <Progress
         percent={room.u_usage_rate}
         size="small"
         strokeColor={usageColor(room.u_usage_rate, token)}
       />
-      <div style={{ fontSize: 12, color: token.colorTextSecondary }}>功率利用率</div>
+      <div style={{ fontSize: 12, color: token.colorTextSecondary }}>
+        {td('room.overview.powerUsage')}
+      </div>
       <Progress
         percent={room.power_usage_rate}
         size="small"
@@ -131,6 +146,7 @@ function RoomCard({ room }: { room: RoomOverviewItem }) {
 }
 
 function RoomGroup({ group, filtered }: { group: RoomOverviewGroup; filtered: boolean }) {
+  const { t: td } = useTranslation('device');
   const { token } = theme.useToken();
 
   return (
@@ -146,19 +162,19 @@ function RoomGroup({ group, filtered }: { group: RoomOverviewGroup; filtered: bo
       >
         <Typography.Title level={5} style={{ margin: 0 }}>
           <ClusterOutlined /> {/* 裸值（如 "A"）单看不知含义，故显式标出这是机房 */}
-          机房 {group.name}
+          {td('room.overview.groupRoom', { name: group.name })}
         </Typography.Title>
-        <Tag>{group.room_count} 个房间</Tag>
-        <Tag>{group.cabinet_count} 台机柜</Tag>
+        <Tag>{td('room.overview.roomCount', { count: group.room_count })}</Tag>
+        <Tag>{td('room.overview.cabinetCount', { count: group.cabinet_count })}</Tag>
         {filtered ? (
-          <Tooltip title="利用率是全机房口径；过滤后无法按房间容量加权平均，故不展示">
+          <Tooltip title={td('room.overview.utilTooltip')}>
             <span style={{ fontSize: 12, color: token.colorTextTertiary }}>
-              U 位平均利用率（过滤时不可用）
+              {td('room.overview.uAvgDisabled')}
             </span>
           </Tooltip>
         ) : (
           <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
-            U 位平均利用率 {group.u_usage_rate}%
+            {td('room.overview.uAvg')} {group.u_usage_rate}%
           </span>
         )}
       </div>
@@ -182,6 +198,7 @@ function OverviewFilterBar({
   filter: OverviewFilter;
   onChange: (next: OverviewFilter) => void;
 }) {
+  const { t: td } = useTranslation('device');
   const nameOptions = useMemo(
     () => groups.map((g) => ({ label: g.name ?? '', value: g.name ?? '' })),
     [groups]
@@ -206,7 +223,7 @@ function OverviewFilterBar({
     <Space wrap style={{ marginBottom: 16 }}>
       <Select
         allowClear
-        placeholder="全部机房"
+        placeholder={td('room.filter.allRooms')}
         style={{ width: 180 }}
         value={filter.name}
         options={nameOptions}
@@ -214,7 +231,7 @@ function OverviewFilterBar({
       />
       <Select
         allowClear
-        placeholder="全部楼栋"
+        placeholder={td('room.filter.allBuildings')}
         style={{ width: 150 }}
         value={filter.building}
         options={buildingOptions}
@@ -222,7 +239,7 @@ function OverviewFilterBar({
       />
       <Select
         allowClear
-        placeholder="全部楼层"
+        placeholder={td('room.filter.allFloors')}
         style={{ width: 130 }}
         value={filter.floor}
         options={floorOptions}
@@ -230,7 +247,7 @@ function OverviewFilterBar({
       />
       <Input
         allowClear
-        placeholder="搜索机房名"
+        placeholder={td('room.filter.searchName')}
         prefix={<SearchOutlined />}
         style={{ width: 180 }}
         value={filter.keyword}
@@ -241,6 +258,7 @@ function OverviewFilterBar({
 }
 
 function RoomOverview() {
+  const { t: td } = useTranslation('device');
   const { data: groups, isLoading, isError } = useRoomOverview();
   const [filter, setFilter] = useState<OverviewFilter>({});
 
@@ -252,11 +270,11 @@ function RoomOverview() {
   }
 
   if (isError) {
-    return <Alert type="error" showIcon message="加载机房总览失败" />;
+    return <Alert type="error" showIcon message={td('room.overview.loadFailed')} />;
   }
 
   if (!groups || groups.length === 0) {
-    return <Empty description="暂无机房" />;
+    return <Empty description={td('room.overview.empty')} />;
   }
 
   return (
@@ -267,12 +285,16 @@ function RoomOverview() {
         <Empty
           description={
             <span>
-              没有符合条件的机房（共 {countRooms(groups)} 个机房
-              {filtering ? '，当前已过滤' : ''}）
+              {td('room.overview.noneMatched', {
+                count: countRooms(groups),
+                filtered: filtering ? td('room.overview.filtered') : ''
+              })}
             </span>
           }
         >
-          <Typography.Link onClick={() => setFilter({})}>清除过滤条件</Typography.Link>
+          <Typography.Link onClick={() => setFilter({})}>
+            {td('room.overview.clearFilter')}
+          </Typography.Link>
         </Empty>
       ) : (
         filtered.map((group) => <RoomGroup key={group.name} group={group} filtered={filtering} />)

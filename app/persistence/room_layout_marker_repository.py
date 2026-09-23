@@ -63,45 +63,6 @@ class RoomLayoutMarkerRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             raise QueryExecutionError("定位机房占位标记失败", original_error=e)
 
-    def update_versioned(
-        self, marker_id: int, room_id: int, expected_version: int,
-        fields: dict,
-    ) -> bool:
-        """乐观锁 CAS 更新（WP-7：消 lost-update）
-
-        版本判据放在 **UPDATE 谓词内**而不是"先 SELECT 再比较"——MySQL
-        REPEATABLE READ 下事务先读到的快照可能已过期，先读后比会被骗过；
-        谓词内判定由当前行版本兜底，rowcount 即裁决。
-
-        Returns:
-            bool: True=命中（1 行被更新）；False=未命中（不存在或版本过期，
-            由调用方重读区分两种情形）。
-
-        Raises:
-            QueryExecutionError: SQL 执行失败（含唯一键竞态，由上层还原 409）
-        """
-        from sqlalchemy import update
-
-        stmt = (
-            update(RoomLayoutMarker)
-            .where(
-                RoomLayoutMarker.id == marker_id,
-                RoomLayoutMarker.room_id == room_id,
-                RoomLayoutMarker.version == expected_version,
-            )
-            .values(**fields, version=expected_version + 1)
-            .execution_options(synchronize_session=False)
-        )
-        try:
-            result = self.session.execute(stmt)
-            self.session.expire_all()
-            return result.rowcount == 1
-        except SQLAlchemyError as e:
-            logger.error(
-                f"乐观锁更新占位标记失败 (id={marker_id}, expected_v={expected_version}): {e}"
-            )
-            raise QueryExecutionError("乐观锁更新占位标记失败", original_error=e)
-
     def delete_by_room_id(self, room_id: int) -> int:
         """删除某机房的全部占位标记，返回删除条数。
 

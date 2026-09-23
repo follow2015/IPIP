@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from app.utils.logging import get_logger
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.exceptions.business import LayoutMarkerVersionConflict, ResourceConflictError
+from app.exceptions.business import ResourceConflictError
 from app.exceptions.data_access import DataAccessError
 from app.exceptions.validation import ValidationError
 from app.persistence.room_repository import RoomRepository
@@ -505,12 +505,10 @@ class RoomService:
             )
 
         try:
-            data = dict(data)
-            data["version"] = (marker.version or 0) + 1
             updated = self.marker_repository.update(
                 marker_id,
                 data,
-                allowed=["row_number", "col_number", "marker_type", "label", "notes", "version"],
+                allowed=["row_number", "col_number", "marker_type", "label", "notes"],
             )
         except DataAccessError as e:
             _raise_position_conflict(
@@ -519,79 +517,6 @@ class RoomService:
             raise
         self.marker_repository.session.flush()
         logger.info(f"更新机房占位标记成功 (room_id={room_id}, id={marker_id})")
-        return updated
-
-    def batch_update_layout_markers(self, room_id: int, items: List[Dict[str, Any]]) -> List:
-        """批量编辑占位标记（WP-7：单一事务 + 乐观锁 CAS，消 lost-update）
-
-        Args:
-            room_id: 机房 ID
-            items: [{"marker_id": int, "expected_version": int, "fields": {...}}, ...]
-                expected_version 来自 GET 接口下发的 version；fields 为
-                RoomLayoutMarkerUpdateSchema 校验后的字段子集。
-
-        Returns:
-            更新后的标记实例列表（version 已 +1）
-
-        Raises:
-            ValidationError: 标记不存在 / 不属于该机房 / items 内 marker_id 重复
-            ResourceConflictError: 目标位置与其他标记冲突（唯一键或前置校验）
-            LayoutMarkerVersionConflict: 任一项版本过期 ⇒ 整批不生效（@transactional 回滚）
-        """
-        updated: List = []
-        conflicts: List[tuple] = []
-        seen_ids = set()
-
-        for item in items:
-            marker_id = item["marker_id"]
-            expected_version = item["expected_version"]
-            fields = item["fields"]
-
-            if marker_id in seen_ids:
-                raise ValidationError(f"items 中标记 #{marker_id} 重复提交")
-            seen_ids.add(marker_id)
-
-            marker = self.marker_repository.find_by_id(marker_id)
-            if not marker or marker.room_id != room_id:
-                raise ValidationError(f"占位标记 #{marker_id} 不存在")
-
-            new_row = fields.get("row_number", marker.row_number)
-            new_col = fields.get("col_number", marker.col_number)
-            if (new_row, new_col) != (marker.row_number, marker.col_number) and (
-                self.marker_repository.find_by_position(room_id, new_row, new_col)
-            ):
-                raise ResourceConflictError(
-                    "占位标记",
-                    f"{new_row}-{new_col}",
-                    message=f"位置（第{new_row}行 第{new_col}列）已存在占位标记",
-                )
-
-            try:
-                hit = self.marker_repository.update_versioned(
-                    marker_id, room_id, expected_version, fields
-                )
-                self.marker_repository.session.flush()
-            except DataAccessError as e:
-                _raise_position_conflict(
-                    e, f"位置（第{new_row}行 第{new_col}列）已存在占位标记（可能由并发操作创建）"
-                )
-                raise
-
-            if not hit:
-                current = self.marker_repository.find_by_id(marker_id)
-                if not current or current.room_id != room_id:
-                    raise ValidationError(f"占位标记 #{marker_id} 不存在")
-                conflicts.append((marker_id, expected_version, current.version or 0))
-                continue
-
-            updated.append(self.marker_repository.find_by_id(marker_id))
-
-        if conflicts:
-            raise LayoutMarkerVersionConflict(conflicts)
-
-        logger.info(
-            f"批量更新机房占位标记成功 (room_id={room_id}, n={len(updated)})"
-        )
         return updated
 
     def delete_layout_marker(self, room_id: int, marker_id: int) -> bool:

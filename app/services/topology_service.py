@@ -32,16 +32,14 @@ class TopologyService:
         """
         from app.persistence.device_repository import DeviceRepository
 
-        return DeviceRepository().topology_switch_query(alive_only=True)
+        return DeviceRepository().topology_switch_query()
 
     @staticmethod
     def _device_query_base():
         """设备基础查询：预加载 cabinet + room，消灭 N+1"""
         from app.persistence.device_repository import DeviceRepository
 
-        return DeviceRepository().topology_device_query(
-            ["network", "server"], alive_only=True
-        )
+        return DeviceRepository().topology_device_query(["network", "server"])
 
 
     @staticmethod

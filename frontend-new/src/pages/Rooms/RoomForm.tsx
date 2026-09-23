@@ -25,12 +25,13 @@ interface RoomFormProps {
 }
 
 function BuildingInput(props: { value?: string | null; onChange?: (value: string) => void }) {
+  const { t: td } = useTranslation('device');
   const { data: buildings } = useRoomBuildings();
   return (
     <AutoComplete
       allowClear
       {...props}
-      placeholder="如：A栋（可选，留空归入「未分组」）"
+      placeholder={td('room.form.buildingPlaceholder')}
       options={(buildings ?? []).map((b) => ({ value: b }))}
       filterOption={(input, option) =>
         String(option?.value ?? '')
@@ -42,6 +43,7 @@ function BuildingInput(props: { value?: string | null; onChange?: (value: string
 }
 
 function NameInput(props: { value?: string; onChange?: (value: string) => void }) {
+  const { t: td } = useTranslation('device');
   const { data: options } = useRoomNameOptions();
   const name = Form.useWatch<string>('name');
 
@@ -54,7 +56,7 @@ function NameInput(props: { value?: string; onChange?: (value: string) => void }
       <AutoComplete
         allowClear
         {...props}
-        placeholder="机房名称（同名机房将归为一组）"
+        placeholder={td('room.form.namePlaceholderGroup')}
         options={(options ?? []).map((o) => ({ value: o.name }))}
         filterOption={(input, option) =>
           String(option?.value ?? '')
@@ -64,7 +66,7 @@ function NameInput(props: { value?: string; onChange?: (value: string) => void }
       />
       {matched && matched.room_count > 0 ? (
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          将并入「{matched.name}」机房组（现有 {matched.room_count} 条记录）
+          {td('room.form.mergeHint', { name: matched.name, count: matched.room_count })}
         </Typography.Text>
       ) : null}
     </div>
@@ -72,13 +74,14 @@ function NameInput(props: { value?: string; onChange?: (value: string) => void }
 }
 
 function FloorInput(props: { value?: string | null; onChange?: (value: string) => void }) {
+  const { t: td } = useTranslation('device');
   const building = Form.useWatch<string>('building');
   const { data: floors } = useRoomFloors(building || undefined);
   return (
     <AutoComplete
       allowClear
       {...props}
-      placeholder="如：3F（可选，留空表示未标注）"
+      placeholder={td('room.form.floorPlaceholder')}
       options={(floors ?? []).map((f) => ({ value: f }))}
       filterOption={(input, option) =>
         String(option?.value ?? '')
@@ -102,10 +105,10 @@ function buildRoomSchema(d: TFunction<'device'>): FormSchema {
       },
       {
         name: 'room_number',
-        label: '房间号',
+        label: d('room.field.roomNumber'),
         type: 'input',
         required: true,
-        placeholder: '如：01（同一机房名称下不可重复）'
+        placeholder: d('room.form.roomNumberPlaceholder')
       },
       {
         name: 'location',
@@ -114,8 +117,13 @@ function buildRoomSchema(d: TFunction<'device'>): FormSchema {
         required: true,
         placeholder: d('room.form.locationPlaceholder')
       },
-      { name: 'building', label: '所属楼栋', type: 'custom', component: BuildingInput },
-      { name: 'floor', label: '所属楼层', type: 'custom', component: FloorInput },
+      {
+        name: 'building',
+        label: d('room.field.buildingOwn'),
+        type: 'custom',
+        component: BuildingInput
+      },
+      { name: 'floor', label: d('room.field.floorOwn'), type: 'custom', component: FloorInput },
       {
         name: 'contact',
         label: d('customer.field.contactPerson'),
@@ -182,10 +190,10 @@ function RoomForm({ open, editRecord, onClose }: RoomFormProps) {
     const name = String(values.name ?? '').trim();
     if (isNewGroupName(name)) {
       await confirm({
-        title: '创建新机房组',
-        content: `机房组「${name}」不存在，保存将创建新机房组。同一物理机房的房间应使用相同的机房名称。`,
-        okText: '继续创建',
-        cancelText: '取消',
+        title: td('room.form.newGroupTitle'),
+        content: td('room.form.newGroupContent', { name }),
+        okText: td('addModal.confirm.partialNoU.ok'),
+        cancelText: tc('action.cancel'),
         onOk: async () => {
           await doSubmit(values);
         }
@@ -205,7 +213,7 @@ function RoomForm({ open, editRecord, onClose }: RoomFormProps) {
       modalProps={{
         open,
         title: isEdit ? td('room.edit') : td('room.add'),
-        destroyOnHidden: true,
+        destroyOnHidden: true
       }}
     />
   );

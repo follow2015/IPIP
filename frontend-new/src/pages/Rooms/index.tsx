@@ -59,20 +59,20 @@ function Rooms() {
     },
     { title: td('room.field.name'), dataIndex: 'name', key: 'name' },
     {
-      title: '房间号',
+      title: td('room.field.roomNumber'),
       dataIndex: 'room_number',
       key: 'room_number',
       width: 110
     },
     {
-      title: '楼栋',
+      title: td('room.field.building'),
       dataIndex: 'building',
       key: 'building',
       width: 120,
       render: (v: string | null) => v || '-'
     },
     {
-      title: '楼层',
+      title: td('room.field.floor'),
       dataIndex: 'floor',
       key: 'floor',
       width: 90,
@@ -144,7 +144,7 @@ function Rooms() {
       filters={[
         {
           key: 'building',
-          label: '全部楼栋',
+          label: td('room.filter.allBuildings'),
           type: 'select',
           width: 150,
           showSearch: true,
@@ -152,7 +152,9 @@ function Rooms() {
         },
         {
           key: 'floor',
-          label: buildingFilterValue ? '全部楼层' : '楼层（先选楼栋）',
+          label: buildingFilterValue
+            ? td('room.filter.allFloors')
+            : td('room.filter.floorNeedsBuilding'),
           type: 'select',
           width: 150,
           showSearch: true,
@@ -160,7 +162,7 @@ function Rooms() {
         },
         {
           key: 'status',
-          label: '全部状态',
+          label: td('room.filter.allStatus'),
           type: 'select',
           width: 120,
           options: Object.entries(ROOM_STATUS_MAP).map(([value, s]) => ({
@@ -172,10 +174,10 @@ function Rooms() {
       extra={
         <Space>
           <Button icon={<AppstoreOutlined />} onClick={() => navigate('/rooms/overview')}>
-            机房总览
+            {td('room.overview.title')}
           </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={crud.handleAdd}>
-            新增机房
+            {td('room.add')}
           </Button>
         </Space>
       }

@@ -58,15 +58,15 @@ const STATUS_COLOR: Record<string, string> = {
   closed: 'default'
 };
 
-function renderDeviceRef(id: number | null, name: string | null) {
+function renderDeviceRef(id: number | null, name: string | null, t: TFunction<'monitor'>) {
   if (!name) return id != null ? String(id) : '-';
   if (id != null) return name;
   return (
     <Space size={4}>
       <span>{name}</span>
-      <Tooltip title="设备已被彻底删除；本行由设备名快照保留（引用列已置空）">
+      <Tooltip title={t('incidents.deletedTooltip')}>
         <Tag color="default" style={{ marginInlineEnd: 0 }}>
-          已删除
+          {t('incidents.deleted')}
         </Tag>
       </Tooltip>
     </Space>
@@ -212,7 +212,7 @@ export default function MonitorIncidents() {
               searchable={false}。 */}
           <Input.Search
             allowClear
-            placeholder="按设备名搜历史事件"
+            placeholder={t('incidents.searchPlaceholder')}
             style={{ width: isMobile ? '100%' : 220 }}
             value={deviceNameInput}
             onChange={(e) => setDeviceNameInput(e.target.value)}
@@ -275,7 +275,9 @@ export default function MonitorIncidents() {
               <Descriptions.Item label={tc('field.status')}>
                 <Tag color={STATUS_COLOR[detail.status] ?? 'default'}>{detail.status}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label={t('column.alertCount')}>{detail.alert_count}</Descriptions.Item>
+              <Descriptions.Item label={t('column.alertCount')}>
+                {detail.alert_count}
+              </Descriptions.Item>
               <Descriptions.Item label={t('incident.column.deviceCount')}>
                 <Text strong style={{ color: detail.device_count > 1 ? '#cf1322' : undefined }}>
                   {detail.device_count}
@@ -285,7 +287,7 @@ export default function MonitorIncidents() {
                 {reasonLabel(detail.reason_code, t) ?? '-'}
               </Descriptions.Item>
               <Descriptions.Item label={t('incident.detail.rootDevice')}>
-                {renderDeviceRef(detail.root_device_id, detail.root_device_name)}
+                {renderDeviceRef(detail.root_device_id, detail.root_device_name, t)}
               </Descriptions.Item>
               <Descriptions.Item label={t('incident.column.firstAlertAt')}>
                 {detail.first_alert_at ? formatDateTime(detail.first_alert_at) : '-'}
@@ -295,7 +297,10 @@ export default function MonitorIncidents() {
               </Descriptions.Item>
             </Descriptions>
 
-            <Card size="small" title={t('incident.detail.relatedAlerts', { count: detail.related_alerts.length })}>
+            <Card
+              size="small"
+              title={t('incident.detail.relatedAlerts', { count: detail.related_alerts.length })}
+            >
               <DataTable
                 searchable={false}
                 showCard={false}
@@ -318,7 +323,9 @@ export default function MonitorIncidents() {
 
             <Card
               size="small"
-              title={t('incident.detail.suppressedDevices', { count: detail.suppressed_logs.length })}
+              title={t('incident.detail.suppressedDevices', {
+                count: detail.suppressed_logs.length
+              })}
             >
               <DataTable
                 searchable={false}
@@ -332,7 +339,7 @@ export default function MonitorIncidents() {
                     title: t('thresholdOverride.column.deviceId'),
                     dataIndex: 'device_name',
                     width: 160,
-                    render: (_: string | null, r) => renderDeviceRef(r.device_id, r.device_name)
+                    render: (_: string | null, r) => renderDeviceRef(r.device_id, r.device_name, t)
                   },
                   { title: t('column.alertType'), dataIndex: 'alert_type', width: 140 },
                   { title: tc('field.severity'), dataIndex: 'severity', width: 90 },
@@ -341,7 +348,7 @@ export default function MonitorIncidents() {
                     dataIndex: 'upstream_device_name',
                     width: 160,
                     render: (_: string | null, r) =>
-                      renderDeviceRef(r.upstream_device_id, r.upstream_device_name)
+                      renderDeviceRef(r.upstream_device_id, r.upstream_device_name, t)
                   },
                   {
                     title: tc('field.time'),
