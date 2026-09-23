@@ -1,6 +1,10 @@
 # ipip — IP 管理系统
 
+[简体中文](README.md) | [English](README.en.md)
+
 开源 IP/IPAM 管理系统：机房、机柜、设备、IP 分配、VLAN、交换机、监控告警、客户管理一体化平台，内置 AI 助手（告警解读 / NL 查询 / RAG 知识库 / Agentic 巡查诊断）。
+
+**当前版本：v1.4.1** —— 版本号唯一来源是 `config.py` 的 `VERSION`，运行时出口为 `GET /api/health` 的 `data.version`（界面左侧边栏底部同步展示）。
 
 后端 Flask + SQLAlchemy + MySQL + Redis，前端 React 19 + Ant Design 6 + Vite 8，ASGI SSE 实时推送网关（多副本就绪），Celery 异步任务底座（AI 长任务 + 语音通知）。
 
@@ -28,7 +32,8 @@
 
 ```
 ipip/
-├── README.md                   # 本文件
+├── README.md                   # 本文件（简体中文）
+├── README.en.md                # 英文版说明
 ├── LICENSE                     # 开源协议
 ├── RELEASE_NOTES_v1.0.md       # v1.0 发布说明
 ├── .env.example                # 环境变量模板（脱敏）
@@ -307,6 +312,7 @@ sudo systemctl disable --now ipip-trapd.service
 | [运维手册-密钥与环境变量](docs/ops/运维手册-密钥与环境变量.md) | 密钥管理、环境变量口径 |
 | [systemd 托管部署说明](deploy/systemd/README.md) | 逐 unit 说明、`ProtectSystem` 加固与放行、启停/排障 |
 | [RELEASE_NOTES_v1.0.md](RELEASE_NOTES_v1.0.md) | v1.0 发布说明 |
+| [README.en.md](README.en.md) | 本文档的英文版（随中文版同步更新） |
 
 ## 前端开发
 
