@@ -36,7 +36,10 @@ ipip/
 ├── README.en.md                # 英文版说明
 ├── LICENSE                     # 开源协议
 ├── RELEASE_NOTES_v1.0.md       # v1.0 发布说明
-├── .env.example                # 环境变量模板（脱敏）
+├── .env.example                # 环境变量模板（脱敏，install.sh 用）
+├── .dockerignore               # 构建上下文排除（Docker 用）
+├── Dockerfile                  # 三段构建：frontend-builder → python-builder(venv) → runtime
+├── docker-compose.yml          # 11 服务编排（评估/开发用，见「评估用 Docker 快速路径」）
 ├── .gitignore
 ├── app/                        # 后端 Flask 应用
 │   ├── api/                    # 路由（含 monitor/incident、voice_callback/voice_settings、topology）
@@ -88,19 +91,25 @@ ipip/
 │   ├── backfill_utc_timestamps.py  # 存量时间戳 UTC 回填（默认水位=切换时刻，防二次偏移）
 │   └── import_sql.py           # SQL 导入工具（DELIMITER 触发器切分）
 ├── deploy/
-│   └── systemd/                # systemd unit（ADR-003 拍板，替代 start.sh 托管）
-│       ├── ipip.target         # 统一目标（stop ipip.target 一键停全部）
-│       ├── ipip-web.service    # Flask HTTP API
-│       ├── ipip-gateway.service # SSE 实时网关
-│       ├── ipip-monitor.service # 监控服务
-│       ├── ipip-celery-ai.service # Celery AI 异步队列
-│       ├── ipip-celery-voice.service # Celery 语音队列
-│       ├── ipip-trapd.service  # SNMP Trap 接收（opt-in，见下文）
-│       ├── ipip-backup.service / .timer # 定时备份
-│       ├── ipip-watchdog.service / .timer # 心跳 watchdog
-│       ├── install-units.sh    # unit 安装脚本
-│       ├── README.md           # systemd 托管部署说明（含逐 unit 排障）
-│       └── ipip.env.example    # systemd 环境段模板
+│   ├── systemd/                # systemd unit（ADR-003 拍板，替代 start.sh 托管）
+│   │   ├── ipip.target         # 统一目标（stop ipip.target 一键停全部）
+│   │   ├── ipip-web.service    # Flask HTTP API
+│   │   ├── ipip-gateway.service # SSE 实时网关
+│   │   ├── ipip-monitor.service # 监控服务
+│   │   ├── ipip-celery-ai.service # Celery AI 异步队列
+│   │   ├── ipip-celery-voice.service # Celery 语音队列
+│   │   ├── ipip-trapd.service  # SNMP Trap 接收（opt-in，见下文）
+│   │   ├── ipip-backup.service / .timer # 定时备份
+│   │   ├── ipip-watchdog.service / .timer # 心跳 watchdog
+│   │   ├── install-units.sh    # unit 安装脚本
+│   │   ├── README.md           # systemd 托管部署说明（含逐 unit 排障）
+│   │   └── ipip.env.example    # systemd 环境段模板
+│   └── docker/                 # 容器化（评估/开发用，与 systemd 二选一）
+│       ├── entrypoint.sh       # 9 角色分发（web/gateway/celery-ai/celery-voice/monitor/trapd/migrate/seed/shell）
+│       ├── nginx.conf          # 反向代理：/api + / → web:5000；/realtime/ → gateway:8000（SSE 必需）
+│       └── .env.example        # compose 专用环境变量样例（与仓库根 .env.example 用途不同）
+├── .github/
+│   └── workflows/              # 开源仓门禁：frontend-check / lint / schema-smoke / secret-guard / docker-publish
 ├── docs/                       # 运维手册（见「文档」节）
 └── logs/                       # 运行时日志（gitignore）
 ```
@@ -152,6 +161,100 @@ bash scripts/start.sh restart   # 重启全部
 ```
 
 访问 `http://<server-ip>:5000` 即可使用。
+
+## 评估用 Docker 快速路径（可选）
+
+> ⚠️ **这是评估/开发路径，不替换生产部署。** 生产仍走上面的 `install.sh` + `deploy/systemd/`
+> ——后者已做 `ProtectSystem=strict` 等命名空间加固，备份与密钥运维手册都围绕它写。
+> 容器路径的定位是给评估者一条「装个 Docker + 一条命令就看到界面」的路，
+> 把「Python 3.14 + Node 20 + pnpm 10 + MySQL 8.4 + Redis 8 手动装一整套」降下来。
+
+**明确不做**（与 systemd 路径的分工边界，避免被误当生产方案）：
+
+| 不做 | 理由 |
+|---|---|
+| 替换生产的 systemd | `deploy/systemd/` 的加固与运维手册都围绕它写 |
+| 容器化的高可用 / 多副本 / 滚动更新 | 评估环境不需要；`monitor` 还**必须**单副本 |
+| 镜像安全加固（非 root / 只读根 / capability 裁剪 / 漏洞扫描） | 登记为后续项，不是评估环境的门槛 |
+| 把 `watchdog` / `backup` 容器化 | 二者是定时任务不是常驻服务，会打乱「一个角色一个常驻进程」的模型 |
+
+### 1. 拉预构建镜像（推荐，1–3 分钟）
+
+镜像由 GitHub Actions 在打 `v*` tag 时自动构建并推到 GHCR
+（多架构 `linux/amd64` + `linux/arm64`，**内置 RAG 模型**，约 4 GB）。
+
+```bash
+# GHCR 的 package 首次推送默认 private ⇒ 需要登录（PAT 至少 read:packages）
+echo "$GHCR_PAT" | docker login ghcr.io -u <你的 GitHub 用户名> --password-stdin
+
+git clone https://github.com/follow2015/IPIP.git && cd IPIP
+cp deploy/docker/.env.example .env      # ⚠️ 是 deploy/docker/ 这份，不是仓库根那份（根那份连的是 localhost）
+```
+
+**填 3 条密钥**——样例里这三个值**故意留空**：留空必定报错，不留「看起来配好了」的假安全。
+
+```bash
+python3 - <<'PY'
+import pathlib, secrets, re
+p = pathlib.Path(".env"); s = p.read_text(encoding="utf-8")
+for k in ("SECRET_KEY", "JWT_SECRET_KEY", "SWITCH_SECRET_KEY"):
+    s, n = re.subn(rf"(?m)^{k}=.*$", f"{k}={secrets.token_hex(32)}", s)
+    assert n == 1, f"{k}: 期望 1 行，实际 {n}"
+p.write_text(s, encoding="utf-8")
+print("3 条密钥已随机化")
+PY
+```
+
+```bash
+# ⚠️ 别跳过 pull：镜像锚点同时带 build:，本地缺该镜像时 compose 会自动**本地构建**（15–40 分钟）
+IPIP_IMAGE_TAG=1.0.2 docker compose pull
+docker compose up -d
+docker compose ps          # mysql/redis healthy；migrate/seed 为 Exited (0)；其余 Up
+```
+
+访问 `http://localhost:8080`（宿主端口可用 `.env` 里的 `HTTP_PORT` 覆写）。
+
+### 2. 或本地全量构建（15–40 分钟，含 1.15 GB 模型层）
+
+```bash
+git clone https://github.com/follow2015/IPIP.git && cd IPIP
+cp deploy/docker/.env.example .env      # 再按上面那步填 3 条密钥
+docker compose up -d --build
+```
+
+### 3. 可选：SNMP Trap 接收（默认不启）
+
+```bash
+# 先在 .env 里放开 TRAPD_COMMUNITIES 并填**强随机口令**（public/private 会被启动期校验拒绝）
+docker compose --profile trapd up -d
+```
+
+> `TRAPD_ENABLED` 不用手填——由 compose 服务的 `environment` 注入（选 profile 本身就是「要启用」的意图）。
+
+### 4. 回滚（一键放弃）
+
+```bash
+docker compose down -v            # 含数据卷；跑之前确认没有要留的数据
+docker volume ls | grep ipip      # 应为空
+```
+
+`.env` 是本机未跟踪文件（已在 `.gitignore` 内），**不会被提交，也不会被自动删除**——
+删掉它就等于丢掉刚生成的 3 条密钥，所以这个动作留给人确认。
+
+### 5. 与 systemd 路径的差异（评估时最容易误解的几点）
+
+- **固定 `FLASK_ENV=development`**：跳过 6 项生产环境门槛（LDAP CA / CORS / 指标暴露等）
+  ⇒ **不能用这份 compose 描述生产行为**。
+- **不内置语料**：`/app/docs` 是 RAG 的知识源目录，镜像内**只有占位 README**——
+  部署仓 `docs/` 是运维手册（含内网信息），不进公开制品。要用 RAG 请自行挂载：
+  `volumes: ["./你的语料:/app/docs:ro"]`。
+- **MySQL 用非 root 账号 `ipip`**，并**关闭 binlog**（`--skip-log-bin`）：
+  评估环境没有复制/时间点恢复需求，关掉可同时避开基线 15 个触发器需要的 SUPER 权限。
+- **不要给 `/app/instance` 挂卷**：镜像里已有内置模型，空卷首挂会白占 1.15 GB，**旧卷则直接遮蔽内置模型**
+  ⇒ 要持久化数据请挂子路径（如 `/app/instance/data`）。
+
+> 完整方案（7 个文件的逐字内容、19 条可测验收判据、12 项风险登记、与两轮评审的逐条对账）
+> 见内部文档《Docker 容器化 · 部署仓可执行方案》（主仓 `docs/design/`，仅供评估使用）。
 
 ## 安装脚本选项
 
