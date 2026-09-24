@@ -824,7 +824,10 @@ PYEOF
 # 全部绕过），实测确认。收尾显式写 production 并跑离线预检；开发/测试装机用
 # --dev-env 保持 development（CI 冒烟口径不受影响，其决策见 .gitea/workflows/ci.yml）。
 if [ "$DEV_ENV" -eq 1 ]; then
-  log "保持 FLASK_ENV=development（--dev-env：开发/测试装机，生产硬校验不生效）"
+  # 措辞按 .env 现值：--dev-env 的语义是「不动 .env 的 FLASK_ENV」（新装=development，
+  # 存量机重跑则维持原值），不是"强制改回 development"
+  KEEP_ENV="$(grep -m1 '^FLASK_ENV=' "$PROJECT_ROOT/.env" | cut -d= -f2- || true)"
+  log "保持 FLASK_ENV=${KEEP_ENV:-<缺失>}（--dev-env：不写 production、不跑生产预检）"
 else
   CUR_ENV="$(grep -m1 '^FLASK_ENV=' "$PROJECT_ROOT/.env" | cut -d= -f2- || true)"
   if [ "$CUR_ENV" != "production" ]; then
