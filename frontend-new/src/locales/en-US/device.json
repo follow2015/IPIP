@@ -1978,7 +1978,7 @@
       "trunkIpBlocked": "The port belongs to Eth-Trunk {{id}} and cannot be assigned an IP directly. Configure it on the Eth-Trunk {{id}} port instead.",
       "vlanIpBlocked": "The port belongs to VLAN {{vlan}} and cannot be assigned an IP directly. Clear the configuration on the port details page first."
     },
-    "portConfigWarning": "⚠ Warning: this action clears the current port configuration and causes one port up/down flap.",
+    "portConfigWarning": "Warning: this action clears the current port configuration and causes one port up/down flap.",
     "portDetail": {
       "title": "Port Details — {{name}}",
       "portNumber": "Port Number",

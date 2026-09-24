@@ -15,6 +15,7 @@
  */
 import { useMemo } from 'react';
 import { Tooltip, Tag, Space, theme } from 'antd';
+import { ExclamationCircleFilled } from '@ant-design/icons';
 import {
   classifyPortType,
   getShortPortNum,
@@ -184,7 +185,10 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
                   <span style={{ color: '#52c41a', marginLeft: 4 }}>
                     ↑{upCount - underspeedCount}
                     {underspeedCount > 0 && (
-                      <span style={{ color: '#faad14' }}>+⚠{underspeedCount}</span>
+                      <span style={{ color: '#faad14' }}>
+                        +<ExclamationCircleFilled />
+                        {underspeedCount}
+                      </span>
                     )}
                   </span>
                 )}
@@ -248,11 +252,7 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
                     {port.ip_list && port.ip_list.length > 0
                       ? port.ip_list.map((ip, i) => {
                           const addr = `${ip.ip_address}${
-                            ip.prefix
-                              ? `/${ip.prefix}`
-                              : ip.subnet_mask
-                                ? `/${ip.subnet_mask}`
-                                : ''
+                            ip.prefix ? `/${ip.prefix}` : ip.subnet_mask ? `/${ip.subnet_mask}` : ''
                           }`;
                           return (
                             <div key={i}>
@@ -267,7 +267,9 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
                             </div>
                           );
                         })
-                      : port.ip_address && <div>{t('portField.ip', { value: port.ip_address })}</div>}
+                      : port.ip_address && (
+                          <div>{t('portField.ip', { value: port.ip_address })}</div>
+                        )}
                     {port.customer_name && (
                       <div>{t('portField.customer', { value: port.customer_name })}</div>
                     )}

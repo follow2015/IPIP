@@ -923,6 +923,12 @@ class MonitorConfigResponseSchema(Schema):
     """GET /config 响应：每个配置项为 {value, editable, type, description} 对象。
 
     字段名 = 白名单 camel 别名（与 dynamic_config.KEY_TO_CAMEL 一致）。
+
+    [WARN] 本类是 `dynamic_config.all_entries()` 的**全量镜像**（含不可编辑项），按"监控运行
+    → 限流/同步 → 自动扫描 → 不可编辑项"分组排列。加配置键时**必须**同步补这里，
+    否则 doc 契约静默落后于实现（曾缺整个 `SCAN_AUTO_*` 组 + 两个 MONITOR_* 键，共 9 个；
+    漏了也不会有任何门禁报错 —— 故补了
+    `tests/test_monitor_config_schema_parity.py` 机械比对）。
     """
 
     consecutive_failures_threshold = fields.Nested(MonitorConfigItemSchema)
@@ -935,6 +941,15 @@ class MonitorConfigResponseSchema(Schema):
     interval_bmc = fields.Nested(MonitorConfigItemSchema)
     interval_zabbix = fields.Nested(MonitorConfigItemSchema)
     outbox_interval = fields.Nested(MonitorConfigItemSchema)
+    rate_limit_enabled = fields.Nested(MonitorConfigItemSchema)
+    non_managed_port_sync = fields.Nested(MonitorConfigItemSchema)
+    scan_auto_enabled = fields.Nested(MonitorConfigItemSchema)
+    scan_auto_cleanup_enabled = fields.Nested(MonitorConfigItemSchema)
+    scan_auto_interval = fields.Nested(MonitorConfigItemSchema)
+    scan_auto_room_ids = fields.Nested(MonitorConfigItemSchema)
+    scan_auto_vr_ids = fields.Nested(MonitorConfigItemSchema)
+    scan_auto_cleanup_interval = fields.Nested(MonitorConfigItemSchema)
+    scan_auto_grace_period = fields.Nested(MonitorConfigItemSchema)
     worker_in_process = fields.Nested(MonitorConfigItemSchema)
 
 

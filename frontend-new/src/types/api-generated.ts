@@ -21450,6 +21450,15 @@ export interface components {
             interval_bmc?: components["schemas"]["MonitorConfigItem"];
             interval_zabbix?: components["schemas"]["MonitorConfigItem"];
             outbox_interval?: components["schemas"]["MonitorConfigItem"];
+            rate_limit_enabled?: components["schemas"]["MonitorConfigItem"];
+            non_managed_port_sync?: components["schemas"]["MonitorConfigItem"];
+            scan_auto_enabled?: components["schemas"]["MonitorConfigItem"];
+            scan_auto_cleanup_enabled?: components["schemas"]["MonitorConfigItem"];
+            scan_auto_interval?: components["schemas"]["MonitorConfigItem"];
+            scan_auto_room_ids?: components["schemas"]["MonitorConfigItem"];
+            scan_auto_vr_ids?: components["schemas"]["MonitorConfigItem"];
+            scan_auto_cleanup_interval?: components["schemas"]["MonitorConfigItem"];
+            scan_auto_grace_period?: components["schemas"]["MonitorConfigItem"];
             worker_in_process?: components["schemas"]["MonitorConfigItem"];
         };
         MonitorConfigUpdateResponse: {

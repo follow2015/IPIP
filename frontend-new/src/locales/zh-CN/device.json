@@ -1978,7 +1978,7 @@
       "trunkIpBlocked": "端口属于 Eth-Trunk {{id}}，不能直接配置 IP。请在 Eth-Trunk {{id}} 端口上配置。",
       "vlanIpBlocked": "端口属于 VLAN {{vlan}}，不能直接配置 IP。请先去端口详情页清除配置。"
     },
-    "portConfigWarning": "⚠ 注意：此操作将清空端口现有配置，并导致端口 up/down 一次。",
+    "portConfigWarning": "注意：此操作将清空端口现有配置，并导致端口 up/down 一次。",
     "portDetail": {
       "title": "端口详情 — {{name}}",
       "portNumber": "端口号",

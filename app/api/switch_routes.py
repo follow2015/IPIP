@@ -717,6 +717,8 @@ def scan_switch(device_id):
             with app_ref.app_context():
                 service = NetworkScannerService()
                 service.scan_switch(switch.device_id)
+                from app import db as _db
+                _db.session.commit()
                 logger.info("异步扫描交换机 device_id=%d 完成", device_id)
                 from app.services.switch_events import emit_resource_change
                 emit_resource_change(switch.device_id, "scan_complete", affected_ports=[])
@@ -829,6 +831,8 @@ def scan_room(room_id):
             with app_ref.app_context():
                 service = NetworkScannerService()
                 result = service.scan_room(room_id)
+                from app import db as _db
+                _db.session.commit()
                 if isinstance(result, dict) and result.get("reason") == "missing_n2n_connections":
                     from app.services.switch_events import emit_global_event
                     emit_global_event("room_scan_complete", {
