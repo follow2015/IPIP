@@ -1,0 +1,237 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# 开发/评估环境编排 —— **不是生产部署方案**。生产继续用 deploy/systemd/
+# （理由见 docs/design/Docker化评估与方案草案-2026-09-20.md §1）
+#
+# 拓扑：
+#   mysql(8.4) ─┐
+#   redis(8)  ─┼→ migrate(一次性) → seed(一次性) → web / celery-ai / celery-voice / monitor
+#              ├→ gateway(不依赖 migrate：零 DB 依赖)
+#              └→ proxy(nginx) ← 唯一对外入口
+#   trapd 走 opt-in profile（默认不起，避免 162/udp 与宿主 snmptrapd 冲突）
+# ═══════════════════════════════════════════════════════════════════════════
+name: ipip
+
+# 所有应用服务共用同一个镜像锚点（一份镜像 = 多角色，差异只在 command）。
+#
+# 三条路径都走这一个锚点：
+#   • 评估者（推荐）：docker compose pull && docker compose up -d
+#       拉 GitHub Actions 预构建的镜像，**已含 RAG 模型**，1–3 分钟起服务。
+#   • 改代码：docker compose build && docker compose up -d
+#       本地构建，覆盖同名 tag（下面的 image: 就是构建产物名）。
+#   • 锁定版本：在 .env 里设 IPIP_IMAGE_TAG=1.0.2（见 §5.6）。
+# ⚠️ image: 与 build: 同时存在时，`up -d` 在**本地缺该镜像时会自动执行构建**（20 分钟量级）
+#    ⇒ 评估者必须先 `pull`，或直接照 §6 Step 2A 走。
+# ⚠️ 锚点用的是 GHCR 全名而非 `ipip:local`：让"本地构建产物"与"预构建产物"同名，
+#    两条路径的 tag 语义完全一致，不会出现"本地改了但 up 用旧镜像"的错位。
+x-ipip-image: &ipip-image
+  image: ghcr.io/follow2015/ipip:${IPIP_IMAGE_TAG:-main}
+  build:
+    context: .
+    dockerfile: Dockerfile
+
+services:
+  # ── 依赖 ────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    # 只在这里声明 MYSQL_*（不走 env_file），root 口令因此不会进入应用容器
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ipip_root_dev_only}
+      MYSQL_DATABASE:      ${MYSQL_DATABASE:-ip_management}
+      MYSQL_USER:          ${MYSQL_USER:-ipip}
+      MYSQL_PASSWORD:      ${MYSQL_PASSWORD:-ipip_dev_only}
+      # mysqladmin 通过 MYSQL_PWD 取口令：避免 -p<pwd> 出现在
+      # docker inspect / ps / 容器日志里（评审 S2）
+      MYSQL_PWD:           ${MYSQL_ROOT_PASSWORD:-ipip_root_dev_only}
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+      # ⚠️ 必须关 binlog（MySQL 8 默认开启）：基线 0000_baseline.sql 含 15 个触发器，
+      # binlog 开启时导入需要 SUPER/SYSTEM_VARIABLES_ADMIN 权限或
+      # log_bin_trust_function_creators=1，否则 ERROR 1419 —— 实测（测试机，
+      # MySQL 8.0.46）migrate 服务当场失败（§3.10 有完整依据）。评估环境不需要 binlog
+      # （无复制/无 point-in-time 恢复需求），直接关闭：既免掉权限问题，又省一份 binlog 磁盘。
+      # ⚠️ 本镜像是 mysql:8.4、实测取自 8.0.46 ⇒ 起容器后用 §7 V13 现场闭环（@@log_bin 应为 0）。
+      - --skip-log-bin
+    volumes:
+      - ipip-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    # 评估环境不设 requirepass：redis 只在 compose 内网可达，未映射宿主端口。
+    # 若要设密码，记得同步改 .env 里的 CELERY_BROKER_URL / CELERY_RESULT_BACKEND。
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ipip-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── 一次性任务 ──────────────────────────────────────────────────────────
+  migrate:
+    <<: *ipip-image
+    command: ["migrate"]
+    env_file: [.env]
+    depends_on:
+      mysql: { condition: service_healthy }
+    restart: "no"
+
+  seed:
+    <<: *ipip-image
+    command: ["seed"]
+    env_file: [.env]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: "no"
+
+  # ── 常驻角色 ────────────────────────────────────────────────────────────
+  web:
+    <<: *ipip-image
+    command: ["web"]
+    env_file: [.env]
+    environment:
+      # ⚠️ 不是可选项：对齐 deploy/systemd/ipip-web.service 的同一行。
+      # web 绝不兼职监控轮询，独占权只属于 monitor 服务；删掉会复刻
+      # "多进程轮询放大"问题（实测 60s → 18.9s）。
+      MONITOR_WORKER_IN_PROCESS: "false"
+      HEARTBEAT_SERVICE_NAME: "web"
+    depends_on:
+      mysql:  { condition: service_healthy }
+      redis:  { condition: service_healthy }
+      seed:   { condition: service_completed_successfully }
+    healthcheck:
+      # 用轻量存活端点（恒 200）；深检端点是 /api/health/check（依赖不健康返 503）
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${FLASK_PORT:-5000}/api/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  gateway:
+    <<: *ipip-image
+    command: ["gateway"]
+    env_file: [.env]
+    environment:
+      HEARTBEAT_SERVICE_NAME: "gateway"
+    # ⚠️ 刻意**不**依赖 migrate/seed：realtime_gateway 零 DB 依赖
+    #    （realtime_gateway/main.py 注释），只依赖 Redis。
+    depends_on:
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${GATEWAY_PORT:-8000}/healthz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  celery-ai:
+    <<: *ipip-image
+    command: ["celery-ai"]
+    env_file: [.env]
+    environment:
+      MONITOR_WORKER_IN_PROCESS: "false"
+      AI_ASYNC_ENABLED: "1"
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      seed:  { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  celery-voice:
+    <<: *ipip-image
+    command: ["celery-voice"]
+    env_file: [.env]
+    environment:
+      MONITOR_WORKER_IN_PROCESS: "false"
+      AI_ASYNC_ENABLED: "1"
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      seed:  { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  monitor:
+    <<: *ipip-image
+    command: ["monitor"]
+    env_file: [.env]
+    environment:
+      # ⚠️ 这里设 "false"，**不是** "true"：
+      #    run_monitor_service.py 经 create_headless_monitor_app() 已强制把它改为 false
+      #    （standalone_service.py:77-78），写 true 只会在文档层面造成误解。
+      #    设 false 的意义是把"本进程不兼职 in-Flask worker"这条隐式契约显式化。
+      MONITOR_WORKER_IN_PROCESS: "false"
+      HEARTBEAT_SERVICE_NAME: "monitor"
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      seed:  { condition: service_completed_successfully }
+    # 全局只允许一个 monitor：Redis 锁只做互斥、不做限速，多实例会把聚合频率
+    # 按实例数放大。真要做高可用，前提是先把锁升级成限速器。
+    deploy:
+      replicas: 1
+    restart: unless-stopped
+
+  # ── 反向代理：唯一对外入口（前端相对路径 /api 与 /realtime 靠它分流）──
+  proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ./deploy/docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    depends_on:
+      web:     { condition: service_started }
+      gateway: { condition: service_started }
+
+  # ── 可选：SNMP Trap 接收（默认不启动）────────────────────────────────────
+  # 起用：docker compose --profile trapd up -d
+  # ⚠️ 两道**独立**的 fail-fast 校验（均在 run_trapd_service.py 里 `raise SystemExit`，
+  #    与 deploy/systemd 的约束同源）：
+  #      ① TRAPD_ENABLED 必须为 true ⇒ 选了这个 profile 就等于"要启用"，故直接由本服务
+  #         的 environment 注入，不要求用户在 .env 里手动取消注释（少一个"起了但没生效"的坑）。
+  #      ② TRAPD_COMMUNITIES 必须显式配置，且**不能是 public / private** —— 这两个在
+  #         `_WEAK_COMMUNITIES` 里，会被**第二道**校验直接拒掉（除非再加
+  #         TRAPD_ALLOW_WEAK_COMMUNITY=true）⇒ 必须在 .env 里填强随机口令。
+  #    ⚠️ 两条任一不满足 ⇒ 容器**反复重启**（restart: unless-stopped + SystemExit ≠ "静默不动"）：
+  #       `docker compose ps trapd` 会一直 `Restarting`，日志里有中文原因。验证见 §7 V14。
+  #    另需确认口令与设备侧发送端一致，否则收到的 trap 全部丢弃。
+  # 宿主 162/udp 被 snmptrapd 等占用时，改 .env 的 TRAPD_HOST_PORT 或直接不启用。
+  trapd:
+    <<: *ipip-image
+    command: ["trapd"]
+    env_file: [.env]
+    profiles: ["trapd"]
+    environment:
+      TRAPD_LISTEN_PORT: "10162"
+      # 选了本 profile 就是"要启用"的意图表达 ⇒ 在此注入（见上方 ①）
+      TRAPD_ENABLED: "true"
+    ports:
+      - "${TRAPD_HOST_PORT:-162}:10162/udp"
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      seed:  { condition: service_completed_successfully }
+    restart: unless-stopped
+
+volumes:
+  ipip-mysql-data:
+  ipip-redis-data:
+  # ⚠️ 刻意**不**给 /app/instance 与 /app/logs 声明 named volume：
+  #   ① /app/instance/huggingface 里是**镜像内置的 RAG 模型**（≈1.15GB）——
+  #      空卷首次挂载会把镜像内容复制进卷（白占 1.15GB 磁盘），
+  #      而**已存在的旧卷**会直接**遮蔽**它 ⇒ 容器里模型"消失"，RAG 静默失效（§9 R13）。
+  #   ② 评估环境预期"可一键放弃"（`down -v` 即清空）。要留数据请挂到别处，
+  #      或接受上面那条遮蔽风险并重新下模型。

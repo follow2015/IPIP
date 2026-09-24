@@ -1,0 +1,59 @@
+# ═══════════════════════════════════════════════════════════════════
+# 构建上下文收窄：build: . 会把整个仓库目录送给 Docker daemon，
+# 不排除 .git / docs 会让上下文凭空多出几十 MB，首次 build 明显变慢。
+# ═══════════════════════════════════════════════════════════════════
+
+# ── 版本控制与本地状态 ──
+.git
+.gitignore
+.dockerignore
+.DS_Store
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+*.egg-info/
+
+# ── 测试与覆盖率（部署仓当前无 tests/，保留以防将来）──
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
+
+# ── 前端产物（dist 必须由镜像内构建，不能吃本地残留）──
+frontend-new/node_modules/
+frontend-new/dist/
+frontend-new/coverage/
+frontend-new/*.tsbuildinfo
+
+# ── 运行期目录：必须由容器自己建，绝不能从宿主机拷进去 ──
+instance/
+logs/
+*.log
+*.pid
+
+# ── 不进构建上下文的大件 ──
+# ⚠️ docs/ **刻意**不进上下文/镜像：部署仓的 docs/ 是 6 个**运维手册**（含内网地址、
+#    LDAP 目录基 DN、密钥轮换与密文约束等内部信息）⇒ 打进 GHCR 制品等于把内网拓扑与
+#    密钥流程一起分发。⚠️ 本仓是 **public** 仓：注释里也**不得**写实这些值。
+#    RAG 的 AI_DOCS_ROOT 仍指向 /app/docs
+#    （镜像内建成空目录 + 占位 README，保证入库校验能过），语料由评估者自行挂载。
+#    要改成内置：先在部署仓把这 6 个文件脱敏，再加上 §5.2 段 3 末尾那行 COPY。
+docs/
+graphify-out/
+backups/
+archive/
+
+# ── 敏感文件：绝不进镜像 ──
+.env
+.env.*
+.credentials
+
+# ── 编辑器 ──
+.vscode/
+.idea/
