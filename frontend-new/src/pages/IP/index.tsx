@@ -111,7 +111,7 @@ function IP() {
 
   const batch = useBatchSelection<IPAddress>({
     dataSource: data?.items ?? [],
-    getRowKey: (r) => `${r.ip_address}|${r.room_id ?? ''}`
+    getRowKey: (r) => `${r.ip_address}|${r.room_id ?? ''}|${r.id ?? ''}`
   });
 
   useGlobalEventListener(
@@ -160,7 +160,9 @@ function IP() {
           const result = await banIP.mutateAsync({
             ip_address: record.ip_address
           });
-          msg.success(result.message || t('ip.message.banned', { address: result.data.ip_address }));
+          msg.success(
+            result.message || t('ip.message.banned', { address: result.data.ip_address })
+          );
           refetch();
         } catch (err) {
           msg.error(err instanceof Error ? err.message : t('ip.message.banFailed'));
@@ -266,10 +268,8 @@ function IP() {
     const keys = batch.selectedKeys.map(String);
     const groups = new Map<number, string[]>();
     for (const k of keys) {
-      const sep = k.lastIndexOf('|');
-      const ip = k.slice(0, sep);
-      const rid = k.slice(sep + 1);
-      const roomId = rid === '' ? NaN : Number(rid);
+      const [ip, rid] = k.split('|');
+      const roomId = !rid ? NaN : Number(rid);
       if (!groups.has(roomId)) groups.set(roomId, []);
       groups.get(roomId)!.push(ip);
     }
@@ -613,7 +613,7 @@ function IP() {
         columns={columns}
         dataSource={data?.items ?? []}
         loading={isLoading}
-        rowKey={(r) => `${r.ip_address}|${r.room_id ?? ''}`}
+        rowKey={(r) => `${r.ip_address}|${r.room_id ?? ''}|${r.id ?? ''}`}
         total={data?.total}
         page={table.page}
         perPage={table.perPage}

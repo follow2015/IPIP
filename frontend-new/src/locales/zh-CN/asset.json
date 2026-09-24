@@ -237,7 +237,8 @@
         "created": "占位标记已新增",
         "deleted": "占位标记已删除",
         "saveFailed": "保存占位标记失败",
-        "deleteFailed": "删除占位标记失败"
+        "deleteFailed": "删除占位标记失败",
+        "versionConflict": "标记已被他人修改，列表已刷新，请重新编辑后再保存"
       }
     }
   },

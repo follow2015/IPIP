@@ -28,7 +28,7 @@ class Role(BaseModel):
     status = db.Column(db.Integer, default=0, nullable=False, comment="状态")
 
     data_scope = db.Column(
-        db.String(16),
+        db.String(32),
         nullable=False,
         server_default="all",
         comment="数据权限范围: all/responsible_person/room/custom",

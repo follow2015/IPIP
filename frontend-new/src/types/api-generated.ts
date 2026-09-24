@@ -20552,12 +20552,20 @@ export interface components {
             display_name?: string | null;
             description?: string | null;
             status: number | null;
+            data_scope: "all" | "responsible_person" | "room" | "custom";
+            data_scope_config: {
+                [key: string]: unknown;
+            } | null;
         };
         RBACRoleUpdateRequest: {
             name?: string;
             display_name?: string | null;
             description?: string | null;
             status?: number | null;
+            data_scope?: "all" | "responsible_person" | "room" | "custom";
+            data_scope_config?: {
+                [key: string]: unknown;
+            } | null;
         };
         RBACRoleBatchDeleteRequest: {
             ids: number[];
@@ -20781,6 +20789,7 @@ export interface components {
             marker_type?: string;
             label?: string | null;
             notes?: string | null;
+            version?: number;
             created_at?: string;
             updated_at?: string;
         };
@@ -21002,6 +21011,7 @@ export interface components {
             deleted_at?: string | null;
         };
         IPAddressResponse: {
+            id?: number;
             ip_address?: string;
             room_id?: number | null;
             mac_address?: string;
@@ -21015,6 +21025,7 @@ export interface components {
             updated_at?: string;
         };
         IPAddressDetailResponse: {
+            id?: number;
             ip_address?: string;
             room_id?: number | null;
             mac_address?: string;
@@ -21108,6 +21119,10 @@ export interface components {
             display_name?: string;
             description?: string | null;
             status?: number;
+            data_scope?: string;
+            data_scope_config?: {
+                [key: string]: unknown;
+            } | null;
             created_at?: string;
             updated_at?: string;
             permissions?: components["schemas"]["PermissionResponse"][] | null;

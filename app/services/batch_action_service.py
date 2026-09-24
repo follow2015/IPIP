@@ -148,6 +148,7 @@ class BatchActionService:
                             port_row = self.switch_repo.find_port_by_device_and_name(switch.device_id, port)
                             if port_row:
                                 port_row.customer_id = customer_id
+                                sp.commit()
                                 details.append({"port": port, "success": True})
                             else:
                                 sp.rollback()
@@ -419,6 +420,8 @@ class BatchActionService:
                             except Exception as e:
                                 sp.rollback()
                                 logger.warning("批量VLAN关联更新失败(端口 %s): %s", port, e)
+                            else:
+                                sp.commit()  # R-I：成功路径释放 savepoint，防嵌套链递归
                 except Exception as e:
                     logger.error("批量VLAN关联更新事务失败: %s", e)
 
@@ -439,6 +442,8 @@ class BatchActionService:
                             except Exception as e:
                                 sp.rollback()
                                 logger.warning("批量LAG关联更新失败(端口 %s): %s", port, e)
+                            else:
+                                sp.commit()  # R-I：成功路径释放 savepoint，防嵌套链递归
                 except Exception as e:
                     logger.error("批量LAG关联更新事务失败: %s", e)
 
@@ -455,6 +460,8 @@ class BatchActionService:
                             except Exception as e:
                                 sp.rollback()
                                 logger.warning("批量LAG关联清除失败(端口 %s): %s", port, e)
+                            else:
+                                sp.commit()  # R-I：成功路径释放 savepoint，防嵌套链递归
                 except Exception as e:
                     logger.error("批量LAG关联清除事务失败: %s", e)
 
@@ -538,6 +545,7 @@ class BatchActionService:
                             details.append({"port": port, "success": False, "error": f"不支持的操作类型: {action}"})
                             continue
 
+                        savepoint.commit()  # R-I：成功路径释放 savepoint，防嵌套链递归
                         details.append({"port": port, "success": True})
                     except Exception as e:
                         savepoint.rollback()

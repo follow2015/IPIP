@@ -237,7 +237,8 @@
         "created": "Placeholder created",
         "deleted": "Placeholder deleted",
         "saveFailed": "Failed to save the placeholder",
-        "deleteFailed": "Failed to delete the placeholder"
+        "deleteFailed": "Failed to delete the placeholder",
+        "versionConflict": "Marker was modified by someone else. The list has been refreshed — please edit again"
       }
     }
   },

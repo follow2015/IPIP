@@ -5,10 +5,17 @@
 1. 扫描调度：按 SCAN_AUTO_INTERVAL 触发各扫描单元（物理机房/虚拟机房各扫各的）
 2. 陈旧度清理：按 SCAN_AUTO_CLEANUP_INTERVAL 降级超期未观测的 IP
 
+**开关策略（2026-09-24 明确）**：两个循环各受一个独立开关控制 ——
+扫描调度看 ``SCAN_AUTO_ENABLED``，陈旧度清理看 ``SCAN_AUTO_CLEANUP_ENABLED``。
+清理原先挂在扫描总开关下，导致「只想收敛存量、不想自动扫描」无法配置
+（生产 SCAN_AUTO_ENABLED=false 期间清理从未执行）。两开关默认均为 false：
+关闭态下 IP 池**只增不减**（写入不回收），需收敛必须显式打开清理开关。
+
 多进程/多实例下各自 Redis leader 选举（心跳续约 + token 校验主动释放）。
 续约失败时通过 lock_lost Event 联动中止主流程。
 
-设计文档：docs/_archive/AUTO_SCAN_DESIGN.md（v5）
+设计文档：docs/_archive/AUTO_SCAN_DESIGN.md（v5）、
+docs/design/多通道设备信息采集架构.md（§18 扫描调度）
 """
 import threading
 import time
@@ -41,8 +48,10 @@ class ScanSchedulerService:
     """自动扫描调度 + 陈旧度清理服务
 
     两个独立循环：
-    1. 扫描调度：按 SCAN_AUTO_INTERVAL 触发各扫描单元（物理机房/虚拟机房各扫各的）
-    2. 陈旧度清理：按 SCAN_AUTO_CLEANUP_INTERVAL 降级超期未观测的 IP
+    1. 扫描调度：按 SCAN_AUTO_INTERVAL 触发各扫描单元（物理机房/虚拟机房各扫各的），
+       开关 ``SCAN_AUTO_ENABLED``
+    2. 陈旧度清理：按 SCAN_AUTO_CLEANUP_INTERVAL 降级超期未观测的 IP，
+       开关 ``SCAN_AUTO_CLEANUP_ENABLED``（与扫描开关解耦，见模块 docstring）
 
     多进程/多实例下各自 Redis leader 选举（心跳续约 + token 校验主动释放）。
     续约失败时通过 lock_lost Event 联动中止主流程（v5 修复 P0 B）。
@@ -138,7 +147,7 @@ class ScanSchedulerService:
             self._stop_event.wait(interval)
 
     def _cleanup_tick(self):
-        if not self._get_enabled():
+        if not self._get_cleanup_enabled():
             return
         got, token, _lock_lost, renew_stop, renew_thread = self._acquire_lock(self.CLEANUP_LEADER_KEY)
         if not got:
@@ -226,6 +235,14 @@ class ScanSchedulerService:
 
     def _get_enabled(self) -> bool:
         return bool(MonitorDynamicConfig.get("SCAN_AUTO_ENABLED"))
+
+    def _get_cleanup_enabled(self) -> bool:
+        """陈旧度清理开关（独立于扫描总开关）
+
+        与 ``_get_enabled`` 分开的理由见 ``_cleanup_tick``：清理是"收敛存量"，
+        扫描是"采集新数据"，两者的运维诉求不重合。
+        """
+        return bool(MonitorDynamicConfig.get("SCAN_AUTO_CLEANUP_ENABLED"))
 
     def _get_interval(self) -> int:
         return int(MonitorDynamicConfig.get("SCAN_AUTO_INTERVAL") or 21600)

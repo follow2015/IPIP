@@ -164,7 +164,7 @@ esac
 # 会把它拖进无限重启循环，systemctl is-active 显示 activating，极具迷惑性
 # （实测踩到：全新机直接 --with-units，5 个单元全部假死）。装之前先拦住。
 if ! id "$RUN_USER" >/dev/null 2>&1; then
-  die "运行账号不存在: $RUN_USER。先创建系统账号并归属项目目录（示例）：
+  die "运行账号不存在: ${RUN_USER}。先创建系统账号并归属项目目录（示例）：
     sudo useradd -r -M -d $PROJECT_ROOT -s /usr/sbin/nologin $RUN_USER
     sudo chown -R $RUN_USER:$RUN_GROUP $PROJECT_ROOT
   或改用既有账号：--user root --group root（项目在 /root 下时必须）"

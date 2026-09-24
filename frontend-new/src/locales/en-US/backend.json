@@ -291,6 +291,7 @@
   "internal-server-error": "Internal server error",
   "invalid-authentication-token-format": "Invalid authentication token format",
   "invalid-callback-verify-mode-value": "Invalid callback_verify_mode value",
+  "invalid-data-scope-value-x-allow-x": "Invalid data_scope value: {{p0}} (allow: {{p1}})",
   "invalid-end-date-format-should-be-yyyy-mm-dd": "Invalid end_date format, should be YYYY-MM-DD",
   "invalid-file-format-x": "Invalid file format: {{p0}}",
   "invalid-fix-command-x-template-x": "Invalid fix command {{p0}} template: {{p1}}",

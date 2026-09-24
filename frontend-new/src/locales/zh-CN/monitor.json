@@ -409,6 +409,7 @@
       "blindspotRole": "盲区应急组",
       "workerInProcess": "进程内 Worker",
       "scanAutoEnabled": "自动扫描总开关",
+      "scanAutoCleanupEnabled": "陈旧度清理开关",
       "scanAutoInterval": "扫描间隔(秒)",
       "scanAutoRoomIds": "物理机房范围",
       "scanAutoVrIds": "虚拟机房范围",

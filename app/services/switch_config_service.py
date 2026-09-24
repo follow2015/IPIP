@@ -849,18 +849,24 @@ class SwitchConfigService:
 
         Returns:
             list[tuple[str, str]]: [(policy_name, direction), ...]
+
+        Raises:
+            Exception: 设备读取失败原样上抛（R-J）。读取失败必须与「确实无策略」
+                区分——吞掉返回 [] 会让调用方以为端口上没有策略、跳过 undo，
+                取消限速静默失败而计费已按成功记账。
         """
         try:
             config_output = self.ssh_mgr.send_show_command(
                 switch, f"display current-configuration interface {port}",
             )
-            if not config_output:
-                return []
-            adapter = get_adapter(switch.device_type)
-            return adapter.parse_qos_policies(config_output)
         except Exception as e:
-            logger.warning("读取端口 %s 已应用QoS策略失败: %s", port, e)
-            return []
+            logger.error("读取端口 %s 已应用QoS策略失败: %s", port, e)
+            raise
+        if not config_output:
+            logger.error("读取端口 %s 配置回显为空，按读取失败中止", port)
+            raise RuntimeError(f"读取端口 {port} 已应用QoS策略失败：设备回显为空")
+        adapter = get_adapter(switch.device_type)
+        return adapter.parse_qos_policies(config_output)
 
 
     def batch_port_action(self, switch, action: str, ports: list[str],

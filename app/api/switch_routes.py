@@ -1360,6 +1360,17 @@ def port_action(device_id):
                     return
 
                 result = service.dispatch_port_action(sw, action, port, params)
+
+                from app import db as _db
+                try:
+                    _db.session.commit()
+                except Exception as commit_err:
+                    _db.session.rollback()
+                    logger.error("端口操作 DB 提交失败 device=%d port=%s action=%s: %s",
+                                 switch_device_id, port, action, commit_err, exc_info=True)
+                    result = dict(result, success=False,
+                                  error=f"配置已下发设备但数据库提交失败，请人工核对设备侧: {commit_err}")
+
                 success = result.get("success", False)
                 emit_port_action_result(
                     switch_device_id, port, task_id, action,
@@ -1458,6 +1469,17 @@ def batch_port_action(device_id):
                     result = service.batch_port_action_db(
                         switch_device_id, action, resolved_ports, params,
                     )
+
+                from app import db as _db
+                try:
+                    _db.session.commit()
+                except Exception as commit_err:
+                    _db.session.rollback()
+                    logger.error("批量端口操作 DB 提交失败 device=%d action=%s: %s",
+                                 switch_device_id, action, commit_err, exc_info=True)
+                    result = dict(result, success=False,
+                                  error=f"配置已下发设备但数据库提交失败，请人工核对设备侧: {commit_err}",
+                                  succeeded=0, failed=result.get("total", 0))
 
                 success = result.get("success", False)
                 port_display = ",".join(resolved_ports[:5]) + (f" 等 {len(resolved_ports)} 个端口" if len(resolved_ports) > 5 else "")

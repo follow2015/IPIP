@@ -206,6 +206,32 @@ export function useUpdateRoomLayoutMarker(roomId: number) {
   });
 }
 
+export interface RoomLayoutMarkerBatchItem {
+  marker_id: number;
+  expected_version: number;
+  row_number?: number;
+  col_number?: number;
+  marker_type?: string;
+  label?: string | null;
+  notes?: string | null;
+}
+
+export function useBatchUpdateRoomLayoutMarkers(roomId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: RoomLayoutMarkerBatchItem[]) => {
+      const res = await post<null>(`/rooms/${roomId}/layout-markers/batch`, { items });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.rooms.markers(roomId) });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.rooms.markers(roomId) });
+    }
+  });
+}
+
 export function useDeleteRoomLayoutMarker(roomId: number) {
   const queryClient = useQueryClient();
   return useMutation({

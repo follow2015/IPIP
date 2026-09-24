@@ -496,15 +496,21 @@
       "name": "Role Name",
       "displayName": "Display Name",
       "permissionCount": "Permissions",
-      "userCount": "Users"
+      "userCount": "Users",
+      "dataScope": "Data scope",
+      "dataScopeRoomIds": "Visible rooms",
+      "dataScopeDeviceIds": "Visible devices"
     },
     "placeholder": {
       "name": "e.g. admin",
-      "displayName": "e.g. Administrator"
+      "displayName": "e.g. Administrator",
+      "dataScopeRooms": "Select visible rooms",
+      "dataScopeDevices": "Select visible devices"
     },
     "validation": {
       "nameRequired": "Please enter role name",
-      "displayNameRequired": "Please enter display name"
+      "displayNameRequired": "Please enter display name",
+      "dataScopeRequired": "Select at least one item"
     },
     "deleteConfirmContent": "Delete role \"{{name}}\"?",
     "assignTitle": "{{username}} - Assign Roles",
@@ -516,6 +522,12 @@
     "message": {
       "updated": "Roles updated",
       "updateFailed": "Failed to update roles"
+    },
+    "dataScope": {
+      "all": "All devices",
+      "responsible_person": "Only devices I am responsible for",
+      "room": "Specific rooms",
+      "custom": "Specific devices"
     }
   },
   "permission": {

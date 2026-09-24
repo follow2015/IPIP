@@ -56,6 +56,7 @@ const getConfigGroups = (
     title: t('settings.group.scan'),
     fields: [
       'scan_auto_enabled',
+      'scan_auto_cleanup_enabled',
       'scan_auto_interval',
       'scan_auto_room_ids',
       'scan_auto_vr_ids',
@@ -79,6 +80,7 @@ const getFieldLabel = (key: string, t: TFunction<'monitor'>) =>
     blindspot_role: t('settings.field.blindspotRole'),
     worker_in_process: t('settings.field.workerInProcess'),
     scan_auto_enabled: t('settings.field.scanAutoEnabled'),
+    scan_auto_cleanup_enabled: t('settings.field.scanAutoCleanupEnabled'),
     scan_auto_interval: t('settings.field.scanAutoInterval'),
     scan_auto_room_ids: t('settings.field.scanAutoRoomIds'),
     scan_auto_vr_ids: t('settings.field.scanAutoVrIds'),
@@ -255,11 +257,7 @@ export default function MonitorSettings() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Alert
-        type="info"
-        showIcon
-        message={t('settings.hint')}
-      />
+      <Alert type="info" showIcon message={t('settings.hint')} />
 
       <Tabs items={tabItems} />
 

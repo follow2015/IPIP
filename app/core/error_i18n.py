@@ -12,7 +12,7 @@ CI 可用 `--check` 校验产物与源码是否一致。
 2) 双表 —— LITERAL 精确匹配 + PATTERNS 正则匹配（具名组回填 params）。
 3) 只查表不翻译 —— 译文在 frontend-new/src/locales/*/backend.json，与本表同源生成。
 
-覆盖：603/896 条（67%）
+覆盖：604/900 条（67%）
 """
 from __future__ import annotations
 
@@ -484,6 +484,7 @@ PATTERNS: List[Tuple[str, str, Tuple[str, ...]]] = [
     ("模板 {p0} 的厂商（{p1}）与组厂商（{p2}）不一致，不能加入同组", "the-vendor-x-of-template-x-is-inconsistent-with-the-group-ve", ("p0", "p1", "p2",)),
     ("端口不属于该设备 (端口ID: {p0}, 设备ID: {p1})", "port-does-not-belong-to-the-device-port-id-x-device-id-x", ("p0", "p1",)),
     ("{p0}: match_oid 不是合法数字 OID: {p1}", "x-match-oid-is-not-valid-a-number-oid-x", ("p0", "p1",)),
+    ("data_scope 取值非法: {p0}（允许: {p1}）", "invalid-data-scope-value-x-allow-x", ("p0", "p1",)),
     ("device_name 长度不能超过 {p0} 个字符", "device-name-length-cannot-exceed-x-characters", ("p0",)),
     ("SMTP 错误（{p0}:{p1} SSL={p2} TLS={p3}）: {p4}", "smtp-error-x-x-ssl-x-tls-x-x", ("p0", "p1", "p2", "p3", "p4",)),
     ("step[{p0}] 缺少 wait_minutes", "step-x-is-missing-wait-minutes", ("p0",)),

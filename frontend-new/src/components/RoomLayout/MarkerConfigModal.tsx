@@ -17,11 +17,11 @@ import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import {
+  useBatchUpdateRoomLayoutMarkers,
   useCreateRoomLayoutMarker,
   useDeleteRoomLayoutMarker,
   useRoomCabinets,
-  useRoomLayoutMarkers,
-  useUpdateRoomLayoutMarker
+  useRoomLayoutMarkers
 } from '@/services/room';
 import { MARKER_TYPE_LABEL_KEYS, positionLabel } from './palette';
 import type { RoomLayoutMarker } from '@/types/models';
@@ -48,7 +48,7 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
   const { data: markers = [], isLoading } = useRoomLayoutMarkers(roomId);
   const { data: cabinets = [] } = useRoomCabinets(roomId);
   const createMutation = useCreateRoomLayoutMarker(roomId);
-  const updateMutation = useUpdateRoomLayoutMarker(roomId);
+  const batchMutation = useBatchUpdateRoomLayoutMarkers(roomId);
   const deleteMutation = useDeleteRoomLayoutMarker(roomId);
 
   const [form] = Form.useForm<MarkerFormValues>();
@@ -85,7 +85,17 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
           notes: values.notes ?? null
         };
         if (editing) {
-          await updateMutation.mutateAsync({ markerId: editing.id, data: payload });
+          await batchMutation.mutateAsync([
+            {
+              marker_id: editing.id,
+              expected_version: editing.version ?? 0,
+              marker_type: payload.marker_type,
+              row_number: payload.row_number,
+              col_number: payload.col_number,
+              label: payload.label,
+              notes: payload.notes
+            }
+          ]);
           message.success(ta('roomLayout.marker.message.updated'));
         } else {
           await createMutation.mutateAsync(payload);
@@ -93,14 +103,18 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
         }
         setFormOpen(false);
       } catch (err) {
-        message.error(
-          err instanceof Error ? err.message : ta('roomLayout.marker.message.saveFailed')
-        );
+        if (err instanceof Error && err.name === 'Http409') {
+          message.warning(ta('roomLayout.marker.message.versionConflict'));
+        } else {
+          message.error(
+            err instanceof Error ? err.message : ta('roomLayout.marker.message.saveFailed')
+          );
+        }
       } finally {
         setSubmitting(false);
       }
     },
-    [createMutation, editing, ta, updateMutation]
+    [batchMutation, createMutation, editing, ta]
   );
 
   const handleSubmit = useCallback(async () => {

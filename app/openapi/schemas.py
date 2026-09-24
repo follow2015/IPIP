@@ -175,6 +175,7 @@ class RoomLayoutMarkerResponseSchema(Schema):
     marker_type = fields.Str()
     label = fields.Str(allow_none=True)
     notes = fields.Str(allow_none=True)
+    version = fields.Int()
     created_at = fields.Str()
     updated_at = fields.Str()
 
@@ -417,6 +418,7 @@ class CustomerResponseSchema(Schema):
 
 class IPAddressResponseSchema(Schema):
     """IP地址列表项（对齐 GET /ip_addresses — 5表JOIN扁平结果）"""
+    id = fields.Int()
     ip_address = fields.Str()
     room_id = fields.Int(allow_none=True)
     mac_address = fields.Str()
@@ -432,6 +434,7 @@ class IPAddressResponseSchema(Schema):
 
 class IPAddressDetailResponseSchema(Schema):
     """IP地址详情（对齐 GET /ip/<address>）"""
+    id = fields.Int()
     ip_address = fields.Str()
     room_id = fields.Int(allow_none=True)
     mac_address = fields.Str()
@@ -537,6 +540,8 @@ class RoleResponseSchema(Schema):
     display_name = fields.Str()
     description = fields.Str(allow_none=True)
     status = fields.Int()
+    data_scope = fields.Str()
+    data_scope_config = fields.Dict(allow_none=True)
     created_at = fields.Str()
     updated_at = fields.Str()
     permissions = fields.List(fields.Nested(PermissionResponseSchema), allow_none=True)

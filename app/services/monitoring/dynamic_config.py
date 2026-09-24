@@ -112,7 +112,13 @@ _WHITELIST: Dict[str, _Entry] = {
     ),
     "SCAN_AUTO_ENABLED": _Entry(
         "SCAN_AUTO_ENABLED", "bool", False,
-        "自动扫描总开关", True, camel="scan_auto_enabled",
+        "自动扫描总开关（仅控制扫描调度，不控制陈旧度清理）", True,
+        camel="scan_auto_enabled",
+    ),
+    "SCAN_AUTO_CLEANUP_ENABLED": _Entry(
+        "SCAN_AUTO_CLEANUP_ENABLED", "bool", False,
+        "陈旧度清理开关（独立于自动扫描总开关；开启后按清理间隔降级超期未观测的 IP）",
+        True, camel="scan_auto_cleanup_enabled",
     ),
     "SCAN_AUTO_INTERVAL": _Entry(
         "SCAN_AUTO_INTERVAL", "int", 21600,

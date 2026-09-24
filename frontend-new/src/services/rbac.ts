@@ -12,10 +12,14 @@ import { toSelectOptions } from './service-utils';
 import type { Role, RoleDetail, Permission } from '@/types/models';
 import type { PaginatedData, PaginationParams } from '@/types/api';
 
+export type DataScopeMode = 'all' | 'responsible_person' | 'room' | 'custom';
+
 export interface CreateRoleRequest {
   name: string;
   display_name: string;
   description?: string;
+  data_scope?: DataScopeMode;
+  data_scope_config?: { room_ids?: number[]; device_ids?: number[] } | null;
 }
 
 export interface UpdateRoleRequest {
@@ -24,14 +28,18 @@ export interface UpdateRoleRequest {
 }
 
 
-const roleHooks = createCrudHooks<Role & { permission_count?: number; user_count?: number }, CreateRoleRequest, UpdateRoleRequest>({
+const roleHooks = createCrudHooks<
+  Role & { permission_count?: number; user_count?: number },
+  CreateRoleRequest,
+  UpdateRoleRequest
+>({
   basePath: '/rbac/roles',
   queryKey: queryKeys.rbac.all,
   getId: (data) => data.id,
-  toUpdatePayload: (data) => data.data,
+  toUpdatePayload: (data) => data.data
 });
 
-export const useRoleList   = roleHooks.useList;
+export const useRoleList = roleHooks.useList;
 export const useRoleDetail = roleHooks.useDetail;
 export const useCreateRole = roleHooks.useCreate;
 export const useUpdateRole = roleHooks.useUpdate;
@@ -42,9 +50,12 @@ export function usePermissionList(params?: PaginationParams) {
   return useQuery({
     queryKey: queryKeys.rbac.permissions(params),
     queryFn: async () => {
-      const res = await get<PaginatedData<Permission>>('/rbac/permissions', { per_page: 999, ...params });
+      const res = await get<PaginatedData<Permission>>('/rbac/permissions', {
+        per_page: 999,
+        ...params
+      });
       return res.data;
-    },
+    }
   });
 }
 
@@ -54,7 +65,7 @@ export function usePermissionCategories() {
     queryFn: async () => {
       const res = await get<string[]>('/rbac/permissions/categories');
       return res.data;
-    },
+    }
   });
 }
 
@@ -65,7 +76,7 @@ export function useRolePermissions(roleId: number) {
       const res = await get<Permission[]>(`/rbac/roles/${roleId}/permissions`);
       return res.data;
     },
-    enabled: roleId > 0,
+    enabled: roleId > 0
   });
 }
 
@@ -76,7 +87,7 @@ export function useUserRoles(userId: number) {
       const res = await get<Role[]>(`/rbac/users/${userId}/roles`);
       return res.data;
     },
-    enabled: userId > 0,
+    enabled: userId > 0
   });
 }
 
@@ -87,7 +98,7 @@ export function useSetRolePermissions() {
       put<null>(`/rbac/roles/${roleId}/permissions`, { permissions }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.rbac.all });
-    },
+    }
   });
 }
 
@@ -98,7 +109,7 @@ export function useSetUserRoles() {
       put<null>(`/rbac/users/${userId}/roles`, { roles }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.rbac.all });
-    },
+    }
   });
 }
 
@@ -107,7 +118,10 @@ export function useRoleOptions() {
     queryKey: queryKeys.rbac.options,
     queryFn: async () => {
       const res = await get<PaginatedData<Role>>('/rbac/roles', { per_page: 999 });
-      return toSelectOptions(res.data?.items ?? [], 'display_name', 'id') as { label: string; value: string | number }[];
-    },
+      return toSelectOptions(res.data?.items ?? [], 'display_name', 'id') as {
+        label: string;
+        value: string | number;
+      }[];
+    }
   });
 }

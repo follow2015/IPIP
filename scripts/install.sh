@@ -773,7 +773,10 @@ fi
 log "=== [4/7] 初始化 .env ==="
 if [ ! -f "$PROJECT_ROOT/.env" ]; then
   cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
-  warn ".env 已从 .env.example 创建。请编辑 $PROJECT_ROOT/.env 填写实际数据库/Redis 密码后重新运行本脚本。"
+  # R-N（评审报告）：.env 内含 SWITCH_SECRET_KEY / MYSQL_PASSWORD 等明文密钥，
+  # cp 的默认 0644 使同机任意用户可读（对照 .credentials 是 600）。
+  chmod 600 "$PROJECT_ROOT/.env"
+  warn ".env 已从 .env.example 创建（权限 600）。请编辑 $PROJECT_ROOT/.env 填写实际数据库/Redis 密码后重新运行本脚本。"
   warn "（若已配置好 .env，可忽略此提示，脚本将继续执行）"
 else
   log ".env 已存在，跳过创建"

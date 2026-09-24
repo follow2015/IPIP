@@ -269,6 +269,12 @@ class ArpSync:
         - 无 sw_id（真正无法定位）→ 删除该IP的所有 ip_switch_info（含同房间旧记录），
           避免旧的错误定位数据残留
 
+        无归属则不写池（2026-09-24 加固）：
+        ``loc.room_id`` 为 None（ARP 来源交换机/管理IP属主的 ``device.cabinet.room_id``
+        缺失）时**跳过** ip_addresses 的清理与 upsert，只打 warning 留痕。
+        ip_switch_info 仍按定位结果写入（它是"在哪台交换机端口见过这个 IP"的
+        观测事实，删掉即丢数据）。
+
         Args:
             ip: 目标 IP
             mac: MAC 地址
@@ -279,12 +285,20 @@ class ArpSync:
                 可按标记回滚（语义=最近一次写入者）。
         """
         final_room_id = loc.room_id
-
         ip_repo = IPManagerRepository(db_session)
-        ip_repo.delete_ip_switch_info_cross_room(ip, final_room_id)
-        ip_repo.delete_ip_addresses_cross_room(ip, final_room_id)
 
-        ip_repo.upsert_protect_customer(ip, final_room_id, status=IPStatus.ACTIVE)
+        if final_room_id is None:
+            logger.warning(
+                "ARP 定位未解析出机房，跳过 IP 池写入（避免产生无归属孤儿行）",
+                extra={"phase": "arp_sync", "ip": ip, "mac": mac,
+                       "sw_id": loc.sw_id, "port": loc.port,
+                       "kind": loc.kind, "confidence": loc.confidence},
+            )
+        else:
+            ip_repo.delete_ip_switch_info_cross_room(ip, final_room_id)
+            ip_repo.delete_ip_addresses_cross_room(ip, final_room_id)
+
+            ip_repo.upsert_protect_customer(ip, final_room_id, status=IPStatus.ACTIVE)
 
         if loc.sw_id:
             if loc.port:

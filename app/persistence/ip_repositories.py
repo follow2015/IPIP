@@ -282,6 +282,41 @@ class IPManagerRepository(BaseRepository):
         ).filter(*filters).all()
         return {r.ip_address: r.customer_id for r in rows}
 
+    def _find_existing_null_room_ips(self, ip_list: List[str]) -> set:
+        """返回库中已存在且 ``room_id IS NULL`` 的 IP 集合。
+
+        MySQL 唯一约束 ``unique_ip_room(ip_address, room_id)`` 对 NULL 不去重，
+        room_id 为空时同一 IP 可被重复插入（2026-09-24 重复 10.0.1.2 事故），
+        故 NULL 机房场景必须在应用层显式查重。
+        """
+        unique_ips = {ip for ip in ip_list if ip}
+        if not unique_ips:
+            return set()
+        rows = self.session.query(IPManager.ip_address).filter(
+            IPManager.ip_address.in_(unique_ips),
+            IPManager.room_id.is_(None),
+        ).all()
+        return {row[0] for row in rows}
+
+    def _drop_null_room_duplicates(self, rows: List[dict]) -> List[dict]:
+        """剔除 room_id 为空且「库中已存在或本批已出现」的重复行。"""
+        null_ips = [
+            r["ip_address"] for r in rows
+            if r.get("room_id") is None and r.get("ip_address")
+        ]
+        if not null_ips:
+            return rows
+        seen = self._find_existing_null_room_ips(null_ips)
+        kept: List[dict] = []
+        for row in rows:
+            ip = row.get("ip_address")
+            if row.get("room_id") is None and ip:
+                if ip in seen:
+                    continue
+                seen.add(ip)
+            kept.append(row)
+        return kept
+
     def upsert_protect_customer(
         self,
         ip_address: str,
@@ -294,22 +329,62 @@ class IPManagerRepository(BaseRepository):
         ON DUPLICATE KEY UPDATE 时不覆盖 customer_id，
         仅在初次 INSERT 时写入；已有记录不触碰 customer_id 字段。
 
+        **观测即刷新（v5 陈旧度模型）**：写入 ``status=ACTIVE`` 意味着"本轮扫描
+        真的观测到了这个 IP"，因此**必然**同时刷新 ``last_active_at``。这里不给
+        可绕过的开关参数 —— 原实现只有 ARP 之外的路径
+        （``batch_update_active_status_with_timestamp``，且仅限规划网段内）写时间戳，
+        导致生产 868 行 ACTIVE 中 780 行（90%）``last_active_at`` 为空；而陈旧度
+        清理的判据要求 ``last_active_at IS NOT NULL``，这些行**永远不可能被降级**
+        （2026-09-24 排查结论）。BANNED(2) 行的 status 与 last_active_at 都不动。
+
         Args:
             ip_address: IP地址
             room_id: 机房ID
             status: IP状态
             customer_id: 客户ID（仅首次写入）
         """
-        stmt = mysql_insert(IPManager).values(
-            ip_address=ip_address,
-            room_id=room_id,
-            status=status,
-            customer_id=customer_id,
-        )
-        stmt = stmt.on_duplicate_key_update(
-            status=text("CASE WHEN ip_addresses.status = 2 THEN 2 ELSE VALUES(status) END"),
-            updated_at=func.now(),
-        )
+        touch_last_active = int(status) == int(IPStatus.ACTIVE)
+        last_active_expr = text(
+            "CASE WHEN ip_addresses.status = 2 THEN ip_addresses.last_active_at "
+            "ELSE NOW() END"
+        ) if touch_last_active else None
+
+        if room_id is None:
+            existing_id = self.session.query(IPManager.id).filter(
+                IPManager.ip_address == ip_address,
+                IPManager.room_id.is_(None),
+            ).scalar()
+            if existing_id is not None:
+                values = {
+                    "status": text(
+                        "CASE WHEN ip_addresses.status = 2 THEN 2 ELSE :st END"
+                    ),
+                    "updated_at": func.now(),
+                }
+                if last_active_expr is not None:
+                    values["last_active_at"] = last_active_expr
+                self.session.execute(
+                    update(IPManager).where(IPManager.id == existing_id).values(**values),
+                    {"st": int(status)},
+                )
+                self.session.flush()
+                return
+        insert_values = {
+            "ip_address": ip_address,
+            "room_id": room_id,
+            "status": status,
+            "customer_id": customer_id,
+        }
+        if last_active_expr is not None:
+            insert_values["last_active_at"] = func.now()
+        stmt = mysql_insert(IPManager).values(**insert_values)
+        update_map = {
+            "status": text("CASE WHEN ip_addresses.status = 2 THEN 2 ELSE VALUES(status) END"),
+            "updated_at": func.now(),
+        }
+        if last_active_expr is not None:
+            update_map["last_active_at"] = last_active_expr
+        stmt = stmt.on_duplicate_key_update(**update_map)
         self.session.execute(stmt)
         self.session.flush()
 
@@ -556,6 +631,9 @@ class IPManagerRepository(BaseRepository):
         Returns:
             int: 影响行数
         """
+        if not rows:
+            return 0
+        rows = self._drop_null_room_duplicates(rows)
         if not rows:
             return 0
         stmt = mysql_insert(IPManager).values(rows)
@@ -1030,16 +1108,40 @@ class IPManagerRepository(BaseRepository):
         """)).fetchall()
         return {r[0]: r[1] for r in rows}
 
-    def delete_ip_switch_info_cross_room(self, ip: str, room_id: int) -> None:
-        """清理跨房间残留 ip_switch_info"""
+    _CROSS_ROOM_PREDICATE = "(room_id IS NULL OR room_id <> :rid)"
+
+    def delete_ip_switch_info_cross_room(self, ip: str, room_id: Optional[int]) -> None:
+        """清理跨房间残留 ip_switch_info（含 room_id IS NULL 的无归属行）
+
+        防御：``room_id is None`` 时「跨机房」语义不成立（NULL 是「无归属」而非
+        「其他机房」），此时显式含 NULL 的判据会退化成「删除该 IP 的所有行」，
+        故直接返回，绝不执行删除。
+        """
+        if room_id is None:
+            logger.warning(
+                "跨机房清理缺少当前机房（room_id=None），跳过 ip_switch_info 清理",
+                extra={"ip": ip},
+            )
+            return
         self.session.execute(text(
-            "DELETE FROM ip_switch_info WHERE ip_address = :ip AND room_id != :rid"
+            f"DELETE FROM ip_switch_info WHERE ip_address = :ip "
+            f"AND {self._CROSS_ROOM_PREDICATE}"
         ), {"ip": ip, "rid": room_id})
 
-    def delete_ip_addresses_cross_room(self, ip: str, room_id: int) -> None:
-        """清理跨房间残留 ip_addresses"""
+    def delete_ip_addresses_cross_room(self, ip: str, room_id: Optional[int]) -> None:
+        """清理跨房间残留 ip_addresses（含 room_id IS NULL 的无归属行）
+
+        防御同 ``delete_ip_switch_info_cross_room``：``room_id is None`` 直接返回。
+        """
+        if room_id is None:
+            logger.warning(
+                "跨机房清理缺少当前机房（room_id=None），跳过 ip_addresses 清理",
+                extra={"ip": ip},
+            )
+            return
         self.session.execute(text(
-            "DELETE FROM ip_addresses WHERE ip_address = :ip AND room_id != :rid"
+            f"DELETE FROM ip_addresses WHERE ip_address = :ip "
+            f"AND {self._CROSS_ROOM_PREDICATE}"
         ), {"ip": ip, "rid": room_id})
 
     def _upsert_ip_switch_info_row(self, values: dict, update_cols: list[str]) -> None:
@@ -1159,20 +1261,27 @@ class IPManagerRepository(BaseRepository):
             banned_ips.add(ip)
         return banned_ips
 
-    def find_existing_ips_in_other_rooms(self, batch: list[str], room_id: int) -> set[str]:
-        """查找已在其他机房存在的 IP
+    def find_existing_ips_in_other_rooms(self, batch: list[str], room_id: Optional[int]) -> set[str]:
+        """查找已在其他机房存在的 IP（含 room_id IS NULL 的无归属行）
 
-        Args:
-            batch: IP 列表
-            room_id: 当前机房ID
+        判据显式含 NULL（同 ``_CROSS_ROOM_PREDICATE`` 的理由）：无归属行也算
+        「不属本机房」。对账据此跳过插入，避免同一 IP 在「无归属行 + 规划行」
+        之间产生两条记录。取舍是**宁可少一行，不要多一行**。
 
-        Returns:
-            set[str]: 已在其他机房存在的 IP 集合
+        防御：``room_id is None`` 时返回空集合（= 无冲突，照常插入）。这样与
+        改造前的行为一致（原判据 ``room_id != NULL`` 恒 unknown，同样返回空集），
+        避免因换判据而让对账静默停摆。实践中 room_id 来自
+        ``load_planned_networks``（按 ``room_id IN (...)`` 取网段），不会为 None。
         """
+        if room_id is None:
+            logger.warning(
+                "对账查重缺少当前机房（room_id=None），跳过其他机房存在性判定"
+            )
+            return set()
         rows = self.session.execute(
             text(
                 "SELECT ip_address FROM ip_addresses "
-                "WHERE ip_address IN :ips AND room_id != :rid"
+                f"WHERE ip_address IN :ips AND {self._CROSS_ROOM_PREDICATE}"
             ).bindparams(bindparam("ips", expanding=True)),
             {"ips": batch, "rid": room_id}
         ).fetchall()
@@ -1186,12 +1295,18 @@ class IPManagerRepository(BaseRepository):
             room_id: 机房ID
             status: IP 状态
         """
-        if insert_batch:
-            self.session.execute(text("""
-                INSERT IGNORE INTO ip_addresses (ip_address, room_id, status)
-                VALUES (:ip, :rid, :unused)
-            """), [{"ip": ip, "rid": room_id, "unused": status}
-                   for ip in insert_batch])
+        if not insert_batch:
+            return
+        if room_id is None:
+            existing = self._find_existing_null_room_ips(insert_batch)
+            insert_batch = [ip for ip in insert_batch if ip not in existing]
+            if not insert_batch:
+                return
+        self.session.execute(text("""
+            INSERT IGNORE INTO ip_addresses (ip_address, room_id, status)
+            VALUES (:ip, :rid, :unused)
+        """), [{"ip": ip, "rid": room_id, "unused": status}
+               for ip in insert_batch])
 
     def batch_update_active_status(self, active_ips: list[str], room_id: int) -> None:
         """将活跃 IP 标记为 ACTIVE"""

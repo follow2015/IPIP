@@ -21,6 +21,11 @@ class RBACRoleCreateRequestSchema(Schema):
     display_name = fields.Str(allow_none=True, validate=validate.Length(max=100))
     description = fields.Str(allow_none=True, validate=validate.Length(max=255))
     status = fields.Int(allow_none=True, load_default=0)
+    data_scope = fields.Str(
+        load_default="all",
+        validate=validate.OneOf(["all", "responsible_person", "room", "custom"]),
+    )
+    data_scope_config = fields.Dict(allow_none=True, load_default=None)
 
 
 class RBACRoleUpdateRequestSchema(Schema):
@@ -32,6 +37,10 @@ class RBACRoleUpdateRequestSchema(Schema):
     display_name = fields.Str(allow_none=True, validate=validate.Length(max=100))
     description = fields.Str(allow_none=True, validate=validate.Length(max=255))
     status = fields.Int(allow_none=True)
+    data_scope = fields.Str(
+        validate=validate.OneOf(["all", "responsible_person", "room", "custom"])
+    )
+    data_scope_config = fields.Dict(allow_none=True)
 
 
 class RBACRoleBatchDeleteRequestSchema(Schema):

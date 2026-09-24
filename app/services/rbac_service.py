@@ -33,6 +33,57 @@ def _invalidate_role_permission_cache(role_name: str):
         logger.warning("清除角色权限缓存失败: %s", e)
 
 
+_DATA_SCOPE_MODES = ("all", "responsible_person", "room", "custom")
+
+
+def _validate_data_scope(data: Dict[str, Any]):
+    """校验并归一化请求中的 data_scope + data_scope_config。
+
+    Returns:
+        (scope, config)：scope 恒为合法字符串；config 仅 room/custom 模式返回
+        非空结构，其余模式为 None。请求未携带 data_scope 时返回 ``(None, None)``，
+        调用方据此维持现值（部分更新语义）。
+
+    Raises:
+        ValidationError: 取值不在白名单，或 room/custom 模式缺配套配置。
+    """
+    if "data_scope" not in data:
+        return None, None
+
+    scope = (data.get("data_scope") or "all").strip()
+    if scope not in _DATA_SCOPE_MODES:
+        raise ValidationError(
+            f"data_scope 取值非法: {scope}（允许: {'/'.join(_DATA_SCOPE_MODES)}）"
+        )
+
+    if scope in ("all", "responsible_person"):
+        return scope, None
+
+    config = data.get("data_scope_config") or {}
+    if scope == "room":
+        room_ids = config.get("room_ids")
+        if (
+            not isinstance(room_ids, list)
+            or not room_ids
+            or not all(isinstance(i, int) and not isinstance(i, bool) for i in room_ids)
+        ):
+            raise ValidationError(
+                "room 模式需要非空的 data_scope_config.room_ids（整数数组）"
+            )
+        return scope, {"room_ids": room_ids}
+
+    device_ids = config.get("device_ids")
+    if (
+        not isinstance(device_ids, list)
+        or not device_ids
+        or not all(isinstance(i, int) and not isinstance(i, bool) for i in device_ids)
+    ):
+        raise ValidationError(
+            "custom 模式需要非空的 data_scope_config.device_ids（整数数组）"
+        )
+    return scope, {"device_ids": device_ids}
+
+
 class RbacService:
     """RBAC 权限管理服务"""
 
@@ -90,8 +141,13 @@ class RbacService:
             description=data.get("description", ""),
             status=data.get("status", 0),
         )
+
+        scope, scope_config = _validate_data_scope(data)
+        role.data_scope = scope if scope is not None else "all"  # 缺省 = 全部可见
+        role.data_scope_config = scope_config
+
         self.role_repository.session.add(role)
-        logger.info("创建角色成功: %s", name)
+        logger.info("创建角色成功: %s (data_scope=%s)", name, scope)
         return role
 
     def update_role(self, role_id: int, data: Dict[str, Any]) -> Optional[Role]:
@@ -117,8 +173,13 @@ class RbacService:
         role.description = data.get("description", role.description)
         role.status = data.get("status", role.status)
 
+        scope, scope_config = _validate_data_scope(data)
+        if scope is not None:
+            role.data_scope = scope
+            role.data_scope_config = scope_config
+
         _invalidate_role_permission_cache(role.name)
-        logger.info("更新角色成功: %s", role.name)
+        logger.info("更新角色成功: %s (data_scope=%s)", role.name, role.data_scope)
         return role
 
     def delete_role(self, role_id: int) -> bool:

@@ -409,6 +409,7 @@
       "blindspotRole": "Blind Spot Escalation Group",
       "workerInProcess": "In-process Worker",
       "scanAutoEnabled": "Auto Scan Master Switch",
+      "scanAutoCleanupEnabled": "Staleness Cleanup Switch",
       "scanAutoInterval": "Scan Interval (s)",
       "scanAutoRoomIds": "Physical Room Scope",
       "scanAutoVrIds": "Virtual Room Scope",

@@ -496,15 +496,21 @@
       "name": "角色名",
       "displayName": "显示名",
       "permissionCount": "权限数",
-      "userCount": "用户数"
+      "userCount": "用户数",
+      "dataScope": "数据域",
+      "dataScopeRoomIds": "可见机房",
+      "dataScopeDeviceIds": "可见设备"
     },
     "placeholder": {
       "name": "如 admin",
-      "displayName": "如 管理员"
+      "displayName": "如 管理员",
+      "dataScopeRooms": "选择可见的机房",
+      "dataScopeDevices": "选择可见的设备"
     },
     "validation": {
       "nameRequired": "请输入角色名",
-      "displayNameRequired": "请输入显示名"
+      "displayNameRequired": "请输入显示名",
+      "dataScopeRequired": "至少选择一项"
     },
     "deleteConfirmContent": "确定要删除角色「{{name}}」吗？",
     "assignTitle": "{{username}} - 分配角色",
@@ -516,6 +522,12 @@
     "message": {
       "updated": "角色更新成功",
       "updateFailed": "角色更新失败"
+    },
+    "dataScope": {
+      "all": "全部设备",
+      "responsible_person": "仅自己负责的设备",
+      "room": "指定机房",
+      "custom": "指定设备"
     }
   },
   "permission": {

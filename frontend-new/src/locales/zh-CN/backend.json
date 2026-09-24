@@ -291,6 +291,7 @@
   "internal-server-error": "服务器内部错误",
   "invalid-authentication-token-format": "无效的认证令牌格式",
   "invalid-callback-verify-mode-value": "callback_verify_mode 取值非法",
+  "invalid-data-scope-value-x-allow-x": "data_scope 取值非法: {{p0}}（允许: {{p1}}）",
   "invalid-end-date-format-should-be-yyyy-mm-dd": "end_date 格式错误，应为 YYYY-MM-DD",
   "invalid-file-format-x": "文件格式错误: {{p0}}",
   "invalid-fix-command-x-template-x": "修复命令 {{p0}} 模板非法：{{p1}}",
