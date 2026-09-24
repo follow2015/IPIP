@@ -45,6 +45,7 @@
 #   bash scripts/install.sh --skip-db          # 跳过数据库初始化
 #   bash scripts/install.sh --skip-seed        # 跳过种子导入
 #   bash scripts/install.sh --with-units       # 额外安装 systemd 进程托管 unit（需 root）
+#   bash scripts/install.sh --dev-env          # 保持 FLASK_ENV=development（默认收尾改 production 并预检）
 #   bash scripts/install.sh --upgrade          # 升级模式：沿用已装 torch flavor、走迁移升级、跳过种子
 #   bash scripts/install.sh --help
 #
@@ -99,6 +100,9 @@ PIP_INDEX_OFFICIAL="https://pypi.org/simple"
 # 兜底源用中科大 USTC：清华/阿里镜像对长时间大文件下载限速（实测教训），
 # USTC 无此策略。不再把清华作为 pip 兜底。
 PIP_INDEX_FALLBACK="https://mirrors.ustc.edu.cn/pypi/web/simple"
+# 第三源：主源/兜底源都因"单包故障"失败时的最后重试（实测教训：USTC 对 posthog
+# 返回 403，阿里云正常——镜像故障常是源级的，换源才有意义）。
+PIP_INDEX_FALLBACK2="https://mirrors.aliyun.com/pypi/simple/"
 PIP_INDEX_ARG=""   # 空=官方源；非空=携带 -i <url>
 # 探测包取项目自身依赖之一，中等体积（numpy 约 16MB wheel）：太小反映不出
 # 大文件（torch ≈554MB）场景的真实吞吐，太大又拖慢探测本身。
@@ -304,6 +308,7 @@ TORCH_FLAVOR_EXPLICIT=0 # 1=用户显式指定了 --cpu/--gpu/--gpu-fast（C：�
 CUDA_MULTI_MIRROR=0     # 1=用多镜像分散并行预取 CUDA 大包（--gpu-fast）
 WITH_UNITS=0            # 1=安装完成后渲染并安装 systemd unit（T2.1）
 UPGRADE=0               # 1=升级模式（A）：沿用已装 flavor、走迁移升级路径、默认跳过种子
+DEV_ENV=0               # 1=--dev-env：收尾不写 FLASK_ENV=production（开发/测试装机用）
 UNITS_USER=""           # 空=由 install-units.sh 决定默认账号（ipip）
 UNITS_GROUP=""
 UNITS_SCRIPT=""         # 空=按仓库布局自动探测
@@ -318,6 +323,7 @@ while [ $# -gt 0 ]; do
     --gpu)           TORCH_FLAVOR="gpu"; TORCH_FLAVOR_EXPLICIT=1; shift ;;
     --gpu-fast)      TORCH_FLAVOR="gpu"; CUDA_MULTI_MIRROR=1; TORCH_FLAVOR_EXPLICIT=1; shift ;;
     --with-units)    WITH_UNITS=1; shift ;;
+    --dev-env)       DEV_ENV=1; shift ;;
     --upgrade)       UPGRADE=1; shift ;;
     # 取值形式（同时支持 "--k v" 与 "--k=v"）
     # 缺值时给出与前文一致的 [ERROR] 提示，而不是 bash 默认的 "line N: 2: ..."
@@ -380,7 +386,7 @@ if [ "$SOURCE_ROOT" != "$PROJECT_ROOT" ]; then
       || die "代码同步到 $PROJECT_ROOT 失败（tar 回退路径）"
   fi
 else
-  log "副本已位于安装目录 $PROJECT_ROOT，跳过同步"
+  log "副本已位于安装目录 ${PROJECT_ROOT}，跳过同步"
 fi
 cd "$PROJECT_ROOT"
 
@@ -401,7 +407,7 @@ else
   if [ "$SAVED_FLAVOR" = "gpu" ]; then
     RESOLVED_FLAVOR="gpu"
     CUDA_MULTI_MIRROR="${SAVED_CUDA_MIRROR:-0}"
-    warn "沿用上次安装的 GPU 版 torch（记录文件 $FLAVOR_STATE）；如需强制改回 CPU 版请显式加 --cpu"
+    warn "沿用上次安装的 GPU 版 torch（记录文件 ${FLAVOR_STATE}）；如需强制改回 CPU 版请显式加 --cpu"
     if [ "$CUDA_MULTI_MIRROR" = "1" ]; then
       log "沿用多镜像分散预取（--gpu-fast 等价）"
     fi
@@ -731,7 +737,7 @@ fi
 # （避免 GPU 静默降级为 CPU，以及 --gpu-fast 的多镜像分散在升级时丢失）
 mkdir -p "$PROJECT_ROOT/instance"
 printf '%s\n%s\n' "$RESOLVED_FLAVOR" "$CUDA_MULTI_MIRROR" > "$FLAVOR_STATE"
-log "torch flavor 已记录到 $FLAVOR_STATE: $RESOLVED_FLAVOR（cuda_multi_mirror=$CUDA_MULTI_MIRROR）"
+log "torch flavor 已记录到 ${FLAVOR_STATE}: ${RESOLVED_FLAVOR}（cuda_multi_mirror=${CUDA_MULTI_MIRROR}）"
 
 run_timed "升级 pip" script -qec "$VENV_PY -m pip install --upgrade pip wheel setuptools $PIP_INDEX_ARG --timeout 30 --retries 3" /dev/null
 
@@ -741,9 +747,17 @@ if run_timed "安装 requirements.txt" pip_tty \
       "-r $PROJECT_ROOT/requirements.txt $PIP_INDEX_ARG --progress-bar on --timeout 60 --retries 5"; then
   :
 else
-  warn "依赖安装失败，尝试改用中科大镜像重试一次..."
-  run_timed "安装 requirements.txt（中科大镜像重试）" pip_tty \
-      "-r $PROJECT_ROOT/requirements.txt -i $PIP_INDEX_FALLBACK --progress-bar on --timeout 60 --retries 5" \
+  # ⚠️ 重试必须换一个**没失败过的**源。旧逻辑固定用 $PIP_INDEX_FALLBACK 重试，
+  # 而该值常就是首跑已选中的源 → 同一个 403 连死两次（实测：USTC 对 posthog 403，
+  # 首跑选中 USTC，重试还是 USTC，安装中断）。
+  case "${PIP_INDEX_ARG}" in
+    *"$PIP_INDEX_FALLBACK"*) RETRY_INDEX="$PIP_INDEX_FALLBACK2" ;;  # 首跑用了 USTC → 换阿里云
+    "")                      RETRY_INDEX="$PIP_INDEX_FALLBACK"  ;;  # 首跑用官方 → 换 USTC
+    *)                       RETRY_INDEX="$PIP_INDEX_FALLBACK2" ;;  # 其它（强制指定源）→ 阿里云
+  esac
+  warn "依赖安装失败，换用 $(echo "$RETRY_INDEX" | cut -d/ -f3) 重试一次..."
+  run_timed "安装 requirements.txt（备用镜像重试）" pip_tty \
+      "-r $PROJECT_ROOT/requirements.txt -i $RETRY_INDEX --progress-bar on --timeout 60 --retries 5" \
     || die "依赖安装失败。若报错为 ResolutionImpossible/版本冲突，属 requirements.txt 内部矛盾（非网络问题）；若卡在大包下载，可加 --gpu-fast 或设置 PIP_INDEX_URL 指定更快镜像。"
 fi
 log "Python 依赖安装完成"
@@ -765,11 +779,13 @@ else
   log ".env 已存在，跳过创建"
 fi
 
-# 安全密钥自动注入：SECRET_KEY / JWT_SECRET_KEY / SWITCH_SECRET_KEY 凡缺失（含整行
-# 不存在、空值、或仍是 change-me 占位符）一律生成 64 位随机 hex，杜绝弱默认密钥
-# 上线（生产配置对占位符会直接拒绝启动，此处提前修复，避免部署者漏填）。
+# 安全密钥自动注入：SECRET_KEY / JWT_SECRET_KEY / SWITCH_SECRET_KEY / METRICS_TOKEN
+# 凡缺失（含整行不存在、空值、或仍是 change-me 占位符）一律生成 64 位随机 hex，
+# 杜绝弱默认密钥上线（生产配置对占位符会直接拒绝启动，此处提前修复，避免部署者漏填）。
 # SWITCH_SECRET_KEY 是设备凭据加密密钥，FLASK_ENV=production 时**强制非空**，
 # 缺失会让服务启动即崩（实测：monitor 因此被 systemd 反复拉起后进入 failed）。
+# METRICS_TOKEN 保护 /metrics：生产硬校验要求「口令 / IP 白名单 / 关闭」至少一项，
+# 生成随机口令既通过校验又真正保护端点（实测：漏掉它时 production 启动被 fail-fast 拒绝）。
 "$VENV_PY" - <<PYEOF
 import re, secrets
 from pathlib import Path
@@ -777,7 +793,7 @@ from pathlib import Path
 p = Path("$PROJECT_ROOT/.env")
 lines = p.read_text().splitlines()
 generated = []
-targets = {"SECRET_KEY", "JWT_SECRET_KEY", "SWITCH_SECRET_KEY"}
+targets = {"SECRET_KEY", "JWT_SECRET_KEY", "SWITCH_SECRET_KEY", "METRICS_TOKEN"}
 present = set()
 for i, line in enumerate(lines):
     m = re.match(r"^([A-Z_]+)=(.*)$", line)
@@ -801,6 +817,29 @@ if generated:
 else:
     print("    SECRET_KEY / JWT_SECRET_KEY / SWITCH_SECRET_KEY 已配置，跳过")
 PYEOF
+
+# ── P0-A（评审报告 R-A）：收尾固化 FLASK_ENV=production ──────────
+# install.sh 是生产安装器，但装完 .env 仍是 .env.example 带来的
+# FLASK_ENV=development ⇒ 生产裸奔（DevelopmentConfig：DEBUG=True、六项硬校验
+# 全部绕过），实测确认。收尾显式写 production 并跑离线预检；开发/测试装机用
+# --dev-env 保持 development（CI 冒烟口径不受影响，其决策见 .gitea/workflows/ci.yml）。
+if [ "$DEV_ENV" -eq 1 ]; then
+  log "保持 FLASK_ENV=development（--dev-env：开发/测试装机，生产硬校验不生效）"
+else
+  CUR_ENV="$(grep -m1 '^FLASK_ENV=' "$PROJECT_ROOT/.env" | cut -d= -f2- || true)"
+  if [ "$CUR_ENV" != "production" ]; then
+    if grep -q '^FLASK_ENV=' "$PROJECT_ROOT/.env"; then
+      sed -i "s/^FLASK_ENV=.*/FLASK_ENV=production/" "$PROJECT_ROOT/.env"
+    else
+      printf 'FLASK_ENV=production\n' >> "$PROJECT_ROOT/.env"
+    fi
+    log "已将 FLASK_ENV: ${CUR_ENV:-<缺失>} → production（install.sh 为生产安装器；开发环境请加 --dev-env）"
+  fi
+  # 写完即预检：「装完」≠「能起」——六项硬校验缺哪项当场点名，比启动时撞
+  # fail-fast 早一个阶段（实测：METRICS_EXPOSURE 就是装完第一次启动才炸出来的）。
+  "$VENV_PY" "$PROJECT_ROOT/scripts/precheck_prod_config.py" --env-file "$PROJECT_ROOT/.env" \
+    || die "生产配置预检未通过（见上方逐项清单）。按建议补全 .env 后重跑本脚本即可，无需重装。"
+fi
 # ⚠️ 不能用 `set -a; . .env`：.env 不是 shell 脚本。值里含 $ / 反引号 / 空格时，
 # source 会真的去执行它们 —— 实测踩到：随机生成的 MySQL 密码含 '$'（9ai$aoGx…），
 # source 时被当作变量展开，set -u 下报 "aoGxEm3Y: unbound variable" 直接中断安装。
@@ -863,7 +902,7 @@ else
         $VENV_PY scripts/download_models.py --only embedding    # 只下必需的 92MB"
   ) &
   MODELS_DOWNLOAD_PID=$!
-  log "RAG 模型下载已在后台启动（PID $MODELS_DOWNLOAD_PID），与 DB 初始化并行"
+  log "RAG 模型下载已在后台启动（PID ${MODELS_DOWNLOAD_PID}），与 DB 初始化并行"
 fi
 
 # ── 5. 数据库初始化 ────────────────────────────────────────
@@ -874,7 +913,10 @@ else
   DB_HOST="${MYSQL_HOST:-localhost}"
   DB_PORT="${MYSQL_PORT:-3306}"
   DB_USER="${MYSQL_USER:-root}"
-  DB_NAME="${MYSQL_DATABASE:-ip_manager}"
+  # ⚠️ 兜底默认必须与 .env.example（MYSQL_DATABASE=ip_management）一致。
+  # 旧值 ip_manager 与模板不一致：.env 缺该键时会静默建/用错库（实测踩到：
+  # 授权/导入按文档口径 ip_manager 建了库，脚本却连 ip_management）。
+  DB_NAME="${MYSQL_DATABASE:-ip_management}"
   export MYSQL_PWD="${MYSQL_PASSWORD:-}"
 
   log "预检 MySQL 连通性 ($DB_HOST:$DB_PORT)..."
@@ -885,6 +927,41 @@ c = pymysql.connect(host="$DB_HOST", port=int("$DB_PORT"), user="$DB_USER",
                     password=os.getenv("MYSQL_PASSWORD",""), charset="utf8mb4")
 c.close()
 print("    MySQL 连接 OK")
+PYEOF
+
+  # MySQL 8 默认开启 binlog；权威基线 0000_baseline.sql 含 15 个触发器/函数，
+  # 该状态下导入会 ERROR 1419（无 SUPER 权限 + binlog）——实测全新安装当场中断。
+  # 这里预检并在有权限时自动 SET GLOBAL；无权限则给出精确修复指令后中止。
+  # 注意 SET GLOBAL 仅运行时生效：持久化需 my.cnf [mysqld] 加
+  # log_bin_trust_function_creators=1（否则 MySQL 重启后升级导入会再次 1419）。
+  "$VENV_PY" - << PYEOF || die "log_bin_trust_function_creators 未开启且当前账号无权修改。请用 MySQL 管理员执行：
+        mysql -uroot -p -e \"SET GLOBAL log_bin_trust_function_creators = 1;\"
+        并建议在 my.cnf [mysqld] 持久化（SET GLOBAL 重启后失效）：log_bin_trust_function_creators=1"
+import pymysql, os, sys
+c = pymysql.connect(host="$DB_HOST", port=int("$DB_PORT"), user="$DB_USER",
+                     init_command="SET time_zone='+00:00'",
+                  password=os.getenv("MYSQL_PASSWORD",""), charset="utf8mb4",
+                  autocommit=True)
+cur = c.cursor()
+cur.execute("SELECT @@global.log_bin, @@global.log_bin_trust_function_creators")
+log_bin, tfc = cur.fetchone()
+if not log_bin or tfc:
+    print("    log_bin_trust_function_creators 预检通过（log_bin=%s, trust_function_creators=%s）" % (log_bin, tfc))
+    c.close()
+    sys.exit(0)
+try:
+    cur.execute("SET GLOBAL log_bin_trust_function_creators = 1")
+except Exception as e:
+    sys.stderr.write("binlog 已开启且 trust_function_creators=0，当前账号无权 SET GLOBAL：%s\n" % e)
+    c.close()
+    sys.exit(1)
+cur.execute("SELECT @@global.log_bin_trust_function_creators")
+ok = cur.fetchone()[0]
+c.close()
+if not ok:
+    sys.stderr.write("SET GLOBAL 已执行但未生效\n")
+    sys.exit(1)
+print("    已自动开启 log_bin_trust_function_creators（基线含触发器/函数，MySQL 8 默认 binlog 下必需）")
 PYEOF
 
   log "创建数据库 ${DB_NAME}（若不存在）..."
@@ -1129,7 +1206,12 @@ elif [ "$UNITS_INSTALLED" -eq 1 ]; then
   log "  3) curl -fsS http://127.0.0.1:${FLASK_PORT:-5000}/api/health/check"
 else
   log "安装完成 ✅"
-  log "下一步: 编辑 .env 确认配置后，执行 bash scripts/start.sh 启动系统"
-  log "  需要 systemd 托管进程时：重跑本脚本并加 --with-units"
+  if [ "$DEV_ENV" -eq 1 ]; then
+    log "下一步: 编辑 .env 确认配置后，执行 bash scripts/start.sh 启动系统（FLASK_ENV=development）"
+  else
+    # P0-A 收尾后配置已过预检，提示语与实际状态一致（不再是"请编辑 .env"的悬念）
+    log "下一步: 配置已通过生产预检（FLASK_ENV=production），执行 bash scripts/start.sh 启动系统"
+    log "  切换环境后务必 stop 再 start（restart 对 gunicorn 旧进程不保证换环境）；systemd 托管则加 --with-units"
+  fi
 fi
 log "============================================================"
