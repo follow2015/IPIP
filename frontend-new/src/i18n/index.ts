@@ -67,6 +67,13 @@ const syncDayjs = (lng: string) => {
   dayjs.locale(DAYJS_LOCALE[lng as AppLanguage] ?? 'en');
 };
 
+const syncDocumentMeta = (lng: string) => {
+  if (typeof document === 'undefined') return;
+  document.documentElement.lang = lng;
+  const title = i18next.t('app.title', { defaultValue: 'IPIP' });
+  if (title) document.title = title;
+};
+
 const PSEUDO_ENABLED =
   typeof globalThis !== 'undefined' &&
   new URLSearchParams(globalThis.location.search).get('pseudo') === '1';
@@ -93,7 +100,9 @@ i18next
   });
 
 syncDayjs(i18next.language);
+syncDocumentMeta(i18next.language);
 i18next.on('languageChanged', syncDayjs);
+i18next.on('languageChanged', syncDocumentMeta);
 
 export function changeLanguage(lng: AppLanguage): Promise<unknown> {
   return i18next.changeLanguage(lng);

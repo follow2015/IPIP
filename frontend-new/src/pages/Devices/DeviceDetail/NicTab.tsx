@@ -8,7 +8,8 @@ import { useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import { useConfirm } from '@/utils/confirm';
 import { useTranslation } from 'react-i18next';
-import { Table, Button, Space, Modal, Form, Input, InputNumber, Select } from 'antd';
+import DataTable from '@/components/DataTable';
+import { Button, Space, Modal, Form, Input, InputNumber, Select } from 'antd';
 import { AppstoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   useDeviceNics,
@@ -193,39 +194,56 @@ function NicTab({ deviceId }: NicTabProps) {
       title: tCommon('field.actions'),
       key: 'action',
       width: 80,
-      render: (_: unknown, record: DeviceNicPort) => (
-        <Space>
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          />
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() =>
-              confirm({
-                title: t('nic.confirmDelete'),
-                okText: tCommon('action.delete'),
-                okButtonProps: { danger: true },
-                onOk: async () => {
-                  try {
-                    await deleteNic.mutateAsync(record.id);
-                    message.success(tCommon('message.deleteSuccess'));
-                  } catch (err) {
-                    message.error(err instanceof Error ? err.message : tCommon('message.deleteFailed'));
-                  }
-                }
-              })
-            }
-          />
-        </Space>
-      )
+      render: (_: unknown, record: DeviceNicPort) => renderNicActions(record)
     }
   ];
+
+  const renderNicActions = (record: DeviceNicPort) => (
+    <Space wrap>
+      <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+      <Button
+        type="link"
+        size="small"
+        danger
+        icon={<DeleteOutlined />}
+        onClick={() =>
+          confirm({
+            title: t('nic.confirmDelete'),
+            okText: tCommon('action.delete'),
+            okButtonProps: { danger: true },
+            onOk: async () => {
+              try {
+                await deleteNic.mutateAsync(record.id);
+                message.success(tCommon('message.deleteSuccess'));
+              } catch (err) {
+                message.error(
+                  err instanceof Error ? err.message : tCommon('message.deleteFailed')
+                );
+              }
+            }
+          })
+        }
+      />
+    </Space>
+  );
+
+  const renderNicCard = (r: DeviceNicPort) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Space size={8} wrap>
+        <span style={{ fontWeight: 500 }}>{r.display_name}</span>
+        <StatusTag status={r.port_status} statusMap={PORT_USAGE_STATUS_MAP} />
+      </Space>
+      <div style={{ fontSize: 12, color: '#666' }}>
+        {t('nic.column.nicIndex')}: {r.nic_number ?? '-'} · {t('nic.column.portIndex')}:{' '}
+        {r.port_number ?? '-'}
+      </div>
+      <div style={{ fontSize: 12, color: '#666' }}>
+        {r.port_name || '-'} · {r.port_type || '-'} · {r.port_speed || '-'}
+      </div>
+      {r.description && <div style={{ fontSize: 12, color: '#999' }}>{r.description}</div>}
+      {renderNicActions(r)}
+    </div>
+  );
 
   return (
     <div>
@@ -262,12 +280,16 @@ function NicTab({ deviceId }: NicTabProps) {
         </Space>
       </div>
 
-      <Table
+      <DataTable
         columns={columns}
         dataSource={nics ?? []}
         rowKey="id"
         loading={isLoading}
         size="small"
+        searchable={false}
+        showCard={false}
+        mobileCardMode
+        cardRender={renderNicCard}
         rowSelection={batch.rowSelection}
         scroll={{ x: 'max-content' }}
       />

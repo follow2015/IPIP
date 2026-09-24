@@ -3,7 +3,7 @@
  * - Card(基本信息) + Card(资源统计)
  */
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Button, Descriptions, Spin, Result, Table, Tag } from 'antd';
+import { Card, Button, Descriptions, Spin, Result, Tag } from 'antd';
 import { ArrowLeftOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useMessage } from '@/hooks/useMessage';
 import {
@@ -17,6 +17,7 @@ import { StatusTag } from '@/components/StatusTag';
 import { CUSTOMER_STATUS_MAP, CustomerStatusCode } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
 import { useTranslation } from 'react-i18next';
+import DataTable from '@/components/DataTable';
 
 function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +63,45 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
       message.error(td('customer.message.exportFailed'));
     }
   };
+
+  const renderArchiveActions = (hasPdf: boolean) => (
+    <Button
+      type="link"
+      size="small"
+      icon={<DownloadOutlined />}
+      disabled={!hasPdf}
+      onClick={async () => {
+        try {
+          await downloadTerminationArchive(customerId, customer.customer_name);
+        } catch {
+          message.error(td('customer.message.downloadFailed'));
+        }
+      }}
+    >
+      {td('customer.archive.download')}
+    </Button>
+  );
+
+  const renderArchiveCard = (a: NonNullable<typeof archives>[number]) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ fontSize: 12, color: '#999' }}>
+        {a.created_at ? formatDateTime(a.created_at) : '-'}
+      </div>
+      <div>
+        <span style={{ marginRight: 8 }}>{a.operator_name ?? '-'}</span>
+        {a.has_pdf ? (
+          <Tag color="green">{td('customer.archive.generated')}</Tag>
+        ) : (
+          <Tag color="orange">{td('customer.archive.notGenerated')}</Tag>
+        )}
+      </div>
+      {a.reason && <div style={{ fontSize: 12 }}>{a.reason}</div>}
+      <div style={{ fontSize: 12, color: '#999' }}>
+        {a.pdf_size != null ? `${(a.pdf_size / 1024).toFixed(1)} KB` : '-'}
+      </div>
+      {renderArchiveActions(a.has_pdf)}
+    </div>
+  );
 
   return (
     <div>
@@ -154,11 +194,15 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
       {isTerminated && (
         <Card title={td('customer.archive.title')} style={{ marginTop: 16 }}>
           {archives && archives.length > 0 ? (
-            <Table
+            <DataTable
               size="small"
               rowKey="id"
               dataSource={archives}
               pagination={false}
+              searchable={false}
+              showCard={false}
+              mobileCardMode
+              cardRender={renderArchiveCard}
               columns={[
                 {
                   title: td('customer.archive.terminatedAt'),
@@ -193,23 +237,8 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
                 {
                   title: tc('field.actions'),
                   key: 'action',
-                  render: (_: unknown, r: (typeof archives)[number]) => (
-                    <Button
-                      type="link"
-                      size="small"
-                      icon={<DownloadOutlined />}
-                      disabled={!r.has_pdf}
-                      onClick={async () => {
-                        try {
-                          await downloadTerminationArchive(customerId, customer.customer_name);
-                        } catch {
-                          message.error(td('customer.message.downloadFailed'));
-                        }
-                      }}
-                    >
-                      {td('customer.archive.download')}
-                    </Button>
-                  )
+                  render: (_: unknown, r: NonNullable<typeof archives>[number]) =>
+                    renderArchiveActions(r.has_pdf)
                 }
               ]}
               scroll={{ x: 'max-content' }}

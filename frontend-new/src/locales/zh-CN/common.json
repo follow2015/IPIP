@@ -106,7 +106,8 @@
     "switchTo": "切换语言"
   },
   "app": {
-    "name": "IPIP 管理系统"
+    "name": "IPIP 管理系统",
+    "title": "IPIP 数据中心管理系统"
   },
   "menu": {
     "dashboard": "仪表盘",

@@ -4,12 +4,14 @@
  * - 展示该 IP 的分配/释放/状态变更历史
  * - 使用 Table + Timeline 展示
  */
-import { Table, Tag, Timeline } from 'antd';
+import { Space, Tag, Timeline } from 'antd';
 import { useIPAllocationLogs } from '@/services/ip-allocation';
 import type { IPAllocationLog } from '@/types/models';
 import { getIPStatusMeta, type DeviceT } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '@/utils/format';
+import DataTable from '@/components/DataTable';
+import { useResponsive } from '@/hooks/useResponsive';
 
 type AllocationActionKey =
   | 'allocation.action.allocate'
@@ -38,6 +40,27 @@ function AllocationHistory({ ipAddress, roomId }: AllocationHistoryProps) {
   const { t } = useTranslation('network');
   const { data, isLoading } = useIPAllocationLogs(ipAddress, roomId);
   const logs = data ?? [];
+  const { isMobile } = useResponsive();
+
+  const renderLogCard = (log: IPAllocationLog) => {
+    const actionInfo = ACTION_LABEL_MAP[log.action];
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <Space size={8} wrap>
+          <Tag color={actionInfo?.color}>
+            {actionInfo ? t(actionInfo.labelKey) : log.action}
+          </Tag>
+          <span style={{ color: '#999', fontSize: 12 }}>{formatDateTime(log.created_at)}</span>
+        </Space>
+        <div style={{ fontSize: 12 }}>
+          {renderStatusValue(log.old_status, td)} → {renderStatusValue(log.new_status, td)}
+        </div>
+        <div style={{ fontSize: 12, color: '#999' }}>
+          {t('allocation.operator', { id: log.operator_id })}
+        </div>
+      </div>
+    );
+  };
 
   const columns = [
     {
@@ -105,17 +128,21 @@ function AllocationHistory({ ipAddress, roomId }: AllocationHistoryProps) {
   return (
     <div>
       {/* 表格视图 */}
-      <Table<IPAllocationLog>
+      <DataTable<IPAllocationLog>
         columns={columns}
         dataSource={logs}
         loading={isLoading}
         rowKey="id"
         pagination={false}
         size="small"
+        searchable={false}
+        showCard={false}
+        mobileCardMode
+        cardRender={renderLogCard}
       />
 
-      {/* Timeline 视图（可选，数据量少时更直观） */}
-      {logs.length > 0 && logs.length <= 10 && (
+      {/* Timeline 视图（可选，数据量少时更直观）；窄屏让位给卡片模式，避免同一份数据重复呈现 */}
+      {!isMobile && logs.length > 0 && logs.length <= 10 && (
         <div style={{ marginTop: 16 }}>
           <Timeline items={timelineItems} />
         </div>

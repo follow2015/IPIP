@@ -106,7 +106,8 @@
     "switchTo": "Switch language"
   },
   "app": {
-    "name": "IPIP Management System"
+    "name": "IPIP Management System",
+    "title": "IPIP Data Center Management System"
   },
   "menu": {
     "dashboard": "Dashboard",

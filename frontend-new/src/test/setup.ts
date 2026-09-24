@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { beforeAll, vi } from 'vitest';
+import axios, { AxiosError } from 'axios';
+import { afterEach, beforeAll, vi } from 'vitest';
 import i18n from '../i18n';
 
 if (!window.matchMedia) {
@@ -52,6 +53,31 @@ if (typeof globalThis.localStorage === 'undefined') {
     value: createMemoryStorage()
   });
 }
+
+const NO_NETWORK_MESSAGE =
+  '[test] real network requests are disabled: mock the target service in your test, ' +
+  'or override this stub via vi.stubGlobal';
+
+const pendingRejects = new Set<ReturnType<typeof setTimeout>>();
+
+const rejectOnNextTick = (makeError: () => unknown): Promise<never> =>
+  new Promise((_resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingRejects.delete(timer);
+      reject(makeError());
+    }, 0);
+    pendingRejects.add(timer);
+  });
+
+axios.defaults.adapter = (config) =>
+  rejectOnNextTick(() => new AxiosError(NO_NETWORK_MESSAGE, AxiosError.ERR_NETWORK, config));
+
+vi.stubGlobal('fetch', () => rejectOnNextTick(() => new Error(NO_NETWORK_MESSAGE)));
+
+afterEach(() => {
+  pendingRejects.forEach(clearTimeout);
+  pendingRejects.clear();
+});
 
 beforeAll(async () => {
   await i18n.changeLanguage('zh-CN');

@@ -22,10 +22,27 @@ class DeviceOperationConflict(Exception):
 
 
 class DeviceOpLock:
-    """设备级操作锁（Redis / 内存双模式）"""
+    """设备级操作锁（Redis / 内存双模式，**支持同线程内重入**）
+
+    为什么必须支持重入
+    ------------------
+    这是把互斥下沉到 ``CommandDispatcher._send_config`` 的前提。下沉后，
+    已经持锁的调用方（如 ``lag_config_service.remove_port_from_channel``）
+    会在 with 块内部再次进入 ``_send_config`` -> 二次 acquire 同一把锁：
+
+    - 内存模式用的是 ``threading.Lock``（**不是 RLock**），同线程二次 acquire 直接死锁；
+    - Redis 模式的 redis-py 可重入只在**同一 Lock 实例**内靠 ``local.token +
+      _lock_count`` 生效，而 ``acquire()`` 每次都新建 ``r.lock(...)`` 实例，
+      换实例即自我等待，直到 ``blocking_timeout`` 超时才抛
+      ``DeviceOperationConflict``。
+
+    因此重入语义必须在本类实现：**同一线程**对同一 ``lock_key`` 的嵌套 acquire
+    只增加计数，不再次向底层申请锁；计数归零时才真正释放。
+    """
 
     _local_locks: dict = {}
     _meta_lock = threading.Lock()
+    _reentrant_local = threading.local()
 
     def _get_local_lock(self, key) -> threading.Lock:
         """获取或创建设备级线程锁（按 key 隔离，key 可为 device_id 或 lock_key 字符串）"""
@@ -68,17 +85,32 @@ class DeviceOpLock:
             else:
                 lock_key = f"device_op_lock:{device_id}"
 
+        held = getattr(self._reentrant_local, "map", None)
+        if held is None:
+            held = {}
+            self._reentrant_local.map = held
+        rec = held.get(lock_key)
+        if rec is not None:
+            rec[0] += 1
+            try:
+                yield
+            finally:
+                rec[0] -= 1
+            return
+
         if r:
             lock = r.lock(
                 lock_key,
                 timeout=timeout * 2,  # 自动释放时间 = 操作超时的2倍
                 blocking_timeout=timeout,  # 等待时间 = 操作超时
+                thread_local=False,
             )
             acquired = lock.acquire(blocking=True)
             if not acquired:
                 raise DeviceOperationConflict(
                     f"设备 {device_id} 当前有 SSH 操作正在执行，请稍后重试（超时 {timeout}s）"
                 )
+            held[lock_key] = [1]  # 记账：本线程外层持有（此后嵌套 acquire 走重入分支）
             stop_renew = threading.Event()
             renew_period = max((timeout * 2) / 4.0, 0.05)
 
@@ -101,6 +133,7 @@ class DeviceOpLock:
             try:
                 yield
             finally:
+                held.pop(lock_key, None)  # 摘记账，避免异常路径残留导致永久重入
                 stop_renew.set()
                 renew_thread.join(timeout=1)
                 try:
@@ -117,9 +150,11 @@ class DeviceOpLock:
                 raise DeviceOperationConflict(
                     f"设备 {device_id} 当前有 SSH 操作正在执行，请稍后重试"
                 )
+            held[lock_key] = [1]
             try:
                 yield
             finally:
+                held.pop(lock_key, None)
                 lock.release()
 
 

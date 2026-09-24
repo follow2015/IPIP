@@ -1,7 +1,7 @@
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useState, useMemo } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
-import { Table, Button, Space, Card, Tabs, Tag, Switch } from 'antd';
+import { Button, Space, Card, Tabs, Tag, Switch } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
@@ -9,6 +9,7 @@ import {
   SafetyOutlined,
   KeyOutlined
 } from '@ant-design/icons';
+import DataTable from '@/components/DataTable';
 import RoleForm from './RoleForm';
 import PermissionAssign from './PermissionAssign';
 import {
@@ -130,32 +131,55 @@ function RBAC() {
     {
       title: tc('field.actions'),
       key: 'action',
-      render: (_: unknown, r: Role) => (
-        <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(r)}>
-            {tc('action.edit')}
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<SafetyOutlined />}
-            onClick={() => handlePermAssign(r)}
-          >
-            {t('permission.label')}
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(r)}
-          >
-            {tc('action.delete')}
-          </Button>
-        </Space>
-      )
+      render: (_: unknown, r: Role) => renderRoleActions(r)
     }
   ];
+
+  const renderRoleActions = (r: Role) => (
+    <Space wrap>
+      <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(r)}>
+        {tc('action.edit')}
+      </Button>
+      <Button
+        type="link"
+        size="small"
+        icon={<SafetyOutlined />}
+        onClick={() => handlePermAssign(r)}
+      >
+        {t('permission.label')}
+      </Button>
+      <Button
+        type="link"
+        size="small"
+        danger
+        icon={<DeleteOutlined />}
+        onClick={() => handleDelete(r)}
+      >
+        {tc('action.delete')}
+      </Button>
+    </Space>
+  );
+
+  const renderRoleCard = (r: Role) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Space size={8} wrap>
+        <span style={{ fontWeight: 500 }}>{r.display_name ?? r.name}</span>
+        {r.status === 0 ? (
+          <Tag color="green">{t('role.status.normal')}</Tag>
+        ) : (
+          <Tag color="red">{t('role.status.disabled')}</Tag>
+        )}
+      </Space>
+      <div style={{ fontSize: 12, color: '#666' }}>
+        {t('role.field.permissionCount')}:{' '}
+        {(r as Role & { permission_count?: number }).permission_count ?? r.permissions?.length ?? 0}
+        {' · '}
+        {t('role.field.userCount')}: {r.user_count ?? 0}
+      </div>
+      {r.description && <div style={{ fontSize: 12, color: '#999' }}>{r.description}</div>}
+      {renderRoleActions(r)}
+    </div>
+  );
 
   const permCategories = useMemo(() => {
     const map = new Map<string, Permission[]>();
@@ -190,6 +214,19 @@ function RBAC() {
     }
   ];
 
+  const renderPermCard = (p: Permission) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Space size={8} wrap>
+        <Tag>{p.code}</Tag>
+        <span style={{ fontWeight: 500 }}>{p.name}</span>
+      </Space>
+      <div style={{ fontSize: 12, color: '#666' }}>
+        {p.category ?? t('permission.uncategorized')}
+      </div>
+      {p.description && <div style={{ fontSize: 12, color: '#999' }}>{p.description}</div>}
+    </div>
+  );
+
   return (
     <Card>
       <Tabs
@@ -206,12 +243,16 @@ function RBAC() {
                     {t('role.action.add')}
                   </Button>
                 </div>
-                <Table<Role>
+                <DataTable<Role>
                   columns={roleColumns}
                   dataSource={roles}
                   rowKey="id"
                   loading={rolesLoading}
                   size="small"
+                  searchable={false}
+                  showCard={false}
+                  mobileCardMode
+                  cardRender={renderRoleCard}
                   scroll={{ x: 'max-content' }}
                 />
               </>
@@ -221,12 +262,16 @@ function RBAC() {
             key: 'permissions',
             label: t('rbac.tab.permissions'),
             children: (
-              <Table<Permission>
+              <DataTable<Permission>
                 columns={permColumns}
                 dataSource={permissions}
                 rowKey="id"
                 loading={permsLoading}
                 size="small"
+                searchable={false}
+                showCard={false}
+                mobileCardMode
+                cardRender={renderPermCard}
                 pagination={{ pageSize: 20, showTotal: (t) => tc('pagination.total', { count: t }) }}
                 scroll={{ x: 'max-content' }}
               />

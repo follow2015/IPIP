@@ -514,6 +514,8 @@ function Switches() {
                     rowSelection={rowSelection}
                     searchable={false}
                     showCard={false}
+                    mobileCardMode
+                    cardRender={renderSwitchCard}
                   />
                 )
               },
@@ -530,6 +532,8 @@ function Switches() {
                     rowSelection={rowSelection}
                     searchable={false}
                     showCard={false}
+                    mobileCardMode
+                    cardRender={renderSwitchCard}
                   />
                 )
               }

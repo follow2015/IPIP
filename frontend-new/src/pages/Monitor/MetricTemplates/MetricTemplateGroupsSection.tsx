@@ -46,6 +46,7 @@ import {
 } from '@/services/monitor';
 import { SOURCE_OPTIONS, SOURCE_LABEL, deviceTypeLabel, buildDeviceTypeOptions } from './shared';
 import { useTranslation } from 'react-i18next';
+import DataTable from '@/components/DataTable';
 
 const { Text } = Typography;
 
@@ -244,31 +245,48 @@ export default function MetricTemplateGroupsSection() {
       title: tc('field.actions'),
       key: 'action',
       width: 220,
-      render: (_: unknown, r: MetricTemplateGroupItem) => (
-        <Space size={4}>
-          <Button size="small" onClick={() => openManage(r.id)}>
-            {t('metricTemplate.group.action.manage')}
-          </Button>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEditGroup(r)} />
-          <Button
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() =>
-              confirm({
-                title: t('metricTemplate.group.confirm.deleteTitle'),
-                content: t('metricTemplate.group.confirm.deleteContent'),
-                okText: tc('action.delete'),
-                cancelText: tc('action.cancel'),
-                okButtonProps: { danger: true },
-                onOk: () => handleDeleteGroup(r.id)
-              })
-            }
-          />
-        </Space>
-      )
+      render: (_: unknown, r: MetricTemplateGroupItem) => renderGroupActions(r)
     }
   ];
+
+  const renderGroupActions = (r: MetricTemplateGroupItem) => (
+    <Space size={4} wrap>
+      <Button size="small" onClick={() => openManage(r.id)}>
+        {t('metricTemplate.group.action.manage')}
+      </Button>
+      <Button size="small" icon={<EditOutlined />} onClick={() => openEditGroup(r)} />
+      <Button
+        size="small"
+        danger
+        icon={<DeleteOutlined />}
+        onClick={() =>
+          confirm({
+            title: t('metricTemplate.group.confirm.deleteTitle'),
+            content: t('metricTemplate.group.confirm.deleteContent'),
+            okText: tc('action.delete'),
+            cancelText: tc('action.cancel'),
+            okButtonProps: { danger: true },
+            onOk: () => handleDeleteGroup(r.id)
+          })
+        }
+      />
+    </Space>
+  );
+
+  const renderGroupCard = (r: MetricTemplateGroupItem) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Space size={8} wrap>
+        <span style={{ fontWeight: 500 }}>{r.name}</span>
+        {r.source && <Tag color="blue">{SOURCE_LABEL[r.source] ?? r.source}</Tag>}
+        {r.vendor && <Tag>{r.vendor}</Tag>}
+      </Space>
+      <div style={{ fontSize: 12, color: '#666' }}>
+        {t('metricTemplate.group.column.templateCount')}: {r.template_count ?? 0}
+      </div>
+      {r.description && <div style={{ fontSize: 12, color: '#999' }}>{r.description}</div>}
+      {renderGroupActions(r)}
+    </div>
+  );
 
   return (
     <Card
@@ -279,22 +297,24 @@ export default function MetricTemplateGroupsSection() {
         </Button>
       }
     >
-      <Table<MetricTemplateGroupItem>
+      <DataTable<MetricTemplateGroupItem>
         columns={groupColumns}
         dataSource={allGroups}
         rowKey={(r) => String(r.id)}
         loading={isLoading}
         pagination={false}
         size="small"
-        locale={{
-          emptyText: (
-            <Empty
-              description={t('metricTemplate.group.empty', {
-                action: t('metricTemplate.group.action.create')
-              })}
-            />
-          )
-        }}
+        searchable={false}
+        showCard={false}
+        mobileCardMode
+        cardRender={renderGroupCard}
+        emptyText={
+          <Empty
+            description={t('metricTemplate.group.empty', {
+              action: t('metricTemplate.group.action.create')
+            })}
+          />
+        }
         scroll={{ x: 'max-content' }}
       />
 

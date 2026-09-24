@@ -16,6 +16,7 @@
  * - useDeviceTrafficPorts（Zabbix 端口列表 + configured 标记）
  */
 import { Card, Table, Tag, Empty, Spin, Alert, Row, Col, Space, Typography } from 'antd';
+import DataTable from '@/components/DataTable';
 import {
   FireOutlined,
   SwapOutlined,
@@ -296,6 +297,32 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
 
   const isStatusOnly = STATUS_ONLY_OVERALL.has(overall);
 
+  const renderMetricStatusTag = (r: DeviceMetricDashboardItem) =>
+    r.breached ? (
+      <Tag color={SEVERITY_COLOR[r.severity ?? ''] ?? 'orange'}>
+        {t(SEVERITY_LABEL_KEY[r.severity ?? ''] ?? 'metric.column.alert')}
+      </Tag>
+    ) : r.value != null ? (
+      <Tag color="green">{t('metric.status.normal')}</Tag>
+    ) : (
+      <Tag color="default">{t('metric.status.noData')}</Tag>
+    );
+
+  const renderMetricCard = (r: DeviceMetricDashboardItem) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Space size={8} wrap>
+        <span style={{ fontWeight: 500 }}>{r.metric_name || r.metric_key}</span>
+        {renderMetricStatusTag(r)}
+      </Space>
+      <div style={{ fontSize: 12, color: '#666' }}>
+        {t('metric.column.value')}: {r.value ?? '—'} · {r.source ? r.source.toUpperCase() : '—'}
+      </div>
+      <div style={{ fontSize: 12, color: '#999' }}>
+        {r.collected_at ? formatDateTime(r.collected_at) : '—'}
+      </div>
+    </div>
+  );
+
   return (
     <Card size="small" title={t('metric.title')}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -367,11 +394,15 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                 style={{ background: '#fafafa', borderColor: '#d9d9d9' }}
                 styles={{ body: { padding: 0 } }}
               >
-                <Table<DeviceMetricDashboardItem>
+                <DataTable<DeviceMetricDashboardItem>
                   dataSource={metricStatus}
                   rowKey="metric_key"
                   size="small"
                   pagination={false}
+                  searchable={false}
+                  showCard={false}
+                  mobileCardMode
+                  cardRender={renderMetricCard}
                   columns={[
                     {
                       title: t('metric.column.name'),
@@ -425,11 +456,15 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
               style={{ background: '#fafafa', borderColor: '#d9d9d9' }}
               styles={{ body: { padding: 0 } }}
             >
-              <Table<DeviceMetricDashboardItem>
+              <DataTable<DeviceMetricDashboardItem>
                 dataSource={metricStatus}
                 rowKey="metric_key"
                 size="small"
                 pagination={false}
+                searchable={false}
+                showCard={false}
+                mobileCardMode
+                cardRender={renderMetricCard}
                 columns={[
                   {
                     title: t('metric.column.name'),

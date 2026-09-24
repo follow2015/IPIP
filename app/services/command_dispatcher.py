@@ -18,6 +18,7 @@ from typing import Optional
 
 from app.adapters.adapter_factory import get_adapter
 from app.exceptions.system import SSHConnectionError, SwitchConfigError
+from app.services.device_op_lock import DeviceOperationConflict
 
 logger = get_logger(__name__)
 
@@ -137,12 +138,16 @@ class CommandDispatcher:
         commands = self._maybe_append_commit(
             commands, adapter, getattr(switch.device, "device_model", "") or "")
         try:
-            output = self.ssh_mgr.send_config_commands(
-                switch=switch,
-                commands=commands,
-                save_cmd=adapter.get_save_command(getattr(switch.device, "device_model", "") or ""),
-            )
+            with self.device_op_lock.acquire(switch.device_id):
+                output = self.ssh_mgr.send_config_commands(
+                    switch=switch,
+                    commands=commands,
+                    save_cmd=adapter.get_save_command(getattr(switch.device, "device_model", "") or ""),
+                )
             return {"success": True, "output": output or "", **(ok_extra or {})}
+        except DeviceOperationConflict as e:
+            logger.warning("%s未执行：设备正被其他操作占用 —— %s", err_label, e)
+            return {"success": False, "error": str(e)}
         except Exception as e:
             logger.error("%s失败: %s", err_label, e)
             return {"success": False, "error": self._classify_error(e)}

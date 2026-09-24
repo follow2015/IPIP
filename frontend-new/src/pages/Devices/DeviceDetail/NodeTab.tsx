@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import type { DragEvent } from 'react';
 import {
-  Table,
   Button,
   Space,
   Form,
@@ -32,6 +31,7 @@ import { DeviceStatusCode } from '@/types/enums';
 import { getDeviceStatusMeta, getDeviceStatusOptions } from '@/types/statusMeta';
 import { useMessage } from '@/hooks/useMessage';
 import { useTranslation } from 'react-i18next';
+import DataTable from '@/components/DataTable';
 import type { Device } from '@/types/models';
 import HardwareConfigFields, {
   buildStorageSummary,
@@ -278,17 +278,46 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       title: tCommon('field.actions'),
       key: 'action',
       width: 80,
-      render: (_: unknown, record: Device) => (
-        <Button
-          type="link"
-          size="small"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => handleDelete(record)}
-        />
-      )
+      render: (_: unknown, record: Device) => renderNodeActions(record)
     }
   ];
+
+  const renderNodeActions = (record: Device) => (
+    <Button
+      type="link"
+      size="small"
+      danger
+      icon={<DeleteOutlined />}
+      onClick={() => handleDelete(record)}
+    />
+  );
+
+  const renderNodeCard = (r: Device) => {
+    const statusInfo = getDeviceStatusMeta(r.status, t);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <Space size={8} wrap>
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0 }}
+            onClick={() => navigate(`/devices/${r.id}#basic`)}
+          >
+            {r.device_name}
+          </Button>
+          <Tag color={statusInfo?.color}>{statusInfo?.label ?? tCommon('field.unknown')}</Tag>
+        </Space>
+        <div style={{ fontSize: 12, color: '#666' }}>
+          {t('node.column.position')}: {r.node_position ?? '-'}
+        </div>
+        <div style={{ fontSize: 12, color: '#666' }}>
+          {r.hostname ?? '-'} · CPU: {r.cpu ?? '-'}
+        </div>
+        <div style={{ fontSize: 12, color: '#666' }}>{r.os_version ?? '-'}</div>
+        {renderNodeActions(r)}
+      </div>
+    );
+  };
 
   const handleSwapDrop = async (sourcePos: number, targetPos: number) => {
     if (sourcePos === targetPos) return;
@@ -437,12 +466,16 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
         </Tooltip>
       </div>
       {renderNodeGrid()}
-      <Table
+      <DataTable
         columns={columns}
         dataSource={data?.items ?? []}
         rowKey="id"
         loading={isLoading}
         size="small"
+        searchable={false}
+        showCard={false}
+        mobileCardMode
+        cardRender={renderNodeCard}
         scroll={{ x: 'max-content' }}
       />
 
