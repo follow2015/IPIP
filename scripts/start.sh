@@ -34,10 +34,29 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 err()  { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 die()  { err "$*"; exit 1; }
 
-# 加载 .env
-if [ -f "$PROJECT_ROOT/.env" ]; then
-  set -a; . "$PROJECT_ROOT/.env"; set +a
+# Python 解释器
+VENV_PY="$PROJECT_ROOT/.venv/bin/python"
+if [ ! -x "$VENV_PY" ]; then
+  die "venv 不存在。请先运行 bash scripts/install.sh"
 fi
+
+# 加载 .env（⚠️ 不能 `set -a; . .env`：.env 不是 shell 脚本，值里含 $ / 反引号 /
+# 空格会被 shell 展开、执行或截断 —— install.sh 同一位置注释里有实测案例：
+# 随机 MySQL 密码含 '$' 时 source 直接报 unbound variable 中断安装）。
+# 改用 python-dotenv 解析 + shlex.quote 转义后 eval，与 install.sh 的 load_env_file 同一做法。
+if [ -f "$PROJECT_ROOT/.env" ]; then
+  eval "$("$VENV_PY" -c '
+import shlex, sys
+from dotenv import dotenv_values
+for k, v in dotenv_values(sys.argv[1]).items():
+    if v is not None and k:
+        print("export %s=%s" % (k, shlex.quote(v)))
+' "$PROJECT_ROOT/.env" 2>/dev/null)" || true
+fi
+# 环境可见性：start/restart 的第一条日志就说明本轮进程将以哪个 FLASK_ENV 运行。
+# 实测教训：.env 改成 production 后 restart，日志里应用却加载了 DevelopmentConfig，
+# 没有这行日志时"改了配置却没生效"完全不可见。
+log "运行环境: FLASK_ENV=${FLASK_ENV:-<未设置>}（改 .env 后需 stop 再 start 才保证生效）"
 
 # 运行时目录
 RUN_DIR="$PROJECT_ROOT/logs/run"
@@ -55,15 +74,15 @@ LOG_GATEWAY="$PROJECT_ROOT/logs/gateway.log"
 LOG_MONITOR="$PROJECT_ROOT/logs/monitor.log"
 LOG_CELERY="$PROJECT_ROOT/logs/celery.log"
 
-# Python 解释器
-VENV_PY="$PROJECT_ROOT/.venv/bin/python"
-if [ ! -x "$VENV_PY" ]; then
-  die "venv 不存在。请先运行 bash scripts/install.sh"
-fi
-
 # 端口
 FLASK_PORT="${FLASK_PORT:-5000}"
 GATEWAY_PORT="${GATEWAY_PORT:-8000}"
+
+# ── 端口占用检测（restart 兜底用）：bash /dev/tcp 探测，不依赖 ss/lsof ──
+port_busy() {
+  (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null || return 1
+  return 0
+}
 
 # ── 进程检查工具 ────────────────────────────────────────────
 is_running() {
@@ -263,12 +282,28 @@ case "$CMD" in
     ;;
   restart)
     stop_all
+    # ⚠️ 环境切换场景（.env 改 FLASK_ENV 等）必须等旧进程**彻底退净**再拉起：
+    # gunicorn master 被 SIGKILL 时 worker 会变孤儿继续占着端口，新 master 绑不上
+    # 端口而静默失败，健康检查打到旧 worker ⇒ 「改了配置却像没生效」（实测踩到：
+    # development → production 切换后日志仍是 DevelopmentConfig）。
+    for _ in $(seq 1 15); do
+      if port_busy "$FLASK_PORT" || port_busy "$GATEWAY_PORT"; then
+        sleep 1
+      else
+        break
+      fi
+    done
+    # 兜底清理孤儿（模式锁定本项目的特征路径/模块名，不误伤其它进程）
+    pkill -f "gunicorn.*--chdir $PROJECT_ROOT"      2>/dev/null || true
+    pkill -f "uvicorn.*realtime_gateway.main:app"   2>/dev/null || true
+    pkill -f "$VENV_PY $PROJECT_ROOT/run_monitor_service.py" 2>/dev/null || true
+    pkill -f "celery.*-A app.celery_app.celery worker"        2>/dev/null || true
     sleep 1
     start_flask
     start_gateway
     start_monitor
     start_celery
-    log "全部服务已重启"
+    log "全部服务已重启（FLASK_ENV=${FLASK_ENV:-<未设置>}）"
     ;;
   status)
     status_all
