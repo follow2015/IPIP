@@ -1210,7 +1210,8 @@ elif [ "$UNITS_INSTALLED" -eq 1 ]; then
 else
   log "安装完成 ✅"
   if [ "$DEV_ENV" -eq 1 ]; then
-    log "下一步: 编辑 .env 确认配置后，执行 bash scripts/start.sh 启动系统（FLASK_ENV=development）"
+    # KEEP_ENV 在 .env 初始化段已取过现值（--dev-env 不改动它）
+    log "下一步: 编辑 .env 确认配置后，执行 bash scripts/start.sh 启动系统（--dev-env：FLASK_ENV 保持 ${KEEP_ENV:-development}）"
   else
     # P0-A 收尾后配置已过预检，提示语与实际状态一致（不再是"请编辑 .env"的悬念）
     log "下一步: 配置已通过生产预检（FLASK_ENV=production），执行 bash scripts/start.sh 启动系统"
