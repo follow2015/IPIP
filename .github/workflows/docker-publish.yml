@@ -1,0 +1,68 @@
+name: Docker Publish
+
+# 与部署仓现有的 frontend-check.yml / lint.yml / schema-smoke.yml / secret-guard.yml
+# 是同一套基础设施，不新增任何账号：GHCR 直接用仓库自带的 GITHUB_TOKEN 推送。
+#
+# 触发面（三条，覆盖"发版自动构建"+"改 main 冒烟"+"手动补跑"）：
+#   tags: v*         ← **发布新版本**：git tag v1.0.2 && git push origin v1.0.2
+#   branches: main    ← 每推 main 出 :main（评估者开箱即用的那条）
+#   workflow_dispatch ← 手动补跑（选 main 分支时出 :main）
+# ⚠️ 刻意**不加** `on: release`：打 tag 与创建 Release 会各触发一次，两次都推同一版本号
+#    ⇒ 白烧一倍 CI（含 1.15GB 模型层的构建）。
+on:
+  push:
+    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write      # 推 GHCR 必需；GITHUB_TOKEN 默认**没有**这个权限，必须显式声明
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 多架构：评估者若是 Apple Silicon（darwin/arm64），只出 amd64 会全程走 Rosetta
+      # 模拟（torch 推理尤其明显）。qemu 是为在 amd64 runner 上构建 arm64 层。
+      # 代价：构建时间与 Actions 缓存体积都翻倍（§9 R12 / R9）。
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 提取镜像 tag
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # github.repository = follow2015/IPIP；GHCR 会自动转小写 → ghcr.io/follow2015/ipip
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix=sha-
+          # 显式声明 OCI labels，不依赖 metadata-action 的默认行为：
+          # source 决定 GHCR 上 package 与仓库的**关联关系**（缺它则 package 页显示不出仓库），
+          # description/title 决定页面信息是否完整。
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.title=IPIP
+            org.opencontainers.image.description=IPIP 网络设备管理系统（评估用多角色单镜像，已内置 RAG 模型）
+
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
