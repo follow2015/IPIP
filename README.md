@@ -27,6 +27,34 @@
 | 客户/审计 | 客户管理、操作审计、RBAC 权限 |
 | **统一身份** | LDAP/AD 接入、组→角色映射、本地白名单应急绕过（详见《运维手册-企业身份集成》） |
 | **AI 助手** | 告警解读 / NL 查询 / RAG 知识库 / Agentic 巡查诊断；Celery `ai` 队列异步执行，RBAC `ai:use`/`ai:admin` 权限隔离 |
+| **容器化部署** | 单镜像多角色（app / monitor / trapd / proxy + migrate、seed 一次性作业）；镜像由 GitHub Actions 自动构建推送 **GHCR**（多架构 amd64+arm64、内置 RAG 模型），`docker compose pull && up -d` 即用 —— 见[从 GitHub 获取镜像](#从-github-获取镜像免构建) |
+
+### 从 GitHub 获取镜像（免构建）
+
+不用在本机搭 Python/Node/MySQL/Redis，镜像由本仓
+[`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) 在 GitHub Actions 上构建，
+推送到 GHCR（`ghcr.io/follow2015/ipip`，**建仓即已配好，不需要任何自建 CI**）：
+
+| 触发方式 | 产出 tag |
+|---|---|
+| 推送 `main` 分支 | `:main` 与 `:sha-<短SHA>` —— 评估者开箱即用的那条 |
+| 打 `v*` tag（如 `v1.4.1`） | `:<版本号>`，**无 `v` 前缀**（如 `1.4.1`）。⚠️ 须**三段式**：`type=semver` 要求合法 semver，仓里既有的两段式 `v1.0` 不满足 ⇒ 打它只会得到 `:sha-<短SHA>`，拿不到版本 tag |
+| Actions 页手动 `workflow_dispatch` | `:main` |
+
+```bash
+# 1) 登录 GHCR —— package 首次推送默认 private，必须登录；PAT 至少 read:packages
+echo "$GHCR_PAT" | docker login ghcr.io -u <你的 GitHub 用户名> --password-stdin
+
+# 2) 取镜像（克隆只为拿 compose 与 .env 样例，镜像本身从 GHCR 拉）
+git clone https://github.com/follow2015/IPIP.git && cd IPIP
+cp deploy/docker/.env.example .env      # ⚠️ 是 deploy/docker/ 这份，不是仓库根那份
+
+IPIP_IMAGE_TAG=main docker compose pull   # 换版本号即可拉对应发版镜像
+docker compose up -d
+```
+
+> tag 列表见 <https://github.com/follow2015/IPIP/pkgs/container/ipip>。
+> 填 3 条密钥、端口、回滚等后续步骤见下文 **评估用 Docker 快速路径**。
 
 ## 目录结构
 
@@ -180,7 +208,7 @@ bash scripts/start.sh restart   # 重启全部
 
 ### 1. 拉预构建镜像（推荐，1–3 分钟）
 
-镜像由 GitHub Actions 在打 `v*` tag 时自动构建并推到 GHCR
+镜像由 GitHub Actions 在**打 `v*` tag 或推送 `main`** 时自动构建并推到 GHCR
 （多架构 `linux/amd64` + `linux/arm64`，**内置 RAG 模型**，约 4 GB）。
 
 ```bash
@@ -207,10 +235,13 @@ PY
 
 ```bash
 # ⚠️ 别跳过 pull：镜像锚点同时带 build:，本地缺该镜像时 compose 会自动**本地构建**（15–40 分钟）
-IPIP_IMAGE_TAG=1.0.2 docker compose pull
+IPIP_IMAGE_TAG=main docker compose pull
 docker compose up -d
 docker compose ps          # mysql/redis healthy；migrate/seed 为 Exited (0)；其余 Up
 ```
+
+> `IPIP_IMAGE_TAG` 用 **`:main`**（推 `main` 即产出，一定拉得到）或具体版本号（如 `1.4.1`）——
+> tag 清单见 <https://github.com/follow2015/IPIP/pkgs/container/ipip>。
 
 访问 `http://localhost:8080`（宿主端口可用 `.env` 里的 `HTTP_PORT` 覆写）。
 
