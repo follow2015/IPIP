@@ -44,9 +44,12 @@ services:
       MYSQL_DATABASE:      ${MYSQL_DATABASE:-ip_management}
       MYSQL_USER:          ${MYSQL_USER:-ipip}
       MYSQL_PASSWORD:      ${MYSQL_PASSWORD:-ipip_dev_only}
-      # mysqladmin 通过 MYSQL_PWD 取口令：避免 -p<pwd> 出现在
-      # docker inspect / ps / 容器日志里（评审 S2）
-      MYSQL_PWD:           ${MYSQL_ROOT_PASSWORD:-ipip_root_dev_only}
+      # ⚠️ 刻意**不设** MYSQL_PWD：它是 mysql client 的标准环境变量，会污染官方
+      # entrypoint 内部的所有 mysql 调用——初始化时临时 server 的 root 是空密码
+      # （--initialize-insecure），client 却带上 MYSQL_PWD ⇒ Access denied，
+      # root 密码设置与 ipip 用户/库创建全部中断（2026-10-09 部署实锤）。
+      # healthcheck 的口令安全由"ping 对 denied 连接也返回 alive"兜底：它只判
+      # server 存活，不需要凭据，口令自然不出现在 inspect / ps / 日志里。
       TZ: UTC
     command:
       - --character-set-server=utf8mb4
@@ -62,7 +65,9 @@ services:
     volumes:
       - ipip-mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root"]
+      # 无凭据 ping：server 活着（即使 Access denied）也返回 0 —— 这正是健康
+      # 检查想要的语义，且不需要任何口令（评审 S2 的目标由"不传口令"达成）
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
       interval: 10s
       timeout: 5s
       retries: 15
