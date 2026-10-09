@@ -101,7 +101,8 @@ jobs:
           print(f"保护集：{len(protected)} 个 digest（tags={len(tags)} 个）")
 
           # ── 2) versions API：digest 不在保护集的才是真垃圾 ───────────────────
-          base = f"https://api.github.com/user/packages/container/{pkg}/versions"
+          # ⚠️ REST API 的包名**不带 namespace**（container/ipip）；ghcr.io 路径才带
+          base = "https://api.github.com/user/packages/container/ipip/versions"
           page, victims, total = 1, [], 0
           while True:
               vr = subprocess.run(["curl", "-sS", "-w", "\n%{http_code}", "-H", auth_github,
