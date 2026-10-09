@@ -96,9 +96,12 @@ jobs:
           base = f"https://api.github.com/user/packages/container/{pkg}/versions"
           page, victims, total = 1, [], 0
           while True:
-              versions = json.loads(subprocess.run(
-                  ["curl", "-sf", "-H", auth_github, f"{base}?per_page=100&page={page}"],
-                  capture_output=True, text=True, check=True).stdout)
+              vr = subprocess.run(["curl", "-sS", "-w", "\n%{http_code}", "-H", auth_github,
+                                   f"{base}?per_page=100&page={page}"],
+                                  capture_output=True, text=True, check=True).stdout
+              vbody, vcode = vr.rsplit("\n", 1)
+              print(f"versions page {page}: HTTP {vcode}, body: {vbody[:150]!r}")
+              versions = json.loads(vbody)
               if not versions:
                   break
               total += len(versions)
