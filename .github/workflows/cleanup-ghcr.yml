@@ -1,21 +1,29 @@
-# GHCR 版本清理：删除 tags 与保留清单无交集的镜像版本（dangling / 过期 tag）。
+# GHCR 版本清理（引用感知版）。
 #
-# 背景（2026-10-09）：v1.5.0 tag 曾指向被撤回的提交并构建过镜像，回撤重打后
-# 旧 version 在 GHCR 里残留为 dangling 条目；CLI 需 delete:packages scope，
-# 而 GITHUB_TOKEN 对本仓自发布的包有完整 packages 权限 —— 故走 workflow 清理。
+# ⚠️ 历史教训（2026-10-09）：第一版按 "tags 为空 = dangling = 可删" 清理，把
+# **多架构构建的平台子 manifest**（天生无 tag，被带 tag 的 image index 引用）
+# 全部删除 → 三个 tag 的 pull 全部 404（index 完好、子层失踪）。GHCR 的
+# version 列表里，无 tag 条目 ≠ 垃圾——它可能是正被引用的子 manifest。
+#
+# 现行逻辑（引用感知）：
+#   1) 枚举 registry 全部 tag，逐个取 index manifest，收集其 children digest；
+#      tag 自身 digest 一并计入**保护集**；
+#   2) 遍历 packages versions API（其 name 字段即 manifest digest），凡 digest
+#      不在保护集的版本才列入待删（真正废弃的历史构建：旧 index + 其子层）；
+#   3) keep_tags 仅用于**核对**——tag 清单必须覆盖 keep_tags，缺了立即中止
+#      （防误删仍在服务的版本）。
 #
 # 用法：
-#   gh workflow run cleanup-ghcr.yml -f keep_tags="1.5.0,main"
-# 语义：只保留 keep_tags 中任一 tag 的版本，其余（含空 tag 的 dangling）全删。
+#   gh workflow run cleanup-ghcr.yml -f keep_tags="main,1.5.0,1.4.1" -f dry_run=true
 name: GHCR Cleanup
 
 on:
   workflow_dispatch:
     inputs:
       keep_tags:
-        description: '保留的 tag（逗号分隔），其余版本全删'
+        description: '必须保留的 tag（逗号分隔，缺任何一个立即中止）'
         required: true
-        default: 'main'
+        default: 'main,1.5.0,1.4.1'
       dry_run:
         description: 'true=只列出将删除的版本，不真删'
         required: false
@@ -28,7 +36,7 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Delete stale package versions
+      - name: Delete unreferenced package versions
         env:
           GH_TOKEN: ${{ github.token }}
           KEEP: ${{ inputs.keep_tags }}
@@ -36,48 +44,72 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, os, subprocess
+
           token = os.environ["GH_TOKEN"]
           keep = {t.strip() for t in os.environ["KEEP"].split(",") if t.strip()}
           dry = os.environ.get("DRY", "true").lower() == "true"
+          pkg = "follow2015/ipip"
+          reg = f"https://ghcr.io/v2/{pkg}"
+          auth = f"Authorization: Bearer {token}"
+          accept = ("application/vnd.oci.image.index.v1+json, "
+                    "application/vnd.docker.distribution.manifest.list.v2+json, "
+                    "application/vnd.oci.image.manifest.v1+json")
 
-          # 安全阀：keep 为空 = 全部版本都在删除射程内，直接中止而不是全删
-          if not keep:
-              print("keep_tags 为空——拒绝执行（防止误删全部镜像版本）")
+          def curl_json(url):
+              r = subprocess.run(["curl", "-sf", "-H", auth, "-H", f"Accept: {accept}", url],
+                                 capture_output=True, text=True, check=True)
+              return json.loads(r.stdout)
+
+          # ── 0) keep_tags 必须真实存在于 registry，否则中止 ──────────────────
+          tags = curl_json(f"{reg}/tags/list")["tags"]
+          missing = keep - set(tags)
+          if missing:
+              print(f"❌ keep_tags 在 registry 中不存在：{sorted(missing)}——中止，不删任何东西")
               raise SystemExit(1)
 
-          def api(url):
-              out = subprocess.run(
-                  ["curl", "-sf", "-H", f"Authorization: Bearer {token}",
-                   "-H", "Accept: application/vnd.github+json", url],
-                  capture_output=True, text=True, check=True)
-              return json.loads(out.stdout)
+          # ── 1) 保护集：每个 tag 的 digest + 多架构 index 的 children digest ──
+          protected = set()
+          for t in sorted(tags):
+              r = subprocess.run(["curl", "-sf", "-D", "-", "-o", "-", "-H", auth,
+                                  "-H", f"Accept: {accept}", f"{reg}/manifests/{t}"],
+                                 capture_output=True, text=True, check=True)
+              head, _, body = r.stdout.partition("\r\n\r\n")
+              for line in head.splitlines():
+                  if line.lower().startswith("docker-content-digest:"):
+                      protected.add(line.split(":", 1)[1].strip())
+              m = json.loads(body)
+              for c in m.get("manifests", []):
+                  protected.add(c["digest"])
+          print(f"保护集：{len(protected)} 个 digest（tags={len(tags)} 个）")
 
-          base = "https://api.github.com/user/packages/container/ipip/versions"
-          page = 1
-          victims = []
+          # ── 2) versions API：digest 不在保护集的才是真垃圾 ───────────────────
+          base = f"https://api.github.com/user/packages/container/{pkg}/versions"
+          page, victims, total = 1, [], 0
           while True:
-              versions = api(f"{base}?per_page=100&page={page}")
+              versions = json.loads(subprocess.run(
+                  ["curl", "-sf", "-H", auth, f"{base}?per_page=100&page={page}"],
+                  capture_output=True, text=True, check=True).stdout)
               if not versions:
                   break
+              total += len(versions)
               for v in versions:
-                  tags = set(v.get("metadata", {}).get("container", {}).get("tags", []))
-                  if tags & keep:
-                      continue
-                  victims.append((v["id"], sorted(tags) or ["<dangling>"],
-                                  v["created_at"]))
+                  digest = v.get("name", "")
+                  if digest not in protected:
+                      victims.append((v["id"], digest[:19], sorted(
+                          v.get("metadata", {}).get("container", {}).get("tags", [])) or ["<dangling>"],
+                          v["created_at"]))
               page += 1
+          print(f"versions 共 {total} 个；待删除 {len(victims)} 个（不被任何 tag 引用）")
+          for vid, digest, tags_, created in victims:
+              print(f"  version {vid} {digest} tags={tags_} created={created}")
 
-          print(f"待删除 {len(victims)} 个版本（保留 tag：{sorted(keep)}）")
-          for vid, tags, created in victims:
-              print(f"  version {vid} tags={tags} created={created}")
+          # ── 3) 执行删除 ──────────────────────────────────────────────────────
           if dry:
               print("dry_run=true，未执行删除")
           else:
-              for vid, _, _ in victims:
-                  r = subprocess.run(
-                      ["curl", "-sf", "-X", "DELETE",
-                       "-H", f"Authorization: Bearer {token}",
-                       f"{base}/{vid}"], capture_output=True, text=True)
+              for vid, _, _, _ in victims:
+                  r = subprocess.run(["curl", "-sf", "-X", "DELETE", "-H", auth,
+                                      f"{base}/{vid}"], capture_output=True, text=True)
                   print(f"  已删 version {vid}: rc={r.returncode}")
               print("清理完成")
           PY
