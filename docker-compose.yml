@@ -92,6 +92,9 @@ services:
 
   # ── 一次性任务 ──────────────────────────────────────────────────────────
   migrate:
+    <<: *ipip-image
+    command: ["migrate"]
+    env_file: [.env]
     environment:
       # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
       MYSQL_HOST: mysql
@@ -115,6 +118,9 @@ services:
 
   # ── 常驻角色 ────────────────────────────────────────────────────────────
   web:
+    <<: *ipip-image
+    command: ["web"]
+    env_file: [.env]
     environment:
       # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
       MYSQL_HOST: mysql
@@ -137,6 +143,9 @@ services:
     restart: unless-stopped
 
   gateway:
+    <<: *ipip-image
+    command: ["gateway"]
+    env_file: [.env]
     environment:
       # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
       MYSQL_HOST: mysql
@@ -154,6 +163,9 @@ services:
     restart: unless-stopped
 
   celery-ai:
+    <<: *ipip-image
+    command: ["celery-ai"]
+    env_file: [.env]
     environment:
       # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
       MYSQL_HOST: mysql
@@ -166,6 +178,9 @@ services:
     restart: unless-stopped
 
   celery-voice:
+    <<: *ipip-image
+    command: ["celery-voice"]
+    env_file: [.env]
     environment:
       # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
       MYSQL_HOST: mysql
@@ -178,6 +193,9 @@ services:
     restart: unless-stopped
 
   monitor:
+    <<: *ipip-image
+    command: ["monitor"]
+    env_file: [.env]
     environment:
       # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
       MYSQL_HOST: mysql
@@ -223,6 +241,9 @@ services:
   #    另需确认口令与设备侧发送端一致，否则收到的 trap 全部丢弃。
   # 宿主 162/udp 被 snmptrapd 等占用时，改 .env 的 TRAPD_HOST_PORT 或直接不启用。
   trapd:
+    <<: *ipip-image
+    command: ["trapd"]
+    env_file: [.env]
     environment:
       # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
       MYSQL_HOST: mysql
