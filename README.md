@@ -96,6 +96,11 @@ bash scripts/installer/bootstrap.sh --help     # 全部参数
 
 **升级到新版本**：拉取代码后执行 `bash scripts/installer/bootstrap.sh --upgrade`（自动 `flask db-upgrade`；1.5.0 起含权限码变更，按发布说明执行 `seed_rbac`）。
 
+**旧环境升级检查单**（全新部署可跳过，两个"不动就静默坏"的点）：
+
+1. `ipip-backup` 默认 `--include-secrets`，依赖 `/etc/ipip/ipip.env` 里的 `GPG_PASSPHRASE`——升级后不手工补写，**凌晨备份会静默失败**。
+2. `MONITOR_WORKER_IN_PROCESS` 存在 EnvironmentFile 覆盖 unit 内变量的陷阱（误写 true 会让告警聚合频率按实例数放大）——升级后重跑 `deploy/systemd/install-units.sh` 并重启服务。
+
 ### 启动
 
 #### 方式 A：systemd 托管（生产推荐，`--with-units` 安装后）

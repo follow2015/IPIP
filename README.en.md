@@ -96,6 +96,11 @@ The installer has two layers:
 
 **Upgrading to a new release**: pull the code, then run `bash scripts/installer/bootstrap.sh --upgrade` (runs `flask db-upgrade` automatically; since 1.5.0 RBAC permission changes require running `seed_rbac` per the release notes).
 
+**Upgrade checklist for existing deployments** (skip for fresh installs; two "silent breakage if untouched" points):
+
+1. `ipip-backup` defaults to `--include-secrets` and depends on `GPG_PASSPHRASE` in `/etc/ipip/ipip.env` — without manually re-adding it after an upgrade, **nightly backups fail silently**.
+2. `MONITOR_WORKER_IN_PROCESS` can be overridden by EnvironmentFile over the unit's own variable (a mistaken `true` multiplies alert-aggregation frequency by instance count) — re-run `deploy/systemd/install-units.sh` and restart services after upgrading.
+
 ### Start
 
 #### Option A: systemd Hosting (recommended for production, after `--with-units`)
