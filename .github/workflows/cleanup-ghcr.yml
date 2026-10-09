@@ -50,6 +50,12 @@ jobs:
           dry = os.environ.get("DRY", "true").lower() == "true"
           pkg = "follow2015/ipip"
           reg = f"https://ghcr.io/v2/{pkg}"
+          # GITHUB_TOKEN 不能直接当 registry Bearer：先走 GHCR token 交换
+          # （docker login 后引擎会自动处理这个流程，脚本里须显式做）
+          token = json.loads(subprocess.run(
+              ["curl", "-sf", "-H", f"Authorization: Bearer {token}",
+               "https://ghcr.io/token?service=ghcr.io&scope=repository:follow2015/ipip:pull,push"],
+              capture_output=True, text=True, check=True).stdout)["token"]
           auth = f"Authorization: Bearer {token}"
           accept = ("application/vnd.oci.image.index.v1+json, "
                     "application/vnd.docker.distribution.manifest.list.v2+json, "
