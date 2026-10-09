@@ -39,7 +39,6 @@ jobs:
       - name: Delete unreferenced package versions
         env:
           GH_TOKEN: ${{ github.token }}
-          ACTOR: ${{ github.actor }}
           KEEP: ${{ inputs.keep_tags }}
           DRY: ${{ inputs.dry_run }}
         run: |
@@ -52,14 +51,14 @@ jobs:
           dry = os.environ.get("DRY", "true").lower() == "true"
           pkg = "follow2015/ipip"
           reg = f"https://ghcr.io/v2/{pkg}"
-          # GITHUB_TOKEN 不能直接当 registry Bearer：先走 GHCR token 交换
-          # （docker login 后引擎会自动处理这个流程，脚本里须显式做；
-          # 交换端点用 Basic 认证——即 docker login 的凭据形态）
-          token = json.loads(subprocess.run(
-              ["curl", "-sf", "-u", f"{actor}:{token}",
-               "https://ghcr.io/token?service=ghcr.io&scope=repository:follow2015/ipip:pull,push"],
+          # registry 读（tags/list、manifests）走**匿名 token**：包是 public，
+          # 匿名 pull 即可；GITHUB_TOKEN 的 Basic 交换被 GHCR 拒（ghs_ token 401，
+          # 2026-10-09 实测）。删除走 GitHub REST API（GITHUB_TOKEN 有 packages:write）。
+          reg_token = json.loads(subprocess.run(
+              ["curl", "-sf",
+               "https://ghcr.io/token?service=ghcr.io&scope=repository:follow2015/ipip:pull"],
               capture_output=True, text=True, check=True).stdout)["token"]
-          auth = f"Authorization: Bearer {token}"
+          auth = f"Authorization: Bearer {reg_token}"
           accept = ("application/vnd.oci.image.index.v1+json, "
                     "application/vnd.docker.distribution.manifest.list.v2+json, "
                     "application/vnd.oci.image.manifest.v1+json")
