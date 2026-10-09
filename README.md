@@ -181,9 +181,21 @@ sudo systemctl disable --now ipip-trapd.service
 
 | 触发 | 产出镜像 tag |
 |---|---|
-| 推送 `v*` 版本 tag（发版） | `:1.5.0`（semver 版本号） |
-| 每次推送 `main` | `:main`（默认 tag，评估者开箱即用） |
+| 推送 `v*` 版本 tag（发版） | `:1.5.0`（semver）+ `:latest`（指向最新正式版） |
+| 推送 `main`（仅代码 / 依赖变更） | `:main`（跟踪最新，评估者开箱即用） |
 | 手动 `workflow_dispatch` | 对应分支的 `:main` |
+
+> 文档 / CI 配置 / README 类提交**不触发**镜像构建（`paths-ignore`），因此 `:main` 永远指向最后一次代码变更。
+
+**镜像拉取**：
+
+```bash
+docker pull ghcr.io/follow2015/ipip:main     # 跟踪最新（代码变更即更新）
+docker pull ghcr.io/follow2015/ipip:1.5.0    # 锁定版本（升级需显式改 tag）
+docker pull ghcr.io/follow2015/ipip:latest   # 最新正式版（当前 = 1.5.0）
+```
+
+> ⚠️ 不要使用 `sha-xxxxxxx` 形式的 tag——已废除（历史上每次构建都会产生一个 sha 条目，是 GHCR 版本条目膨胀的来源之一）。
 
 - **多架构**：`linux/amd64` + `linux/arm64`（Apple Silicon 原生运行，不走 Rosetta 模拟）
 - 镜像**已内置 RAG 模型**（构建含约 1.15GB 的模型层）

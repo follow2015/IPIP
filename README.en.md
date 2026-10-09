@@ -181,9 +181,21 @@ Images are built and published to GHCR (`ghcr.io/follow2015/ipip`) automatically
 
 | Trigger | Image tag produced |
 |---|---|
-| Pushing a `v*` version tag (release) | `:1.5.0` (semver) |
-| Every push to `main` | `:main` (default tag, works out of the box) |
+| Pushing a `v*` version tag (release) | `:1.5.0` (semver) + `:latest` (points to the newest release) |
+| Pushing `main` (code / dependency changes only) | `:main` (tracks the latest, works out of the box) |
 | Manual `workflow_dispatch` | `:main` of the chosen branch |
+
+> Docs / CI config / README-only pushes do **not** trigger an image build (`paths-ignore`), so `:main` always reflects the last code change.
+
+**Pulling the image**:
+
+```bash
+docker pull ghcr.io/follow2015/ipip:main     # Track the latest (updated on code changes)
+docker pull ghcr.io/follow2015/ipip:1.5.0    # Pin a version (upgrade by changing the tag)
+docker pull ghcr.io/follow2015/ipip:latest   # Newest release (currently = 1.5.0)
+```
+
+> ⚠️ Do not use `sha-xxxxxxx`-style tags — they are discontinued (historically each build produced one sha entry, a major source of GHCR version clutter).
 
 - **Multi-arch**: `linux/amd64` + `linux/arm64` (native on Apple Silicon, no Rosetta emulation)
 - Images **include the RAG models** (the build carries a ~1.15GB model layer)
