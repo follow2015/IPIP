@@ -29,6 +29,11 @@ name: ipip
 #    两条路径的 tag 语义完全一致，不会出现"本地改了但 up 用旧镜像"的错位。
 x-ipip-image: &ipip-image
   image: ghcr.io/follow2015/ipip:${IPIP_IMAGE_TAG:-main}
+  environment:
+    # ⚠️ 容器网络里 MySQL 的地址是服务名 mysql，不是 localhost（localhost 在
+    # 容器内指向自己，连不上任何东西）。显式覆盖 .env 里可能残留的 localhost
+    # —— compose 规则 environment 优先于 env_file。
+    MYSQL_HOST: mysql
   build:
     context: .
     dockerfile: Dockerfile
@@ -92,6 +97,11 @@ services:
     <<: *ipip-image
     command: ["migrate"]
     env_file: [.env]
+    environment:
+      # baseline 导入要建表/建触发器，用 root；MYSQL_PASSWORD 在这里被
+      # 重定义为 **root 的口令**（MYSQL_ROOT_PASSWORD）——只对本服务生效
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ipip_root_dev_only}
     depends_on:
       mysql: { condition: service_healthy }
     restart: "no"
