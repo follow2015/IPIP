@@ -22,7 +22,7 @@ name: ipip
 #       拉 GitHub Actions 预构建的镜像，**已含 RAG 模型**，1–3 分钟起服务。
 #   • 改代码：docker compose build && docker compose up -d
 #       本地构建，覆盖同名 tag（下面的 image: 就是构建产物名）。
-#   • 锁定版本：在 .env 里设 IPIP_IMAGE_TAG=<版本号>（如 1.4.1；不设则用默认 main）。
+#   • 锁定版本：在 .env 里设 IPIP_IMAGE_TAG=<版本号>（如 1.5.0；不设则用默认 main）。
 # ⚠️ image: 与 build: 同时存在时，`up -d` 在**本地缺该镜像时会自动执行构建**（20 分钟量级）
 #    ⇒ 评估者必须先 `pull`，或直接照 §6 Step 2A 走。
 # ⚠️ 锚点用的是 GHCR 全名而非 `ipip:local`：让"本地构建产物"与"预构建产物"同名，

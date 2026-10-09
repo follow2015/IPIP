@@ -23,8 +23,8 @@ systemd 提供 OS 级能力：崩溃自动拉起 + 退避抑制 + 进程组清�
 
 ## 二、安装步骤
 
-> ⚠️ **前置：必须先完成 P0-1 备份演练**（`docs/plan/2026-09-09-IPIP缺口整改-P0批次任务分解WBS.md` 的 T1.8）。
-> 首次切换到 systemd 属于生产变更，改动前必须有可用备份。
+> ⚠️ **前置：必须先完成一次备份演练**（按 `docs/ops/运维手册-备份与恢复.md` 的流程跑通
+> `scripts/backup_system.py` 并验证可恢复）。首次切换到 systemd 属于生产变更，改动前必须有可用备份。
 
 ### 1. 创建运行账号
 
@@ -117,7 +117,7 @@ bash deploy/systemd/install-units.sh \
 **也可以让应用安装脚本一并完成本节**（把「装应用」与「装托管」合并成一条命令）：
 
 ```bash
-sudo bash ipip-deploy/scripts/install.sh \
+sudo bash scripts/installer/bootstrap.sh \
   --with-units --units-user root --units-group root
 ```
 

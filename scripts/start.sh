@@ -46,7 +46,7 @@ die()  { err "$*"; exit 1; }
 # Python 解释器
 VENV_PY="$PROJECT_ROOT/.venv/bin/python"
 if [ ! -x "$VENV_PY" ]; then
-  die "venv 不存在。请先运行 bash scripts/install.sh"
+  die "venv 不存在。请先运行 bash scripts/installer/bootstrap.sh"
 fi
 
 # 加载 .env（[WARN] 不能 `set -a; . .env`：.env 不是 shell 脚本，值里含 $ / 反引号 /

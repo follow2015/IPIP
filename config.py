@@ -997,8 +997,8 @@ class ProductionConfig(Config):
             raise ValueError("生产环境必须设置SECRET_KEY环境变量")
         if not cls.JWT_SECRET_KEY:
             raise ValueError("生产环境必须设置JWT_SECRET_KEY环境变量")
-        # 占位符密钥等于弱默认密钥（会话/JWT 可被伪造），install.sh 会自动生成
-        # 随机值，正常不会触发；绕过 install.sh 手工部署时在此拒绝启动。
+        # 占位符密钥等于弱默认密钥（会话/JWT 可被伪造），bootstrap.sh 会自动生成
+        # 随机值，正常不会触发；绕过安装器手工部署时在此拒绝启动。
         for _key_name in ("SECRET_KEY", "JWT_SECRET_KEY"):
             _val = getattr(cls, _key_name, "")
             if _val and str(_val).lower().startswith("change-me"):
@@ -1118,7 +1118,7 @@ def _assert_deploy_location():
             "拒绝启动：项目部署在 /root 下（%s）。\n"
             "  systemd 加固单元启用 ProtectHome=true 时 /root 对服务进程完全不可见，\n"
             "  继续启动必然失败。修复方式二选一：\n"
-            "    1) 部署到 /opt/ipip（scripts/install.sh 的固定安装目标，推荐）\n"
+            "    1) 部署到 /opt/ipip（scripts/installer/bootstrap.sh 的固定安装目标，推荐）\n"
             "    2) 将单元模板的 ProtectHome=true 改为 read-only（保留加固，"
             "/root 变为只读可访问）" % root
         )

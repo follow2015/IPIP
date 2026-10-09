@@ -35,7 +35,7 @@ _SUGGESTIONS = {
     "METRICS_EXPOSURE": "METRICS_TOKEN=<openssl rand -hex 32> 或 METRICS_ALLOWED_IPS=<Prometheus 所在网段>；不要该端点则 METRICS_ENABLED=false",
     "SECRET_KEY_DUPLICATE": "两把密钥分别执行 `openssl rand -hex 32`；更换 SECRET_KEY 会使现有会话失效（用户需重新登录）",
     "LDAP_CA_FILE": "LDAP_CA_FILE=/etc/ssl/certs/ca-certificates.crt（或指向自家企业 CA 的 PEM 路径）",
-    "DEPLOY_LOCATION": "部署到 /opt/ipip（scripts/install.sh 的固定安装目标），或将单元模板 ProtectHome=true 改为 read-only",
+    "DEPLOY_LOCATION": "部署到 /opt/ipip（scripts/installer/bootstrap.sh 的固定安装目标），或将单元模板 ProtectHome=true 改为 read-only",
     "BASE_CONFIG": "基础配置（端口/必需项）校验失败，见上方消息",
 }
 
