@@ -4,7 +4,6 @@
 """
 from typing import Any, Dict
 
-from sqlalchemy import Index
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel, MEDIUMTEXT
@@ -37,6 +36,13 @@ class Customer(BaseModel):
 
     devices = relationship("Device", back_populates="customer", lazy="select")
 
+    circuits = relationship(
+        "Circuit",
+        primaryjoin="and_(Customer.id == Circuit.customer_id, Circuit.deleted_token == '')",
+        viewonly=True,
+        lazy="select",
+    )
+
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> Dict[str, Any]:
         """转换为字典
 
@@ -52,6 +58,14 @@ class Customer(BaseModel):
         if include_relations:
             data["cabinets"] = [cabinet.to_dict() for cabinet in self.cabinets]
             data["devices"] = [device.to_dict() for device in self.devices]
+            circuit_rows = []
+            for circuit in self.circuits:
+                row = circuit.to_dict()
+                for key in ("monthly_fee", "overage_unit_price", "traffic_unit_price"):
+                    if row.get(key) is not None:
+                        row[key] = float(row[key])
+                circuit_rows.append(row)
+            data["circuits"] = circuit_rows
 
         return data
 

@@ -323,7 +323,7 @@ class LdapAuthService:
             return
         try:
             started = conn.start_tls()
-        except Exception as exc:  # noqa: BLE001 - 统一归为配置/信任链问题
+        except Exception as exc:  # 统一归为配置/信任链问题
             raise _TlsFailed(str(exc) or type(exc).__name__) from exc
         if started is False:
             raise _TlsFailed(_describe(conn))
@@ -349,7 +349,7 @@ class LdapAuthService:
             return conn
         except (_Unreachable, _ServiceBindFailed, _TlsFailed):
             raise
-        except Exception as exc:  # noqa: BLE001 - 统一归类，避免异常类型外泄
+        except Exception as exc:  # 统一归类，避免异常类型外泄
             if _is_network_exc(exc):
                 raise _Unreachable(str(exc)) from exc
             if _is_invalid_credentials_exc(exc):
@@ -367,7 +367,7 @@ class LdapAuthService:
                 attributes=list(self._attrs),
             )
             entries = list(conn.entries)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if _is_network_exc(exc):
                 raise _Unreachable(str(exc)) from exc
             raise
@@ -400,7 +400,7 @@ class LdapAuthService:
             ok = conn.bind()
         except _TlsFailed as exc:
             return LdapAuthResult(STATUS_MISCONFIGURED, f"TLS 协商/证书校验失败：{exc}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if _is_network_exc(exc):
                 return LdapAuthResult(STATUS_UNREACHABLE, f"域控不可达：{exc}")
             ad = _from_ad_data(_extract_data_code(exc), username)
@@ -524,5 +524,5 @@ def _safe_unbind(conn: Any) -> None:
         return
     try:
         conn.unbind()
-    except Exception:  # noqa: BLE001 - 关闭失败不影响认证结论
+    except Exception:  # noqa: BLE001, S110 - 关闭失败不影响认证结论
         pass

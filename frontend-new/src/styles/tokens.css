@@ -1,0 +1,20 @@
+/**
+ * 设计 Token（B0 新建）
+ *
+ * 定位：**只定义 CSS 自定义属性**，不写任何选择器（除 :root）、不写任何色值。
+ *   - 不写选择器：保持 AppLayout 契约测试的「结构与样式分离」前提。
+ *   - 不写色值：`scripts/color-ratchet.mjs` 对新文件执行「色值 = 0」硬约束，
+ *     色值必须走既有 design token 入口，不得在此另起一套。
+ *
+ * 命名约定：`--ipip-*`，其中 `--ipip-touch-target` 为 §5.2 的 44px 目标值。
+ */
+:root {
+  /* 触摸目标最小尺寸（对齐 iOS HIG 44px 建议，供后续批次卡片/按钮引用） */
+  --ipip-touch-target: 44px;
+
+  /* 移动端卡片内边距（与 overflow.css 的 .ant-card-body padding 同源意图） */
+  --ipip-mobile-card-padding: 12px;
+
+  /* 移动端横向滚动容器的滚动条高度预留（避免内容被滚动条遮挡） */
+  --ipip-scrollbar-gutter: 0px;
+}

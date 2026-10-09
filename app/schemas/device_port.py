@@ -11,7 +11,7 @@
   的现存 Schema（`create_d2n_connection` 直接转调
   `device_connection_service.create_connection(data)`，同一套字段）
 """
-from marshmallow import Schema, fields, validate, EXCLUDE
+from marshmallow import Schema, fields, EXCLUDE
 
 
 class PortCreateRequestSchema(Schema):

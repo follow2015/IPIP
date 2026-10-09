@@ -20,7 +20,8 @@
     "disable": "Disable",
     "copy": "Copy",
     "retry": "Retry",
-    "copyId": "Click to copy ID"
+    "copyId": "Click to copy ID",
+    "discard": "Discard"
   },
   "field": {
     "name": "Name",
@@ -40,6 +41,7 @@
     "unknown": "Unknown"
   },
   "message": {
+    "formValidationFailed": "Please fix the highlighted fields before submitting",
     "createSuccess": "Created successfully",
     "updateSuccess": "Updated successfully",
     "deleteSuccess": "Deleted successfully",
@@ -53,12 +55,19 @@
     "selectRequired": "Please select",
     "idCopied": "ID copied",
     "copyFailedManual": "Copy failed, please copy manually",
-    "copyUnsupported": "Auto-copy is not supported in this environment"
+    "copyUnsupported": "Auto-copy is not supported in this environment",
+    "noPermission": "No permission"
   },
   "confirm": {
     "deleteTitle": "Confirm Delete",
     "deleteContent": "This action cannot be undone. Delete anyway?",
-    "deleteNamed": "Delete {{label}} \"{{name}}\"?"
+    "deleteNamed": "Delete {{label}} \"{{name}}\"?",
+    "unsavedTitle": "Discard unsaved changes?",
+    "unsavedContent": "This form has unsaved changes. Closing will discard them.",
+    "emptyPermissionTitle": "Clear all permissions?",
+    "emptyPermissionContent": "All permissions of this role will be removed (submitting an empty set).",
+    "emptyRoleTitle": "Clear all roles?",
+    "emptyRoleContent": "All roles of this user will be removed (submitting an empty set), leaving no permissions."
   },
   "validation": {
     "required": "This field is required",
@@ -74,7 +83,8 @@
   "batch": {
     "selectedPrefix": "",
     "selectedSuffix": " selected",
-    "clear": "Clear selection"
+    "clear": "Clear selection",
+    "tooMany": "Batch edit accepts at most {{max}} items per request, but {{submitted}} were submitted. Please split them into smaller batches."
   },
   "pagination": {
     "total": "Total {{count}}",
@@ -117,6 +127,8 @@
     "devices": "Devices",
     "deviceRecycleBin": "Device Recycle Bin",
     "customers": "Customers",
+    "carriers": "Carriers",
+    "circuits": "Circuits",
     "componentTemplates": "Component Templates",
     "vendorBrands": "Vendor Brands",
     "networkGroup": "Network Management",
@@ -162,6 +174,19 @@
     "switchDark": "Switch to dark mode",
     "switchLight": "Switch to light mode"
   },
+  "realtime": {
+    "status": {
+      "idle": "Realtime feed disabled",
+      "connecting": "Connecting to realtime feed",
+      "live": "Realtime feed connected",
+      "degraded": "Realtime feed down, falling back to 30s polling",
+      "idleShort": "Off",
+      "connectingShort": "Connecting",
+      "liveShort": "Live",
+      "degradedShort": "Polling",
+      "hint": "Data still refreshes while degraded, but may lag up to 30s"
+    }
+  },
   "user": {
     "profile": "User Center",
     "notLoggedIn": "Not signed in"
@@ -173,5 +198,9 @@
   "version": {
     "label": "Version v{{version}}",
     "backend": "Backend version v{{version}}"
+  },
+  "filter": {
+    "title": "Filters",
+    "activeCount": "Filters ({{count}} active)"
   }
 }

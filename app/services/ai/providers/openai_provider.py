@@ -108,16 +108,16 @@ class OpenAIProvider(LLMClient):
         except (APIConnectionError, APITimeoutError) as e:
             logger.error("ai.chat.connection_failed type=%s err=%s",
                          type(e).__name__, e)
-            raise AIServiceError(operation="chat")
+            raise AIServiceError(operation="chat") from e
         except APIStatusError as e:
             logger.error("ai.chat.status_error status=%s err=%s", e.status_code, e)
-            raise AIServiceError(operation="chat")
+            raise AIServiceError(operation="chat") from e
         except AIServiceError:
             raise
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error("ai.chat.unexpected type=%s err=%s",
                          type(e).__name__, e, exc_info=True)
-            raise AIServiceError(operation="chat")
+            raise AIServiceError(operation="chat") from e
 
     @_RETRY_DECORATOR
     def _call_sdk(self, system_prompt: str, user_prompt: str):
@@ -177,13 +177,13 @@ class OpenAIProvider(LLMClient):
             breaker.record_failure()
             logger.error("ai.chat_stream.upstream_failed type=%s err=%s",
                          type(e).__name__, e)
-            raise AIServiceError(operation="chat_stream")
-        except Exception as e:  # noqa: BLE001
+            raise AIServiceError(operation="chat_stream") from e
+        except Exception as e:
             _usage["status"] = "error"
             breaker.record_failure()
             logger.error("ai.chat_stream.unexpected type=%s err=%s",
                          type(e).__name__, e, exc_info=True)
-            raise AIServiceError(operation="chat_stream")
+            raise AIServiceError(operation="chat_stream") from e
         finally:
             _record(self.model, _usage, time.monotonic() - _t0)
 

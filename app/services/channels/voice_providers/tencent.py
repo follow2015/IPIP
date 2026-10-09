@@ -45,7 +45,7 @@ class TencentVoiceProvider(VoiceProvider):
 
         try:
             response = client.SendTtsVoice(request)
-        except Exception as exc:  # noqa: BLE001 - 分类后再抛，未知则原样透传
+        except Exception as exc:  # 分类后再抛，未知则原样透传
             classified = self._classify_error(exc)
             if classified is exc:
                 raise

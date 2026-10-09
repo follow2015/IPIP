@@ -1,5 +1,5 @@
 import React from 'react';
-import { Table, Card, Space, Button, List, Pagination, Checkbox } from 'antd';
+import { Table, Card, Space, Button, Listy, Pagination, Checkbox, Spin, Empty } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { TableProps, TablePaginationConfig, CheckboxProps } from 'antd';
@@ -7,6 +7,8 @@ import type { UseTableReturn } from '@/hooks/useTable';
 import SearchInput from '@/components/SearchInput';
 import { useResponsive } from '@/hooks/useResponsive';
 import { formatLimitHint, isBeyondOffsetLimit } from './serverPagination';
+import { useLargeUnpagedListWarning } from './largeUnpagedList';
+import QueryErrorState from './QueryErrorState';
 
 type CheckboxChangeEvent = Parameters<NonNullable<CheckboxProps['onChange']>>[0];
 
@@ -52,6 +54,8 @@ export interface DataTableProps<T> {
   size?: TableProps<T>['size'];
   rowClassName?: TableProps<T>['rowClassName'];
   scroll?: TableProps<T>['scroll'];
+  error?: unknown;
+  onRetry?: () => void;
 }
 
 function DataTable<T extends object>({
@@ -82,13 +86,19 @@ function DataTable<T extends object>({
   cardRender,
   size,
   rowClassName,
-  scroll = DEFAULT_SCROLL
+  scroll = DEFAULT_SCROLL,
+  error,
+  onRetry
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const { isMobile } = useResponsive();
   const resolvedEmptyText = emptyText === undefined ? t('message.noData') : emptyText;
   const resolvedSearchPlaceholder = searchPlaceholder ?? t('action.search');
   const hasToolbar = searchable || toolbar || onRefresh || filters || actions;
+  const hideListForError = !!error && dataSource.length === 0;
+  const errorNode = error ? (
+    <QueryErrorState error={error} onRetry={onRetry} hasData={dataSource.length > 0} />
+  ) : null;
   const showAsCard = mobileCardMode && isMobile && !!cardRender;
   const resolvedPage = page ?? tableProps?.page;
   const resolvedPerPage = perPage ?? tableProps?.perPage;
@@ -110,7 +120,11 @@ function DataTable<T extends object>({
     ? { simple: true, showSizeChanger: false, showQuickJumper: false }
     : beyondOffsetLimit
       ? { showSizeChanger: true, showQuickJumper: false, showTotal: formatLimitHint }
-      : { showSizeChanger: true, showQuickJumper: true, showTotal: (total) => t('pagination.total', { count: total }) };
+      : {
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total) => t('pagination.total', { count: total })
+        };
   const paginationConfig: false | TablePaginationConfig =
     pagination === false
       ? false
@@ -122,6 +136,8 @@ function DataTable<T extends object>({
           ...(resolvedTotal !== undefined ? { total: resolvedTotal } : {}),
           ...(resolvedOnPageChange ? { onChange: resolvedOnPageChange } : {})
         };
+
+  useLargeUnpagedListWarning(dataSource.length, paginationConfig === false);
 
   const rowKeyFn: (r: T) => string =
     typeof rowKey === 'function'
@@ -164,7 +180,8 @@ function DataTable<T extends object>({
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: 8
+            gap: 8,
+            minWidth: 0
           }}
         >
           <Space wrap>
@@ -194,66 +211,77 @@ function DataTable<T extends object>({
           )}
         </div>
       )}
-      {showAsCard ? (
-        <>
-          {rowSelection && dataSource.length > 0 && (
-            <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
-              <Checkbox
-                checked={allPageSelected}
-                indeterminate={somePageSelected}
-                onChange={handleCardCheckAll}
-              >
-                {t('pagination.selectAllOnPage', { count: dataSource.length })}
-              </Checkbox>
-            </div>
-          )}
-          <List<T>
-            dataSource={dataSource}
-            rowKey={rowKeyFn}
-            loading={loading}
-            split={false}
-            locale={{ emptyText: resolvedEmptyText }}
-            renderItem={(record) => (
-              <List.Item style={{ padding: '8px 0' }}>
-                <Card
-                  size="small"
-                  style={{ width: '100%' }}
-                  title={
-                    rowSelection ? (
-                      <Checkbox
-                        checked={selectedKeySet.has(String(rowKeyFn(record)))}
-                        disabled={rowSelection.getCheckboxProps?.(record)?.disabled}
-                        onChange={handleCardCheck(record)}
-                      />
-                    ) : undefined
-                  }
+      {errorNode}
+      {!hideListForError &&
+        (showAsCard ? (
+          <>
+            {rowSelection && dataSource.length > 0 && (
+              <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+                <Checkbox
+                  checked={allPageSelected}
+                  indeterminate={somePageSelected}
+                  onChange={handleCardCheckAll}
                 >
-                  {cardRender(record)}
-                </Card>
-              </List.Item>
+                  {t('pagination.selectAllOnPage', { count: dataSource.length })}
+                </Checkbox>
+              </div>
             )}
+            {/* Listy 无 loading / locale prop（对比原 List 的能力缺口），
+                故加载态用 Spin 包裹、空态自行渲染 Empty —— 职责上移到调用侧。
+                Spin 的 spinning 在空数据时也生效，与原 List 行为一致。 */}
+            <Spin spinning={loading}>
+              {dataSource.length === 0 ? (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={resolvedEmptyText}
+                  style={{ padding: '24px 0' }}
+                />
+              ) : (
+                <Listy<T>
+                  items={dataSource}
+                  rowKey={rowKeyFn}
+                  styles={{ item: { padding: 0 } }}
+                  itemRender={(record) => (
+                    <Card
+                      size="small"
+                      style={{ width: '100%', minWidth: 0, marginBottom: 8 }}
+                      title={
+                        rowSelection ? (
+                          <Checkbox
+                            checked={selectedKeySet.has(String(rowKeyFn(record)))}
+                            disabled={rowSelection.getCheckboxProps?.(record)?.disabled}
+                            onChange={handleCardCheck(record)}
+                          />
+                        ) : undefined
+                      }
+                    >
+                      {cardRender(record)}
+                    </Card>
+                  )}
+                />
+              )}
+            </Spin>
+            {paginationConfig !== false && (
+              <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+                <Pagination {...paginationConfig} size={isMobile ? 'small' : undefined} />
+              </div>
+            )}
+          </>
+        ) : (
+          <Table<T>
+            columns={columns}
+            dataSource={dataSource}
+            loading={loading}
+            rowKey={rowKey}
+            pagination={paginationConfig}
+            rowSelection={rowSelection}
+            onRow={onRow}
+            locale={{ emptyText: resolvedEmptyText }}
+            scroll={scroll}
+            size={size}
+            rowClassName={rowClassName}
           />
-          {paginationConfig !== false && (
-            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-              <Pagination {...paginationConfig} size={isMobile ? 'small' : undefined} />
-            </div>
-          )}
-        </>
-      ) : (
-        <Table<T>
-          columns={columns}
-          dataSource={dataSource}
-          loading={loading}
-          rowKey={rowKey}
-          pagination={paginationConfig}
-          rowSelection={rowSelection}
-          onRow={onRow}
-          locale={{ emptyText: resolvedEmptyText }}
-          scroll={scroll}
-          size={size}
-          rowClassName={rowClassName}
-        />
-      )}
+        ))}
     </>
   );
 

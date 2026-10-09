@@ -54,27 +54,11 @@ interface PortRef {
   port: string;
 }
 
-interface PortSpeedPayload {
-  inbound_speed: number;
-  outbound_speed: number;
-}
-
-interface PortVlanPayload {
-  vlan_id: number;
-  mode: 'access' | 'trunk';
-  allowed_vlans?: number[] | null;
-}
-
-interface PortIPPayload {
-  ip_address: string;
-  subnet_mask: string;
-  is_secondary?: boolean;
-}
-
 
 const switchHooks = createCrudHooks<Switch, CreateSwitchRequest, UpdateSwitchRequest>({
   basePath: '/switch',
   queryKey: queryKeys.switches.all,
+  invalidateResource: 'switch',
   getId: (data) => data.id,
   toUpdatePayload: (data) => data.data
 });
@@ -102,11 +86,10 @@ export function useSwitchOptions(roomId?: number) {
   return useQuery({
     queryKey: [...queryKeys.switches.all, 'options', roomId ?? null],
     queryFn: async () => {
-      const params: Record<string, unknown> = { per_page: 1000 };
+      const params: Record<string, unknown> = {};
       if (roomId) params.room_id = roomId;
-      const res = await get<PaginatedData<Switch>>('/switch/list', params);
-      const items = res.data?.items ?? [];
-      return items.map((s) => ({ label: s.name, value: s.id }));
+      const res = await get<{ id: number; name: string }[]>('/switch/options', params);
+      return (res.data ?? []).map((s) => ({ label: s.name, value: s.id }));
     }
   });
 }

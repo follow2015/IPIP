@@ -120,24 +120,32 @@ class TopologyDiscoveryService:
 
         raw_text, err = self._run_show(cred, adapter.get_lldp_neighbor_command())
         source = "lldp"
-        if err:
-            return {"device_id": device_id, "source": source,
-                    "suggestions": [], "error": err}
+        neighbors: list = []
+        if not err:
+            neighbors = adapter.parse_lldp_neighbors(raw_text)
+            if not neighbors:
+                cdp_cmd = adapter.get_cdp_neighbor_command()
+                if cdp_cmd:
+                    raw2, err2 = self._run_show(cred, cdp_cmd)
+                    if not err2:
+                        cdp_rows = adapter.parse_cdp_neighbors(raw2)
+                        if cdp_rows:
+                            neighbors, source = cdp_rows, "cdp"
 
-        neighbors = adapter.parse_lldp_neighbors(raw_text)
-        if not neighbors and source == "lldp":
-            cdp_cmd = adapter.get_cdp_neighbor_command()
-            if cdp_cmd:
-                raw2, err2 = self._run_show(cred, cdp_cmd)
-                if not err2:
-                    cdp_rows = adapter.parse_cdp_neighbors(raw2)
-                    if cdp_rows:
-                        neighbors, source = cdp_rows, "cdp"
+        snmp_note = None
+        if not neighbors:
+            neighbors, snmp_note = self._discover_lldp_via_snmp(cred)
+            if neighbors:
+                source = "lldp(snmp)"
+
+        if err and not neighbors:
+            return {"device_id": device_id, "source": source,
+                    "suggestions": [], "error": snmp_note or err}
 
         suggestions = [self._build_suggestion(device_id, n) for n in neighbors]
         return {"device_id": device_id, "source": source,
                 "suggestions": suggestions, "raw_count": len(neighbors),
-                "error": None}
+                "error": None if neighbors else snmp_note}
 
     def discover_batch(self, device_ids: List[int]) -> Dict[str, Any]:
         """批量发现（≤10 台，逐台串行，单台失败不阻断其余）"""
@@ -146,7 +154,7 @@ class TopologyDiscoveryService:
         for did in ids:
             try:
                 results.append(self.discover_switch(did))
-            except Exception as e:  # 单台失败不阻断
+            except Exception as e:  # noqa: BLE001 -- 单台设备发现失败隔离：单台失败不阻断其余，记入 results 后继续下一台
                 logger.warning("[topo-discovery] 设备 %s 发现失败: %s", did, e)
                 results.append({"device_id": did, "source": None,
                                 "suggestions": [], "error": str(e)})
@@ -225,6 +233,87 @@ class TopologyDiscoveryService:
             return output or "", None
         except Exception as e:  # noqa: BLE001 - SSH 执行失败时返回 (None, 错误信息) 交调用方处理（已回传）
             return None, f"SSH 执行失败 [{command}]: {e}"
+
+    def _discover_lldp_via_snmp(self, cred) -> tuple[list, Optional[str]]:
+        """CLI 拿不到 LLDP 邻居时的 SNMP 来源（无 SSH 设备的唯一路径）。
+
+        设计要点：
+
+        - **走 ``runtime.selector_for``，不直接 new SnmpChannel**：拓扑发现与扫描
+          共用同一套灰度开关（``SCAN_CHANNEL_ENABLED``）与 SNMP 白名单，
+          不需要为"只读建议"另开一条绕过开关的路。
+        - 通道返回的是 ``[asdict(ParsedLldpNeighbor)]``（dict），而
+          ``_build_suggestion`` 按属性访问 —— 这里转回 dataclass，**按字段名过滤**
+          而不是硬编码键，SNMP 侧加字段时不会炸。
+        - 诚实边界：SNMP 不采 ``lldpRemManAddrTable`` ⇒ ``neighbor_mgmt_ip`` 为空，
+          对端匹配退化为 sysname，建议可能落在 UNKNOWN_PEER —— 不编造地址。
+
+        Returns:
+            ``(neighbors, note)``：neighbors 为空时 note 是给用户的原因说明。
+        """
+        from dataclasses import fields as _dc_fields
+
+        from app.adapters.base_adapter import ParsedLldpNeighbor
+        from app.core.enums import CollectCapability
+        from app.services.collector import runtime
+
+        try:
+            selector = runtime.selector_for(cred)
+        except Exception as exc:  # noqa: BLE001 —— 装配异常不得让发现接口 500
+            logger.warning("[topo-discovery] 通道装配失败 device=%s: %s", cred.device_id, exc)
+            return [], f"通道层装配失败: {exc}"
+        if selector is None:
+            return [], ("通道层未启用，或该设备不在 SNMP 白名单内"
+                        "（无 SSH 设备需先放行才可走 SNMP 发现）")
+
+        try:
+            facts = selector.collect(cred.device_id, [CollectCapability.LLDP])
+        except Exception as exc:  # noqa: BLE001 —— 同上：发现失败降级为提示
+            logger.warning("[topo-discovery] SNMP 采集 LLDP 失败 device=%s: %s",
+                           cred.device_id, exc)
+            return [], f"SNMP 采集失败: {exc}"
+
+        names = {f.name for f in _dc_fields(ParsedLldpNeighbor)}
+        neighbors = [
+            ParsedLldpNeighbor(**{k: v for k, v in row.items() if k in names})
+            for row in (facts.lldp or [])
+        ]
+        if not neighbors:
+            outcomes = {k: str(v) for k, v in (facts.outcomes or {}).items()}
+            return [], (f"SNMP 未返回 LLDP 邻居（outcomes={outcomes}）"
+                        + self._lldp_local_hint(selector, cred))
+        logger.info("[topo-discovery] 设备 %s 经 SNMP 取得 %d 条 LLDP 邻居",
+                    cred.device_id, len(neighbors))
+        return neighbors, None
+
+    @staticmethod
+    def _lldp_local_hint(selector, cred) -> str:
+        """邻居为空时补一句"为什么"：本机 LLDP 端口表为空 ⇒ 设备未启用。
+
+        现场最常见的困惑就是"点了几次都没有建议" —— 本机表为空的两种成因
+        （设备没开 LLDP / SNMP 视图未放行 ``1.0.8802`` 子树）用户都不该靠猜。
+        探测失败（返回 None）时**只说未判定**，不把"没采到"说成"没启用"。
+        """
+        snmp_ch = next(
+            (c for c in (getattr(selector, "channels", None) or [])
+             if getattr(c, "code", "") == "snmp"),
+            None,
+        )
+        probe = getattr(snmp_ch, "lldp_local_status", None)  # 非 SNMP 通道没有此探针
+        if probe is None:
+            return ""
+        try:
+            count = probe(cred.device_id)
+        except Exception as exc:  # noqa: BLE001 —— 诊断探针失败不影响主结论
+            logger.debug("[topo-discovery] LLDP 本机状态探测失败 device=%s: %s",
+                         cred.device_id, exc)
+            return ""
+        if count is None:
+            return "（本机 LLDP 状态未判定：探测失败）"
+        if count == 0:
+            return ("（本机 LLDP 端口表为空 ⇒ 设备侧 LLDP 未启用，"
+                    "或 SNMP 视图未开放 1.0.8802 子树）")
+        return "（本机 LLDP 已启用，但未学到邻居 ⇒ 对端未开 LLDP 或非 LLDP 设备）"
 
     def _build_suggestion(self, switch_device_id: int,
                           neighbor) -> Dict[str, Any]:

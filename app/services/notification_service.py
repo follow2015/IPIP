@@ -10,7 +10,7 @@ P2 修订：外部渠道（email/webhook）改为后台线程异步投递，不�
 """
 from sqlalchemy.exc import IntegrityError
 from app.utils.logging import get_logger
-from datetime import datetime, timezone
+from datetime import datetime
 from app.utils.time_utils import now_utc_naive
 
 from app.core.enums import ChannelType, PERSONAL_CHANNELS, SeverityLevel
@@ -119,7 +119,7 @@ class NotificationService:
                 idempotency_key=idempotency_key, ack_required=ack_required,
                 allow_broadcast=allow_broadcast,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 -- 通知投递失败已忽略：notify_strict 已打印完整 traceback 并回滚，此处仅记录语义
             logger.warning(
                 "通知投递失败（已忽略，不影响主流程）: type=%s target=%s:%s",
                 type, target_type, target_id,
@@ -266,7 +266,8 @@ class NotificationService:
 
         try:
             from app.services.switch_events import _redis_publish_global
-            import json, time as _time
+            import json
+            import time as _time
             _redis_publish_global(json.dumps({
                 "event_type": "notification_created",
                 "payload": {
@@ -286,7 +287,7 @@ class NotificationService:
         _broadcast_names = set(NotificationService._broadcast_channel_registry.keys())
         has_broadcast_channels = (
             allow_broadcast
-            and bool(channels_set := set(channels) & _broadcast_names)
+            and bool(set(channels) & _broadcast_names)
             and bool(NotificationService._broadcast_channel_registry)
         )
         if (has_personal_external or has_broadcast_channels) and user_ids:
@@ -486,13 +487,13 @@ class NotificationService:
             try:
                 from config import get_config
                 tz_name = getattr(get_config(), 'APP_TIMEZONE', 'Asia/Shanghai')
-            except Exception:
+            except Exception:  # noqa: BLE001 -- 时区名读取失败降级为 Asia/Shanghai 默认值
                 tz_name = 'Asia/Shanghai'
 
             try:
                 from zoneinfo import ZoneInfo
                 tz = ZoneInfo(tz_name)
-            except Exception:
+            except Exception:  # noqa: BLE001 -- zoneinfo 不可用时回退 UTC+8 固定偏移：环境差异异常不可枚举
                 from datetime import timedelta
                 tz = timezone(timedelta(hours=8))
 

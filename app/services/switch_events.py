@@ -1,4 +1,3 @@
-from __future__ import annotations
 # -*- coding: utf-8 -*-
 """
 端口变更事件发布模块（Flask 侧，仅发布，不再服务 SSE）
@@ -29,15 +28,21 @@ from __future__ import annotations
 注意：事件携带发布侧分配的 seq（Redis INCR，网关透传不重新分配），
 同时携带 event_id（uuid，供前端去重）。
 """
+from __future__ import annotations
 import json
 import os
 from app.utils.logging import get_logger
+from app.utils.trace_context import current_trace_id
 import time
 import uuid as _uuid_mod
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
-_GLOBAL_REDIS_CHANNEL = "events:global"
+_GLOBAL_REDIS_CHANNEL = redis_keys.GLOBAL_CHANNEL
+
+GLOBAL_RING_KEY = redis_keys.GLOBAL_RING_KEY
+_GLOBAL_SEQ_KEY = redis_keys.GLOBAL_SEQ_KEY
 
 RING_BUFFER_SIZE = int(os.environ.get("SSE_RING_BUFFER_SIZE", "200"))
 RING_TTL_SECONDS = int(os.environ.get("SSE_RING_TTL_SECONDS", "3600"))
@@ -57,6 +62,7 @@ _publish_drop_stats: dict[str, int] = {
     "device_publish": 0,   # 设备事件最终投递失败（含有界重试耗尽）
     "global_publish": 0,   # 全局事件投递失败
     "redis_unavailable": 0,  # Redis 不可用导致的事件丢弃
+    "global_ring": 0,      # M1：全局事件 ring/seq 落定失败（丢的是重放能力，非本次事件）
 }
 _last_unavailable_log = 0.0  # 节流：不可用告警 60s 一次，防故障期刷屏
 
@@ -100,6 +106,20 @@ def _get_ring_script(r):
     return _ring_script
 
 
+def _inject_trace_id(event_dict: dict) -> None:
+    """M10：把当前 trace_id 带进事件 payload（没有就不带）。
+
+    网关 fan-out 是整串转发，故在发布侧带上即可全程透传到前端，网关侧无需改动。
+    事件来源可能是后台任务/定时扫描（无请求上下文），那时没有上游可关联，
+    不写 null 以免给前端解析器添一个必须判空的键。
+    """
+    if "trace_id" in event_dict or not event_dict:
+        return
+    trace_id = current_trace_id()
+    if trace_id:
+        event_dict["trace_id"] = trace_id
+
+
 def _publish_device_event(device_id: int, event_dict: dict) -> None:
     """设备事件发布：INCR 分配 seq → Lua 原子落 ring → PUBLISH。
 
@@ -120,21 +140,22 @@ def _publish_device_event(device_id: int, event_dict: dict) -> None:
         _warn_redis_unavailable()
         return
     try:
-        seq_key = f"seq:{device_id}"
+        seq_key = redis_keys.seq_key(device_id)
         r.set(seq_key, int(time.time()), nx=True)
         event_dict["seq"] = r.incr(seq_key)
+        _inject_trace_id(event_dict)
         payload = json.dumps(event_dict, ensure_ascii=False)
 
         _get_ring_script(r)(
-            keys=[f"ring:{device_id}"],
+            keys=[redis_keys.ring_key(device_id)],
             args=[payload, RING_BUFFER_SIZE - 1, RING_TTL_SECONDS],
         )
 
         for attempt in range(1, _PUBLISH_ATTEMPTS + 1):
             try:
-                r.publish(f"sw:{device_id}", payload)
+                r.publish(redis_keys.device_channel(device_id), payload)
                 break
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- Redis 发布重试中的单次失败接管：需捕获任意异常参与有界重试计数与提级 ERROR
                 if attempt == _PUBLISH_ATTEMPTS:
                     _publish_drop_stats["device_publish"] += 1
                     logger.error(
@@ -145,22 +166,58 @@ def _publish_device_event(device_id: int, event_dict: dict) -> None:
                     )
                 else:
                     time.sleep(_PUBLISH_RETRY_DELAY)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 设备事件发布最终失败：计入丢弃统计并 ERROR（消息确定丢失）
         _publish_drop_stats["device_publish"] += 1
         logger.error("Redis 设备事件发布失败（累计丢弃 %d 条）: %s",
                      _publish_drop_stats["device_publish"], exc)
 
 
 def _redis_publish_global(payload: str) -> None:
-    """通过 Redis Pub/Sub 广播全局事件。"""
+    """全局事件发布：INCR 分配 seq → Lua 原子落 ring → PUBLISH（M1）。
+
+    与 `_publish_device_event` 同构。此前这里只有一行裸 `publish`：全局流既无
+    ring 也无 seq，**断线即永久漏推**——机房扫描完成、批量资源变更这类事件
+    恰好都是"错过就得手动刷新页面"的，而设备流早就按 ring+seq 修好了，全局流
+    是漏网的那一个（评审 M1）。
+
+    顺序硬约束同设备流：**必须先落 ring 再 PUBLISH**（理由见
+    `_publish_device_event` 的 [WARN] 注释）。
+
+    Args:
+        payload: 已序列化的事件 JSON 字符串（不含 seq，本函数负责分配并注入）。
+    """
     r = _get_redis()
     if not r:
         _publish_drop_stats["redis_unavailable"] += 1
         _warn_redis_unavailable()
         return
+
+    try:
+        event_dict = json.loads(payload)
+    except json.JSONDecodeError:
+        logger.warning("全局事件负载非 JSON，跳过 seq/ring，仅实时广播")
+        event_dict = None
+
+    if event_dict is not None:
+        try:
+            r.set(_GLOBAL_SEQ_KEY, int(time.time()), nx=True)
+            event_dict["seq"] = r.incr(_GLOBAL_SEQ_KEY)
+            _inject_trace_id(event_dict)  # M10：同设备流，进 ring 前注入
+            payload = json.dumps(event_dict, ensure_ascii=False)
+
+            _get_ring_script(r)(
+                keys=[GLOBAL_RING_KEY],
+                args=[payload, RING_BUFFER_SIZE - 1, RING_TTL_SECONDS],
+            )
+        except Exception as exc:  # noqa: BLE001 -- 全局事件 seq/ring 落定失败：计入丢重放统计，不得阻断本次广播
+            _publish_drop_stats["global_ring"] += 1
+            logger.error("全局事件 seq/ring 落定失败（该事件将无法被重连重放，"
+                         "累计 %d 条）: %s",
+                         _publish_drop_stats["global_ring"], exc)
+
     try:
         r.publish(_GLOBAL_REDIS_CHANNEL, payload)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- global publish 最终失败：同 173
         _publish_drop_stats["global_publish"] += 1
         logger.error("Redis global publish 失败（累计丢弃 %d 条）: %s",
                      _publish_drop_stats["global_publish"], exc)

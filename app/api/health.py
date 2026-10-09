@@ -9,7 +9,7 @@ from flask import Blueprint, current_app
 from app.api.base import APIResponse
 from app.openapi.doc import doc, public
 from app.utils import error_statistics, health_checker
-from app.utils.auth import login_required, permission_required
+from app.services.auth import login_required, permission_required
 from app.utils.time_utils import now_iso_utc
 
 health_bp = Blueprint("health", __name__)

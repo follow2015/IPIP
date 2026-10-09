@@ -5,7 +5,7 @@
 定义日志记录的统一接口，支持结构化日志和多种输出格式。
 """
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from enum import Enum
 
 

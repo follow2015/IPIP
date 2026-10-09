@@ -48,7 +48,7 @@ class IncidentRepository:
             now: 事件首末告警时间（测试注入）；None 取当前 UTC 时间。
 
         创建时一并落 ``root_device_name`` 快照：本列在设备彻底删除前会由
-        ``DeviceService._dispose_monitor_trace`` 刷成最终名，但若创建时不写，
+        ``DeviceService.dispose_monitor_trace`` 刷成最终名，但若创建时不写，
         整个"设备还活着"的期间事件列表都只能显示裸 ID —— 而那是绝大多数时间。
         设备不存在时不编造，保持 NULL（读取面回落 ID）。
         """
@@ -185,6 +185,143 @@ class IncidentRepository:
         inc.status = "closed"
         inc.closed_at = now_utc_naive()
         self.session.flush()
+
+    def close_by_key(self, incident_key: str, now: Optional[datetime] = None) -> int:
+        """关闭该归并键下的**全部**活跃事件，返回关闭条数。
+
+        用于「条件已解除」路径（连通性恢复 / 指标恢复通知），是事件生命周期的
+        闭合端：``aggregate_alert`` 建/续事件，本方法关事件。
+
+        用批量 UPDATE 而非 ``close()`` 逐条：
+        - ``find_active_by_key`` 只取最新一条，真库曾出现同键多条活跃行
+          （聚合器竞态 / 人工干预），逐条关会留下半开状态；
+        - 恢复发生在探测热路径上，一次 UPDATE 比"查-改-flush"更省往返。
+
+        ``synchronize_session="evaluate"``（而非 ``False``）：恢复通知与事件聚合
+        可能在同一事务内已加载过该事件行，用 False 会让会话里留着 status='active'
+        的旧对象 —— 后续若有人读它就会看到"已是活跃"的假象。evaluate 在 Python 侧
+        按同一条件同步**已加载**的属性（无额外 SQL）。
+
+        [WARN] 同步只覆盖已加载的属性：``closed_at`` 这类尚未加载过的列不会被填，
+        对象上读到的仍是 None，直到会话刷新/过期。真值在 DB —— 本仓同类场景
+        （``set_diagnosis_backfill``）也是这个口径，读侧必须以库为准。
+        commit 由调用方收口。
+
+        Args:
+            incident_key: 归并键（``{alert_type}:{device_id}``）。
+            now: 关闭时间（测试注入）；None 取当前 UTC（naive，与列一致）。
+        """
+        ts = now if now is not None else now_utc_naive()
+        return (
+            self.session.query(MonitorIncident)
+            .filter(
+                MonitorIncident.incident_key == incident_key,
+                MonitorIncident.status != "closed",
+            )
+            .update({"status": "closed", "closed_at": ts},
+                    synchronize_session="evaluate")
+        )
+
+    def close_stale_active(
+        self, older_than: datetime, limit: int = 500, now: Optional[datetime] = None,
+    ) -> int:
+        """关闭 ``last_alert_at`` 早于 ``older_than`` 的活跃事件（停滞清扫）。
+
+        返回关闭条数；上限 ``limit`` 保证单轮工作量有界（真库积压几百条时
+        一轮扫完，不会因 UPDATE 长时间持锁阻塞告警写入）。
+
+        先取 id 再按 id 批量 UPDATE，而不是 ``UPDATE ... LIMIT``：MySQL 与
+        SQLite 对 ``UPDATE ... ORDER BY ... LIMIT`` 的支持不一致，SQLAlchemy
+        的 ``Query.update()`` 也不接受 limit/order_by。两步走跨方言一致。
+
+        同步策略同 ``close_by_key``（evaluate）：只同步已加载属性；``closed_at``
+        未加载时对象上读到 None，真值在 DB。
+
+        Args:
+            older_than: 停滞判据（naive UTC，与 ``last_alert_at`` 列同口径）。
+            limit: 单次最多关闭条数。
+            now: 写入 ``closed_at`` 的时间（测试注入）；None 取当前 UTC。
+        """
+        ids = [
+            row[0]
+            for row in (
+                self.session.query(MonitorIncident.id)
+                .filter(
+                    MonitorIncident.status != "closed",
+                    MonitorIncident.last_alert_at < older_than,
+                )
+                .order_by(MonitorIncident.id.asc())
+                .limit(limit)
+                .all()
+            )
+        ]
+        if not ids:
+            return 0
+        ts = now if now is not None else now_utc_naive()
+        return (
+            self.session.query(MonitorIncident)
+            .filter(MonitorIncident.id.in_(ids))
+            .update({"status": "closed", "closed_at": ts},
+                    synchronize_session="evaluate")
+        )
+
+    def close_recovered_connectivity(
+        self, alert_type: str, limit: int = 500, now: Optional[datetime] = None,
+    ) -> int:
+        """自愈：关闭「设备当前被监控且可达」的连通性问题事件，返回关闭条数。
+
+        为什么需要（2026-10-08 现场实例）：恢复通知只在**探测到恢复的那一刻**
+        发出并关闭事件；若那一刻进程正在重启/维护静默，这条转移就永久丢了 ——
+        实测设备 107 在 02:45:45 恢复、而新代码 02:48 才生效，事件从此挂在
+        active。仅靠"停滞清扫"要等满 24h 才收敛，期间"未关闭事件"数字是假的。
+
+        判据刻意收紧到"**在监控**（monitor_enabled=1）**且可达**"：
+        - 暂停探测的设备快照可能是陈旧的 reachable=True（设备实际已宕），
+          不能据此断言恢复 —— 它们由停滞清扫兜底；
+        - 无状态行的设备无从判断，跳过。
+        仅针对连通性问题键（``{alert_type}:`` 前缀）：指标类事件的可达性
+        与"指标是否恢复"无关，不能顺手关掉。
+
+        Args:
+            alert_type: 连通性问题侧告警类型（如 ``device_unreachable``）。
+            limit: 单次最多关闭条数。
+            now: 关闭时间（测试注入）；None 取当前 UTC。
+
+        Returns:
+            关闭条数（0 = 没有需要自愈的事件）。
+        """
+        from app.models.device_monitor_status import DeviceMonitorStatus
+
+        ids = [
+            row[0]
+            for row in (
+                self.session.query(MonitorIncident.id)
+                .join(
+                    DeviceMonitorStatus,
+                    DeviceMonitorStatus.device_id == MonitorIncident.root_device_id,
+                )
+                .filter(
+                    MonitorIncident.status != "closed",
+                    MonitorIncident.incident_key.startswith(
+                        f"{alert_type}:", autoescape=True,
+                    ),
+                    DeviceMonitorStatus.monitor_enabled.is_(True),
+                    DeviceMonitorStatus.reachable.is_(True),
+                )
+                .order_by(MonitorIncident.id.asc())
+                .limit(limit)
+                .all()
+            )
+        ]
+        if not ids:
+            return 0
+        ts = now if now is not None else now_utc_naive()
+        return (
+            self.session.query(MonitorIncident)
+            .filter(MonitorIncident.id.in_(ids))
+            .update({"status": "closed", "closed_at": ts},
+                    synchronize_session="evaluate")
+        )
 
     def set_diagnosis_backfill(
         self, incident_id: int, session_id: int, summary: Optional[str],

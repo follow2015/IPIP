@@ -3,7 +3,7 @@
 
 提供 ComponentTemplate 的数据访问方法。
 """
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from sqlalchemy import or_
 

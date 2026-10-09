@@ -140,7 +140,7 @@ def _apply_to_config(snapshot: Dict[str, Any]) -> None:
         if api_key_enc and "AI_API_KEY" not in _ENV_OVERRIDES:
             try:
                 from app.utils.security.encryption import decrypt
-                setattr(Config, "AI_API_KEY", decrypt(api_key_enc))
+                Config.AI_API_KEY = decrypt(api_key_enc)
             except Exception as e:  # noqa: BLE001
                 _logger.warning("ai.config.api_key_decrypt_failed %s", e)
 
@@ -340,11 +340,11 @@ def _apply_updates_to_config(updates: Dict[str, Any],
         setattr(Config, attr, val)
         changed.append(field)
 
-    if "api_key" in updates and updates["api_key"]:
+    if updates.get("api_key"):
         if "AI_API_KEY" in _ENV_OVERRIDES:
             locked.append("api_key")
         else:
-            setattr(Config, "AI_API_KEY", str(updates["api_key"]))
+            Config.AI_API_KEY = str(updates["api_key"])
             changed.append("api_key")
 
 

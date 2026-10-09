@@ -1,16 +1,11 @@
 import { useConfirm } from '@/utils/confirm';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Tabs, Spin, Button, Space, Tag, Dropdown, Descriptions, Result } from 'antd';
-import {
-  ArrowLeftOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  SwapOutlined,
-  ReloadOutlined
-} from '@ant-design/icons';
+import { Tabs, Button, Space, Tag, Dropdown, Descriptions, Result } from 'antd';
+import { EditOutlined, DeleteOutlined, SwapOutlined, ReloadOutlined } from '@ant-design/icons';
+import DetailActionBar from '@/components/DetailActionBar';
 import { useDeviceSuspenseDetail, useDeleteDevice, useUpdateDeviceStatus } from '@/services/device';
 import { DEVICE_SUBTYPE_COLORS, DeviceType, DeviceSubtype } from '@/types/enums';
 import {
@@ -207,43 +202,32 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
 
   return (
     <div>
-      {/* 顶部导航栏 */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 16
-        }}
-      >
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/devices')}>
-          {tDevice('detail.backToList')}
-        </Button>
-        <Space>
-          <Dropdown
-            menu={{ items: statusMenuItems, onClick: ({ key }) => handleStatusChange(Number(key)) }}
+      {/* 顶部导航栏 —— 窄屏自动换行，避免 7 个按钮挤出视口后不可点 */}
+      <DetailActionBar backText={tDevice('detail.backToList')} onBack={() => navigate('/devices')}>
+        <Dropdown
+          menu={{ items: statusMenuItems, onClick: ({ key }) => handleStatusChange(Number(key)) }}
+        >
+          <Button icon={<SwapOutlined />}>{tDevice('detail.changeStatus')}</Button>
+        </Dropdown>
+        {hasSsh && (
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={handleRefreshDeviceInfo}
+            loading={syncSwitchInfo.isPending}
           >
-            <Button icon={<SwapOutlined />}>{tDevice('detail.changeStatus')}</Button>
-          </Dropdown>
-          {hasSsh && (
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={handleRefreshDeviceInfo}
-              loading={syncSwitchInfo.isPending}
-            >
-              {tDevice('detail.refreshInfo')}
-            </Button>
-          )}
-          <Button type="primary" icon={<EditOutlined />} onClick={() => form.open()}>
-            {tCommon('action.edit')}
+            {tDevice('detail.refreshInfo')}
           </Button>
-          <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
-            {tCommon('action.delete')}
-          </Button>
-        </Space>
-      </div>
+        )}
+        <Button type="primary" icon={<EditOutlined />} onClick={() => form.open()}>
+          {tCommon('action.edit')}
+        </Button>
+        <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
+          {tCommon('action.delete')}
+        </Button>
+      </DetailActionBar>
 
-      {/* 设备概要 */}
+      {/* 设备概要 —— 现场场景（PM 场景 B1 / AC-P0-2）：位置信息（机房/机柜/U位）
+          必须首屏可见，不得藏在 Tab 之下。故在此置顶展示，避免现场巡检要滑过 Tabs。 */}
       <Descriptions column={{ xs: 1, md: 3 }} size="small" style={{ marginBottom: 16 }}>
         <Descriptions.Item label={tDevice('field.name')}>
           <strong style={{ fontSize: 16 }}>{device.device_name}</strong>
@@ -259,6 +243,17 @@ function DeviceDetailContent({ deviceId }: { deviceId: number }) {
         </Descriptions.Item>
         <Descriptions.Item label={tCommon('field.status')}>
           <Tag color={statusInfo?.color}>{statusInfo?.label ?? tDevice('status.unknown')}</Tag>
+        </Descriptions.Item>
+        <Descriptions.Item label={tDevice('basic.field.location')} span={{ xs: 1, md: 3 }}>
+          {(() => {
+            const uPos = device.parent_u_position ?? device.u_position;
+            const parts = [
+              device.room_name,
+              device.cabinet_number,
+              uPos ? `U${uPos}` : null
+            ].filter(Boolean);
+            return parts.length ? parts.join(' / ') : '-';
+          })()}
         </Descriptions.Item>
       </Descriptions>
 

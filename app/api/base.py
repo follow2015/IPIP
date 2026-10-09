@@ -78,7 +78,7 @@ class APIResponse:
 
         try:
             resolved = resolve_error_i18n(message)
-        except Exception as exc:  # 映射表出问题绝不能影响错误响应本身
+        except Exception as exc:  # noqa: BLE001 -- 错误文案映射失败兜底：映射表故障绝不能影响错误响应本身（否则报错时报错）
             logger.warning('error_i18n 解析失败: %s', exc)
             resolved = None
         if resolved:
@@ -158,7 +158,7 @@ class RequestValidator:
         try:
             return schema.load(data)
         except MarshmallowValidationError as e:
-            raise ValidationError(f"数据验证失败: {e.messages}")
+            raise ValidationError(f"数据验证失败: {e.messages}") from e
     
     @staticmethod
     def validate_required_fields(data: Dict, required_fields: list) -> None:
@@ -171,20 +171,32 @@ class RequestValidator:
         if missing_fields:
             raise ValidationError(f"缺少必填字段: {', '.join(missing_fields)}")
     
+    MAX_PER_PAGE = 100
+    DEFAULT_PER_PAGE = 20
+    MAX_PAGE = 1000
+
     @staticmethod
-    def validate_pagination_params() -> Tuple[int, int]:
-        """验证分页参数"""
+    def validate_pagination_params(default_per_page: int = DEFAULT_PER_PAGE) -> Tuple[int, int]:
+        """验证并夹紧分页参数（HTTP 边界唯一入口）
+
+        夹紧而非报错：分页参数越界是客户端的常规噪声（手改 URL、爬虫），
+        返回 400 会让正常浏览体验变差；夹紧既堵住资源耗尽又不打扰用户。
+
+        Args:
+            default_per_page: 各端点可自带默认页大小（如权限列表默认 50）。
+        """
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        
-        per_page = min(per_page, 100)
-        
+        per_page = request.args.get('per_page', default_per_page, type=int)
+
+        per_page = min(per_page, RequestValidator.MAX_PER_PAGE)
+
         if page < 1:
             page = 1
-            
+        page = min(page, RequestValidator.MAX_PAGE)
+
         if per_page < 1:
-            per_page = 20
-            
+            per_page = default_per_page
+
         return page, per_page
 
 
@@ -204,7 +216,7 @@ def api_exception_handler(f):
             return APIResponse.error(e.message, "VALIDATION_ERROR", 400)
         except PresetResponseError:
             raise
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 异常路径清理 session 兜底：防止 session 处于脏状态影响后续请求（CR-04）
             try:
                 from extensions import db
                 db.session.rollback()

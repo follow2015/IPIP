@@ -9,6 +9,7 @@
 import type { CSSProperties } from 'react';
 import type { TFunction } from 'i18next';
 import type { TopologyNode, TopologyEdge } from '@/types/models';
+import { GRAPH_COLOR, COMBO_COLORS } from './graphPalette';
 
 
 export type LayoutType = 'force' | 'dagre' | 'concentric' | 'radial';
@@ -45,52 +46,41 @@ export const NODE_SIZES = {
 export const LABEL_FONT_SIZE = 10;
 export const MAX_LABEL_LEN = 14;
 
-export const COMBO_COLORS = [
-  { fill: '#f0f5ff', stroke: '#adc6ff' },
-  { fill: '#f6ffed', stroke: '#b7eb8f' },
-  { fill: '#fffbe6', stroke: '#ffe58f' },
-  { fill: '#fff1f0', stroke: '#ffa39e' },
-  { fill: '#f9f0ff', stroke: '#d3adf7' },
-  { fill: '#e6fffb', stroke: '#87e8de' },
-  { fill: '#fff0f6', stroke: '#ffadd2' },
-  { fill: '#fcffe6', stroke: '#eaff8f' }
-];
-
 
 export const SWITCH_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect x="4" y="16" width="56" height="32" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="2"/>
-  <circle cx="16" cy="28" r="3" fill="#52c41a"/><circle cx="26" cy="28" r="3" fill="#52c41a"/>
-  <circle cx="36" cy="28" r="3" fill="#52c41a"/><circle cx="46" cy="28" r="3" fill="#52c41a"/>
-  <rect x="12" y="36" width="6" height="6" rx="1" fill="#1677ff"/><rect x="22" y="36" width="6" height="6" rx="1" fill="#1677ff"/>
-  <rect x="32" y="36" width="6" height="6" rx="1" fill="#1677ff"/><rect x="42" y="36" width="6" height="6" rx="1" fill="#1677ff"/>
+  <rect x="4" y="16" width="56" height="32" rx="4" fill="${GRAPH_COLOR.primaryBg}" stroke="${GRAPH_COLOR.primary}" stroke-width="2"/>
+  <circle cx="16" cy="28" r="3" fill="${GRAPH_COLOR.success}"/><circle cx="26" cy="28" r="3" fill="${GRAPH_COLOR.success}"/>
+  <circle cx="36" cy="28" r="3" fill="${GRAPH_COLOR.success}"/><circle cx="46" cy="28" r="3" fill="${GRAPH_COLOR.success}"/>
+  <rect x="12" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.primary}"/><rect x="22" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.primary}"/>
+  <rect x="32" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.primary}"/><rect x="42" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.primary}"/>
 </svg>`;
 
 export const CORE_SWITCH_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect x="4" y="16" width="56" height="32" rx="4" fill="#e6f4ff" stroke="#1677ff" stroke-width="2.5"/>
-  <circle cx="16" cy="28" r="3" fill="#1677ff"/><circle cx="26" cy="28" r="3" fill="#1677ff"/>
-  <circle cx="36" cy="28" r="3" fill="#1677ff"/><circle cx="46" cy="28" r="3" fill="#1677ff"/>
-  <rect x="12" y="36" width="6" height="6" rx="1" fill="#1677ff"/><rect x="22" y="36" width="6" height="6" rx="1" fill="#1677ff"/>
-  <rect x="32" y="36" width="6" height="6" rx="1" fill="#1677ff"/><rect x="42" y="36" width="6" height="6" rx="1" fill="#1677ff"/>
-  <polygon points="32,2 34,8 40,8 35,12 37,18 32,14 27,18 29,12 24,8 30,8" fill="#1677ff"/>
+  <rect x="4" y="16" width="56" height="32" rx="4" fill="${GRAPH_COLOR.primaryBg}" stroke="${GRAPH_COLOR.primary}" stroke-width="2.5"/>
+  <circle cx="16" cy="28" r="3" fill="${GRAPH_COLOR.primary}"/><circle cx="26" cy="28" r="3" fill="${GRAPH_COLOR.primary}"/>
+  <circle cx="36" cy="28" r="3" fill="${GRAPH_COLOR.primary}"/><circle cx="46" cy="28" r="3" fill="${GRAPH_COLOR.primary}"/>
+  <rect x="12" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.primary}"/><rect x="22" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.primary}"/>
+  <rect x="32" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.primary}"/><rect x="42" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.primary}"/>
+  <polygon points="32,2 34,8 40,8 35,12 37,18 32,14 27,18 29,12 24,8 30,8" fill="${GRAPH_COLOR.primary}"/>
 </svg>`;
 
 export const SERVER_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect x="8" y="4" width="48" height="16" rx="3" fill="#fffbe6" stroke="#faad14" stroke-width="2"/>
-  <rect x="8" y="24" width="48" height="16" rx="3" fill="#fffbe6" stroke="#faad14" stroke-width="2"/>
-  <rect x="8" y="44" width="48" height="16" rx="3" fill="#fffbe6" stroke="#faad14" stroke-width="2"/>
-  <circle cx="48" cy="12" r="2.5" fill="#52c41a"/><circle cx="48" cy="32" r="2.5" fill="#52c41a"/>
-  <circle cx="48" cy="52" r="2.5" fill="#52c41a"/>
-  <rect x="14" y="9" width="24" height="2" rx="1" fill="#faad14" opacity="0.5"/>
-  <rect x="14" y="29" width="24" height="2" rx="1" fill="#faad14" opacity="0.5"/>
-  <rect x="14" y="49" width="24" height="2" rx="1" fill="#faad14" opacity="0.5"/>
+  <rect x="8" y="4" width="48" height="16" rx="3" fill="${GRAPH_COLOR.warningBg}" stroke="${GRAPH_COLOR.warning}" stroke-width="2"/>
+  <rect x="8" y="24" width="48" height="16" rx="3" fill="${GRAPH_COLOR.warningBg}" stroke="${GRAPH_COLOR.warning}" stroke-width="2"/>
+  <rect x="8" y="44" width="48" height="16" rx="3" fill="${GRAPH_COLOR.warningBg}" stroke="${GRAPH_COLOR.warning}" stroke-width="2"/>
+  <circle cx="48" cy="12" r="2.5" fill="${GRAPH_COLOR.success}"/><circle cx="48" cy="32" r="2.5" fill="${GRAPH_COLOR.success}"/>
+  <circle cx="48" cy="52" r="2.5" fill="${GRAPH_COLOR.success}"/>
+  <rect x="14" y="9" width="24" height="2" rx="1" fill="${GRAPH_COLOR.warning}" opacity="0.5"/>
+  <rect x="14" y="29" width="24" height="2" rx="1" fill="${GRAPH_COLOR.warning}" opacity="0.5"/>
+  <rect x="14" y="49" width="24" height="2" rx="1" fill="${GRAPH_COLOR.warning}" opacity="0.5"/>
 </svg>`;
 
 export const OFFLINE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect x="4" y="16" width="56" height="32" rx="4" fill="#f5f5f5" stroke="#d9d9d9" stroke-width="2"/>
-  <circle cx="16" cy="28" r="3" fill="#d9d9d9"/><circle cx="26" cy="28" r="3" fill="#d9d9d9"/>
-  <circle cx="36" cy="28" r="3" fill="#d9d9d9"/><circle cx="46" cy="28" r="3" fill="#d9d9d9"/>
-  <rect x="12" y="36" width="6" height="6" rx="1" fill="#d9d9d9"/><rect x="22" y="36" width="6" height="6" rx="1" fill="#d9d9d9"/>
-  <rect x="32" y="36" width="6" height="6" rx="1" fill="#d9d9d9"/><rect x="42" y="36" width="6" height="6" rx="1" fill="#d9d9d9"/>
+  <rect x="4" y="16" width="56" height="32" rx="4" fill="${GRAPH_COLOR.disabledBg}" stroke="${GRAPH_COLOR.disabled}" stroke-width="2"/>
+  <circle cx="16" cy="28" r="3" fill="${GRAPH_COLOR.disabled}"/><circle cx="26" cy="28" r="3" fill="${GRAPH_COLOR.disabled}"/>
+  <circle cx="36" cy="28" r="3" fill="${GRAPH_COLOR.disabled}"/><circle cx="46" cy="28" r="3" fill="${GRAPH_COLOR.disabled}"/>
+  <rect x="12" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.disabled}"/><rect x="22" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.disabled}"/>
+  <rect x="32" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.disabled}"/><rect x="42" y="36" width="6" height="6" rx="1" fill="${GRAPH_COLOR.disabled}"/>
 </svg>`;
 
 export function svgToDataUrl(svg: string): string {

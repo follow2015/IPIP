@@ -15,6 +15,7 @@ from typing import Optional, Dict, Any
 from flask import request
 
 from app.utils.storage import StorageAdapter
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -71,7 +72,7 @@ class QRCodeManager:
                 'user_id': None
             }
             
-            key = f"qr_session:{scene_id}"
+            key = redis_keys.qr_session_key(scene_id)
             ttl = expire_minutes * 60
             
             success = self.storage.set(key, session_data, ttl)
@@ -99,7 +100,7 @@ class QRCodeManager:
             Optional[Dict]: 会话数据，如果不存在或已过期则返回 None
         """
         try:
-            key = f"qr_session:{scene_id}"
+            key = redis_keys.qr_session_key(scene_id)
             session_data = self.storage.get(key)
             
             if session_data is None:
@@ -174,7 +175,7 @@ class QRCodeManager:
             
             session_data['updated_at'] = int(time.time())
             
-            key = f"qr_session:{scene_id}"
+            key = redis_keys.qr_session_key(scene_id)
             remaining_ttl = session_data.get('expires_at', 0) - int(time.time())
             if remaining_ttl < 0:
                 remaining_ttl = 60  # 已过期的保留 1 分钟

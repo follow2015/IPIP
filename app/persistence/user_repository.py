@@ -5,7 +5,7 @@
 提供用户相关的数据访问方法。
 """
 from app.utils.logging import get_logger
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
 from app.utils.time_utils import now_utc_naive
 
@@ -41,7 +41,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return self.session.query(User).filter(User.username == username).first()
         except SQLAlchemyError as e:
             self.logger.error(f"根据用户名查找用户失败 (username={username}): {e}")
-            raise QueryExecutionError("查找用户失败", original_error=e)
+            raise QueryExecutionError("查找用户失败", original_error=e) from e
 
     def find_by_email(self, email: str) -> Optional[User]:
         """根据邮箱查找用户"""
@@ -49,7 +49,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return self.session.query(User).filter(User.email == email).first()
         except SQLAlchemyError as e:
             self.logger.error(f"根据邮箱查找用户失败 (email={email}): {e}")
-            raise QueryExecutionError("查找用户失败", original_error=e)
+            raise QueryExecutionError("查找用户失败", original_error=e) from e
 
     def find_email_conflict(self, email: str, username: str) -> Optional[User]:
         """查邮箱是否已被**其它账号**占用（排除同用户名的"自己"）。
@@ -76,7 +76,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
         except SQLAlchemyError as e:
             self.logger.error(f"查询邮箱冲突失败 (email={email}): {e}")
-            raise QueryExecutionError("查询邮箱冲突失败", original_error=e)
+            raise QueryExecutionError("查询邮箱冲突失败", original_error=e) from e
 
     def find_by_openid(self, openid: str) -> Optional[User]:
         """根据微信OpenID查找用户"""
@@ -84,7 +84,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return self.session.query(User).filter(User.openid == openid).first()
         except SQLAlchemyError as e:
             self.logger.error(f"根据OpenID查找用户失败 (openid={openid}): {e}")
-            raise QueryExecutionError("查找用户失败", original_error=e)
+            raise QueryExecutionError("查找用户失败", original_error=e) from e
 
 
     def find_by_role(self, role_name: str, active_only: bool = True) -> List[User]:
@@ -109,7 +109,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return query.all()
         except SQLAlchemyError as e:
             self.logger.error(f"根据角色查找用户失败 (role={role_name}): {e}")
-            raise QueryExecutionError("查找用户失败", original_error=e)
+            raise QueryExecutionError("查找用户失败", original_error=e) from e
 
     def exists_active_with_role(self, role_name: str) -> bool:
         """是否存在拥有该角色的**活跃**用户（B-44 收敛：告警兜底角色可用性判断）。
@@ -197,7 +197,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
         except SQLAlchemyError as e:
             self.logger.error(f"查找首个激活用户失败: {e}")
-            raise QueryExecutionError("查找用户失败", original_error=e)
+            raise QueryExecutionError("查找用户失败", original_error=e) from e
 
     def count_admins(self) -> int:
         """统计激活的管理员用户数量"""
@@ -211,7 +211,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             ) or 0
         except SQLAlchemyError as e:
             self.logger.error(f"统计管理员数量失败: {e}")
-            raise QueryExecutionError("统计管理员数量失败", original_error=e)
+            raise QueryExecutionError("统计管理员数量失败", original_error=e) from e
 
 
     def check_username_exists(self, username: str, exclude_id: int = None) -> bool:
@@ -223,7 +223,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return self.session.query(query.exists()).scalar()
         except SQLAlchemyError as e:
             self.logger.error(f"检查用户名存在性失败 (username={username}): {e}")
-            raise QueryExecutionError("检查用户名存在性失败", original_error=e)
+            raise QueryExecutionError("检查用户名存在性失败", original_error=e) from e
 
     def check_email_exists(self, email: str, exclude_id: int = None) -> bool:
         """检查邮箱是否已存在"""
@@ -236,7 +236,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return self.session.query(query.exists()).scalar()
         except SQLAlchemyError as e:
             self.logger.error(f"检查邮箱存在性失败 (email={email}): {e}")
-            raise QueryExecutionError("检查邮箱存在性失败", original_error=e)
+            raise QueryExecutionError("检查邮箱存在性失败", original_error=e) from e
 
 
     @monitor_query_performance
@@ -308,7 +308,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             }
         except SQLAlchemyError as e:
             self.logger.error(f"搜索用户失败: {e}")
-            raise QueryExecutionError("搜索用户失败", original_error=e)
+            raise QueryExecutionError("搜索用户失败", original_error=e) from e
 
     def find_paginated(
         self,
@@ -341,7 +341,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             }
         except SQLAlchemyError as e:
             self.logger.error(f"分页查找用户失败: {e}")
-            raise QueryExecutionError("分页查找用户失败", original_error=e)
+            raise QueryExecutionError("分页查找用户失败", original_error=e) from e
 
     def get_all_users(self, active_only: bool = False) -> List[User]:
         """获取所有用户"""
@@ -352,7 +352,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return query.order_by(User.created_at.desc()).all()
         except SQLAlchemyError as e:
             self.logger.error(f"获取所有用户失败: {e}")
-            raise QueryExecutionError("获取所有用户失败", original_error=e)
+            raise QueryExecutionError("获取所有用户失败", original_error=e) from e
 
     def find_active_users(self, limit: int = None) -> List[User]:
         """查找激活用户"""
@@ -363,7 +363,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return query.all()
         except SQLAlchemyError as e:
             self.logger.error(f"查找激活用户失败: {e}")
-            raise QueryExecutionError("查找用户失败", original_error=e)
+            raise QueryExecutionError("查找用户失败", original_error=e) from e
 
     def find_recent_users(self, days: int = 7, limit: int = 10) -> List[User]:
         """查找最近注册的用户"""
@@ -378,7 +378,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
         except SQLAlchemyError as e:
             self.logger.error(f"查找最近注册用户失败: {e}")
-            raise QueryExecutionError("查找最近注册用户失败", original_error=e)
+            raise QueryExecutionError("查找最近注册用户失败", original_error=e) from e
 
 
     @monitor_query_performance
@@ -413,7 +413,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             }
         except SQLAlchemyError as e:
             self.logger.error(f"获取用户统计信息失败: {e}")
-            raise QueryExecutionError("获取用户统计信息失败", original_error=e)
+            raise QueryExecutionError("获取用户统计信息失败", original_error=e) from e
 
 
     def activate_user(self, user_id: int) -> Optional[User]:
@@ -455,7 +455,7 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return True
         except SQLAlchemyError as e:
             self.logger.error(f"删除用户失败 (user_id={user_id}): {e}")
-            raise QueryExecutionError("删除用户失败", original_error=e)
+            raise QueryExecutionError("删除用户失败", original_error=e) from e
 
     def count_other_admins(self, exclude_user_id: int) -> int:
         """统计除指定用户外的管理员数量
@@ -476,4 +476,4 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             ) or 0
         except SQLAlchemyError as e:
             self.logger.error(f"统计管理员数量失败: {e}")
-            raise QueryExecutionError("统计管理员数量失败", original_error=e)
+            raise QueryExecutionError("统计管理员数量失败", original_error=e) from e

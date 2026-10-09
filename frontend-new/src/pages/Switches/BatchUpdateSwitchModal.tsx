@@ -16,19 +16,17 @@ import { useTranslation } from 'react-i18next';
 import type { Switch } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
 import { useState } from 'react';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
-const EDITABLE_FIELDS = [
-  'port',
-  'protocol',
-  'username',
-  'password',
-  'device_type',
-  'switch_role',
-  'layer',
-  'authentication_method'
-] as const;
-
-type EditableField = (typeof EDITABLE_FIELDS)[number];
+type EditableField =
+  | 'port'
+  | 'protocol'
+  | 'username'
+  | 'password'
+  | 'device_type'
+  | 'switch_role'
+  | 'layer'
+  | 'authentication_method';
 
 type BatchFieldLabelKey =
   | 'switch.batchField.port'
@@ -115,13 +113,16 @@ function BatchUpdateSwitchModal({ open, selectedSwitches, onClose }: BatchUpdate
           })
         );
       } else {
-        message.success(
-          td('switch.batchUpdate.success', { count: result.success_count })
-        );
+        message.success(td('switch.batchUpdate.success', { count: result.success_count }));
         handleClose();
       }
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 

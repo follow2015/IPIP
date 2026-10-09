@@ -5,6 +5,6 @@
 （app/services/__init__.py / ai_conversation_repository），并维持门禁的
 services 文件数下界。本文件**不含任何查询**。
 """
-from app.persistence.base_service import BaseService  # noqa: F401
+from app.persistence.base_service import BaseService
 
 __all__ = ["BaseService"]

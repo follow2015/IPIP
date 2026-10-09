@@ -17,6 +17,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { Switch } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface SwitchFormProps {
   open: boolean;
@@ -74,7 +75,12 @@ function SwitchForm({ open, editRecord, onClose }: SwitchFormProps) {
       message.success(tc('message.updateSuccess'));
       onClose();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 

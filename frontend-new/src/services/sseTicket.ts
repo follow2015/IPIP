@@ -28,7 +28,7 @@ export async function fetchSSETicket(deviceId?: number | string): Promise<string
       });
       if (!res.ok) return null;
       const json = (await res.json()) as { data?: { ticket?: string } };
-      return json?.data?.ticket ?? null;
+      return json?.data?.ticket || null;
     } catch {
       return null;
     } finally {

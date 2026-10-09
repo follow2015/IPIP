@@ -1,4 +1,3 @@
-from __future__ import annotations
 # -*- coding: utf-8 -*-
 """
 路由表同步服务（Phase 1 + Phase 4）
@@ -6,6 +5,7 @@ from __future__ import annotations
 Phase 1 RouteSync：路由表写入 ip_network + Redis 直连索引
 Phase 4 NexthopResolver：nexthop 关联推断补充 switch_id/port
 """
+from __future__ import annotations
 import ipaddress
 from app.utils.logging import get_logger
 import re
@@ -98,7 +98,7 @@ class RouteSync:
 
         try:
             self._resolve_unknown_ports(to_upsert, scan_redis, ctx.scope)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- Unknown 端口推断失败非致命：不影响路由同步主流程
             logger.warning("推断Unknown端口失败（不影响路由同步）: %s", e)
 
         current_keys = {(r["ip_network"], r["switch_id"], r["port"]) for r in to_upsert}
@@ -140,7 +140,7 @@ class RouteSync:
             current_sw_id = r.get("switch_id")
             if r["flags"] != "C":
                 nexthop = r.get("nexthop", "")
-                if not nexthop or nexthop == "0.0.0.0":
+                if not nexthop or nexthop == "0.0.0.0":  # noqa: S104 -- nexthop 比较判定，非 socket bind
                     continue
                 result = scan_redis.port_ip_find_by_ip(scope, nexthop)
                 if result:
@@ -240,7 +240,7 @@ class RouteSync:
                         except ValueError:
                             continue
                     return ips[0]
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- Redis 索引读取失败降级为推断：索引可能未建立，回退算法即可
                 logger.debug("从端口IP索引获取网关失败，回退到推断: %s", e,
                              extra={"phase": "route_sync", "switch_id": ctx.sw_id})
         return RouteSync._infer_gateway(route)

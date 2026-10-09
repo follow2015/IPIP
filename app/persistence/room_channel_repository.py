@@ -37,7 +37,7 @@ class RoomChannelRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
         except SQLAlchemyError as e:
             logger.error(f"查询机房通道失败 (room_id={room_id}): {e}")
-            raise QueryExecutionError("查询机房通道失败", original_error=e)
+            raise QueryExecutionError("查询机房通道失败", original_error=e) from e
 
     def find_by_room_and_col(self, room_id: int, col_number: int) -> Optional[RoomChannel]:
         """按机房 + 列号反查单条通道（唯一键 `uk_room_col_channel` 的定位查询）
@@ -53,7 +53,7 @@ class RoomChannelRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
         except SQLAlchemyError as e:
             logger.error(f"定位机房通道失败 (room_id={room_id}, col={col_number}): {e}")
-            raise QueryExecutionError("定位机房通道失败", original_error=e)
+            raise QueryExecutionError("定位机房通道失败", original_error=e) from e
 
     def delete_by_room_id(self, room_id: int) -> int:
         """删除某机房的全部通道，返回删除条数。
@@ -71,4 +71,4 @@ class RoomChannelRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return int(deleted or 0)
         except SQLAlchemyError as e:
             logger.error(f"清理机房通道失败 (room_id={room_id}): {e}")
-            raise QueryExecutionError("清理机房通道失败", original_error=e)
+            raise QueryExecutionError("清理机房通道失败", original_error=e) from e

@@ -23,7 +23,7 @@ from app.schemas.monitor import (
     VendorBrandCreateSchema,
     VendorBrandUpdateSchema,
 )
-from app.utils import login_required, permission_required
+from app.services.auth import login_required, permission_required
 from app.utils.logging import get_logger
 from app.utils.transactional import transactional
 
@@ -37,7 +37,7 @@ def _validate_body(schema, body):
     try:
         return schema.load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
 
 
 

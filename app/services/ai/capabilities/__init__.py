@@ -5,12 +5,12 @@
 装饰器不执行、_CAPS 始终为空，所有技能 YAML 运行时报
 "capability not registered"。此处显式 import builtin，确保能力注册表被填充。
 """
-from . import builtin  # noqa: F401  (side-effect: 注册内置能力)
-from . import diagnostic  # noqa: F401  (side-effect: 注册诊断类能力 device.live_inspection/ssh.diagnostic_show)
-from . import entity_capabilities  # noqa: F401  (side-effect: 注册 customer.search / devices.locate)
-from . import topology_capabilities  # noqa: F401  (side-effect: 注册 topology.* 遍历能力)
-from . import root_cause_capabilities  # noqa: F401  (side-effect: 注册 root_cause.analyze 故障域定位)
-from . import deployment_capabilities  # noqa: F401  (side-effect: 注册 deployment.plan 上架方案推荐)
+from . import builtin  # (side-effect: 注册内置能力)
+from . import diagnostic  # (side-effect: 注册诊断类能力 device.live_inspection/ssh.diagnostic_show)
+from . import entity_capabilities  # (side-effect: 注册 customer.search / devices.locate)
+from . import topology_capabilities  # (side-effect: 注册 topology.* 遍历能力)
+from . import root_cause_capabilities  # (side-effect: 注册 root_cause.analyze 故障域定位)
+from . import deployment_capabilities  # (side-effect: 注册 deployment.plan 上架方案推荐)
 from .registry import get_capability, register_capability
 
 __all__ = [

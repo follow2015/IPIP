@@ -5,7 +5,7 @@
  * - "查看网段IP"按钮跳转到IP管理页面并按网段搜索
  */
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, Button, Descriptions, Tag, Spin, Progress, Statistic, Row, Col } from 'antd';
+import { Card, Button, Descriptions, Tag, Progress, Statistic, Row, Col, theme } from 'antd';
 import { ArrowLeftOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNetworkSuspenseDetail, useNetworkUsage } from '@/services/network';
 import type { NetworkInfoListItem } from '@/types/models';
@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import DataTable from '@/components/DataTable';
 
 function NetworkDetail() {
+  const { token } = theme.useToken();
   const { t } = useTranslation('network');
   const { t: tc } = useTranslation('common');
   const { t: td } = useTranslation('device');
@@ -131,17 +132,20 @@ function NetworkDetail() {
                 size={120}
                 strokeColor={
                   usageData.usage_rate > 0.8
-                    ? '#ff4d4f'
+                    ? token.colorError
                     : usageData.usage_rate > 0.6
-                      ? '#faad14'
-                      : '#52c41a'
+                      ? token.colorWarning
+                      : token.colorSuccess
                 }
               />
             </Col>
             <Col span={16}>
               <Row gutter={16}>
                 <Col span={8}>
-                  <Statistic title={t('networkDetail.usage.totalIps')} value={usageData.total_ips} />
+                  <Statistic
+                    title={t('networkDetail.usage.totalIps')}
+                    value={usageData.total_ips}
+                  />
                 </Col>
                 <Col span={8}>
                   <Statistic
@@ -154,7 +158,7 @@ function NetworkDetail() {
                   <Statistic
                     title={t('networkDetail.usage.availableIps')}
                     value={usageData.available_ips}
-                    styles={{ content: { color: '#52c41a' } }}
+                    styles={{ content: { color: token.colorSuccess } }}
                   />
                 </Col>
               </Row>

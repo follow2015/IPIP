@@ -91,9 +91,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ device, totalU }) => {
         >
           {device.deviceName}
         </span>
-        <span style={{ fontSize: 10, color: cfg.subText, flexShrink: 0 }}>
-          {t(cfg.labelKey)}
-        </span>
+        <span style={{ fontSize: 10, color: cfg.subText, flexShrink: 0 }}>{t(cfg.labelKey)}</span>
       </div>
 
       {/* 字段列表 */}

@@ -125,7 +125,7 @@ class VoiceChannel(PersonalChannel):
                 receipt.channel_status = status
                 flag_modified(receipt, "channel_status")
                 db.session.commit()
-            except Exception:
+            except Exception:  # noqa: BLE001 -- 语音失败状态回写失败兜底：回滚并记录（状态丢失），不得再抛
                 db.session.rollback()
                 logger.error(
                     "语音失败状态回写也失败 receipt_id=%s（状态丢失，"

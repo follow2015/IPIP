@@ -5,8 +5,8 @@
 接收前端错误报告并记录到日志文件。
 """
 from flask import Blueprint, request, current_app
-from app.openapi.doc import doc, public
-from app.utils.auth import login_required
+from app.openapi.doc import doc
+from app.services.auth import login_required
 from app.utils.rate_limiting.decorators import rate_limit_api
 from app.api.base import APIResponse
 from app.utils.logging import get_logger
@@ -60,6 +60,6 @@ def report_error():
 
         return APIResponse.success(message="错误报告已接收")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应
         logger.error(f"处理前端错误报告失败: {str(e)}")
         return APIResponse.error(message="服务器内部错误", status_code=500)

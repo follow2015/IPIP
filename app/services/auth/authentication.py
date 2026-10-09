@@ -10,11 +10,12 @@
 `setattr(auth_mod.config, ...)` 打补丁，各持一份会让补丁静默失效）。
 """
 import hashlib
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import jwt
-from flask import request
 
 from app.utils.cache import cache_manager
 from app.utils.logging import get_logger
@@ -23,6 +24,28 @@ from config import get_config
 
 logger = get_logger(__name__)
 config = get_config()
+
+_revoke_drop_stats = {"redis_unavailable": 0}
+_last_revoke_warn_at = 0.0
+_revoke_warn_lock = threading.Lock()
+_REVOKE_WARN_INTERVAL = 60.0  # 秒；与 switch_events 的告警节流口径一致
+
+
+def _warn_revoke_degraded(op: str, user_id: Any) -> None:
+    """令牌吊销因 Redis 不可用而失败时的节流告警（首次及每 60s 一次）。"""
+    global _last_revoke_warn_at
+    _revoke_drop_stats["redis_unavailable"] += 1
+    now = time.monotonic()
+    with _revoke_warn_lock:
+        if now - _last_revoke_warn_at < _REVOKE_WARN_INTERVAL:
+            return
+        _last_revoke_warn_at = now
+    logger.error(
+        "Redis 不可用，refresh token 吊销未生效（op=%s user_id=%s，累计 %d 次；"
+        "本条每 60s 提醒一次）—— 期间已登出的令牌仍可换发 access token，"
+        "Redis 恢复前请勿依赖「登出即失效」",
+        op, user_id, _revoke_drop_stats["redis_unavailable"],
+    )
 
 class AuthenticationManager:
     """认证管理器
@@ -68,7 +91,7 @@ class AuthenticationManager:
         user_id: int,
         username: str = None,
         roles: list = None,
-        token_type: str = "access",
+        token_type: str = "access",  # noqa: S107
         auth_type: str = "web",
         openid: str = None,
         expires_delta: "timedelta" = None,
@@ -94,7 +117,7 @@ class AuthenticationManager:
         import uuid
 
         if expires_delta is None:
-            if token_type == "refresh":
+            if token_type == "refresh":  # noqa: S105
                 expires_delta = timedelta(seconds=self.refresh_token_expires)
             else:
                 expires_delta = timedelta(seconds=self.access_token_expires)
@@ -122,7 +145,7 @@ class AuthenticationManager:
             payload["username"] = username
             payload["user_identifier"] = username
 
-        if device_fingerprint and token_type == "refresh":
+        if device_fingerprint and token_type == "refresh":  # noqa: S105
             payload["dfp"] = device_fingerprint
 
         token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
@@ -144,7 +167,7 @@ class AuthenticationManager:
             ttl=int(expires_delta.total_seconds())
         )
 
-        if token_type == "refresh":
+        if token_type == "refresh":  # noqa: S105
             try:
                 from app.services.switch_events import _get_redis
                 r = _get_redis()
@@ -152,7 +175,7 @@ class AuthenticationManager:
                     rkey = f"user_refresh_tokens:{user_id}"
                     r.sadd(rkey, token)
                     r.expire(rkey, int(expires_delta.total_seconds()))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- refresh token 记录失败非致命：鉴权主体已通过，仅刷新能力受限
                 logger.warning("记录 refresh token 失败: user_id=%d, error=%s", user_id, e)
 
         identifier = openid if auth_type == "wx" else username
@@ -310,12 +333,12 @@ class AuthenticationManager:
 
             new_access_token = self.generate_token(
                 user_id, roles=roles,
-                token_type="access", auth_type="wx",
+                token_type="access", auth_type="wx",  # noqa: S106
                 openid=openid
             )
             new_refresh_token = self.generate_token(
                 user_id, roles=roles,
-                token_type="refresh", auth_type="wx",
+                token_type="refresh", auth_type="wx",  # noqa: S106
                 openid=openid
             )
         else:
@@ -326,11 +349,11 @@ class AuthenticationManager:
 
             new_access_token = self.generate_token(
                 user_id, username=username, roles=roles,
-                token_type="access", auth_type=auth_type
+                token_type="access", auth_type=auth_type  # noqa: S106
             )
             new_refresh_token = self.generate_token(
                 user_id, username=username, roles=roles,
-                token_type="refresh", auth_type=auth_type,
+                token_type="refresh", auth_type=auth_type,  # noqa: S106
                 device_fingerprint=bound_dfp,
             )
 
@@ -343,8 +366,11 @@ class AuthenticationManager:
             if r:
                 rkey = f"user_refresh_tokens:{user_id}"
                 r.srem(rkey, refresh_token)
-        except Exception:
-            pass  # 非关键操作，失败不影响主流程
+            else:
+                _warn_revoke_degraded("logout_srem", user_id)
+        except Exception as exc:  # noqa: BLE001 -- 吊销令牌时从 refresh 集合移除失败降级：已调 _warn_revoke_degraded 留痕，Redis 异常类型不可枚举
+            _warn_revoke_degraded("logout_srem_error", user_id)
+            logger.debug("从 refresh 集合移除令牌失败: %s", exc)
 
         return {
             "access_token": new_access_token,
@@ -488,14 +514,14 @@ class AuthenticationManager:
             user.id,
             username=user.username,
             roles=user_roles,
-            token_type="access",
+            token_type="access",  # noqa: S106
             auth_type=auth_type,
         )
         refresh_token = self.generate_token(
             user.id,
             username=user.username,
             roles=user_roles,
-            token_type="refresh",
+            token_type="refresh",  # noqa: S106
             auth_type=auth_type,
             expires_delta=(
                 timedelta(seconds=getattr(
@@ -674,7 +700,7 @@ class AuthenticationManager:
                 "登录审计[%s]: username=%s auth_type=%s reason=%s ip=%s",
                 action, username, auth_type, detail["reason"], ip_address,
             )
-        except Exception as exc:  # noqa: BLE001 - 审计失败不影响登录结论
+        except Exception as exc:  # 审计失败不影响登录结论
             logger.error(
                 "登录审计写入失败: username=%s action=%s error=%s",
                 username, "auth.ldap_bypass" if bypass else "auth.login", exc,
@@ -745,7 +771,7 @@ class AuthenticationManager:
         except LdapIdentityError as exc:
             logger.error("LDAP 身份落库失败，拒绝登录: username=%s error=%s", username, exc)
             return None, "identity_error"
-        except Exception as exc:  # noqa: BLE001 - 配置/DB 异常一律 fail-close
+        except Exception as exc:  # 配置/DB 异常一律 fail-close
             logger.error(
                 "LDAP 身份落库异常，拒绝登录: username=%s error=%s",
                 username, exc, exc_info=True,
@@ -790,16 +816,23 @@ class AuthenticationManager:
             logger.warning("尝试登出无法解码的令牌")
             return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 登出流程顶层兜底：登出不得因单点异常失败（否则用户无法退出），异常转 False 由调用方决定
             logger.error("登出过程发生错误: %s", str(e))
             return False
 
     def _revoke_all_refresh_tokens(self, user_id: int) -> None:
-        """撤销指定用户的所有刷新令牌"""
+        """撤销指定用户的所有刷新令牌。
+
+        Redis 不可用时**无法**枚举该用户的令牌集合（集合本身就在 Redis 里），
+        故这里是能力性缺失、不是"跳过优化"。原实现 `if not r: return` 完全静默，
+        导致"改密码/强制下线"这类安全动作在 Redis 故障期间**悄悄失效**。
+        现改为节流告警 + 计数，让运维可感知（见模块顶部 `_revoke_drop_stats`）。
+        """
         try:
             from app.services.switch_events import _get_redis
             r = _get_redis()
             if not r:
+                _warn_revoke_degraded("revoke_all", user_id)
                 return
 
             key = f"user_refresh_tokens:{user_id}"
@@ -807,7 +840,8 @@ class AuthenticationManager:
             for tid in token_ids:
                 self.revoke_token(tid)
             r.delete(key)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 撤销全部刷新令牌失败降级：同 424
+            _warn_revoke_degraded("revoke_all_error", user_id)
             logger.warning("撤销刷新令牌失败: user_id=%d, error=%s", user_id, e)
 
     @staticmethod
@@ -834,7 +868,7 @@ class AuthenticationManager:
             exp = payload.get("exp")
             ttl = int(exp - datetime.now(timezone.utc).timestamp()) if exp else 86400
             cache_manager.set(f"auth:refresh_rotated:{jti}", "1", ttl=max(ttl, 1))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 写 refresh 轮换标记失败非致命：标记仅用于复用检测（安全增强），写失败不应阻断正常刷新
             logger.warning("写 refresh 轮换标记失败: %s", e)
 
     def _handle_refresh_token_reuse(self, token: str) -> None:
@@ -905,12 +939,12 @@ class AuthenticationManager:
 
             access_token = self.generate_token(
                 user.id, roles=user_roles,
-                token_type="access", auth_type="wx",
+                token_type="access", auth_type="wx",  # noqa: S106
                 openid=openid
             )
             refresh_token = self.generate_token(
                 user.id, roles=user_roles,
-                token_type="refresh", auth_type="wx",
+                token_type="refresh", auth_type="wx",  # noqa: S106
                 openid=openid
             )
 

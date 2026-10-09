@@ -21,8 +21,8 @@ from app.api.monitor import (
 )
 from app.core.enums import MonitorProtocolCode
 from app.openapi.doc import doc
-from app.utils import login_required, permission_required
-from app.utils.auth import get_current_user_id
+from app.services.auth import login_required, permission_required
+from app.services.auth import get_current_user_id
 from app.utils.logging import get_logger
 from app.utils.transactional import transactional
 
@@ -53,7 +53,7 @@ def put_config():
     try:
         data = _monitor_config_update_schema.load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"配置校验失败: {e.messages}")
+        raise ValidationError(f"配置校验失败: {e.messages}") from e
 
     updates = data["updates"]
     from app.services.monitoring.dynamic_config import update_batch
@@ -266,8 +266,8 @@ def get_device_traffic(device_id: int):
     try:
         time_from = int(request.args.get("from", now - 3600))
         time_till = int(request.args.get("till", now))
-    except (TypeError, ValueError):
-        raise ValidationError("from/till 必须是 unix 时间戳")
+    except (TypeError, ValueError) as e:
+        raise ValidationError("from/till 必须是 unix 时间戳") from e
 
     series = _get_graph_service().get_port_traffic(
         cred, device, port, time_from, time_till,
@@ -429,15 +429,15 @@ def get_device_metric_history(device_id: int, metric_key: str):
     try:
         from_ = _parse_iso_dt(raw_from)
         to_ = _parse_iso_dt(raw_to)
-    except ValueError:
-        raise ValidationError("from/to 必须为合法 ISO datetime")
+    except ValueError as e:
+        raise ValidationError("from/to 必须为合法 ISO datetime") from e
     if from_ and to_ and from_ > to_:
         raise ValidationError("from 不能晚于 to")
 
     try:
         limit = min(max(int(request.args.get("limit", 2000)), 1), 5000)
-    except ValueError:
-        raise ValidationError("limit 必须为正整数")
+    except ValueError as e:
+        raise ValidationError("limit 必须为正整数") from e
 
     if to_ is None:
         to_ = now_utc_naive()

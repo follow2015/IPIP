@@ -50,7 +50,7 @@ def apply(conn) -> None:
     cur = conn.cursor()
     try:
         cur.execute(
-            f"SELECT id, device_id, password FROM `{TABLE}` "
+            f"SELECT id, device_id, password FROM `{TABLE}` "  # noqa: S608 -- alembic 迁移的 DDL 无法参数化表/列名，标识符由迁移脚本自身硬编码
             "WHERE password IS NOT NULL AND password <> '' "
             f"AND password NOT LIKE '{CIPHER_PREFIX}%'"
         )
@@ -76,7 +76,7 @@ def apply(conn) -> None:
                     "禁止截断"
                 )
             cur.execute(
-                f"UPDATE `{TABLE}` SET password = %s WHERE id = %s",
+                f"UPDATE `{TABLE}` SET password = %s WHERE id = %s",  # noqa: S608 -- alembic 迁移的 DDL 无法参数化表/列名，标识符由迁移脚本自身硬编码
                 (cipher, row_id),
             )
             migrated += 1

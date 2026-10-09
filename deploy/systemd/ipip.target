@@ -15,7 +15,14 @@ Documentation=https://github.com/follow2015/IPIP
 ; 部署说明见仓库 deploy/systemd/README.md（systemd 的 Documentation= 只接受纯 URL，
 ; 含中文/括号会被判为 "Invalid URL, ignoring"，故说明文字另起注释行）
 After=network.target mysql.service redis.service
-Wants=ipip-web.service ipip-gateway.service ipip-monitor.service ipip-celery-ai.service ipip-celery-voice.service ipip-trapd.service
+; ⚠️ ipip-trapd.service（SNMP Trap 接收）**刻意不列入 Wants=**：
+; 它的启用开关是「动态配置」而非 unit 是否启动 —— 进程常驻待机，由
+; TRAPD_ENABLED（前端「监控中心 → 运行配置」一键开关）决定是否监听端口。
+; 未开启时不监听、不占端口、不报错，故不需要靠 Wants= 来拉起。
+; 这里若列上，`systemctl restart ipip.target` 会连带重启它（无意义但无害）；
+; 真正的理由是保持「谁负责启动服务」的语义单一：trapd 的安装/启用由
+; deploy/systemd/install-units.sh 显式管理（见该文件「可选能力」段）。
+Wants=ipip-web.service ipip-gateway.service ipip-monitor.service ipip-celery-ai.service ipip-celery-voice.service
 
 [Install]
 WantedBy=multi-user.target

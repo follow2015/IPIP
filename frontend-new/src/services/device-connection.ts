@@ -76,13 +76,15 @@ export function useSwitchConnections(switchDeviceId: number) {
   });
 }
 
+export async function fetchPortLinks(deviceId: number): Promise<PortLink[]> {
+  const res = await get<PortLink[]>(`/devices/${deviceId}/port-links`);
+  return res.data ?? [];
+}
+
 export function usePortLinks(deviceId: number) {
   return useQuery({
     queryKey: [...queryKeys.devices.detail(deviceId), 'port-links'],
-    queryFn: async () => {
-      const res = await get<PortLink[]>(`/devices/${deviceId}/port-links`);
-      return res.data;
-    },
+    queryFn: () => fetchPortLinks(deviceId),
     enabled: deviceId > 0
   });
 }

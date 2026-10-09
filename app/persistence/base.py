@@ -82,7 +82,7 @@ class BaseRepository:
             return query.first()
         except SQLAlchemyError as e:
             self.logger.error(f"根据ID查找{self.model_class.__name__}失败 (ID={entity_id}): {e}")
-            raise QueryExecutionError(f"查找{self.model_class.__name__}失败", original_error=e)
+            raise QueryExecutionError(f"查找{self.model_class.__name__}失败", original_error=e) from e
 
     def find_by_ids(self, ids: List[int]) -> List[BaseModel]:
         """根据ID列表批量查找实体（避免 N+1 查询）
@@ -102,7 +102,32 @@ class BaseRepository:
             return query.all()
         except SQLAlchemyError as e:
             self.logger.error(f"批量查找{self.model_class.__name__}失败: {e}")
-            raise QueryExecutionError(f"批量查找{self.model_class.__name__}失败", original_error=e)
+            raise QueryExecutionError(f"批量查找{self.model_class.__name__}失败", original_error=e) from e
+
+    def expire_instance(self, entity_id: int, model_class: Type[BaseModel] = None) -> None:
+        """只过期受本条 Core UPDATE 影响的**那一个**实例（替代 ``expire_all()``）。
+
+        为什么必须显式过期：Core UPDATE（``synchronize_session=False``）绕过了
+        ORM 身份图，session 里已加载的对应实例仍是旧值；而 SQLAlchemy 默认
+        **不会**用查询结果覆盖身份图里已有的对象，于是后续 ``find_by_id()``
+        会把旧值原样返回 —— 表现为"刚写完就读到写之前的数据"。
+
+        为什么不用 ``session.expire_all()``：它把 session 里**所有**已加载对象
+        一起过期（room / 设备 / 权限 / 关联集合…），外层调用链上每一处属性访问
+        都变成一次 SELECT。在批量循环里这就是 N×M 的放大：改 200 个标记，
+        会把整个 session 反复清空 200 次。
+
+        本方法只精确过期目标那一行 —— 纯内存操作，不产生任何 SQL。
+
+        Args:
+            entity_id: 被 UPDATE 的那一行主键
+            model_class: 模型类，默认取 ``self.model_class``
+        """
+        model = model_class or self.model_class
+        for obj in list(self.session.identity_map.values()):
+            if isinstance(obj, model) and getattr(obj, "id", None) == entity_id:
+                self.session.expire(obj)
+                return
 
     def _base_query(self) -> Query:
         """构建基础查询，自动过滤软删除记录。
@@ -149,7 +174,7 @@ class BaseRepository:
             return query.all()
         except SQLAlchemyError as e:
             self.logger.error(f"查找{self.model_class.__name__}列表失败: {e}")
-            raise QueryExecutionError(f"查找{self.model_class.__name__}列表失败", original_error=e)
+            raise QueryExecutionError(f"查找{self.model_class.__name__}列表失败", original_error=e) from e
 
     def count(self, filters: Dict[str, Any] = None) -> int:
         """统计符合条件的实体数量（分页用）
@@ -167,7 +192,7 @@ class BaseRepository:
             return query.count()
         except SQLAlchemyError as e:
             self.logger.error(f"统计{self.model_class.__name__}数量失败: {e}")
-            raise QueryExecutionError(f"统计{self.model_class.__name__}数量失败", original_error=e)
+            raise QueryExecutionError(f"统计{self.model_class.__name__}数量失败", original_error=e) from e
 
     def find_one(self, filters: Dict[str, Any]) -> Optional[BaseModel]:
         """查找单个符合条件的实体
@@ -187,7 +212,7 @@ class BaseRepository:
             return query.first()
         except SQLAlchemyError as e:
             self.logger.error(f"查找单个{self.model_class.__name__}失败: {e}")
-            raise QueryExecutionError(f"查找{self.model_class.__name__}失败", original_error=e)
+            raise QueryExecutionError(f"查找{self.model_class.__name__}失败", original_error=e) from e
     
     def save(self, entity: BaseModel) -> BaseModel:
         """保存实体（创建或更新）
@@ -212,7 +237,7 @@ class BaseRepository:
             return entity
         except SQLAlchemyError as e:
             self.logger.error(f"保存{self.model_class.__name__}失败: {e}")
-            raise DataAccessError(f"保存{self.model_class.__name__}失败", original_error=e)
+            raise DataAccessError(f"保存{self.model_class.__name__}失败", original_error=e) from e
     
     def create(self, data: Dict[str, Any]) -> BaseModel:
         """创建新实体
@@ -234,7 +259,7 @@ class BaseRepository:
             return entity
         except SQLAlchemyError as e:
             self.logger.error(f"创建{self.model_class.__name__}失败: {e}")
-            raise DataAccessError(f"创建{self.model_class.__name__}失败", original_error=e)
+            raise DataAccessError(f"创建{self.model_class.__name__}失败", original_error=e) from e
     
     def update(self, entity_id: int, data: Dict[str, Any], allowed: list = None) -> Optional[BaseModel]:
         """更新实体
@@ -278,7 +303,7 @@ class BaseRepository:
             return entity
         except SQLAlchemyError as e:
             self.logger.error(f"更新{self.model_class.__name__}失败 (ID={entity_id}): {e}")
-            raise DataAccessError(f"更新{self.model_class.__name__}失败", original_error=e)
+            raise DataAccessError(f"更新{self.model_class.__name__}失败", original_error=e) from e
     
     def delete(self, entity_id: int) -> bool:
         """删除实体（支持软删除）
@@ -309,7 +334,7 @@ class BaseRepository:
             return True
         except SQLAlchemyError as e:
             self.logger.error(f"删除{self.model_class.__name__}失败 (ID={entity_id}): {e}")
-            raise DataAccessError(f"删除{self.model_class.__name__}失败", original_error=e)
+            raise DataAccessError(f"删除{self.model_class.__name__}失败", original_error=e) from e
     
     def exists(self, filters: Dict[str, Any]) -> bool:
         """检查实体是否存在
@@ -329,7 +354,7 @@ class BaseRepository:
             return self.session.query(query.exists()).scalar()
         except SQLAlchemyError as e:
             self.logger.error(f"检查{self.model_class.__name__}存在性失败: {e}")
-            raise QueryExecutionError(f"检查{self.model_class.__name__}存在性失败", original_error=e)
+            raise QueryExecutionError(f"检查{self.model_class.__name__}存在性失败", original_error=e) from e
     
     def paginate(self, page: int = 1, page_size: int = 20, 
                  filters: Dict[str, Any] = None, 
@@ -373,7 +398,7 @@ class BaseRepository:
             }
         except SQLAlchemyError as e:
             self.logger.error(f"分页查询{self.model_class.__name__}失败: {e}")
-            raise QueryExecutionError(f"分页查询{self.model_class.__name__}失败", original_error=e)
+            raise QueryExecutionError(f"分页查询{self.model_class.__name__}失败", original_error=e) from e
     
     def bulk_create(self, data_list: List[Dict[str, Any]]) -> List[BaseModel]:
         """批量创建实体
@@ -395,7 +420,7 @@ class BaseRepository:
             return entities
         except SQLAlchemyError as e:
             self.logger.error(f"批量创建{self.model_class.__name__}失败: {e}")
-            raise DataAccessError(f"批量创建{self.model_class.__name__}失败", original_error=e)
+            raise DataAccessError(f"批量创建{self.model_class.__name__}失败", original_error=e) from e
     
     def bulk_update(self, updates: List[Tuple[int, Dict[str, Any]]]) -> int:
         """批量更新实体
@@ -433,7 +458,7 @@ class BaseRepository:
             return updated_count
         except SQLAlchemyError as e:
             self.logger.error(f"批量更新{self.model_class.__name__}失败: {e}")
-            raise DataAccessError(f"批量更新{self.model_class.__name__}失败", original_error=e)
+            raise DataAccessError(f"批量更新{self.model_class.__name__}失败", original_error=e) from e
     
     def bulk_delete(self, entity_ids: List[int]) -> int:
         """批量删除实体
@@ -449,7 +474,6 @@ class BaseRepository:
         """
         try:
             if getattr(self.model_class, '__soft_delete__', False):
-                from datetime import datetime, timezone
                 entities = self._base_query().filter(
                     self.model_class.id.in_(entity_ids)
                 ).all()
@@ -467,7 +491,7 @@ class BaseRepository:
             return deleted_count
         except SQLAlchemyError as e:
             self.logger.error(f"批量删除{self.model_class.__name__}失败: {e}")
-            raise DataAccessError(f"批量删除{self.model_class.__name__}失败", original_error=e)
+            raise DataAccessError(f"批量删除{self.model_class.__name__}失败", original_error=e) from e
     
     
     def _apply_filters(self, query: Query, filters: Dict[str, Any]) -> Query:
@@ -558,7 +582,7 @@ class BaseRepository:
         except SQLAlchemyError as e:
             self.session.rollback()
             self.logger.error(f"事务执行失败(数据库错误): {e}")
-            raise TransactionError("事务执行失败", original_error=e)
+            raise TransactionError("事务执行失败", original_error=e) from e
         except Exception as e:
             self.session.rollback()
             self.logger.error(f"事务执行失败(非数据库错误): {e}")
@@ -607,7 +631,7 @@ class SQLAlchemyRepository(BaseRepository, abstract=True):
             return query.filter_by(id=entity_id).first()
         except SQLAlchemyError as e:
             self.logger.error(f"查找{self.model_class.__name__}及关联对象失败 (ID={entity_id}): {e}")
-            raise QueryExecutionError(f"查找{self.model_class.__name__}失败", original_error=e)
+            raise QueryExecutionError(f"查找{self.model_class.__name__}失败", original_error=e) from e
     
     def search(self, search_fields: List[str], keyword: str,
                filters: Dict[str, Any] = None,
@@ -678,7 +702,7 @@ class SQLAlchemyRepository(BaseRepository, abstract=True):
             
             if distinct:
                 from sqlalchemy import distinct as sa_distinct
-                pk_col = getattr(self.model_class, 'id')
+                pk_col = self.model_class.id
                 total_count = query.with_entities(func.count(sa_distinct(pk_col))).scalar() or 0
                 total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 0
                 page = 1 if total_pages == 0 else max(1, min(page, total_pages))
@@ -714,7 +738,7 @@ class SQLAlchemyRepository(BaseRepository, abstract=True):
             }
         except SQLAlchemyError as e:
             self.logger.error(f"搜索{self.model_class.__name__}失败: {e}")
-            raise QueryExecutionError(f"搜索{self.model_class.__name__}失败", original_error=e)
+            raise QueryExecutionError(f"搜索{self.model_class.__name__}失败", original_error=e) from e
 
 
 class OptimizedRepository(BaseRepository, abstract=True):
@@ -768,7 +792,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return query.filter_by(id=entity_id).first()
         except Exception as e:
             logger.error(f"优化查询失败: {e}")
-            raise QueryExecutionError("按ID查找失败", original_error=e)
+            raise QueryExecutionError("按ID查找失败", original_error=e) from e
     
     @monitor_query_performance
     def find_all_optimized(self, filters: Optional[Dict[str, Any]] = None,
@@ -801,7 +825,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return query.all()
         except Exception as e:
             logger.error(f"优化查询失败: {e}")
-            raise QueryExecutionError("查找所有记录失败", original_error=e)
+            raise QueryExecutionError("查找所有记录失败", original_error=e) from e
     
     @monitor_query_performance
     def paginate_optimized(self, page: int = 1, page_size: int = 20,
@@ -855,7 +879,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             }
         except Exception as e:
             logger.error(f"分页查询失败: {e}")
-            raise QueryExecutionError("分页查询失败", original_error=e)
+            raise QueryExecutionError("分页查询失败", original_error=e) from e
     
     @monitor_query_performance
     def exists_optimized(self, filters: Dict[str, Any]) -> bool:
@@ -876,7 +900,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return self.session.query(query.exists()).scalar()
         except Exception as e:
             logger.error(f"存在性检查失败: {e}")
-            raise QueryExecutionError("存在性检查失败", original_error=e)
+            raise QueryExecutionError("存在性检查失败", original_error=e) from e
     
     @monitor_query_performance
     def batch_load_by_ids(self, entity_ids: List[int],
@@ -909,7 +933,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return {entity.id: entity for entity in entities}
         except Exception as e:
             logger.error(f"批量加载失败: {e}")
-            raise QueryExecutionError("批量加载失败", original_error=e)
+            raise QueryExecutionError("批量加载失败", original_error=e) from e
     
     def batch_create(self, data_list: List[Dict[str, Any]]) -> List[Any]:
         """批量创建实体
@@ -934,7 +958,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return entities
         except Exception as e:
             logger.error(f"批量创建失败: {e}")
-            raise QueryExecutionError("批量创建失败", original_error=e)
+            raise QueryExecutionError("批量创建失败", original_error=e) from e
     
     def batch_update(self, updates: List[Tuple[int, Dict[str, Any]]]) -> int:
         """批量更新实体（先批量 IN 预加载，再 setattr，消除 N+1 写）
@@ -974,7 +998,7 @@ class OptimizedRepository(BaseRepository, abstract=True):
             return updated_count
         except Exception as e:
             logger.error(f"批量更新失败: {e}")
-            raise QueryExecutionError("批量更新失败", original_error=e)
+            raise QueryExecutionError("批量更新失败", original_error=e) from e
     
     def _apply_eager_loading(self, query: Query, relationships: List[str]) -> Query:
         """应用预加载策略

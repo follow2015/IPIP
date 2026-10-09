@@ -179,14 +179,14 @@ def ensure_vendor_mib_source() -> Optional[str]:
         return str(VENDOR_MIB_DIR)
     try:
         VENDOR_MIB_DIR.mkdir(parents=True, exist_ok=True)
-    except OSError:  # noqa: BLE001 - 只读文件系统/权限不足时降级
+    except OSError:  # 只读文件系统/权限不足时降级
         logger.warning("厂商 MIB 目录不可用，跳过搜索路径注册: %s", VENDOR_MIB_DIR)
         return None
     try:
         from pysnmp.smi import builder as _builder_mod
 
         _get_builder().add_mib_sources(_builder_mod.DirMibSource(str(VENDOR_MIB_DIR)))
-    except Exception:  # noqa: BLE001 - pysnmp 缺失/API 变化都不该阻断采集
+    except Exception:  # pysnmp 缺失/API 变化都不该阻断采集
         logger.warning("注册厂商 MIB 搜索路径失败: %s", VENDOR_MIB_DIR, exc_info=True)
         return None
     _vendor_registered = True

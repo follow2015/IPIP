@@ -64,7 +64,7 @@ class DeviceNicsPortService:
             new_ports = self.repo.find_ports_by_device_orm(device_id)
             logger.info("设备 %d 网卡配置保存成功，共 %d 个端口", device_id, count)
             return (True, f"网卡配置保存成功，共 {count} 个端口", new_ports)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 保存网卡配置失败转结构化返回：DB 异常类型不可枚举
             logger.error("保存网卡配置失败: device_id=%d, error=%s", device_id, e)
             return (False, f"保存网卡配置失败: {e}", [])
 
@@ -129,7 +129,7 @@ class DeviceNicsPortService:
             logger.info("设备 %d 增量批量创建 %d 个端口", device_id, len(objs))
             all_ports = self.repo.find_ports_by_device_orm(device_id)
             return (True, f"成功创建 {len(objs)} 个端口", all_ports)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 增量批量创建端口失败转结构化返回：同 68
             logger.error("增量批量创建端口失败: device_id=%d, error=%s", device_id, e)
             return (False, f"创建端口失败: {e}", [])
 
@@ -267,7 +267,7 @@ class DeviceNicsPortService:
                 self.repo.session.delete(p)
                 deleted.append(p.id)
             self.repo.session.flush()
-        except Exception as e:  # pragma: no cover - 防御性兜底
+        except Exception as e:  # noqa: BLE001 -- 批量删除端口兜底（防御性）：已标注 pragma no cover
             logger.error("批量删除端口失败: device_id=%d, error=%s", device_id, e)
             return {"deleted": deleted, "skipped": skipped, "error": str(e)}
 
@@ -283,10 +283,14 @@ class DeviceNicsPortService:
         }
         for port in ports:
             status = port.port_status
-            if status == "free":   summary["available"] += 1
-            elif status == "occupied": summary["occupied"] += 1
-            elif status == "disabled": summary["disabled"] += 1
-            elif status == "error":    summary["error"] += 1
+            if status == "free":
+                summary["available"] += 1
+            elif status == "occupied":
+                summary["occupied"] += 1
+            elif status == "disabled":
+                summary["disabled"] += 1
+            elif status == "error":
+                summary["error"] += 1
             pt = port.port_type
             sp = port.port_speed
             summary["by_type"][pt] = summary["by_type"].get(pt, 0) + 1

@@ -9,6 +9,7 @@
  *
  * 数据来自 GET /monitor/devices/<id>/history 与 /trends（默认近 7 天窗口）。
  */
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import { useMemo, useState } from 'react';
 import {
   Card,
@@ -50,7 +51,7 @@ import { useTranslation } from 'react-i18next';
 import { useMessage } from '@/hooks/useMessage';
 import { useResetPageOnDeps } from '@/hooks/useResetPageOnDeps';
 import { useTable } from '@/hooks/useTable';
-import DataTable from '@/components/DataTable';
+import DataTable, { type DataTableColumn } from '@/components/DataTable';
 import dayjs from 'dayjs';
 import type { TFunction } from 'i18next';
 
@@ -97,7 +98,9 @@ export default function MonitorHistory() {
   const [protocol, setProtocol] = useState<string>('');
   const table = useTable({ initialPerPage: 20 });
 
-  const { data: statusData, isLoading: devicesLoading } = useMonitorStatuses({ per_page: 200 });
+  const { data: statusData, isLoading: devicesLoading } = useMonitorStatuses({
+    per_page: PER_PAGE_CAP
+  });
   const deviceOptions = useMemo(
     () =>
       (statusData?.items ?? []).map((d) => ({
@@ -159,6 +162,43 @@ export default function MonitorHistory() {
       })
       .filter((r) => r.value != null);
   }, [metricHistory]);
+
+  const metricLatestColumns = useMemo<DataTableColumn<DeviceMetricLatestItem>[]>(
+    () => [
+      { title: t('column.metricKey'), dataIndex: 'metric_key', width: 160 },
+      { title: t('column.instance'), dataIndex: 'index_key', width: 120 },
+      {
+        title: t('column.currentValue'),
+        dataIndex: 'value',
+        render: (v: string | null) => v ?? '-'
+      },
+      {
+        title: tc('field.level'),
+        dataIndex: 'severity',
+        width: 80,
+        render: (s: string | null) =>
+          s ? <Tag color={s === 'crit' ? 'red' : s === 'warn' ? 'orange' : 'green'}>{s}</Tag> : '-'
+      },
+      {
+        title: tc('field.status'),
+        dataIndex: 'breached',
+        width: 80,
+        render: (b: boolean) =>
+          b ? (
+            <Tag color="error">{t('history.latest.breached')}</Tag>
+          ) : (
+            <Tag color="success">{t('alertPopover.normal')}</Tag>
+          )
+      },
+      {
+        title: t('column.collectedAt'),
+        dataIndex: 'collected_at',
+        width: 180,
+        render: (v: string) => (v ? dayjs(v).format('MM-DD HH:mm:ss') : '-')
+      }
+    ],
+    [t, tc]
+  );
 
   const message = useMessage();
   const exportHistory = useExportHistory();
@@ -697,45 +737,7 @@ export default function MonitorHistory() {
                 rowKey={(r) => `${r.metric_key}:${r.index_key}`}
                 dataSource={metricLatestData?.items ?? []}
                 pagination={false}
-                columns={[
-                  { title: t('column.metricKey'), dataIndex: 'metric_key', width: 160 },
-                  { title: t('column.instance'), dataIndex: 'index_key', width: 120 },
-                  {
-                    title: t('column.currentValue'),
-                    dataIndex: 'value',
-                    render: (v: string | null) => v ?? '-'
-                  },
-                  {
-                    title: tc('field.level'),
-                    dataIndex: 'severity',
-                    width: 80,
-                    render: (s: string | null) =>
-                      s ? (
-                        <Tag color={s === 'crit' ? 'red' : s === 'warn' ? 'orange' : 'green'}>
-                          {s}
-                        </Tag>
-                      ) : (
-                        '-'
-                      )
-                  },
-                  {
-                    title: tc('field.status'),
-                    dataIndex: 'breached',
-                    width: 80,
-                    render: (b: boolean) =>
-                      b ? (
-                        <Tag color="error">{t('history.latest.breached')}</Tag>
-                      ) : (
-                        <Tag color="success">{t('alertPopover.normal')}</Tag>
-                      )
-                  },
-                  {
-                    title: t('column.collectedAt'),
-                    dataIndex: 'collected_at',
-                    width: 180,
-                    render: (t: string) => (t ? dayjs(t).format('MM-DD HH:mm:ss') : '-')
-                  }
-                ]}
+                columns={metricLatestColumns}
               />
             </Card>
           )}

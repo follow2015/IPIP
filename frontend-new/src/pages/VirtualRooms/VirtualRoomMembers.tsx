@@ -3,6 +3,7 @@
  * - Transfer 穿梭框选择交换机
  * - 显示交换机所属机房信息
  */
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import { useState, useEffect, useCallback } from 'react';
 import { Modal, Transfer, Tag, Space, Spin, Empty } from 'antd';
 import { useUpdateVirtualRoomMembers, useVirtualRoom } from '@/services/virtual-room';
@@ -41,30 +42,35 @@ function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) 
   const loadSwitches = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await get<PaginatedData<{
-        device_id: number;
-        ip_address: string;
-        name?: string;
-        room_id?: number;
-        room_name?: string;
-        has_ssh?: boolean;
-      }>>('/switch/list', { page: 1, per_page: 500 });
+      const res = await get<
+        PaginatedData<{
+          device_id: number;
+          ip_address: string;
+          name?: string;
+          room_id?: number;
+          room_name?: string;
+          has_ssh?: boolean;
+        }>
+      >('/switch/list', { page: 1, per_page: PER_PAGE_CAP });
       const items = (res.data?.items ?? []).filter((sw) => sw.has_ssh === true);
       setSwitchOptions(
         items.map((sw) => ({
           key: String(sw.device_id),
-          title: sw.name || sw.ip_address || td('virtualRoom.members.deviceFallback', { id: sw.device_id }),
+          title:
+            sw.name ||
+            sw.ip_address ||
+            td('virtualRoom.members.deviceFallback', { id: sw.device_id }),
           description: sw.ip_address || '',
           roomName: sw.room_name || tn('audit.roomFallback', { id: sw.room_id || '?' }),
-          roomId: sw.room_id || 0,
-        })),
+          roomId: sw.room_id || 0
+        }))
       );
     } catch {
       message.error(td('virtualRoom.message.loadSwitchesFailed'));
     } finally {
       setLoading(false);
     }
-  }, [td, tn]);
+  }, [td, tn, message]);
 
   useEffect(() => {
     if (open && record) {
@@ -98,7 +104,11 @@ function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) 
   return (
     <Modal
       open={open}
-      title={record ? td('virtualRoom.members.title', { name: record.name }) : td('virtualRoom.action.manageMembers')}
+      title={
+        record
+          ? td('virtualRoom.members.title', { name: record.name })
+          : td('virtualRoom.action.manageMembers')
+      }
       onOk={handleSubmit}
       onCancel={onClose}
       confirmLoading={updateMembers.isPending}
@@ -130,7 +140,10 @@ function VirtualRoomMembers({ open, record, onClose }: VirtualRoomMembersProps) 
           )}
           filterOption={filterOption}
           showSearch
-          titles={[td('virtualRoom.members.availableTitle'), td('virtualRoom.members.selectedTitle')]}
+          titles={[
+            td('virtualRoom.members.availableTitle'),
+            td('virtualRoom.members.selectedTitle')
+          ]}
           listStyle={{ width: 320, height: 400 }}
           oneWay={false}
         />

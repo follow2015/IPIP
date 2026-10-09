@@ -7,6 +7,7 @@ import axios, {
 import i18next from 'i18next';
 import type { ApiResponse, ApiResponseMaybe, BackendPaginatedData } from '@/types/api';
 import { adaptPaginatedResponse } from '@/types/api';
+import { getAccessToken, getRefreshToken, setTokens } from './tokenStorage';
 
 interface ApiErrorData {
   message?: string;
@@ -66,7 +67,7 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = sessionStorage.getItem('token');
+    const token = getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -92,7 +93,7 @@ function rejectPendingRequests(err: Error): void {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = sessionStorage.getItem('refresh_token');
+  const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
 
   try {
@@ -103,8 +104,7 @@ async function refreshAccessToken(): Promise<string | null> {
     if (!res.data?.success || !res.data?.data) return null;
 
     const { token, refresh_token } = res.data.data;
-    sessionStorage.setItem('token', token);
-    sessionStorage.setItem('refresh_token', refresh_token);
+    setTokens(token, refresh_token);
     try {
       const { useAuthStore } = await import('@/stores/auth');
       const state = useAuthStore.getState();
@@ -151,7 +151,7 @@ apiClient.interceptors.response.use(
         url.startsWith('/users/refresh');
 
       if (!isAuthEndpoint) {
-        const refreshToken = sessionStorage.getItem('refresh_token');
+        const refreshToken = getRefreshToken();
         if (refreshToken) {
           if (!isRefreshing) {
             isRefreshing = true;
@@ -187,7 +187,7 @@ apiClient.interceptors.response.use(
                 return;
               }
               originalRequest._retry = true;
-              const currentToken = sessionStorage.getItem('token');
+              const currentToken = getAccessToken();
               if (currentToken) {
                 originalRequest.headers.Authorization = `Bearer ${currentToken}`;
               }
@@ -229,10 +229,10 @@ function handleUnauthorized(): void {
   if (isHandling401) return;
   isHandling401 = true;
 
-  const staleToken = sessionStorage.getItem('token');
+  const staleToken = getAccessToken();
 
   import('@/stores/auth').then(({ useAuthStore }) => {
-    const currentToken = sessionStorage.getItem('token');
+    const currentToken = getAccessToken();
     if (currentToken !== staleToken) return;
     useAuthStore.getState().clearAuth();
     import('@/router')

@@ -48,9 +48,7 @@ const COL_HEADER_HEIGHT = 24;
 type DensityKey = 'compact' | 'standard' | 'large';
 
 type DensityLabelKey =
-  | 'roomLayout.density.compact'
-  | 'roomLayout.density.standard'
-  | 'roomLayout.density.large';
+  'roomLayout.density.compact' | 'roomLayout.density.standard' | 'roomLayout.density.large';
 
 interface DensityConfig {
   labelKey: DensityLabelKey;
@@ -61,9 +59,27 @@ interface DensityConfig {
 }
 
 const DENSITY_CONFIG: Record<DensityKey, DensityConfig> = {
-  compact: { labelKey: 'roomLayout.density.compact', cellWidth: 88, cellHeight: 72, gap: 6, showCustomer: false },
-  standard: { labelKey: 'roomLayout.density.standard', cellWidth: 120, cellHeight: 96, gap: 8, showCustomer: true },
-  large: { labelKey: 'roomLayout.density.large', cellWidth: 156, cellHeight: 124, gap: 10, showCustomer: true }
+  compact: {
+    labelKey: 'roomLayout.density.compact',
+    cellWidth: 88,
+    cellHeight: 72,
+    gap: 6,
+    showCustomer: false
+  },
+  standard: {
+    labelKey: 'roomLayout.density.standard',
+    cellWidth: 120,
+    cellHeight: 96,
+    gap: 8,
+    showCustomer: true
+  },
+  large: {
+    labelKey: 'roomLayout.density.large',
+    cellWidth: 156,
+    cellHeight: 124,
+    gap: 10,
+    showCustomer: true
+  }
 };
 
 const DENSITY_KEYS = Object.keys(DENSITY_CONFIG) as DensityKey[];
@@ -87,7 +103,6 @@ function RoomLayout({
   const { token } = theme.useToken();
   const { t } = useTranslation('asset');
   const { t: tDevice } = useTranslation('device');
-  const { t: tCommon } = useTranslation('common');
 
   const [density, setDensity] = useState<DensityKey>('standard');
   const [keyword, setKeyword] = useState('');
@@ -171,15 +186,15 @@ function RoomLayout({
       const entry = map.get(key) ?? { cabinetNumbers: [], markerNames: [] };
       entry.markerNames.push(
         marker.label ||
-        (MARKER_TYPE_LABEL_KEYS[marker.marker_type]
-          ? t(MARKER_TYPE_LABEL_KEYS[marker.marker_type])
-          : marker.marker_type)
+          (MARKER_TYPE_LABEL_KEYS[marker.marker_type]
+            ? t(MARKER_TYPE_LABEL_KEYS[marker.marker_type])
+            : marker.marker_type)
       );
       map.set(key, entry);
     }
 
     return map;
-  }, [cabinets, visibleMarkers, occupiedCells]);
+  }, [cabinets, visibleMarkers, occupiedCells, t]);
 
   const legendStatuses = useMemo(
     () => [...new Set(cabinets.map((c) => c.status ?? DEFAULT_STATUS))].sort((a, b) => a - b),

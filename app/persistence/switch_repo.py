@@ -28,6 +28,8 @@ from extensions import db
 
 logger = get_logger(__name__)
 
+SWITCH_OPTIONS_MAX = 1000
+
 
 class SwitchRepository(BaseRepository):
     """SwitchCredentials / Device 数据访问层
@@ -55,7 +57,7 @@ class SwitchRepository(BaseRepository):
             ).first()
         except SQLAlchemyError as e:
             self.logger.error("根据 device_id 查找 SwitchCredentials 失败 (device_id=%d): %s", device_id, e)
-            raise QueryExecutionError("查找交换机失败", original_error=e)
+            raise QueryExecutionError("查找交换机失败", original_error=e) from e
 
     def get_by_room(
         self, room_id: int, status: Optional[int] = None,
@@ -379,6 +381,29 @@ class SwitchRepository(BaseRepository):
             "page_size": page_size,
             "total_pages": (total + page_size - 1) // page_size if page_size else 0,
         }
+
+    def list_options(self, room_id: int = None) -> List[dict]:
+        """交换机下拉选项（轻量两列，不分页）—— 供 GET /api/switch/options 使用（OD-8）。
+
+        背景：前端下拉曾用 per_page=1000 打 /list，被 RequestValidator.MAX_PER_PAGE=100
+        夹紧后静默缺项。选项场景改走本方法：只取 id + device_name 两列，
+        materialize 成本远低于完整行，故上限单独设定（SWITCH_OPTIONS_MAX），
+        与列表端点的分页语义解耦——这正是 OD-8 (a)「显式、专用的选项通道」的落地。
+        """
+        query = self.session.query(Device.id, Device.device_name).filter(
+            Device.device_type == 'network',
+            Device.deleted_at.is_(None),
+        )
+        if room_id is not None:
+            query = query.join(Cabinet, Device.cabinet_id == Cabinet.id).filter(
+                Cabinet.room_id == room_id
+            )
+        rows = (
+            query.order_by(Device.device_name)
+            .limit(SWITCH_OPTIONS_MAX)
+            .all()
+        )
+        return [{"id": row.id, "name": row.device_name} for row in rows]
 
 
     def get_switch_ports_list(self, switch_id: int) -> List[str]:

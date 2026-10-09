@@ -22,9 +22,7 @@ from app.utils import validation_manager
 from app.services import import_export_service
 from app.schemas.device import DeviceCreateSchema
 from app.services.network_device_service import NetworkDeviceService
-from app.models.device import Device
-from app.models.device_server_ext import DeviceServerExt
-from app.exceptions.business import DeviceNotSupported, InvalidOperationError
+from app.exceptions.business import InvalidOperationError
 from app.exceptions.data_access import RecordNotFoundError
 from app.exceptions.validation import RequiredFieldError, InvalidFormatError
 
@@ -388,8 +386,8 @@ def parse_and_import_devices(df: pd.DataFrame) -> dict:
             if switch_role is not None and switch_role != "":
                 try:
                     role_val = int(switch_role)
-                except (ValueError, TypeError):
-                    raise InvalidFormatError(field="switch_role", expected_format="整数（0=核心，1=接入）", actual_value=switch_role, message=f"交换机角色必须为整数（0=核心，1=接入），当前值：{switch_role!r}")
+                except (ValueError, TypeError) as e:
+                    raise InvalidFormatError(field="switch_role", expected_format="整数（0=核心，1=接入）", actual_value=switch_role, message=f"交换机角色必须为整数（0=核心，1=接入），当前值：{switch_role!r}") from e
                 if role_val not in VALID_SWITCH_ROLES:
                     raise InvalidFormatError(field="switch_role", expected_format="0（核心）或 1（接入）", actual_value=role_val, message=f"不支持的交换机角色：{role_val}。可选值：0（核心）、1（接入）")
 
@@ -447,7 +445,7 @@ def parse_and_import_devices(df: pd.DataFrame) -> dict:
                 imported_ids.append(device.id)
                 if device.device_name:
                     name_to_id[device.device_name] = device.id
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 导入单行失败隔离：记入 failed_rows 继续下一行，脏数据不得中断整个导入
             logger.error("导入第 %d 行失败: %s", index + 1, str(e))
             failed_rows.append({
                 "row": index + 1,
@@ -508,7 +506,7 @@ def parse_and_import_devices(df: pd.DataFrame) -> dict:
             imported_count += 1
             if device and device.id:
                 imported_ids.append(device.id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 导入单行(节点)失败隔离：同 506
             logger.error("导入第 %d 行(节点)失败: %s", index + 1, str(e))
             failed_rows.append({
                 "row": index + 1,

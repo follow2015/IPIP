@@ -74,7 +74,7 @@ class ZabbixPortCollector:
             return []
         try:
             port_items = self._graph_service.list_ports(credential, device, use_cache=True)
-        except Exception:  # noqa: BLE001 - 采集失败静默降级
+        except Exception:  # 采集失败静默降级
             logger.warning(
                 "Zabbix 端口列表采集失败 device_id=%s",
                 getattr(device, "id", None), exc_info=True,

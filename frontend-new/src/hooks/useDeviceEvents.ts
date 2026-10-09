@@ -8,11 +8,12 @@
  *   useDeviceEvents(deviceId, 'ports', (event) => { ... });
  *   useDeviceEvents(deviceId, 'vlans');
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getDeviceBus, releaseDeviceBus } from '@/services/DeviceEventBus';
 import type { DeviceChangeEvent } from '@/services/DeviceEventBus';
 import { queryKeys } from '@/services/query-keys';
+import { createCoalescedInvalidator } from '@/utils/coalescedInvalidate';
 
 type ResourceType = 'ports' | 'vlans' | 'lags' | 'connections';
 
@@ -31,6 +32,7 @@ export function useDeviceEvents(
   enabled: boolean = true
 ): void {
   const queryClient = useQueryClient();
+  const invalidator = useMemo(() => createCoalescedInvalidator(queryClient), [queryClient]);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
 
@@ -41,51 +43,45 @@ export function useDeviceEvents(
     const unsubscribe = bus.on(resource, (event) => {
       switch (resource) {
         case 'ports':
-          queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(deviceId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.devices.networkPorts(deviceId) });
+          invalidator.invalidate(queryKeys.switches.withPorts(deviceId));
+          invalidator.invalidate(queryKeys.devices.networkPorts(deviceId));
           if (event.op_type === 'info_refresh' || event.op_type === 'scan_complete') {
-            queryClient.invalidateQueries({ queryKey: queryKeys.switches.detail(deviceId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.devices.detail(deviceId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.switches.all });
-            queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
+            invalidator.invalidate(queryKeys.switches.detail(deviceId));
+            invalidator.invalidate(queryKeys.devices.detail(deviceId));
+            invalidator.invalidate(queryKeys.switches.all);
+            invalidator.invalidate(queryKeys.devices.all);
           }
           event.affected_ports.forEach((portName) => {
-            queryClient.invalidateQueries({
-              queryKey: queryKeys.switches.portDetail(deviceId, portName)
-            });
+            invalidator.invalidate(queryKeys.switches.portDetail(deviceId, portName));
           });
           break;
         case 'vlans':
-          queryClient.invalidateQueries({ queryKey: queryKeys.vlans.byDevice(deviceId) });
+          invalidator.invalidate(queryKeys.vlans.byDevice(deviceId));
           event.affected_vlans.forEach((vlanDbId) => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.vlans.detail(vlanDbId) });
+            invalidator.invalidate(queryKeys.vlans.detail(vlanDbId));
           });
           if (event.affected_ports.length > 0) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(deviceId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.devices.networkPorts(deviceId) });
+            invalidator.invalidate(queryKeys.switches.withPorts(deviceId));
+            invalidator.invalidate(queryKeys.devices.networkPorts(deviceId));
           }
           break;
         case 'lags':
-          queryClient.invalidateQueries({ queryKey: queryKeys.linkAggregation.byDevice(deviceId) });
+          invalidator.invalidate(queryKeys.linkAggregation.byDevice(deviceId));
           event.affected_lags.forEach((lagId) => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.linkAggregation.detail(lagId) });
+            invalidator.invalidate(queryKeys.linkAggregation.detail(lagId));
           });
           if (event.affected_ports.length > 0) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(deviceId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.devices.networkPorts(deviceId) });
+            invalidator.invalidate(queryKeys.switches.withPorts(deviceId));
+            invalidator.invalidate(queryKeys.devices.networkPorts(deviceId));
           }
           break;
         case 'connections':
-          queryClient.invalidateQueries({ queryKey: queryKeys.devices.connections(deviceId) });
-          queryClient.invalidateQueries({
-            queryKey: [...queryKeys.devices.detail(deviceId), 'port-links']
-          });
-          queryClient.invalidateQueries({
-            queryKey: [...queryKeys.devices.connections(deviceId), 'switch']
-          });
+          invalidator.invalidate(queryKeys.devices.connections(deviceId));
+          invalidator.invalidate([...queryKeys.devices.detail(deviceId), 'port-links']);
+          invalidator.invalidate([...queryKeys.devices.connections(deviceId), 'switch']);
           if (event.affected_ports.length > 0) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(deviceId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.devices.networkPorts(deviceId) });
+            invalidator.invalidate(queryKeys.switches.withPorts(deviceId));
+            invalidator.invalidate(queryKeys.devices.networkPorts(deviceId));
           }
           break;
       }
@@ -95,8 +91,9 @@ export function useDeviceEvents(
     return () => {
       unsubscribe();
       releaseDeviceBus(deviceId);
+      invalidator.flush();
     };
-  }, [deviceId, resource, queryClient, enabled]);
+  }, [deviceId, resource, invalidator, enabled]);
 }
 
 /**

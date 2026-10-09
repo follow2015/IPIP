@@ -5,11 +5,13 @@
  * 由 useG6Graph Hook 持有。类型与纯逻辑见 graphBuilders / graphConfig。
  */
 import React, { forwardRef } from 'react';
+import { theme } from 'antd';
 import { useG6Graph } from './useG6Graph';
 import type { TopologyGraphHandle, TopologyGraphProps } from './graphBuilders';
 
 const TopologyGraph = forwardRef<TopologyGraphHandle, TopologyGraphProps>(
   ({ nodes, edges, layout, onNodeClick, onEdgeClick, highlightNodeId, style }, ref) => {
+    const { token } = theme.useToken();
     const { containerRef } = useG6Graph({
       nodes,
       edges,
@@ -26,7 +28,7 @@ const TopologyGraph = forwardRef<TopologyGraphHandle, TopologyGraphProps>(
         style={{
           width: '100%',
           height: '100%',
-          background: '#fafafa',
+          background: token.colorBgLayout,
           borderRadius: 8,
           overflow: 'hidden',
           ...style

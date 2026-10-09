@@ -51,7 +51,7 @@ def _fd_monitor_loop(threshold: int, interval: float, stop_event: threading.Even
                     "请排查对端或网络，必要时人工重启监控进程回收资源。",
                     count, threshold,
                 )
-        except Exception:  # noqa: BLE001 - 监控线程自身不得因异常退出
+        except Exception:  # 监控线程自身不得因异常退出
             logger.warning("FD 监控线程异常", exc_info=True)
         stop_event.wait(interval)
 

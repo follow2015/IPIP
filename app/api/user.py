@@ -15,15 +15,9 @@ from app.services.user_service import UserService
 from app.services.security_service import SecurityService
 from app.persistence.user_repository import UserRepository
 from app.persistence.user_log_repository import UserLogRepository
-from marshmallow import Schema
 
-from app.utils import (
-    auth_manager,
-    login_required,
-    permission_required,
-    rate_limit_api,
-    rate_limit_login,
-)
+from app.services.auth import auth_manager, login_required, permission_required
+from app.utils import rate_limit_api, rate_limit_login
 from app.utils.transactional import transactional
 
 
@@ -512,7 +506,7 @@ def batch_delete_users():
                 deleted_count += 1
             else:
                 failed_ids.append(user_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 批量/循环内单条失败隔离：记入失败列表后继续处理下一条，单条异常不得中断整批
             logger.error(f"删除用户 {user_id} 失败: {e}")
             failed_ids.append(user_id)
 

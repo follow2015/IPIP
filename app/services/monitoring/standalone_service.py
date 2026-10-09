@@ -60,6 +60,7 @@ from app.services.monitoring.protocol_registry import (
 )
 from extensions import db
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -245,7 +246,7 @@ class StandaloneMonitorService:
         if not self.use_redis_lock or self._redis is None:
             return
         try:
-            release_owner_lock(self._redis, f"monitor:lock:{loop_name}")
+            release_owner_lock(self._redis, redis_keys.monitor_lock_key(loop_name))
         except Exception:
             logger.warning("监控 Redis 锁释放失败 loop=%s", loop_name, exc_info=True)
 

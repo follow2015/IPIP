@@ -170,7 +170,9 @@ function CabinetNode({
             <strong>{cabinet.cabinet_number}</strong>
           </div>
           <div>
-            {ta('roomLayout.tooltip.status', { value: statusInfo ? td(statusInfo.labelKey) : status })}
+            {ta('roomLayout.tooltip.status', {
+              value: statusInfo ? td(statusInfo.labelKey) : status
+            })}
           </div>
           <div>
             {ta('roomLayout.tooltip.u', {

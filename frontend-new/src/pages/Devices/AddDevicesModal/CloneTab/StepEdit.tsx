@@ -1,4 +1,4 @@
-import { Button, Space, Table, Alert } from 'antd';
+import { Button, Space, Table, Alert, theme } from 'antd';
 import { ThunderboltOutlined, AimOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { DeviceBatchRow } from '../shared';
@@ -29,6 +29,7 @@ const StepEdit: React.FC<StepEditProps> = ({
   cloneChassisId,
   cloneAvailablePositions
 }) => {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   return (
     <div>
@@ -49,16 +50,16 @@ const StepEdit: React.FC<StepEditProps> = ({
           </Button>
         </Space>
         <Space>
-          <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+          <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>
             {t('addModal.clone.totalCount', { count: diffRows.length })}
           </span>
           {!isNodeTemplate && availableUPositions != null && (
-            <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+            <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>
               {t('form.location.availableUPositions', { count: availableUCount })}
             </span>
           )}
           {isNodeTemplate && cloneChassisId && (
-            <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+            <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>
               {t('addModal.clone.chassisVacant', { count: cloneAvailablePositions.length })}
             </span>
           )}

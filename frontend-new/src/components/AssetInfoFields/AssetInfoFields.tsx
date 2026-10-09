@@ -33,7 +33,8 @@ import {
   Switch,
   Button,
   Space,
-  Popover
+  Popover,
+  theme
 } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
@@ -301,6 +302,7 @@ function AssetNumberSection({
   autoGenerate?: boolean;
   onAutoGenerateChange?: (value: boolean) => void;
 }) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('asset');
   if (mode === 'none') return null;
   const name = (key: string) => buildName(prefix, key);
@@ -323,7 +325,7 @@ function AssetNumberSection({
         </Col>
         <Col xs={24} md={8} style={{ paddingTop: 4 }}>
           {autoGenerate && (
-            <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+            <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>
               {t('assetInfo.autoGenerate.hintBatch')}
             </span>
           )}
@@ -359,7 +361,7 @@ function AssetNumberSection({
         </Col>
         <Col xs={24} md={8} style={{ paddingTop: 30 }}>
           {autoGenerate && (
-            <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+            <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>
               {t('assetInfo.autoGenerate.hint')}
             </span>
           )}
@@ -422,10 +424,7 @@ export default function AssetInfoFields({
           </Form.Item>
         </Col>
         <Col xs={24} md={12}>
-          <Form.Item
-            name={name('supplier_contact')}
-            label={t('assetInfo.supplierContact.label')}
-          >
+          <Form.Item name={name('supplier_contact')} label={t('assetInfo.supplierContact.label')}>
             <Input placeholder={t('assetInfo.supplierContact.placeholder')} />
           </Form.Item>
         </Col>

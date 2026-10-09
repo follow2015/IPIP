@@ -181,7 +181,7 @@ async def async_ping_quality(
             try:
                 proc.kill()
                 await proc.wait()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.debug("终止 ping 子进程失败: ip=%s", ip, exc_info=True)
         return PingQuality(sent=count)
     except (OSError, FileNotFoundError) as e:

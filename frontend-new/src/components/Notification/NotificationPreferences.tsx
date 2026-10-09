@@ -241,7 +241,13 @@ const NotificationPreferences: React.FC = () => {
           <Divider />
 
           <Form.Item>
-            <Button type="primary" htmlType="submit" loading={updateMutation.isPending}>
+            {/* loading 只出转圈、不阻止点击，连点会发两次写请求（P1-4 / AC-6） */}
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={updateMutation.isPending}
+              disabled={updateMutation.isPending}
+            >
               {t('notification.preferences.action.save')}
             </Button>
           </Form.Item>

@@ -7,11 +7,12 @@
 析出它有两个好处：
 
   1. utils 层内部（`app/utils/logging/*` 等）用它时保持 utils -> utils，
-     不必绕道 `app.utils.auth` 垫片 —— 那条边在 AST 上看不见，实为 utils -> services，
-     属"自指陷阱"（见 `tests/test_architecture_layering.py` 的 R1c）。
+     不必绕道认证服务 —— 那条边在 AST 上曾因 `app.utils.auth` 垫片而看不见，
+     实为 utils -> services，属"自指陷阱"（见 `tests/test_architecture_layering.py`
+     的 R1c；垫片已于 2026-10-04 随 P1-11 收尾删除）。
   2. 认证服务与 utils 层共用同一个实现，不产生第二份定义。
 
-`app.utils.auth` / `app.services.auth` 均 re-export 本函数，既有消费方无需改动。
+`app.services.auth` re-export 本函数；旧路径 `app.utils.auth` 已删除，不要再引用。
 """
 from typing import Optional
 

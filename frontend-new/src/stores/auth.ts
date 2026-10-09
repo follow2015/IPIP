@@ -16,6 +16,7 @@ import i18next from 'i18next';
 import type { User } from '@/types/models';
 import { login as apiLogin, logout as apiLogout } from '@/services/auth';
 import type { LoginRequest, LoginResponse } from '@/types/api';
+import { clearTokens, setAccessToken, setTokens } from '@/services/tokenStorage';
 
 interface AuthState {
   user: User | null;
@@ -66,10 +67,7 @@ export const useAuthStore = create<AuthState>()(
         const user = buildUserFromLogin(loginUser);
         set({ user, token, permissions: permissions ?? [], isAuthenticated: true });
 
-        sessionStorage.setItem('token', token);
-        if (res.data.refresh_token) {
-          sessionStorage.setItem('refresh_token', res.data.refresh_token);
-        }
+        setTokens(token, res.data.refresh_token ?? null);
       },
 
       logout: () => {
@@ -78,14 +76,12 @@ export const useAuthStore = create<AuthState>()(
           apiLogout().catch(() => {});
         }
         set({ user: null, token: null, permissions: [], isAuthenticated: false, isVerifying: false });
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('refresh_token');
+        clearTokens();
       },
 
       clearAuth: () => {
         set({ user: null, token: null, permissions: [], isAuthenticated: false, isVerifying: false });
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('refresh_token');
+        clearTokens();
       },
 
       setVerifying: (verifying: boolean) => {
@@ -99,7 +95,7 @@ export const useAuthStore = create<AuthState>()(
 
       setAuth: (user, token, permissions) => {
         set({ user, token, permissions, isAuthenticated: true });
-        sessionStorage.setItem('token', token);
+        setAccessToken(token);
       },
     }),
     {
@@ -117,8 +113,7 @@ export const useAuthStore = create<AuthState>()(
           state.token           = null;
           state.permissions     = [];
           state.isAuthenticated = false;
-          sessionStorage.removeItem('token');
-          sessionStorage.removeItem('refresh_token');
+          clearTokens();
         }
       },
     },

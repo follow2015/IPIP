@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 from app.utils.logging import get_logger
 from app.utils.time_utils import now_utc_naive
 from typing import Optional, Tuple
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -39,7 +40,7 @@ def _get_redis():
 
 
 def _maint_cache_key(device_id: int) -> str:
-    return f"monitor:maint:{device_id}"
+    return redis_keys.monitor_maint_key(device_id)
 
 
 def invalidate_maintenance_cache(device_id: int) -> None:

@@ -2,6 +2,7 @@
  * 客户详情页（Card 布局，与交换机详情一致）
  * - Card(基本信息) + Card(资源统计)
  */
+import { useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Button, Descriptions, Spin, Result, Tag } from 'antd';
 import { ArrowLeftOutlined, DownloadOutlined } from '@ant-design/icons';
@@ -17,7 +18,9 @@ import { StatusTag } from '@/components/StatusTag';
 import { CUSTOMER_STATUS_MAP, CustomerStatusCode } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
 import { useTranslation } from 'react-i18next';
-import DataTable from '@/components/DataTable';
+import DataTable, { type DataTableColumn } from '@/components/DataTable';
+
+type ArchiveRow = NonNullable<ReturnType<typeof useTerminationArchives>['data']>[number];
 
 function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
@@ -49,6 +52,69 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
   const { data: assetsData, isLoading: assetsLoading } = useCustomerAssets(customerId);
   const isTerminated = customer?.customer_status === CustomerStatusCode.TERMINATED;
   const { data: archives } = useTerminationArchives(customerId);
+  const customerName = customer?.customer_name ?? '';
+
+  const renderArchiveActions = useCallback(
+    (hasPdf: boolean) => (
+      <Button
+        type="link"
+        size="small"
+        icon={<DownloadOutlined />}
+        disabled={!hasPdf}
+        onClick={async () => {
+          try {
+            await downloadTerminationArchive(customerId, customerName);
+          } catch {
+            message.error(td('customer.message.downloadFailed'));
+          }
+        }}
+      >
+        {td('customer.archive.download')}
+      </Button>
+    ),
+    [customerId, customerName, message, td]
+  );
+
+  const archiveColumns = useMemo<DataTableColumn<ArchiveRow>[]>(
+    () => [
+      {
+        title: td('customer.archive.terminatedAt'),
+        dataIndex: 'created_at',
+        render: (v: string | null) => (v ? formatDateTime(v) : '-')
+      },
+      {
+        title: td('customer.archive.operator'),
+        dataIndex: 'operator_name',
+        render: (v: string | null) => v ?? '-'
+      },
+      {
+        title: td('customer.archive.reason'),
+        dataIndex: 'reason',
+        render: (v: string | null) => v ?? '-'
+      },
+      {
+        title: 'PDF',
+        dataIndex: 'has_pdf',
+        render: (v: boolean) =>
+          v ? (
+            <Tag color="green">{td('customer.archive.generated')}</Tag>
+          ) : (
+            <Tag color="orange">{td('customer.archive.notGenerated')}</Tag>
+          )
+      },
+      {
+        title: td('customer.archive.size'),
+        dataIndex: 'pdf_size',
+        render: (v: number | null) => (v != null ? `${(v / 1024).toFixed(1)} KB` : '-')
+      },
+      {
+        title: tc('field.actions'),
+        key: 'action',
+        render: (_: unknown, r: ArchiveRow) => renderArchiveActions(r.has_pdf)
+      }
+    ],
+    [td, tc, renderArchiveActions]
+  );
 
   if (!customer) {
     return <div>{td('customer.notFound')}</div>;
@@ -64,25 +130,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
     }
   };
 
-  const renderArchiveActions = (hasPdf: boolean) => (
-    <Button
-      type="link"
-      size="small"
-      icon={<DownloadOutlined />}
-      disabled={!hasPdf}
-      onClick={async () => {
-        try {
-          await downloadTerminationArchive(customerId, customer.customer_name);
-        } catch {
-          message.error(td('customer.message.downloadFailed'));
-        }
-      }}
-    >
-      {td('customer.archive.download')}
-    </Button>
-  );
-
-  const renderArchiveCard = (a: NonNullable<typeof archives>[number]) => (
+  const renderArchiveCard = (a: ArchiveRow) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ fontSize: 12, color: '#999' }}>
         {a.created_at ? formatDateTime(a.created_at) : '-'}
@@ -184,6 +232,15 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
             <Descriptions.Item label={td('customer.stats.ipTotal')}>
               {s?.total_ips ?? 0}
             </Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.circuitCount')}>
+              {s?.total_circuits ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.circuitBandwidth')}>
+              {s?.total_circuit_bandwidth_mbps ?? 0}
+            </Descriptions.Item>
+            <Descriptions.Item label={td('customer.stats.circuitMonthlyFee')}>
+              {s?.total_circuit_monthly_fee ?? 0}
+            </Descriptions.Item>
           </Descriptions>
         ) : (
           <span>{tc('message.noData')}</span>
@@ -203,44 +260,7 @@ function CustomerDetailContent({ customerId }: { customerId: number }) {
               showCard={false}
               mobileCardMode
               cardRender={renderArchiveCard}
-              columns={[
-                {
-                  title: td('customer.archive.terminatedAt'),
-                  dataIndex: 'created_at',
-                  render: (v: string | null) => (v ? formatDateTime(v) : '-')
-                },
-                {
-                  title: td('customer.archive.operator'),
-                  dataIndex: 'operator_name',
-                  render: (v: string | null) => v ?? '-'
-                },
-                {
-                  title: td('customer.archive.reason'),
-                  dataIndex: 'reason',
-                  render: (v: string | null) => v ?? '-'
-                },
-                {
-                  title: 'PDF',
-                  dataIndex: 'has_pdf',
-                  render: (v: boolean) =>
-                    v ? (
-                      <Tag color="green">{td('customer.archive.generated')}</Tag>
-                    ) : (
-                      <Tag color="orange">{td('customer.archive.notGenerated')}</Tag>
-                    )
-                },
-                {
-                  title: td('customer.archive.size'),
-                  dataIndex: 'pdf_size',
-                  render: (v: number | null) => (v != null ? `${(v / 1024).toFixed(1)} KB` : '-')
-                },
-                {
-                  title: tc('field.actions'),
-                  key: 'action',
-                  render: (_: unknown, r: NonNullable<typeof archives>[number]) =>
-                    renderArchiveActions(r.has_pdf)
-                }
-              ]}
+              columns={archiveColumns}
               scroll={{ x: 'max-content' }}
             />
           ) : (

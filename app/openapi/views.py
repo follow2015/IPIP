@@ -9,8 +9,8 @@
 """
 import os
 
-from flask import Blueprint, jsonify, current_app
-from app.utils.auth import login_required
+from flask import Blueprint, jsonify
+from app.services.auth import login_required
 
 openapi_bp = Blueprint("openapi", __name__)
 

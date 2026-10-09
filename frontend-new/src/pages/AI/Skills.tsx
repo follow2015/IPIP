@@ -38,7 +38,7 @@ import {
 } from '@/services/ai';
 import { usePermission } from '@/hooks/usePermission';
 import { useMessage } from '@/hooks/useMessage';
-import SkillEditForm from './SkillEditForm';
+import SkillEditForm, { type SkillEditFormHandle } from './SkillEditForm';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
@@ -142,6 +142,7 @@ export default function Skills() {
   const [editInitial, setEditInitial] = useState<SkillWritePayload | undefined>();
   const [editMode, setEditMode] = useState<'create' | 'update'>('create');
   const [submitting, setSubmitting] = useState(false);
+  const editFormRef = useRef<SkillEditFormHandle>(null);
 
   const handleCreate = () => {
     setEditMode('create');
@@ -453,13 +454,16 @@ export default function Skills() {
       <Modal
         title={editMode === 'create' ? t('skills.action.create') : t('skills.detail.editTitle')}
         open={edit.isOpen}
-        onCancel={() => edit.close()}
+        onCancel={() => editFormRef.current?.requestClose()}
         footer={null}
         width="90%"
         style={{ maxWidth: 720 }}
-        destroyOnClose
+        closable={!submitting}
+        mask={{ closable: false }}
+        destroyOnHidden
       >
         <SkillEditForm
+          ref={editFormRef}
           initial={editInitial}
           onSubmit={handleSubmit}
           onCancel={() => edit.close()}

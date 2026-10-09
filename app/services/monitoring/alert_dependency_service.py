@@ -30,10 +30,11 @@ import json
 from app.utils.logging import get_logger
 from app.utils.redis_client import get_redis_client
 from typing import List, Optional, Tuple, TypedDict
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
-_CACHE_KEY = "monitor:dep_rules:active"
+_CACHE_KEY = redis_keys.MONITOR_DEP_RULES_ACTIVE_KEY
 _CACHE_TTL = 60  # 秒
 
 
@@ -115,7 +116,7 @@ def _upstream_alert_max_age_seconds() -> int:
         raw = current_app.config.get(
             "MONITOR_DEP_UPSTREAM_ALERT_MAX_AGE", _UPSTREAM_ALERT_MAX_AGE_SECONDS
         )
-    except Exception:  # noqa: BLE001 - 无 app 上下文或配置缺失时沿用模块默认值
+    except Exception:  # noqa: BLE001, S110 - 无 app 上下文或配置缺失时沿用模块默认值
         pass
     try:
         value = int(raw)

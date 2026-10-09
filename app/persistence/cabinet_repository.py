@@ -107,7 +107,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
         except SQLAlchemyError as e:
             self.logger.error(f"根据ID查找机柜失败 (ID={entity_id}): {e}")
-            raise QueryExecutionError(f"查找机柜失败", original_error=e)
+            raise QueryExecutionError("查找机柜失败", original_error=e) from e
 
     def find_device_ids_in_cabinet(self, cabinet_id: int) -> list:
         """柜内全部设备 ID（B-46 收敛：机柜强删第 0 步）。
@@ -169,7 +169,110 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
         except SQLAlchemyError as e:
             logger.error(f"根据机柜编号查找失败 (cabinet_number={cabinet_number}): {e}")
-            raise QueryExecutionError("查找机柜失败", original_error=e)
+            raise QueryExecutionError("查找机柜失败", original_error=e) from e
+
+    def update_versioned(
+        self, cabinet_id: int, room_id: int, expected_version: int,
+        fields: dict,
+    ) -> bool:
+        """乐观锁 CAS 更新机柜（迁移 0020）
+
+        版本判据放在 **UPDATE 谓词内**而不是"先 SELECT 再比较"——MySQL
+        REPEATABLE READ 下事务先读到的快照可能已过期，先读后比会被骗过；
+        谓词内判定由当前行版本兜底，rowcount 即裁决。
+
+        Returns:
+            bool: True=命中（1 行被更新）；False=未命中（不存在或版本过期，
+            由调用方重读区分两种情形）。
+
+        Raises:
+            QueryExecutionError: SQL 执行失败（含唯一键竞态，由上层还原 409）
+        """
+        from sqlalchemy import update
+
+        stmt = (
+            update(Cabinet)
+            .where(
+                Cabinet.id == cabinet_id,
+                Cabinet.room_id == room_id,
+                Cabinet.version == expected_version,
+            )
+            .values(**fields, version=expected_version + 1)
+            .execution_options(synchronize_session=False)
+        )
+        try:
+            result = self.session.execute(stmt)
+            self.expire_instance(cabinet_id)
+            return result.rowcount == 1
+        except SQLAlchemyError as e:
+            logger.error(
+                f"乐观锁更新机柜失败 (id={cabinet_id}, expected_v={expected_version}): {e}"
+            )
+            raise QueryExecutionError("乐观锁更新机柜失败", original_error=e) from e
+
+    def set_position(
+        self, cabinet_id: int, room_id: int,
+        row: Optional[int], col: Optional[int],
+    ) -> bool:
+        """只改坐标的单条 UPDATE（**不递增 version**）
+
+        供批量换位的坐标两阶段搬迁使用：`uk_cabinet_position` 唯一键在 MySQL 下
+        即时检查、不可延迟，交换/轮换位置时若直接把 A 更新到 B 当前所在格（B
+        尚未让出）会当场违反约束。搬迁拆成"先挪哨兵格 → 再落最终坐标"两步，
+        每一步都调用本方法；version 的递增与 CAS 判据统一由 `update_versioned`
+        负责，本方法不再动它，避免一次编辑把版本号加了两次。
+
+        Returns:
+            bool: True=命中 1 行；False=机柜不存在或不属于该机房
+
+        Raises:
+            QueryExecutionError: SQL 执行失败（含唯一键冲突，由上层还原 409）
+        """
+        from sqlalchemy import update
+
+        stmt = (
+            update(Cabinet)
+            .where(Cabinet.id == cabinet_id, Cabinet.room_id == room_id)
+            .values(row=row, col=col)
+            .execution_options(synchronize_session=False)
+        )
+        try:
+            result = self.session.execute(stmt)
+            self.expire_instance(cabinet_id)
+            return result.rowcount == 1
+        except SQLAlchemyError as e:
+            logger.error(
+                f"搬迁机柜坐标失败 (id={cabinet_id}, pos=({row},{col})): {e}"
+            )
+            raise QueryExecutionError("搬迁机柜坐标失败", original_error=e) from e
+
+    def find_by_ids_in_room(self, ids, room_id: int) -> List[Cabinet]:
+        """批量存在性预查：一次 IN 把本批 id 查完（评审 20260924 §2.2）。
+
+        与 `find_by_id` 的区别（**关键，别顺手换回来**）：`find_by_id` 带
+        devices/room/customer 三组预加载，单条场景是对的；但批量换位循环里
+        逐条调用就是 N×(1+3) 次查询。本方法只做"该 id 存在且属于本机房"的判定
+        与 version 读取，**刻意不带任何预加载** —— 批量场景下把 N 台机柜的
+        设备/客户关联一起拉出来，才是真正的 N+1 放大。
+
+        Args:
+            ids: 机柜 id 集合（本批）
+            room_id: 机房 ID（过滤后调用方无需再逐个校验归属）
+
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
+        if not ids:
+            return []
+        try:
+            return (
+                self._base_query()
+                .filter(Cabinet.id.in_(list(ids)), Cabinet.room_id == room_id)
+                .all()
+            )
+        except SQLAlchemyError as e:
+            logger.error(f"批量预查机柜失败 (room_id={room_id}, n={len(ids)}): {e}")
+            raise QueryExecutionError("批量预查机柜失败", original_error=e) from e
 
     def find_by_position(
         self, room_id: int, row: int, col: int, exclude_id: Optional[int] = None
@@ -201,7 +304,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             logger.error(
                 f"按坐标查找机柜失败 (room_id={room_id}, row={row}, col={col}): {e}"
             )
-            raise QueryExecutionError("查找机柜失败", original_error=e)
+            raise QueryExecutionError("查找机柜失败", original_error=e) from e
 
 
     def find_by_room_id(self, room_id: int) -> List[Cabinet]:
@@ -221,7 +324,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
         except SQLAlchemyError as e:
             logger.error(f"根据机房ID查找机柜失败 (room_id={room_id}): {e}")
-            raise QueryExecutionError("查找机柜失败", original_error=e)
+            raise QueryExecutionError("查找机柜失败", original_error=e) from e
 
     def find_all(self, filters: Optional[Dict[str, Any]] = None) -> List[Cabinet]:
         """获取满足过滤条件的机柜列表（不分页）。
@@ -237,7 +340,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return query.order_by(Cabinet.cabinet_number).all()
         except SQLAlchemyError as e:
             logger.error(f"查找机柜列表失败 (filters={filters}): {e}")
-            raise QueryExecutionError("查找机柜列表失败", original_error=e)
+            raise QueryExecutionError("查找机柜列表失败", original_error=e) from e
 
     def find_available_cabinets(
         self, room_id: Optional[int] = None, min_available_u: int = 1,
@@ -260,7 +363,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return [c for c in query.all() if c.get_available_u_count() >= min_available_u]
         except SQLAlchemyError as e:
             logger.error(f"查找可用机柜失败: {e}")
-            raise QueryExecutionError("查找可用机柜失败", original_error=e)
+            raise QueryExecutionError("查找可用机柜失败", original_error=e) from e
 
     def search(
         self,
@@ -312,7 +415,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             }
         except SQLAlchemyError as e:
             logger.error(f"搜索机柜失败 (keyword={keyword}): {e}")
-            raise QueryExecutionError("搜索机柜失败", original_error=e)
+            raise QueryExecutionError("搜索机柜失败", original_error=e) from e
 
     def paginate(
         self,
@@ -348,7 +451,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return self.session.query(query.exists()).scalar()
         except SQLAlchemyError as e:
             logger.error(f"检查机柜编号存在性失败 (cabinet_number={cabinet_number}): {e}")
-            raise QueryExecutionError("检查机柜编号存在性失败", original_error=e)
+            raise QueryExecutionError("检查机柜编号存在性失败", original_error=e) from e
 
     def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
         """统计满足条件的机柜数量。"""
@@ -359,7 +462,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return query.scalar() or 0
         except SQLAlchemyError as e:
             logger.error(f"统计机柜数量失败: {e}")
-            raise QueryExecutionError("统计机柜数量失败", original_error=e)
+            raise QueryExecutionError("统计机柜数量失败", original_error=e) from e
 
 
     def get_cabinet_statistics(self) -> Dict[str, Any]:
@@ -429,7 +532,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             }
         except SQLAlchemyError as e:
             logger.error(f"获取机柜统计信息失败: {e}")
-            raise QueryExecutionError("获取机柜统计信息失败", original_error=e)
+            raise QueryExecutionError("获取机柜统计信息失败", original_error=e) from e
 
     def get_overview_stats_by_room(self) -> Dict[int, Dict[str, Any]]:
         """按机房聚合机柜统计，一次 SQL 拿全部机房（跨机房总览用，避免 N+1）。
@@ -493,7 +596,7 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return result
         except SQLAlchemyError as e:
             logger.error(f"按机房聚合机柜统计失败: {e}")
-            raise QueryExecutionError("聚合机柜统计失败", original_error=e)
+            raise QueryExecutionError("聚合机柜统计失败", original_error=e) from e
 
     def get_room_cabinet_statistics(self, room_id: int) -> Dict[str, Any]:
         """获取指定机房的机柜统计信息。
@@ -543,4 +646,4 @@ class CabinetRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             }
         except SQLAlchemyError as e:
             logger.error(f"获取机房机柜统计失败 (room_id={room_id}): {e}")
-            raise QueryExecutionError("获取机房机柜统计失败", original_error=e)
+            raise QueryExecutionError("获取机房机柜统计失败", original_error=e) from e

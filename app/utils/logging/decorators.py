@@ -461,7 +461,7 @@ def log_performance_critical(
                 
                 if elapsed_time > threshold_seconds:
                     logger.warning(
-                        f"性能警告: 函数执行时间超过阈值",
+                        "性能警告: 函数执行时间超过阈值",
                         extra={
                             'function': func.__name__,
                             'module': func.__module__,
@@ -473,7 +473,7 @@ def log_performance_critical(
                     )
                 else:
                     logger.debug(
-                        f"性能监控: 函数执行正常",
+                        "性能监控: 函数执行正常",
                         extra={
                             'function': func.__name__,
                             'module': func.__module__,
@@ -488,7 +488,7 @@ def log_performance_critical(
                 elapsed_time = time.time() - start_time
                 
                 logger.error(
-                    f"性能监控: 函数执行异常",
+                    "性能监控: 函数执行异常",
                     extra={
                         'function': func.__name__,
                         'module': func.__module__,

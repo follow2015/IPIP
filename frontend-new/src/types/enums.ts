@@ -25,6 +25,9 @@ export enum DeviceSubtype {
   SWITCH = 'switch',
   ROUTER = 'router',
   FIREWALL = 'firewall',
+  OTN = 'otn',
+  WDM = 'wdm',
+  ODF = 'odf',
   PDU = 'pdu',
   UPS = 'ups',
   OTHER = 'other'
@@ -38,7 +41,14 @@ export const DEVICE_SUBTYPE_MAP: Record<DeviceType, DeviceSubtype[]> = {
     DeviceSubtype.STORAGE,
     DeviceSubtype.GPU
   ],
-  [DeviceType.NETWORK]: [DeviceSubtype.SWITCH, DeviceSubtype.ROUTER, DeviceSubtype.FIREWALL],
+  [DeviceType.NETWORK]: [
+    DeviceSubtype.SWITCH,
+    DeviceSubtype.ROUTER,
+    DeviceSubtype.FIREWALL,
+    DeviceSubtype.OTN,
+    DeviceSubtype.WDM,
+    DeviceSubtype.ODF
+  ],
   [DeviceType.OTHER]: [DeviceSubtype.PDU, DeviceSubtype.UPS, DeviceSubtype.OTHER]
 };
 
@@ -51,6 +61,9 @@ export type DeviceSubtypeKey =
   | 'deviceSubtype.SWITCH'
   | 'deviceSubtype.ROUTER'
   | 'deviceSubtype.FIREWALL'
+  | 'deviceSubtype.OTN'
+  | 'deviceSubtype.WDM'
+  | 'deviceSubtype.ODF'
   | 'deviceSubtype.PDU'
   | 'deviceSubtype.UPS'
   | 'deviceSubtype.OTHER';
@@ -64,6 +77,9 @@ export const DEVICE_SUBTYPE_LABEL_KEYS: Record<DeviceSubtype, DeviceSubtypeKey> 
   [DeviceSubtype.SWITCH]: 'deviceSubtype.SWITCH',
   [DeviceSubtype.ROUTER]: 'deviceSubtype.ROUTER',
   [DeviceSubtype.FIREWALL]: 'deviceSubtype.FIREWALL',
+  [DeviceSubtype.OTN]: 'deviceSubtype.OTN',
+  [DeviceSubtype.WDM]: 'deviceSubtype.WDM',
+  [DeviceSubtype.ODF]: 'deviceSubtype.ODF',
   [DeviceSubtype.PDU]: 'deviceSubtype.PDU',
   [DeviceSubtype.UPS]: 'deviceSubtype.UPS',
   [DeviceSubtype.OTHER]: 'deviceSubtype.OTHER'
@@ -78,6 +94,9 @@ export const DEVICE_SUBTYPE_COLORS: Record<DeviceSubtype, string> = {
   [DeviceSubtype.SWITCH]: 'cyan',
   [DeviceSubtype.ROUTER]: 'geekblue',
   [DeviceSubtype.FIREWALL]: 'red',
+  [DeviceSubtype.OTN]: 'geekblue',
+  [DeviceSubtype.WDM]: 'purple',
+  [DeviceSubtype.ODF]: 'gold',
   [DeviceSubtype.PDU]: 'gold',
   [DeviceSubtype.UPS]: 'lime',
   [DeviceSubtype.OTHER]: 'default'
@@ -116,10 +135,7 @@ export enum SSHAction {
  * 注意：与 status-codes.generated.ts 中的后端 PortStatus（int 0/1/2）是不同域，勿混淆。
  */
 export type PortUsageStatusKey =
-  | 'portUsage.FREE'
-  | 'portUsage.OCCUPIED'
-  | 'portUsage.DISABLED'
-  | 'portUsage.ERROR';
+  'portUsage.FREE' | 'portUsage.OCCUPIED' | 'portUsage.DISABLED' | 'portUsage.ERROR';
 
 export const PORT_USAGE_STATUS_MAP: Record<
   string,
@@ -131,15 +147,6 @@ export const PORT_USAGE_STATUS_MAP: Record<
   error: { labelKey: 'portUsage.ERROR', color: 'red' }
 };
 
-/**
- * 端口占用状态 → 色块背景色（十六进制，供图形化色块使用；与 PORT_USAGE_STATUS_MAP 语义一致）
- */
-export const PORT_STATUS_BG_COLOR: Record<string, string> = {
-  free: '#52c41a',
-  occupied: '#1677ff',
-  disabled: '#bfbfbf',
-  error: '#ff4d4f'
-};
 
 /**
  * 连接活跃状态映射（由后端 device_connection.status 字符串 active/inactive 推导）
@@ -164,10 +171,7 @@ export const CONNECTION_STATUS_MAP: Record<
  * - disabled: 已禁用 → 默认灰
  */
 export type LinkStatusKey =
-  | 'linkStatus.UP'
-  | 'linkStatus.DOWN'
-  | 'linkStatus.ADMIN_DOWN'
-  | 'linkStatus.DISABLED';
+  'linkStatus.UP' | 'linkStatus.DOWN' | 'linkStatus.ADMIN_DOWN' | 'linkStatus.DISABLED';
 
 export const LINK_STATUS_MAP: Record<string, { labelKey: LinkStatusKey; color: string }> = {
   up: { labelKey: 'linkStatus.UP', color: 'success' },
@@ -182,10 +186,7 @@ export const LINK_STATUS_MAP: Record<string, { labelKey: LinkStatusKey; color: s
  * - offline: 离线 → 默认灰
  * - warning: 告警 → 橙（warning）
  */
-export type NodeStatusKey =
-  | 'nodeStatus.ONLINE'
-  | 'nodeStatus.OFFLINE'
-  | 'nodeStatus.WARNING';
+export type NodeStatusKey = 'nodeStatus.ONLINE' | 'nodeStatus.OFFLINE' | 'nodeStatus.WARNING';
 
 export const NODE_STATUS_MAP: Record<string, { labelKey: NodeStatusKey; color: string }> = {
   online: { labelKey: 'nodeStatus.ONLINE', color: 'success' },
@@ -194,11 +195,7 @@ export const NODE_STATUS_MAP: Record<string, { labelKey: NodeStatusKey; color: s
 };
 
 export type LoginTypeKey =
-  | 'loginType.WEB'
-  | 'loginType.WECHAT'
-  | 'loginType.API'
-  | 'loginType.MOBILE'
-  | 'loginType.TOKEN';
+  'loginType.WEB' | 'loginType.WECHAT' | 'loginType.API' | 'loginType.MOBILE' | 'loginType.TOKEN';
 
 export const LOGIN_TYPE_MAP: Record<string, { labelKey: LoginTypeKey; color: string }> = {
   web: { labelKey: 'loginType.WEB', color: 'blue' },
@@ -231,12 +228,6 @@ export const MONITOR_PROTOCOL_COLOR_MAP: Record<string, string> = {
   ping: 'green'
 };
 
-export const MONITOR_PROTOCOL_PALETTE: Record<string, string> = {
-  snmp: '#1677ff',
-  ipmi: '#2f54eb',
-  zabbix: '#faad14',
-  ping: '#52c41a'
-};
 
 export type NetworkLayerKey = 'networkLayer.L2' | 'networkLayer.L3';
 
@@ -253,11 +244,6 @@ export const SEVERITY_LABEL_KEYS: Record<string, SeverityKey> = {
   info: 'severity.INFO'
 };
 
-export const SEVERITY_COLOR_MAP: Record<string, string> = {
-  critical: 'red',
-  warning: 'gold',
-  info: 'blue'
-};
 
 export type ChannelKey =
   | 'channel.INBOX'

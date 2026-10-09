@@ -152,7 +152,7 @@ def run_batch_import(
     """
     validate_file_size(file_bytes)
 
-    file_hash = hashlib.md5(file_bytes).hexdigest()
+    file_hash = hashlib.md5(file_bytes, usedforsecurity=False).hexdigest()
     idem_key = f"ipm:idem:{idem_scope}:{user_id}:{file_hash}"
     idem_acquired = False
     if redis_client:
@@ -177,7 +177,7 @@ def run_batch_import(
         logger.error("批量导入文件解析失败: %s", str(e))
         if redis_client and idem_acquired:
             redis_client.delete(idem_key)
-        raise AppValidationError(f"文件格式错误: {str(e)}")
+        raise AppValidationError(f"文件格式错误: {str(e)}") from e
     except Exception:
         if redis_client and idem_acquired:
             redis_client.delete(idem_key)
@@ -352,7 +352,7 @@ def write_rows_to_sheet(buf, sheet_name: str, rows: list) -> None:
 
     内存与行数解耦的关键：openpyxl 普通模式会把每个单元格物化成常驻 Python 对象
     （20 万行 × 22 列 ＝ 440 万个 Cell），write_only 模式逐行落盘、不保留单元格。
-    实测（``code_review/export_memory_probe.py``，22 列 / 20 万行）：
+    实测（``scripts/probes/export_memory_probe.py``，22 列 / 20 万行）：
 
         df.to_excel + 普通模式  峰值 RSS 1,986 MB   「写出增量」1,302 MB
         write_only 流式         峰值 RSS   709 MB   「写出增量」    26 MB
@@ -592,7 +592,7 @@ def import_rows(
             create_func(row_data)
             savepoint.commit()
             imported_count += 1
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 导入失败兜底：需捕获任意异常以提取真实错误信息（DataAccessError 包装层）
             from app.exceptions.data_access import DataAccessError
             original = getattr(e, "original_error", None) if isinstance(e, DataAccessError) else None
             error_msg = str(original) if original else str(e)

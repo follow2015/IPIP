@@ -113,7 +113,7 @@ def main(argv=None):
 
     print("════════ 生产配置离线预检 ════════")
     print(f"env 文件：{', '.join(loaded_from)}")
-    print(f"配置类：ProductionConfig（FLASK_ENV=production）")
+    print("配置类：ProductionConfig（FLASK_ENV=production）")
     print()
     for check_id, message in ProductionConfig.collect_violations():
         violations.append((check_id, message))

@@ -348,6 +348,43 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
         )
         return [r[0] for r in rows]
 
+    def find_enabled_protocols_batch(self, device_ids: list) -> dict:
+        """批量返回 {device_id: [protocol, ...]}（M11：消除循环内逐设备查询）。
+
+        与 `find_enabled_protocols` 的语义一致（`enabled=True`、按 (设备, 协议)
+        去重），只是把 N 次查询压成 1 次 IN 查询。
+
+        Args:
+            device_ids: 设备 id 列表。
+
+        Returns:
+            {device_id: [protocol, ...]}；**未出现在结果里的设备键也存在**，
+            值为空列表——调用方可直接用 `.get(did, [])` 而不必区分"没查到"与
+            "查到了但没有协议"。
+        """
+        if not device_ids:
+            return {}
+        rows = (
+            self.session.query(
+                DeviceMonitorCredential.device_id,
+                MonitorCredential.protocol,
+            )
+            .join(
+                MonitorCredential,
+                DeviceMonitorCredential.credential_id == MonitorCredential.id,
+            )
+            .filter(
+                DeviceMonitorCredential.device_id.in_(device_ids),
+                MonitorCredential.enabled.is_(True),
+            )
+            .distinct()
+            .all()
+        )
+        result: dict = {did: [] for did in device_ids}
+        for device_id, protocol in rows:
+            result.setdefault(device_id, []).append(protocol)
+        return result
+
     def get_decrypted(self, device_id: int, protocol: str) -> Optional[dict]:
         cred = self.find_enabled(device_id, protocol)
         if not cred:

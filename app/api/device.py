@@ -5,13 +5,9 @@
 提供设备管理的RESTful API端点。
 """
 from app.utils.logging import get_logger
-from flask import Blueprint, request, g
-import hashlib
-from marshmallow import Schema, fields, validate, EXCLUDE
-
-logger = get_logger(__name__)
-
-from app.openapi.doc import doc, public
+from app.openapi.doc import doc
+from app.schemas.device import DeviceCreateApiSchema as DeviceCreateSchema
+from flask import Blueprint, request
 from app.models.device_hardware import (
     SNAPSHOT_KEY_CHILDREN,
     SNAPSHOT_KEY_LOCATION,
@@ -19,15 +15,11 @@ from app.models.device_hardware import (
 from app.services import DeviceService, CabinetService
 from app.services.network_device_service import NetworkDeviceService
 from app.api.monitor import monitor_service
-from app.api.base import APIResponse
+from app.api.base import APIResponse, RequestValidator
 from app.exceptions import PresetResponseError
 from app.exceptions.business import ResourceConflictError
-from app.utils import (
-    login_required,
-    permission_required,
-    rate_limit_api,
-    validation_manager,
-)
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api, validation_manager
 from app.utils.transactional import transactional
 from app.persistence.cabinet_repository import CabinetRepository
 from app.persistence.device_repository import DeviceRepository
@@ -35,18 +27,17 @@ from app.persistence.vlan_repository import VLANRepository
 from app.persistence.link_aggregation_repository import LinkAggregationRepository
 from app.persistence.switch_port_repository import NetworkPortRepository
 from app.core.enums import NotificationTypeCode
-from app.schemas.device import DeviceCreateApiSchema as DeviceCreateSchema, NullableDate
+from app.schemas.device import (
+    DeviceUpdateSchema,
+)
+
+logger = get_logger(__name__)
 
 device_bp = Blueprint("device", __name__)
 device_service = DeviceService(DeviceRepository())
 cabinet_service = CabinetService(CabinetRepository())
 
 
-from app.schemas.device import (
-    DeviceUpdateSchema,
-    BatchDeleteSchema,
-    DeviceVLANCreateSchema,
-)
 
 @device_bp.route("/", methods=["GET"])
 @doc(summary="获取设备列表", tags=["设备"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}, {"name": "cabinet_id", "in": "query", "schema": {"type": "integer"}}, {"name": "room_id", "in": "query", "schema": {"type": "integer"}}, {"name": "customer_id", "in": "query", "schema": {"type": "integer"}}, {"name": "device_type", "in": "query", "schema": {"type": "string"}}, {"name": "device_subtype", "in": "query", "schema": {"type": "string"}}, {"name": "status", "in": "query", "schema": {"type": "integer"}}, {"name": "parent_device_id", "in": "query", "schema": {"type": "integer"}}, {"name": "is_chassis", "in": "query", "schema": {"type": "integer"}}, {"name": "has_ssh", "in": "query", "schema": {"type": "string"}}], responses={200: "DeviceResponse", 500: "ApiError"})
@@ -122,7 +113,7 @@ def list_devices():
                 did = d.get("id")
                 if did is not None and did in monitor_summary_map:
                     d["monitor_summary"] = monitor_summary_map[did]
-        except Exception:  # noqa: BLE001 - 监控摘要注入失败不阻断列表
+        except Exception:  # 监控摘要注入失败不阻断列表
             logger.warning("设备列表监控摘要注入失败", exc_info=True)
 
         return APIResponse.paginated(
@@ -132,7 +123,7 @@ def list_devices():
             total=total,
             message="获取设备列表成功",
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取设备列表失败: %s", e)
         return APIResponse.error(message="获取设备列表失败", error_code="DEVICE_LIST_ERROR", status_code=500)
 
@@ -153,7 +144,7 @@ def get_device(device_id):
     """
     try:
         device = device_service.get_by_id(device_id)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取设备详情失败: %s", e)
         return APIResponse.error(message="获取设备信息失败", error_code="DEVICE_QUERY_ERROR", status_code=500)
 
@@ -211,13 +202,13 @@ def create_device():
     if not data.get("parent_device_id") and not data.get("cabinet_id"):
         return APIResponse.error(message="非子节点设备必须指定所属机柜", error_code="CABINET_REQUIRED", status_code=400)
 
-    if "ip_address" in data and data["ip_address"]:
+    if data.get("ip_address"):
         from app.services.device_service import _parse_ip_address_json
         parsed = _parse_ip_address_json(data["ip_address"])
         if parsed is None:
             return APIResponse.error(message="IP地址格式无效", error_code="INVALID_IP_ADDRESS", status_code=400)
 
-    if "mac_address" in data and data["mac_address"]:
+    if data.get("mac_address"):
         if not validation_manager.validate_mac(data["mac_address"]):
             return APIResponse.error(message="MAC地址格式无效", error_code="INVALID_MAC_ADDRESS", status_code=400)
 
@@ -275,13 +266,13 @@ def update_device(device_id):
     if not device:
         return APIResponse.error(message="设备不存在", error_code="DEVICE_NOT_FOUND", status_code=404)
 
-    if "ip_address" in data and data["ip_address"]:
+    if data.get("ip_address"):
         from app.services.device_service import _parse_ip_address_json
         parsed = _parse_ip_address_json(data["ip_address"])
         if parsed is None:
             return APIResponse.error(message="IP地址格式无效", error_code="INVALID_IP_ADDRESS", status_code=400)
 
-    if "mac_address" in data and data["mac_address"]:
+    if data.get("mac_address"):
         if not validation_manager.validate_mac(data["mac_address"]):
             return APIResponse.error(message="MAC地址格式无效", error_code="INVALID_MAC_ADDRESS", status_code=400)
 
@@ -638,7 +629,7 @@ def batch_delete_devices():
                 deleted_count += 1
             else:
                 failed_ids.append(device_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 批量删除内单设备失败隔离：记入 failed_ids 后继续删除下一个设备，同 cabinet.py:1196
             logger.error("删除设备 %d 失败: %s", device_id, str(e))
             failed_ids.append(device_id)
     
@@ -676,8 +667,7 @@ def get_deleted_devices():
     from datetime import timedelta
     from app.utils.time_utils import local_day_range
 
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    page, per_page = RequestValidator.validate_pagination_params()
     start_date_str = request.args.get("start_date")
     end_date_str = request.args.get("end_date")
     room_id = request.args.get("room_id", type=int)
@@ -731,13 +721,6 @@ def restore_device(device_id):
         result = device_service.restore_device(
             device_id, cabinet_id=cabinet_id, u_position=u_position
         )
-        if result.get("restored"):
-            return APIResponse.success(data=result, message="设备恢复成功")
-        else:
-            return APIResponse.error(
-                data=result, message="原U位已被占用，请重新指定位置",
-                error_code="LOCATION_CONFLICT", status_code=409
-            )
     except ValidationError as e:
         raise PresetResponseError(message=e.message, status_code=400) from e
     except Exception as e:
@@ -745,6 +728,15 @@ def restore_device(device_id):
         raise PresetResponseError(
             message="恢复设备失败", error_code="DEVICE_RESTORE_ERROR", status_code=500
         ) from e
+
+    if not result.get("restored"):
+        raise PresetResponseError(
+            message="原U位已被占用，请重新指定位置",
+            error_code="LOCATION_CONFLICT",
+            status_code=409,
+            details={"conflict_devices": result.get("conflict_devices") or []},
+        )
+    return APIResponse.success(data=result, message="设备恢复成功")
 
 
 @device_bp.route("/batch-restore", methods=["POST"])
@@ -944,7 +936,7 @@ def batch_create_devices():
                 "device_id": device.id,
             })
             success_count += 1
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 批量导入单条失败隔离：转为该条的结果项（含错误信息）后继续导入下一条，单条校验/DB 异常不得中断整批导入
             results.append({
                 "index": index,
                 "device_name": device_data.get("device_name", ""),
@@ -1032,10 +1024,7 @@ def get_switch_ports():
     from app.services.network_port_service import NetworkPortService
 
     device_id = request.args.get("device_id", type=int)
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
-
-    per_page = min(per_page, 100)
+    page, per_page = RequestValidator.validate_pagination_params()
 
     try:
         port_service = NetworkPortService(NetworkPortRepository())
@@ -1053,7 +1042,7 @@ def get_switch_ports():
             total=total,
             message="获取交换机端口列表成功"
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取交换机端口列表失败: %s", str(e))
         return APIResponse.error(message="操作失败", status_code=500)
 
@@ -1073,7 +1062,7 @@ def get_device_statistics():
     try:
         stats = device_service.get_device_statistics()
         return APIResponse.success(data=stats, message="获取设备统计信息成功")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取设备统计信息失败: %s", str(e))
         return APIResponse.error(message="操作失败", status_code=500)
 
@@ -1105,7 +1094,7 @@ def get_device_count():
             count = device_service.get_device_count()
         
         return APIResponse.success(data={"count": count}, message="获取设备数量成功")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取设备数量失败: %s", str(e))
         return APIResponse.error(message="操作失败", status_code=500)
 
@@ -1332,7 +1321,7 @@ def batch_update_device_metric_template_group():
         )
     except ValidationError as e:
         raise PresetResponseError(message=e.message, status_code=400) from e
-    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+    except Exception as e:  # 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("批量更新指标模板组失败: %s", e, exc_info=True)
         raise PresetResponseError(message="操作失败", status_code=500) from e
 
@@ -1377,7 +1366,7 @@ def batch_update_device_port_sync_enabled():
         )
     except ValidationError as e:
         raise PresetResponseError(message=e.message, status_code=400) from e
-    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+    except Exception as e:  # 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("批量更新端口同步开关失败: %s", e, exc_info=True)
         raise PresetResponseError(message="操作失败", status_code=500) from e
 
@@ -1485,7 +1474,7 @@ def generate_serial_number():
         
         serial_number = device_service.generate_serial_number(prefix, format_type, length)
         return APIResponse.success(data={"serial_number": serial_number}, message="序列号生成成功")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("生成序列号失败: %s", str(e))
         return APIResponse.error(message="操作失败", status_code=500)
 
@@ -1518,7 +1507,7 @@ def check_serial_number_unique():
         
         is_unique = device_service.is_serial_number_unique(serial_number, exclude_id)
         return APIResponse.success(data={"is_unique": is_unique}, message="检查完成")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("检查序列号唯一性失败: %s", str(e))
         return APIResponse.error(message="操作失败", status_code=500)
 
@@ -1542,7 +1531,7 @@ def get_device_by_name(device_name):
         if not device:
             return APIResponse.error(message="设备不存在", status_code=404)
         return APIResponse.success(data=device.to_dict() if hasattr(device, 'to_dict') else device, message="获取设备成功")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("根据名称获取设备失败: %s", str(e))
         return APIResponse.error(message="操作失败", status_code=500)
 
@@ -1566,7 +1555,7 @@ def get_device_by_serial(serial_number):
         if not device:
             return APIResponse.error(message="设备不存在", status_code=404)
         return APIResponse.success(data=device.to_dict() if hasattr(device, 'to_dict') else device, message="获取设备成功")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("根据序列号获取设备失败: %s", str(e))
         return APIResponse.error(message="操作失败", status_code=500)
 
@@ -1606,7 +1595,7 @@ def check_node_position():
             data=result,
             message="节点位置重复" if result["is_duplicate"] else "节点位置可用",
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("检查节点位置失败: %s", e)
         return APIResponse.error(message="操作失败", status_code=500)
 
@@ -1643,7 +1632,7 @@ def swap_node_positions(chassis_id):
         raise PresetResponseError(
             message=e.message, error_code="VALIDATION_ERROR", status_code=400
         ) from e
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.error("交换节点位置失败: %s", e)
         raise PresetResponseError(
             message="交换节点位置失败", error_code="DEVICE_UPDATE_ERROR", status_code=500
@@ -1683,7 +1672,6 @@ def create_device_vlan(device_id):
     """
     from marshmallow import Schema, fields, validate
     from app.services.vlan_service import VLANService
-    from app.exceptions.validation import ValidationError
 
     class DeviceVLANCreateSchema(Schema):
         """设备维度VLAN创建参数（device_id从URL获取）"""
@@ -1884,7 +1872,7 @@ def list_device_port_channels(device_id):
     from app.services.link_aggregation_service import LinkAggregationService
     lag_svc = LinkAggregationService(LinkAggregationRepository())
     lags = lag_svc.get_by_device(device_id)
-    return APIResponse.success(data=[l.to_dict() for l in lags], message="获取LAG列表成功")
+    return APIResponse.success(data=[lg.to_dict() for lg in lags], message="获取LAG列表成功")
 
 
 @device_bp.route("/<int:device_id>/port-channels", methods=["POST"])
@@ -1901,7 +1889,6 @@ def create_device_port_channel(device_id):
     Request Body: lag_name, lag_type等（不含device_id）
     """
     from app.services.link_aggregation_service import LinkAggregationService
-    from app.exceptions.validation import ValidationError
     data = request.get_json()
     data['device_id'] = device_id
     try:

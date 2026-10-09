@@ -1,6 +1,8 @@
+import { forwardRef, useCallback, useImperativeHandle } from 'react';
 import { Form, Input, InputNumber, Select, Switch, Button, Space, Card } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import type { SkillWritePayload } from '@/services/ai';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
 import { useTranslation } from 'react-i18next';
 
 interface Props {
@@ -8,6 +10,10 @@ interface Props {
   onSubmit: (payload: SkillWritePayload) => Promise<void>;
   onCancel: () => void;
   submitting?: boolean;
+}
+
+export interface SkillEditFormHandle {
+  requestClose: () => void;
 }
 
 const STEP_TYPES = ['capability', 'llm', 'route'] as const;
@@ -25,10 +31,19 @@ const safeJsonParse = (v: unknown): unknown => {
   }
 };
 
-export default function SkillEditForm({ initial, onSubmit, onCancel, submitting }: Props) {
+const SkillEditForm = forwardRef<SkillEditFormHandle, Props>(function SkillEditForm(
+  { initial, onSubmit, onCancel, submitting },
+  ref
+) {
   const { t } = useTranslation('ai');
   const { t: tc } = useTranslation('common');
   const [form] = Form.useForm<SkillWritePayload>();
+
+  const isPending = submitting ?? false;
+  const guard = useDirtyGuard({ form, isPending });
+  const requestClose = useCallback(() => guard.requestClose(onCancel), [guard, onCancel]);
+
+  useImperativeHandle(ref, () => ({ requestClose }), [requestClose]);
 
   const handleFinish = async (values: SkillWritePayload) => {
     const payload: SkillWritePayload = {
@@ -227,13 +242,15 @@ export default function SkillEditForm({ initial, onSubmit, onCancel, submitting 
       </Form.Item>
 
       <Space>
-        <Button type="primary" htmlType="submit" loading={submitting}>
+        <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
           {tc('action.save')}
         </Button>
-        <Button onClick={onCancel} disabled={submitting}>
+        <Button onClick={requestClose} disabled={isPending}>
           {tc('action.cancel')}
         </Button>
       </Space>
     </Form>
   );
-}
+});
+
+export default SkillEditForm;

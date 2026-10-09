@@ -21,13 +21,27 @@ PK(id) 无分区状态（模型 docstring 声明的"按日分区"从未真正落
 与 90 天保留清理（METRIC_RETENTION_DAYS）。
 """
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
 TABLE = "device_metric_timeseries"
 PARTITION_FUTURE_DAYS = 5
 PARTITION_HISTORY_BUFFER_DAYS = 30
+
+
+def _utc_today() -> date:
+    """UTC 日历日（与 app.utils.time_utils.utc_today 同口径）。
+
+    这里刻意**不 import app.***：本迁移在 alembic 环境执行，不保证有 Flask
+    app 上下文，保持脚本零应用依赖。
+
+    为什么不能用 date.today()：分区边界是 TO_DAYS(collected_at)，而
+    collected_at 存 UTC naive。用本地日会让边界整体偏一个时区偏移
+    （东八区差 1 天），与运行时维护（monitor_timeseries_repository 走
+    utc_today()）口径不一致。
+    """
+    return datetime.now(timezone.utc).date()
 
 
 def _pk_columns(conn) -> set:
@@ -61,7 +75,7 @@ def _partition_count(conn) -> int:
 def _earliest_collected_date(conn):
     cur = conn.cursor()
     try:
-        cur.execute(f"SELECT MIN(collected_at) FROM `{TABLE}`")
+        cur.execute(f"SELECT MIN(collected_at) FROM `{TABLE}`")  # noqa: S608 -- alembic 迁移的 DDL 无法参数化表/列名，标识符由迁移脚本自身硬编码
         row = cur.fetchone()
         if not row or not row[0]:
             return None
@@ -95,7 +109,7 @@ def apply(conn) -> None:
         logger.info("跳过 %s（已有 %d 个分区，幂等）", TABLE, nparts)
         return
 
-    today = date.today()
+    today = _utc_today()
     earliest = _earliest_collected_date(conn)
     start = min(earliest, today - timedelta(days=PARTITION_HISTORY_BUFFER_DAYS)) \
         if earliest else today - timedelta(days=PARTITION_HISTORY_BUFFER_DAYS)

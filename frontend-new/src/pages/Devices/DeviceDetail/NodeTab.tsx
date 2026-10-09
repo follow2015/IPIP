@@ -1,3 +1,4 @@
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
@@ -15,7 +16,8 @@ import {
   Col,
   Card,
   Tooltip,
-  Modal
+  Modal,
+  theme
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, FullscreenOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -40,6 +42,7 @@ import HardwareConfigFields, {
 } from '@/components/HardwareConfigFields';
 import NicConfigFields, { expandNicPorts } from '@/components/NicConfigFields';
 import { useComponentTemplates } from '@/services/component-template';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface NodeTabProps {
   deviceId: number;
@@ -50,13 +53,14 @@ interface NodeTabProps {
 }
 
 function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeTabProps) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
   const navigate = useNavigate();
   const message = useMessage();
 
-  const { data, isLoading } = useDeviceList({ parent_device_id: deviceId, per_page: 999 });
+  const { data, isLoading } = useDeviceList({ parent_device_id: deviceId, per_page: PER_PAGE_CAP });
   const createDevice = useCreateDevice();
   const deleteDevice = useDeleteDevice();
   const updateDevice = useUpdateDevice();
@@ -97,7 +101,10 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       .replace('{col}', String(col))
       .replace('{COL}', String(col));
     form.setFieldValue('device_name', newName);
-    form.setFieldValue('notes', t('node.notesTemplate', { name: deviceName, position: watchedNodePosition }));
+    form.setFieldValue(
+      'notes',
+      t('node.notesTemplate', { name: deviceName, position: watchedNodePosition })
+    );
   }, [formDisclosure.isOpen, watchedNodePosition, deviceName, chassisDetail, form, t]);
 
   const handleAdd = () => {
@@ -151,7 +158,12 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       message.success(t('node.createSuccess'));
       formDisclosure.close();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -209,7 +221,12 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
       message.success(t('node.generated', { count: fillCount }));
       fill.close();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -259,7 +276,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
           <div>
             <div>{r.memory ? `${r.memory}${count ? ` ×${count}` : ''}` : '-'}</div>
             {total ? (
-              <div style={{ fontSize: 12, color: '#888', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 12, color: token.colorTextTertiary, lineHeight: 1.6 }}>
                 {single ? t('node.memorySummary', { single, count }) : ''}
                 {total}GB
               </div>
@@ -345,7 +362,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
     const total = nodeRows * nodeCols;
     return (
       <div style={{ marginBottom: 16 }}>
-        <div style={{ marginBottom: 8, color: '#8c8c8c', fontSize: 12 }}>
+        <div style={{ marginBottom: 8, color: token.colorTextTertiary, fontSize: 12 }}>
           {t('node.layout', {
             rows: nodeRows,
             cols: nodeCols,
@@ -402,8 +419,16 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
                   textAlign: 'center',
                   fontSize: 12,
                   cursor: node ? (swapping ? 'wait' : 'grab') : 'default',
-                  background: isTarget ? '#e6f4ff' : node ? '#f6ffed' : '#fafafa',
-                  borderColor: isTarget ? '#1677ff' : node ? '#b7eb8f' : '#d9d9d9',
+                  background: isTarget
+                    ? token.colorInfoBg
+                    : node
+                      ? token.colorSuccessBg
+                      : token.colorFillQuaternary,
+                  borderColor: isTarget
+                    ? token.colorPrimary
+                    : node
+                      ? token.colorSuccessBorder
+                      : token.colorBorder,
                   opacity: isSource ? 0.4 : 1,
                   transition: 'background 0.15s, border-color 0.15s, opacity 0.15s',
                   userSelect: 'none'
@@ -452,9 +477,7 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
             </Tooltip>
           )}
         </Space>
-        <Tooltip
-          title={vacantCount === 0 ? t('node.chassisFull') : t('node.addChildTooltip')}
-        >
+        <Tooltip title={vacantCount === 0 ? t('node.chassisFull') : t('node.addChildTooltip')}>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -570,10 +593,10 @@ function NodeTab({ deviceId, deviceName, totalNodes, nodeRows, nodeCols }: NodeT
           <Alert
             type="info"
             message={t('node.generateDesc', {
-          total: maxTotal,
-          existing: existingNodeCount,
-          vacant: vacantCount
-        })}
+              total: maxTotal,
+              existing: existingNodeCount,
+              vacant: vacantCount
+            })}
             style={{ marginBottom: 16 }}
             showIcon
           />

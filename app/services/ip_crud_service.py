@@ -8,7 +8,7 @@ from app.core.enums import IPStatus
 from config import Config
 from app.persistence.ip_repositories import IPManagerRepository
 from app.services.switch_events import emit_resource_change_global
-from app.services.ip_status_service import detect_ip_status, _async_ping, _async_tcp_probe
+from app.services.ip_status_service import detect_ip_status, _async_tcp_probe
 
 logger = get_logger(__name__)
 
@@ -101,7 +101,7 @@ class IPCrudService:
         跳过。这是「系统驱动动作不记录」的结构性保证——将来任何系统调用复用
         本 Service，都不会把系统动作静默记成人工分配。
         """
-        from app.utils.auth import get_current_user_id
+        from app.services.auth import get_current_user_id
         from app.utils.transactional import on_commit
         from app.persistence.ip_audit_repository import IPAuditRepository
         from app.services.ip_audit_service import IPAuditService
@@ -188,7 +188,7 @@ class IPCrudService:
         tasks = [_async_tcp_probe(ip_address, int(p), timeout=1.5) for p in ports]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         open_ports = []
-        for port, ok in zip(ports, results):
+        for port, ok in zip(ports, results, strict=False):
             if ok is True:
                 open_ports.append(int(port))
         return open_ports

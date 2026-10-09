@@ -5,10 +5,11 @@
  * 支持按 alert_type / severity / status / 时间范围过滤，分页浏览；
  * failed 状态的告警可一键重试（乐观锁，仅 failed 行可重置）。
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
+  Collapse,
   Tag,
   Button,
   Space,
@@ -20,10 +21,12 @@ import {
   Modal,
   Drawer,
   Descriptions,
-  Input
+  Input,
+  theme
 } from 'antd';
 import type { Breakpoint } from 'antd';
-import DataTable from '@/components/DataTable';
+import { severityColor, deliveryStatusColor } from '@/utils/statusColor';
+import DataTable, { type DataTableColumn } from '@/components/DataTable';
 import { useResponsive } from '@/hooks/useResponsive';
 import BatchActionBar from '@/components/BatchActionBar/BatchActionBar';
 import {
@@ -36,6 +39,7 @@ import {
 import dayjs, { Dayjs } from 'dayjs';
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  asAlertPort,
   useMonitorAlerts,
   useRetryAlert,
   useAckAlert,
@@ -53,11 +57,7 @@ import {
 import { useMessage } from '@/hooks/useMessage';
 import { useTable } from '@/hooks/useTable';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
-import {
-  NotificationTypeCode,
-  SEVERITY_COLOR_MAP,
-  NOTIFICATION_TYPE_LABEL_KEYS
-} from '@/types/enums';
+import { NotificationTypeCode, NOTIFICATION_TYPE_LABEL_KEYS } from '@/types/enums';
 import { getSeverityOptions } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
 import { translateProbeError, formatDateTime, relativeTime } from '@/utils/format';
@@ -94,15 +94,11 @@ const getStatusOptions = (t: TFunction<'monitor'>) => [
   { label: t('alerts.deliveryStatus.failed'), value: 'failed' }
 ];
 
-const STATUS_COLOR: Record<string, string> = {
-  pending: 'gold',
-  sent: 'green',
-  failed: 'red'
-};
 
 export default function MonitorAlerts() {
   const { t } = useTranslation('monitor');
   const { t: tc } = useTranslation('common');
+  const { token } = theme.useToken();
   const { t: td } = useTranslation('device');
   const message = useMessage();
   const navigate = useNavigate();
@@ -128,6 +124,7 @@ export default function MonitorAlerts() {
   });
   const [detailId, setDetailId] = useState<number | null>(null);
   const detailQuery = useAlertDetail(detailId);
+  const alertPort = useMemo(() => asAlertPort(detailQuery.data?.port ?? null), [detailQuery.data]);
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [scope, setScope] = useState<'all' | 'mine'>('all');
   const [metricKey, setMetricKey] = useState<string>('');
@@ -136,6 +133,14 @@ export default function MonitorAlerts() {
   const [ackTarget, setAckTarget] = useState<MonitorAlertItem | null>(null);
   const [ackNote, setAckNote] = useState('');
   const { isMobile } = useResponsive();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilterCount = useMemo(
+    () =>
+      [alertType, severity, status, metricKey, indexKey].filter(Boolean).length +
+      (range ? 1 : 0) +
+      (scope !== 'all' ? 1 : 0),
+    [alertType, severity, status, metricKey, indexKey, range, scope]
+  );
 
   const query: MonitorAlertQuery = {
     alert_type: alertType || undefined,
@@ -163,9 +168,7 @@ export default function MonitorAlerts() {
       const res = await batchAckAlert.mutateAsync({ alertIds: ids });
       message.success(
         t('alerts.message.batchAck', { count: res.acknowledged }) +
-          (res.not_found
-            ? t('alerts.message.notFoundSuffix', { count: res.not_found })
-            : '')
+          (res.not_found ? t('alerts.message.notFoundSuffix', { count: res.not_found }) : '')
       );
       batch.clear();
     } catch (err: unknown) {
@@ -202,9 +205,7 @@ export default function MonitorAlerts() {
       const res = await batchCloseAlert.mutateAsync({ alertIds: ids });
       message.success(
         t('alerts.message.batchClose', { count: res.closed }) +
-          (res.not_found
-            ? t('alerts.message.notFoundSuffix', { count: res.not_found })
-            : '')
+          (res.not_found ? t('alerts.message.notFoundSuffix', { count: res.not_found }) : '')
       );
       batch.clear();
     } catch (err: unknown) {
@@ -253,6 +254,57 @@ export default function MonitorAlerts() {
     }
   };
 
+  const aggregationColumns = useMemo<DataTableColumn<MonitorAlertAggregationItem>[]>(
+    () => [
+      {
+        title: t('column.alertType'),
+        dataIndex: 'alert_type',
+        render: (v: string) => <Tag>{v}</Tag>
+      },
+      {
+        title: tc('field.level'),
+        dataIndex: 'severity',
+        render: (v: string) => <Tag color={severityColor(v, token) ?? 'default'}>{v}</Tag>
+      },
+      { title: t('column.device'), dataIndex: 'device_name' },
+      {
+        title: t('column.alertCount'),
+        dataIndex: 'count',
+        render: (v: number) => (
+          <span
+            style={{
+              fontWeight: 600,
+              color: v >= 5 ? token.colorError : v >= 3 ? token.colorWarning : undefined
+            }}
+          >
+            {v}
+          </span>
+        ),
+        sorter: (a, b) => a.count - b.count,
+        defaultSortOrder: 'descend'
+      },
+      {
+        title: t('column.firstAt'),
+        dataIndex: 'first_at',
+        responsive: ['lg'] satisfies Breakpoint[], // ≥992
+        render: (v: string) => (v ? dayjs(v).format('MM-DD HH:mm:ss') : '-')
+      },
+      {
+        title: t('column.lastAt'),
+        dataIndex: 'last_at',
+        responsive: ['sm'] satisfies Breakpoint[], // ≥576
+        render: (v: string) => (v ? dayjs(v).format('MM-DD HH:mm:ss') : '-')
+      },
+      {
+        title: t('column.sampleIds'),
+        dataIndex: 'sample_ids',
+        responsive: ['lg'] satisfies Breakpoint[], // ≥992
+        render: (ids: number[]) => ids.join(', ')
+      }
+    ],
+    [t, tc, token]
+  );
+
   const columns = [
     {
       title: t('column.device'),
@@ -286,9 +338,7 @@ export default function MonitorAlerts() {
       key: 'alert_type',
       width: 120,
       render: (alertType: string) => (
-        <Tag color={ALERT_TYPE_COLOR[alertType] || 'default'}>
-          {alertTypeLabel(alertType, td)}
-        </Tag>
+        <Tag color={ALERT_TYPE_COLOR[alertType] || 'default'}>{alertTypeLabel(alertType, td)}</Tag>
       )
     },
     {
@@ -317,7 +367,7 @@ export default function MonitorAlerts() {
       dataIndex: 'severity',
       key: 'severity',
       width: 90,
-      render: (s: string) => <Tag color={SEVERITY_COLOR_MAP[s] || 'default'}>{s}</Tag>
+      render: (s: string) => <Tag color={severityColor(s, token) ?? 'default'}>{s}</Tag>
     },
     {
       title: t('column.deliveryStatus'),
@@ -325,7 +375,7 @@ export default function MonitorAlerts() {
       key: 'status',
       width: 100,
       responsive: ['sm'] satisfies Breakpoint[], // ≥576
-      render: (s: string) => <Tag color={STATUS_COLOR[s] || 'default'}>{s}</Tag>
+      render: (s: string) => <Tag color={deliveryStatusColor(s, token) ?? 'default'}>{s}</Tag>
     },
     {
       title: t('column.attempts'),
@@ -416,11 +466,11 @@ export default function MonitorAlerts() {
     <Space direction="vertical" size={8} style={{ width: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <Space size={4} wrap>
-          <Tag color={SEVERITY_COLOR_MAP[record.severity] || 'default'}>{record.severity}</Tag>
+          <Tag color={severityColor(record.severity, token) ?? 'default'}>{record.severity}</Tag>
           <Tag color={ALERT_TYPE_COLOR[record.alert_type] || 'default'}>
             {alertTypeLabel(record.alert_type, td)}
           </Tag>
-          <Tag color={STATUS_COLOR[record.status] || 'default'}>{record.status}</Tag>
+          <Tag color={deliveryStatusColor(record.status, token) ?? 'default'}>{record.status}</Tag>
         </Space>
         <Text type="secondary" style={{ fontSize: 12 }}>
           {formatDateTime(record.created_at)}
@@ -447,121 +497,154 @@ export default function MonitorAlerts() {
     </Space>
   );
 
+  const renderViewSwitch = (block: boolean) => (
+    <Segmented
+      block={block}
+      style={block ? undefined : { width: isMobile ? '100%' : undefined }}
+      options={[
+        { label: t('alerts.view.list'), value: 'list' },
+        { label: t('alerts.view.aggregation'), value: 'aggregation' }
+      ]}
+      value={viewMode}
+      onChange={(v) => setViewMode(v as 'list' | 'aggregation')}
+    />
+  );
+
+  const renderFilterControls = (withViewSwitch: boolean) => (
+    <>
+      <Select
+        style={{ width: isMobile ? '100%' : 160 }}
+        value={alertType}
+        options={getAlertTypeOptions(t, td)}
+        onChange={(v) => {
+          setAlertType(v);
+          table.setPage(1);
+        }}
+        placeholder={t('column.alertType')}
+      />
+      <Select
+        style={{ width: isMobile ? '100%' : 140 }}
+        value={severity}
+        options={[{ label: t('filter.all'), value: '' }, ...getSeverityOptions(td)]}
+        onChange={(v) => {
+          setSeverity(v);
+          table.setPage(1);
+        }}
+        placeholder={tc('field.severity')}
+      />
+      <Segmented
+        style={{ width: isMobile ? '100%' : undefined }}
+        options={getStatusOptions(t)}
+        value={status}
+        onChange={(v) => {
+          setStatus(v as string);
+          table.setPage(1);
+        }}
+      />
+      <RangePicker
+        style={{ width: isMobile ? '100%' : undefined }}
+        value={range}
+        onChange={(v) => {
+          setRange(v as [Dayjs, Dayjs] | null);
+          table.setPage(1);
+        }}
+        disabledDate={(cur) => cur && cur > dayjs().endOf('day')}
+      />
+      <Segmented
+        style={{ width: isMobile ? '100%' : undefined }}
+        options={[
+          { label: t('alerts.filter.scopeAll'), value: 'all' },
+          { label: t('alerts.filter.scopeMine'), value: 'mine' }
+        ]}
+        value={scope}
+        onChange={(v) => {
+          setScope(v as 'all' | 'mine');
+          table.setPage(1);
+        }}
+      />
+      {/* P2-10: 聚合视图切换。窄屏下该控件常驻筛选栏外（收起筛选时仍需切视图），故按需渲染 */}
+      {withViewSwitch && renderViewSwitch(false)}
+      {/* P1-7: 按 metric_key/index_key 过滤 */}
+      <Input
+        allowClear
+        placeholder={t('alerts.filter.metricKey')}
+        value={metricKey}
+        onChange={(e) => setMetricKey(e.target.value)}
+        onPressEnter={() => table.setPage(1)}
+        style={{ width: isMobile ? '100%' : 180 }}
+      />
+      <Input
+        allowClear
+        placeholder={t('alerts.filter.indexKey')}
+        value={indexKey}
+        onChange={(e) => setIndexKey(e.target.value)}
+        onPressEnter={() => table.setPage(1)}
+        style={{ width: isMobile ? '100%' : 180 }}
+      />
+      <Button
+        icon={<ReloadOutlined />}
+        onClick={() => refetch()}
+        loading={isFetching}
+        block={isMobile}
+      >
+        {tc('action.refresh')}
+      </Button>
+      <Button onClick={resetFilters} block={isMobile}>
+        {tc('action.reset')}
+      </Button>
+      {/* G5: 导出告警 CSV */}
+      <Button
+        icon={<DownloadOutlined />}
+        loading={exportAlerts.isPending}
+        block={isMobile}
+        onClick={async () => {
+          try {
+            await exportAlerts.mutateAsync(query);
+          } catch (err: unknown) {
+            message.error(err instanceof Error ? err.message : t('export.failed'));
+          }
+        }}
+      >
+        {t('export.csv')}
+      </Button>
+    </>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* 过滤栏 */}
       <Card variant="borderless" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-        {/* 移动端：垂直堆叠 + 控件全宽；桌面端保持原横向 wrap 布局 */}
-        <Space
-          direction={isMobile ? 'vertical' : 'horizontal'}
-          wrap={!isMobile}
-          size="middle"
-          style={isMobile ? { width: '100%' } : undefined}
-        >
-          <Select
-            style={{ width: isMobile ? '100%' : 160 }}
-            value={alertType}
-            options={getAlertTypeOptions(t, td)}
-            onChange={(v) => {
-              setAlertType(v);
-              table.setPage(1);
-            }}
-            placeholder={t('column.alertType')}
-          />
-          <Select
-            style={{ width: isMobile ? '100%' : 140 }}
-            value={severity}
-            options={[{ label: t('filter.all'), value: '' }, ...getSeverityOptions(td)]}
-            onChange={(v) => {
-              setSeverity(v);
-              table.setPage(1);
-            }}
-            placeholder={tc('field.severity')}
-          />
-          <Segmented
-            style={{ width: isMobile ? '100%' : undefined }}
-            options={getStatusOptions(t)}
-            value={status}
-            onChange={(v) => {
-              setStatus(v as string);
-              table.setPage(1);
-            }}
-          />
-          <RangePicker
-            style={{ width: isMobile ? '100%' : undefined }}
-            value={range}
-            onChange={(v) => {
-              setRange(v as [Dayjs, Dayjs] | null);
-              table.setPage(1);
-            }}
-            disabledDate={(cur) => cur && cur > dayjs().endOf('day')}
-          />
-          <Segmented
-            style={{ width: isMobile ? '100%' : undefined }}
-            options={[
-              { label: t('alerts.filter.scopeAll'), value: 'all' },
-              { label: t('alerts.filter.scopeMine'), value: 'mine' }
-            ]}
-            value={scope}
-            onChange={(v) => {
-              setScope(v as 'all' | 'mine');
-              table.setPage(1);
-            }}
-          />
-          {/* P2-10: 聚合视图切换 */}
-          <Segmented
-            style={{ width: isMobile ? '100%' : undefined }}
-            options={[
-              { label: t('alerts.view.list'), value: 'list' },
-              { label: t('alerts.view.aggregation'), value: 'aggregation' }
-            ]}
-            value={viewMode}
-            onChange={(v) => setViewMode(v as 'list' | 'aggregation')}
-          />
-          {/* P1-7: 按 metric_key/index_key 过滤 */}
-          <Input
-            allowClear
-            placeholder={t('alerts.filter.metricKey')}
-            value={metricKey}
-            onChange={(e) => setMetricKey(e.target.value)}
-            onPressEnter={() => table.setPage(1)}
-            style={{ width: isMobile ? '100%' : 180 }}
-          />
-          <Input
-            allowClear
-            placeholder={t('alerts.filter.indexKey')}
-            value={indexKey}
-            onChange={(e) => setIndexKey(e.target.value)}
-            onPressEnter={() => table.setPage(1)}
-            style={{ width: isMobile ? '100%' : 180 }}
-          />
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => refetch()}
-            loading={isFetching}
-            block={isMobile}
-          >
-            {tc('action.refresh')}
-          </Button>
-          <Button onClick={resetFilters} block={isMobile}>
-            {tc('action.reset')}
-          </Button>
-          {/* G5: 导出告警 CSV */}
-          <Button
-            icon={<DownloadOutlined />}
-            loading={exportAlerts.isPending}
-            block={isMobile}
-            onClick={async () => {
-              try {
-                await exportAlerts.mutateAsync(query);
-              } catch (err: unknown) {
-                message.error(err instanceof Error ? err.message : t('export.failed'));
-              }
-            }}
-          >
-            {t('export.csv')}
-          </Button>
-        </Space>
+        {/* 窄屏：11 个筛选 / 操作控件垂直全宽堆叠实测吃掉 536px，把告警列表整体挤出首屏（390x844
+            实测首条告警 top=813，844 视口下只露 31px）。故窄屏改为默认收起的折叠面板，仅把
+            「列表 / 聚合」视图切换常驻；桌面端维持原横向 wrap 布局，一行都未动。 */}
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {renderViewSwitch(true)}
+            <Collapse
+              ghost
+              activeKey={filtersOpen ? ['filters'] : []}
+              onChange={(keys) => setFiltersOpen(keys.length > 0)}
+              items={[
+                {
+                  key: 'filters',
+                  label:
+                    activeFilterCount > 0
+                      ? t('alerts.filter.activeCount', { count: activeFilterCount })
+                      : t('alerts.filter.title'),
+                  children: (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {renderFilterControls(false)}
+                    </div>
+                  )
+                }
+              ]}
+            />
+          </div>
+        ) : (
+          <Space direction="horizontal" wrap size="middle">
+            {renderFilterControls(true)}
+          </Space>
+        )}
       </Card>
 
       {/* 告警历史表格 */}
@@ -578,53 +661,7 @@ export default function MonitorAlerts() {
             pagination={{ pageSize: 20, showSizeChanger: false }}
             searchable={false}
             showCard={false}
-            columns={[
-              {
-                title: t('column.alertType'),
-                dataIndex: 'alert_type',
-                render: (v: string) => <Tag>{v}</Tag>
-              },
-              {
-                title: tc('field.level'),
-                dataIndex: 'severity',
-                render: (v: string) => <Tag color={SEVERITY_COLOR_MAP[v] ?? 'default'}>{v}</Tag>
-              },
-              { title: t('column.device'), dataIndex: 'device_name' },
-              {
-                title: t('column.alertCount'),
-                dataIndex: 'count',
-                render: (v: number) => (
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      color: v >= 5 ? '#ff4d4f' : v >= 3 ? '#faad14' : undefined
-                    }}
-                  >
-                    {v}
-                  </span>
-                ),
-                sorter: (a, b) => a.count - b.count,
-                defaultSortOrder: 'descend'
-              },
-              {
-                title: t('column.firstAt'),
-                dataIndex: 'first_at',
-                responsive: ['lg'] satisfies Breakpoint[], // ≥992
-                render: (v: string) => (v ? dayjs(v).format('MM-DD HH:mm:ss') : '-')
-              },
-              {
-                title: t('column.lastAt'),
-                dataIndex: 'last_at',
-                responsive: ['sm'] satisfies Breakpoint[], // ≥576
-                render: (v: string) => (v ? dayjs(v).format('MM-DD HH:mm:ss') : '-')
-              },
-              {
-                title: t('column.sampleIds'),
-                dataIndex: 'sample_ids',
-                responsive: ['lg'] satisfies Breakpoint[], // ≥992
-                render: (ids: number[]) => ids.join(', ')
-              }
-            ]}
+            columns={aggregationColumns}
           />
         ) : (
           <>
@@ -721,7 +758,7 @@ export default function MonitorAlerts() {
         open={detailId != null}
         onClose={() => setDetailId(null)}
         width={isMobile ? '100vw' : 640}
-        destroyOnClose
+        destroyOnHidden
       >
         {detailQuery.isLoading && (
           <Typography.Text type="secondary">{tc('message.loading')}</Typography.Text>
@@ -738,12 +775,12 @@ export default function MonitorAlerts() {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label={tc('field.level')}>
-                <Tag color={SEVERITY_COLOR_MAP[detailQuery.data.severity] || 'default'}>
+                <Tag color={severityColor(detailQuery.data.severity, token) ?? 'default'}>
                   {detailQuery.data.severity}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label={tc('field.status')}>
-                <Tag color={STATUS_COLOR[detailQuery.data.status] || 'default'}>
+                <Tag color={deliveryStatusColor(detailQuery.data.status, token) ?? 'default'}>
                   {detailQuery.data.status}
                 </Tag>
               </Descriptions.Item>
@@ -763,6 +800,46 @@ export default function MonitorAlerts() {
                   </>
                 )}
               </Descriptions.Item>
+              {/* 端口：后端读取期从该条告警自身的 payload 还原 —— 存量行（2026-10-08
+                  改造前入箱）没有 port_name 键，靠 varbind 的 IF-MIB 列还原，
+                  故历史告警同样能看出是哪个端口。与端口无关/无从还原时不渲染。 */}
+              {alertPort && (
+                <>
+                  <Descriptions.Item label={t('alerts.detail.port')} span={2}>
+                    {alertPort.name ? (
+                      <>
+                        <Text code>{alertPort.name}</Text>
+                        {alertPort.index && (
+                          <Text type="secondary">{` （ifIndex=${alertPort.index}）`}</Text>
+                        )}
+                      </>
+                    ) : alertPort.index ? (
+                      <Text type="secondary">
+                        {t('alerts.detail.portNameMissing', { index: alertPort.index })}
+                      </Text>
+                    ) : (
+                      '-'
+                    )}
+                  </Descriptions.Item>
+                  {alertPort.alias && (
+                    <Descriptions.Item label={t('alerts.detail.portAlias')} span={2}>
+                      {alertPort.alias}
+                    </Descriptions.Item>
+                  )}
+                  {alertPort.oper_status && (
+                    <Descriptions.Item label={t('alerts.detail.portStatus')}>
+                      <Space size={4} wrap>
+                        <span>
+                          {t('alerts.detail.portOper', { status: alertPort.oper_status })}
+                        </span>
+                        {alertPort.shutdown === true && (
+                          <Tag color="default">{t('alerts.detail.portShutdown')}</Tag>
+                        )}
+                      </Space>
+                    </Descriptions.Item>
+                  )}
+                </>
+              )}
               <Descriptions.Item label={t('alerts.detail.dedupKey')} span={2}>
                 <Typography.Text code copyable style={{ wordBreak: 'break-all' }}>
                   {detailQuery.data.dedup_key}
@@ -815,7 +892,9 @@ export default function MonitorAlerts() {
               title={t('alerts.detail.payloadSection')}
             >
               <Descriptions.Item label="payload">
-                <pre style={{ margin: 0, maxHeight: 240, overflow: 'auto', fontSize: 12 }}>
+                <pre
+                  style={{ margin: 0, maxHeight: 240, overflow: 'auto', fontSize: 12 }}
+                >
                   {JSON.stringify(detailQuery.data.payload, null, 2)}
                 </pre>
               </Descriptions.Item>

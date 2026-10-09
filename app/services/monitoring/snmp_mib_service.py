@@ -25,6 +25,7 @@ from app.services.monitoring.adapters.snmp_adapter import (
     _resolve_snmp_version,
 )
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -35,7 +36,7 @@ _WALK_TIME_BUDGET_SEC = float(os.environ.get("MIB_WALK_TIME_BUDGET_SEC", "60"))
 
 _MIB_PROBE_CACHE_TTL = int(os.environ.get("MIB_PROBE_CACHE_TTL_SECONDS", "86400"))
 _MIB_PROBE_CACHE_MAX_ENTRIES = int(os.environ.get("MIB_PROBE_CACHE_MAX_ENTRIES", "500"))
-_MIB_PROBE_CACHE_PREFIX = "monitor:mib-probe:"
+_MIB_PROBE_CACHE_PREFIX = redis_keys.MONITOR_MIB_PROBE_PREFIX
 
 
 async def _read_sys_object_id(
@@ -69,7 +70,7 @@ async def _read_sys_object_id(
         for _oid, val in var_binds:
             value = val.prettyPrint() if hasattr(val, "prettyPrint") else str(val)
             return str(value)
-    except Exception:  # noqa: BLE001 - 读不到 sysObjectID 不影响探测能力
+    except Exception:  # 读不到 sysObjectID 不影响探测能力
         logger.warning("读取 sysObjectID 异常 ip=%s", ip, exc_info=True)
         return None
     return None
@@ -134,7 +135,7 @@ async def _walk_subtree(
                     "value": val.prettyPrint() if hasattr(val, "prettyPrint") else str(val),
                 }
             )
-        if asyncio.get_event_loop().time() >= deadline:
+        if asyncio.get_running_loop().time() >= deadline:
             logger.info(
                 "MIB walk 时间预算耗尽 ip=%s start=%s rows=%d deadline=%.1f",
                 ip, start_oid, len(rows), deadline,
@@ -160,7 +161,7 @@ async def _walk_all(credential: dict, ip: str, timeout: int) -> list:
     transport = await transport if asyncio.iscoroutine(transport) else transport
 
     rows: list = []
-    deadline = asyncio.get_event_loop().time() + _WALK_TIME_BUDGET_SEC
+    deadline = asyncio.get_running_loop().time() + _WALK_TIME_BUDGET_SEC
     await _walk_subtree(_START_OID, snmp_cred, transport, _p, deadline, rows, ip, version)
 
     seen: set = set()
@@ -217,7 +218,7 @@ def _filter_noise_oids(rows: list) -> list:
     try:
         from app.services.monitoring.oid_category_service import _load_rule_prefixes
         rule_prefixes = _load_rule_prefixes()
-    except Exception:  # noqa: BLE001 - 规则加载失败降级为不排除（保守不过滤）
+    except Exception:  # noqa: BLE001, S110 - 规则加载失败降级为不排除（保守不过滤）
         pass
 
     from collections import defaultdict
@@ -270,7 +271,7 @@ async def _walk_entity_sensor_type(credential: dict, ip: str, timeout: int) -> d
 
     type_map: dict[str, int] = {}
     rows: list = []
-    deadline = asyncio.get_event_loop().time() + _WALK_TIME_BUDGET_SEC
+    deadline = asyncio.get_running_loop().time() + _WALK_TIME_BUDGET_SEC
     await _walk_subtree(
         _ENTITY_SENSOR_TYPE_OID, snmp_cred, transport, _p, deadline, rows, ip, version
     )
@@ -297,7 +298,7 @@ def scan_device(ip: str, credential: dict, timeout: int = 5) -> dict:
     if any(r["oid"].startswith(_ENTITY_SENSOR_VALUE_PREFIX) for r in rows):
         try:
             sensor_type_map = asyncio.run(_walk_entity_sensor_type(credential, ip, timeout))
-        except Exception:  # noqa: BLE001 - 设备不支持该 MIB 或 walk 失败，降级为不细分
+        except Exception:  # 设备不支持该 MIB 或 walk 失败，降级为不细分
             logger.warning("entPhySensorType walk 失败，降级为 entity_sensor 兜底 ip=%s", ip, exc_info=True)
             sensor_type_map = {}
     from app.services.monitoring.oid_category_service import categorize_oids, extract_vendor_id
@@ -368,7 +369,7 @@ def scan_device_cached(ip: str, credential: dict, model_key: str | None = None,
                     return _rebuild_with_ip(ip, json.loads(cached))
                 except (json.JSONDecodeError, TypeError):
                     logger.warning("MIB 探测缓存解析失败，重新探测 key=%s", cache_key)
-    except Exception:  # noqa: BLE001 - Redis 不可用降级为直接探测
+    except Exception:  # Redis 不可用降级为直接探测
         logger.warning("MIB 探测缓存读取失败，降级为直接探测 key=%s", cache_key, exc_info=True)
 
     result = scan_device(ip, credential, timeout)
@@ -379,7 +380,7 @@ def scan_device_cached(ip: str, credential: dict, model_key: str | None = None,
             r = get_scan_redis_client()
             if r is not None:
                 _write_probe_cache(r, cache_key, _strip_device_ip(result))
-        except Exception:  # noqa: BLE001 - 缓存写入失败不影响探测结果
+        except Exception:  # 缓存写入失败不影响探测结果
             logger.warning("MIB 探测缓存写入失败 key=%s", cache_key, exc_info=True)
     else:
         logger.warning(
@@ -407,5 +408,5 @@ def _write_probe_cache(r, cache_key: str, result: dict) -> None:
                 return
         r.sadd(index_key, cache_key)
         r.expire(index_key, _MIB_PROBE_CACHE_TTL)
-    except Exception:  # noqa: BLE001 - 索引维护失败不影响缓存本身
+    except Exception:  # 索引维护失败不影响缓存本身
         logger.warning("MIB 探测缓存索引维护失败", exc_info=True)

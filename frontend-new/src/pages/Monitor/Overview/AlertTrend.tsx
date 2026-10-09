@@ -3,6 +3,7 @@
  *
  * 从 Overview 拆分（M28）：按日聚合告警数，简易柱状无外部图表依赖。
  */
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import { useState, useMemo } from 'react';
 import { Card, Empty, Space, Tooltip, Typography, DatePicker, theme } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
@@ -22,7 +23,7 @@ export default function AlertTrend() {
   const { data: trendAlerts } = useMonitorAlerts({
     start_date: trendRange[0].toISOString(),
     end_date: trendRange[1].toISOString(),
-    per_page: 200
+    per_page: PER_PAGE_CAP
   });
 
   const trendByDay = useMemo(() => {

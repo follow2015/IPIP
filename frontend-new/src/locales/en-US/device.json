@@ -578,7 +578,8 @@
       "cpu": "CPU",
       "gpu": "GPU",
       "power": "Power Consumption",
-      "memoryPerDimm": "{{size}}GB per DIMM × {{count}} = "
+      "memoryPerDimm": "{{size}}GB per DIMM × {{count}} = ",
+      "location": "Location"
     },
     "cpu": {
       "way": "{{count}}-way",
@@ -615,7 +616,8 @@
     "backupType": {
       "manual": "Manual",
       "scheduled": "Scheduled",
-      "preChange": "Pre-change"
+      "preChange": "Pre-change",
+      "preRemedial": "Pre-AI-remediation"
     },
     "changeStatus": {
       "draft": "Draft",
@@ -660,6 +662,7 @@
       "networkToNetwork": "Network→Network"
     },
     "column": {
+      "id": "ID",
       "connectionType": "Connection Type",
       "linkType": "Link Mode",
       "localPort": "Local Port",
@@ -958,6 +961,9 @@
     "SWITCH": "Switch",
     "ROUTER": "Router",
     "FIREWALL": "Firewall",
+    "OTN": "OTN transport",
+    "WDM": "DWDM",
+    "ODF": "ODF",
     "PDU": "PDU",
     "UPS": "UPS",
     "OTHER": "Other"
@@ -1030,7 +1036,10 @@
       "partialCabinetDevices": "Partial-Cabinet Devices",
       "networkCount": "Networks",
       "fullNetworks": "Full Networks Leased",
-      "ipTotal": "Total IPs"
+      "ipTotal": "Total IPs",
+      "circuitCount": "Circuits",
+      "circuitBandwidth": "Total bandwidth (Mbps)",
+      "circuitMonthlyFee": "Monthly fee total (CNY)"
     },
     "archive": {
       "title": "Termination Archive",
@@ -1157,7 +1166,14 @@
     "RATE_LIMIT_EXCEEDED": "Rate Limit Exceeded",
     "SERVICE_UNHEALTHY": "Service Unhealthy",
     "SERVICE_RECOVERED": "Service Recovered",
-    "ASSET_WARRANTY_ALERT": "Asset Warranty Reminder"
+    "ASSET_WARRANTY_ALERT": "Asset Warranty Reminder",
+    "TRAP_LINK_DOWN": "Port Link Down",
+    "TRAP_LINK_UP": "Port Link Up",
+    "TRAP_AUTH_FAILURE": "SNMP Auth Failure",
+    "TRAP_COLD_START": "Device Cold Start",
+    "TRAP_WARM_START": "Device Warm Start",
+    "TRAP_EGP_NEIGHBOR_LOSS": "EGP Neighbor Loss",
+    "TRAP_OTHER": "SNMP Trap (Other)"
   },
   "notificationGroup": {
     "MONITOR": "Monitoring Alerts",
@@ -1165,7 +1181,8 @@
     "SCAN": "Scan Complete",
     "PORT_ASYNC": "Port / Async Operations",
     "OPS": "Ops Alerts",
-    "ASSET": "Asset Reminders"
+    "ASSET": "Asset Reminders",
+    "TRAP": "SNMP Trap"
   },
   "loginType": {
     "WEB": "Web",
@@ -1566,7 +1583,8 @@
     },
     "confirm": {
       "scanTitle": "Confirm scan?",
-      "scanContent": "A full scan will run on all switches in the virtual data center \"{{name}}\""
+      "scanContent": "A full scan will run on all switches in the virtual data center \"{{name}}\"",
+      "snmpTakeoverHint": "(Note: devices collected via SNMP in this virtual room — undiscovered manual ports will be removed during scan)"
     },
     "message": {
       "scanSubmitted": "Virtual data center scan submitted; you will be notified when it completes",
@@ -1785,7 +1803,8 @@
       "version": "Version",
       "uptime": "Uptime",
       "mac": "MAC Address",
-      "connectedDevices": "Connected Devices"
+      "connectedDevices": "Connected Devices",
+      "portStatus": "Port Status"
     },
     "copy": {
       "header": "Switch Details",

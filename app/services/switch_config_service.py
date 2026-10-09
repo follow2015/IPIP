@@ -278,12 +278,12 @@ class SwitchConfigService:
                         self.ssh_mgr.execute_show_on_conn(
                             conn, adapter.get_save_command(device_model), timeout=60,
                         )
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 保存配置失败不阻断操作结果：命令已下发，保存仅持久化
                         logger.warning("%s 保存配置失败（不影响操作结果）: %s", err_label, e)
                     self._sync_coordinator.sync_single_port_on_conn(
                         conn, switch, port, op_type,
                     )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 配置下发失败兜底：转结构化返回并由 _classify_error 分类
                 logger.error("%s失败: %s", err_label, e)
                 return {
                     "success": False, "error": self._dispatcher._classify_error(e),
@@ -835,7 +835,7 @@ class SwitchConfigService:
             output = self.ssh_mgr.send_show_command(
                 switch, adapter.get_qos_policy_query_command(policy_name),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- QoS 策略查询失败保守降级返回 False：触发幂等重建
             logger.warning("查询QoS策略 %s 是否存在失败: %s", policy_name, e)
             return False
         if not output:

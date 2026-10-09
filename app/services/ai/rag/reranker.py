@@ -110,7 +110,7 @@ def rerank(query: str, chunks: List[dict], top_k: int) -> Optional[List[dict]]:
     try:
         logits = model.predict([(query, c["text"]) for c in candidates])
         scored = sorted(
-            zip(candidates, logits),
+            zip(candidates, logits, strict=False),
             key=lambda pair: pair[1],
             reverse=True,
         )

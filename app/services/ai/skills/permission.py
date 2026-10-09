@@ -7,7 +7,6 @@
 from typing import Set
 
 from app.services.ai.capabilities.registry import get_required_permission
-from app.services.ai.skills.schema import SkillSpec
 
 
 def collect_required_permissions(skill) -> Set[str]:

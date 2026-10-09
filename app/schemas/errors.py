@@ -5,7 +5,7 @@
 按 `app/schemas/device.py` 的既有约定：契约只声明确实会被读取的字段，
 其余动态透传字段仍可发送（`Meta.unknown = EXCLUDE`）。
 """
-from marshmallow import Schema, fields, validate, EXCLUDE
+from marshmallow import Schema, fields, EXCLUDE
 
 class ErrorReportRequestSchema(Schema):
     """前端错误批量上报（`POST /errors/report`）。

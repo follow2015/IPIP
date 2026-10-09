@@ -7,10 +7,11 @@ P2：新增通知偏好设置端点。
 """
 from flask import Blueprint, request
 
-from app.api.base import APIResponse
+from app.api.base import APIResponse, RequestValidator
+from app.exceptions import PresetResponseError
 from app.openapi.doc import doc
 from app.services.notification_service import notification_service
-from app.utils.auth import login_required
+from app.services.auth import login_required
 from app.utils.transactional import transactional
 
 router = Blueprint("notifications", __name__, url_prefix="/api/notifications")
@@ -32,14 +33,13 @@ def unread_count():
 def notification_list():
     """获取当前用户通知列表（分页）。"""
     from flask import g
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    page, per_page = RequestValidator.validate_pagination_params()
     unread_only = request.args.get("unread_only", "false").lower() == "true"
 
     result = notification_service.get_notifications(
         user_id=g.current_user["user_id"],
         page=page,
-        per_page=min(per_page, 100),
+        per_page=per_page,
         unread_only=unread_only,
     )
     return APIResponse.success(data=result)
@@ -74,7 +74,7 @@ def ack_notification(notification_id):
         notification_id=notification_id,
     )
     if not success:
-        return APIResponse.error("确认失败：通知不存在或无需确认", "NOT_FOUND", 404)
+        raise PresetResponseError("确认失败：通知不存在或无需确认", "NOT_FOUND", 404)
     return APIResponse.success(message="已确认")
 
 

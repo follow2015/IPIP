@@ -4,7 +4,7 @@
 虚拟机房是用户自由组合交换机形成的逻辑扫描单元，
 用于跨机房二层/三层网络场景下的联合扫描。
 """
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 

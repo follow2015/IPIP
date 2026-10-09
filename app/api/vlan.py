@@ -7,17 +7,17 @@ VLAN API
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
-from marshmallow import Schema
 
-from app.api.base import APIResponse
+from app.api.base import APIResponse, RequestValidator
 from app.services.vlan_service import VLANService
 from app.persistence.vlan_repository import VLANRepository
 from app.exceptions import PresetResponseError
 from app.exceptions.validation import ValidationError
 from app.exceptions.business import ResourceConflictError
 from app.exceptions.data_access import RecordNotFoundError
-from app.openapi.doc import doc, public
-from app.utils import login_required, permission_required, rate_limit_api
+from app.openapi.doc import doc
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api
 from app.utils.transactional import transactional
 
 logger = get_logger(__name__)
@@ -29,7 +29,7 @@ _vlan_service = VLANService(VLANRepository())
 
 
 
-from app.schemas.vlan import VLANCreateSchema, VLANUpdateSchema
+from app.schemas.vlan import VLANCreateSchema, VLANUpdateSchema  # noqa: E402 -- 本仓约定：Schema import 就近放在使用它的路由区（见上方注释说明）
 
 @vlan_bp.route("/", methods=["GET"])
 @doc(summary="查询VLAN列表", tags=["VLAN"], responses={200: "VLANResponse", 401: "ApiError"})
@@ -48,11 +48,9 @@ def list_vlans():
 
     排序：按 device_id 分组，同设备内按 vlan_id 升序
     """
-    from app.models.vlan import VLAN
     from app.persistence.switch_ext_repository import SwitchExtRepository
 
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    page, per_page = RequestValidator.validate_pagination_params()
     search = request.args.get('search', type=str)
     device_id = request.args.get('device_id', type=int)
     room_id = request.args.get('room_id', type=int)
@@ -80,7 +78,6 @@ def list_vlans():
         d['has_ssh'] = sc_map.get(d.get('device_id'), False)
         items.append(d)
 
-    total_pages = (total_count + per_page - 1) // per_page
     return APIResponse.paginated(items, page, per_page, total_count)
 
 

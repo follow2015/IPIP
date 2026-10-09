@@ -11,7 +11,7 @@
 """
 from flask import g, request
 
-from app.utils.auth import get_current_user_id
+from app.services.auth import get_current_user_id
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -23,6 +23,7 @@ AUDITED_RESOURCES = {
     "/api/rbac": "rbac",
     "/api/webhook-configs": "webhook_config",
     "/api/settings/mail": "mail_setting",
+    "/api/settings/voice": "voice_setting",
 }
 
 METHOD_ACTION_MAP = {
@@ -168,7 +169,7 @@ class AuditMiddleware:
                 first = created[0]
                 if isinstance(first, dict) and 'id' in first:
                     return first['id']
-        except Exception:  # noqa: BLE001 - 解析 ORM 新增对象 id 失败时返回 None：审计降级不应影响主请求
-            pass
+        except Exception as e:  # noqa: BLE001 - 审计降级不应影响主请求
+            logger.debug("audit middleware: resolve created id failed: %s", e)
 
         return None

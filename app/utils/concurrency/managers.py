@@ -189,14 +189,14 @@ class ResourcePool(Generic[T]):
             self._stats['acquired'] += 1
             return resource
             
-        except queue.Empty:
+        except queue.Empty as e:
             with self._lock:
                 if self._created_count < self.max_size:
                     resource = self._create_resource()
                     self._stats['acquired'] += 1
                     return resource
             
-            raise TimeoutError(f"无法在{self.timeout}秒内获取资源")
+            raise TimeoutError(f"无法在{self.timeout}秒内获取资源") from e
     
     def return_resource(self, resource: T) -> None:
         """归还资源
@@ -261,7 +261,7 @@ class ResourcePool(Generic[T]):
                     break
             
             self._created_count = 0
-            self._stats = {key: 0 for key in self._stats}
+            self._stats = dict.fromkeys(self._stats, 0)
             logger.info("资源池已清空")
 
 
@@ -430,7 +430,7 @@ class WorkerPool:
                     with self._lock:
                         self._stats['completed'] += 1
                     
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 任务执行失败隔离：转为结果队列的 error 项，单任务异常不得终止工作线程
                     self._result_queue.put((task_id, 'error', str(e), 0))
                     
                     with self._lock:
@@ -443,7 +443,7 @@ class WorkerPool:
             
             except queue.Empty:
                 continue
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 工作线程顶层兜底：线程内异常无人接收，记录后线程正常退出
                 logger.error(f"工作线程 {thread_name} 发生错误: {e}")
         
         logger.debug(f"工作线程 {thread_name} 已停止")

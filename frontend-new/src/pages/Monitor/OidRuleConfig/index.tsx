@@ -9,6 +9,8 @@
  */
 import { useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
+import { useDirtyGuard, useSnapshotDirty } from '@/hooks/useDirtyGuard';
+import { isValidationError, firstFieldError } from '@/utils/formError';
 import {
   Card,
   Tabs,
@@ -110,6 +112,7 @@ function CategoryRulesTab() {
 
   const openEdit = (rule: OidCategoryRule) => {
     setEditing(rule);
+    form.resetFields();
     form.setFieldsValue({
       ...rule,
       device_type: rule.device_type ?? '',
@@ -118,8 +121,19 @@ function CategoryRulesTab() {
     modal.open();
   };
 
+  const isPending = createMut.isPending || updateMut.isPending;
+  const guard = useDirtyGuard({ form, isPending });
+
   const handleSave = async () => {
-    const values = await form.validateFields();
+    let values: Awaited<ReturnType<typeof form.validateFields>>;
+    try {
+      values = await form.validateFields();
+    } catch (err: unknown) {
+      if (isValidationError(err)) {
+        message.error(firstFieldError(err) ?? tc('message.formValidationFailed'));
+      }
+      return;
+    }
     const payload = {
       ...values,
       device_type: values.device_type || null,
@@ -253,8 +267,10 @@ function CategoryRulesTab() {
         title={editing ? t('oid.rule.modal.editTitle') : t('oid.rule.modal.createTitle')}
         open={modal.isOpen}
         onOk={handleSave}
-        onCancel={() => modal.close()}
-        confirmLoading={createMut.isPending || updateMut.isPending}
+        onCancel={() => guard.requestClose(() => modal.close())}
+        confirmLoading={isPending}
+        closable={!isPending}
+        mask={{ closable: false }}
         width={560}
       >
         <Form form={form} layout="vertical">
@@ -325,11 +341,17 @@ function RecommendConfigTab() {
   const allCategories = useAllCategories();
   const [editingType, setEditingType] = useState<string | null>(null);
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
+  const [initialCats, setInitialCats] = useState<string[]>([]);
 
   const openEdit = (deviceType: string, cats: string[]) => {
     setEditingType(deviceType);
     setSelectedCats(cats);
+    setInitialCats(cats);
   };
+
+  const isPending = updateMut.isPending;
+  const isDirty = useSnapshotDirty(initialCats, selectedCats);
+  const guard = useDirtyGuard({ isPending, isDirty });
 
   const handleSave = async () => {
     if (!editingType) return;
@@ -395,8 +417,10 @@ function RecommendConfigTab() {
         title={t('oid.recommend.modal.editTitle', { type: editingType })}
         open={!!editingType}
         onOk={handleSave}
-        onCancel={() => setEditingType(null)}
-        confirmLoading={updateMut.isPending}
+        onCancel={() => guard.requestClose(() => setEditingType(null))}
+        confirmLoading={isPending}
+        closable={!isPending}
+        mask={{ closable: false }}
         width={600}
       >
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>

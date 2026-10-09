@@ -10,7 +10,7 @@ from datetime import timedelta
 from typing import Any, Dict, List, Optional, Sequence
 from app.utils.time_utils import now_utc_naive
 
-from sqlalchemy import update, delete
+from sqlalchemy import delete, false as sa_false, update
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -38,7 +38,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return port.to_dict(include_relations=True) if port else None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口失败", original_error=e)
+            raise QueryExecutionError("查找端口失败", original_error=e) from e
 
     def find_by_id_for_update(self, port_id: int) -> Optional[Dict[str, Any]]:
         """根据端口 ID 查找并加行级锁（SELECT ... FOR UPDATE），用于并发安全操作
@@ -55,7 +55,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return port.to_dict(include_relations=True) if port else None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口(加锁)失败", original_error=e)
+            raise QueryExecutionError("查找端口(加锁)失败", original_error=e) from e
 
     def list_by_customer(self, customer_id: int) -> List[NetworkPort]:
         """取分配给某客户的全部端口**实体**（B-44 扫尾批：客户资产报告 ×2）。
@@ -136,7 +136,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查询机柜内空闲交换机端口失败", original_error=e)
+            raise QueryExecutionError("查询机柜内空闲交换机端口失败", original_error=e) from e
 
     def find_port_by_name_orm(
         self, device_id: int, port_name: str,
@@ -167,7 +167,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return [p.to_dict(include_relations=True) for p in ports]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口列表失败", original_error=e)
+            raise QueryExecutionError("查找端口列表失败", original_error=e) from e
 
     def find_available_ports(self, device_id: int) -> List[Dict[str, Any]]:
         """获取空闲端口（usage_status='free'）"""
@@ -180,7 +180,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return [p.to_dict() for p in ports]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找可用端口失败", original_error=e)
+            raise QueryExecutionError("查找可用端口失败", original_error=e) from e
 
     def find_active_ports(self, device_id: int) -> List[Dict[str, Any]]:
         """获取有效端口（排除 disabled），用于容量计算"""
@@ -195,7 +195,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return [p.to_dict() for p in ports]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找有效端口失败", original_error=e)
+            raise QueryExecutionError("查找有效端口失败", original_error=e) from e
 
     def occupy_port(self, port_id: int) -> bool:
         """占用网络端口（设置 usage_status='occupied'，跳过 disabled 端口）
@@ -217,7 +217,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("占用端口失败", original_error=e)
+            raise QueryExecutionError("占用端口失败", original_error=e) from e
 
     def release_customer_ports(self, customer_id: int) -> int:
         """批量释放客户名下所有交换机端口。
@@ -256,7 +256,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("释放端口失败", original_error=e)
+            raise QueryExecutionError("释放端口失败", original_error=e) from e
 
     def release_port_and_set_link_down(self, port_id: int) -> bool:
         """释放网络端口并设置物理端口 link_status='down'（仅非逻辑端口）
@@ -279,7 +279,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("释放端口并设置link_down失败", original_error=e)
+            raise QueryExecutionError("释放端口并设置link_down失败", original_error=e) from e
 
     def find_occupied_ports_by_device_orm(self, device_id: int) -> List[NetworkPort]:
         """查找设备的已占用端口，返回 ORM 对象列表（供 Service 层释放端口）"""
@@ -293,7 +293,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找已占用端口失败", original_error=e)
+            raise QueryExecutionError("查找已占用端口失败", original_error=e) from e
 
     def find_by_id_orm(self, port_id: int) -> Optional[NetworkPort]:
         """根据端口 ID 查找，返回 ORM 对象（供 Service 层直接修改属性）"""
@@ -304,7 +304,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口(ORM)失败", original_error=e)
+            raise QueryExecutionError("查找端口(ORM)失败", original_error=e) from e
 
     def find_by_ids_orm(self, port_ids: List[int]) -> List[NetworkPort]:
         """根据端口 ID 列表批量查找，返回 ORM 对象列表（供 API 层构建映射）"""
@@ -317,7 +317,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("批量查找端口(ORM)失败", original_error=e)
+            raise QueryExecutionError("批量查找端口(ORM)失败", original_error=e) from e
 
     def find_port_by_name(self, device_id: int, port_name: str) -> Optional[Dict[str, Any]]:
         """根据设备 ID 和端口名称查找端口"""
@@ -332,7 +332,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return port.to_dict(include_relations=True) if port else None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口失败", original_error=e)
+            raise QueryExecutionError("查找端口失败", original_error=e) from e
 
     def count_ports_by_device(self, device_id: int, filters: Dict = None) -> int:
         """统计端口数量，可按 usage_status 过滤"""
@@ -342,7 +342,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 q = q.filter(NetworkPort.usage_status == filters["usage_status"])
             return q.count()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("统计端口数量失败", original_error=e)
+            raise QueryExecutionError("统计端口数量失败", original_error=e) from e
 
     def get_by_device(self, device_id: int) -> List[NetworkPort]:
         """获取设备所有端口（返回 ORM 对象列表，供 API 层使用）"""
@@ -354,7 +354,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("获取设备端口失败", original_error=e)
+            raise QueryExecutionError("获取设备端口失败", original_error=e) from e
 
     def get_port_names_by_device(self, device_id: int) -> List[str]:
         """获取设备端口名称列表"""
@@ -364,7 +364,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             ).all()
             return [r[0] for r in rows]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("获取端口名称列表失败", original_error=e)
+            raise QueryExecutionError("获取端口名称列表失败", original_error=e) from e
 
 
     def create_ports_batch(self, device_id: int, ports: List[Dict]) -> int:
@@ -398,7 +398,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return len(objs)
         except SQLAlchemyError as e:
-            raise QueryExecutionError("批量创建端口失败", original_error=e)
+            raise QueryExecutionError("批量创建端口失败", original_error=e) from e
 
     def update_port(self, port_id: int, data: Dict[str, Any]) -> bool:
         """更新端口字段
@@ -418,18 +418,21 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 "vlan", "description",
                 "link_status", "mac", "ip_address", "customer_id",
                 "raw_info", "data_source", "last_collected_at",
+                "collect_trace",
             }
             for field in allowed:
                 if field in data:
                     value = data[field]
                     if field == "raw_info":
                         value = NetworkPort.normalize_raw_info(value)
+                    elif field == "collect_trace":
+                        value = NetworkPort.normalize_collect_trace(value)
                     setattr(port, field, value)
 
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("更新端口失败", original_error=e)
+            raise QueryExecutionError("更新端口失败", original_error=e) from e
 
     def delete_port(self, port_id: int) -> bool:
         """删除单个端口
@@ -445,7 +448,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除端口失败", original_error=e)
+            raise QueryExecutionError("删除端口失败", original_error=e) from e
 
     def delete_device_ports(self, device_id: int) -> int:
         """删除设备全部端口，返回删除数量
@@ -462,10 +465,11 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return count
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除设备端口失败", original_error=e)
+            raise QueryExecutionError("删除设备端口失败", original_error=e) from e
 
 
-    def incremental_update(self, device_id: int, port_rows: list) -> None:
+    def incremental_update(self, device_id: int, port_rows: list,
+                           reconcile_manual: bool = False) -> None:
         """端口增量更新三步事务（R-01），写入 network_ports 表
 
         Step 1: 全标记为 link_status=TOMBSTONE（待删除）
@@ -473,6 +477,13 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         Step 3: 清理残留（仅删除纯 auto 端口，hybrid 端口仅清除标记）
 
         事务原子性由调用方保证（通常在 SwitchInfoService.collect_port_info 中 commit）。
+
+        :param reconcile_manual: 是否把**未被本次采集发现**的 manual 行也纳入清理。
+            仅用于「通道层接管为该设备唯一采集路径」的场景（无 SSH 设备，SNMP 是
+            唯一事实来源）——此时未被发现的 manual 行是设备上不存在的陈旧台账；
+            有 SSH 设备保持 False（CLI 语义：manual 永远保护）。
+            2026-10-06 用户拍板：SNMP 接管设备的手动端口直接删除，
+            前端扫描包含 SNMP 设备时给出提示。
 
         Args:
             device_id: 交换机 device_id
@@ -522,9 +533,12 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                         "speed": row.get("speed"),
                         "description": row.get("description"),
                         "raw_info": NetworkPort.normalize_raw_info(row.get("raw_info")),
+                        "collect_trace": NetworkPort.normalize_collect_trace(row.get("collect_trace")),
                         "last_collected_at": now,
                         "updated_at": now,
                     }
+                    if row.get("collect_trace") is None:
+                        update_fields.pop("collect_trace")
                     if existing.data_source == DataSource.MANUAL:
                         update_fields["data_source"] = DataSource.HYBRID
                     else:
@@ -551,19 +565,42 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                         customer_id=row.get("customer_id"),
                         description=row.get("description"),
                         raw_info=NetworkPort.normalize_raw_info(row.get("raw_info")),
+                        collect_trace=NetworkPort.normalize_collect_trace(row.get("collect_trace")),
                         data_source=DataSource.AUTO,
                         last_collected_at=now,
                     )
                     self.session.add(new_port)
 
         grace_cutoff = now_utc_naive() - timedelta(seconds=600)
+        delete_conditions = [
+            NetworkPort.device_id == device_id,
+            NetworkPort.link_status == TOMBSTONE,
+        ]
+        if reconcile_manual:
+            self.session.execute(
+                update(NetworkPort)
+                .where(
+                    NetworkPort.device_id == device_id,
+                    NetworkPort.data_source == DataSource.MANUAL,
+                    ~NetworkPort.port_name.in_(
+                        [row.get("port_name") for row in port_rows if row.get("port_name")]
+                    ) if port_rows else sa_false(),
+                )
+                .values(link_status=TOMBSTONE)
+            )
+            self.session.execute(
+                delete(NetworkPort).where(
+                    NetworkPort.device_id == device_id,
+                    NetworkPort.link_status == TOMBSTONE,
+                    NetworkPort.data_source == DataSource.MANUAL,
+                )
+            )
+            delete_conditions.append(NetworkPort.data_source == DataSource.AUTO)
+        else:
+            delete_conditions.append(NetworkPort.data_source == DataSource.AUTO)
         self.session.execute(
             delete(NetworkPort)
-            .where(
-                NetworkPort.device_id == device_id,
-                NetworkPort.link_status == TOMBSTONE,
-                NetworkPort.data_source == DataSource.AUTO,
-            )
+            .where(*delete_conditions)
             .where(
                 ~(
                     NetworkPort.updated_at.isnot(None)
@@ -629,7 +666,7 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查询端口IP列表失败", original_error=e)
+            raise QueryExecutionError("查询端口IP列表失败", original_error=e) from e
 
 
     def find_ports_by_lag_group_id(self, lag_id: int) -> List[NetworkPort]:

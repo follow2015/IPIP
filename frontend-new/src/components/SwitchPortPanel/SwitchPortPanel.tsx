@@ -15,6 +15,7 @@
  */
 import { useMemo } from 'react';
 import { Tooltip, Tag, Space, theme } from 'antd';
+import type { GlobalToken } from 'antd';
 import { ExclamationCircleFilled } from '@ant-design/icons';
 import {
   classifyPortType,
@@ -83,21 +84,21 @@ function isUnderspeed(portType: string, speed: string): boolean {
 
 
 
-function getPortVisual(status: string | null | undefined, underspeed: boolean) {
+function getPortVisual(status: string | null | undefined, underspeed: boolean, token: GlobalToken) {
   const lower = (status || '').toLowerCase();
   if (underspeed && lower === 'up') {
-    return { color: '#faad14', border: 'solid', glow: true };
+    return { color: token.colorWarning, border: 'solid', glow: true };
   }
   if (lower === 'up') {
-    return { color: '#52c41a', border: 'solid', glow: true };
+    return { color: token.colorSuccess, border: 'solid', glow: true };
   }
   if (lower === 'down') {
-    return { color: '#ff4d4f', border: 'solid', glow: false };
+    return { color: token.colorError, border: 'solid', glow: false };
   }
   if (lower.includes('down') || lower === 'disabled') {
     return { color: '#bfbfbf', border: 'dashed', glow: false };
   }
-  return { color: '#d9d9d9', border: 'dotted', glow: false };
+  return { color: token.colorBorder, border: 'dotted', glow: false };
 }
 
 
@@ -146,7 +147,7 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
           <Tag color="red" style={{ fontSize: 11, margin: 0 }}>
             {td('linkStatus.DOWN')}
           </Tag>
-          <Tag color="#faad14" style={{ fontSize: 11, margin: 0, color: '#fff' }}>
+          <Tag color={token.colorWarning} style={{ fontSize: 11, margin: 0, color: '#fff' }}>
             {t('switchPort.legend.reducedSpeed')}
           </Tag>
           <Tag color="default" style={{ fontSize: 11, margin: 0, borderStyle: 'dashed' }}>
@@ -182,10 +183,10 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
               <span style={{ fontSize: 11, color: token.colorTextSecondary }}>
                 {t('switchPort.group.total', { count: groupPorts.length })}
                 {upCount > 0 && (
-                  <span style={{ color: '#52c41a', marginLeft: 4 }}>
+                  <span style={{ color: token.colorSuccess, marginLeft: 4 }}>
                     ↑{upCount - underspeedCount}
                     {underspeedCount > 0 && (
-                      <span style={{ color: '#faad14' }}>
+                      <span style={{ color: token.colorWarning }}>
                         +<ExclamationCircleFilled />
                         {underspeedCount}
                       </span>
@@ -193,7 +194,7 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
                   </span>
                 )}
                 {downCount > 0 && (
-                  <span style={{ color: '#ff4d4f', marginLeft: 4 }}>↓{downCount}</span>
+                  <span style={{ color: token.colorError, marginLeft: 4 }}>↓{downCount}</span>
                 )}
                 {otherCount > 0 && (
                   <span style={{ color: '#bfbfbf', marginLeft: 4 }}>?{otherCount}</span>
@@ -210,7 +211,7 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
                 padding: '6px 8px',
                 background: token.colorFillQuaternary,
                 borderRadius: 6,
-                border: '1px solid #f0f0f0'
+                border: `1px solid ${token.colorBorderSecondary}`
               }}
             >
               {groupPorts.map((port) => {
@@ -219,7 +220,7 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
                   color,
                   border: borderStyle,
                   glow
-                } = getPortVisual(getLinkStatus(port), underspeed);
+                } = getPortVisual(getLinkStatus(port), underspeed, token);
                 const shortNum = getShortPortNum(port.port_name);
                 const blockWidth = getBlockWidth(shortNum);
                 const fontSize = getBlockFontSize(shortNum);
@@ -244,7 +245,7 @@ function SwitchPortPanel({ ports, onPortClick }: SwitchPortPanelProps) {
                     </div>
                     <div>{t('portField.speed', { value: port.speed || '-' })}</div>
                     {underspeed && (
-                      <div style={{ color: '#faad14' }}>
+                      <div style={{ color: token.colorWarning }}>
                         {t('switchPort.tooltip.underspeed', { type, speed: port.speed })}
                       </div>
                     )}

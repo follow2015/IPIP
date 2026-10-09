@@ -36,10 +36,6 @@ interface NetworkDetailParams {
   [key: string]: unknown;
 }
 
-interface DeleteNetworkRequest {
-  network_id: number;
-}
-
 interface UpdateNetworkCustomerRequest {
   network_id: number;
   customer_id: number | null;

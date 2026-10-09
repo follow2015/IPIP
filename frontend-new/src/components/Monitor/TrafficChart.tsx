@@ -51,7 +51,7 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
   const { data: portsData, isLoading: portsLoading } = useDeviceTrafficPorts(deviceId);
   const ports = portsData?.ports ?? [];
 
-  const now = useMemo(() => Math.floor(Date.now() / 1000), [rangeKey, shouldFetch]);
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const windowSec = RANGE_MAP[rangeKey];
 
   const { data, isLoading, isFetching } = useDeviceTraffic(
@@ -94,6 +94,7 @@ export default function TrafficChart({ deviceId }: { deviceId: number }) {
       return;
     }
     setShouldFetch(true);
+    setNow(Math.floor(Date.now() / 1000));
   };
 
   if (portsLoading) {

@@ -11,7 +11,6 @@
 """
 from typing import List
 
-from app.utils.cache import cache_manager
 from app.utils.logging import get_logger
 
 from app.services.auth.context import RBAC_CACHE_TTL, _stable_hash

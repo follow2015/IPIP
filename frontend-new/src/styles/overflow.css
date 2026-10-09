@@ -1,0 +1,80 @@
+/**
+ * 溢出兜底（B0 从 responsive.css 拆出）
+ *
+ * 定位：唯一允许出现「结构性处理」的样式层 —— 允许 min-width 收缩与 overflow 兜底。
+ * 拆分目的：把「布局兜底」与「触摸尺寸」解耦，各由独立门禁守；见 docs/design/
+ * 2026-10-07-响应式布局原语体系-架构设计.md。
+ *
+ * 断点阈值必须与 src/hooks/useResponsive.ts 的 RESPONSIVE_BREAKPOINTS 一致
+ * （移动端 = max-width: md - 1 = 767px）。该一致性由 useResponsive.test.tsx 钉住。
+ *
+ * 注：本文件被 src/components/Layout/layoutOverflow.gate.test.tsx 以文本方式读取并断言，
+ * 改动规则文本会触发该门禁 —— 属预期行为。
+ */
+
+/* ========== 移动端（<768px，与 useResponsive().isMobile 同阈值） ========== */
+
+@media (max-width: 767px) {
+  /* 收紧容器内边距，把宽度还给内容。
+     :not([style]) —— 跳过带内联 style 的元素：调用方显式设置的 padding
+     （如拓扑页 bodyStyle={{ padding: 0 }}）属刻意意图，不应被兜底规则压掉。
+
+     [B5 订正，2026-10-08] 以下两条**不需要** important 声明（原带该声明，本批去除）：
+     antd 规则为 :where(hash).ant-card .ant-card-body，:where() 特异性为 0，
+     即 (0,2,0)；本文件 .ant-card-body:not([style]) 亦为 (0,2,0)（类 + 属性选择器）。
+     同特异性下按注入顺序，antd 早于本文件 ⇒ 本文件胜。
+     真机实测（390x844，/devices 与 /dashboard）：去留两态下 padding 均分别为
+     12px 与 0 12px，逐值相等 —— 属实测证伪的冗余声明。 */
+  .ant-card-body:not([style]) {
+    padding: 12px;
+  }
+  .ant-card-head:not([style]) {
+    padding: 0 12px;
+  }
+
+  /* 表格横向滚动兜底（DataTable 已内置 scroll.x，此处防止撑破外层布局） */
+  .ant-table-wrapper {
+    overflow-x: auto;
+    /* 表格容器必须能被压缩到视口宽以内，滚动条才会落在这个容器上；
+       少了 max-width，容器会按内容宽度撑开，滚动条逃逸到 <body>
+       —— 即「左右滑动变成整个页面移动」。 */
+    max-width: 100%;
+    /* [WARN] 与 .ant-table 自身的 scroll.x 可能形成双层滚动容器，
+       真机手感待确认（见 docs/review/2026-09-14-移动端适配合并评审.md §1.4）。 */
+  }
+
+  /* 卡片列表（DataTable mobileCardMode）不得横向溢出。
+     卡片本身 width:100% 会随容器收缩，但 antd Space 的子项是 inline-flex、
+     默认 `min-width: auto`，内部一条长 IP / 长型号会把卡片顶宽。
+     这里让 Space 子项可收缩，长文本交给 ellipsis / word-break 处理。
+     注：antd 6.6 起 List 已废弃、由 Listy 取代，行节点类名为 .ant-listy-item
+     （旧 .ant-list-item 一并保留，防止仍有未迁移的 List 用法漏掉兜底）。 */
+  .ant-listy-item,
+  .ant-list-item {
+    min-width: 0;
+  }
+  .ant-space-item {
+    min-width: 0;
+  }
+
+  /* 统计数值缩小，避免窄屏撑破卡片。
+     本条是 overflow.css 里唯一需要 important 声明的一条：antd 规则为
+     :where(hash).ant-statistic .ant-statistic-content，特异性 (0,2,0) 高于本文件的
+     (0,1,0)，去掉后字号会被组件官方样式压回 heading3。
+     注：本文件未渲染 Statistic 的页面无法实测，判据为 antd 6.6.2 源码核对，
+     证据等级低于同批 card-body / card-head 的真机实测。 */
+  .ant-statistic-content {
+    font-size: 22px !important;
+  }
+
+  /* 长文本 / 长 IP 不撑破单元格 */
+  .ant-table-cell,
+  .ant-descriptions-item-content {
+    word-break: break-word;
+  }
+
+  /* 描述列表标签不换行，避免窄屏错行 */
+  .ant-descriptions-item-label {
+    white-space: nowrap;
+  }
+}

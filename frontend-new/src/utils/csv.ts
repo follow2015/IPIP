@@ -5,8 +5,8 @@
  * - useExportCSV: React Hook，返回导出函数
  */
 import { useCallback } from 'react';
-import { message } from 'antd';
 import { useTranslation } from 'react-i18next';
+import { useMessage } from '@/hooks/useMessage';
 
 interface ExportCSVOptions {
   filename?: string;
@@ -33,6 +33,7 @@ export function exportCSV(
 
 export function useExportCSV() {
   const { t } = useTranslation('common');
+  const message = useMessage();
   return useCallback(
     <T extends Record<string, unknown>>(
       data: T[],
@@ -47,7 +48,7 @@ export function useExportCSV() {
       const rows = data.map((item) => columns.map((c) => String(item[c.key] ?? '')));
       exportCSV(headers, rows, { filename });
     },
-    [t],
+    [t, message],
   );
 }
 

@@ -13,7 +13,6 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.models.device import Device
-from app.models.device_metric_latest import DeviceMetricLatest
 from app.services.ai.baseline_service import BaselineService
 from app.utils.logging import get_logger
 from extensions import db

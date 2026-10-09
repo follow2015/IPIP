@@ -44,8 +44,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
 
   const firstDevice = devices[0];
   const subtypeLabel = firstDevice?.device_subtype
-    ? (getDeviceSubtypeLabel(firstDevice.device_subtype, t) ??
-      firstDevice.device_subtype)
+    ? (getDeviceSubtypeLabel(firstDevice.device_subtype, t) ?? firstDevice.device_subtype)
     : (firstDevice?.device_type ?? '');
 
   const hasNetworkDevice = devices.some((d) => d.device_type === 'network');
@@ -92,7 +91,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
 
       if (p === 'snmp') {
         const ver = (values.snmp_version as string) || 'v2c';
-        payload.version = ver;
+        payload.snmp_version = ver;
         if (ver === 'v2c') {
           payload.community = values.community;
         } else {
@@ -119,12 +118,16 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           name: (values.credential_name as string) || undefined,
           device_ids: deviceIds
         });
-        message.success(t('batchMonitor.message.credentialConfigured', {
-          count: deviceIds.length,
-          protocol: p.toUpperCase()
-        }));
+        message.success(
+          t('batchMonitor.message.credentialConfigured', {
+            count: deviceIds.length,
+            protocol: p.toUpperCase()
+          })
+        );
       } catch (err) {
-        message.error(err instanceof Error ? err.message : t('batchMonitor.message.credentialFailed'));
+        message.error(
+          err instanceof Error ? err.message : t('batchMonitor.message.credentialFailed')
+        );
         return;
       }
     }
@@ -182,7 +185,9 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
           message.success(parts.join(t('batchMonitor.separator')));
         }
       } catch (err) {
-        message.error(err instanceof Error ? err.message : t('batchMonitor.message.portSyncFailed'));
+        message.error(
+          err instanceof Error ? err.message : t('batchMonitor.message.portSyncFailed')
+        );
         return;
       }
     }
@@ -227,24 +232,34 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
       >
         {/* 监控开关 */}
         <Divider plain>{t('batchMonitor.monitorSwitch')}</Divider>
-        <Form.Item name="monitor_enabled" label={t('batchMonitor.monitorStatus')} valuePropName="checked">
-          <Switch checkedChildren={tCommon('action.enable')} unCheckedChildren={t('batchMonitor.paused')} />
+        <Form.Item
+          name="monitor_enabled"
+          label={t('batchMonitor.monitorStatus')}
+          valuePropName="checked"
+        >
+          <Switch
+            checkedChildren={tCommon('action.enable')}
+            unCheckedChildren={t('batchMonitor.paused')}
+          />
         </Form.Item>
         <Alert
           type={watchMonitorEnabled ? 'success' : 'warning'}
           showIcon
           style={{ marginBottom: 16 }}
-          message={
-            watchMonitorEnabled
-              ? t('batchMonitor.enableHint')
-              : t('batchMonitor.pauseHint')
-          }
+          message={watchMonitorEnabled ? t('batchMonitor.enableHint') : t('batchMonitor.pauseHint')}
         />
 
         {/* 凭据配置 */}
         <Divider plain>{t('batchMonitor.credentialTitle')}</Divider>
-        <Form.Item name="configure_credential" label={t('batchMonitor.configCredential')} valuePropName="checked">
-          <Switch checkedChildren={t('batchMonitor.config')} unCheckedChildren={t('batchMonitor.skip')} />
+        <Form.Item
+          name="configure_credential"
+          label={t('batchMonitor.configCredential')}
+          valuePropName="checked"
+        >
+          <Switch
+            checkedChildren={t('batchMonitor.config')}
+            unCheckedChildren={t('batchMonitor.skip')}
+          />
         </Form.Item>
 
         {watchConfigureCredential && (
@@ -279,8 +294,15 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
 
         {/* 指标模板组 */}
         <Divider plain>{t('credential.templateGroupTitle')}</Divider>
-        <Form.Item name="configure_group" label={t('batchMonitor.configGroup')} valuePropName="checked">
-          <Switch checkedChildren={t('batchMonitor.config')} unCheckedChildren={t('batchMonitor.skip')} />
+        <Form.Item
+          name="configure_group"
+          label={t('batchMonitor.configGroup')}
+          valuePropName="checked"
+        >
+          <Switch
+            checkedChildren={t('batchMonitor.config')}
+            unCheckedChildren={t('batchMonitor.skip')}
+          />
         </Form.Item>
 
         {watchConfigureGroup && (
@@ -310,10 +332,10 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
                 notFoundContent={
                   <Space direction="vertical" size={2} style={{ padding: 8 }}>
                     <span>
-                    {t('credential.noMatchedGroup', {
-                      type: firstDevice?.device_type ?? t('credential.currentType')
-                    })}
-                  </span>
+                      {t('credential.noMatchedGroup', {
+                        type: firstDevice?.device_type ?? t('credential.currentType')
+                      })}
+                    </span>
                     <span style={{ fontSize: 12, color: '#999' }}>
                       {t('credential.createInMonitorCenter')}
                     </span>
@@ -328,8 +350,15 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
         {hasNetworkDevice && (
           <>
             <Divider plain>{t('batchMonitor.portSyncTitle')}</Divider>
-            <Form.Item name="configure_port_sync" label={t('batchMonitor.configPortSync')} valuePropName="checked">
-              <Switch checkedChildren={t('batchMonitor.config')} unCheckedChildren={t('batchMonitor.skip')} />
+            <Form.Item
+              name="configure_port_sync"
+              label={t('batchMonitor.configPortSync')}
+              valuePropName="checked"
+            >
+              <Switch
+                checkedChildren={t('batchMonitor.config')}
+                unCheckedChildren={t('batchMonitor.skip')}
+              />
             </Form.Item>
 
             {watchConfigurePortSync && (

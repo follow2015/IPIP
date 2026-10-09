@@ -21,11 +21,12 @@
 """
 from typing import Optional, Tuple
 
+from app.utils import redis_keys
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-_PREFIX = "ai:idem:"
+_PREFIX = redis_keys.AI_IDEM_PREFIX
 _TTL = 86400
 
 
@@ -36,7 +37,7 @@ def _scoped_key(key: str, user_id: int) -> str:
     task_id（归属校验可兜底，但存在性信息仍外泄）。user_id 为必填参数，
     在签名层面杜绝调用方遗漏。
     """
-    return f"{_PREFIX}{user_id}:{key}"
+    return redis_keys.ai_idem_key(user_id, key)
 
 
 class IdempotencyUnavailableError(RuntimeError):
@@ -98,7 +99,7 @@ def try_claim(
         return False, existing
     except IdempotencyUnavailableError:
         raise  # fail-closed 信号，不得被下方兜底吞掉
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         if fail_closed:
             raise IdempotencyUnavailableError(
                 f"Redis 异常，高危操作拒绝执行: {e}") from e

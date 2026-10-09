@@ -41,6 +41,7 @@ from app.services.monitoring.protocol_registry import (
     DEFAULT_LOOP_INTERVALS,
 )
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -94,13 +95,11 @@ def _rate_limit_allow(r, loop_name: str, interval: int) -> bool:
     """
     try:
         allowed = r.eval(
-            _RATE_LIMIT_LUA, 1, f"monitor:rate:{loop_name}",
+            _RATE_LIMIT_LUA, 1, redis_keys.monitor_rate_key(loop_name),
             str(max(int(interval), 1) * 1000), str(_lock_ttl(interval)),
         )
-    except Exception:
-        logger.debug(
-            "监控最小间隔闸门不可用（本轮放行） loop=%s", loop_name, exc_info=True
-        )
+    except Exception as exc:  # noqa: BLE001 -- 监控循环心跳/统计写入降级：高频路径，Redis 异常不可枚举且不能中断循环（详见行内注释）
+        _warn_rate_limit_degraded(loop_name, exc)
         return True
 
     if allowed:
@@ -110,7 +109,7 @@ def _rate_limit_allow(r, loop_name: str, interval: int) -> bool:
         from app.services.monitoring.round_metrics import record_skip
 
         record_skip(loop_name)
-    except Exception:  # noqa: BLE001  指标写失败不得影响采集
+    except Exception:  # noqa: BLE001 - 候选来源不可读则跳过（下方还有多个来源）  指标写失败不得影响采集
         logger.debug("监控跳过计数写入失败（已忽略） loop=%s", loop_name)
     return False
 
@@ -163,7 +162,7 @@ def _acquire_lock(r, loop_name: str, interval: int, rate_limit: bool = True) -> 
     if rate_limit and not _rate_limit_allow(r, loop_name, interval):
         return False
     return bool(
-        r.set(f"monitor:lock:{loop_name}", owner_token(),
+        r.set(redis_keys.monitor_lock_key(loop_name), owner_token(),
               nx=True, ex=_lock_ttl(interval))
     )
 
@@ -171,7 +170,7 @@ def _acquire_lock(r, loop_name: str, interval: int, rate_limit: bool = True) -> 
 def _renew_lock(r, loop_name: str, interval: int) -> bool:
     """续期轮询锁；仍持有返回 True，已易主 / 已过期返回 False。"""
     res = r.eval(
-        _RENEW_LOCK_LUA, 1, f"monitor:lock:{loop_name}",
+        _RENEW_LOCK_LUA, 1, redis_keys.monitor_lock_key(loop_name),
         owner_token(), str(_lock_ttl(interval)),
     )
     return bool(res)
@@ -243,6 +242,41 @@ _STOP_POLL_SECONDS = 1.0
 _LOOP_ERROR_LOG_BURST = 5
 _LOOP_ERROR_LOG_INTERVAL = 60.0
 _loop_error_log_state: dict = {}
+
+
+_rate_limit_warn_state: dict = {}
+
+
+def _warn_rate_limit_degraded(loop_name: str, exc: Exception) -> None:
+    """最小间隔闸门不可用时的**节流**告警（复用循环异常日志的抑制口径）。
+
+    [WARN] 为什么独立于 ``_log_loop_error``：后者的 state key 是 loop_name，
+    而本闸门在**同一 loop 的每轮**都会走（含正常轮次），若共用 state 会把
+    循环异常的计数口径污染（测试断言"Redis 拒连时反复重试"依赖该计数）。
+    故用独立的 ``_rate_limit_warn_state``，但**阈值与间隔沿用同一常量**，
+    保证两处的抑制行为一致、调参只需改一处。
+
+    这是限流不是吞错：前 `_LOOP_ERROR_LOG_BURST` 次带堆栈（一次即可定位），
+    之后每 `_LOOP_ERROR_LOG_INTERVAL` 秒一条摘要。返回值语义（fail-open 放行）
+    完全不变 —— 闸门只是限速，锁才是互斥权威。
+    """
+    import time as _time
+
+    state = _rate_limit_warn_state.setdefault(loop_name, [0, 0.0])
+    state[0] += 1
+    now = _time.monotonic()
+    if state[0] <= _LOOP_ERROR_LOG_BURST:
+        logger.debug(
+            "监控最小间隔闸门不可用（本轮放行） loop=%s", loop_name, exc_info=True
+        )
+        state[1] = now
+    elif now - state[1] >= _LOOP_ERROR_LOG_INTERVAL:
+        logger.warning(
+            "监控最小间隔闸门持续不可用（连续 %d 次本轮放行；完整堆栈见前 %d 条） "
+            "loop=%s 最近错误: %s",
+            state[0], _LOOP_ERROR_LOG_BURST, loop_name, exc,
+        )
+        state[1] = now
 
 
 def _log_loop_error(loop_name: str) -> None:
@@ -428,7 +462,7 @@ def _try_sync_non_managed_ports(device) -> None:
                 device.id, port_rows,
             )
         db.session.commit()
-    except Exception:  # noqa: BLE001 - 端口同步失败不阻断主探测
+    except Exception:  # 端口同步失败不阻断主探测
         logger.warning(
             "网络设备端口同步失败 device_id=%s", getattr(device, "id", None),
             exc_info=True,
@@ -461,19 +495,28 @@ def _check_one_device(app, monitor_service, device_id: int) -> bool:
                     from app.persistence.device_metric_latest_repository import (
                         DeviceMetricLatestRepository,
                     )
-                    try:
-                        DeviceMetricLatestRepository().upsert_many(device.id, collected)
-                    except Exception:  # noqa: BLE001 - latest 写入失败不阻断告警
-                        db.session.rollback()
-                        logger.warning("device_metric_latest upsert 失败 device_id=%s", device.id, exc_info=True)
-                    try:
+                    def _isolated(label, fn):
+                        """在 savepoint 里跑 fn；失败只回滚这一段，并记日志。"""
+                        try:
+                            with db.session.begin_nested():
+                                fn()
+                        except Exception:  # 单段失败不阻断其它段与告警
+                            logger.warning(
+                                "%s 失败 device_id=%s（已回滚该段，不影响其它写入）",
+                                label, device.id, exc_info=True,
+                            )
+
+                    _isolated(
+                        "device_metric_latest upsert",
+                        lambda: DeviceMetricLatestRepository().upsert_many(device.id, collected),
+                    )
+                    def _write_timeseries():
                         from app.persistence.device_metric_timeseries_repository import (
                             DeviceMetricTimeseriesRepository,
                         )
                         DeviceMetricTimeseriesRepository().add_many(device.id, collected)
-                    except Exception:  # noqa: BLE001 - 时序写入失败不阻断告警
-                        db.session.rollback()
-                        logger.warning("device_metric_timeseries insert 失败 device_id=%s", device.id, exc_info=True)
+
+                    _isolated("device_metric_timeseries insert", _write_timeseries)
                     MetricAlertService().process(device.id, collected)
                     db.session.commit()
                 _try_sync_non_managed_ports(device)
@@ -483,6 +526,98 @@ def _check_one_device(app, monitor_service, device_id: int) -> bool:
     except Exception:
         logger.error("监控探测异常（已吞掉，不中断整轮） device_id=%s", device_id, exc_info=True)
         return False
+
+
+
+_SHARED_POOL_LOCK = threading.Lock()
+_shared_executor = None
+_shared_executor_refs = 0
+
+
+def _shared_pool_size(app) -> int:
+    """共享池容量 = 单 loop 配置值 与 DB 并发上限取小（后者默认 24 < 池 30）。"""
+    per_loop = app.config.get("MONITOR_THREAD_POOL_SIZE", 20)
+    cap = app.config.get("MONITOR_MAX_DB_CONCURRENCY", 24)
+    per_loop = 20 if per_loop is None else int(per_loop)
+    cap = 24 if cap is None else int(cap)
+    return max(1, min(per_loop, cap))
+
+
+def _acquire_shared_executor(app):
+    """取共享池（引用计数 +1）。
+
+    惰性创建：单测把模块级 `ThreadPoolExecutor` 打桩成串行 fake（见文件头
+    docstring），若池在 import 时就建好，打桩将永远不生效。
+    """
+    global _shared_executor, _shared_executor_refs
+    with _SHARED_POOL_LOCK:
+        if _shared_executor is None:
+            _shared_executor = ThreadPoolExecutor(
+                max_workers=_shared_pool_size(app),
+                thread_name_prefix="monitor-shared",
+            )
+        _shared_executor_refs += 1
+        return _shared_executor
+
+
+def _release_shared_executor() -> None:
+    """归还共享池（引用计数 -1，归零才真正关闭）。"""
+    global _shared_executor, _shared_executor_refs
+    with _SHARED_POOL_LOCK:
+        if _shared_executor_refs > 0:
+            _shared_executor_refs -= 1
+        if _shared_executor_refs <= 0 and _shared_executor is not None:
+            _shared_executor_refs = 0
+            _shared_executor.shutdown(wait=False, cancel_futures=True)
+            _shared_executor = None
+
+
+def reset_shared_executor() -> None:
+    """强制丢弃共享池（仅供单测隔离，避免上一用例建好的池漏进下一用例）。"""
+    global _shared_executor, _shared_executor_refs
+    with _SHARED_POOL_LOCK:
+        if _shared_executor is not None:
+            _shared_executor.shutdown(wait=False, cancel_futures=True)
+        _shared_executor = None
+        _shared_executor_refs = 0
+
+
+def _pool_saturation(pool) -> dict | None:
+    """连接池饱和度快照；池型不支持（NullPool / 测试替身）时返回 None。"""
+    try:
+        size = pool.size()
+        checkedout = pool.checkedout()
+    except Exception:  # noqa: BLE001 -- 观测不得影响主流程：池型千差万别（NullPool/StaticPool/替身），任何探测方式失败都降级为"不观测"
+        return None
+    if not isinstance(size, int) or not isinstance(checkedout, int):
+        return None
+    return {
+        "size": size,
+        "checkedout": checkedout,
+        "overflow": max(0, checkedout - size),
+    }
+
+
+def _log_pool_saturation(loop_name: str) -> dict | None:
+    """常驻连接不够用（已在吃 overflow）时告警。
+
+    这是"线程数 ≫ 连接数"的领先指标：等到真的抛 TimeoutError 时，探测已经
+    排队等了 30 s，而现场只看到一个泛型的连接池异常。
+    """
+    try:
+        from extensions import db
+
+        pool = db.engine.pool
+    except Exception:  # noqa: BLE001 -- 观测不得影响主流程（未推 app context / 非 Flask-SQLAlchemy 时静默跳过）
+        return None
+    stats = _pool_saturation(pool)
+    if stats and stats["overflow"] > 0:
+        logger.warning(
+            "监控探测连接饱和 loop=%s checkedout=%d size=%d overflow=%d"
+            "（超出常驻连接的部分正在等 pool_timeout）",
+            loop_name, stats["checkedout"], stats["size"], stats["overflow"],
+        )
+    return stats
 
 
 
@@ -559,6 +694,7 @@ def _run_one_round(app, loop_name: str, monitor_service, executor=None, stop_eve
         finally:
             if own_executor:
                 ex.shutdown(wait=False)
+        _log_pool_saturation(loop_name)
         stats = {"checked": checked, "failed": failed, "total": len(target_ids)}
         if aborted:
             stats["aborted"] = True
@@ -675,7 +811,7 @@ def _resolve_loop_interval(app, loop_name: str, current: int) -> int:
         )
     try:
         candidates.append(app.config.get(cfg_key, current))
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001, S110 - 候选来源不可读则跳过（下方还有多个来源）
         pass
 
     for raw in candidates:
@@ -693,14 +829,14 @@ def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) 
     每轮：动态读取 MONITOR_INTERVAL_<LOOP>（热重载）→ 过最小间隔闸门（同 loop 的
     全部实例共享一个 interval 配额）→ 抢 Redis 锁（TTL 随 interval 同步）→ 抢到则
     跑一轮 → stop_event.wait(interval)（可被 set 提前唤醒）。
-    复用单一 ThreadPoolExecutor（与 standalone_service 一致），避免每轮新建销毁池。
+
+    线程池：M9 起改为**全部 loop 共用一个进程级池**（`_acquire_shared_executor`），
+    避免 4 个 loop × 20 线程 = 80 去抢 30 条 DB 连接。与 standalone_service 一致地
+    跨轮复用（不每轮新建销毁），差别只在"跨 loop 也复用"。
     """
     monitor_service = _build_monitor_service()
     r = _redis_client(app)
-    pool_size = app.config.get("MONITOR_THREAD_POOL_SIZE", 20)
-    executor = ThreadPoolExecutor(
-        max_workers=pool_size, thread_name_prefix=f"monitor-{loop_name}"
-    )
+    executor = _acquire_shared_executor(app)
     try:
         while not stop_event.is_set():
             try:
@@ -732,19 +868,19 @@ def _poll_loop(app, loop_name: str, interval: int, stop_event: threading.Event) 
                         logger.error("监控轮询一轮异常（已吞掉，继续循环） loop=%s", loop_name, exc_info=True)
                     finally:
                         try:
-                            release_owner_lock(r, f"monitor:lock:{loop_name}")
+                            release_owner_lock(r, redis_keys.monitor_lock_key(loop_name))
                         except Exception:
                             logger.warning("监控轮询锁释放失败 loop=%s", loop_name, exc_info=True)
                 from app.services.monitoring.adapters.base_adapter import get_orphan_count
                 logger.debug("监控轮询一轮结束 loop=%s orphan_count=%d", loop_name, get_orphan_count())
                 stop_event.wait(interval)
-            except Exception:
+            except Exception:  # noqa: BLE001 -- 循环级兜底：此前 _acquire_lock 未被保护导致线程退出后无人拉起，该 loop 探测永久停止（详见行内注释）
                 if stop_event.is_set():
                     break
                 _log_loop_error(loop_name)
                 stop_event.wait(_LOOP_ERROR_BACKOFF_SECONDS)
     finally:
-        executor.shutdown(wait=False, cancel_futures=True)
+        _release_shared_executor()
 
 
 

@@ -184,7 +184,7 @@ class IPAuditService:
             })
             session.commit()
             return log
-        except Exception:  # noqa: BLE001 - 审计留痕失败不能阻断 IP 业务操作
+        except Exception:  # 审计留痕失败不能阻断 IP 业务操作
             session.rollback()
             logger.exception("IP归属审计留痕失败（不影响业务）: ip=%s", ip_address)
             return None
@@ -235,7 +235,7 @@ class IPAuditService:
             count = repo.bulk_insert_allocations(rows)
             session.commit()
             return count
-        except Exception:  # noqa: BLE001 - 审计留痕失败不能阻断 IP 业务操作
+        except Exception:  # 审计留痕失败不能阻断 IP 业务操作
             session.rollback()
             logger.exception("IP归属审计批量留痕失败（不影响业务），共 %d 条", len(rows))
             return 0
@@ -253,7 +253,7 @@ class IPAuditService:
         if operator_id is not None:
             return operator_id
         try:
-            from app.utils.auth import get_current_user_id
+            from app.services.auth import get_current_user_id
 
             return get_current_user_id()
         except Exception:  # noqa: BLE001 - 无 app context 时 g 访问会抛异常

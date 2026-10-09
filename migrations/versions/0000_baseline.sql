@@ -180,7 +180,7 @@ CREATE TABLE `device_config_backups` (
   `device_id` bigint NOT NULL,
   `config_content` mediumtext NOT NULL,
   `config_hash` varchar(64) NOT NULL,
-  `backup_type` enum('manual','scheduled','pre_change') NOT NULL DEFAULT 'manual',
+  `backup_type` enum('manual','scheduled','pre_change','pre_remedial') NOT NULL DEFAULT 'manual',
   `file_size` int unsigned DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -363,6 +363,7 @@ CREATE TABLE `device_metric_timeseries` (
   `metric_key` varchar(64) NOT NULL COMMENT '指标 key，如 cpu_usage / temperature / if_status',
   `index_key` varchar(128) NOT NULL DEFAULT '' COMMENT '指标实例索引，如端口号 ifIndex；无索引时为空串',
   `value` varchar(255) DEFAULT NULL COMMENT '指标值（字符串存储，前端按 metric_type 解析为数值/状态）',
+  `value_num` double DEFAULT NULL COMMENT 'value 的数值派生列（非数值指标为 NULL），供 M1 预聚合做 AVG/MIN/MAX，避免 CAST(value) 全表扫；填充口径见 app/utils/metric_value.py::parse_metric_value_num',
   `severity` varchar(20) DEFAULT NULL COMMENT '告警级别 ok/warn/crit（阈值判定结果）',
   `breached` tinyint(1) NOT NULL DEFAULT '0' COMMENT '本次采集是否触发阈值告警',
   `collected_at` datetime NOT NULL COMMENT '采集时间（=趋势横轴，分区键）',
@@ -371,6 +372,50 @@ CREATE TABLE `device_metric_timeseries` (
   KEY `ix_dmts_device_metric_collected` (`device_id`,`metric_key`,`collected_at`),
   KEY `ix_dmts_collected` (`collected_at`)
 ) ENGINE=InnoDB AUTO_INCREMENT=10560034 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设备指标值历史时序分区表（每次采集每指标一行，供趋势图，保留90天）';
+
+DROP TABLE IF EXISTS `device_metric_timeseries_daily`;
+CREATE TABLE `device_metric_timeseries_daily` (
+  `device_id` bigint NOT NULL COMMENT '关联设备ID',
+  `metric_key` varchar(64) NOT NULL COMMENT '指标 key，与明细表同名同义',
+  `index_key` varchar(128) NOT NULL DEFAULT '' COMMENT '指标实例索引（端口号 ifIndex）；不可省，跨实例平均是错语义',
+  `day_bucket` date NOT NULL COMMENT '日期桶（UTC，由 DATE(hour_bucket) 产出）',
+  `avg_value` double DEFAULT NULL COMMENT '当天各小时桶 avg_value 的均值；非数值指标为 NULL',
+  `min_value` double DEFAULT NULL COMMENT '当天各小时桶 min_value 的最小值',
+  `max_value` double DEFAULT NULL COMMENT '当天各小时桶 max_value 的最大值',
+  `sample_count` int NOT NULL DEFAULT '0' COMMENT '当天覆盖的小时桶数',
+  `sum_sq` double DEFAULT NULL COMMENT '当天各小时桶 sum_sq 之和，供方差合成',
+  `numeric_count` int NOT NULL DEFAULT '0' COMMENT '当天各小时桶 numeric_count 之和',
+  `last_value` varchar(255) DEFAULT NULL COMMENT '当天最后一个小时桶的 last_value（状态词保真）',
+  `state_changes` int NOT NULL DEFAULT '0' COMMENT '当天各小时桶 state_changes 之和',
+  `breach_count` int NOT NULL DEFAULT '0' COMMENT '当天各小时桶 breach_count 之和',
+  `worst_severity` varchar(20) DEFAULT NULL COMMENT '当天最坏告警级别 ok/warn/crit',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次聚合时间',
+  PRIMARY KEY (`device_id`,`metric_key`,`index_key`,`day_bucket`),
+  KEY `ix_dmts_daily_bucket` (`day_bucket`),
+  CONSTRAINT `fk_dmts_daily_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设备指标时序天级预聚合（M1 分层对称化，保留730天长期趋势）';
+
+DROP TABLE IF EXISTS `device_metric_timeseries_hourly`;
+CREATE TABLE `device_metric_timeseries_hourly` (
+  `device_id` bigint NOT NULL COMMENT '关联设备ID',
+  `metric_key` varchar(64) NOT NULL COMMENT '指标 key，与明细表同名同义（如 cpu_usage / if_status）',
+  `index_key` varchar(128) NOT NULL DEFAULT '' COMMENT '指标实例索引（端口号 ifIndex）；不可省，跨实例平均是错语义',
+  `hour_bucket` datetime NOT NULL COMMENT '小时桶起点（UTC）',
+  `avg_value` double DEFAULT NULL COMMENT '桶内 value_num 均值；非数值指标为 NULL',
+  `min_value` double DEFAULT NULL COMMENT '桶内 value_num 最小值；非数值指标为 NULL',
+  `max_value` double DEFAULT NULL COMMENT '桶内 value_num 最大值；非数值指标为 NULL',
+  `sample_count` int NOT NULL DEFAULT '0' COMMENT '桶内采样点数（含非数值指标）',
+  `sum_sq` double DEFAULT NULL COMMENT '桶内 value_num 的平方和 Σ(x²)，供方差合成（非数值指标为 NULL）',
+  `numeric_count` int NOT NULL DEFAULT '0' COMMENT '桶内 value_num 非 NULL 的行数（= AVG 的分母；方差合成必需）',
+  `last_value` varchar(255) DEFAULT NULL COMMENT '桶内时间最晚的原始 value（状态词靠它保真）',
+  `state_changes` int NOT NULL DEFAULT '0' COMMENT '桶内 value 跃变次数（相邻采样不同计 1）；up→down→up 记 2',
+  `breach_count` int NOT NULL DEFAULT '0' COMMENT '桶内 breached=1 的采样数',
+  `worst_severity` varchar(20) DEFAULT NULL COMMENT '桶内最坏告警级别 ok/warn/crit',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次聚合时间',
+  PRIMARY KEY (`device_id`,`metric_key`,`index_key`,`hour_bucket`),
+  KEY `ix_dmts_hourly_bucket` (`hour_bucket`),
+  CONSTRAINT `fk_dmts_hourly_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设备指标时序小时级预聚合（M1 分层对称化，保留90天）';
 
 DROP TABLE IF EXISTS `device_monitor_credentials`;
 CREATE TABLE `device_monitor_credentials` (

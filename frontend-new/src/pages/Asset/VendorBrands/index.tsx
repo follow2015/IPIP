@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import {
   Card,
-  Table,
   Button,
   Space,
   Modal,
@@ -223,7 +222,9 @@ export default function VendorBrandsPage() {
               <Form.Item
                 name="brand_name"
                 label={ta('vendorBrand.field.brandName')}
-                rules={[{ required: true, message: ta('vendorBrand.validation.brandNameRequired') }]}
+                rules={[
+                  { required: true, message: ta('vendorBrand.validation.brandNameRequired') }
+                ]}
               >
                 <Input placeholder="Dell EMC" />
               </Form.Item>

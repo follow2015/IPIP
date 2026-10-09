@@ -164,7 +164,7 @@ class SwitchExtRepository:
             Cabinet, Device.cabinet_id == Cabinet.id
         ).filter(
             Cabinet.room_id == room_id,
-            SwitchCredentials.has_ssh == False,
+            SwitchCredentials.has_ssh.is_(False),
         ).all()
 
     def get_no_auth_switches_by_device_ids(self, device_ids: list[int]) -> list[SwitchCredentials]:
@@ -182,7 +182,7 @@ class SwitchExtRepository:
             return []
         return SwitchCredentials.query.filter(
             SwitchCredentials.device_id.in_(device_ids),
-            SwitchCredentials.has_ssh == False,
+            SwitchCredentials.has_ssh.is_(False),
         ).all()
 
     def get_device_name_map_by_ids(self, device_ids: list[int]) -> dict[int, str]:

@@ -18,8 +18,13 @@ except ImportError:  # pragma: no cover
 try:
     import chromadb
     _HAS_CHROMA = True
+    _CHROMA_IMPORT_ERROR = ""
 except ImportError:  # pragma: no cover
     _HAS_CHROMA = False
+    _CHROMA_IMPORT_ERROR = "chromadb 未安装"
+except RuntimeError as _e:
+    _HAS_CHROMA = False
+    _CHROMA_IMPORT_ERROR = f"{_e}"
 
 from app.utils.logging import get_logger
 
@@ -94,7 +99,7 @@ def _chunk_doc_id(domain: str, source: str, block: str) -> str:
     前缀 c- 与旧版"整文 md5"id 区分，避免新旧粒度在同一 collection 混存冲突。
     同一块内容重复出现（文件间重复段落）自然去重合并。
     """
-    return "c-" + hashlib.md5(f"{domain}\x00{source}\x00{block}".encode()).hexdigest()[:16]
+    return "c-" + hashlib.md5(f"{domain}\x00{source}\x00{block}".encode(), usedforsecurity=False).hexdigest()[:16]
 
 
 def _rrf_fuse(vec_chunks: list, kw_chunks: list) -> list:
@@ -120,7 +125,7 @@ def _rrf_fuse(vec_chunks: list, kw_chunks: list) -> list:
         e["kw_rank"] = rank0
 
     scored = []
-    for did, e in merged.items():
+    for _did, e in merged.items():
         s = 0.0
         if e["vec_rank"] is not None:
             s += 1.0 / (_RRF_K + e["vec_rank"] + 1)
@@ -174,6 +179,10 @@ class RAGStore:
                  fts_db: str = "instance/rag_fts.db"):
         self.available = _HAS_CHROMA
         if not self.available:
+            logger.warning("RAG 向量检索不可用，已降级（原因：%s）。"
+                           "关键词索引随 RAGStore 一并停用；如需完整 RAG，"
+                           "请修复该依赖后重启服务。",
+                           _CHROMA_IMPORT_ERROR or "未知")
             return
         self.client = chromadb.PersistentClient(path=persist_dir,
                                                   settings=chromadb.Settings(anonymized_telemetry=False))
@@ -201,7 +210,7 @@ class RAGStore:
         try:
             from app.services.ai.rag.keyword_index import KeywordIndex
             self.kw_index = KeywordIndex(fts_db)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- FTS5 初始化失败降级为纯向量检索：SQLite 版本差异导致，属预期降级
             logger.warning("FTS5 关键词索引初始化失败，降级为纯向量检索: %s", e)
 
         self._meta_ready: Optional[bool] = None
@@ -235,7 +244,7 @@ class RAGStore:
             return
         self.col.upsert(ids=ids, documents=blocks, metadatas=metas)
         if self.kw_index is not None:
-            for doc_id, block in zip(ids, blocks):
+            for doc_id, block in zip(ids, blocks, strict=False):
                 try:
                     self.kw_index.upsert(doc_id, domain, block, source)
                 except Exception as e:  # noqa: BLE001

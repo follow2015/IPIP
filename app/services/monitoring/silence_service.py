@@ -19,10 +19,11 @@ from app.utils.redis_client import get_redis_client
 from datetime import datetime
 from typing import List, Optional
 from app.utils.time_utils import now_utc_naive
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
-_CACHE_KEY = "monitor:silence:active"
+_CACHE_KEY = redis_keys.MONITOR_SILENCE_ACTIVE_KEY
 _CACHE_TTL = 60  # 秒
 
 
@@ -125,7 +126,7 @@ def is_silenced(device_id: int, alert_type: str,
                 continue
             return True
         return False
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 静默服务 fail-open：故障不得吞掉真告警（同 B-17 结论，行内已说明）
         logger.warning("silence_service.is_silenced 失败: %s", exc)
         return False
 
@@ -156,7 +157,6 @@ def create_rule(data: dict, user_id: int = None) -> dict:
     data: {name, device_ids, alert_types, silence_from, silence_until, reason, enabled}
     返回新建规则的 to_dict()。
     """
-    from datetime import datetime as _dt
     from app.models.monitor_silence_rule import MonitorSilenceRule
     from app.persistence.monitor_silence_rule_repository import MonitorSilenceRuleRepository
     from app.exceptions.validation import ValidationError

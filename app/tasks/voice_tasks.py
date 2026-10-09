@@ -6,7 +6,7 @@
 """
 import threading
 import time
-from datetime import datetime, timezone
+import uuid
 
 from celery.exceptions import SoftTimeLimitExceeded
 
@@ -21,8 +21,76 @@ from app.services.channels.voice_providers.terminal_status import (
     is_call_concluded,
     is_failed_status,
 )
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
+
+_PENDING_PREFIX = redis_keys.VOICE_PENDING_PREFIX
+
+PENDING_TTL = 900  # 15 分钟
+
+
+def _new_pending_placeholder() -> str:
+    """生成占位值：pending:<epoch秒>:<uuid4>，带时间戳才能判断陈旧。"""
+    return f"{_PENDING_PREFIX}{int(time.time())}:{uuid.uuid4().hex}"
+
+
+def _is_pending_placeholder(call_id: str | None) -> bool:
+    return bool(call_id) and call_id.startswith(_PENDING_PREFIX)
+
+
+def _pending_is_stale(placeholder: str) -> bool:
+    """占位是否陈旧（超过 PENDING_TTL）。格式异常时按陈旧处理（不阻塞重打）。"""
+    try:
+        ts = int(placeholder[len(_PENDING_PREFIX):].split(":", 1)[0])
+    except (ValueError, IndexError):
+        return True
+    return time.time() - ts > PENDING_TTL
+
+
+def _poll_for_callback(receipt, call_timeout: int, *, check_first: bool = False):
+    """短轮询等待回调把终态写进 channel_status。
+
+    Args:
+        receipt: NotificationReceipt 实例
+        call_timeout: 轮询窗口（秒）
+        check_first: True 则**先查一次再等待**。补轮询路径（重入时呼叫早已
+            发出，回调可能在上次进程崩溃期间就已到达）必须用它；首次呼叫
+            路径刚拨出不可能有回调，先 sleep 更省一次查询。
+
+    Returns:
+        dict | None: 等到终态返回结果 dict；窗口内没等到返回 None，
+            由调用方决定抛 TransientVoiceError 触发重试。
+
+    Raises:
+        TransientVoiceError: 终态标记为 retryable（占线/超并发等），交 Celery 重试。
+    """
+    from extensions import db
+
+    poll_interval = 5
+    deadline = time.time() + max(1, call_timeout)
+    checked = False
+
+    while True:
+        if checked or not check_first:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return None
+            time.sleep(min(poll_interval, remaining))
+        checked = True
+
+        db.session.expire(receipt)  # 强制重读
+        status_now = dict(receipt.channel_status or {})
+        current = status_now.get("voice")
+        call_id = status_now.get("voice_call_id")
+
+        if current in VOICE_RESULT_EVENTS:
+            return {"result": current, "call_id": call_id}
+        if current == "no_answer" or is_failed_status(current):
+            if status_now.get("voice_retryable"):
+                raise TransientVoiceError(f"call ended: {current}")
+            logger.info("语音呼叫终态不重试: receipt_id=%s status=%s", receipt.id, current)
+            return {"result": current, "call_id": call_id, "retried": False}
 
 
 def _get_voice_redis():
@@ -103,6 +171,31 @@ def send_voice_call(self, receipt_id: int) -> dict:
     provider = get_voice_provider(provider_name)
     redis_client = _get_voice_redis()
 
+    existing_call_id = status.get("voice_call_id")
+    if existing_call_id:
+        call_timeout = min(int(config.get("call_timeout", 30)), 30)
+        if _is_pending_placeholder(existing_call_id):
+            if not _pending_is_stale(existing_call_id):
+                logger.warning(
+                    "语音重入：上次呼叫可能已拨出（pending 占位未陈旧），本次不重复拨打 "
+                    "receipt_id=%s placeholder=%s", receipt_id, existing_call_id,
+                )
+                return {"skipped": "call_inflight", "call_id": existing_call_id}
+            logger.warning(
+                "语音重入：pending 占位已陈旧（>%ds），判定上次未拨出，允许重新发起 "
+                "receipt_id=%s placeholder=%s", PENDING_TTL, receipt_id, existing_call_id,
+            )
+            status.pop("voice_call_id", None)
+        else:
+            logger.info(
+                "语音重入：呼叫已发起，只补轮询不再拨打 receipt_id=%s call_id=%s",
+                receipt_id, existing_call_id,
+            )
+            waited = _poll_for_callback(receipt, call_timeout, check_first=True)
+            if waited is not None:
+                return waited
+            raise TransientVoiceError("callback_timeout")
+
     if not _check_and_consume_budget(redis_client, callee_user.contact_phone, config):
         status["voice"] = "failed:throttled:budget_exhausted"
         receipt.channel_status = status
@@ -112,6 +205,11 @@ def send_voice_call(self, receipt_id: int) -> dict:
         return {"status": "budget_exhausted"}
 
     status["voice"] = "calling"
+    status["voice_call_id"] = _new_pending_placeholder()
+    receipt.channel_status = status
+    flag_modified(receipt, "channel_status")
+    db.session.commit()
+
     _t0 = time.perf_counter()
     try:
         call_id = provider.make_call(
@@ -125,6 +223,7 @@ def send_voice_call(self, receipt_id: int) -> dict:
                     receipt_id, call_id, provider_name, _duration_ms)
     except PermanentVoiceError as exc:
         status["voice"] = f"failed:permanent:{type(exc).__name__}"
+        status["voice_call_id"] = None  # 清占位：没拨出去，别让重入以为"已发起"
         receipt.channel_status = status
         flag_modified(receipt, "channel_status")
         db.session.commit()
@@ -134,9 +233,14 @@ def send_voice_call(self, receipt_id: int) -> dict:
     except TransientVoiceError as exc:
         logger.warning("语音呼叫瞬态失败 receipt_id=%s duration_ms=%d: %s",
                        receipt_id, int((time.perf_counter() - _t0) * 1000), exc)
+        status["voice_call_id"] = None
+        receipt.channel_status = status
+        flag_modified(receipt, "channel_status")
+        db.session.commit()
         raise  # 交由 Celery autoretry
     except Exception as exc:
         status["voice"] = f"failed:{type(exc).__name__}"
+        status["voice_call_id"] = None  # 同上，清占位
         receipt.channel_status = status
         flag_modified(receipt, "channel_status")
         db.session.commit()
@@ -150,24 +254,12 @@ def send_voice_call(self, receipt_id: int) -> dict:
     db.session.commit()
 
     if redis_client:
-        redis_client.setex(f"voice:call:{call_id}", 600, str(receipt_id))
+        redis_client.setex(redis_keys.voice_call_key(call_id), 600, str(receipt_id))
 
     call_timeout = min(int(config.get("call_timeout", 30)), 30)
-    poll_interval = 5
-    poll_count = call_timeout // poll_interval
-
-    for _ in range(poll_count):
-        time.sleep(poll_interval)
-        db.session.expire(receipt)  # 强制重读
-        status_now = dict(receipt.channel_status or {})
-        current = status_now.get("voice")
-        if current in VOICE_RESULT_EVENTS:
-            return {"result": current, "call_id": call_id}
-        if current == "no_answer" or is_failed_status(current):
-            if status_now.get("voice_retryable"):
-                raise TransientVoiceError(f"call ended: {current}")
-            logger.info("语音呼叫终态不重试: receipt_id=%s status=%s", receipt_id, current)
-            return {"result": current, "call_id": call_id, "retried": False}
+    waited = _poll_for_callback(receipt, call_timeout)
+    if waited is not None:
+        return waited
 
     raise TransientVoiceError("callback_timeout")
 
@@ -178,7 +270,7 @@ def cancel_voice_retry_task(task_id: str) -> dict:
     try:
         celery.control.revoke(task_id, terminate=False)
         return {"revoked": task_id}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 取消语音重试失败兜底：转为结构化结果返回，Celery/网络异常类型不可枚举
         logger.warning("取消语音重试 task 失败 task_id=%s: %s", task_id, exc)
         return {"revoked": None, "error": str(exc)}
 
@@ -194,7 +286,7 @@ def _build_template_vars(receipt) -> dict:
             "title": (getattr(notif, "title", "") or "")[:30],
             "level": getattr(notif, "severity", "") or "",
         }
-    except Exception:  # 取不到变量不应阻断呼叫（模板无变量时本就不需要）
+    except Exception:  # noqa: BLE001 -- 模板变量解析失败返回空字典：模板无变量时本就不需要，不应阻断呼叫
         return {}
 
 
@@ -224,13 +316,13 @@ def _night_window_id(now_ts: int) -> str | None:
     try:
         from config import get_config
         tz_name = getattr(get_config(), "APP_TIMEZONE", "Asia/Shanghai")
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 时区名读取失败降级为 Asia/Shanghai 默认值
         tz_name = "Asia/Shanghai"
 
     try:
         from zoneinfo import ZoneInfo
         tz = ZoneInfo(tz_name)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- zoneinfo 不可用时回退 UTC+8 固定偏移：环境差异导致的异常不可枚举
         from datetime import timedelta, timezone
         tz = timezone(timedelta(hours=8))
 
@@ -254,7 +346,7 @@ def voice_budget_key(provider: str, span: int, phone: str, now: int) -> str:
     [WARN] 改键格式前先想清楚：旧键会在 TTL 内残留，改格式等于限流窗口**重置一次**
     （期间可能多放行几个呼叫）。
     """
-    return f"voice:budget:{provider}:{span}:{phone}:{now // span}"
+    return redis_keys.voice_budget_key(provider, span, phone, now // span)
 
 
 def _check_and_consume_budget(redis_client, phone: str, config: dict) -> bool:
@@ -296,7 +388,7 @@ def _check_and_consume_budget(redis_client, phone: str, config: dict) -> bool:
         night_id = _night_window_id(now)
         if night_id:
             checks.append(
-                (f"voice:budget:{provider}:night:{phone}:{night_id}", night_budget, 14 * 3600)
+                (redis_keys.voice_budget_key(provider, "night", phone, night_id), night_budget, 14 * 3600)
             )
 
     if not redis_client:

@@ -1,7 +1,7 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useMemo } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
-import { Button, Space, Form, InputNumber, Input, Select, Modal } from 'antd';
+import { Button, Space, Form, InputNumber, Input, Select, Modal, theme } from 'antd';
 import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SyncOutlined } from '@ant-design/icons';
 import {
@@ -22,6 +22,7 @@ import { StatusTag } from '@/components/StatusTag';
 import { VLAN_STATUS_MAP } from '@/types/enums';
 import type { VLAN, SwitchPort } from '@/types/models';
 import { useTranslation } from 'react-i18next';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface VlanTabProps {
   deviceId: number;
@@ -29,6 +30,7 @@ interface VlanTabProps {
 }
 
 function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
@@ -78,7 +80,12 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
       addModal.close();
       addForm.resetFields();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -105,7 +112,12 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
       editModal.close();
       setEditingVlan(null);
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -144,7 +156,12 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
       memberModal.close();
       setEditingMemberVlan(null);
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -301,7 +318,9 @@ function VlanTab({ deviceId, hasSsh = true }: VlanTabProps) {
         }}
         destroyOnHidden
       >
-        <p style={{ color: '#8c8c8c', marginBottom: 16 }}>{t('memberPort.purposeHint')}</p>
+        <p style={{ color: token.colorTextTertiary, marginBottom: 16 }}>
+          {t('memberPort.purposeHint')}
+        </p>
         <Form form={editForm} layout="vertical">
           <Form.Item
             name="vlan_id"

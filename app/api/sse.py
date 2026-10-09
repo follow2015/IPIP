@@ -8,7 +8,6 @@ SSE 票据签发端点。
 短期（默认 60s）、一次性（single-use）的 SSE ticket，再将其作为 ?ticket= 传入 SSE URL。
 网关 realtime_gateway 校验 ticket（共享 JWT_SECRET_KEY，无状态）并强制一次性消费。
 """
-import logging
 import os
 from datetime import timedelta
 
@@ -16,7 +15,7 @@ from flask import Blueprint, g, request
 
 from app.api.base import APIResponse, api_exception_handler
 from app.utils import rate_limit_api
-from app.utils.auth import auth_manager, login_required
+from app.services.auth import auth_manager, login_required
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -45,7 +44,7 @@ def _device_in_scope(user_id: int, device_id: int) -> bool:
         from app.services.monitoring.data_scope_service import get_visible_device_ids
 
         visible = get_visible_device_ids(user_id)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error(
             "SSE 票据数据域校验失败，拒绝签发（fail-closed）user_id=%s: %s",
             user_id, exc, exc_info=True,

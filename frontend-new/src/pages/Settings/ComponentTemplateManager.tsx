@@ -6,6 +6,7 @@
  */
 import { useState, useMemo } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
 import { Tabs, Modal, Form, Select, Input, InputNumber, Tag, Button, Space, Switch } from 'antd';
 import DataTable from '@/components/DataTable';
 import { useConfirm } from '@/utils/confirm';
@@ -32,26 +33,15 @@ import {
   NicSpecFields,
   GpuSpecFields
 } from './ComponentSpecFields';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 type CategoryKey = 'cpu' | 'memory' | 'disk' | 'nic' | 'gpu';
 
 type SettingsT = TFunction<'settings'>;
 
-const CATEGORY_LABELS: Record<CategoryKey, string> = {
-  cpu: 'componentTemplate.category.cpu',
-  memory: 'componentTemplate.category.memory',
-  disk: 'componentTemplate.category.disk',
-  nic: 'componentTemplate.category.nic',
-  gpu: 'componentTemplate.category.gpu'
-};
-
 const CATEGORY_KEYS: CategoryKey[] = ['cpu', 'memory', 'disk', 'nic', 'gpu'];
 
-function specSummary(
-  t: SettingsT,
-  category: string,
-  spec: Record<string, unknown>
-): string {
+function specSummary(t: SettingsT, category: string, spec: Record<string, unknown>): string {
   if (!spec || typeof spec !== 'object') return '-';
   const parts: string[] = [];
   switch (category) {
@@ -161,6 +151,7 @@ function ComponentTemplateManager() {
 
   const handleEdit = (record: ComponentTemplate) => {
     setEditRecord(record);
+    form.resetFields();
     form.setFieldsValue({
       category: record.category,
       customer_id: record.customer_id,
@@ -173,6 +164,9 @@ function ComponentTemplateManager() {
     });
     modal.open();
   };
+
+  const isPending = createTemplate.isPending || updateTemplate.isPending;
+  const guard = useDirtyGuard({ form, isPending });
 
   const handleDelete = async (id: number) => {
     try {
@@ -195,8 +189,13 @@ function ComponentTemplateManager() {
       }
       modal.close();
     } catch (err) {
-      if (err instanceof Error) {
-        message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) {
+          message.error(err.message);
+        }
       }
     }
   };
@@ -243,7 +242,11 @@ function ComponentTemplateManager() {
       key: 'is_active',
       width: 60,
       render: (v: boolean) =>
-        v ? <Tag color="green">{t('componentTemplate.yes')}</Tag> : <Tag color="red">{t('componentTemplate.no')}</Tag>
+        v ? (
+          <Tag color="green">{t('componentTemplate.yes')}</Tag>
+        ) : (
+          <Tag color="red">{t('componentTemplate.no')}</Tag>
+        )
     },
     {
       title: t('componentTemplate.column.sortOrder'),
@@ -338,12 +341,16 @@ function ComponentTemplateManager() {
       {/* 新增/编辑弹窗 */}
       <Modal
         title={
-          editRecord ? t('componentTemplate.modal.editTitle') : t('componentTemplate.modal.createTitle')
+          editRecord
+            ? t('componentTemplate.modal.editTitle')
+            : t('componentTemplate.modal.createTitle')
         }
         open={modal.isOpen}
         onOk={handleFormSubmit}
-        onCancel={() => modal.close()}
-        confirmLoading={createTemplate.isPending || updateTemplate.isPending}
+        onCancel={() => guard.requestClose(() => modal.close())}
+        confirmLoading={isPending}
+        closable={!isPending}
+        mask={{ closable: false }}
         width={600}
         destroyOnHidden
       >

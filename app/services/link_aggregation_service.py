@@ -5,7 +5,7 @@
 提供链路聚合组的业务逻辑，通过 Repository 访问数据，不直接操作 ORM/DB。
 """
 from app.utils.logging import get_logger
-from typing import Optional, Dict, List
+from typing import Dict, List
 
 from app.models.link_aggregation import LinkAggregationGroup
 from app.persistence.link_aggregation_repository import LinkAggregationRepository

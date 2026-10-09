@@ -277,7 +277,7 @@ def _switch_distribution(ports: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
 
     counter: Dict[int, Dict[str, Any]] = {}
-    for port, sw in list(ports["access"]) + list(ports["core"]):
+    for _port, sw in list(ports["access"]) + list(ports["core"]):
         item = counter.get(sw.id)
         if item is None:
             meta = ports["switches"].get(sw.id, {})

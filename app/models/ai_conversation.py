@@ -4,7 +4,7 @@
 Task 0.4：记录用户与 AI 的对话轮次，供前端展示历史问答。
 当前各 AI service 暂未接线 save_turn（待后续接入），模型与仓储已就位。
 """
-from sqlalchemy import ForeignKey, Index, Integer, String, Text
+from sqlalchemy import ForeignKey, Index, String, Text
 
 from app.models.base import BaseModel
 from extensions import db

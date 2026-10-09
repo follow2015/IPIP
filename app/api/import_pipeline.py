@@ -83,7 +83,7 @@ def run_import(
     if after_success is not None:
         try:
             after_success(outcome)
-        except Exception:  # noqa: BLE001 - 旁路钩子失败不得影响已成功的导入响应
+        except Exception:  # 旁路钩子失败不得影响已成功的导入响应
             logger.exception("after_success 钩子抛异常（导入已成功，忽略）: scope=%s", idem_scope)
 
     return APIResponse.success(

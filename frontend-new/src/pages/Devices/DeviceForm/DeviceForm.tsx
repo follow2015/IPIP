@@ -1,3 +1,4 @@
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import { useConfirm } from '@/utils/confirm';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Form, Input, Row, Col, Modal } from 'antd';
@@ -18,11 +19,10 @@ import {
 } from '@/services/cabinet';
 import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useUserOptions } from '@/services/user';
-import { useUpdateSwitch } from '@/services/switch';
 import { usePortLinks } from '@/services/device-connection';
 import { useTranslation } from 'react-i18next';
 import { useComponentTemplates } from '@/services/component-template';
-import HardwareConfigFields, { buildStorageSummary } from '@/components/HardwareConfigFields';
+import HardwareConfigFields from '@/components/HardwareConfigFields';
 import NicConfigFields from '@/components/NicConfigFields';
 import { DeviceType, DeviceSubtype, DEVICE_SUBTYPE_MAP, DeviceStatusCode } from '@/types/enums';
 import {
@@ -32,12 +32,7 @@ import {
 } from '@/types/statusMeta';
 import type { Device, DeviceNicPort } from '@/types/models';
 
-import {
-  generateDeviceName,
-  parseStorageConfig,
-  computeStorageSummary,
-  type StorageItem
-} from './deviceFormUtils';
+import { generateDeviceName, parseStorageConfig, type StorageItem } from './deviceFormUtils';
 import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
 import NetworkTopologyFields from './NetworkTopologyFields';
 import BasicInfoFields from './BasicInfoFields';
@@ -79,7 +74,6 @@ function DeviceForm({
   const message = useMessage();
   const createDevice = useCreateDevice();
   const updateDevice = useUpdateDevice();
-  const updateSwitch = useUpdateSwitch();
   const { data: roomOptions } = useRoomOptions();
   const { data: customerOptions } = useAllocatableCustomerOptions();
   const { data: userOptions } = useUserOptions();
@@ -88,13 +82,7 @@ function DeviceForm({
 
   const customerId = Form.useWatch('customer_id', form);
 
-  const { data: cpuTemplates = [] } = useComponentTemplates('cpu', customerId);
-  const { data: memoryTemplates = [] } = useComponentTemplates('memory', customerId);
-  const { data: diskTemplates = [] } = useComponentTemplates('disk', customerId);
-  const { data: nicComponentTemplates = [], isLoading: nicTplLoading } = useComponentTemplates(
-    'nic',
-    customerId
-  );
+  const { data: nicComponentTemplates = [] } = useComponentTemplates('nic', customerId);
 
   const isEdit = !!editRecordProp || !!editDeviceId;
 
@@ -129,22 +117,22 @@ function DeviceForm({
     device_type: DeviceType.SERVER,
     device_subtype: DeviceSubtype.CHASSIS,
     room_id: selectedRoomId ?? undefined,
-    per_page: 999
+    per_page: PER_PAGE_CAP
   });
 
   const { data: allChassisNodesData } = useDeviceList({
     device_type: DeviceType.SERVER,
     device_subtype: DeviceSubtype.NODE,
     room_id: selectedRoomId ?? undefined,
-    per_page: 999
+    per_page: PER_PAGE_CAP
   });
 
   const { data: chassisNodesData } = useDeviceList({
     parent_device_id: selectedChassisId ?? undefined,
-    per_page: 999
+    per_page: PER_PAGE_CAP
   });
 
-  const [storageValidation, setStorageValidation] = useState<{
+  const [, setStorageValidation] = useState<{
     valid: boolean;
     preview: string;
     items: StorageItem[];
@@ -199,7 +187,6 @@ function DeviceForm({
     return allPorts.slice(0, 500);
   }, [portGroups]);
 
-  const showNicConfig = showHardware || (showChassisConfig && generateNodes);
 
   const chassisOptions = useMemo(() => {
     const chassisList = chassisData?.items ?? [];
@@ -248,9 +235,11 @@ function DeviceForm({
     return positions;
   }, [selectedChassisId, chassisData, chassisNodesData, editRecord]);
 
+  const uPosValue = form.getFieldValue('u_position');
+  const heightUValue = form.getFieldValue('height_u');
   const uPositionStatus = useMemo(() => {
-    const uPos = form.getFieldValue('u_position');
-    const heightU = form.getFieldValue('height_u') ?? 1;
+    const uPos = uPosValue;
+    const heightU = heightUValue ?? 1;
     if (!selectedCabinetId || !uPos || !availableUPositions) return null;
 
     const conflicts: number[] = [];
@@ -268,14 +257,7 @@ function DeviceForm({
       }
     }
     return conflicts.length > 0 ? conflicts : null;
-  }, [
-    selectedCabinetId,
-    form.getFieldValue('u_position'),
-    form.getFieldValue('height_u'),
-    availableUPositions,
-    isEdit,
-    editRecord
-  ]);
+  }, [selectedCabinetId, uPosValue, heightUValue, availableUPositions, isEdit, editRecord]);
 
   const handleAutoAssignUPosition = useCallback(() => {
     if (!selectedCabinetId) {
@@ -469,26 +451,12 @@ function DeviceForm({
         prevChassisId.current = undefined;
       }
     }
-  }, [open, editRecord, form]);
+  }, [open, editRecord, form, defaultDeviceType]);
 
   const handleGenerateDeviceName = useCallback(() => {
     const name = generateDeviceName(deviceType);
     form.setFieldValue('device_name', name);
   }, [deviceType, form]);
-
-  const handleStorageChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const text = e.target.value;
-      const result = parseStorageConfig(text);
-      setStorageValidation(result);
-      if (result.valid && result.items.length > 0) {
-        form.setFieldValue('storage_summary', buildStorageSummary(result.items));
-      } else if (!text.trim()) {
-        form.setFieldValue('storage_summary', undefined);
-      }
-    },
-    [form]
-  );
 
   const handleGenerateNodesChange = useCallback(
     (checked: boolean) => {

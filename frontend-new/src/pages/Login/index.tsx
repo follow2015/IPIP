@@ -5,7 +5,7 @@
  * - 已登录自动跳转
  */
 import React from 'react';
-import { Form, Input, Button, Card, Typography, Checkbox } from 'antd';
+import { Form, Input, Button, Card, Typography, Checkbox, theme } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +24,7 @@ function Login() {
   const message = useMessage();
   const { t } = useTranslation('auth');
   const [loading, setLoading] = React.useState(false);
+  const { token } = theme.useToken();
 
   React.useEffect(() => {
     if (isAuthenticated) {
@@ -55,7 +56,7 @@ function Login() {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        background: token.colorBgLayout
       }}
     >
       <Card style={{ width: 400, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
@@ -63,7 +64,7 @@ function Login() {
           <Title level={3} style={{ margin: 0 }}>
             {t('title')}
           </Title>
-          <p style={{ color: '#999', marginTop: 8 }}>{t('subtitle')}</p>
+          <p style={{ color: token.colorTextTertiary, marginTop: 8 }}>{t('subtitle')}</p>
         </div>
         <Form<LoginRequest> onFinish={handleLogin} autoComplete="off" size="large">
           <Form.Item
@@ -86,7 +87,7 @@ function Login() {
             <Checkbox>{t('field.remember', { days: REMEMBER_DAYS })}</Checkbox>
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} block>
+            <Button type="primary" htmlType="submit" loading={loading} disabled={loading} block>
               {t('action.login')}
             </Button>
           </Form.Item>

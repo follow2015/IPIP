@@ -4,18 +4,7 @@
  * 从 Overview 拆分（M28）：保留所有交互逻辑（mutation + 批量选择 + 冷却计时）。
  */
 import { useState, useEffect, useCallback, memo } from 'react';
-import {
-  Card,
-  Table,
-  Tag,
-  Button,
-  Space,
-  Segmented,
-  Tooltip,
-  Typography,
-  Switch,
-  Input
-} from 'antd';
+import { Card, Tag, Button, Space, Segmented, Tooltip, Typography, Switch, Input } from 'antd';
 import {
   ThunderboltOutlined,
   ReloadOutlined,
@@ -140,9 +129,7 @@ export default function DeviceStatusTable() {
         if (axiosErr?.response?.status === 429) {
           message.warning(t('deviceStatus.probe.coolingDown'));
         } else {
-          message.error(
-            err instanceof Error ? err.message : t('deviceStatus.probe.requestFailed')
-          );
+          message.error(err instanceof Error ? err.message : t('deviceStatus.probe.requestFailed'));
         }
       } finally {
         setProbingId(null);
@@ -200,9 +187,7 @@ export default function DeviceStatusTable() {
     } catch (err: unknown) {
       hide();
       message.error(
-        err instanceof Error
-          ? err.message
-          : t(`deviceStatus.probe.batchToggleFailed.${toggleKey}`)
+        err instanceof Error ? err.message : t(`deviceStatus.probe.batchToggleFailed.${toggleKey}`)
       );
     }
   };
@@ -210,9 +195,7 @@ export default function DeviceStatusTable() {
   const handleToggleMonitorEnabled = async (deviceId: number, enabled: boolean) => {
     try {
       await toggleMonitor.mutateAsync({ deviceId, enabled });
-      message.success(
-        t(`deviceStatus.probe.toggleSingle.${enabled ? 'enabled' : 'disabled'}`)
-      );
+      message.success(t(`deviceStatus.probe.toggleSingle.${enabled ? 'enabled' : 'disabled'}`));
     } catch (err: unknown) {
       message.error(err instanceof Error ? err.message : tc('message.operationFailed'));
     }
@@ -293,9 +276,7 @@ export default function DeviceStatusTable() {
       render: (_: unknown, record: MonitorStatusItem) => (
         <Tooltip
           title={
-            record.monitor_enabled === false
-              ? t('status.probePaused')
-              : t('status.probeNormal')
+            record.monitor_enabled === false ? t('status.probePaused') : t('status.probeNormal')
           }
         >
           <Switch

@@ -15,11 +15,12 @@ from app.utils.logging import get_logger
 
 from flask import Blueprint, request
 
-from app.api.base import APIResponse
+from app.api.base import APIResponse, RequestValidator
 from app.services.link_aggregation_service import LinkAggregationService
 from app.persistence.link_aggregation_repository import LinkAggregationRepository
-from app.openapi.doc import doc, public
-from app.utils import login_required, permission_required, rate_limit_api
+from app.openapi.doc import doc
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api
 
 logger = get_logger(__name__)
 
@@ -47,8 +48,7 @@ def list_all_port_channels():
         room_id (int, optional): 按机房筛选
         device_id (int, optional): 按交换机筛选
     """
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    page, per_page = RequestValidator.validate_pagination_params()
     search = request.args.get("search", type=str)
     room_id = request.args.get("room_id", type=int)
     device_id = request.args.get("device_id", type=int)

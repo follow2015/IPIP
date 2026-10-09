@@ -157,6 +157,8 @@ function VLANs() {
   return (
     <div>
       <DataTable<VLANWithHasSsh>
+        error={crud.error}
+        onRetry={crud.refetch}
         columns={columns}
         dataSource={data?.items ?? []}
         rowKey="id"

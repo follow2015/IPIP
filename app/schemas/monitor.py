@@ -265,7 +265,8 @@ class MonitorConfigUpdateSchema(Schema):
                 elif entry.max is not None and value > entry.max:
                     errors[camel] = f"不得大于 {entry.max}"
             elif entry.type == "string":
-                if not isinstance(value, str) or value.strip() == "":
+                allow_empty = entry.default == ""
+                if not isinstance(value, str) or (value.strip() == "" and not allow_empty):
                     errors[camel] = "必须为非空字符串"
             elif entry.type == "bool":
                 if not isinstance(value, bool):

@@ -1,9 +1,5 @@
-/**
- * 菜单配置常量
- * - 供 Sidebar 和 AppLayout 共享使用
- * - 菜单项的 key/label/path 用于 TabBar 标签页同步
- */
 import React from 'react';
+import type { PermissionCode } from '@/router/routePermissions';
 import {
   DashboardOutlined,
   HomeOutlined,
@@ -37,7 +33,9 @@ import {
   ControlOutlined,
   ReadOutlined,
   RobotOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  ContactsOutlined,
+  NodeIndexOutlined
 } from '@ant-design/icons';
 
 export type MenuLabelKey =
@@ -48,6 +46,8 @@ export type MenuLabelKey =
   | 'menu.devices'
   | 'menu.deviceRecycleBin'
   | 'menu.customers'
+  | 'menu.carriers'
+  | 'menu.circuits'
   | 'menu.componentTemplates'
   | 'menu.vendorBrands'
   | 'menu.networkGroup'
@@ -94,7 +94,7 @@ export interface MenuConfig {
   labelKey: MenuLabelKey;
   icon: React.ReactNode;
   path: string;
-  permission?: string;
+  permission?: PermissionCode;
   children?: MenuConfig[];
 }
 
@@ -141,6 +141,20 @@ export const MENU_CONFIGS: MenuConfig[] = [
         icon: <TeamOutlined />,
         path: '/customers',
         permission: 'customer:view'
+      },
+      {
+        key: 'carriers',
+        labelKey: 'menu.carriers',
+        icon: <ContactsOutlined />,
+        path: '/carriers',
+        permission: 'carrier:view'
+      },
+      {
+        key: 'circuits',
+        labelKey: 'menu.circuits',
+        icon: <NodeIndexOutlined />,
+        path: '/circuits',
+        permission: 'circuit:view'
       },
       {
         key: 'component-templates',

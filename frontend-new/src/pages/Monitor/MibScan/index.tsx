@@ -16,8 +16,7 @@ import {
   Alert,
   Statistic,
   Row,
-  Col,
-  Tooltip
+  Col
 } from 'antd';
 import { SearchOutlined, ImportOutlined, ReloadOutlined, StarOutlined } from '@ant-design/icons';
 import { useDeviceList } from '@/services/device';
@@ -38,11 +37,6 @@ import type { TFunction } from 'i18next';
 const { Text, Paragraph } = Typography;
 
 type MibDeviceTypeKey = 'oid.deviceType.network' | 'oid.deviceType.server' | 'oid.deviceType.other';
-type MibMetricTypeKey =
-  | 'mib.metricTypeOption.gauge'
-  | 'mib.metricTypeOption.counter'
-  | 'mib.metricTypeOption.state'
-  | 'mib.metricTypeOption.event';
 
 const getDeviceTypeOptions = (t: TFunction<'monitor'>) =>
   (
@@ -51,16 +45,6 @@ const getDeviceTypeOptions = (t: TFunction<'monitor'>) =>
       { key: 'oid.deviceType.server', value: 'server' },
       { key: 'oid.deviceType.other', value: 'other' }
     ] as { key: MibDeviceTypeKey; value: string }[]
-  ).map(({ key, value }) => ({ label: t(key), value }));
-
-const getMetricTypeOptions = (t: TFunction<'monitor'>) =>
-  (
-    [
-      { key: 'mib.metricTypeOption.gauge', value: 'gauge' },
-      { key: 'mib.metricTypeOption.counter', value: 'counter' },
-      { key: 'mib.metricTypeOption.state', value: 'state' },
-      { key: 'mib.metricTypeOption.event', value: 'event' }
-    ] as { key: MibMetricTypeKey; value: string }[]
   ).map(({ key, value }) => ({ label: t(key), value }));
 
 export default function MibScanPage() {

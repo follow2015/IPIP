@@ -8,8 +8,13 @@
 ## 一、为什么不再用 `scripts/start.sh`
 
 `start.sh` 是 nohup + PID 文件方案，**无法自动拉起崩溃进程**，且其判活存在缺陷
-（`ipip-deploy/scripts/start.sh:69-75` 用 `kill -0` 只验证 PID 存在、不验证身份）：
+（`scripts/start.sh` 的 `is_running()` 用 `kill -0` 只验证 PID 存在、不验证身份）：
 一旦旧 PID 被系统复用给无关进程，看门狗会判定"存活"而**永不拉起**已死的服务。
+
+> 锚点说明：此处以**函数名**而非行号定位。2026-10-09 起 `start.sh` 的真源从
+> ipip-deploy 仓收回主仓（`scripts/start.sh`，经白名单同步下发），旧的
+> `ipip-deploy/scripts/start.sh:69-75` 行号引用已失效；`is_running()` 与其
+> `kill -0` 判活方式至今未变，故该缺陷依然成立。
 
 systemd 提供 OS 级能力：崩溃自动拉起 + 退避抑制 + 进程组清理 + 依赖编排 + 开机自启 + journald
 日志 + 资源上限，且**零新增 Python 依赖**。

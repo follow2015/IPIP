@@ -24,6 +24,26 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
         super().__init__(NetworkConnection, session)
 
 
+    def filter_existing_ids(self, conn_ids) -> set:
+        """批量判定哪些连接 id 真实存在（返回存在的 id 集合）。
+
+        给上层做「引用完整性前置校验」用（如线路分段的 `connection_id`，
+        AC-C-09）：与其让 service 层直查 `db.session.query`，查询一律收在这里。
+        只取 id 一列，不加载整行 ORM 对象。
+        """
+        ids = {int(i) for i in conn_ids if i is not None}
+        if not ids:
+            return set()
+        try:
+            rows = (
+                self.session.query(NetworkConnection.id)
+                .filter(NetworkConnection.id.in_(ids))
+                .all()
+            )
+            return {int(r[0]) for r in rows}
+        except SQLAlchemyError as e:
+            raise QueryExecutionError("批量校验连接存在性失败", original_error=e) from e
+
     def find_by_id(self, conn_id: int) -> Optional[Dict[str, Any]]:
         """根据连接ID查找，含两端端口和设备信息"""
         try:
@@ -40,7 +60,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
             )
             return conn.to_dict() if conn else None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找N2N连接失败", original_error=e)
+            raise QueryExecutionError("查找N2N连接失败", original_error=e) from e
 
     def find_by_device(self, device_id: int) -> List[Dict[str, Any]]:
         """查询设备的所有 N2N 连接（作为 local 或 peer 任一端）"""
@@ -63,7 +83,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
             )
             return [c.to_dict(perspective_device_id=device_id) for c in conns]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查询设备N2N连接失败", original_error=e)
+            raise QueryExecutionError("查询设备N2N连接失败", original_error=e) from e
 
     def find_by_port(self, port_id: int) -> Optional[Dict[str, Any]]:
         """根据端口ID查找连接（一个端口最多一条 N2N 连接）"""
@@ -86,7 +106,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
             )
             return conn.to_dict() if conn else None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("根据端口查找N2N连接失败", original_error=e)
+            raise QueryExecutionError("根据端口查找N2N连接失败", original_error=e) from e
 
     def list_by_local_port_device_ids(self, device_ids) -> list[NetworkConnection]:
         """取 **local 端口**所属设备在集合内的 N2N 连接（B-46 批 4：拓扑建边）。
@@ -127,7 +147,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("根据端口列表查找N2N连接失败", original_error=e)
+            raise QueryExecutionError("根据端口列表查找N2N连接失败", original_error=e) from e
 
     def find_by_port_for_update(self, port_id: int) -> Optional[Dict[str, Any]]:
         """根据端口ID查找连接并加行级锁，用于并发安全操作"""
@@ -145,7 +165,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
             )
             return conn.to_dict() if conn else None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("根据端口查找N2N连接(加锁)失败", original_error=e)
+            raise QueryExecutionError("根据端口查找N2N连接(加锁)失败", original_error=e) from e
 
     def find_by_port_for_update_orm(self, port_id: int) -> Optional[NetworkConnection]:
         """根据端口ID查找连接并加行级锁，返回 ORM 对象（供 Service 层删除/修改）"""
@@ -162,7 +182,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("根据端口查找N2N连接(加锁ORM)失败", original_error=e)
+            raise QueryExecutionError("根据端口查找N2N连接(加锁ORM)失败", original_error=e) from e
 
     def find_by_id_for_update_orm(self, conn_id: int) -> Optional[NetworkConnection]:
         """根据连接ID查找并加行级锁，返回 ORM 对象（供 Service 层删除/修改）"""
@@ -174,7 +194,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("根据ID查找N2N连接(加锁ORM)失败", original_error=e)
+            raise QueryExecutionError("根据ID查找N2N连接(加锁ORM)失败", original_error=e) from e
 
     def find_existing_by_ports_orm(self, local_port_id: int, peer_port_id: int) -> Optional[NetworkConnection]:
         """查找涉及指定端口的已有 N2N 连接，返回 ORM 对象（供 Service 层判断旧端口释放）"""
@@ -192,7 +212,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找已有N2N连接(ORM)失败", original_error=e)
+            raise QueryExecutionError("查找已有N2N连接(ORM)失败", original_error=e) from e
 
     def list_by_device_via_ports(self, device_id: int) -> List[NetworkConnection]:
         """取该设备经**任一端端口**参与的全部 N2N 连接（B-44 扫尾批：MAC 表比对）。
@@ -249,7 +269,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口对之间的N2N连接失败", original_error=e)
+            raise QueryExecutionError("查找端口对之间的N2N连接失败", original_error=e) from e
 
     def list_by_device_ids(
         self, device_ids, *, with_ports: bool = False, any_side: bool = True,
@@ -288,7 +308,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
         try:
             return query.all()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("按设备集合查询N2N连接失败", original_error=e)
+            raise QueryExecutionError("按设备集合查询N2N连接失败", original_error=e) from e
 
     def exists_by_ports(self, local_port_id: int, peer_port_id: int) -> bool:
         """检查两个端口之间是否已存在连接"""
@@ -300,7 +320,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
                 )
             ).first() is not None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("检查N2N连接存在性失败", original_error=e)
+            raise QueryExecutionError("检查N2N连接存在性失败", original_error=e) from e
 
 
     def create_connection(self, data: Dict[str, Any]) -> int:
@@ -356,7 +376,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
             self.session.flush()
             return conn.id
         except SQLAlchemyError as e:
-            raise QueryExecutionError("创建N2N连接失败", original_error=e)
+            raise QueryExecutionError("创建N2N连接失败", original_error=e) from e
 
     def update_connection(self, conn_id: int, data: Dict[str, Any]) -> bool:
         """更新 N2N 连接的业务字段"""
@@ -378,7 +398,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("更新N2N连接失败", original_error=e)
+            raise QueryExecutionError("更新N2N连接失败", original_error=e) from e
 
     def delete_connection_orm(self, conn: "NetworkConnection") -> None:
         """删除 N2N 连接 ORM 对象（仅 flush，由调用方统一 commit）
@@ -390,7 +410,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
             self.session.delete(conn)
             self.session.flush()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除N2N连接(ORM)失败", original_error=e)
+            raise QueryExecutionError("删除N2N连接(ORM)失败", original_error=e) from e
 
     def delete_connection(self, conn_id: int) -> bool:
         """删除 N2N 连接"""
@@ -404,7 +424,7 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除N2N连接失败", original_error=e)
+            raise QueryExecutionError("删除N2N连接失败", original_error=e) from e
 
     def delete_by_device(self, device_id: int) -> int:
         """删除设备的所有 N2N 连接，返回删除数量"""
@@ -418,4 +438,4 @@ class NetworkConnectionRepository(SQLAlchemyRepository):
             self.session.flush()
             return count
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除设备N2N连接失败", original_error=e)
+            raise QueryExecutionError("删除设备N2N连接失败", original_error=e) from e

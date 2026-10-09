@@ -27,7 +27,8 @@ import {
   Typography,
   Tooltip,
   Alert,
-  Statistic
+  Statistic,
+  theme
 } from 'antd';
 import {
   PlusOutlined,
@@ -70,6 +71,7 @@ const PROTOCOL_ICONS: Record<string, React.ReactNode> = {
 
 export default function MonitorCredentials() {
   const msg = useMessage();
+  const { token } = theme.useToken();
   const { t } = useTranslation('monitor');
   const { t: tc } = useTranslation('common');
 
@@ -214,7 +216,7 @@ export default function MonitorCredentials() {
           }}
           style={{
             margin: 0,
-            color: record.enabled ? undefined : 'rgba(0,0,0,0.45)'
+            color: record.enabled ? undefined : token.colorTextTertiary
           }}
         >
           {name || `${record.protocol} #${record.id}`}

@@ -61,7 +61,7 @@ def scan_plaintext_passwords(session) -> Dict[str, List[Dict]]:
         result["empty_count"] = empty_count
         result["total_scanned"] = len(records) + empty_count
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 扫描 IPMI 密码失败：错误写入 result["error"] 返回，批量流程继续
         logger.error(f"扫描 IPMI 密码失败: {e}")
         result["error"] = str(e)
 
@@ -117,7 +117,7 @@ def migrate_plaintext_to_encrypted(session, dry_run: bool = True) -> Tuple[int, 
             session.commit()
             logger.info(f"已加密 {migrated} 条明文 IPMI 密码")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 批量加密 IPMI 密码失败：rollback 后继续，返回已处理结果
         logger.error(f"批量加密 IPMI 密码失败: {e}")
         if not dry_run:
             session.rollback()

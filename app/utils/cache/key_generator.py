@@ -42,7 +42,7 @@ class StandardCacheKeyGenerator(CacheKeyGenerator):
     def token_key(self, token: str) -> str:
         """生成令牌缓存键"""
         if len(token) > 50:
-            token_hash = hashlib.md5(token.encode()).hexdigest()
+            token_hash = hashlib.md5(token.encode(), usedforsecurity=False).hexdigest()
             return f"{self.PREFIXES['token']}:{token_hash}"
         return f"{self.PREFIXES['token']}:{token}"
     
@@ -124,7 +124,7 @@ class StandardCacheKeyGenerator(CacheKeyGenerator):
     
     def search_key(self, entity_type: str, keyword: str, **params) -> str:
         """生成搜索结果缓存键"""
-        keyword_hash = hashlib.md5(keyword.encode()).hexdigest()[:8]
+        keyword_hash = hashlib.md5(keyword.encode(), usedforsecurity=False).hexdigest()[:8]
         key_parts = [self.PREFIXES['search'], entity_type, keyword_hash]
         
         if params:

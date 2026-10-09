@@ -76,7 +76,7 @@ def apply(conn) -> None:
 
         if not _fk_exists(conn, FK):
             cur.execute(
-                f"UPDATE `{TABLE}` SET `ai_diagnosis_session_id` = NULL "
+                f"UPDATE `{TABLE}` SET `ai_diagnosis_session_id` = NULL "  # noqa: S608 -- alembic 迁移的 DDL 无法参数化表/列名，标识符由迁移脚本自身硬编码
                 f"WHERE `ai_diagnosis_session_id` IS NOT NULL "
                 f"AND `ai_diagnosis_session_id` NOT IN "
                 f"(SELECT `id` FROM `ai_diagnosis_sessions`)"

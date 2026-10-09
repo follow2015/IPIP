@@ -5,7 +5,7 @@
  * - 登录记录（限制为当前用户）
  */
 import { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Tabs, Tag, Space } from 'antd';
+import { theme, Card, Form, Input, Button, Tabs, Tag, Space } from 'antd';
 import DataTable from '@/components/DataTable';
 import { serverPagination } from '@/components/DataTable/serverPagination';
 import { UserOutlined, LockOutlined, HistoryOutlined, SaveOutlined } from '@ant-design/icons';
@@ -20,12 +20,15 @@ import type { LoginLog } from '@/services/user';
 import { getLoginTypeMeta } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '@/utils/format';
+import { isValidationError, firstFieldError } from '@/utils/formError';
 import { useMessage } from '@/hooks/useMessage';
 
 function ProfilePage() {
+  const { token } = theme.useToken();
   const { t } = useTranslation('settings');
   const { t: tDevice } = useTranslation('device');
   const { t: tAuth } = useTranslation('auth');
+  const { t: tc } = useTranslation('common');
   const { t: tCommon } = useTranslation('common');
   const message = useMessage();
   const authUser = useAuthStore((s) => s.user);
@@ -66,7 +69,15 @@ function ProfilePage() {
   }, [userData, profileForm]);
 
   const handleSaveProfile = async () => {
-    const values = await profileForm.validateFields();
+    let values: Awaited<ReturnType<typeof profileForm.validateFields>>;
+    try {
+      values = await profileForm.validateFields();
+    } catch (err: unknown) {
+      if (isValidationError(err)) {
+        message.error(firstFieldError(err) ?? tc('message.formValidationFailed'));
+      }
+      return;
+    }
     try {
       const result = await updateProfile.mutateAsync(values);
       if (result.data) {
@@ -84,7 +95,15 @@ function ProfilePage() {
   };
 
   const handleChangePassword = async () => {
-    const values = await passwordForm.validateFields();
+    let values: Awaited<ReturnType<typeof passwordForm.validateFields>>;
+    try {
+      values = await passwordForm.validateFields();
+    } catch (err: unknown) {
+      if (isValidationError(err)) {
+        message.error(firstFieldError(err) ?? tc('message.formValidationFailed'));
+      }
+      return;
+    }
     if (values.new_password !== values.confirm_password) {
       message.error(t('user.validation.passwordMismatch'));
       return;
@@ -124,7 +143,9 @@ function ProfilePage() {
       width: 100,
       render: (v: string) => {
         const m = getLoginTypeMeta(v, tDevice);
-        return <Tag color={m?.color ?? 'default'}>{(m?.label ?? v) || tDevice('loginType.WEB')}</Tag>;
+        return (
+          <Tag color={m?.color ?? 'default'}>{(m?.label ?? v) || tDevice('loginType.WEB')}</Tag>
+        );
       }
     },
     {
@@ -197,7 +218,10 @@ function ProfilePage() {
                     <Input
                       value={userData?.department || '-'}
                       disabled
-                      style={{ background: '#f5f5f5', color: 'rgba(0,0,0,0.45)' }}
+                      style={{
+                        background: token.colorFillTertiary,
+                        color: token.colorTextTertiary
+                      }}
                     />
                   </Form.Item>
 
@@ -208,10 +232,10 @@ function ProfilePage() {
                         minHeight: 32,
                         display: 'flex',
                         alignItems: 'center',
-                        background: '#f5f5f5',
+                        background: token.colorFillTertiary,
                         borderRadius: 6,
                         padding: '4px 11px',
-                        color: 'rgba(0,0,0,0.45)'
+                        color: token.colorTextTertiary
                       }}
                     >
                       {rolesDisplay}
@@ -225,7 +249,7 @@ function ProfilePage() {
                         minHeight: 32,
                         display: 'flex',
                         alignItems: 'center',
-                        background: '#f5f5f5',
+                        background: token.colorFillTertiary,
                         borderRadius: 6,
                         padding: '4px 11px'
                       }}
@@ -239,7 +263,10 @@ function ProfilePage() {
                     <Input
                       value={formatDateTime(userData?.updated_at)}
                       disabled
-                      style={{ background: '#f5f5f5', color: 'rgba(0,0,0,0.45)' }}
+                      style={{
+                        background: token.colorFillTertiary,
+                        color: token.colorTextTertiary
+                      }}
                     />
                   </Form.Item>
                 </Form>
@@ -286,7 +313,9 @@ function ProfilePage() {
                   <Form.Item
                     name="old_password"
                     label={t('profile.field.oldPassword')}
-                    rules={[{ required: true, message: t('profile.validation.oldPasswordRequired') }]}
+                    rules={[
+                      { required: true, message: t('profile.validation.oldPasswordRequired') }
+                    ]}
                   >
                     <Input.Password placeholder={t('profile.validation.oldPasswordRequired')} />
                   </Form.Item>
@@ -314,9 +343,7 @@ function ProfilePage() {
                           if (!value || getFieldValue('new_password') === value) {
                             return Promise.resolve();
                           }
-                          return Promise.reject(
-                            new Error(t('user.validation.passwordMismatch'))
-                          );
+                          return Promise.reject(new Error(t('user.validation.passwordMismatch')));
                         }
                       })
                     ]}

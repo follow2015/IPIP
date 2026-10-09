@@ -218,7 +218,7 @@ class DeviceService:
 
     VALID_DEVICE_TYPES = {
         'server': ['standalone', 'chassis', 'node', 'storage', 'gpu'],
-        'network': ['switch', 'router', 'firewall'],
+        'network': ['switch', 'router', 'firewall', 'otn', 'wdm', 'odf'],
         'other': ['pdu', 'ups', 'other'],
     }
 
@@ -718,7 +718,6 @@ class DeviceService:
         整个流程包裹在 begin_nested() (SAVEPOINT) 中，
         保证中间步骤失败时整体回滚，避免数据半清理状态。
         """
-        from datetime import datetime, timezone
 
         device = self.get_by_id(device_id)
         if not device:
@@ -731,7 +730,7 @@ class DeviceService:
             with self.session.begin_nested():
                 self._save_location_to_config(device)
 
-                self._cleanup_device_dependencies(device_id)
+                self.cleanup_device_dependencies(device_id)
 
                 device.deleted_at = now_utc_naive()
 
@@ -752,15 +751,20 @@ class DeviceService:
         logger.info("删除设备成功: device_id=%d", device_id)
         return True
 
-    def _cleanup_device_dependencies(self, device_id: int, purge: bool = False) -> Dict[str, int]:
+    def cleanup_device_dependencies(self, device_id: int, purge: bool = False) -> Dict[str, int]:
         """清理设备关联数据
+
+        为什么是**公开**名（评审第五轮 P2 → 第六轮仍"未修"）：本方法被
+        ``cabinet_service`` / ``room_service`` 等**跨模块**调用，下划线前缀与
+        实际可见性矛盾 —— 调用方无从区分"内部实现细节"与"稳定入口"，
+        改个名就静默破坏别的模块。公开化即契约声明：签名变更需同步全部调用点。
 
         ``purge`` 区分两种调用场景，**只影响留痕类数据的处置方式**：
         - ``False``：软删（``delete_device``）—— 设备行仍在，留痕原样保留，
           恢复后关联完好；
         - ``True``：彻底删（``permanent_delete_device`` / 批量彻底删）—— 设备行
           即将物理删除，留痕改为"写设备名快照 + 置空设备引用"（不删行）。
-        详见 ``_delete_monitor_related`` 与 ``_dispose_monitor_trace``。
+        详见 ``_delete_monitor_related`` 与 ``dispose_monitor_trace``。
 
         在删除设备前调用，按依赖顺序清理：
         1. 子节点（自引用 parent_device_id）
@@ -779,7 +783,6 @@ class DeviceService:
         ondelete="CASCADE"，但主设备走软删除（UPDATE 而非 DELETE），DB CASCADE
         不会触发，因此必须在此显式清理。
         """
-        from app.models.device_server_ext import DeviceServerExt
         from datetime import datetime as _dt, timezone as _tz
 
         session = self.session
@@ -793,7 +796,7 @@ class DeviceService:
         if children:
             self._save_children_location_to_chassis_config(device_id, children)
         for child in children:
-            self._cleanup_device_dependencies(child.id)
+            self.cleanup_device_dependencies(child.id)
             child.deleted_at = _dt.now(_tz.utc).replace(tzinfo=None)
             self._clear_device_location_inline(child)
 
@@ -868,7 +871,6 @@ class DeviceService:
         便于事后核对。
         """
         from app.core.enums import IPStatus
-        from app.models.device import Device
 
         device = DeviceRepository(session).find_by_id_including_deleted(device_id)
         raw_ips = set()
@@ -999,12 +1001,16 @@ class DeviceService:
         MonitorTimeseriesRepository(session).delete_hourly_by_device(device_id)
 
         if purge:
-            return DeviceService._dispose_monitor_trace(session, device_id)
+            return DeviceService.dispose_monitor_trace(session, device_id)
         return 0
 
     @staticmethod
-    def _dispose_monitor_trace(session, device_id: int) -> int:
+    def dispose_monitor_trace(session, device_id: int) -> int:
         """彻底删前对留痕三表的处置：**写设备名快照 → 置空设备引用（不删行）**。
+
+        公开名的理由同 ``cleanup_device_dependencies``（跨模块调用 ⇒ 前缀名不副实）；
+        本方法与 ``dispose_monitor_trace_batch`` 是**同一语义的两条实现**
+        （单设备 / 批量），改名必须成对改，否则一侧静默失效。
 
         顺序不可颠倒：快照必须在本设备行被物理删除**之前**取，否则名字来源即消失
         （强删是 `session.delete(device)`，本函数在其之前调用）。
@@ -1014,7 +1020,6 @@ class DeviceService:
         - `upstream_device_id` 侧同理，被删设备就是那条留痕的"上游设备"，
           名字用同一个快照值，无需另查其他设备。
         """
-        from app.models.device import Device
 
         device = DeviceRepository(session).find_by_id_including_deleted(device_id)
         name = getattr(device, "device_name", None) if device else None
@@ -1036,8 +1041,8 @@ class DeviceService:
         return sum(n or 0 for n in (n1, n2, n3, n4))
 
     @staticmethod
-    def _dispose_monitor_trace_batch(session, device_ids: List[int]) -> None:
-        """``_dispose_monitor_trace`` 的**批量版**：一次处置一批设备（机房型强删用）。
+    def dispose_monitor_trace_batch(session, device_ids: List[int]) -> None:
+        """``dispose_monitor_trace`` 的**批量版**：一次处置一批设备（机房型强删用）。
 
         单设备版是"每台设备 1 次查询 + 4 条 UPDATE"；机房强删动辄上百台设备，
         逐台执行会产生 5N 条语句。本方法摊平为 **1 条名字查询 + 4 条 executemany
@@ -1051,7 +1056,6 @@ class DeviceService:
             return
 
 
-        from app.models.device import Device
 
         id_name = DeviceRepository(session).find_id_name_map(
             device_ids, include_deleted=True,
@@ -1238,7 +1242,6 @@ class DeviceService:
         Returns:
             {'updated': int, 'skipped': int}
         """
-        from app.persistence.device_repository import DeviceRepository
         from app.persistence.monitor_metric_template_group_repository import (
             MonitorMetricTemplateGroupRepository,
         )
@@ -1260,8 +1263,16 @@ class DeviceService:
         cred_repo = MonitorCredentialRepository()
         updated = 0
         skipped = 0
+
+        devices_by_id = self.device_repository.find_by_ids(device_ids)
+        protocols_by_device = (
+            cred_repo.find_enabled_protocols_batch(list(devices_by_id))
+            if group is not None
+            else {}
+        )
+
         for did in device_ids:
-            device = self.device_repository.find_by_id(did)
+            device = devices_by_id.get(did)
             if not device:
                 skipped += 1
                 continue
@@ -1272,8 +1283,7 @@ class DeviceService:
                 if group.vendor and (device.brand or "") != group.vendor:
                     skipped += 1
                     continue
-                enabled_protocols = cred_repo.find_enabled_protocols(did)
-                if group.source not in enabled_protocols:
+                if group.source not in protocols_by_device.get(did, []):
                     skipped += 1
                     continue
             device.metric_template_group_id = metric_template_group_id
@@ -1507,7 +1517,7 @@ class DeviceService:
                                 self.session
                             ).create_ports_batch(device_id, nic_ports)
                             nic_created += cnt
-                        except Exception as e:  # 已存在连接等，跳过该设备端口创建
+                        except Exception as e:  # noqa: BLE001 -- 批量配置单设备网卡端口创建失败隔离：已存在连接等异常跳过该设备，不中断整批配置
                             logger.warning(
                                 "批量配置-网卡端口覆盖跳过 设备%d: %s", device_id, e
                             )
@@ -1541,7 +1551,7 @@ class DeviceService:
                                 device_id, switch_ports
                             )
                             port_created += cnt
-                        except Exception as e:
+                        except Exception as e:  # noqa: BLE001 -- 批量配置单设备交换机端口创建失败隔离：同 1687
                             logger.warning(
                                 "批量配置-交换机端口创建跳过 设备%d: %s", device_id, e
                             )
@@ -1614,12 +1624,11 @@ class DeviceService:
     @staticmethod
     def _generate_asset_number(prefix: str = "ZC") -> str:
         """生成资产编号：ZC-YYYYMMDD-HHmmss-XXXX"""
-        from datetime import datetime, timezone
-        import random
+        import secrets
         now = now_utc_naive()
         date_part = now.strftime("%Y%m%d")
         time_part = now.strftime("%H%M%S")
-        rand_part = str(random.randint(0, 9999)).zfill(4)
+        rand_part = str(secrets.randbelow(10000)).zfill(4)
         return f"{prefix}-{date_part}-{time_part}-{rand_part}"
 
 
@@ -1893,7 +1902,6 @@ class DeviceService:
         st_items = storage_items or []
         np_items = nic_ports or []
 
-        from app.models.device_server_ext import DeviceServerExt
 
         if overwrite:
             old_nodes = self.device_repository.find_child_devices(chassis.id)
@@ -2071,7 +2079,6 @@ class DeviceService:
         避免 uk_device_nic_port 唯一键冲突。
         """
         from app.models.device_nics_port import DeviceNicsPort
-        from datetime import datetime, timezone
         now = now_utc_naive()
         nic_num = 1
 
@@ -2372,8 +2379,6 @@ class DeviceService:
             {"restored": bool, "location_conflict": bool, "conflict_devices": list,
              "auto_assigned_u_position": Optional[int]}
         """
-        from app.models.device_hardware import DeviceHardware
-        from app.models.device_server_ext import DeviceServerExt
 
         session = self.session
         device = self.device_repository.find_by_id_including_deleted(device_id)
@@ -2560,7 +2565,7 @@ class DeviceService:
         if not parent_device:
             raise ValidationError(f"原机箱不存在 (ID: {original_parent_id})，无法恢复")
         if parent_device.deleted_at is not None:
-            raise ValidationError(f"原机箱已被删除，请先恢复机箱后再恢复子节点")
+            raise ValidationError("原机箱已被删除，请先恢复机箱后再恢复子节点")
         if not (parent_device.server_ext and parent_device.server_ext.is_chassis):
             raise ValidationError(f"原所属设备已不是机箱类型 (ID: {original_parent_id})")
         if parent_device.total_nodes and original_node_position is not None and original_node_position > parent_device.total_nodes:
@@ -2723,7 +2728,6 @@ class DeviceService:
 
         只能删除已软删除的设备。
         """
-        from app.models.device import Device
 
         session = self.session
         device = self.device_repository.find_by_id_including_deleted(device_id)
@@ -2734,7 +2738,7 @@ class DeviceService:
 
         try:
             with self.session.begin_nested():
-                self._cleanup_device_dependencies(device_id, purge=True)
+                self.cleanup_device_dependencies(device_id, purge=True)
 
                 session.delete(device)
                 session.flush()
@@ -2804,7 +2808,7 @@ class DeviceService:
                     first_device = False
                 else:
                     results["conflict"].append({"device_id": did, **result})
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 批量删除内单设备失败隔离：记入 results["failed"] 继续下一台，单台级联删除异常不可枚举
                 results["failed"].append({"device_id": did, "error": str(e)})
 
         for cid in affected_cabinet_ids:
@@ -2834,7 +2838,6 @@ class DeviceService:
         ``released_network_ports`` / ``released_nics_ports`` / ``released_ips`` /
         ``disposed_trace_refs``。机柜强删要把它们回给前端。
         """
-        from app.models.device import Device
 
         session = self.session
         results = {"success": [], "failed": [], "released_network_ports": 0,
@@ -2857,14 +2860,14 @@ class DeviceService:
                         device.deleted_at = now_utc_naive()
                         self._clear_device_location_inline(device)
                         session.flush()
-                    counters = self._cleanup_device_dependencies(did, purge=True)
+                    counters = self.cleanup_device_dependencies(did, purge=True)
                     for key in ("released_network_ports", "released_nics_ports",
                                 "released_ips", "disposed_trace_refs"):
                         results[key] += counters.get(key, 0)
                     session.delete(device)
                     results["success"].append(did)
                 session.flush()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- savepoint 异常退出后跳过显式 rollback：begin_nested() 上下文管理器已自动回滚，此处捕获任意异常后仅需标记该条失败（收窄无意义）
             results["failed"] = [{"device_id": did, "error": str(e)} for did in device_ids]
             results["success"] = []
             for key in ("released_network_ports", "released_nics_ports",

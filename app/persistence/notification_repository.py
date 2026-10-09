@@ -135,7 +135,6 @@ class NotificationReceiptRepository(BaseRepository):
         Returns:
             int: 更新行数
         """
-        from datetime import datetime, timezone
         now = now_utc_naive()
         return self.session.query(NotificationReceipt).filter_by(
             user_id=user_id, read_at=None,
@@ -154,7 +153,6 @@ class NotificationReceiptRepository(BaseRepository):
         Returns:
             int: 更新行数
         """
-        from datetime import datetime, timezone
         now = now_utc_naive()
         return self.session.query(NotificationReceipt).filter_by(
             user_id=user_id, read_at=None,

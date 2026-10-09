@@ -5,7 +5,7 @@
 定义所有模型的基类，提供通用字段和方法。
 软删除支持：子类设置 __soft_delete__ = True 并定义 deleted_at 列即可启用。
 """
-from datetime import datetime, timezone
+from datetime import date, datetime
 from typing import Any, Dict
 from app.utils.time_utils import now_utc_naive, to_iso_utc
 
@@ -89,17 +89,25 @@ class BaseModel(db.Model):
 
     @staticmethod
     def _serialize_value(value: Any) -> Any:
-        """序列化单个值：datetime → 带 `Z` 的 UTC ISO 字符串，其余原样返回。
+        """序列化单个值：datetime → 带 `Z` 的 UTC ISO 串；date → `YYYY-MM-DD`。
 
         子类 to_dict() 中手动构建字段时，可调用此方法避免重复
         isinstance(value, datetime) 判断。
 
         改用 to_iso_utc（而非裸 isoformat）的原因：库内时间是 naive UTC，
         裸输出会让消费方按本地时区误读。带 Z 后字符串自描述为 UTC，符合
-        ISO8601 且前端 ensureUtc 对已带 Z 的字符串不重复处理。date-only
-        列（如 warranty_end）不是 datetime 子类，原样返回。
+        ISO8601 且前端 ensureUtc 对已带 Z 的字符串不重复处理。
+
+        **date-only 列必须显式转 isoformat**（2026-10-08）：否则 date 对象
+        原样漏进 Flask jsonify，会被其默认 JSON provider 编码成 RFC 1123
+        HTTP 日期（如 `Sat, 31 Oct 2026 00:00:00 GMT`）——线路的起租/到期日
+        就是这样变成英文长串的。date-only 无时区语义，isoformat 自描述。
         """
-        return to_iso_utc(value) if isinstance(value, datetime) else value
+        if isinstance(value, datetime):
+            return to_iso_utc(value)
+        if isinstance(value, date):
+            return value.isoformat()
+        return value
 
     def to_dict(self, exclude: list = None, include_relations: bool = False) -> Dict[str, Any]:
         """将模型转换为字典

@@ -1,7 +1,7 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState, useMemo } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
-import { Button, Space, Form, Input, Select, Tag, Modal } from 'antd';
+import { Button, Space, Form, Input, Select, Tag, Modal, theme } from 'antd';
 import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined } from '@ant-design/icons';
 import {
@@ -15,8 +15,6 @@ import { useNetworkPorts } from '@/services/network-port';
 import { useSyncMembers } from '@/services/switch';
 import { useMessage } from '@/hooks/useMessage';
 import { useDeviceEvents } from '@/hooks/useDeviceEvents';
-import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/services/query-keys';
 import { GroupedMemberPorts, PortLegend } from '@/components/PortMemberBlocks';
 import { StatusTag } from '@/components/StatusTag';
 import { LAG_STATUS_MAP } from '@/types/enums';
@@ -24,6 +22,7 @@ import type { LinkAggregationGroup } from '@/services/link-aggregation';
 import type { SwitchPort } from '@/types/models';
 import { isPhysicalPort } from '@/utils/portType';
 import { useTranslation } from 'react-i18next';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface LagTabProps {
   deviceId: number;
@@ -31,6 +30,7 @@ interface LagTabProps {
 }
 
 function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
@@ -40,7 +40,6 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
   const updateLAGMembers = useUpdateLAGMembers(deviceId);
   const updateLag = useUpdateLinkAggregationGroup(deviceId);
   const syncMembers = useSyncMembers();
-  const queryClient = useQueryClient();
   const { data: ports } = useNetworkPorts(deviceId);
   const message = useMessage();
 
@@ -71,7 +70,12 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
       addModal.close();
       addForm.resetFields();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -110,7 +114,12 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
       memberModal.close();
       setEditingMemberLag(null);
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -132,7 +141,12 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
       purposeModal.close();
       setEditingLag(null);
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -150,7 +164,11 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
       dataIndex: 'lag_type',
       key: 'lag_type',
       render: (v: string) =>
-        v === 'lacp' ? <Tag color="blue">{t('lag.type.lacp')}</Tag> : <Tag>{t('lag.type.static')}</Tag>
+        v === 'lacp' ? (
+          <Tag color="blue">{t('lag.type.lacp')}</Tag>
+        ) : (
+          <Tag>{t('lag.type.static')}</Tag>
+        )
     },
     {
       title: t('lag.column.algorithm'),
@@ -340,7 +358,9 @@ function LagTab({ deviceId, hasSsh = true }: LagTabProps) {
         }}
         destroyOnHidden
       >
-        <p style={{ color: '#8c8c8c', marginBottom: 16 }}>{t('memberPort.purposeHint')}</p>
+        <p style={{ color: token.colorTextTertiary, marginBottom: 16 }}>
+          {t('memberPort.purposeHint')}
+        </p>
         <Form form={purposeForm} layout="vertical">
           <Form.Item name="purpose" label={tCommon('field.purpose')}>
             <Input placeholder={t('lag.form.purposePlaceholder')} maxLength={255} />

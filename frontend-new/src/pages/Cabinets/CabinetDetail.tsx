@@ -1,7 +1,7 @@
 
 import { useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Descriptions, Spin, Button, Tag, Result, Space } from 'antd';
+import { Card, Descriptions, Button, Tag, Result, Space, theme } from 'antd';
 import { ArrowLeftOutlined, EnvironmentOutlined } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCabinetSuspenseDetail, useCabinetWithDevices } from '@/services/cabinet';
@@ -41,9 +41,7 @@ function ChannelTag({ channel, side }: { channel: RoomChannel; side: 'left' | 'r
     <Tag color={paletteKeyOf(channel.channel_type)}>
       {side === 'left' ? ta('roomLayout.channel.sideLeft') : ta('roomLayout.channel.sideRight')}
       {typeLabel}
-      {channel.enclosed
-        ? ta('roomLayout.channel.enclosedDot')
-        : ta('roomLayout.channel.openDot')}
+      {channel.enclosed ? ta('roomLayout.channel.enclosedDot') : ta('roomLayout.channel.openDot')}
     </Tag>
   );
 }
@@ -70,6 +68,7 @@ function CabinetDetail() {
 }
 
 function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
+  const { token } = theme.useToken();
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
   const { t: ta } = useTranslation('asset');
@@ -109,7 +108,7 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
         }
       );
     },
-    [updateDevice, cabinetId, queryClient, td]
+    [updateDevice, cabinetId, queryClient, td, message]
   );
 
   if (!cabinet) {
@@ -198,7 +197,9 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
       <Card title={td('cabinet.detailTitle', { number: c.cabinet_number })}>
         <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
           <Descriptions.Item label={td('cabinet.number')}>{c.cabinet_number}</Descriptions.Item>
-          <Descriptions.Item label={tc('field.status')}>{renderStatus(c.status, td)}</Descriptions.Item>
+          <Descriptions.Item label={tc('field.status')}>
+            {renderStatus(c.status, td)}
+          </Descriptions.Item>
           <Descriptions.Item label={td('basic.field.room')}>{c.room_name}</Descriptions.Item>
           <Descriptions.Item label={td('cabinet.field.roomLocation')}>
             {c.room_location ?? '-'}
@@ -218,7 +219,9 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
                 {leftChannel ? <ChannelTag channel={leftChannel} side="left" /> : null}
                 {rightChannel ? <ChannelTag channel={rightChannel} side="right" /> : null}
                 {!leftChannel && !rightChannel ? (
-                  <span style={{ color: '#8c8c8c' }}>{ta('roomLayout.channel.unmarked')}</span>
+                  <span style={{ color: token.colorTextTertiary }}>
+                    {ta('roomLayout.channel.unmarked')}
+                  </span>
                 ) : null}
                 <Button
                   type="link"
@@ -230,7 +233,9 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
                 </Button>
               </Space>
             ) : (
-              <span style={{ color: '#8c8c8c' }}>{ta('roomLayout.positionNotSet')}</span>
+              <span style={{ color: token.colorTextTertiary }}>
+                {ta('roomLayout.positionNotSet')}
+              </span>
             )}
           </Descriptions.Item>
           <Descriptions.Item label={td('cabinet.field.leaseCustomer')}>
@@ -240,8 +245,12 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
           <Descriptions.Item label={td('cabinet.field.usedU')}>
             <Tag color={c.used_u > c.total_u * 0.8 ? 'red' : 'green'}>{c.used_u}U</Tag>
           </Descriptions.Item>
-          <Descriptions.Item label={td('cabinet.field.availableU')}>{c.available_u}U</Descriptions.Item>
-          <Descriptions.Item label={ta('uposition.side.uUsage')}>{c.u_usage_rate}%</Descriptions.Item>
+          <Descriptions.Item label={td('cabinet.field.availableU')}>
+            {c.available_u}U
+          </Descriptions.Item>
+          <Descriptions.Item label={ta('uposition.side.uUsage')}>
+            {c.u_usage_rate}%
+          </Descriptions.Item>
           <Descriptions.Item label={td('cabinet.field.ratedPowerUnit')}>
             {c.total_power ? `${c.total_power}W` : '-'}
           </Descriptions.Item>
@@ -258,8 +267,12 @@ function CabinetDetailContent({ cabinetId }: { cabinetId: number }) {
           <Descriptions.Item label={td('cabinet.field.maxWeight')}>
             {c.max_weight ? `${c.max_weight}KG` : '-'}
           </Descriptions.Item>
-          <Descriptions.Item label={td('cabinet.field.deviceCount')}>{c.device_count}</Descriptions.Item>
-          <Descriptions.Item label={tc('field.createdAt')}>{formatDateTime(c.created_at)}</Descriptions.Item>
+          <Descriptions.Item label={td('cabinet.field.deviceCount')}>
+            {c.device_count}
+          </Descriptions.Item>
+          <Descriptions.Item label={tc('field.createdAt')}>
+            {formatDateTime(c.created_at)}
+          </Descriptions.Item>
           <Descriptions.Item label={tc('field.updatedAt')} span={1}>
             {formatDateTime(c.updated_at)}
           </Descriptions.Item>

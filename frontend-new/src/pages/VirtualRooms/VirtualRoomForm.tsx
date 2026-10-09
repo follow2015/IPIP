@@ -3,7 +3,7 @@
  * - 名称 + 描述
  * - 创建时可选成员交换机
  */
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { Form, Input, Modal } from 'antd';
 import { useCreateVirtualRoom, useUpdateVirtualRoom } from '@/services/virtual-room';
 import type { VirtualRoom } from '@/types/models';
@@ -30,7 +30,7 @@ function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
       if (editRecord) {
         form.setFieldsValue({
           name: editRecord.name,
-          description: editRecord.description,
+          description: editRecord.description
         });
       } else {
         form.resetFields();
@@ -48,7 +48,7 @@ function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
         await createVirtualRoom.mutateAsync({
           name: values.name,
           description: values.description || '',
-          device_ids: values.device_ids || [],
+          device_ids: values.device_ids || []
         });
         message.success(tc('message.createSuccess'));
       }
@@ -73,12 +73,7 @@ function VirtualRoomForm({ open, editRecord, onClose }: VirtualRoomFormProps) {
       destroyOnHidden
       width={520}
     >
-      <Form
-        form={form}
-        layout="vertical"
-        autoComplete="off"
-        style={{ marginTop: 16 }}
-      >
+      <Form form={form} layout="vertical" autoComplete="off" style={{ marginTop: 16 }}>
         <Form.Item
           name="name"
           label={td('virtualRoom.field.name')}

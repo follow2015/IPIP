@@ -4,9 +4,12 @@
 
 提供系统概览和统计数据。
 """
+import json
+import time
+from typing import Any, Dict, Optional
+
 from app.utils.logging import get_logger
 from flask import Blueprint
-from datetime import datetime
 from app.utils.time_utils import now_utc_naive
 
 from app.persistence.factory import create_repository
@@ -17,8 +20,8 @@ from app.persistence.customer_repository import CustomerRepository
 from app.core.enums import CustomerStatus
 from app.persistence.ip_repositories import IPManagerRepository, IPNetworkRepository
 from app.persistence.user_log_repository import UserLogRepository
-from app.openapi.doc import doc, public
-from app.utils.auth import login_required, permission_required
+from app.openapi.doc import doc
+from app.services.auth import login_required, permission_required
 from app.api.base import APIResponse
 
 logger = get_logger(__name__)
@@ -188,9 +191,143 @@ def get_activities():
 
         return APIResponse.success(data={"activities": activities, "total": len(activities)})
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 活动记录查询失败降级为空列表：仪表盘不得因单块数据失败整体不可用
         logger.error(f"获取活动记录失败: {e}")
         return APIResponse.success(data={"activities": [], "total": 0})
+
+
+def _probe_components() -> Dict[str, dict]:
+    """真实探测各后端服务组件健康,替换原硬编码 services。
+
+    每项独立 try/except + 计时,失败降级 unknown,不拖垮 dashboard 端点。
+    返回 {name: {"status": running|degraded|down|unknown, ...指标}}。
+    """
+    services: Dict[str, dict] = {}
+
+    services["api"] = {"status": "running"}
+
+    try:
+        from extensions import db
+        from sqlalchemy import text
+
+        start = time.perf_counter()
+        with db.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        services["database"] = {
+            "status": "running",
+            "latency_ms": round((time.perf_counter() - start) * 1000, 1),
+        }
+    except Exception as exc:  # noqa: BLE001 -- 探测失败降级,不冒泡
+        logger.warning("数据库探测失败: %s", exc)
+        services["database"] = {"status": "down", "message": str(exc)[:200]}
+
+    try:
+        from app.utils.redis_client import get_redis_client
+
+        client = get_redis_client()
+        start = time.perf_counter()
+        ok = bool(client and client.ping())
+        latency = round((time.perf_counter() - start) * 1000, 1)
+        services["redis"] = (
+            {"status": "running", "latency_ms": latency}
+            if ok
+            else {"status": "down", "message": "Redis ping 失败"}
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Redis 探测失败: %s", exc)
+        services["redis"] = {"status": "down", "message": str(exc)[:200]}
+
+    try:
+        from app.services.monitoring.heartbeat import interval_seconds, read_heartbeats
+
+        stale_after = max(interval_seconds() * 3, 60)
+        for name in ("gateway", "monitor"):
+            try:
+                state = read_heartbeats([name]).get(name, {})
+                if not state.get("checked"):
+                    services[name] = {"status": "unknown", "message": "心跳未读到(Redis 可能不可用)"}
+                elif not state.get("alive"):
+                    services[name] = {"status": "down", "age_seconds": state.get("age_seconds")}
+                elif state.get("age_seconds") is not None and state["age_seconds"] > stale_after:
+                    services[name] = {"status": "degraded", "age_seconds": state.get("age_seconds")}
+                else:
+                    services[name] = {"status": "running", "age_seconds": state.get("age_seconds")}
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("%s 心跳读取失败: %s", name, exc)
+                services[name] = {"status": "unknown", "message": str(exc)[:200]}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("心跳模块加载失败: %s", exc)
+        for name in ("gateway", "monitor"):
+            services.setdefault(name, {"status": "unknown", "message": str(exc)[:200]})
+
+    try:
+        from app.celery_app import celery
+
+        replies = celery.control.ping(timeout=3)
+        workers = len(replies) if isinstance(replies, list) else 0
+        services["celery"] = (
+            {"status": "running", "workers": workers}
+            if workers > 0
+            else {"status": "down", "workers": 0}
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Celery 探测失败: %s", exc)
+        services["celery"] = {"status": "unknown", "message": str(exc)[:200]}
+
+    return services
+
+
+def _recompute_overall(data: Dict[str, Any]) -> None:
+    """把组件健康并入整体状态判定(原地修改 data["overall"])。
+
+    规则:db/redis 挂 → critical;gateway/monitor/celery 降级或失联,或主机已 warning
+    → warning;否则保留主机阈值推导的 healthy/warning/critical。
+    """
+    comp = data.get("services") or {}
+    db_down = comp.get("database", {}).get("status") == "down"
+    redis_down = comp.get("redis", {}).get("status") == "down"
+    comp_abnormal = any(
+        comp.get(n, {}).get("status") in ("down", "degraded")
+        for n in ("gateway", "monitor", "celery")
+    )
+    if db_down or redis_down:
+        data["overall"] = "critical"
+    elif comp_abnormal or data.get("overall") == "warning":
+        data["overall"] = "warning"
+
+
+_STATUS_CACHE_KEY = "ipip:dashboard:system-status"
+_STATUS_CACHE_TTL = 10  # 秒；系统状态无需秒级精度，10s 粒度对大屏足够
+
+
+def _read_status_cache() -> Optional[Dict[str, Any]]:
+    """读缓存；未命中/Redis 不可用/解析失败一律返回 None 走实时探测。"""
+    try:
+        from app.utils.redis_client import get_redis_client
+
+        client = get_redis_client()
+        if client is None:
+            return None
+        raw = client.get(_STATUS_CACHE_KEY)
+        if not raw:
+            return None
+        cached = json.loads(raw)
+        return cached if isinstance(cached, dict) else None
+    except Exception as exc:  # noqa: BLE001 -- 缓存是优化路径，失败必须静默降级
+        logger.warning("系统状态缓存读取失败，降级为实时探测: %s", exc)
+        return None
+
+
+def _write_status_cache(data: Dict[str, Any]) -> None:
+    try:
+        from app.utils.redis_client import get_redis_client
+
+        client = get_redis_client()
+        if client is None:
+            return
+        client.set(_STATUS_CACHE_KEY, json.dumps(data), ex=_STATUS_CACHE_TTL)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("系统状态缓存写入失败（忽略）: %s", exc)
 
 
 @dashboard_bp.route("/system-status", methods=["GET"])
@@ -198,26 +335,32 @@ def get_activities():
 @login_required
 @permission_required("system:stats")
 def get_system_status():
-    """获取系统状态"""
+    """获取系统状态(主机资源 + 后端服务组件真实健康)"""
+    cached = _read_status_cache()
+    if cached is not None:
+        return APIResponse.success(data=cached)
+
     try:
         try:
             import psutil
         except ImportError:
-            return APIResponse.success(data={
+            psutil = None
+
+        services = _probe_components()
+        if psutil is None:
+            degraded = {
                 "overall": "warning",
                 "performance": {
                     "cpu": 0, "memory": 0, "disk": 0,
                     "memory_total": 0, "memory_used": 0,
                     "disk_total": 0, "disk_used": 0
                 },
-                "services": {
-                    "database": "running",
-                    "api": "running",
-                    "frontend": "running"
-                },
+                "services": services,
                 "lastUpdated": now_utc_naive().isoformat(),
                 "error": "psutil library not installed"
-            })
+            }
+            _write_status_cache(degraded)
+            return APIResponse.success(data=degraded)
 
         try:
             cpu_percent = psutil.cpu_percent(interval=1)
@@ -243,13 +386,12 @@ def get_system_status():
                 "disk_total": round(disk.total / (1024**3), 2),
                 "disk_used": round(disk.used / (1024**3), 2)
             },
-            "services": {
-                "database": "running",
-                "api": "running",
-                "frontend": "running"
-            },
+            "services": services,
             "lastUpdated": now_utc_naive().isoformat()
         }
+
+        _recompute_overall(data)
+        _write_status_cache(data)
 
         return APIResponse.success(data=data)
 
@@ -263,11 +405,7 @@ def get_system_status():
                 "memory_total": 0, "memory_used": 0,
                 "disk_total": 0, "disk_used": 0
             },
-            "services": {
-                "database": "unknown",
-                "api": "unknown",
-                "frontend": "unknown"
-            },
+            "services": _probe_components(),
             "lastUpdated": now_utc_naive().isoformat(),
             "error": str(e)
         }

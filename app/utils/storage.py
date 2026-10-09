@@ -34,7 +34,7 @@ class StorageAdapter:
             try:
                 self.redis_client.ping()
                 logger.info("存储适配器: 使用 Redis 存储")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- Redis 连接失败降级兜底：任意连接异常（ConnectionError/TimeoutError/AuthError…）都必须切到内存存储保证服务可用
                 logger.warning(f"存储适配器: Redis 连接失败，降级到内存存储: {str(e)}")
                 self.use_redis = False
         else:
@@ -60,7 +60,7 @@ class StorageAdapter:
                     else:
                         self.redis_client.set(key, serialized_value)
                     return True
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- Redis set 失败降级兜底：同 38
                     logger.warning(f"Redis set 失败，降级到内存存储: {str(e)}")
                     self.use_redis = False
             
@@ -74,7 +74,7 @@ class StorageAdapter:
             }
             return True
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- Redis set 兜底失败：返回 False 由调用方处理（内存存储也已不可用时）
             logger.error(f"存储适配器 set 失败: key={key}, error={str(e)}")
             return False
 
@@ -94,7 +94,7 @@ class StorageAdapter:
                     if value is None:
                         return None
                     return json.loads(value)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- Redis get 失败降级兜底：同 38
                     logger.warning(f"Redis get 失败，降级到内存存储: {str(e)}")
                     self.use_redis = False
             
@@ -109,7 +109,7 @@ class StorageAdapter:
             
             return item['value']
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- Redis get 兜底失败：返回 None，同 81
             logger.error(f"存储适配器 get 失败: key={key}, error={str(e)}")
             return None
 
@@ -127,7 +127,7 @@ class StorageAdapter:
                 try:
                     self.redis_client.delete(key)
                     return True
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- Redis delete 失败降级兜底：同 38
                     logger.warning(f"Redis delete 失败，降级到内存存储: {str(e)}")
                     self.use_redis = False
             
@@ -135,7 +135,7 @@ class StorageAdapter:
                 del self.memory_store[key]
             return True
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- Redis delete 兜底失败：返回 False，同 81
             logger.error(f"存储适配器 delete 失败: key={key}, error={str(e)}")
             return False
 
@@ -152,7 +152,7 @@ class StorageAdapter:
             if self.use_redis:
                 try:
                     return self.redis_client.exists(key) > 0
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- Redis exists 失败降级兜底：同 38
                     logger.warning(f"Redis exists 失败，降级到内存存储: {str(e)}")
                     self.use_redis = False
             
@@ -167,7 +167,7 @@ class StorageAdapter:
             
             return True
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- Redis exists 兜底失败：返回 False，同 81
             logger.error(f"存储适配器 exists 失败: key={key}, error={str(e)}")
             return False
 
@@ -184,7 +184,7 @@ class StorageAdapter:
             if self.use_redis:
                 try:
                     return self.redis_client.incr(key)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- Redis incr 失败降级兜底：同 38
                     logger.warning(f"Redis incr 失败，降级到内存存储: {str(e)}")
                     self.use_redis = False
             
@@ -202,7 +202,7 @@ class StorageAdapter:
             item['value'] += 1
             return item['value']
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- Redis incr 兜底失败：返回 0，同 81
             logger.error(f"存储适配器 incr 失败: key={key}, error={str(e)}")
             return 0
 
@@ -220,7 +220,7 @@ class StorageAdapter:
             if self.use_redis:
                 try:
                     return self.redis_client.expire(key, ttl) > 0
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- Redis expire 失败降级兜底：同 38
                     logger.warning(f"Redis expire 失败，降级到内存存储: {str(e)}")
                     self.use_redis = False
             
@@ -230,7 +230,7 @@ class StorageAdapter:
             self.memory_store[key]['expire_at'] = time.time() + ttl
             return True
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- Redis expire 兜底失败：返回 False，同 81
             logger.error(f"存储适配器 expire 失败: key={key}, error={str(e)}")
             return False
 

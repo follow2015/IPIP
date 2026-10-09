@@ -114,6 +114,14 @@ class DeviceMonitorStatusRepository(SQLAlchemyRepository):
         抖动 = reachable=False 且 0 < consecutive_failures < threshold（尚未告警）。
         告警盲区与协议/类型分布单独查询，避免 JSON 列跨方言问题影响主统计。
 
+        [WARN] 口径：**monitor_enabled=0（暂停探测）的设备一律不计入**，含分母
+        `total_monitored`。暂停探测的设备 `last_checked_at` 不再刷新，快照里的
+        reachable/down_alerted 会永久停在最后一次结果上；若仍纳入统计，分母被
+        放大、分子恒为"不可达"，健康分被系统性压低且永不回升（实测 2026-10-08：
+        31 台有状态行设备中 17 台暂停探测，纳入口径 可达 10 / 不可达 21；
+        排除后 7 / 7）。被排除的台数由 `paused_devices` 一并回传，供读侧
+        显式说明"少掉的那部分去哪了"，而不是让数字默默变小。
+
         Args:
             failure_threshold: 抖动→不可达的连续失败阈值，默认 2（与状态机一致）。
         """
@@ -144,6 +152,7 @@ class DeviceMonitorStatusRepository(SQLAlchemyRepository):
             .select_from(DeviceMonitorStatus)
             .join(Device, Device.id == DeviceMonitorStatus.device_id)
             .filter(Device.deleted_at.is_(None))
+            .filter(DeviceMonitorStatus.monitor_enabled.is_(True))
             .one()
         )
 
@@ -152,9 +161,19 @@ class DeviceMonitorStatusRepository(SQLAlchemyRepository):
             .select_from(DeviceMonitorStatus)
             .join(Device, Device.id == DeviceMonitorStatus.device_id)
             .filter(Device.deleted_at.is_(None))
+            .filter(DeviceMonitorStatus.monitor_enabled.is_(True))
             .filter(DeviceMonitorStatus.extra["alert_blindspot_at"].isnot(None))
         )
         blindspot = blindspot_q.scalar() or 0
+
+        paused = (
+            self.session.query(func.count())
+            .select_from(DeviceMonitorStatus)
+            .join(Device, Device.id == DeviceMonitorStatus.device_id)
+            .filter(Device.deleted_at.is_(None))
+            .filter(DeviceMonitorStatus.monitor_enabled.is_(False))
+            .scalar()
+        ) or 0
 
         return {
             "total_monitored": row.total or 0,
@@ -163,10 +182,11 @@ class DeviceMonitorStatusRepository(SQLAlchemyRepository):
             "flapping": int(row.flapping or 0),
             "never_reachable": int(row.never_reachable or 0),
             "alert_blindspot": int(blindspot),
+            "paused_devices": int(paused),
         }
 
     def distribution_by_protocol(self) -> Dict[str, int]:
-        """按协议分组计数（snmp/redfish/ipmi）。"""
+        """按协议分组计数（snmp/redfish/ipmi）——口径同 overview_stats，排除暂停设备。"""
         rows = (
             self.session.query(
                 DeviceMonitorStatus.protocol,
@@ -175,13 +195,14 @@ class DeviceMonitorStatusRepository(SQLAlchemyRepository):
             .select_from(DeviceMonitorStatus)
             .join(Device, Device.id == DeviceMonitorStatus.device_id)
             .filter(Device.deleted_at.is_(None))
+            .filter(DeviceMonitorStatus.monitor_enabled.is_(True))
             .group_by(DeviceMonitorStatus.protocol)
             .all()
         )
         return {proto: cnt for proto, cnt in rows if proto}
 
     def distribution_by_device_type(self) -> Dict[str, int]:
-        """JOIN devices 表按设备类型分组计数。"""
+        """JOIN devices 表按设备类型分组计数——口径同 overview_stats，排除暂停设备。"""
         rows = (
             self.session.query(
                 Device.device_type,
@@ -190,6 +211,7 @@ class DeviceMonitorStatusRepository(SQLAlchemyRepository):
             .select_from(DeviceMonitorStatus)
             .join(Device, Device.id == DeviceMonitorStatus.device_id)
             .filter(Device.deleted_at.is_(None))
+            .filter(DeviceMonitorStatus.monitor_enabled.is_(True))
             .group_by(Device.device_type)
             .all()
         )

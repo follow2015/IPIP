@@ -6,7 +6,7 @@ API 层不再直接使用 db.session 或 Model.query。
 """
 from typing import Any, Dict, List, Optional
 
-from app.core.enums import ChannelType, BROADCAST_CHANNELS
+from app.core.enums import BROADCAST_CHANNELS
 from app.exceptions.business import ResourceConflictError
 from app.exceptions.validation import ValidationError
 from app.models.webhook_config import WebhookConfig, validate_webhook_url

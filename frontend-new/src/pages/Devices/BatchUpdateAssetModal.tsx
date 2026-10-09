@@ -10,6 +10,7 @@ import { useBatchUpdateDeviceAsset, type BatchUpdateAssetRequest } from '@/servi
 import { useMessage } from '@/hooks/useMessage';
 import AssetInfoFields from '@/components/AssetInfoFields';
 import { useTranslation } from 'react-i18next';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 const ASSET_DATE_FIELDS = [
   'purchase_date',
@@ -62,8 +63,13 @@ function BatchUpdateAssetModal({ open, deviceIds, onClose }: BatchUpdateAssetMod
       form.resetFields();
       setAutoGenerate(false);
     } catch (err) {
-      if (err instanceof Error) {
-        message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) {
+          message.error(err.message);
+        }
       }
     }
   };

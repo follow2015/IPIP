@@ -130,7 +130,7 @@ def _git_commit() -> str:
             ["git", "rev-parse", "--short", "HEAD"],
             cwd=ROOT, capture_output=True, text=True, timeout=10,
         ).stdout.strip() or "unknown"
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 主机名/版本探测失败返回 unknown：备份脚本容错
         return "unknown"
 
 
@@ -141,7 +141,7 @@ def _mysqldump_version(dump_bin: str) -> str:
             [dump_bin, "--version"], capture_output=True, text=True, timeout=10,
         ).stdout.strip()
         return out.splitlines()[0] if out else "unknown"
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 同 138
         return "unknown"
 
 

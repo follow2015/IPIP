@@ -5,6 +5,7 @@
  * 与全部提交处理逻辑；把「模板 → 创建请求」的纯映射下沉到 cloneBuild.ts，
  * 本 hook 只做编排（校验 / 提交 / 结果处理）。
  */
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useEditableRows } from '@/hooks/useEditableRows';
 import { useBatchDeviceCreate } from '@/hooks/useBatchDeviceCreate';
@@ -53,11 +54,11 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
   const { data: chassisData } = useDeviceList({
     is_chassis: isNodeTemplate ? 1 : undefined,
     room_id: undefined,
-    per_page: 200
+    per_page: PER_PAGE_CAP
   });
   const { data: chassisNodesData } = useDeviceList({
     parent_device_id: cloneChassisId ?? 0,
-    per_page: 999
+    per_page: PER_PAGE_CAP
   });
   const cloneChassisOptions = useMemo(() => {
     const list = chassisData?.items ?? [];

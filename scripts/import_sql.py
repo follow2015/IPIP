@@ -9,7 +9,7 @@
 包裹；而 ``DELIMITER`` 是 **mysql CLI 的客户端指令、不是 SQL 语句**，朴素写法
 ``sql.split(';')`` 会把触发器体切碎，直接报语法错误。
 
-本模块实现与 mysql CLI 等价的切分逻辑，供无 mysql 客户端的环境（install.sh 的
+本模块实现与 mysql CLI 等价的切分逻辑，供无 mysql 客户端的环境（编排器的
 PyMySQL 回退路径、CI 冒烟）使用。
 
 用法::
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 
 
@@ -41,7 +42,7 @@ def split_statements(sql: str) -> list[str]:
 
     for raw in sql.splitlines():
         line = raw.strip()
-        if line.upper().startswith("DELIMITER"):
+        if re.match(r"DELIMITER(\s|$)", line.upper()):
             parts = line.split(None, 1)
             if len(parts) == 2:
                 delim = parts[1].strip()
@@ -97,7 +98,7 @@ def import_sql_file(path: str, dry_run: bool = False) -> dict:
         port=int(os.getenv("MYSQL_PORT", "3306")),
         user=os.getenv("MYSQL_USER", "root"),
         password=os.getenv("MYSQL_PASSWORD", ""),
-        database=os.getenv("MYSQL_DATABASE", "ip_manager"),
+        database=os.getenv("MYSQL_DATABASE", "ip_management"),
         charset="utf8mb4",
         autocommit=True,
     )

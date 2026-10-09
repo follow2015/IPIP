@@ -8,6 +8,7 @@
  * - 节点详情侧边抽屉
  * - 自动推断拓扑字段
  */
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import React, { useState, useCallback, useMemo, useRef, useDeferredValue, useEffect } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import {
@@ -22,12 +23,13 @@ import {
   Modal,
   Table,
   Tag,
-  message,
   Spin,
   Empty,
   Alert
 } from 'antd';
+import { theme } from 'antd';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useMessage } from '@/hooks/useMessage';
 import {
   ApartmentOutlined,
   CloudServerOutlined,
@@ -58,19 +60,24 @@ const TopologyPage: React.FC = () => {
   const [layout, setLayout] = useState<LayoutType>('force');
   const [selectedNode, setSelectedNode] = useState<TopologyNode | null>(null);
   const drawer = useDisclosure();
+  const { open: openDrawer } = drawer;
   const [highlightNodeId, setHighlightNodeId] = useState<number | null>(null);
   const [searchValue, setSearchValue] = useState('');
   const deferredSearch = useDeferredValue(searchValue);
   const autoDetectModal = useDisclosure();
+  const { token } = theme.useToken();
+
+  const { open: openAutoDetectModal, close: closeAutoDetectModal } = autoDetectModal;
   const discoveryModal = useDisclosure();
   const graphRef = useRef<TopologyGraphHandle>(null);
   const { isMobile } = useResponsive();
   const { t: tn } = useTranslation('network');
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
+  const message = useMessage();
 
   const { data: roomOptions } = useRoomOptions();
-  const { data: virtualRoomsData } = useVirtualRooms({ per_page: 200 });
+  const { data: virtualRoomsData } = useVirtualRooms({ per_page: PER_PAGE_CAP });
   const networkQuery = useNetworkTopology(
     viewMode === 'network' ? { room_id: roomId, virtual_room_id: virtualRoomId } : undefined
   );
@@ -90,10 +97,13 @@ const TopologyPage: React.FC = () => {
     [topologyData]
   );
 
-  const handleNodeClick = useCallback((node: TopologyNode) => {
-    setSelectedNode(node);
-    drawer.open();
-  }, []);
+  const handleNodeClick = useCallback(
+    (node: TopologyNode) => {
+      setSelectedNode(node);
+      openDrawer();
+    },
+    [openDrawer]
+  );
 
   const handleEdgeClick = useCallback((_edge: TopologyEdge) => {
   }, []);
@@ -125,12 +135,12 @@ const TopologyPage: React.FC = () => {
           if (data.changes.length === 0) {
             message.success(tn('topology.autoDetect.noChanges'));
           } else {
-            autoDetectModal.open();
+            openAutoDetectModal();
           }
         }
       }
     );
-  }, [roomId, autoDetectMutation, tn]);
+  }, [roomId, autoDetectMutation, tn, openAutoDetectModal, message]);
 
   const handleApplyAutoDetect = useCallback(() => {
     if (!roomId) return;
@@ -139,11 +149,11 @@ const TopologyPage: React.FC = () => {
       {
         onSuccess: (data) => {
           message.success(tn('topology.autoDetect.updatedRecords', { count: data.changes.length }));
-          autoDetectModal.close();
+          closeAutoDetectModal();
         }
       }
     );
-  }, [roomId, autoDetectMutation, tn]);
+  }, [roomId, autoDetectMutation, tn, closeAutoDetectModal, message]);
 
   const statsItems = useMemo(() => {
     if (!topologyData?.stats) return [];
@@ -175,7 +185,11 @@ const TopologyPage: React.FC = () => {
   }, [topologyData?.stats, viewMode, tn, td]);
 
   const autoDetectColumns = [
-    { title: tn('topology.autoDetect.column.device'), dataIndex: 'device_name', key: 'device_name' },
+    {
+      title: tn('topology.autoDetect.column.device'),
+      dataIndex: 'device_name',
+      key: 'device_name'
+    },
     {
       title: tn('topology.autoDetect.column.changedFields'),
       dataIndex: 'fields',
@@ -357,7 +371,7 @@ const TopologyPage: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 zIndex: 10,
-                background: 'rgba(255,255,255,0.7)'
+                background: token.colorBgMask
               }}
             >
               <Spin size="large" description={tn('topology.loading')} />

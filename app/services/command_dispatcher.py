@@ -148,7 +148,7 @@ class CommandDispatcher:
         except DeviceOperationConflict as e:
             logger.warning("%s未执行：设备正被其他操作占用 —— %s", err_label, e)
             return {"success": False, "error": str(e)}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 命令下发兜底：转为结构化失败结果并由 _classify_error 分类，netmiko/SSH 异常类型不可枚举
             logger.error("%s失败: %s", err_label, e)
             return {"success": False, "error": self._classify_error(e)}
 
@@ -185,7 +185,7 @@ class CommandDispatcher:
                 read_timeout=read_timeout,
             )
             return {"success": True, **(ok_extra or {})}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 命令下发兜底（另一路径）：同 165
             logger.error("%s失败: %s", err_label, e)
             return {"success": False, "error": self._classify_error(e)}
 
@@ -209,7 +209,7 @@ class CommandDispatcher:
             with self.ssh_mgr.get_connection(switch) as conn:
                 output = self.ssh_mgr.execute_command(conn, check_cmd)
             return self._check_id_in_output(output, entity_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 存在性检查失败返回 None：由调用方按"不存在"处理（后续操作会自然失败并报错），设备查询异常不可枚举
             logger.warning("检查 %s %d 存在性失败: %s", entity_name, entity_id, e)
             return None
 
@@ -219,6 +219,6 @@ class CommandDispatcher:
         try:
             self.ssh_mgr.send_config_commands(switch, [], save_cmd=adapter.get_save_command(switch.device.device_model or ""))
             return {"success": True, "message": "配置已保存"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 保存配置失败兜底：转为结构化失败结果，同 165
             logger.error("保存配置失败: %s", e)
             return {"success": False, "error": str(e)}

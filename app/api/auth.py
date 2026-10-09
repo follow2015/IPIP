@@ -7,6 +7,7 @@
 from app.exceptions import PresetResponseError
 from app.utils.logging import get_logger
 import re
+import time
 from typing import Dict, Optional
 from urllib.parse import urlparse
 from flask import Blueprint, request
@@ -19,7 +20,6 @@ from app.utils.transactional import transactional
 from app.persistence.user_repository import UserRepository
 from app.persistence.user_log_repository import UserLogRepository
 from config import Config
-from marshmallow import Schema
 
 
 logger = get_logger(__name__)
@@ -31,8 +31,34 @@ qrcode_service = QRCodeService()
 
 def verify_token(token: str) -> Optional[Dict]:
     """验证JWT令牌（兼容函数）"""
-    from app.utils.auth import auth_manager
+    from app.services.auth import auth_manager
     return auth_manager.verify_token(token)
+
+
+_bruteforce_degraded = {"redis_unavailable": 0}
+_bruteforce_warn_at = 0.0
+_BRUTEFORCE_WARN_INTERVAL = 60.0  # 秒
+
+
+def _bruteforce_degraded_warn(username: str) -> None:
+    """暴力破解防护因 Redis 不可用而失效时的节流告警（首次及每 60s 一次）。
+
+    [WARN] 节流**只作用于 ERROR**，DEBUG 行每次照记：ERROR 是"运维要知道"的粗粒度
+    信号（防刷屏），而"哪个账号正被尝试"是排障时最需要的细粒度线索 —— 把它
+    一并节流掉，等于在故障期间丢失攻击目标信息（恰好是最该保留的）。
+    """
+    global _bruteforce_warn_at
+    _bruteforce_degraded["redis_unavailable"] += 1
+    now = time.monotonic()
+    if now - _bruteforce_warn_at >= _BRUTEFORCE_WARN_INTERVAL:
+        _bruteforce_warn_at = now
+        logger.error(
+            "Redis 不可用，登录失败次数限制已失效（累计 %d 次登录请求未受保护；"
+            "本条每 60s 提醒一次）—— 故障期间暴力破解防护不生效，"
+            "如需应急可临时下线登录入口或改用 WAF 限流",
+            _bruteforce_degraded["redis_unavailable"],
+        )
+    logger.debug("暴力破解防护降级：username=%s", username)
 
 
 def _extract_bearer_token():
@@ -45,7 +71,7 @@ def _extract_bearer_token():
 
 def require_permission(*permissions):
     """要求特定权限的装饰器（兼容函数）"""
-    from app.utils.auth import auth_manager
+    from app.services.auth import auth_manager
     return auth_manager.require_permission(*permissions)
 
 
@@ -116,7 +142,7 @@ class SecurityValidator:
                     if domain.strip() and SecurityValidator.validate_domain(domain.strip())
                 ]
                 allowed_domains.update(config_domains)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 配置读取失败降级为默认值：配置模块异常不可枚举，不应阻断鉴权
             logger.error("读取ALLOWED_DOMAINS配置失败: %s", e)
 
         return list(allowed_domains)
@@ -190,7 +216,7 @@ def login():
     Returns:
         JSON响应，包含访问令牌和用户信息
     """
-    from app.utils.auth import auth_manager
+    from app.services.auth import auth_manager
     from app.services.user_service import UserService
 
     data = request.get_json()
@@ -221,6 +247,8 @@ def login():
         attempts = int(r.get(attempt_key) or 0)
         if attempts >= 5:
             return APIResponse.error("登录失败次数过多，请5分钟后重试", status_code=429)
+    else:
+        _bruteforce_degraded_warn(username)
 
     try:
 
@@ -252,7 +280,7 @@ def login():
                 user_agent=request.headers.get('User-Agent', '')[:512],
             )
 
-        from app.utils.auth import permission_manager
+        from app.services.auth import permission_manager
         user_roles = auth_result["user"].get("roles", [])
         user_permissions = []
         for role in user_roles:
@@ -296,7 +324,7 @@ def logout():
     Returns:
         JSON响应
     """
-    from app.utils.auth import auth_manager
+    from app.services.auth import auth_manager
 
     try:
         token = _extract_bearer_token()
@@ -311,7 +339,7 @@ def logout():
         else:
             return APIResponse.error(message="登出失败", status_code=400)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应
         logger.error("登出过程发生错误: %s", str(e))
         return APIResponse.error(message="登出失败，请稍后重试", status_code=500)
 
@@ -331,7 +359,7 @@ def get_profile():
     Returns:
         JSON响应，包含用户信息
     """
-    from app.utils.auth import auth_manager
+    from app.services.auth import auth_manager
     from app.services.user_service import UserService
 
     try:
@@ -357,7 +385,7 @@ def get_profile():
 
         user_dict = user.to_dict(include_sensitive=False)
 
-        from app.utils.auth import permission_manager
+        from app.services.auth import permission_manager
         user_permissions = []
         for role in user.roles:
             role_perms = permission_manager.get_role_permissions(role.name)
@@ -387,7 +415,7 @@ def get_profile():
             message="获取用户资料成功"
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应
         logger.error("获取用户资料失败: %s", str(e))
         return APIResponse.error(message="获取用户资料失败", status_code=500)
 
@@ -498,7 +526,7 @@ def complete_qr_login():
     Returns:
         JSON响应
     """
-    from app.utils.auth import auth_manager
+    from app.services.auth import auth_manager
     from app.services.user_service import UserService
 
     data = request.get_json()
@@ -533,7 +561,7 @@ def complete_qr_login():
     )
 
     if not success:
-        return APIResponse.error(message="登录失败", status_code=500)
+        raise PresetResponseError(message="登录失败", status_code=500)
 
     return APIResponse.success(
         data={

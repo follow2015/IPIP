@@ -207,6 +207,13 @@ export enum NotificationTypeCode {
   PORT_STATUS_CHANGED = 'port_status_changed',
   MONITOR_INTERRUPTED = 'monitor_interrupted',
   RAID_FAILURE_ALERT = 'raid_failure_alert',
+  TRAP_LINK_DOWN = 'trap_link_down',
+  TRAP_LINK_UP = 'trap_link_up',
+  TRAP_AUTH_FAILURE = 'trap_auth_failure',
+  TRAP_COLD_START = 'trap_cold_start',
+  TRAP_WARM_START = 'trap_warm_start',
+  TRAP_EGP_NEIGHBOR_LOSS = 'trap_egp_neighbor_loss',
+  TRAP_OTHER = 'trap_other',
   BATCH_CREATE_DEVICES = 'batch_create_devices',
   BATCH_BAN_IP = 'batch_ban_ip',
   BATCH_UNBAN_IP = 'batch_unban_ip',
@@ -232,6 +239,13 @@ export type NotificationTypeKey =
   'notificationType.PORT_STATUS_CHANGED' |
   'notificationType.MONITOR_INTERRUPTED' |
   'notificationType.RAID_FAILURE_ALERT' |
+  'notificationType.TRAP_LINK_DOWN' |
+  'notificationType.TRAP_LINK_UP' |
+  'notificationType.TRAP_AUTH_FAILURE' |
+  'notificationType.TRAP_COLD_START' |
+  'notificationType.TRAP_WARM_START' |
+  'notificationType.TRAP_EGP_NEIGHBOR_LOSS' |
+  'notificationType.TRAP_OTHER' |
   'notificationType.BATCH_CREATE_DEVICES' |
   'notificationType.BATCH_BAN_IP' |
   'notificationType.BATCH_UNBAN_IP' |
@@ -256,6 +270,13 @@ export const NOTIFICATION_TYPE_LABEL_KEYS: Record<NotificationTypeCode, Notifica
   [NotificationTypeCode.PORT_STATUS_CHANGED]: 'notificationType.PORT_STATUS_CHANGED',
   [NotificationTypeCode.MONITOR_INTERRUPTED]: 'notificationType.MONITOR_INTERRUPTED',
   [NotificationTypeCode.RAID_FAILURE_ALERT]: 'notificationType.RAID_FAILURE_ALERT',
+  [NotificationTypeCode.TRAP_LINK_DOWN]: 'notificationType.TRAP_LINK_DOWN',
+  [NotificationTypeCode.TRAP_LINK_UP]: 'notificationType.TRAP_LINK_UP',
+  [NotificationTypeCode.TRAP_AUTH_FAILURE]: 'notificationType.TRAP_AUTH_FAILURE',
+  [NotificationTypeCode.TRAP_COLD_START]: 'notificationType.TRAP_COLD_START',
+  [NotificationTypeCode.TRAP_WARM_START]: 'notificationType.TRAP_WARM_START',
+  [NotificationTypeCode.TRAP_EGP_NEIGHBOR_LOSS]: 'notificationType.TRAP_EGP_NEIGHBOR_LOSS',
+  [NotificationTypeCode.TRAP_OTHER]: 'notificationType.TRAP_OTHER',
   [NotificationTypeCode.BATCH_CREATE_DEVICES]: 'notificationType.BATCH_CREATE_DEVICES',
   [NotificationTypeCode.BATCH_BAN_IP]: 'notificationType.BATCH_BAN_IP',
   [NotificationTypeCode.BATCH_UNBAN_IP]: 'notificationType.BATCH_UNBAN_IP',
@@ -273,7 +294,7 @@ export const NOTIFICATION_TYPE_LABEL_KEYS: Record<NotificationTypeCode, Notifica
   [NotificationTypeCode.ASSET_WARRANTY_ALERT]: 'notificationType.ASSET_WARRANTY_ALERT',
 };
 
-export type NotificationGroupKey = 'notificationGroup.MONITOR' | 'notificationGroup.OPERATION' | 'notificationGroup.SCAN' | 'notificationGroup.PORT_ASYNC' | 'notificationGroup.OPS' | 'notificationGroup.ASSET';
+export type NotificationGroupKey = 'notificationGroup.MONITOR' | 'notificationGroup.TRAP' | 'notificationGroup.OPERATION' | 'notificationGroup.SCAN' | 'notificationGroup.PORT_ASYNC' | 'notificationGroup.OPS' | 'notificationGroup.ASSET';
 
 export const NOTIFICATION_TYPE_GROUPS: {
   groupKey: NotificationGroupKey;
@@ -289,6 +310,18 @@ export const NOTIFICATION_TYPE_GROUPS: {
       NotificationTypeCode.PORT_STATUS_CHANGED,
       NotificationTypeCode.MONITOR_INTERRUPTED,
       NotificationTypeCode.RAID_FAILURE_ALERT,
+    ],
+  },
+  {
+    groupKey: 'notificationGroup.TRAP',
+    types: [
+      NotificationTypeCode.TRAP_LINK_DOWN,
+      NotificationTypeCode.TRAP_LINK_UP,
+      NotificationTypeCode.TRAP_AUTH_FAILURE,
+      NotificationTypeCode.TRAP_COLD_START,
+      NotificationTypeCode.TRAP_WARM_START,
+      NotificationTypeCode.TRAP_EGP_NEIGHBOR_LOSS,
+      NotificationTypeCode.TRAP_OTHER,
     ],
   },
   {

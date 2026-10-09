@@ -4,8 +4,8 @@
  * - useCopyInfo: React Hook，返回复制函数 + message 提示
  */
 import { useCallback } from 'react';
-import { message } from 'antd';
 import { useTranslation } from 'react-i18next';
+import { useMessage } from '@/hooks/useMessage';
 
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {
@@ -25,6 +25,7 @@ export function formatRecordAsText(record: Record<string, unknown>, labelMap?: R
 
 export function useCopyInfo() {
   const { t } = useTranslation();
+  const message = useMessage();
   return useCallback(
     (text: string, successMsg?: string) => {
       copyToClipboard(text).then((ok) => {
@@ -32,6 +33,6 @@ export function useCopyInfo() {
         else message.error(t('clipboard.failed'));
       });
     },
-    [t]
+    [t, message]
   );
 }

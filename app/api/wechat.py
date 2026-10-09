@@ -14,7 +14,7 @@ from flask import Blueprint, g, redirect, request
 from app.services.user_service import UserService
 from app.services.wx_service import WeChatService
 from app.openapi.doc import doc, public
-from app.utils.auth import auth_manager, login_required, permission_required
+from app.services.auth import auth_manager, login_required, permission_required
 from app.utils.transactional import transactional
 from app.utils.qrcode_manager import QRCodeManager
 from config import get_config
@@ -127,7 +127,6 @@ def miniprogram_login():
             return APIResponse.error(message="微信登录失败：无法获取用户标识", status_code=400)
 
         openid = wx_data["openid"]
-        session_key = wx_data.get("session_key")
 
         logger.info("成功获取openid: %s", _mask_openid(openid))
 
@@ -207,7 +206,6 @@ def web_auth_callback():
     """
     try:
         code = request.args.get("code")
-        state = request.args.get("state")
 
         if not code:
             logger.warning("微信授权回调缺少code参数")
@@ -430,14 +428,14 @@ def get_qrcode_status(scene_id: str):
                     access_token = auth_manager.generate_token(
                         user_id=user.id,
                         roles=user_roles,
-                        token_type="access",
+                        token_type="access",  # noqa: S106
                         auth_type="wx",
                         openid=openid
                     )
                     refresh_token = auth_manager.generate_token(
                         user_id=user.id,
                         roles=user_roles,
-                        token_type="refresh",
+                        token_type="refresh",  # noqa: S106
                         auth_type="wx",
                         openid=openid
                     )
@@ -715,14 +713,14 @@ def auto_confirm_qrcode():
         access_token = auth_manager.generate_token(
             user_id=user.id,
             role=user.role,
-            token_type="access",
+            token_type="access",  # noqa: S106
             auth_type="wx",
             openid=test_openid
         )
         refresh_token = auth_manager.generate_token(
             user_id=user.id,
             role=user.role,
-            token_type="refresh",
+            token_type="refresh",  # noqa: S106
             auth_type="wx",
             openid=test_openid
         )

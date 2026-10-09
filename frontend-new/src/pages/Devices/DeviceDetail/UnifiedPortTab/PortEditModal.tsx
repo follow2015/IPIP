@@ -10,6 +10,7 @@ import { useUpdateNetworkPort } from '@/services/network-port';
 import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useMessage } from '@/hooks/useMessage';
 import { getUsageStatusFormOptions } from './constants';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface PortEditModalProps {
   deviceId: number;
@@ -52,7 +53,12 @@ export function PortEditModal({ deviceId, port, onClose }: PortEditModalProps) {
       message.success(t('port.message.updated'));
       onClose();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 

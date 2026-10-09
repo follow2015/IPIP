@@ -8,14 +8,15 @@ from app.utils.logging import get_logger
 
 from flask import Blueprint, request
 
-from app.api.base import APIResponse, ErrorCode
-from app.openapi.doc import doc, public
+from app.api.base import APIResponse, ErrorCode, RequestValidator
+from app.openapi.doc import doc
 from app.persistence.ip_repositories import IPNetworkRepository, IPManagerRepository
 from app.persistence.network_repo import NetworkRepository
 from app.utils.network_utils import get_network_info
-from app.utils.auth import login_required, permission_required
+from app.services.auth import login_required, permission_required
 from app.core.enums import NotificationTypeCode
 from app.utils.transactional import transactional
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -138,14 +139,15 @@ def network_usage():
 def get_networks():
     """分页获取网段列表"""
     from app.services.network_service import NetworkService
+    page, page_size = RequestValidator.validate_pagination_params()
     filters = {
         "room_id": request.args.get("room_id", type=int),
         "switch_id": request.args.get("switch_id", type=int),
         "customer_id": request.args.get("customer_id", type=int),
         "search": request.args.get("search"),
         "route_type": request.args.get("route_type", type=int),
-        "page": request.args.get("page", 1, type=int),
-        "page_size": request.args.get("per_page", 20, type=int),
+        "page": page,
+        "page_size": page_size,
     }
     service = NetworkService(NetworkRepository(), IPManagerRepository())
     result = service.get_networks_paginated(**filters)
@@ -211,11 +213,12 @@ def update_network_customer(ip_network):
 def get_ip_networks():
     """分页获取IP网段"""
     from app.services.network_service import NetworkService
+    page, page_size = RequestValidator.validate_pagination_params()
     filters = {
         "room_id": request.args.get("room_id", type=int),
         "customer_id": request.args.get("customer_id", type=int),
-        "page": request.args.get("page", 1, type=int),
-        "page_size": request.args.get("per_page", 20, type=int),
+        "page": page,
+        "page_size": page_size,
     }
     service = NetworkService(NetworkRepository(), IPManagerRepository())
     result = service.get_ip_networks_paginated(**filters)
@@ -242,8 +245,7 @@ def get_network_detail(ip_network):
 
     room_id = request.args.get("room_id", type=int)
     switch_id = request.args.get("switch_id", type=int)
-    page = request.args.get("page", 1, type=int)
-    page_size = request.args.get("per_page", 20, type=int)
+    page, page_size = RequestValidator.validate_pagination_params()
 
     net_info = get_network_info(ip_network)
     if "error" in net_info:
@@ -275,7 +277,7 @@ def get_network_detail(ip_network):
 
     ip_repo = IPManagerRepository()
     try:
-        net = _ipaddress.ip_network(ip_network, strict=False)
+        _ipaddress.ip_network(ip_network, strict=False)
     except ValueError:
         return APIResponse.error(f"无效的网段格式: {ip_network}", ErrorCode.VALIDATION_ERROR, 400)
 
@@ -419,7 +421,7 @@ def trigger_full_scan(room_id):
                 for sw in switches:
                     emit_resource_change(sw.device_id, "scan_complete", affected_ports=["*"])
                 emit_global_event("room_scan_complete", {"room_id": room_id, "reason": scan_reason} if scan_failed else {"room_id": room_id})
-            except Exception as _e:
+            except Exception as _e:  # noqa: BLE001 -- SSE 通知失败不影响数据：扫描结果已落库，通知失败仅告警
                 logger.warning("全量扫描 SSE 通知失败（不影响数据）: %s", _e)
 
             try:
@@ -451,7 +453,7 @@ def trigger_full_scan(room_id):
 
                         idempotency_key=f"scan_complete:room:{room_id}:{int(__import__('time').time())}",
                     )
-            except Exception as _e:
+            except Exception as _e:  # noqa: BLE001 -- 扫描完成通知创建失败不影响数据：同 451
                 logger.warning("扫描完成通知创建失败（不影响数据）: %s", _e)
 
     from app.utils.concurrency.task_executor import task_executor
@@ -486,16 +488,14 @@ def get_scan_status(room_id):
 @permission_required("system:config")
 def get_no_auth_fallback(room_id):
     """查询当前所有降级映射"""
-    from app.services.scan_redis import ScanRedis
     try:
         from app.utils.cache import cache_manager
         if cache_manager.primary_storage and cache_manager.primary_storage.redis_client:
             redis_client = cache_manager.primary_storage.redis_client
-            sr = ScanRedis(redis_client)
-            key = f"no_auth_fallback:{room_id}"
+            key = redis_keys.scan_no_auth_fallback_key(room_id)
             mapping = redis_client.hgetall(key)
             return APIResponse.success(mapping)
-    except Exception as e:  # noqa: BLE001 - Redis 故障：原文只进日志，对外降级为 503
+    except Exception as e:  # Redis 故障：原文只进日志，对外降级为 503
         logger.warning("查询降级映射失败: room_id=%s error=%s", room_id, e, exc_info=True)
         return APIResponse.error(
             message="查询降级映射失败，请稍后重试",
@@ -526,7 +526,7 @@ def rebuild_no_auth_fallback():
                 room_id, SwitchExtRepository(), SwitchRepository()
             )
             return APIResponse.success({"room_id": room_id, "status": "rebuilt"})
-    except Exception as e:  # noqa: BLE001 - 重建失败：原文只进日志，对外降级为 503
+    except Exception as e:  # 重建失败：原文只进日志，对外降级为 503
         logger.error("重建降级映射失败: room_id=%s error=%s", room_id, e, exc_info=True)
         return APIResponse.error(
             message="重建降级映射失败",

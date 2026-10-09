@@ -15,7 +15,7 @@ from app.api.monitor import _ALLOWED_PROTOCOLS, _credential_upsert_schema, _audi
 from app.openapi.doc import doc
 from app.schemas.monitor import MonitorCheckBatchSchema
 from app.services.monitoring.monitor_service import get_probe_trends as _probe_trends
-from app.utils import login_required, permission_required
+from app.services.auth import login_required, permission_required
 from app.utils.transactional import transactional
 
 
@@ -97,15 +97,15 @@ def get_probe_history(device_id: int):
     try:
         from_ = _parse_dt(raw_from)
         to_ = _parse_dt(raw_to)
-    except ValueError:
-        raise ValidationError("from/to 必须为合法 ISO datetime")
+    except ValueError as e:
+        raise ValidationError("from/to 必须为合法 ISO datetime") from e
     if from_ and to_ and from_ > to_:
         raise ValidationError("from 不能晚于 to")
 
     try:
         limit = min(max(int(request.args.get("limit", 500)), 1), 2000)
-    except ValueError:
-        raise ValidationError("limit 必须为正整数")
+    except ValueError as e:
+        raise ValidationError("limit 必须为正整数") from e
 
     if to_ is None:
         to_ = now_utc_naive()
@@ -138,8 +138,8 @@ def get_probe_trends(device_id: int):
     try:
         from_ = _parse_dt(raw_from)
         to_ = _parse_dt(raw_to)
-    except ValueError:
-        raise ValidationError("from/to 必须为合法 ISO datetime")
+    except ValueError as e:
+        raise ValidationError("from/to 必须为合法 ISO datetime") from e
     if from_ and to_ and from_ > to_:
         raise ValidationError("from 不能晚于 to")
 

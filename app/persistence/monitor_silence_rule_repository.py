@@ -29,7 +29,7 @@ class MonitorSilenceRuleRepository:
         return (
             self.session.query(MonitorSilenceRule)
             .filter(
-                MonitorSilenceRule.enabled == True,
+                MonitorSilenceRule.enabled.is_(True),
                 MonitorSilenceRule.silence_from <= now,
                 MonitorSilenceRule.silence_until >= now,
             )

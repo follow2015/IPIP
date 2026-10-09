@@ -162,13 +162,13 @@ def _publish_escalation(alert: MonitorAlertOutbox,
             payload=payload,
             target_user_ids=target_user_ids,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- SSE 发布失败非致命：升级已入库，推送失败仅告警
         logger.warning("升级 SSE 发布失败 alert_id=%s: %s", alert.id, exc)
 
     if escalate_webhook_url:
         try:
             _signed_webhook_post(escalate_webhook_url, payload)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- Webhook 投递失败需捕获任意异常：先脱敏（URL 含凭证）再分类上抛
             from app.utils.redaction import redact_credentials
             logger.warning("升级 webhook 失败 alert_id=%s url=%s: %s",
                            alert.id, redact_credentials(str(escalate_webhook_url)),
@@ -178,7 +178,7 @@ def _publish_escalation(alert: MonitorAlertOutbox,
         from extensions import db
 
         db.session.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 升级状态提交失败非致命：不影响已发出的告警
         logger.warning("升级状态提交失败 alert_id=%s: %s", alert.id, exc)
 
     from app.services.notification_service import NotificationService

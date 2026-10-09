@@ -13,6 +13,7 @@ from typing import Any, Dict, List
 from app.utils.cache import cache_manager
 from app.utils.time_utils import now_iso, now_local, parse_iso
 from extensions import db
+import app.utils.redis_keys as redis_keys
 
 logger = get_logger(__name__)
 
@@ -147,9 +148,9 @@ class ErrorStatistics:
             self.error_details = self.error_details[-self.max_details :]
 
         try:
-            cache_key = f"error_stats:{error_type}"
+            cache_key = redis_keys.error_stats_key(error_type)
             cache_manager.increment(cache_key)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 错误统计写 Redis 失败非致命：统计是尽力而为
             logger.error(f"记录错误统计到Redis失败: {e}")
 
     def get_statistics(self, time_range: int = 3600) -> Dict[str, Any]:

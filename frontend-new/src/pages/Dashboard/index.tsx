@@ -1,34 +1,16 @@
-/**
- * 仪表盘页面 — 运营监控中心
- *
- * 设计系统 (UI-UX-Pro-Max):
- * - 风格: Dark Mode (OLED) — 深色监控中心
- * - 配色: Primary #0F172A / CTA #22C55E / BG #020617 / Text #F8FAFC
- * - 字体: 系统默认 (Ant Design 体系)
- * - 图表: 环形图 + 仪表盘进度条 + 实时刷新
- * - 布局: 大屏友好三栏布局，信息密度高
- *
- * 布局结构：
- * 1. 顶部核心指标卡片（机房/机柜/设备/客户/IP/交换机/在线率/利用率）
- * 2. 中部可视化区域（设备状态环形图 + 机柜状态环形图 + IP状态环形图）
- * 3. 底部信息区域（资源利用率仪表盘 + 系统状态 + 最近活动流）
- */
 import React, { useMemo } from 'react';
 import {
   Row,
   Col,
   Card,
-  Statistic,
   Spin,
-  Tag,
   Timeline,
   Badge,
   theme,
-  Tooltip,
   Progress,
-  Flex,
   Space,
-  Divider
+  Tooltip,
+  Button
 } from 'antd';
 import {
   HomeOutlined,
@@ -37,14 +19,15 @@ import {
   GlobalOutlined,
   TeamOutlined,
   LockOutlined,
-  ApiOutlined,
   CheckCircleOutlined,
   WarningOutlined,
   CloseCircleOutlined,
   QuestionCircleOutlined,
   DashboardOutlined,
   SwapOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  ClusterOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 import { Pie } from '@ant-design/charts';
 import {
@@ -52,10 +35,12 @@ import {
   useDashboardActivities,
   useSystemStatus
 } from '@/services/dashboard';
+import { useMonitorOverview, useIncidents } from '@/services/monitor';
 import { CabinetStatusCode } from '@/types/enums';
+import type { ComponentHealth } from '@/types/models';
 import { getCabinetStatusMeta, getDeviceStatusEntries } from '@/types/statusMeta';
+import { calcHealthScore } from '@/utils/monitorHealth';
 import { useTranslation } from 'react-i18next';
-import type { DeviceStatusCode, IPStatusCode } from '@/types/enums';
 import { formatDateTime } from '@/utils/format';
 import { useResponsive } from '@/hooks/useResponsive';
 
@@ -320,8 +305,8 @@ function ActivityTimeline() {
     blue: token.colorPrimary,
     green: token.colorSuccess,
     orange: token.colorWarning,
-    purple: '#722ed1',
-    cyan: '#13c2c2',
+    purple: token.purple6,
+    cyan: token.cyan6,
     default: token.colorTextSecondary
   };
 
@@ -436,27 +421,288 @@ function UtilizationGauges() {
 }
 
 
+function MonitorOverviewCard() {
+  const { token } = useToken();
+  const { t } = useTranslation('monitor');
+  const { t: tCommon } = useTranslation('common');
+  const {
+    data: overview,
+    isError: overviewErr,
+    isFetching,
+    refetch,
+    dataUpdatedAt
+  } = useMonitorOverview();
+  const { data: incidents, isError: incidentsErr, refetch: refetchIncidents } = useIncidents();
+
+  const healthScore = overview ? calcHealthScore(overview) : null;
+  const scoreColor =
+    healthScore == null
+      ? undefined
+      : healthScore >= 90
+        ? token.colorSuccess
+        : healthScore >= 70
+          ? token.colorWarning
+          : token.colorError;
+  const monitorUnavailable = overviewErr || incidentsErr;
+  const openIncidents = incidents?.total ?? 0;
+  const pausedDevices = overview?.paused_devices ?? 0;
+  const monitorItems = overview
+    ? [
+        {
+          label: t('dashboard.monitorOverview.reachable'),
+          value: overview.reachable ?? 0,
+          color: token.colorSuccess
+        },
+        {
+          label: t('dashboard.monitorOverview.unreachable'),
+          value: overview.unreachable ?? 0,
+          color: token.colorError
+        },
+        {
+          label: t('dashboard.monitorOverview.flapping'),
+          value: overview.flapping ?? 0,
+          color: token.colorWarning
+        },
+        {
+          label: t('dashboard.monitorOverview.blindspot'),
+          value: overview.alert_blindspot ?? 0,
+          color: token.colorErrorActive
+        }
+      ]
+    : [];
+
+  return (
+    <Card
+      title={
+        <Space>
+          <DashboardOutlined />
+          <span>{t('dashboard.monitorOverview.title')}</span>
+        </Space>
+      }
+      size="small"
+      style={{ height: '100%' }}
+      styles={{ body: { display: 'flex', flexDirection: 'column', gap: 10 } }}
+      extra={
+        <Tooltip title={tCommon('action.refresh')}>
+          <Button
+            type="text"
+            size="small"
+            icon={<ReloadOutlined />}
+            loading={isFetching}
+            aria-label={tCommon('action.refresh')}
+            onClick={() => {
+              refetch();
+              refetchIncidents();
+            }}
+          />
+        </Tooltip>
+      }
+    >
+      <div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8
+          }}
+        >
+          <span style={{ fontSize: 12, color: token.colorTextSecondary, fontWeight: 600 }}>
+            {t('dashboard.monitorOverview.monitoredObjects')}
+          </span>
+          {healthScore != null && (
+            <span style={{ fontSize: 12, fontWeight: 700, color: scoreColor }}>
+              {t('dashboard.monitorOverview.healthScore')} {healthScore}
+            </span>
+          )}
+        </div>
+        {monitorUnavailable ? (
+          <div style={{ fontSize: 12, color: token.colorTextDisabled }}>
+            {tCommon('message.noPermission')}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+            {monitorItems.map((it) => (
+              <div
+                key={it.label}
+                style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}
+              >
+                <span style={{ color: token.colorTextSecondary }}>{it.label}</span>
+                <span style={{ fontWeight: 600, color: it.value > 0 ? it.color : token.colorText }}>
+                  {it.value}
+                </span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span style={{ color: token.colorTextSecondary }}>
+                {t('dashboard.monitorOverview.openIncidents')}
+              </span>
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: openIncidents > 0 ? token.colorWarning : token.colorText
+                }}
+              >
+                {openIncidents}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 布局债纪律（B5 清理，2026-10-08）：此处原本用 justifyContent 的两端对齐值，
+          窄屏下它会把两个 span 死死顶到左右两端，中间只剩 gap —— 提示文字一长，
+          时间戳就被压到换行且两端参差。改 flexWrap：空间不足时时间戳整块落到下一行，
+          不再互相挤压；宽屏下由 marginLeft:auto 保持时间戳右对齐，视觉与原状一致。
+          注：本注释刻意不写该取值的字面量 —— layout-ratchet 按正则计数且不区分注释，
+          写全称会把基线数字抬高，与 §17.12.4 的 important 口径同理。 */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 8,
+          fontSize: 11,
+          color: token.colorTextDisabled
+        }}
+      >
+        {/* 暂停探测的设备已被后端排除在上面的统计之外，此处显式说明，
+            否则运维会疑惑"设备总数怎么少了" */}
+        <span>
+          {pausedDevices > 0 ? t('dashboard.monitorOverview.paused', { count: pausedDevices }) : ''}
+        </span>
+        <span style={{ marginLeft: 'auto' }}>
+          <ClockCircleOutlined style={{ marginRight: 4 }} />
+          {dataUpdatedAt ? formatDateTime(new Date(dataUpdatedAt).toISOString()) : '--'}
+        </span>
+      </div>
+    </Card>
+  );
+}
+
+
+function ComponentHealthCard() {
+  const { token } = useToken();
+  const { t } = useTranslation('monitor');
+  const { t: tCommon } = useTranslation('common');
+  const { data: status } = useSystemStatus();
+
+  const services = status?.services ?? {};
+  const serviceOrder = ['database', 'redis', 'api', 'gateway', 'monitor', 'celery'];
+  const serviceList: [string, ComponentHealth][] = [
+    ...serviceOrder
+      .filter((k) => k in services)
+      .map((k) => [k, services[k]] as [string, ComponentHealth]),
+    ...(Object.entries(services) as [string, ComponentHealth][]).filter(
+      ([k]) => !serviceOrder.includes(k)
+    )
+  ];
+  const statusMeta: Record<string, { color: string }> = {
+    running: { color: token.colorSuccess },
+    degraded: { color: token.colorWarning },
+    down: { color: token.colorError },
+    unknown: { color: token.colorTextDisabled }
+  };
+  const serviceNames: Record<string, string> = {
+    database: t('dashboard.componentHealth.service.database'),
+    redis: t('dashboard.componentHealth.service.redis'),
+    api: t('dashboard.componentHealth.service.api'),
+    gateway: t('dashboard.componentHealth.service.gateway'),
+    monitor: t('dashboard.componentHealth.service.monitor'),
+    celery: t('dashboard.componentHealth.service.celery')
+  };
+  const serviceLabel = (k: string) => serviceNames[k] ?? k;
+  const statusNames: Record<string, string> = {
+    running: t('dashboard.componentHealth.status.running'),
+    degraded: t('dashboard.componentHealth.status.degraded'),
+    down: t('dashboard.componentHealth.status.down'),
+    unknown: t('dashboard.componentHealth.status.unknown')
+  };
+  const statusLabel = (s: string) => statusNames[s] ?? s;
+  const detailText = (c: ComponentHealth) => {
+    if (c.latency_ms != null) return `${c.latency_ms.toFixed(1)} ms`;
+    if (c.age_seconds != null)
+      return `${t('dashboard.componentHealth.heartbeat')} ${c.age_seconds.toFixed(0)}s`;
+    if (c.workers != null) return `${c.workers} workers`;
+    return '';
+  };
+
+  return (
+    <Card
+      title={
+        <Space>
+          <ClusterOutlined />
+          <span>{t('dashboard.componentHealth.title')}</span>
+        </Space>
+      }
+      size="small"
+      style={{ height: '100%' }}
+      styles={{ body: { display: 'flex', flexDirection: 'column', gap: 8 } }}
+    >
+      {/* 后端服务组件 */}
+      <div>
+        <div
+          style={{
+            fontSize: 12,
+            color: token.colorTextSecondary,
+            fontWeight: 600,
+            marginBottom: 8
+          }}
+        >
+          {t('dashboard.componentHealth.services')}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {serviceList.length > 0 ? (
+            serviceList.map(([name, c]) => (
+              <div
+                key={name}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: 12
+                }}
+              >
+                <span
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, color: token.colorText }}
+                >
+                  <Badge color={statusMeta[c.status]?.color ?? token.colorTextDisabled} />
+                  {serviceLabel(name)}
+                </span>
+                <span style={{ color: token.colorTextSecondary }}>
+                  {statusLabel(c.status)}
+                  {detailText(c) ? ` · ${detailText(c)}` : ''}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div style={{ fontSize: 12, color: token.colorTextDisabled }}>
+              {tCommon('message.noData')}
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+
 function Dashboard() {
   const { t } = useTranslation('monitor');
   const { t: tDevice } = useTranslation('device');
   const { isMobile } = useResponsive();
-  const { data: stats } = useDashboardSuspenseStats();
   const { token } = useToken();
+  const { data: stats } = useDashboardSuspenseStats();
 
-  const publicGroup = stats?.networks?.public_ips ?? {
-    total: 0,
-    active: 0,
-    inactive: 0,
-    blocked: 0,
-    unused: 0
-  };
-  const privateGroup = stats?.networks?.private_ips ?? {
-    total: 0,
-    active: 0,
-    inactive: 0,
-    blocked: 0,
-    unused: 0
-  };
+  const publicGroup = useMemo(
+    () =>
+      stats?.networks?.public_ips ?? { total: 0, active: 0, inactive: 0, blocked: 0, unused: 0 },
+    [stats]
+  );
+  const privateGroup = useMemo(
+    () =>
+      stats?.networks?.private_ips ?? { total: 0, active: 0, inactive: 0, blocked: 0, unused: 0 },
+    [stats]
+  );
 
   const deviceChartData = useMemo(() => {
     const dist = stats?.devices?.status_distribution ?? {};
@@ -501,65 +747,97 @@ function Dashboard() {
 
   const ipChartData = useMemo(() => {
     return [
-      { type: t('dashboard.ip.publicActive'), value: publicGroup.active, color: '#1890ff' },
-      { type: t('dashboard.ip.publicInactive'), value: publicGroup.inactive, color: '#69c0ff' },
-      { type: t('dashboard.ip.publicBlocked'), value: publicGroup.blocked, color: '#ff4d4f' },
-      { type: t('dashboard.ip.publicUnused'), value: publicGroup.unused, color: '#bae7ff' },
-      { type: t('dashboard.ip.privateActive'), value: privateGroup.active, color: '#52c41a' },
-      { type: t('dashboard.ip.privateInactive'), value: privateGroup.inactive, color: '#95de64' },
-      { type: t('dashboard.ip.privateBlocked'), value: privateGroup.blocked, color: '#ff7875' },
-      { type: t('dashboard.ip.privateUnused'), value: privateGroup.unused, color: '#d9f7be' }
+      {
+        type: t('dashboard.ip.publicActive'),
+        value: publicGroup.active,
+        color: token.colorPrimary
+      },
+      {
+        type: t('dashboard.ip.publicInactive'),
+        value: publicGroup.inactive,
+        color: token.blue4
+      },
+      {
+        type: t('dashboard.ip.publicBlocked'),
+        value: publicGroup.blocked,
+        color: token.colorError
+      },
+      {
+        type: t('dashboard.ip.publicUnused'),
+        value: publicGroup.unused,
+        color: token.blue2
+      },
+      {
+        type: t('dashboard.ip.privateActive'),
+        value: privateGroup.active,
+        color: token.colorSuccess
+      },
+      {
+        type: t('dashboard.ip.privateInactive'),
+        value: privateGroup.inactive,
+        color: token.green4
+      },
+      {
+        type: t('dashboard.ip.privateBlocked'),
+        value: privateGroup.blocked,
+        color: token.red4
+      },
+      {
+        type: t('dashboard.ip.privateUnused'),
+        value: privateGroup.unused,
+        color: token.green2
+      }
     ].filter((d) => d.value > 0);
-  }, [publicGroup, privateGroup, t]);
+  }, [publicGroup, privateGroup, t, token]);
 
   const metricCards = [
     {
       title: t('dashboard.metric.roomTotal'),
       value: stats?.rooms?.total ?? 0,
       icon: <HomeOutlined />,
-      color: '#1890ff',
+      color: token.colorPrimary,
       subtitle: t('dashboard.subtitle.active', { count: stats?.rooms?.active ?? 0 })
     },
     {
       title: t('dashboard.metric.cabinetTotal'),
       value: stats?.cabinets?.total ?? 0,
       icon: <DatabaseOutlined />,
-      color: '#722ed1',
+      color: token.purple6,
       subtitle: t('dashboard.subtitle.available', { count: stats?.cabinets?.available ?? 0 })
     },
     {
       title: t('chart.deviceTotal'),
       value: stats?.devices?.total ?? 0,
       icon: <CloudServerOutlined />,
-      color: '#13c2c2',
+      color: token.cyan6,
       subtitle: t('dashboard.subtitle.online', { count: stats?.devices?.online ?? 0 })
     },
     {
       title: t('dashboard.metric.customerTotal'),
       value: stats?.customers?.total ?? 0,
       icon: <TeamOutlined />,
-      color: '#fa8c16',
+      color: token.orange6,
       subtitle: t('dashboard.subtitle.active', { count: stats?.customers?.active ?? 0 })
     },
     {
       title: t('dashboard.metric.publicIp'),
       value: publicGroup.total,
       icon: <GlobalOutlined />,
-      color: '#1890ff',
+      color: token.colorPrimary,
       subtitle: t('dashboard.subtitle.active', { count: publicGroup.active })
     },
     {
       title: t('dashboard.metric.privateIp'),
       value: privateGroup.total,
       icon: <LockOutlined />,
-      color: '#52c41a',
+      color: token.colorSuccess,
       subtitle: t('dashboard.subtitle.active', { count: privateGroup.active })
     },
     {
       title: tDevice('deviceSubtype.SWITCH'),
       value: stats?.switches?.total ?? 0,
       icon: <SwapOutlined />,
-      color: '#eb2f96',
+      color: token.magenta6,
       subtitle: t('dashboard.subtitle.segments', { count: stats?.networks?.segments ?? 0 })
     },
     {
@@ -567,7 +845,10 @@ function Dashboard() {
       value: stats?.percentages?.device_online_rate ?? 0,
       suffix: '%',
       icon: <CheckCircleOutlined />,
-      color: (stats?.percentages?.device_online_rate ?? 0) > 80 ? '#52c41a' : '#faad14',
+      color:
+        (stats?.percentages?.device_online_rate ?? 0) > 80
+          ? token.colorSuccess
+          : token.colorWarning,
       subtitle: t('dashboard.subtitle.onlineRatio', {
         online: stats?.devices?.online ?? 0,
         total: stats?.devices?.total ?? 0
@@ -620,15 +901,27 @@ function Dashboard() {
         </Col>
       </Row>
 
-      {/* 第三行：资源利用率 + 系统状态 + 活动流 */}
-      <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
-        <Col xs={24} lg={8}>
+      {/* 第三行：资源利用率 + 系统状态 + 监控概览 + 组件健康
+          （「监控概览」2026-10-08 从「组件健康」拆出：原卡两段内容高度不等，
+            同排被拉齐后留白；拆成两张等高的卡后与邻居对齐） */}
+      <Row gutter={[12, 12]} align="stretch" style={{ marginTop: 12 }}>
+        <Col xs={24} sm={12} lg={6}>
           <UtilizationGauges />
         </Col>
-        <Col xs={24} lg={8}>
+        <Col xs={24} sm={12} lg={6}>
           <SystemStatusCard />
         </Col>
-        <Col xs={24} lg={8}>
+        <Col xs={24} sm={12} lg={6}>
+          <MonitorOverviewCard />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <ComponentHealthCard />
+        </Col>
+      </Row>
+
+      {/* 第四行：最近活动流（列表型内容，独占一行） */}
+      <Row gutter={[12, 12]} align="stretch" style={{ marginTop: 12 }}>
+        <Col xs={24}>
           <ActivityTimeline />
         </Col>
       </Row>

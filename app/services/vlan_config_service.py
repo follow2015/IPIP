@@ -136,7 +136,7 @@ class VlanConfigService:
                 if affected_ports:
                     try:
                         self.clear_service._batch_clear_ports(switch, affected_ports, auto_save=True)
-                    except Exception as ssh_err:
+                    except Exception as ssh_err:  # noqa: BLE001 -- VLAN 删除后清端口配置失败转结构化返回：SSH 异常不可枚举
                         logger.error("VLAN %d 删除后清除端口配置失败（SSH）: %s", vlan_id, ssh_err)
                         return {"success": False, "error": f"清除端口配置失败: {ssh_err}"}
 
@@ -160,7 +160,7 @@ class VlanConfigService:
 
                     if vlan_row:
                         self.switch_repo.delete_vlan_record(vlan_row)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- VLAN 删除后 DB 清理失败降级：受影响端口置空但仍广播 SSE 通知前端
                 logger.error("VLAN %d 删除后数据库清理失败: %s", vlan_id, e)
                 affected_ports = []
                 emit_resource_change(

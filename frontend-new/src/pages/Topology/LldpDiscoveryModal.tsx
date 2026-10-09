@@ -21,7 +21,7 @@ type DiscoveryStatusKey =
   | 'topology.discovery.status.unknownPeer'
   | 'topology.discovery.status.portOccupied';
 
-const STATUS_COLOR: Record<DiscoveryMatchStatus, string> = {
+const LLDP_MATCH_STATUS_COLOR: Record<DiscoveryMatchStatus, string> = {
   existing: 'green',
   matched: 'geekblue',
   partial: 'orange',
@@ -179,7 +179,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
       render: (s: DiscoveryMatchStatus) => {
         const key = STATUS_LABEL_KEY[s];
         return (
-          <Tag color={STATUS_COLOR[s] ?? 'default'} style={{ fontSize: 10 }}>
+          <Tag color={LLDP_MATCH_STATUS_COLOR[s] ?? 'default'} style={{ fontSize: 10 }}>
             {key ? tn(key) : s}
           </Tag>
         );
@@ -226,11 +226,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
       ]}
     >
       <Space size={8} style={{ width: '100%' }} direction="vertical">
-        <Alert
-          type="info"
-          showIcon
-          message={tn('topology.discovery.notice')}
-        />
+        <Alert type="info" showIcon message={tn('topology.discovery.notice')} />
         <Space.Compact style={{ width: '100%' }}>
           <Select
             mode="multiple"
@@ -258,11 +254,7 @@ const LldpDiscoveryModal: React.FC<LldpDiscoveryModalProps> = ({ open, onClose, 
         </Space.Compact>
 
         {hasError && (
-          <Alert
-            type="warning"
-            showIcon
-            message={tn('topology.discovery.partialFailed')}
-          />
+          <Alert type="warning" showIcon message={tn('topology.discovery.partialFailed')} />
         )}
 
         <Table

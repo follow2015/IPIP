@@ -18,8 +18,8 @@ from app.schemas.monitor import (
     MonitorSlaTargetCreateSchema,
     MonitorSlaTargetUpdateSchema,
 )
-from app.utils import login_required, permission_required
-from app.utils.auth import get_current_user_id
+from app.services.auth import login_required, permission_required
+from app.services.auth import get_current_user_id
 from app.utils.transactional import transactional
 
 
@@ -46,7 +46,7 @@ def create_silence_rule():
     try:
         data = MonitorSilenceRuleCreateSchema().load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
     from app.services.monitoring.silence_service import create_rule as _create
     result = _create(data, user_id=get_current_user_id())
     return APIResponse.success(data=result)
@@ -64,7 +64,7 @@ def update_silence_rule(rule_id: int):
     try:
         data = MonitorSilenceRuleUpdateSchema().load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
     from app.services.monitoring.silence_service import update_rule as _update
     result = _update(rule_id, data)
     return APIResponse.success(data=result)
@@ -106,7 +106,7 @@ def upsert_threshold_override():
     try:
         data = DeviceMetricOverrideUpsertSchema().load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
     from app.services.monitoring.threshold_override_service import upsert as _upsert
     result = _upsert(data)
     return APIResponse.success(data=result)
@@ -146,7 +146,7 @@ def create_escalation_policy():
     try:
         data = MonitorEscalationPolicyCreateSchema().load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
     from app.services.monitoring.escalation_service import create_policy as _create
     result = _create(data)
     return APIResponse.success(data=result)
@@ -164,7 +164,7 @@ def update_escalation_policy(policy_id: int):
     try:
         data = MonitorEscalationPolicyUpdateSchema().load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
     from app.services.monitoring.escalation_service import update_policy as _update
     result = _update(policy_id, data)
     return APIResponse.success(data=result)
@@ -204,7 +204,7 @@ def create_alert_dependency_rule():
     try:
         data = MonitorAlertDependencyRuleCreateSchema().load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
     from app.services.monitoring.alert_dependency_service import create_rule as _create
     result = _create(data)
     return APIResponse.success(data=result)
@@ -222,7 +222,7 @@ def update_alert_dependency_rule(rule_id: int):
     try:
         data = MonitorAlertDependencyRuleUpdateSchema().load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
     from app.services.monitoring.alert_dependency_service import update_rule as _update
     result = _update(rule_id, data)
     return APIResponse.success(data=result)
@@ -262,7 +262,7 @@ def create_sla_target():
     try:
         data = MonitorSlaTargetCreateSchema().load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
     from app.services.monitoring.sla_service import create_target as _create
     result = _create(data)
     return APIResponse.success(data=result)
@@ -280,7 +280,7 @@ def update_sla_target(target_id: int):
     try:
         data = MonitorSlaTargetUpdateSchema().load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
     from app.services.monitoring.sla_service import update_target as _update
     result = _update(target_id, data)
     return APIResponse.success(data=result)

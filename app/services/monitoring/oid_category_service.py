@@ -12,12 +12,13 @@
 """
 import json
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
 _RULES_CACHE_TTL = 300  # 5 分钟
-_RULES_CACHE_PREFIX = "monitor:oid-rules:"
-_RECOMMEND_CACHE_PREFIX = "monitor:recommend-config:"
+_RULES_CACHE_PREFIX = redis_keys.MONITOR_OID_RULES_PREFIX
+_RECOMMEND_CACHE_PREFIX = redis_keys.MONITOR_RECOMMEND_CONFIG_PREFIX
 
 
 def _get_redis():
@@ -25,7 +26,7 @@ def _get_redis():
     try:
         from app.services.scan_redis import get_scan_redis_client
         return get_scan_redis_client()
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("获取 Redis 客户端失败", exc_info=True)
         return None
 
@@ -64,7 +65,7 @@ def _load_rules(vendor_id: str | None, device_type: str | None = None) -> list[d
             cached = r.get(cache_key)
             if cached:
                 return json.loads(cached)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("oid_category_service 缓存操作失败", exc_info=True)
 
     from app.persistence.monitor_oid_category_rule_repository import MonitorOidCategoryRuleRepository
@@ -83,7 +84,7 @@ def _load_rules(vendor_id: str | None, device_type: str | None = None) -> list[d
     if r is not None:
         try:
             r.set(cache_key, json.dumps(rules), ex=_RULES_CACHE_TTL)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("oid_category_service 缓存操作失败", exc_info=True)
     return rules
 
@@ -258,7 +259,7 @@ def get_recommended_categories(device_type: str) -> list[str]:
             cached = r.get(cache_key)
             if cached:
                 return json.loads(cached)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("oid_category_service 缓存操作失败", exc_info=True)
 
     from app.persistence.monitor_device_type_recommend_repository import MonitorDeviceTypeRecommendRepository
@@ -269,7 +270,7 @@ def get_recommended_categories(device_type: str) -> list[str]:
     if r is not None:
         try:
             r.set(cache_key, json.dumps(categories), ex=_RULES_CACHE_TTL)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("oid_category_service 缓存操作失败", exc_info=True)
     return categories
 
@@ -282,7 +283,7 @@ def invalidate_rules_cache(vendor_id: str | None = None) -> None:
     try:
         for key in r.scan_iter(f"{_RULES_CACHE_PREFIX}*"):
             r.delete(key)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("invalidate_rule_cache 失败", exc_info=True)
 
 
@@ -294,7 +295,7 @@ def invalidate_recommend_cache() -> None:
     try:
         for key in r.scan_iter(f"{_RECOMMEND_CACHE_PREFIX}*"):
             r.delete(key)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("invalidate_recommend_cache 失败", exc_info=True)
 
 

@@ -9,14 +9,20 @@ import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth';
 import { verifyToken } from '@/services/auth';
 
-function isJwtExpired(token: string): boolean {
+type JwtExpiry = 'valid' | 'expired' | 'unparsable';
+
+function checkJwtExpiry(token: string): JwtExpiry {
   try {
-    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(decodeURIComponent(escape(atob(b64))));
-    if (payload.exp && payload.exp * 1000 < Date.now()) return true;
-    return false;
+    const b64 = token.split('.')[1];
+    if (!b64) return 'unparsable';
+    const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    const payload: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    const exp = (payload as { exp?: unknown } | null)?.exp;
+    if (typeof exp !== 'number') return 'unparsable';
+    return exp * 1000 < Date.now() ? 'expired' : 'valid';
   } catch {
-    return true;  // 解析失败视为过期
+    return 'unparsable';
   }
 }
 
@@ -31,7 +37,8 @@ export function useAuthInit() {
 
     if (!token || !isAuthenticated) return;
 
-    if (isJwtExpired(token)) {
+    const expiry = checkJwtExpiry(token);
+    if (expiry === 'expired') {
       useAuthStore.getState().clearAuth();
       return;
     }

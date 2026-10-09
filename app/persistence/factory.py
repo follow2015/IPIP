@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
-from typing import Callable, Dict, Optional, Type, TypeVar
+from typing import Callable, Optional, Type, TypeVar
 
 from sqlalchemy.orm import Session
 

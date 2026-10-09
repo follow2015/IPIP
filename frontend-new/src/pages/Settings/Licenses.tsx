@@ -3,13 +3,13 @@
  * 集中展示项目依赖的第三方库及其开源许可证，履行开源合规与透明义务。
  * 数据基于根目录 requirements.txt 与前端 package.json 的实际声明生成。
  */
-import { Card, Tag, Typography, Space, Button, Tooltip } from 'antd';
+import { Card, Tag, Typography, Space, Button, Tooltip, theme } from 'antd';
 import DataTable from '@/components/DataTable';
 import { GithubOutlined, ExportOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
-const { Title, Paragraph, Text, Link } = Typography;
+const { Title, Paragraph, Text } = Typography;
 
 type SettingsT = TFunction<'settings'>;
 type CommonT = TFunction<'common'>;
@@ -342,7 +342,7 @@ const licenseColor: Record<string, string> = {
   'Apache-2.0 / BSD-3-Clause': 'purple'
 };
 
-const renderCols = (s: SettingsT, c: CommonT, data: LicenseInfo[]) => [
+const renderCols = (s: SettingsT, c: CommonT, _data: LicenseInfo[]) => [
   {
     title: s('license.column.component'),
     dataIndex: 'name',
@@ -393,6 +393,7 @@ const renderCols = (s: SettingsT, c: CommonT, data: LicenseInfo[]) => [
 ];
 
 export default function LicensesPage() {
+  const { token } = theme.useToken();
   const { t } = useTranslation('settings');
   const { t: tc } = useTranslation('common');
 
@@ -416,7 +417,7 @@ export default function LicensesPage() {
         <Card
           title={t('license.selfTitle')}
           size="small"
-          style={{ borderColor: '#1677ff' }}
+          style={{ borderColor: token.colorPrimary }}
           extra={
             <Button
               type="link"

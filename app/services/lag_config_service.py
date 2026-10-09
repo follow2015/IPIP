@@ -105,7 +105,7 @@ class LagConfigService:
                 remove_cmds.extend(self.dispatcher._port_cmds(switch, member, adapter.get_remove_member_command()))
             try:
                 self.dispatcher._send_config_no_save(switch, remove_cmds, err_label="批量移除Trunk成员")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 批量移除失败触发降级：异常本身即降级信号（转逐端口），收窄会漏掉需降级的失败
                 logger.warning("批量移除 Trunk 成员失败，降级为逐端口: %s", e)
                 for member in members:
                     try:
@@ -114,7 +114,7 @@ class LagConfigService:
                             self.dispatcher._port_cmds(switch, member, adapter.get_remove_member_command()),
                             err_label="移除Trunk成员",
                         )
-                    except Exception as ex:
+                    except Exception as ex:  # noqa: BLE001 -- 逐端口移除单端口失败隔离：继续下一成员
                         logger.warning("移除 Trunk 成员 %s 失败: %s", member, ex)
 
             self.clear_service._batch_clear_ports(switch, members, auto_save=False)
@@ -130,7 +130,7 @@ class LagConfigService:
                         affected_ports=[member],
                     ):
                         self._clear_lag_member_relation(switch.device_id, member)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 成员同步失败非致命：命令已下发，同步失败仅告警
                     logger.warning("移除 Trunk 成员 %s 后同步失败: %s", member, e)
 
         commands = [adapter.get_delete_trunk_command(trunk_id)]

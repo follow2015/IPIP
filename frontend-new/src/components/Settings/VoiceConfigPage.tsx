@@ -11,7 +11,6 @@ import {
   message,
   Alert,
   Tooltip,
-  Descriptions,
   Tag,
   Select,
   Switch,
@@ -258,10 +257,7 @@ const VoiceConfigPage: React.FC = () => {
           {provider === 'aliyun' && (
             <>
               <Form.Item label={t('voice.field.accessKeyId')} name="aliyun_access_key_id">
-                <Input
-                  placeholder={t('voice.field.accessKeyIdPlaceholder')}
-                  autoComplete="off"
-                />
+                <Input placeholder={t('voice.field.accessKeyIdPlaceholder')} autoComplete="off" />
               </Form.Item>
               <Form.Item
                 label={
@@ -452,7 +448,13 @@ const VoiceConfigPage: React.FC = () => {
           {editing && (
             <Form.Item>
               <Space>
-                <Button type="primary" htmlType="submit" loading={updateMutation.isPending}>
+                {/* loading 只出转圈、不阻止点击，连点会发两次写请求（P1-4 / AC-6） */}
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={updateMutation.isPending}
+                  disabled={updateMutation.isPending}
+                >
                   {t('saveConfig')}
                 </Button>
                 <Button

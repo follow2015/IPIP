@@ -27,6 +27,13 @@ Group=ipip
 EnvironmentFile=/etc/ipip/ipip.env
 WorkingDirectory=${PROJECT_ROOT}
 
+; ⚠️ 不要加 --workers：SSE 连接上限（SSE_MAX_CONNECTIONS，默认 500）是**进程内**
+;    计数（realtime_gateway/main.py 的 _ConnectionCounter）。加 --workers 4 就有
+;    4 个互不可见的计数器，实际上限变成 500×4，且不会有任何报错 —— 超限拒绝
+;    静默失效。要扩容必须先把计数换成跨进程实现（Redis + TTL 兜底），改完置
+;    SSE_ALLOW_MULTI_WORKER=1 关掉启动自检告警。
+;    本约束由 realtime_gateway/single_replica_guard.py 在启动时自检，结论同时
+;    暴露在 /healthz 的 sse.single_replica，便于运维核对。
 ExecStart=${VENV_BIN}/uvicorn realtime_gateway.main:app \
   --host 0.0.0.0 \
   --port ${GATEWAY_PORT} \

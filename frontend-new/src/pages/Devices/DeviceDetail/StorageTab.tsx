@@ -6,8 +6,8 @@
  */
 import { useState, useMemo } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
-import { Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Divider } from 'antd';
-import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
+import { theme, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Divider } from 'antd';
+import DataTable from '@/components/DataTable';
 import { useConfirm } from '@/utils/confirm';
 import { AppstoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
 import BatchActionBar from '@/components/BatchActionBar';
 import type { DeviceStorageDetail } from '@/types/models';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface StorageTabProps {
   deviceId: number;
@@ -39,6 +40,7 @@ function formatGb(gb: number): string {
 }
 
 function StorageTab({ deviceId }: StorageTabProps) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
@@ -76,7 +78,12 @@ function StorageTab({ deviceId }: StorageTabProps) {
       }
       formDisclosure.close();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -222,7 +229,9 @@ function StorageTab({ deviceId }: StorageTabProps) {
                     await deleteStorage.mutateAsync(record.id);
                     message.success(tCommon('message.deleteSuccess'));
                   } catch (err) {
-                    message.error(err instanceof Error ? err.message : tCommon('message.deleteFailed'));
+                    message.error(
+                      err instanceof Error ? err.message : tCommon('message.deleteFailed')
+                    );
                   }
                 }
               })
@@ -241,9 +250,9 @@ function StorageTab({ deviceId }: StorageTabProps) {
           style={{
             marginBottom: 16,
             padding: '10px 16px',
-            background: '#fafafa',
+            background: token.colorFillQuaternary,
             borderRadius: 6,
-            border: '1px solid #f0f0f0'
+            border: `1px solid ${token.colorBorderSecondary}`
           }}
         >
           <span style={{ fontWeight: 500, fontSize: 14 }}>
@@ -339,8 +348,16 @@ function StorageTab({ deviceId }: StorageTabProps) {
           >
             <Input placeholder={t('storage.field.capacityHint')} />
           </Form.Item>
-          <Form.Item name="capacity_gb" label={t('storage.field.capacityGb')} extra={t('storage.field.capacityGbHint')}>
-            <InputNumber min={1} style={{ width: '100%' }} placeholder={t('storage.field.capacityGbConvertHint')} />
+          <Form.Item
+            name="capacity_gb"
+            label={t('storage.field.capacityGb')}
+            extra={t('storage.field.capacityGbHint')}
+          >
+            <InputNumber
+              min={1}
+              style={{ width: '100%' }}
+              placeholder={t('storage.field.capacityGbConvertHint')}
+            />
           </Form.Item>
           <Form.Item name="interface_type" label={t('storage.column.interface')}>
             <Select

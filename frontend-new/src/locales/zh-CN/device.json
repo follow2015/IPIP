@@ -578,7 +578,8 @@
       "cpu": "CPU",
       "gpu": "GPU",
       "power": "功耗",
-      "memoryPerDimm": "单条 {{size}}GB × {{count}} = "
+      "memoryPerDimm": "单条 {{size}}GB × {{count}} = ",
+      "location": "位置"
     },
     "cpu": {
       "way": "{{count}}路",
@@ -615,7 +616,8 @@
     "backupType": {
       "manual": "手动",
       "scheduled": "定时",
-      "preChange": "变更前"
+      "preChange": "变更前",
+      "preRemedial": "AI修复前"
     },
     "changeStatus": {
       "draft": "草稿",
@@ -660,6 +662,7 @@
       "networkToNetwork": "网络→网络"
     },
     "column": {
+      "id": "ID",
       "connectionType": "连接类型",
       "linkType": "连接模式",
       "localPort": "本机端口",
@@ -958,6 +961,9 @@
     "SWITCH": "交换机",
     "ROUTER": "路由器",
     "FIREWALL": "防火墙",
+    "OTN": "OTN 传输设备",
+    "WDM": "波分设备",
+    "ODF": "光配线架",
     "PDU": "配电单元",
     "UPS": "不间断电源",
     "OTHER": "其他"
@@ -1030,7 +1036,10 @@
       "partialCabinetDevices": "部分使用设备",
       "networkCount": "网段数",
       "fullNetworks": "整网段租赁",
-      "ipTotal": "IP总数"
+      "ipTotal": "IP总数",
+      "circuitCount": "线路数",
+      "circuitBandwidth": "线路总带宽 (Mbps)",
+      "circuitMonthlyFee": "线路月租合计 (元)"
     },
     "archive": {
       "title": "终止存档",
@@ -1157,7 +1166,14 @@
     "RATE_LIMIT_EXCEEDED": "频率超限",
     "SERVICE_UNHEALTHY": "服务异常",
     "SERVICE_RECOVERED": "服务恢复",
-    "ASSET_WARRANTY_ALERT": "资产到期提醒"
+    "ASSET_WARRANTY_ALERT": "资产到期提醒",
+    "TRAP_LINK_DOWN": "端口链路中断",
+    "TRAP_LINK_UP": "端口链路恢复",
+    "TRAP_AUTH_FAILURE": "SNMP认证失败",
+    "TRAP_COLD_START": "设备冷启动",
+    "TRAP_WARM_START": "设备热启动",
+    "TRAP_EGP_NEIGHBOR_LOSS": "EGP邻居丢失",
+    "TRAP_OTHER": "SNMP Trap（其他）"
   },
   "notificationGroup": {
     "MONITOR": "监控告警",
@@ -1165,7 +1181,8 @@
     "SCAN": "扫描完成",
     "PORT_ASYNC": "端口/异步操作",
     "OPS": "运维告警",
-    "ASSET": "资产提醒"
+    "ASSET": "资产提醒",
+    "TRAP": "SNMP Trap"
   },
   "loginType": {
     "WEB": "Web",
@@ -1566,7 +1583,8 @@
     },
     "confirm": {
       "scanTitle": "确认扫描？",
-      "scanContent": "将对虚拟机房「{{name}}」下的所有交换机执行全量扫描"
+      "scanContent": "将对虚拟机房「{{name}}」下的所有交换机执行全量扫描",
+      "snmpTakeoverHint": "（提示：虚拟机房包含通过 SNMP 通道采集的设备，扫描时这些设备未被采集发现的手动端口将被清理）"
     },
     "message": {
       "scanSubmitted": "虚拟机房扫描已提交，完成后将通过消息通知您",
@@ -1785,7 +1803,8 @@
       "version": "版本",
       "uptime": "运行时间",
       "mac": "MAC地址",
-      "connectedDevices": "关联设备"
+      "connectedDevices": "关联设备",
+      "portStatus": "端口状态"
     },
     "copy": {
       "header": "交换机详细信息",

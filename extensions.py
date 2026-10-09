@@ -50,7 +50,7 @@ def check_mysql_session_timezone(engine=None) -> None:
     try:
         with eng.connect() as conn:
             tz = conn.execute(text("SELECT @@session.time_zone")).scalar()
-    except Exception as exc:  # 自检失败不影响启动
+    except Exception as exc:  # noqa: BLE001 -- MySQL 会话时区自检失败不得阻塞启动：自检失败仅告警后 return
         logger.warning("MySQL 会话时区自检失败（不影响启动）: %s", exc)
         return
     if tz is None:

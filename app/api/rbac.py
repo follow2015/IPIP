@@ -9,11 +9,11 @@ from app.utils.logging import get_logger
 
 from flask import Blueprint, request
 
-from app.api.base import APIResponse, api_exception_handler
+from app.api.base import APIResponse, api_exception_handler, RequestValidator
 from app.utils.transactional import transactional
 from app.services.rbac_service import rbac_service
-from app.openapi.doc import doc, public
-from app.utils.auth import login_required, permission_required
+from app.openapi.doc import doc
+from app.services.auth import login_required, permission_required
 from app.exceptions import PresetResponseError
 from app.exceptions.business import ResourceConflictError
 from app.exceptions.validation import ValidationError
@@ -39,8 +39,7 @@ def get_roles():
         search:   搜索关键词
         status:   状态过滤
     """
-    page     = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    page, per_page = RequestValidator.validate_pagination_params()
     search   = request.args.get("search", "", type=str)
     status   = request.args.get("status", type=int)
 
@@ -120,7 +119,7 @@ def update_role(role_id):
         raise PresetResponseError(message=e.message, status_code=409) from e
 
     if not role:
-        return APIResponse.error(message="角色不存在", status_code=404)
+        raise PresetResponseError(message="角色不存在", status_code=404)
     return APIResponse.success(data=role.to_dict(), message="角色更新成功")
 
 
@@ -138,7 +137,7 @@ def delete_role(role_id):
         raise PresetResponseError(message=e.message, status_code=400) from e
 
     if not result:
-        return APIResponse.error(message="角色不存在", status_code=404)
+        raise PresetResponseError(message="角色不存在", status_code=404)
     return APIResponse.success(message="角色删除成功")
 
 
@@ -210,7 +209,7 @@ def update_role_permissions(role_id):
         ) from e
 
     if result is None:
-        return APIResponse.error(message="角色不存在", status_code=404)
+        raise PresetResponseError(message="角色不存在", status_code=404)
 
     return APIResponse.success(data=result, message="角色权限更新成功")
 
@@ -225,15 +224,20 @@ def get_permissions():
     """获取权限列表
 
     Query Parameters:
+        all:      是否不分页返回全量（默认 false；权限分配弹窗的勾选树用，OD-13）
         page:     页码（默认1）
-        per_page: 每页数量（默认50）
+        per_page: 每页数量（默认50，最大100）
         search:   搜索关键词
         category: 分类过滤
     """
-    page     = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 50, type=int)
     search   = request.args.get("search", "", type=str)
     category = request.args.get("category", "", type=str)
+
+    if request.args.get("all", "false").lower() == "true":
+        permissions = rbac_service.list_all_permissions(category=category)
+        return APIResponse.success(data=permissions, message="获取权限列表成功")
+
+    page, per_page = RequestValidator.validate_pagination_params(default_per_page=50)
 
     result = rbac_service.list_permissions(
         page=page, per_page=per_page, search=search, category=category,
@@ -298,7 +302,7 @@ def update_user_roles(user_id):
         ) from e
 
     if result is None:
-        return APIResponse.error(message="用户不存在", status_code=404)
+        raise PresetResponseError(message="用户不存在", status_code=404)
 
     return APIResponse.success(data=result, message="用户角色更新成功")
 

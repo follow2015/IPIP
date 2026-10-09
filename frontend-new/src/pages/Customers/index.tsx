@@ -8,7 +8,7 @@
  * 列表页骨架（分页/搜索/表单开关/删除确认）由 useCrudPage 统一提供，
  * 本页面仅保留资源跳转、表单提交等特有逻辑。
  */
-import { Button, Space, Tag, Modal, Input } from 'antd';
+import { Button, Space, Tag, Modal, Input, Typography } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
@@ -92,6 +92,93 @@ function Customers() {
     }
   };
 
+  const renderCustomerActions = (r: Customer) => (
+    <Space wrap>
+      <Button
+        type="link"
+        size="small"
+        icon={<CopyOutlined />}
+        style={{ padding: 0 }}
+        onClick={() => handleCopy(r)}
+      >
+        {tc('action.copy')}
+      </Button>
+      <Button
+        type="link"
+        size="small"
+        icon={<EditOutlined />}
+        style={{ padding: 0 }}
+        onClick={() => crud.handleEdit(r)}
+      >
+        {tc('action.edit')}
+      </Button>
+      <Button
+        type="link"
+        size="small"
+        icon={<BarChartOutlined />}
+        style={{ padding: 0 }}
+        onClick={() => handleAssets(r)}
+      >
+        {td('customer.action.resources')}
+      </Button>
+      {r.customer_status !== CustomerStatusCode.TERMINATED && (
+        <Button
+          type="link"
+          size="small"
+          danger
+          icon={<StopOutlined />}
+          style={{ padding: 0 }}
+          onClick={() => {
+            setTerminateReason('');
+            setTerminateTarget(r);
+          }}
+        >
+          {td('customer.action.terminate')}
+        </Button>
+      )}
+      <Button
+        type="link"
+        size="small"
+        danger
+        icon={<DeleteOutlined />}
+        style={{ padding: 0 }}
+        onClick={() => crud.handleDelete(r)}
+      >
+        {tc('action.delete')}
+      </Button>
+    </Space>
+  );
+
+  const renderCustomerCard = (r: Customer) => {
+    const { Text } = Typography;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+        <Space wrap size={4}>
+          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleAssets(r)}>
+            <Text strong>{r.customer_name ?? '-'}</Text>
+          </Button>
+          {renderStatus(r.customer_status as number, td)}
+        </Space>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.contact_person || '-'}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.contact_phone || '-'}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.email || '-'}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.address || '-'}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {tc('field.updatedAt')}: {formatDateTime(r.updated_at ?? '')}
+        </Text>
+        {renderCustomerActions(r)}
+      </div>
+    );
+  };
+
   const columns = [
     {
       title: 'ID',
@@ -100,7 +187,12 @@ function Customers() {
       width: 80,
       render: (id: number) => <IdCell value={id} />
     },
-    { title: td('customer.field.name'), dataIndex: 'customer_name', key: 'customer_name', width: 160 },
+    {
+      title: td('customer.field.name'),
+      dataIndex: 'customer_name',
+      key: 'customer_name',
+      width: 160
+    },
     {
       title: tc('field.status'),
       dataIndex: 'customer_status',
@@ -149,58 +241,15 @@ function Customers() {
       title: tc('field.actions'),
       key: 'action',
       width: 240,
-      render: (_: unknown, r: Customer) => (
-        <Space>
-          <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => handleCopy(r)}>
-            {tc('action.copy')}
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => crud.handleEdit(r)}
-          >
-            {tc('action.edit')}
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<BarChartOutlined />}
-            onClick={() => handleAssets(r)}
-          >
-            {td('customer.action.resources')}
-          </Button>
-          {r.customer_status !== CustomerStatusCode.TERMINATED && (
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<StopOutlined />}
-              onClick={() => {
-                setTerminateReason('');
-                setTerminateTarget(r);
-              }}
-            >
-              {td('customer.action.terminate')}
-            </Button>
-          )}
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => crud.handleDelete(r)}
-          >
-            {tc('action.delete')}
-          </Button>
-        </Space>
-      )
+      render: (_: unknown, r: Customer) => renderCustomerActions(r)
     }
   ];
 
   return (
     <div>
       <DataTable<Customer>
+        error={crud.error}
+        onRetry={crud.refetch}
         columns={columns}
         dataSource={data?.items ?? []}
         loading={isLoading}
@@ -220,6 +269,8 @@ function Customers() {
             {td('customer.add')}
           </Button>
         }
+        mobileCardMode
+        cardRender={renderCustomerCard}
       />
       <CustomerForm
         open={crud.formOpen}

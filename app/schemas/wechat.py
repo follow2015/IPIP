@@ -12,7 +12,7 @@ auth 那个是"用户扫码后在 Web 端确认登录"（`scene_id` + `code`）�
 wechat 这个是"小程序端回报扫码结果"（`scene_id` + `openid` + `action`），
 因此未复用，避免把两套流程混成一个类型。
 """
-from marshmallow import Schema, fields, validate, EXCLUDE
+from marshmallow import Schema, fields, EXCLUDE
 
 
 class WeChatMiniprogramLoginRequestSchema(Schema):

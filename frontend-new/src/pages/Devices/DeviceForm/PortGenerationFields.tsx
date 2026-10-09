@@ -4,7 +4,7 @@
  * 从原 DeviceForm.tsx 拆出。非网管型网络设备（新建）多组端口模板录入。
  * 复用父级 <Form> 上下文，Form.List 的 add/remove 由渲染 prop 提供，无需 form 实例。
  */
-import { Form, InputNumber, Select, Button, Card, Alert, Row, Col } from 'antd';
+import { Form, InputNumber, Select, Button, Card, Alert, Row, Col, theme } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
@@ -15,6 +15,7 @@ interface PortGenerationFieldsProps {
 
 export default function PortGenerationFields({ portPreview }: PortGenerationFieldsProps) {
   const { t } = useTranslation('device');
+  const { token } = theme.useToken();
   return (
     <Card
       title={t('form.section.portGeneration')}
@@ -26,11 +27,11 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
         style={{
           marginBottom: 8,
           padding: '6px 12px',
-          background: '#fafafa',
+          background: token.colorFillQuaternary,
           borderRadius: 6,
           fontSize: 12,
           lineHeight: 1.8,
-          color: '#595959'
+          color: token.colorTextSecondary
         }}
       >
         {t('form.portGeneration.intro')}
@@ -49,7 +50,7 @@ export default function PortGenerationFields({ portPreview }: PortGenerationFiel
                 style={{
                   marginBottom: 8,
                   padding: '8px 0',
-                  borderBottom: '1px dashed #f0f0f0'
+                  borderBottom: `1px dashed ${token.colorBorderSecondary}`
                 }}
               >
                 <Col xs={12} md={6}>

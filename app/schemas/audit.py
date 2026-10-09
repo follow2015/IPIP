@@ -4,7 +4,7 @@
 T3.1 从 app/api/audit.py 迁入：这些 Schema 被 app/openapi/spec.py 等模块引用
 （跨模块使用），按 app/schemas/device.py 已确立的约定，不在 app/api/ 下就地定义。
 """
-from marshmallow import Schema, fields, validate, EXCLUDE
+from marshmallow import Schema, fields, validate
 
 
 class AuditLogQuerySchema(Schema):

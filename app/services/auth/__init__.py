@@ -21,12 +21,12 @@ from app.services.auth.authentication import (
 )
 from app.services.auth.context import (
     RBAC_CACHE_TTL,
-    _stable_hash,
+    _stable_hash,  # noqa: F401
     get_current_user_id,
     get_user_permissions,
 )
 from app.services.auth.decorators import (
-    _sse_error_response,
+    _sse_error_response,  # noqa: F401
     login_required,
     permission_required,
     role_required,

@@ -4,7 +4,7 @@
 """
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Index, UniqueConstraint
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel, MEDIUMTEXT
@@ -41,6 +41,10 @@ class Cabinet(BaseModel):
     location = db.Column(db.String(255), comment="具体位置")
     row = db.Column(db.Integer, comment="行号（机房平面图纵坐标，从1开始）")
     col = db.Column(db.Integer, comment="列号（机房平面图横坐标，从1开始）")
+    version = db.Column(
+        db.Integer, nullable=False, default=0, server_default="0",
+        comment="乐观锁版本号（每次编辑+1）",
+    )
 
     total_u = db.Column(db.Integer, default=42, nullable=False, comment="总U位数")
     used_u  = db.Column(db.Integer, default=0,  nullable=False,

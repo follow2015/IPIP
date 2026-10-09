@@ -153,7 +153,7 @@ class BatchActionService:
                             else:
                                 sp.rollback()
                                 details.append({"port": port, "success": False, "error": "端口不存在"})
-                        except Exception as e:
+                        except Exception as e:  # noqa: BLE001 -- 批次内单端口失败隔离：sp.rollback() 后记入 details 继续处理下一端口，异常类型来自任意 ORM/DB 层不可枚举，单端口失败不得中断整批
                             sp.rollback()
                             logger.warning("批量分配客户端口 %s 失败: %s", port, e)
                             details.append({"port": port, "success": False, "error": str(e)})
@@ -203,7 +203,7 @@ class BatchActionService:
                     }
                 try:
                     self.dispatcher.save_config(switch)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 保存配置失败不阻断主流程：命令已下发成功，保存失败仅告警；netmiko/SSH 异常类型不可枚举，操作结果以命令执行为准
                     logger.warning("批量加入Trunk后保存配置失败: %s", e)
                 sync_res = self.sync.bulk_sync_ports_from_device(switch.device_id, ports, op_type)
                 for port in sync_res["succeeded"]:
@@ -273,7 +273,7 @@ class BatchActionService:
                     }
                 try:
                     self.dispatcher.save_config(switch)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 保存配置失败不阻断主流程：同 222
                     logger.warning("批量限速后统一保存配置失败: %s", e)
                 sync_res = self.sync.bulk_sync_ports_from_device(switch.device_id, ports, op_type)
                 for port in sync_res["succeeded"]:
@@ -341,7 +341,7 @@ class BatchActionService:
                     }
                 try:
                     self.dispatcher.save_config(switch)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 保存配置失败不阻断主流程：同 222
                     logger.warning("批量取消限速后统一保存配置失败: %s", e)
                 sync_res = self.sync.bulk_sync_ports_from_device(switch.device_id, ports, op_type)
                 for port in sync_res["succeeded"]:
@@ -363,7 +363,7 @@ class BatchActionService:
                 return {
                     "success": False, "error": f"不支持的操作类型: {action}",
                     "total": len(ports), "succeeded": 0, "failed": len(ports),
-                    "details": [{"port": p, "success": False, "error": f"不支持的操作类型"} for p in ports],
+                    "details": [{"port": p, "success": False, "error": "不支持的操作类型"} for p in ports],
                 }
 
             port_expr = self._build_port_expr(ports, switch.device_type)
@@ -391,7 +391,7 @@ class BatchActionService:
 
             try:
                 self.dispatcher.save_config(switch)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 统一保存配置失败不阻断主流程：同 222（命令已下发，保存仅用于持久化）
                 logger.warning("批量操作后统一保存配置失败: %s", e)
 
             sync_res = self.sync.bulk_sync_ports_from_device(switch.device_id, ports, op_type)
@@ -417,12 +417,12 @@ class BatchActionService:
                                     switch.device_id, port, vlan_id, mode,
                                     room_id=switch.device.cabinet.room_id if switch.device and switch.device.cabinet else None,
                                 )
-                            except Exception as e:
+                            except Exception as e:  # noqa: BLE001 -- 批次内单端口关联更新失败隔离：sp.rollback() 后继续下一端口，单端口 DB 异常不得中断整批（事务级失败由外层兜底）
                                 sp.rollback()
                                 logger.warning("批量VLAN关联更新失败(端口 %s): %s", port, e)
                             else:
                                 sp.commit()  # R-I：成功路径释放 savepoint，防嵌套链递归
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 批次级事务兜底：关联更新整体失败仅告警，不回滚已成功的端口配置下发；事务异常类型（ORM/SQLAlchemy）不可枚举
                     logger.error("批量VLAN关联更新事务失败: %s", e)
 
             elif action == "add_port_to_trunk" and success_ports:
@@ -439,12 +439,12 @@ class BatchActionService:
                                     switch.device_id, port, channel_id,
                                     device_type=switch.device_type,
                                 )
-                            except Exception as e:
+                            except Exception as e:  # noqa: BLE001 -- 批次内单端口 LAG 关联更新失败隔离：同 464，单端口失败不中断整批
                                 sp.rollback()
                                 logger.warning("批量LAG关联更新失败(端口 %s): %s", port, e)
                             else:
                                 sp.commit()  # R-I：成功路径释放 savepoint，防嵌套链递归
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 批次级事务兜底：同 469
                     logger.error("批量LAG关联更新事务失败: %s", e)
 
             elif action == "remove_port_from_channel" and success_ports:
@@ -457,12 +457,12 @@ class BatchActionService:
                             sp = self.switch_repo.session.begin_nested()
                             try:
                                 self.lag_service._clear_lag_member_relation(switch.device_id, port)
-                            except Exception as e:
+                            except Exception as e:  # noqa: BLE001 -- 批次内单端口 LAG 关联清除失败隔离：同 464，单端口失败不中断整批
                                 sp.rollback()
                                 logger.warning("批量LAG关联清除失败(端口 %s): %s", port, e)
                             else:
                                 sp.commit()  # R-I：成功路径释放 savepoint，防嵌套链递归
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 批次级事务兜底：同 469
                     logger.error("批量LAG关联清除事务失败: %s", e)
 
         succeeded = sum(1 for d in details if d["success"])
@@ -547,12 +547,12 @@ class BatchActionService:
 
                         savepoint.commit()  # R-I：成功路径释放 savepoint，防嵌套链递归
                         details.append({"port": port, "success": True})
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 批次内单端口失败隔离（非网管交换机）：savepoint.rollback() 后记入 details 继续，单端口 ORM/DB 异常类型不可枚举
                         savepoint.rollback()
                         logger.warning("非网管交换机批量操作端口 %s 失败: %s", port, e)
                         details.append({"port": port, "success": False, "error": str(e)})
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 批次级事务兜底：非网管交换机批量操作整体失败，转为全部端口失败结果返回；顶层兜底必须捕获任意异常，否则会以未处理异常冒泡到 API 层
             logger.error("非网管交换机批量操作事务失败: %s", e)
             return {
                 "success": False, "error": str(e),
@@ -632,7 +632,7 @@ class BatchActionService:
                 save_cmd = adapter.get_save_command(device_model)
                 try:
                     self.sync.ssh_mgr.execute_show_on_conn(conn, save_cmd, timeout=60)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 保存配置失败不阻断操作结果：同 222（日志已标注"不影响操作结果"）
                     logger.warning("批量%s 保存配置失败（不影响操作结果）: %s", action, e)
 
                 for port in ports:
@@ -647,7 +647,7 @@ class BatchActionService:
                                 if p.port and normalize_port(p.port).lower() == target:
                                     actual_status = p.status
                                     break
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 单端口状态读取失败容错：读取失败保持原状态继续下一端口，SSH/解析异常不可枚举，不得因单端口读失败中断整批
                         logger.warning("批量%s 端口 %s 状态读取失败: %s", action, port, e)
 
                     if actual_status is None:
@@ -659,11 +659,11 @@ class BatchActionService:
                         )
                         succeeded_ports.append(port)
                         details.append({"port": port, "success": True})
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 单端口状态更新失败隔离：记入 details 后继续下一端口，同 703 语义
                         logger.warning("批量%s 更新端口 %s 状态失败: %s", action, port, e)
                         details.append({"port": port, "success": False, "error": str(e)})
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- SSH 连接失败兜底：连接阶段异常类型（netmiko/socket/DNS/鉴权）不可枚举，统一转为结构化失败结果返回
             logger.error("批量%s SSH 连接失败: %s", action, e)
             return {
                 "success": False, "error": f"SSH 连接失败: {e}",
@@ -676,7 +676,7 @@ class BatchActionService:
                 self.sync.bulk_sync_ports_from_device(
                     switch.device_id, succeeded_ports, op_type,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 配置缓存同步失败不阻断：端口状态已更新，缓存同步失败仅告警
                 logger.warning("批量%s 配置缓存同步失败（状态已更新）: %s", action, e)
 
         succeeded = len(succeeded_ports)
@@ -778,7 +778,7 @@ class BatchActionService:
             output = self.dispatcher.ssh_mgr.send_show_command(
                 switch, adapter.get_qos_policy_query_command(policy_name),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- QoS 策略查询失败保守降级：返回 False 触发幂等重建（华为/H3C 重定义同内容策略是幂等的），SSH/解析异常类型不可枚举
             logger.warning("批量限速查询QoS策略 %s 是否存在失败: %s", policy_name, e)
             return False
         if not output:
@@ -808,10 +808,10 @@ class BatchActionService:
                             result[port] = []
                             continue
                         result[port] = adapter.parse_qos_policies(config_output)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 单端口读取 QoS 策略失败保守降级为该端口 [] 并跳过撤销，不影响其它端口
                         logger.warning("批量取消限速：读取端口 %s 已应用QoS策略失败: %s", port, e)
                         result[port] = []
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 建立 SSH 连接失败降级：所有端口返回 []，由上层走幂等成功分支
             logger.error("批量取消限速建立 SSH 连接失败: %s", e)
             for port in ports:
                 result.setdefault(port, [])
@@ -870,7 +870,7 @@ class BatchActionService:
         try:
             send_range_fn(range_commands)
             return True, "range", None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- range 下发探测：任意异常都需参与"是否降级逐端口"的判定（_is_range_structural_error），不能收窄否则会漏掉需降级的设备 Error / 读超时
             if not self._is_range_structural_error(str(e)):
                 return False, "range", str(e)
             logger.warning(
@@ -881,7 +881,7 @@ class BatchActionService:
                 send_per_port_fn(per_port_cmds_builder())
                 logger.info("批量操作[%s] 逐端口模式重试成功", err_label)
                 return True, "per_port", None
-            except Exception as e2:
+            except Exception as e2:  # noqa: BLE001 -- 逐端口重试兜底：重试阶段的异常同样不可枚举，统一转为结构化失败结果
                 logger.warning("批量操作[%s] 逐端口模式重试仍失败: %s", err_label, e2)
                 return False, "per_port", str(e2)
 

@@ -5,6 +5,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
 import {
   Button,
   Space,
@@ -60,6 +61,7 @@ const WebhookConfigPage: React.FC = () => {
   const testMutation = useTestWebhookConfig();
 
   const modal = useDisclosure();
+  const { open: openModal, close: closeModal } = modal;
   const [editingConfig, setEditingConfig] = useState<WebhookConfig | null>(null);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
@@ -68,12 +70,13 @@ const WebhookConfigPage: React.FC = () => {
     setEditingConfig(null);
     form.resetFields();
     form.setFieldsValue({ channel: 'wechat_work', enabled: true });
-    modal.open();
-  }, [form]);
+    openModal();
+  }, [form, openModal]);
 
   const openEditModal = useCallback(
     (record: WebhookConfig) => {
       setEditingConfig(record);
+      form.resetFields();
       form.setFieldsValue({
         name: record.name,
         channel: record.channel,
@@ -83,10 +86,13 @@ const WebhookConfigPage: React.FC = () => {
         applicable_types: record.applicable_types,
         applicable_severities: record.applicable_severities
       });
-      modal.open();
+      openModal();
     },
-    [form]
+    [form, openModal]
   );
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const guard = useDirtyGuard({ form, isPending });
 
   const handleSubmit = useCallback(
     async (values: CreateWebhookConfigParams) => {
@@ -98,12 +104,12 @@ const WebhookConfigPage: React.FC = () => {
           await createMutation.mutateAsync(values);
           messageApi.success(tCommon('message.createSuccess'));
         }
-        modal.close();
+        closeModal();
       } catch {
         messageApi.error(tCommon('message.operationFailed'));
       }
     },
-    [editingConfig, createMutation, updateMutation, messageApi, tCommon]
+    [editingConfig, createMutation, updateMutation, messageApi, tCommon, closeModal]
   );
 
   const handleDelete = useCallback(
@@ -268,11 +274,13 @@ const WebhookConfigPage: React.FC = () => {
           editingConfig ? t('webhook.modalTitle.edit') : t('webhook.modalTitle.create')
         }
         open={modal.isOpen}
-        onCancel={() => modal.close()}
+        onCancel={() => guard.requestClose(() => modal.close())}
         onOk={() => form.submit()}
-        confirmLoading={createMutation.isPending || updateMutation.isPending}
+        confirmLoading={isPending}
+        closable={!isPending}
+        mask={{ closable: false }}
         width={560}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item

@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, put } from './api-client';
 import { createCrudHooks } from './crud-factory';
 import { queryKeys } from './query-keys';
+import { invalidateCabinetGraph } from './cache-invalidation';
 import type {
   Cabinet,
   Device,
@@ -46,7 +47,8 @@ const cabinetHooks = createCrudHooks<
   CabinetQueryParams
 >({
   basePath: '/cabinets',
-  queryKey: queryKeys.cabinets.all
+  queryKey: queryKeys.cabinets.all,
+  invalidateResource: 'cabinet'
 });
 
 export const useCabinetList = cabinetHooks.useList;
@@ -54,6 +56,8 @@ export const useCabinetDetail = cabinetHooks.useDetail;
 export const useCabinetSuspenseDetail = cabinetHooks.useSuspenseDetail;
 export const useCreateCabinet = cabinetHooks.useCreate;
 export const useDeleteCabinet = cabinetHooks.useDelete;
+
+export { invalidateCabinetGraph };
 
 export function useUpdateCabinet() {
   const queryClient = useQueryClient();
@@ -63,8 +67,7 @@ export function useUpdateCabinet() {
       return put<Cabinet>(`/cabinets/${id}`, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
+      invalidateCabinetGraph(queryClient);
     }
   });
 }
@@ -75,7 +78,7 @@ export function useBatchCreateCabinet() {
     mutationFn: (data: CreateCabinetRequest) =>
       post<BatchCreateCabinetResponse, CreateCabinetRequest>('/cabinets', { ...data, batch: true }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
+      invalidateCabinetGraph(queryClient);
     }
   });
 }

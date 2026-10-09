@@ -9,7 +9,7 @@
 样本 7-28 天：baseline_status = "degraded"（仅全局均值±σ，不分组到 hour_of_day）
 样本 ≥ 28 天：baseline_status = "normal"（按 hour×weekday 分桶）
 """
-from sqlalchemy import ForeignKey, Index, Integer, SmallInteger, String
+from sqlalchemy import ForeignKey, Integer, SmallInteger, String
 from sqlalchemy.dialects.mysql import DECIMAL
 
 from app.models.base import BaseModel

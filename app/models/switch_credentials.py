@@ -4,7 +4,7 @@
 采集缓存字段迁移至 SwitchStatusCache 表。
 """
 from app.core.enums import SwitchDeviceTypeCode
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import Index
 from sqlalchemy.dialects.mysql import INTEGER
 from sqlalchemy.orm import relationship, validates
 

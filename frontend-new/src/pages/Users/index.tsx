@@ -1,14 +1,20 @@
 import { useConfirm } from '@/utils/confirm';
 import { useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
-import { Button, Switch, Space, Drawer, Tag, Checkbox, Typography, Input, Modal } from 'antd';
+import { useDirtyGuard, useSnapshotDirty } from '@/hooks/useDirtyGuard';
 import {
-  PlusOutlined,
-  KeyOutlined,
-  HistoryOutlined,
-  TeamOutlined,
-  CopyOutlined
-} from '@ant-design/icons';
+  Button,
+  Switch,
+  Space,
+  Drawer,
+  Tag,
+  Checkbox,
+  Input,
+  Modal,
+  theme,
+  Typography
+} from 'antd';
+import { PlusOutlined, KeyOutlined, HistoryOutlined, TeamOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '@/components/DataTable';
 import IdCell from '@/components/IdCell';
@@ -20,11 +26,10 @@ import {
   useDeleteUser,
   useToggleUserStatus,
   useResetPassword,
-  type CreateUserRequest,
-  type UpdateUserRequest
+  type CreateUserRequest
 } from '@/services/user';
 import { useRoleOptions, useUserRoles, useSetUserRoles, useRoleList } from '@/services/rbac';
-import type { User, Role } from '@/types/models';
+import type { User } from '@/types/models';
 import { useCrudPage } from '@/hooks/useCrudPage';
 import { useMessage } from '@/hooks/useMessage';
 import { formatDateTime } from '@/utils/format';
@@ -34,6 +39,7 @@ function Users() {
   const { t } = useTranslation('settings');
   const { t: tc } = useTranslation('common');
   const { t: ta } = useTranslation('auth');
+  const { token } = theme.useToken();
   const confirm = useConfirm();
   const navigate = useNavigate();
   const roleDrawer = useDisclosure();
@@ -130,6 +136,93 @@ function Users() {
     });
   };
 
+  const renderUserActions = (r: User) => (
+    <Space wrap>
+      <Button type="link" size="small" style={{ padding: 0 }} onClick={() => crud.handleEdit(r)}>
+        {tc('action.edit')}
+      </Button>
+      <Button
+        type="link"
+        size="small"
+        icon={<TeamOutlined />}
+        style={{ padding: 0 }}
+        onClick={() => handleAssignRole(r)}
+      >
+        {t('role.label')}
+      </Button>
+      <Button
+        type="link"
+        size="small"
+        icon={<KeyOutlined />}
+        style={{ padding: 0 }}
+        onClick={() => handleResetPassword(r)}
+      >
+        {t('user.action.resetPassword')}
+      </Button>
+      <Button
+        type="link"
+        size="small"
+        icon={<HistoryOutlined />}
+        style={{ padding: 0 }}
+        onClick={() => handleViewLoginLogs(r)}
+      >
+        {t('user.action.loginLogs')}
+      </Button>
+      <Button
+        type="link"
+        size="small"
+        danger
+        style={{ padding: 0 }}
+        onClick={() => crud.handleDelete(r)}
+      >
+        {tc('action.delete')}
+      </Button>
+    </Space>
+  );
+
+  const renderUserCard = (r: User) => {
+    const { Text } = Typography;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+        <Space wrap size={8}>
+          <Text strong>{r.username ?? '-'}</Text>
+          <Switch
+            size="small"
+            checked={r.is_active}
+            onChange={() => handleToggle(r)}
+            checkedChildren={tc('action.enable')}
+            unCheckedChildren={tc('action.disable')}
+          />
+        </Space>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.name || '-'}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.email || '-'}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.department || '-'}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.contact_phone || '-'}
+        </Text>
+        {r.roles?.length ? (
+          <Space size={4} wrap>
+            {r.roles.map((role) => (
+              <Tag key={role} color={token.colorPrimary}>
+                {role}
+              </Tag>
+            ))}
+          </Space>
+        ) : null}
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {tc('field.updatedAt')}: {formatDateTime(r.updated_at)}
+        </Text>
+        {renderUserActions(r)}
+      </div>
+    );
+  };
+
   const columns = [
     {
       title: 'ID',
@@ -139,8 +232,18 @@ function Users() {
       render: (id: number) => <IdCell value={id} />
     },
     { title: ta('field.username'), dataIndex: 'username', key: 'username' },
-    { title: t('user.field.fullName'), dataIndex: 'name', key: 'name', render: (v: string) => v || '-' },
-    { title: t('user.field.email'), dataIndex: 'email', key: 'email', render: (v: string) => v || '-' },
+    {
+      title: t('user.field.fullName'),
+      dataIndex: 'name',
+      key: 'name',
+      render: (v: string) => v || '-'
+    },
+    {
+      title: t('user.field.email'),
+      dataIndex: 'email',
+      key: 'email',
+      render: (v: string) => v || '-'
+    },
     {
       title: t('user.field.department'),
       dataIndex: 'department',
@@ -181,46 +284,15 @@ function Users() {
     {
       title: tc('field.actions'),
       key: 'action',
-      render: (_: unknown, r: User) => (
-        <Space>
-          <Button type="link" size="small" onClick={() => crud.handleEdit(r)}>
-            {tc('action.edit')}
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<TeamOutlined />}
-            onClick={() => handleAssignRole(r)}
-          >
-            {t('role.label')}
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<KeyOutlined />}
-            onClick={() => handleResetPassword(r)}
-          >
-            {t('user.action.resetPassword')}
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<HistoryOutlined />}
-            onClick={() => handleViewLoginLogs(r)}
-          >
-            {t('user.action.loginLogs')}
-          </Button>
-          <Button type="link" size="small" danger onClick={() => crud.handleDelete(r)}>
-            {tc('action.delete')}
-          </Button>
-        </Space>
-      )
+      render: (_: unknown, r: User) => renderUserActions(r)
     }
   ];
 
   return (
     <div>
       <DataTable<User>
+        error={crud.error}
+        onRetry={crud.refetch}
         columns={columns}
         dataSource={crud.data?.items ?? []}
         loading={crud.isLoading}
@@ -240,6 +312,8 @@ function Users() {
             {t('user.action.add')}
           </Button>
         }
+        mobileCardMode
+        cardRender={renderUserCard}
       />
 
       <UserForm
@@ -280,18 +354,25 @@ function RoleAssignDrawer({ open, user, onClose, onSuccess }: RoleAssignDrawerPr
   const { data: allRolesData } = useRoleList();
   const setUserRoles = useSetUserRoles();
   const message = useMessage();
+  const confirm = useConfirm();
 
   const allRoles = allRolesData?.items ?? [];
   const currentRoleNames = (userRoles ?? []).map((r) => r.name);
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
+  const [initialNames, setInitialNames] = useState<string[]>([]);
 
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && userRoles) {
       setSelectedNames(currentRoleNames);
+      setInitialNames(currentRoleNames);
     }
   };
 
-  const handleSubmit = async () => {
+  const isPending = setUserRoles.isPending;
+  const isDirty = useSnapshotDirty(initialNames, selectedNames);
+  const guard = useDirtyGuard({ isPending, isDirty });
+
+  const doSubmit = async () => {
     if (!user) return;
     try {
       await setUserRoles.mutateAsync({ userId: user.id, roles: selectedNames });
@@ -303,15 +384,30 @@ function RoleAssignDrawer({ open, user, onClose, onSuccess }: RoleAssignDrawerPr
     }
   };
 
+  const handleSubmit = () => {
+    if (selectedNames.length === 0) {
+      confirm({
+        title: tc('confirm.emptyRoleTitle'),
+        content: tc('confirm.emptyRoleContent'),
+        okButtonProps: { danger: true },
+        onOk: doSubmit
+      });
+      return;
+    }
+    void doSubmit();
+  };
+
   return (
     <Drawer
       title={t('role.assignTitle', { username: user?.username ?? '' })}
       open={open}
-      onClose={onClose}
+      onClose={() => guard.requestClose(onClose)}
       size={400}
       afterOpenChange={handleOpenChange}
+      closable={!isPending}
+      mask={{ closable: false }}
       extra={
-        <Button type="primary" loading={setUserRoles.isPending} onClick={handleSubmit}>
+        <Button type="primary" loading={isPending} onClick={handleSubmit}>
           {tc('action.save')}
         </Button>
       }

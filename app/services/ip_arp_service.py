@@ -7,7 +7,6 @@ ARP 同步服务（Phase 3）
 """
 from app.utils.logging import get_logger
 
-from sqlalchemy import text
 
 from app.persistence.ip_repositories import IPManagerRepository
 from app.core.enums import IPStatus
@@ -16,6 +15,7 @@ from app.services.topology_graph import (
     TopologyGraph, resolve_terminal_ip_with_redis, LocationResult,
 )
 from app.utils.port_name_utils import normalize_port
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -62,7 +62,7 @@ class ArpSync:
         _BANNED_MACS = {"0000-0000-0001", "0000-0000-0000", "0000.0000.0001", "0000.0000.0000"}
         merged: dict[str, tuple] = {}
         for ctx in all_ctxs:
-            if not ctx.has_ssh:
+            if not ctx.arps:
                 continue
             for arp in ctx.arps:
                 if not arp.mac or arp.mac.upper() == "N/A":
@@ -86,11 +86,11 @@ class ArpSync:
                     self._process_arp(ip, arp, ctx, db_session, scan_redis)
                     nested.commit()
                     success_count += 1
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- ARP 单条处理失败隔离：nested.savepoint 回滚后继续，脏数据不得中断同步
                     nested.rollback()
                     fail_count += 1
                     logger.warning("ARP 处理失败", extra={"phase": "arp_sync", "ip": ip, "error": str(e)})
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- SAVEPOINT 创建失败隔离：同 95（该条无 savepoint 可回滚，仅计数）
                 fail_count += 1
                 logger.error("SAVEPOINT 创建失败", extra={"phase": "arp_sync", "error": str(e)})
 
@@ -210,7 +210,7 @@ class ArpSync:
 
         返回所有候选供图遍历算法使用。
         """
-        key = f"mac_index:{scope}:{mac}"
+        key = redis_keys.scan_mac_index_key(scope, mac)
         all_candidates = scan_redis.r.hgetall(key)
         if not all_candidates:
             return []

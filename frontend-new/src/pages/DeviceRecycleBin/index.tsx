@@ -156,6 +156,7 @@ export default function DeviceRecycleBin() {
   const msg = useMessage();
 
   const restoreModal = useDisclosure();
+  const { open: openRestoreModal, close: closeRestoreModal } = restoreModal;
   const [restoringDevice, setRestoringDevice] = useState<Device | null>(null);
   const [restoreCabinetId, setRestoreCabinetId] = useState<number | undefined>();
   const [restoreUPosition, setRestoreUPosition] = useState<number | undefined>();
@@ -163,6 +164,7 @@ export default function DeviceRecycleBin() {
   const [conflictMsg, setConflictMsg] = useState('');
 
   const batchRestoreModal = useDisclosure();
+  const { open: openBatchRestoreModal, close: closeBatchRestoreModal } = batchRestoreModal;
   const [batchRestoreCabinetId, setBatchRestoreCabinetId] = useState<number | undefined>();
   const [batchRestoreUPosition, setBatchRestoreUPosition] = useState<number | undefined>();
 
@@ -208,8 +210,8 @@ export default function DeviceRecycleBin() {
     setRestoreUPosition(undefined);
     setLocationConflict(false);
     setConflictMsg('');
-    restoreModal.open();
-  }, []);
+    openRestoreModal();
+  }, [openRestoreModal]);
 
   const doRestore = useCallback(() => {
     if (!restoringDevice) return;
@@ -238,7 +240,7 @@ export default function DeviceRecycleBin() {
               );
             }
             msg.success(parts.join(''));
-            restoreModal.close();
+            closeRestoreModal();
           } else if (result?.location_conflict) {
             setLocationConflict(true);
             const conflicts = result.conflict_devices || [];
@@ -255,13 +257,13 @@ export default function DeviceRecycleBin() {
         onError: () => msg.error(t('recycleBin.message.restoreFailed'))
       }
     );
-  }, [restoringDevice, restoreCabinetId, restoreUPosition, locationConflict, restoreMutation, msg, t]);
+  }, [restoringDevice, restoreCabinetId, restoreUPosition, locationConflict, restoreMutation, msg, t, closeRestoreModal]);
 
   const handleBatchRestore = useCallback(() => {
     setBatchRestoreCabinetId(undefined);
     setBatchRestoreUPosition(undefined);
-    batchRestoreModal.open();
-  }, []);
+    openBatchRestoreModal();
+  }, [openBatchRestoreModal]);
 
   const doBatchRestore = useCallback(() => {
     batchRestoreMutation.mutate(
@@ -277,12 +279,12 @@ export default function DeviceRecycleBin() {
             t('recycleBin.message.batchRestoreSuccess', { count: result?.success?.length || 0 })
           );
           batch.clear();
-          batchRestoreModal.close();
+          closeBatchRestoreModal();
         },
         onError: () => msg.error(t('recycleBin.message.batchRestoreFailed'))
       }
     );
-  }, [batch, batchRestoreCabinetId, batchRestoreUPosition, batchRestoreMutation, msg, t]);
+  }, [batch, batchRestoreCabinetId, batchRestoreUPosition, batchRestoreMutation, msg, t, closeBatchRestoreModal]);
 
   const handlePermanentDelete = useCallback(
     (record: Device) => {

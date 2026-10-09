@@ -1,10 +1,10 @@
-from __future__ import annotations
 # -*- coding: utf-8 -*-
 """全量扫描编排服务
 
 ScanOrchestrator 替换原 NetworkScannerService，
 严格按 Phase 1→2→3→4→5 顺序执行。
 """
+from __future__ import annotations
 from app.utils.logging import get_logger
 import sys
 import threading
@@ -23,16 +23,20 @@ from app.persistence.virtual_room_repository import VirtualRoomRepository
 from app.services.scan_context import (
     SwitchContext, ParsedRoute, ParsedArpEntry, ParsedMacEntry,
 )
+from app.services.collector.cli_translate import (
+    translate_arps,
+    translate_macs,
+    translate_routes,
+)
 from app.services.scan_redis import ScanRedis
 from app.services.ip_route_service import RouteSync, NexthopResolver
 from app.services.ip_mac_service import MacIndexBuilder, detect_uplink_ports
 from app.services.ip_arp_service import ArpSync
 from app.services.scan_degrader import NoAuthL3Degrader, NoAuthL2Degrader
-from app.utils.port_name_utils import normalize_port
-from app.utils.network_utils import normalize_mac_address
 from app.utils.transactional import transaction_checkpoint
 from sqlalchemy.exc import SQLAlchemyError
 from redis.exceptions import RedisError
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -146,9 +150,6 @@ def _resolve_uplink_port_name(uplink_port_ids, uplink_device_id=None) -> str | N
     """
     if not uplink_port_ids or not isinstance(uplink_port_ids, list):
         return None
-    from app.models.network_connection import NetworkConnection
-    from app.models.network_port import NetworkPort
-    from sqlalchemy import or_
 
     first_port_id = uplink_port_ids[0]
 
@@ -277,7 +278,7 @@ class ScanOrchestrator:
             try:
                 from app.services.switch_events import emit_global_event
                 emit_global_event("scan_progress", progress_dict)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 扫描进度 SSE 推送失败不阻断：进度推送是尽力而为，Redis/SSE 异常不可枚举，不得因推送失败中断扫描
                 logger.warning("推送扫描进度 SSE 事件失败: %s", e)
 
         if sr:
@@ -293,7 +294,7 @@ class ScanOrchestrator:
         acquired_locks = []
         if sr:
             for sw in all_sw:
-                lock_key = f"scan_lock:{sw.id}"
+                lock_key = redis_keys.scan_lock_key(sw.id)
                 existing = sr.r.get(lock_key)
                 if existing:
                     existing_str = existing if isinstance(existing, str) else existing.decode()
@@ -351,9 +352,25 @@ class ScanOrchestrator:
             if failed:
                 logger.warning("[Scan] %d 台采集失败: %s", len(failed), failed)
 
+            snmp_real_ips: set[str] = set()
+            for sw in [s for s in all_sw if not s.has_ssh]:
+                try:
+                    ctx_snmp = self._collect_single_via_snmp(sw)
+                except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单台失败不得中断整轮扫描
+                    logger.error("[Step1b] %s SNMP 补采异常: %s", sw.ip, e)
+                    continue
+                if ctx_snmp is not None:
+                    valid_ctxs.append(ctx_snmp)
+                    snmp_real_ips.add(sw.ip)
+            if snmp_real_ips:
+                progress.completed = len(valid_ctxs)
+                logger.info(
+                    "[Step1b] 无 SSH 设备 SNMP 真实数据就绪 %d 台：%s",
+                    len(snmp_real_ips), sorted(snmp_real_ips),
+                )
+
             progress.current_phase = "phase0_port_info"
             _emit_progress()
-            from app.services.switch_info_service import SwitchInfoService
             from flask import current_app
 
             app_ref = current_app._get_current_object()
@@ -372,7 +389,9 @@ class ScanOrchestrator:
                     svc = SwitchInfoService()  # 独立 session
                     try:
                         with transaction_checkpoint(svc.sw_repo.session, f"phase0:port:{device_id}"):
-                            return svc.collect_port_info(device_id)
+                            return svc.collect_port_info(
+                                device_id, triggered_by_auto=True, virtual_room_id=virtual_room_id,
+                            )
                     finally:
                         db.session.remove()  # 归还连接到池
 
@@ -381,14 +400,14 @@ class ScanOrchestrator:
                 return {"scope": scope, "status": "aborted",
                         "reason": "interpreter_shutdown", "completed": 0, "failed": 0}
 
-            with ThreadPoolExecutor(max_workers=min(10, len(authorized))) as pool:
+            with ThreadPoolExecutor(max_workers=min(10, max(1, len(authorized)))) as pool:
                 futures = {pool.submit(collect_port_one, sw.id): sw
                            for sw in authorized}
                 for f in as_completed(futures):
                     sw = futures[f]
                     try:
                         f.result(timeout=60)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                         logger.error("[Phase0] %s 端口采集失败: %s", sw.ip, e)
 
             progress.current_phase = "phase0b_device_info"
@@ -411,14 +430,14 @@ class ScanOrchestrator:
                 return {"scope": scope, "status": "aborted",
                         "reason": "interpreter_shutdown", "completed": 0, "failed": 0}
 
-            with ThreadPoolExecutor(max_workers=min(5, len(authorized))) as pool:
+            with ThreadPoolExecutor(max_workers=min(5, max(1, len(authorized)))) as pool:
                 futures = {pool.submit(collect_info_one, sw.id): sw
                            for sw in authorized}
                 for f in as_completed(futures):
                     sw = futures[f]
                     try:
                         f.result(timeout=90)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                         logger.error("[Phase0b] %s 设备信息采集失败: %s", sw.ip, e)
 
             try:
@@ -455,8 +474,21 @@ class ScanOrchestrator:
                         logger.warning(
                             f"[Phase0d] {sw.ip} 同步错误: {result['errors']}"
                         )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                     logger.error("[Phase0d] %s 成员同步失败: %s", sw.ip, e)
+
+            progress.current_phase = "phase0d_snmp_vlan"
+            _emit_progress()
+            from app.services.switch_info_service import SwitchInfoService
+
+            for sw in [s for s in all_sw if not s.has_ssh]:
+                try:
+                    with transaction_checkpoint(self.sw_repo.session, f"phase0d-snmp:{sw.id}"):
+                        svc = SwitchInfoService()
+                        svc.sync_vlan_members_via_channel(sw.id)
+                        svc.sync_lag_members_via_channel(sw.id)
+                except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描，异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
+                    logger.error("[Phase0d-snmp] %s VLAN 成员同步失败: %s", sw.ip, e)
 
             progress.current_phase = "phase1b_topology_build"
             _emit_progress()
@@ -492,7 +524,7 @@ class ScanOrchestrator:
                     try:
                         with transaction_checkpoint(self.sw_repo.session, f"phase1:route:{ctx.sw_id}"):
                             self.route_sync.sync(ctx, self.sw_repo.session, sr, topology_graph=topology_graph)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                         logger.error("[Phase1] 交换机 %s 路由同步失败: %s", ctx.ip, e)
 
             progress.current_phase = "phase2_mac_index"
@@ -505,7 +537,7 @@ class ScanOrchestrator:
             try:
                 with transaction_checkpoint(self.sw_repo.session, "phase3:arp_sync"):
                     self.arp_sync.sync_all(valid_ctxs, self.sw_repo.session, sr, topology_graph=topology_graph)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                 logger.error("[Phase3] ARP 同步失败: %s", e)
 
             progress.current_phase = "phase4_nexthop"
@@ -513,12 +545,17 @@ class ScanOrchestrator:
             try:
                 with transaction_checkpoint(self.sw_repo.session, "phase4:nexthop"):
                     self.nexthop.resolve(scope, self.sw_repo.session)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                 logger.error("[Phase4] Nexthop 推断失败: %s", e)
 
             progress.current_phase = "phase5_degrade"
             _emit_progress()
-            no_auth_sws = [s for s in all_sw if not s.has_ssh]
+            no_auth_sws = [s for s in all_sw if not s.has_ssh and s.ip not in snmp_real_ips]
+            if snmp_real_ips:
+                logger.info(
+                    "[Phase5] 跳过 %d 台已有 SNMP 真实数据的无权限设备（真实值优先于降级推断）",
+                    len([s for s in all_sw if not s.has_ssh and s.ip in snmp_real_ips]),
+                )
             for sw in no_auth_sws:
                 try:
                     with transaction_checkpoint(self.sw_repo.session, f"phase5:degrade:{sw.id}"):
@@ -530,7 +567,7 @@ class ScanOrchestrator:
                             NoAuthL2Degrader().degrade(
                                 sw.ip, scope, valid_ctxs, self.sw_repo.session, sr
                             )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                     logger.error("[Phase5] 降级处理 %s 失败: %s", sw.ip, e)
 
             progress.current_phase = "phase6_ip_reconcile"
@@ -555,7 +592,7 @@ class ScanOrchestrator:
             try:
                 with transaction_checkpoint(self.sw_repo.session, "phase6:ip_reconcile"):
                     IPReconcileService(IPManagerRepository(self.sw_repo.session)).reconcile(scope, active_ips, self.sw_repo.session, arp_banned_ips=arp_banned_ips)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                 logger.error("[Phase6] IP对账失败: %s", e)
 
             progress.current_phase = "phase6a_route_ip_info"
@@ -564,7 +601,7 @@ class ScanOrchestrator:
                 with transaction_checkpoint(self.sw_repo.session, "phase6a:route_ip_info"):
                     from app.services.ip_route_info_service import RouteIPInfoService
                     RouteIPInfoService().fill_from_routes(scope, self.sw_repo.session)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                 logger.error("[Phase6a] 路由驱动IP信息补填失败: %s", e)
 
             probe_ips_for_phase7: list[str] = []
@@ -593,7 +630,7 @@ class ScanOrchestrator:
                             continue
                 logger.info("[Phase6b] ARP 未覆盖 IP: %d 个（待 Phase7 探测）",
                             len(probe_ips_for_phase7))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                 logger.error("[Phase6b] 查询待探测 IP 失败: %s", e)
 
             progress.current_phase = "phase7_supplement_detect"
@@ -615,7 +652,7 @@ class ScanOrchestrator:
                         logger.info(
                             f"[Phase7] 补充探测发现 {supplement_result['active_found']} 个新在线IP"
                         )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                 logger.error("[Phase7] 补充探测失败: %s", e)
 
             progress.current_phase = "完成"
@@ -624,7 +661,7 @@ class ScanOrchestrator:
             if virtual_room_id:
                 try:
                     self.vr_repo.update_last_scan(virtual_room_id, scope)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 写回 last_scan_at 失败不阻断：扫描主体已完成，元数据写回失败仅告警（DB 异常类型不可枚举）
                     logger.warning("写回 last_scan_at 失败: %s", e)
 
             elapsed = time.time() - scan_start
@@ -679,7 +716,7 @@ class ScanOrchestrator:
             metas.append(SwitchMeta(
                 id=sw.device_id,
                 cred_id=sw.id,
-                ip=sw.ip,
+                ip=sw.ip or (device.management_ip if device is not None else None),
                 device_type=sw.device_type or SwitchDeviceTypeCode.HUAWEI,
                 has_ssh=sw.has_ssh,
                 layer=device.layer or 3,
@@ -719,7 +756,7 @@ class ScanOrchestrator:
             metas.append(SwitchMeta(
                 id=sw.device_id,
                 cred_id=sw.id,
-                ip=sw.ip,
+                ip=sw.ip or (device.management_ip if device is not None else None),
                 device_type=sw.device_type or SwitchDeviceTypeCode.HUAWEI,
                 has_ssh=sw.has_ssh,
                 layer=device.layer or 3,
@@ -757,16 +794,37 @@ class ScanOrchestrator:
             logger.info("[CollectAll] 进程退出，中止交换机采集")
             return [], []
 
+        if not authorized:
+            logger.info("[CollectAll] 本机房无 SSH 权限交换机，跳过 CLI 采集（交由 SNMP 路径）")
+            return [], []
+
         with ThreadPoolExecutor(max_workers=min(10, len(authorized))) as pool:
             futures = {pool.submit(collect_one, sw): sw for sw in authorized}
             for future in as_completed(futures):
                 sw = futures[future]
                 try:
                     valid.append(future.result(timeout=60))
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                     logger.error("采集 %s 失败: %s", sw.ip, e)
                     failed.append(f"{sw.ip}: {e}")
         return valid, failed
+
+    @staticmethod
+    def _clear_snmp_snapshot(device_id: int) -> None:
+        """本轮采集开始前清掉该设备的 SNMP 快照（快照设计文档步 5 / §1.1）。
+
+        为什么清：快照的共享语义是"**当轮扫描内**"——不清的话 TTL（300s）内的
+        二次扫描会读到上一轮的快照，stale 数据落库。clear 是幂等的卫生动作，
+        与快照开关无关：开关关时只是删一个不存在的 key（O(1) 无害）；开关开时
+        它保证本轮各能力读到的一定是本轮采集。快照层内部已兜全部异常（Redis
+        不可用 = no-op），这里再兜一层只为不让清理问题干扰采集主流程。
+        """
+        try:
+            from app.services.collector import snmp_snapshot
+
+            snmp_snapshot.clear_snapshot(device_id)
+        except Exception as exc:  # noqa: BLE001 —— 清不掉最多复用旧快照（TTL 兜底）
+            logger.debug("SNMP 快照清理失败 device_id=%s: %s", device_id, exc)
 
     def _collect_single(self, sw: SwitchMeta) -> SwitchContext:
         """采集单台交换机（含重试）
@@ -782,6 +840,7 @@ class ScanOrchestrator:
         Raises:
             RuntimeError: 重试耗尽后仍失败
         """
+        self._clear_snmp_snapshot(sw.id)
         MAX_RETRY = 2
         for attempt in range(MAX_RETRY + 1):
             try:
@@ -797,15 +856,15 @@ class ScanOrchestrator:
                         parsed = adapter.parse_routes(route_out)
                         routes = [
                             ParsedRoute(
-                                network=r.network,
-                                nexthop=r.nexthop or "0.0.0.0",
-                                flags=r.protocol or "C",
-                                interface=r.interface or "",
-                                port=normalize_port(r.interface or ""),
+                                network=row["network"],
+                                nexthop=row["nexthop"],
+                                flags=row["flags"],
+                                interface=row["interface"],
+                                port=row["port"],
                             )
-                            for r in parsed
+                            for row in translate_routes(parsed)
                         ]
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                         logger.warning("交换机 %s 路由采集失败: %s", sw.ip, e)
 
                 arps = []
@@ -816,15 +875,14 @@ class ScanOrchestrator:
                     parsed_arps = adapter.parse_arp(arp_out)
                     arps = [
                         ParsedArpEntry(
-                            ip=a.ip_address,
-                            mac=normalize_mac_address(a.mac_address),
-                            interface=a.interface or "",
-                            vlan=a.vlan if hasattr(a, 'vlan') else None,
+                            ip=row["ip"],
+                            mac=row["mac"],
+                            interface=row["interface"],
+                            vlan=row["vlan"],
                         )
-                        for a in parsed_arps
-                        if a.mac_address and a.mac_address.strip().upper() != "INCOMPLETE"
+                        for row in translate_arps(parsed_arps)
                     ]
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                     logger.warning("交换机 %s ARP采集失败: %s", sw.ip, e)
 
                 macs = []
@@ -835,13 +893,13 @@ class ScanOrchestrator:
                     parsed_macs = adapter.parse_mac_table(mac_out)
                     macs = [
                         ParsedMacEntry(
-                            mac=normalize_mac_address(m.mac_address),
-                            port=normalize_port(m.port),
-                            vlan=m.vlan if hasattr(m, 'vlan') else None,
+                            mac=row["mac"],
+                            port=row["port"],
+                            vlan=row["vlan"],
                         )
-                        for m in parsed_macs
+                        for row in translate_macs(parsed_macs)
                     ]
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                     logger.warning("交换机 %s MAC采集失败: %s", sw.ip, e)
 
                 return SwitchContext(
@@ -858,6 +916,102 @@ class ScanOrchestrator:
                     time.sleep(2 ** attempt)
                 else:
                     raise RuntimeError(f"采集 {sw.ip} 失败: {e}") from e
+
+    def _collect_single_via_snmp(self, sw: SwitchMeta) -> SwitchContext | None:
+        """无 SSH 设备：用 SNMP 通道采 ARP / MAC（+ L3 的路由）构造等价上下文。
+
+        **为什么是"造 ctx"而不是另写一份同步**：`full_scan` 与 `scan_switch` 的
+        Phase 0c/1/2/3/6 全部以 ``SwitchContext`` 为输入 —— 端口 IP 索引
+        （``port_ip_set``）、MAC 倒排索引（``mac_builder.build``）、ARP 同步
+        （``arp_sync.sync_all``）、IP 对账都吃这个结构。SNMP 产出同构 ctx 之后，
+        下游落库逻辑**一行都不用改**；反过来，另写一份"SNMP 版落库"必然与 SSH
+        路径的规则漂移（这正是 ``cli_translate`` 当初被抽出来的原因）。
+
+        与 Phase 5 降级的关系：``NoAuthL2/L3Degrader`` 是**推断**（拿上联交换机
+        端口的 MAC 集合反查、结果标 degraded），本方法是**设备真实数据**。按
+        "真实设备获取的数据为最高优先级数据源"的既定原则，采到即用真值，调用方
+        负责让 Phase 5 跳过该设备。
+
+        保守边界（与接管入口同一条纪律：只允许"更早采到"，不允许"把本来能采的
+        采丢"）：只接受**非空**的 ARP/MAC。两者皆空（设备不可达 / 白名单未开 /
+        确实没有邻居）时返回 ``None``，交回原路径（skipped → Phase 5 兜底）——
+        空 ctx 会让 Phase 3/6 把该设备既有的定位记录清掉。
+
+        Returns:
+            SwitchContext（``has_ssh=False``）或 ``None``（本轮不接管定位数据）。
+        """
+        self._clear_snmp_snapshot(sw.id)
+        from app.core.enums import CollectCapability
+        from app.services.collector import runtime
+
+        switch_obj = self.sw_repo.find_by_device_id(sw.id)
+        if switch_obj is None:
+            return None
+        try:
+            selector = runtime.selector_for(
+                switch_obj, ssh_manager=self.ssh_mgr, switch_repo=self.sw_repo,
+            )
+        except Exception as exc:  # noqa: BLE001 —— 装配异常不得让扫描终局失败
+            logger.warning("[SNMP-ctx] %s 通道装配失败，保持原路径: %s", sw.ip, exc)
+            return None
+        if selector is None:
+            logger.info("[SNMP-ctx] %s 无可用通道（开关未开/不在白名单），保持原路径", sw.ip)
+            return None
+
+        caps = [CollectCapability.ARP, CollectCapability.MAC]
+        if sw.layer == 3:
+            caps.append(CollectCapability.ROUTES)  # 与 SSH 路径一致：仅 L3 采路由
+        try:
+            facts = selector.collect(sw.id, caps)
+        except Exception as exc:  # noqa: BLE001 —— 同上：采集异常走回退，不终局失败
+            logger.warning("[SNMP-ctx] %s 通道采集异常，保持原路径: %s", sw.ip, exc)
+            return None
+
+        arp_rows = facts.arps or []
+        mac_rows = facts.macs or []
+        if not arp_rows and not mac_rows:
+            logger.info(
+                "[SNMP-ctx] %s 未采到真实 ARP/MAC，交回原路径（outcomes=%s）",
+                sw.ip,
+                {k: str(v) for k, v in (facts.outcomes or {}).items()},
+            )
+            return None
+
+        ctx = SwitchContext(
+            sw_id=sw.id, ip=sw.ip, has_ssh=False,
+            layer=sw.layer, is_core=sw.is_core,
+            routes=[
+                ParsedRoute(
+                    network=r.get("network"), nexthop=r.get("nexthop"),
+                    flags=r.get("flags"), interface=r.get("interface"),
+                    port=r.get("port"),
+                )
+                for r in (facts.routes or [])
+            ],
+            arps=[
+                ParsedArpEntry(
+                    ip=r.get("ip"), mac=r.get("mac"),
+                    interface=r.get("interface"), vlan=r.get("vlan"),
+                )
+                for r in arp_rows
+            ],
+            macs=[
+                ParsedMacEntry(
+                    mac=r.get("mac"), port=r.get("port"), vlan=r.get("vlan"),
+                )
+                for r in mac_rows
+            ],
+            uplink_sw_id=sw.uplink_sw_id,
+            uplink_port=sw.uplink_port,
+            room_id=sw.room_id,
+            scope=sw.scope,
+        )
+        logger.info(
+            "[SNMP-ctx] %s 真实数据上下文就绪：ARP=%d MAC=%d 路由=%d"
+            "（has_ssh=False，复用同一套落库 Phase）",
+            sw.ip, len(ctx.arps), len(ctx.macs), len(ctx.routes),
+        )
+        return ctx
 
     @staticmethod
     def _summary(scope: str, progress: ScanProgress) -> dict:
@@ -914,8 +1068,10 @@ class ScanOrchestrator:
         device = sw.device
         ext = device.switch_ext if device else None
         meta = SwitchMeta(
-            id=sw.device_id, cred_id=sw.id, ip=sw.ip, device_type=sw.device_type or SwitchDeviceTypeCode.HUAWEI,
-            has_ssh=ext.has_ssh if ext else True,
+            id=sw.device_id, cred_id=sw.id,
+            ip=sw.ip or (device.management_ip if device is not None else None),
+            device_type=sw.device_type or SwitchDeviceTypeCode.HUAWEI,
+            has_ssh=sw.has_ssh if sw.has_ssh is not None else True,
             layer=ext.layer if ext and ext.layer else 2,
             is_core=(ext.switch_role == 0) if ext and ext.switch_role is not None else False,
             uplink_sw_id=ext.uplink_device_id if ext else None,
@@ -923,28 +1079,52 @@ class ScanOrchestrator:
             room_id=room_id,
         )
 
-        if not meta.has_ssh:
-            return {"device_id": device_id, "ip": sw.ip, "skipped": "无SSH权限"}
-
         sr = self.scan_redis
 
-        ctx = self._collect_single(meta)
+        if meta.has_ssh:
+            ctx = self._collect_single(meta)
+        else:
+            ctx = self._collect_single_via_snmp(meta)
+            if ctx is None:
+                return {"device_id": device_id, "ip": meta.ip, "skipped": "无SSH权限"}
 
         try:
             with transaction_checkpoint(self.sw_repo.session, f"scan_switch:phase0:{device_id}"):
                 from app.services.switch_info_service import SwitchInfoService
                 port_svc = SwitchInfoService()
-                port_svc.collect_port_info(sw.device_id)
-        except Exception as e:
+                port_svc.collect_port_info(sw.device_id, triggered_by_auto=True)
+        except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
             logger.error("[scan_switch] 交换机 %s 端口采集失败: %s", sw.ip, e)
 
-        try:
-            with transaction_checkpoint(self.sw_repo.session, f"scan_switch:phase0b:{device_id}"):
-                from app.services.switch_info_service import SwitchInfoService
-                port_svc = SwitchInfoService()
-                port_svc.collect_device_info(sw.device_id)
-        except Exception as e:
-            logger.error("[scan_switch] 交换机 %s 设备信息采集失败: %s", sw.ip, e)
+        if meta.has_ssh is False:
+            try:
+                with transaction_checkpoint(
+                    self.sw_repo.session, f"scan_switch:phase0b-snmp:{device_id}"
+                ):
+                    from app.services.switch_info_service import SwitchInfoService
+
+                    SwitchInfoService().collect_device_identity_via_channel(sw.device_id)
+            except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描，异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
+                logger.error("[scan_switch] 交换机 %s SNMP 设备信息采集失败: %s", sw.ip, e)
+            try:
+                with transaction_checkpoint(
+                    self.sw_repo.session, f"scan_switch:phase0d-snmp:{device_id}"
+                ):
+                    from app.services.switch_info_service import SwitchInfoService
+
+                    svc = SwitchInfoService()
+                    svc.sync_vlan_members_via_channel(sw.device_id)
+                    svc.sync_lag_members_via_channel(sw.device_id)
+            except Exception as e:  # noqa: BLE001 -- 同上：Phase 隔离
+                logger.error("[scan_switch] 交换机 %s SNMP VLAN 成员同步失败: %s", sw.ip, e)
+        elif meta.has_ssh:
+            try:
+                with transaction_checkpoint(self.sw_repo.session, f"scan_switch:phase0b:{device_id}"):
+                    from app.services.switch_info_service import SwitchInfoService
+                    port_svc = SwitchInfoService()
+                    port_svc.collect_device_info(sw.device_id)
+            except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
+                logger.error("[scan_switch] 交换机 %s 设备信息采集失败: %s", sw.ip, e)
 
         try:
             scope = f"r:{room_id}"  # 与下方 topology_graph / route_sync 使用的 scope 保持一致
@@ -953,7 +1133,7 @@ class ScanOrchestrator:
                 sr.port_ip_set(scope, row[0], row[1], row[2], row[3] or 24)
             if port_ip_rows:
                 logger.debug("[scan_switch] 端口IP索引已加载: %d 条", len(port_ip_rows))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
             logger.warning("[scan_switch] 端口IP索引加载失败: %s", e)
 
         from app.services.topology_graph import build_topology_graph
@@ -963,7 +1143,7 @@ class ScanOrchestrator:
             try:
                 with transaction_checkpoint(self.sw_repo.session, f"scan_switch:phase1:{device_id}"):
                     self.route_sync.sync(ctx, self.sw_repo.session, sr, topology_graph=topology_graph)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
                 logger.error("[scan_switch] 交换机 %s 路由同步失败: %s", sw.ip, e)
 
         detect_uplink_ports(ctx)
@@ -972,7 +1152,7 @@ class ScanOrchestrator:
         try:
             with transaction_checkpoint(self.sw_repo.session, f"scan_switch:phase3:{device_id}"):
                 self.arp_sync.sync_all([ctx], self.sw_repo.session, sr, topology_graph=topology_graph)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
             logger.error("[scan_switch] 交换机 %s ARP同步失败: %s", sw.ip, e)
 
         try:
@@ -988,17 +1168,17 @@ class ScanOrchestrator:
             with transaction_checkpoint(self.sw_repo.session, f"scan_switch:phase6:{device_id}"):
                 from app.services.ip_reconcile_service import IPReconcileService
                 IPReconcileService(IPManagerRepository(self.sw_repo.session)).reconcile(f"r:{room_id}", active_ips, self.sw_repo.session, arp_banned_ips=arp_banned_ips)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
             logger.error("[scan_switch Phase6] IP对账失败: %s", e)
 
         try:
             with transaction_checkpoint(self.sw_repo.session, f"scan_switch:phase7:{device_id}"):
                 from app.services.ip_status_service import supplement_detect_room_ips
                 supplement_detect_room_ips(room_id, self.sw_repo.session)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
             logger.error("[scan_switch Phase7] 补充探测失败: %s", e)
 
-        return {"device_id": device_id, "ip": sw.ip, "context": ctx}
+        return {"device_id": device_id, "ip": meta.ip, "context": ctx}
 
 
 

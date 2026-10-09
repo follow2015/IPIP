@@ -19,10 +19,11 @@
  *   → Redis Pub/Sub → ASGI 网关 → GET /realtime/sse/global SSE 流
  *   → data: {"event_type": "room_scan_complete", "payload": {"room_id": 3}, "ts": ...}
  */
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/services/query-keys';
-import { useSSEConnection } from './useSSEConnection';
+import { createCoalescedInvalidator } from '@/utils/coalescedInvalidate';
+import { useSSEConnection, type SSEStatus } from './useSSEConnection';
 
 
 export interface GlobalEvent {
@@ -42,18 +43,6 @@ interface ResourceChangePayload {
   op: string;
   ids: number[];
   extra?: Record<string, unknown>;
-}
-
-interface TaskFailedPayload {
-  task_id: string;
-  task_type: string;
-  error: string;
-}
-
-interface NotificationCreatedPayload {
-  notification_id: number;
-  type: string;
-  severity: string;
 }
 
 const RESOURCE_QUERY_MAP: Record<string, readonly unknown[]> = {
@@ -123,74 +112,88 @@ interface UseGlobalEventsOptions {
  *
  * @param options - 订阅选项
  */
-export function useGlobalEvents({ enabled = true }: UseGlobalEventsOptions = {}) {
+const GLOBAL_INVALIDATE_QUERY_KEYS = [
+  queryKeys.switches.all,
+  queryKeys.devices.all,
+  queryKeys.networks.all,
+  queryKeys.ip.all,
+  queryKeys.rooms.all,
+  queryKeys.cabinets.all,
+  queryKeys.topology.all,
+  queryKeys.notifications.all,
+  queryKeys.dashboard.stats,
+  queryKeys.monitor.alertsAll,
+  queryKeys.monitor.statusesAll,
+  queryKeys.monitor.overview,
+  ['virtual-rooms']
+];
+
+export function useGlobalEvents({ enabled = true }: UseGlobalEventsOptions = {}): {
+  status: SSEStatus;
+} {
   const queryClient = useQueryClient();
+  const invalidator = useMemo(() => createCoalescedInvalidator(queryClient), [queryClient]);
+  useEffect(() => () => invalidator.flush(), [invalidator]);
 
   const handleRoomScanComplete = useCallback(
     (payload: RoomScanCompletePayload) => {
       const { room_id, virtual_room_id } = payload;
 
-      queryClient.invalidateQueries({ queryKey: queryKeys.switches.all });
+      invalidator.invalidate(queryKeys.switches.all);
 
-      queryClient.invalidateQueries({ queryKey: queryKeys.networks.all });
+      invalidator.invalidate(queryKeys.networks.all);
 
-      queryClient.invalidateQueries({ queryKey: queryKeys.ip.all });
+      invalidator.invalidate(queryKeys.ip.all);
 
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats });
+      invalidator.invalidate(queryKeys.dashboard.stats);
 
-      queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
+      invalidator.invalidate(queryKeys.rooms.all);
+      invalidator.invalidate(queryKeys.cabinets.all);
 
-      queryClient.invalidateQueries({ queryKey: queryKeys.topology.all });
+      invalidator.invalidate(queryKeys.topology.all);
 
-      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+      invalidator.invalidate(queryKeys.notifications.all);
 
       if (room_id) {
-        queryClient.invalidateQueries({
-          queryKey: [...queryKeys.switches.all, 'scan-progress', room_id]
-        });
-        queryClient.invalidateQueries({
-          queryKey: [...queryKeys.networks.all, 'scan-status', room_id]
-        });
+        invalidator.invalidate([...queryKeys.switches.all, 'scan-progress', room_id]);
+        invalidator.invalidate([...queryKeys.networks.all, 'scan-status', room_id]);
       }
 
       if (virtual_room_id) {
-        queryClient.invalidateQueries({
-          queryKey: ['virtual-rooms']
-        });
+        invalidator.invalidate(['virtual-rooms']);
       }
     },
-    [queryClient]
+    [invalidator]
   );
 
   const handleResourceChange = useCallback(
     (payload: ResourceChangePayload) => {
       const queryKey = RESOURCE_QUERY_MAP[payload.resource];
       if (queryKey) {
-        queryClient.invalidateQueries({ queryKey });
+        invalidator.invalidate(queryKey);
       }
 
       if (payload.resource === 'device') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.stats });
-        queryClient.invalidateQueries({ queryKey: queryKeys.topology.all });
-        queryClient.invalidateQueries({ queryKey: queryKeys.switches.all });
+        invalidator.invalidate(queryKeys.dashboard.stats);
+        invalidator.invalidate(queryKeys.topology.all);
+        invalidator.invalidate(queryKeys.switches.all);
         if (payload.op === 'location_change' || payload.op === 'status_change') {
-          queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
+          invalidator.invalidate(queryKeys.cabinets.all);
         }
       }
 
       if (payload.resource === 'cabinet') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all });
+        invalidator.invalidate(queryKeys.rooms.all);
       }
 
       if (payload.resource === 'customer') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
-        queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-        queryClient.invalidateQueries({ queryKey: queryKeys.networks.all });
-        queryClient.invalidateQueries({ queryKey: queryKeys.ip.all });
+        invalidator.invalidate(queryKeys.cabinets.all);
+        invalidator.invalidate(queryKeys.devices.all);
+        invalidator.invalidate(queryKeys.networks.all);
+        invalidator.invalidate(queryKeys.ip.all);
       }
     },
-    [queryClient]
+    [invalidator]
   );
 
   const handleEvent = useCallback(
@@ -201,7 +204,7 @@ export function useGlobalEvents({ enabled = true }: UseGlobalEventsOptions = {})
           break;
 
         case 'bulk_config_change':
-          queryClient.invalidateQueries({ queryKey: queryKeys.switches.all });
+          invalidator.invalidate(queryKeys.switches.all);
           break;
 
         case 'resource_change':
@@ -209,28 +212,28 @@ export function useGlobalEvents({ enabled = true }: UseGlobalEventsOptions = {})
           break;
 
         case 'notification_created':
-          queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+          invalidator.invalidate(queryKeys.notifications.all);
           break;
 
         case 'task_failed':
           break;
 
         case 'ip_scan_complete':
-          queryClient.invalidateQueries({ queryKey: queryKeys.ip.all });
-          queryClient.invalidateQueries({ queryKey: queryKeys.networks.all });
+          invalidator.invalidate(queryKeys.ip.all);
+          invalidator.invalidate(queryKeys.networks.all);
           break;
 
         case 'scan_failed':
-          queryClient.invalidateQueries({ queryKey: queryKeys.ip.all });
+          invalidator.invalidate(queryKeys.ip.all);
           break;
 
         case 'monitor_alert':
         case 'monitor_recover':
         case 'monitor_ack':
-          queryClient.invalidateQueries({ queryKey: queryKeys.monitor.alertsAll });
-          queryClient.invalidateQueries({ queryKey: queryKeys.monitor.statusesAll });
-          queryClient.invalidateQueries({ queryKey: queryKeys.monitor.overview });
-          queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+          invalidator.invalidate(queryKeys.monitor.alertsAll);
+          invalidator.invalidate(queryKeys.monitor.statusesAll);
+          invalidator.invalidate(queryKeys.monitor.overview);
+          invalidator.invalidate(queryKeys.notifications.all);
           break;
 
         default:
@@ -245,14 +248,16 @@ export function useGlobalEvents({ enabled = true }: UseGlobalEventsOptions = {})
         }
       });
     },
-    [handleRoomScanComplete, handleResourceChange, queryClient]
+    [handleRoomScanComplete, handleResourceChange, invalidator]
   );
 
   const refreshAll = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.switches.all });
+    for (const queryKey of GLOBAL_INVALIDATE_QUERY_KEYS) {
+      queryClient.invalidateQueries({ queryKey });
+    }
   }, [queryClient]);
 
-  useSSEConnection({
+  const { status } = useSSEConnection({
     url: '/realtime/sse/global',
     enabled,
     onMessage: (data: string) => {
@@ -265,4 +270,6 @@ export function useGlobalEvents({ enabled = true }: UseGlobalEventsOptions = {})
     onFallbackPoll: refreshAll,
     label: 'SSE-Global'
   });
+
+  return { status };
 }

@@ -41,7 +41,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return result is not None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("检查设备存在性失败", original_error=e)
+            raise QueryExecutionError("检查设备存在性失败", original_error=e) from e
 
     def find_by_device(self, device_id: int) -> List[DeviceStorage]:
         """获取设备全部硬盘记录（不分组）"""
@@ -53,7 +53,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备存储失败", original_error=e)
+            raise QueryExecutionError("查找设备存储失败", original_error=e) from e
 
     def find_grouped_by_device(self, device_id: int) -> List[Dict[str, Any]]:
         """按型号分组统计设备硬盘，返回聚合结果
@@ -104,7 +104,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
             return result
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找分组存储失败", original_error=e)
+            raise QueryExecutionError("查找分组存储失败", original_error=e) from e
 
     def find_by_id(self, storage_id: int) -> Optional[DeviceStorage]:
         """根据 ID 查找硬盘记录"""
@@ -115,7 +115,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找存储记录失败", original_error=e)
+            raise QueryExecutionError("查找存储记录失败", original_error=e) from e
 
     def serial_number_exists(
         self,
@@ -142,7 +142,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 q = q.filter(DeviceStorage.device_id != exclude_device_id)
             return self.session.query(q.exists()).scalar()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("检查序列号失败", original_error=e)
+            raise QueryExecutionError("检查序列号失败", original_error=e) from e
 
     def batch_serial_numbers_exist(
         self,
@@ -168,7 +168,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 q = q.filter(DeviceStorage.device_id != exclude_device_id)
             return [row[0] for row in q.all()]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("批量检查序列号失败", original_error=e)
+            raise QueryExecutionError("批量检查序列号失败", original_error=e) from e
 
 
     def create(self, data: Dict[str, Any]) -> DeviceStorage:
@@ -191,7 +191,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return obj
         except SQLAlchemyError as e:
-            raise QueryExecutionError("创建存储记录失败", original_error=e)
+            raise QueryExecutionError("创建存储记录失败", original_error=e) from e
 
     def bulk_create(self, device_id: int, items: List[Dict[str, Any]]) -> int:
         """批量创建硬盘记录，返回创建数量（flush-only，由 Service 层统一 commit/rollback）"""
@@ -216,7 +216,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return len(objs)
         except SQLAlchemyError as e:
-            raise QueryExecutionError("批量创建存储记录失败", original_error=e)
+            raise QueryExecutionError("批量创建存储记录失败", original_error=e) from e
 
     def update(self, storage_id: int, data: Dict[str, Any]) -> bool:
         """更新硬盘记录（flush-only，由 Service 层统一 commit/rollback）"""
@@ -237,7 +237,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("更新存储记录失败", original_error=e)
+            raise QueryExecutionError("更新存储记录失败", original_error=e) from e
 
     def delete(self, storage_id: int) -> bool:
         """删除单条硬盘记录（flush-only，由 Service 层统一 commit/rollback）"""
@@ -249,7 +249,7 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除存储记录失败", original_error=e)
+            raise QueryExecutionError("删除存储记录失败", original_error=e) from e
 
     def delete_by_device(self, device_id: int) -> int:
         """删除设备全部硬盘记录，返回删除数量（flush-only，由 Service 层统一 commit/rollback）"""
@@ -262,4 +262,4 @@ class DeviceStorageRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return count
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除设备存储失败", original_error=e)
+            raise QueryExecutionError("删除设备存储失败", original_error=e) from e

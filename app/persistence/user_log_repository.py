@@ -5,7 +5,7 @@
 提供 users_log 表的数据访问方法。
 """
 from app.utils.logging import get_logger
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
 from app.utils.time_utils import now_utc_naive
 
@@ -14,7 +14,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.models.user_log import UserLog
 from app.core.pagination_limits import ensure_offset_within_limit
 from extensions import db
-from flask import g
 
 logger = get_logger(__name__)
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Form, Input, InputNumber, Select, Switch, Alert, Tag, Space } from 'antd';
+import { Modal, Form, Input, InputNumber, Select, Switch, Alert, Tag, Space, theme } from 'antd';
 import { useCreateCabinet, useUpdateCabinet, useBatchCreateCabinet } from '@/services/cabinet';
 import { useMessage } from '@/hooks/useMessage';
 import { useRoomCabinets, useRoomLayoutMarkers, useRoomOptions } from '@/services/room';
@@ -8,6 +8,7 @@ import { MARKER_TYPE_LABEL_KEYS } from '@/components/RoomLayout/palette';
 import { getCabinetStatusOptions } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
 import type { Cabinet } from '@/types/models';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface CabinetFormProps {
   open: boolean;
@@ -38,6 +39,7 @@ function parseCabinetNumbers(input: string): string[] {
 }
 
 function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
+  const { token } = theme.useToken();
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
   const { t: ta } = useTranslation('asset');
@@ -151,8 +153,13 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
         onClose();
       }
     } catch (err) {
-      if (err instanceof Error) {
-        message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) {
+          message.error(err.message);
+        }
       }
     }
   };
@@ -184,7 +191,7 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
                 checkedChildren={td('cabinet.batch.modeBatch')}
                 unCheckedChildren={td('cabinet.batch.modeSingle')}
               />
-              <span style={{ color: '#8c8c8c', fontSize: 13 }}>
+              <span style={{ color: token.colorTextTertiary, fontSize: 13 }}>
                 {batchMode ? td('cabinet.batch.hintRange') : td('cabinet.batch.hintSingle')}
               </span>
             </Space>
@@ -324,7 +331,10 @@ function CabinetForm({ open, editRecord, onClose }: CabinetFormProps) {
         )}
 
         <Form.Item name="status" label={tc('field.status')} initialValue={1}>
-          <Select options={getCabinetStatusOptions(td)} placeholder={td('cabinet.form.statusPlaceholder')} />
+          <Select
+            options={getCabinetStatusOptions(td)}
+            placeholder={td('cabinet.form.statusPlaceholder')}
+          />
         </Form.Item>
 
         <Form.Item name="customer_id" label={td('cabinet.field.leaseCustomer')}>

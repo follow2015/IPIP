@@ -10,8 +10,7 @@ import {
   Space,
   Table,
   Tag,
-  Typography,
-  message
+  Typography
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined } from '@ant-design/icons';
@@ -23,6 +22,10 @@ import {
   useRoomCabinets,
   useRoomLayoutMarkers
 } from '@/services/room';
+import { getApiErrorCode, getApiErrorMessage } from '@/utils/apiError';
+import { firstFieldError } from '@/utils/formError';
+import { useMessage } from '@/hooks/useMessage';
+import { useConfirm } from '@/utils/confirm';
 import { MARKER_TYPE_LABEL_KEYS, positionLabel } from './palette';
 import type { RoomLayoutMarker } from '@/types/models';
 import type { RoomLayoutMarkerCreate } from '@/types/api-bridge';
@@ -44,6 +47,8 @@ export interface MarkerConfigModalProps {
 export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfigModalProps) {
   const { t: ta } = useTranslation('asset');
   const { t: tc } = useTranslation('common');
+  const message = useMessage();
+  const confirm = useConfirm();
 
   const { data: markers = [], isLoading } = useRoomLayoutMarkers(roomId);
   const { data: cabinets = [] } = useRoomCabinets(roomId);
@@ -103,33 +108,40 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
         }
         setFormOpen(false);
       } catch (err) {
-        if (err instanceof Error && err.name === 'Http409') {
+        const code = getApiErrorCode(err);
+        if (code === 'ROOM_MARKER_VERSION_CONFLICT') {
           message.warning(ta('roomLayout.marker.message.versionConflict'));
-        } else {
-          message.error(
-            err instanceof Error ? err.message : ta('roomLayout.marker.message.saveFailed')
+        } else if (code === 'ROOM_MARKER_CONFLICT') {
+          message.warning(
+            getApiErrorMessage(err) ?? ta('roomLayout.marker.message.positionConflict')
           );
+          form.scrollToField('row_number');
+        } else if (err instanceof Error && err.message) {
+          message.error(err.message);
+        } else {
+          message.error(ta('roomLayout.marker.message.saveFailed'));
         }
       } finally {
         setSubmitting(false);
       }
     },
-    [batchMutation, createMutation, editing, ta]
+    [batchMutation, createMutation, editing, ta, form, message]
   );
 
   const handleSubmit = useCallback(async () => {
     let values: MarkerFormValues;
     try {
       values = await form.validateFields();
-    } catch {
-      return; // 校验未通过：antd 已在表单上标红
+    } catch (err: unknown) {
+      message.error(firstFieldError(err) ?? tc('message.formValidationFailed'));
+      return;
     }
 
     const occupied = cabinets.find(
       (c) => c.row === values.row_number && c.col === values.col_number
     );
     if (occupied) {
-      Modal.confirm({
+      confirm({
         title: ta('roomLayout.marker.occupiedTitle'),
         content: ta('roomLayout.marker.occupiedContent', {
           position: positionLabel(values.row_number, values.col_number, ta),
@@ -143,7 +155,7 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
     }
 
     await doSubmit(values);
-  }, [cabinets, doSubmit, form, ta, tc]);
+  }, [cabinets, confirm, doSubmit, form, ta, tc, message]);
 
   const openCreate = useCallback(() => {
     const maxRow = cabinets.reduce((acc, c) => Math.max(acc, c.row ?? 0), 0);
@@ -181,7 +193,7 @@ export default function MarkerConfigModal({ roomId, open, onClose }: MarkerConfi
         );
       }
     },
-    [deleteMutation, ta]
+    [deleteMutation, ta, message]
   );
 
   const columns: ColumnsType<RoomLayoutMarker> = useMemo(

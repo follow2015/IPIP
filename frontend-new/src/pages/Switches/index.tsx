@@ -2,7 +2,7 @@ import { useConfirm } from '@/utils/confirm';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
-import { Button, Space, Tag, Popover, Segmented, Collapse, Card, Input, Typography } from 'antd';
+import { Button, Space, Tag, Popover, Segmented, Collapse, Card, Typography } from 'antd';
 import {
   PlusOutlined,
   CopyOutlined,
@@ -13,7 +13,6 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import DataTable from '@/components/DataTable';
-import { BatchActionBar } from '@/components/BatchActionBar';
 import FilterBar from '@/components/FilterBar';
 import SearchInput from '@/components/SearchInput';
 import SwitchForm from './SwitchForm';
@@ -68,7 +67,7 @@ function Switches() {
       typeof table.filters.device_type === 'string' ? table.filters.device_type : undefined
   });
 
-  const [scanningRoomId, setScanningRoomId] = useState<number | null>(null);
+  const [, setScanningRoomId] = useState<number | null>(null);
 
   const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -206,7 +205,7 @@ function Switches() {
     a.download = `switches_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [data, td]);
+  }, [data, td, message, tc]);
 
   const columns = [
     {
@@ -225,9 +224,7 @@ function Switches() {
       dataIndex: 'switch_role',
       key: 'switch_role',
       render: (v: number) => (
-        <Tag color={getSwitchRoleMeta(v, td)?.color}>
-          {getSwitchRoleMeta(v, td)?.label ?? '-'}
-        </Tag>
+        <Tag color={getSwitchRoleMeta(v, td)?.color}>{getSwitchRoleMeta(v, td)?.label ?? '-'}</Tag>
       )
     },
     {
@@ -369,7 +366,7 @@ function Switches() {
     </Space>
   );
 
-  const switchList = data?.items ?? [];
+  const switchList = useMemo(() => data?.items ?? [], [data]);
 
   const batch = useBatchSelection<Switch>({
     dataSource: switchList,
@@ -480,7 +477,9 @@ function Switches() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 8
+              flexWrap: 'wrap',
+              gap: 8,
+              minWidth: 0
             }}
           >
             <Space wrap>
@@ -495,7 +494,9 @@ function Switches() {
                 title={tc('action.refresh')}
               />
             </Space>
-            <Space>{filterAndActions}</Space>
+            <Space wrap style={{ minWidth: 0 }}>
+              {filterAndActions}
+            </Space>
           </div>
           <Collapse
             defaultActiveKey={['managed']}

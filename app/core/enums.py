@@ -219,6 +219,13 @@ class NotificationTypeCode(str, Enum):
     PORT_STATUS_CHANGED = "port_status_changed"    # 交换机指定端口 up/down
     MONITOR_INTERRUPTED = "monitor_interrupted"    # 设备监控中断（心跳超时）
     RAID_FAILURE_ALERT = "raid_failure_alert"      # 服务器 RAID 故障
+    TRAP_LINK_DOWN = "trap_link_down"
+    TRAP_LINK_UP = "trap_link_up"
+    TRAP_AUTH_FAILURE = "trap_auth_failure"
+    TRAP_COLD_START = "trap_cold_start"
+    TRAP_WARM_START = "trap_warm_start"
+    TRAP_EGP_NEIGHBOR_LOSS = "trap_egp_neighbor_loss"
+    TRAP_OTHER = "trap_other"
     BATCH_CREATE_DEVICES = "batch_create_devices"
     BATCH_BAN_IP = "batch_ban_ip"
     BATCH_UNBAN_IP = "batch_unban_ip"
@@ -373,6 +380,13 @@ STATUS_DISPLAY = {
         NotificationTypeCode.SERVICE_UNHEALTHY: ("服务异常", "red"),
         NotificationTypeCode.SERVICE_RECOVERED: ("服务恢复", "green"),
         NotificationTypeCode.ASSET_WARRANTY_ALERT: ("资产到期提醒", "orange"),
+        NotificationTypeCode.TRAP_LINK_DOWN: ("端口链路中断", "red"),
+        NotificationTypeCode.TRAP_LINK_UP: ("端口链路恢复", "green"),
+        NotificationTypeCode.TRAP_AUTH_FAILURE: ("SNMP认证失败", "volcano"),
+        NotificationTypeCode.TRAP_COLD_START: ("设备冷启动", "blue"),
+        NotificationTypeCode.TRAP_WARM_START: ("设备热启动", "blue"),
+        NotificationTypeCode.TRAP_EGP_NEIGHBOR_LOSS: ("EGP邻居丢失", "orange"),
+        NotificationTypeCode.TRAP_OTHER: ("SNMP Trap（其他）", "blue"),
     },
     ProbeErrorCode: {
         ProbeErrorCode.TIMEOUT: ("超时", "orange"),
@@ -439,6 +453,10 @@ NOTIFICATION_TYPE_GROUPS = [
                 NotificationTypeCode.TEMPERATURE_ALERT, NotificationTypeCode.DISK_FAILURE_ALERT,
                 NotificationTypeCode.PORT_STATUS_CHANGED, NotificationTypeCode.MONITOR_INTERRUPTED,
                 NotificationTypeCode.RAID_FAILURE_ALERT]),
+    ("SNMP Trap", [NotificationTypeCode.TRAP_LINK_DOWN, NotificationTypeCode.TRAP_LINK_UP,
+                   NotificationTypeCode.TRAP_AUTH_FAILURE, NotificationTypeCode.TRAP_COLD_START,
+                   NotificationTypeCode.TRAP_WARM_START,
+                   NotificationTypeCode.TRAP_EGP_NEIGHBOR_LOSS, NotificationTypeCode.TRAP_OTHER]),
     ("操作结果", [NotificationTypeCode.BATCH_CREATE_DEVICES, NotificationTypeCode.BATCH_BAN_IP, NotificationTypeCode.BATCH_UNBAN_IP]),
     ("扫描完成", [NotificationTypeCode.IP_SCAN_COMPLETE, NotificationTypeCode.IP_SCAN_FAILED,
                 NotificationTypeCode.ROOM_SCAN_COMPLETE, NotificationTypeCode.ROOM_SCAN_FAILED,
@@ -472,6 +490,13 @@ NOTIFICATION_TYPE_LABELS = {
     NotificationTypeCode.RAID_FAILURE_ALERT: "RAID故障",
     NotificationTypeCode.SERVICE_UNHEALTHY: "服务异常",
     NotificationTypeCode.SERVICE_RECOVERED: "服务恢复",
+    NotificationTypeCode.TRAP_LINK_DOWN: "端口链路中断",
+    NotificationTypeCode.TRAP_LINK_UP: "端口链路恢复",
+    NotificationTypeCode.TRAP_AUTH_FAILURE: "SNMP认证失败",
+    NotificationTypeCode.TRAP_COLD_START: "设备冷启动",
+    NotificationTypeCode.TRAP_WARM_START: "设备热启动",
+    NotificationTypeCode.TRAP_EGP_NEIGHBOR_LOSS: "EGP邻居丢失",
+    NotificationTypeCode.TRAP_OTHER: "SNMP Trap（其他）",
 }
 
 
@@ -481,8 +506,11 @@ class DeviceSubtypeCode(str, Enum):
 
     按 DeviceTypeCode 分组：
     - server: standalone / chassis / node / storage / gpu
-    - network: switch / router / firewall
+    - network: switch / router / firewall / otn / wdm / odf（传输设备，2026-10-08 增）
     - other: pdu / ups / other
+
+    **必须与前端手写 `enums.ts` 的 `DeviceSubtype` 逐项一致**——
+    tests/test_enum_registry_sync.py::test_device_subtype_handwritten_matches_backend 守恒。
     """
     STANDALONE = "standalone"
     CHASSIS = "chassis"
@@ -492,6 +520,9 @@ class DeviceSubtypeCode(str, Enum):
     SWITCH = "switch"
     ROUTER = "router"
     FIREWALL = "firewall"
+    OTN = "otn"
+    WDM = "wdm"
+    ODF = "odf"
     PDU = "pdu"
     UPS = "ups"
     OTHER = "other"
@@ -510,6 +541,43 @@ class MonitorProtocolCode(str, Enum):
     IPMI = "ipmi"
     ZABBIX = "zabbix"  # Zabbix 集中式拉取（作为直连探测的 fallback 源，见 protocol_registry）
     PING = "ping"  # 连通性触发源（复用 ip_status_service 的 ping + TCP 端口探测）
+
+
+
+class CollectCapability(str, Enum):
+    """设备信息采集能力（采集意图，与具体通道无关）
+
+    VLANS 曾在 F7/F9 被移除（当时两个现役通道都实现不了，保留即"假 advertised"）。
+    2026-10-08 加回：**SNMP 通道已有真实实现**（Q-BRIDGE-MIB 端口位图，设备 178 实测
+    开放），且 CLI 通道**不实现**它 —— 按"声明即兑现"的纪律，只有真正产出数据的一侧
+    才登记；无 SSH 设备靠它补上 Phase 0d 的 VLAN 成员同步。
+
+    注意：新增成员必须同时给 app/services/collector/facts.py 的 `_CAP_FIELD`
+    加一等字段，并给相应通道加 `@implements` 实现 —— 缺任何一步都视为未完成。
+    """
+    PORTS       = "ports"        # 端口列表 + 链路状态 + 速率
+    ARP         = "arp"          # ARP 表
+    MAC         = "mac"          # MAC 转发表
+    ROUTES      = "routes"       # 路由表（仅 L3）
+    LLDP        = "lldp"         # LLDP/CDP 邻居
+    DEVICE_INFO = "device_info"  # 版本/型号/序列号/uptime/主机名
+    OPTICS      = "optics"       # 光模块功率（DDM）
+    COUNTERS    = "counters"     # 接口流量/错包计数
+    VLANS       = "vlans"        # VLAN 及其成员端口
+    LAGS        = "lags"         # 链路聚合组：成员端口 + LACP 状态（SNMP 专有）
+
+
+class QualityLevel(str, Enum):
+    """能力质量档位（通道对该能力的支持程度）
+
+    三态是能力矩阵的取值域：``FULL`` 完整 / ``PARTIAL`` 部分（可能缺字段）/
+    ``NONE`` 不支持。``NONE`` 在编程环境中习惯作哨兵值使用，这里它是**真实状态**
+    —— 按设备角色把某能力标 ``NONE``（如防火墙的 MAC）是让选择器跳过该能力的
+    唯一途径，运行时产出 ``UNSUPPORTED`` 而非 ``FAILED``。
+    """
+    FULL    = "full"      # 完整
+    PARTIAL = "partial"   # 部分，可能缺字段
+    NONE    = "none"      # 不支持
 
 
 DEVICE_IMPORT_CN_TO_EN = {
@@ -559,3 +627,65 @@ CUSTOMER_IMPORT_CN_TO_EN = {
 }
 
 EN_TO_CN_CUSTOMER_IMPORT = {v: k for k, v in CUSTOMER_IMPORT_CN_TO_EN.items()}
+
+
+
+class CircuitStatus(str, Enum):
+    """线路状态枚举（字符串值，对应 circuits.status）
+
+    成员顺序即状态机的"正常推进方向"，见设计文档 §4。
+    """
+    PENDING = "pending"          # 待开通（已签约，未开通）
+    ACTIVE = "active"            # 在用
+    FAULT = "fault"              # 故障
+    SUSPENDED = "suspended"      # 已暂停（欠费/停机保号）
+    TERMINATED = "terminated"    # 已终止（退租）
+
+
+class BillingMode(str, Enum):
+    """线路计费模式枚举（字符串值，对应 circuits.billing_mode）
+
+    分两大类：端口买断（flat）与保底+超量（commit_*）；per_gb 为按流量。
+    规则 R1–R4 见设计文档 §5.2。
+    """
+    FLAT = "flat"                    # 端口买断（保底 == 带宽）
+    COMMIT_95 = "commit_95"          # 保底 + 95 计费超量
+    COMMIT_PEAK = "commit_peak"      # 保底 + 峰值超量
+    COMMIT_AVG = "commit_avg"        # 保底 + 均值超量
+    PER_GB = "per_gb"                # 按流量计费（元/GB）
+
+
+class CarrierType(str, Enum):
+    """运营商类型枚举（字符串值，对应 carriers.carrier_type）"""
+    BASIC = "basic"      # 基础运营商（电信/联通/移动）
+    ISP = "isp"          # 二级运营商
+    IDC = "idc"          # 机房方
+    AGENT = "agent"      # 代理商
+
+
+class CarrierStatus(str, Enum):
+    """运营商状态枚举（字符串值，对应 carriers.status）"""
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
+COMMIT_BILLING_MODES = (
+    BillingMode.COMMIT_95,
+    BillingMode.COMMIT_PEAK,
+    BillingMode.COMMIT_AVG,
+)
+
+CIRCUIT_STATUS_TRANSITIONS = {
+    CircuitStatus.PENDING: {CircuitStatus.ACTIVE, CircuitStatus.TERMINATED},
+    CircuitStatus.ACTIVE: {
+        CircuitStatus.FAULT,
+        CircuitStatus.SUSPENDED,
+        CircuitStatus.TERMINATED,
+    },
+    CircuitStatus.FAULT: {CircuitStatus.ACTIVE, CircuitStatus.TERMINATED},
+    CircuitStatus.SUSPENDED: {CircuitStatus.ACTIVE, CircuitStatus.TERMINATED},
+    CircuitStatus.TERMINATED: set(),
+}
+
+BANDWIDTH_STEP_SI = 1000
+BANDWIDTH_STEP_IEC = 1024

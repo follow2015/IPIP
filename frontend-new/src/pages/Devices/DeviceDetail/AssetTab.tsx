@@ -3,7 +3,7 @@ import { useConfirm } from '@/utils/confirm';
 import { useState, useCallback } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import dayjs, { Dayjs } from 'dayjs';
-import { Descriptions, Tag, Button, Space, Form, Modal } from 'antd';
+import { Descriptions, Tag, Button, Form, Modal } from 'antd';
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -22,6 +22,7 @@ import { useMessage } from '@/hooks/useMessage';
 import AssetInfoFields, { generateAssetNumber } from '@/components/AssetInfoFields';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface AssetTabProps {
   device: Device;
@@ -34,7 +35,11 @@ function getWarrantyStatus(device: Device, t: TFunction<'device'>) {
   const now = new Date();
   const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   if (daysLeft < 0)
-    return { label: t('asset.warranty.expired'), color: 'red', icon: <ExclamationCircleOutlined /> };
+    return {
+      label: t('asset.warranty.expired'),
+      color: 'red',
+      icon: <ExclamationCircleOutlined />
+    };
   if (daysLeft <= 90)
     return {
       label: t('asset.warranty.expiring', { count: daysLeft }),
@@ -77,6 +82,7 @@ function AssetTab({ device }: AssetTabProps) {
   const resetAsset = useBatchResetDeviceAsset();
   const message = useMessage();
   const edit = useDisclosure();
+  const { open: openEdit } = edit;
   const [editForm] = Form.useForm();
   const [autoGenerate, setAutoGenerate] = useState(false);
 
@@ -97,8 +103,8 @@ function AssetTab({ device }: AssetTabProps) {
       lifecycle_years: device.lifecycle_years ?? undefined
     });
     setAutoGenerate(false);
-    edit.open();
-  }, [device, editForm]);
+    openEdit();
+  }, [device, editForm, openEdit]);
 
   const handleEditSubmit = async () => {
     try {
@@ -138,7 +144,12 @@ function AssetTab({ device }: AssetTabProps) {
       message.success(t('asset.message.updated'));
       edit.close();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -158,7 +169,7 @@ function AssetTab({ device }: AssetTabProps) {
         }
       }
     });
-  }, [t, tCommon, confirm, device.id, device.device_name, resetAsset]);
+  }, [t, tCommon, confirm, device.id, device.device_name, resetAsset, message]);
 
   return (
     <>
@@ -184,7 +195,9 @@ function AssetTab({ device }: AssetTabProps) {
         </Descriptions.Item>
 
         {/* 采购信息 */}
-        <Descriptions.Item label={t('asset.field.supplier')}>{device.supplier ?? '-'}</Descriptions.Item>
+        <Descriptions.Item label={t('asset.field.supplier')}>
+          {device.supplier ?? '-'}
+        </Descriptions.Item>
         <Descriptions.Item label={t('asset.field.supplierContact')}>
           {device.supplier_contact ?? '-'}
         </Descriptions.Item>

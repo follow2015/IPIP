@@ -38,7 +38,7 @@ class MonitorAlertDependencyRuleRepository:
             self.session.query(MonitorAlertDependencyRule)
             .filter(
                 MonitorAlertDependencyRule.downstream_device_id == downstream_device_id,
-                MonitorAlertDependencyRule.enabled == True,
+                MonitorAlertDependencyRule.enabled.is_(True),
             )
             .all()
         )

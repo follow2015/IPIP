@@ -23,6 +23,7 @@ import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
 import type { Device } from '@/types/models';
 import { DeviceType } from '@/types/enums';
 import { useTranslation } from 'react-i18next';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface UseDeviceSubmitParams {
   form: ReturnType<typeof Form.useForm>[0];
@@ -336,7 +337,11 @@ export function useDeviceSubmit({
       }
       onClose();
     } catch (err) {
-      if (err instanceof Error) {
+      if (isValidationError(err)) {
+        message.error(firstFieldError(err) ?? tCommon('message.formValidationFailed'));
+        return;
+      }
+      if (err instanceof Error && err.message) {
         message.error(err.message);
       }
     }

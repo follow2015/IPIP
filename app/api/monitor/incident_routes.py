@@ -11,7 +11,7 @@ from app.api.monitor import monitor_bp
 from app.exceptions.business import BusinessLogicError
 from app.openapi.doc import doc
 from app.persistence.monitor_incident_repository import IncidentRepository
-from app.utils import login_required, permission_required
+from app.services.auth import login_required, permission_required
 
 _INCIDENT_STATUS_WHITELIST = {"active", "acknowledged", "closed"}
 
@@ -36,8 +36,8 @@ def list_incidents():
     try:
         page = max(int(request.args.get("page", 1)), 1)
         per_page = min(max(int(request.args.get("per_page", 20)), 1), 100)
-    except ValueError:
-        raise BusinessLogicError("page/per_page 必须为正整数", status_code=400)
+    except ValueError as e:
+        raise BusinessLogicError("page/per_page 必须为正整数", status_code=400) from e
 
     status = (request.args.get("status") or "").strip() or None
     if status is not None and status not in _INCIDENT_STATUS_WHITELIST:
@@ -82,5 +82,5 @@ def get_incident(incident_id: int):
 
     data = inc.to_dict()
     data["related_alerts"] = [a.to_dict(exclude=["payload"]) for a in related_alerts]
-    data["suppressed_logs"] = [l.to_dict() for l in suppressed_logs]
+    data["suppressed_logs"] = [log.to_dict() for log in suppressed_logs]
     return APIResponse.success(data=data)

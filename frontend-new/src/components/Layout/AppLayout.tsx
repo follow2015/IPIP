@@ -4,7 +4,7 @@
  * - AppLayout 作为 UI 状态的唯一订阅者，通过 Props 传递给子组件
  * - 子组件成为纯展示组件，易于测试和 Storybook 文档化
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import { Layout, theme, Drawer } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
@@ -37,15 +37,16 @@ function AppLayout() {
   const logout = useAuthStore((s) => s.logout);
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  useGlobalEvents({ enabled: isAuthenticated });
+  const { status: sseStatus } = useGlobalEvents({ enabled: isAuthenticated });
 
   const { isMobile } = useResponsive();
 
   const drawer = useDisclosure();
+  const { close: closeDrawer } = drawer;
 
   useEffect(() => {
-    if (!isMobile) drawer.close();
-  }, [isMobile]);
+    if (!isMobile) closeDrawer();
+  }, [isMobile, closeDrawer]);
 
   useEffect(() => {
     const menu = findMenuByPath(location.pathname);
@@ -99,7 +100,8 @@ function AppLayout() {
       <Layout
         style={{
           marginLeft: isMobile ? 0 : sidebarCollapsed ? 80 : 220,
-          transition: 'margin-left 0.2s'
+          transition: 'margin-left 0.2s',
+          minWidth: 0
         }}
       >
         <Header
@@ -110,6 +112,7 @@ function AppLayout() {
           user={user}
           onLogout={handleLogout}
           isMobile={isMobile}
+          sseStatus={sseStatus}
         />
         {/* 移动端隐藏多标签栏：值守场景标签栏价值低且必然横向溢出 */}
         {!isMobile && (
@@ -126,7 +129,10 @@ function AppLayout() {
             padding: isMobile ? 12 : 24,
             background: token.colorBgContainer,
             borderRadius: 8,
-            minHeight: 280
+            minHeight: 280,
+            maxWidth: '100%',
+            minWidth: 0,
+            overflow: 'hidden'
           }}
         >
           <Outlet />

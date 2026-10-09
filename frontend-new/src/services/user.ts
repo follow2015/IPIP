@@ -34,12 +34,13 @@ export interface UserQueryParams extends PaginationParams {
 const userHooks = createCrudHooks<User, CreateUserRequest, UpdateUserRequest, UserQueryParams>({
   basePath: '/users',
   queryKey: queryKeys.users.all,
+  invalidateResource: 'user',
   createPath: '/users/register',
   getId: (data) => data.id,
-  toUpdatePayload: (data) => data.data,
+  toUpdatePayload: (data) => data.data
 });
 
-export const useUserList   = userHooks.useList;
+export const useUserList = userHooks.useList;
 export const useUserDetail = userHooks.useDetail;
 export const useCreateUser = userHooks.useCreate;
 export const useUpdateUser = userHooks.useUpdate;
@@ -51,24 +52,27 @@ export function useDeleteUser() {
     mutationFn: (id: number) => post<null>('/users/batch-delete', { ids: [id] }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
-    },
+    }
   });
 }
 
 
-export function useUserOptions() {
+export function useUserOptions(options?: { includeInactive?: boolean }) {
+  const includeInactive = options?.includeInactive ?? false;
   return useQuery({
-    queryKey: [...queryKeys.users.all, 'options'],
+    queryKey: [...queryKeys.users.all, 'options', { includeInactive }],
     queryFn: async () => {
-      const res = await get<PaginatedData<User>>('/users', { per_page: 999, page: 1 });
-      const users = res.data?.items ?? [];
-      return users
-        .filter((u) => u.is_active)
+      const res = await get<User[]>(
+        '/users',
+        includeInactive ? { all: 'true' } : { all: 'true', active_only: 'true' }
+      );
+      return (res.data ?? [])
+        .filter((u) => includeInactive || u.is_active)
         .map((u) => ({
           label: `${u.name || u.username}${u.department ? ` (${u.department})` : ''}`,
-          value: u.id,
+          value: u.id
         }));
-    },
+    }
   });
 }
 
@@ -84,7 +88,7 @@ export function useCurrentUser() {
     queryFn: async () => {
       const res = await get<User>('/users/me');
       return res.data;
-    },
+    }
   });
 }
 
@@ -105,7 +109,7 @@ export function useLoginLogs(params?: PaginationParams) {
     queryFn: async () => {
       const res = await get<PaginatedData<LoginLog>>('/users/me/login-logs', params);
       return res.data;
-    },
+    }
   });
 }
 
@@ -121,7 +125,7 @@ export function useAllLoginLogs(params?: LoginLogQueryParams) {
     queryFn: async () => {
       const res = await get<PaginatedData<LoginLog>>('/users/login-logs', params);
       return res.data;
-    },
+    }
   });
 }
 
@@ -132,7 +136,7 @@ export function useUserLoginLogs(userId: number, params?: PaginationParams) {
       const res = await get<PaginatedData<LoginLog>>(`/users/${userId}/login-logs`, params);
       return res.data;
     },
-    enabled: userId > 0,
+    enabled: userId > 0
   });
 }
 
@@ -143,7 +147,7 @@ export function useUserPermissions(userId: number) {
       const res = await get<Permission[]>(`/users/${userId}/permissions`);
       return res.data;
     },
-    enabled: userId > 0,
+    enabled: userId > 0
   });
 }
 
@@ -154,14 +158,14 @@ export function useToggleUserStatus() {
       put<User>(`/users/${id}`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
-    },
+    }
   });
 }
 
 export function useChangePassword() {
   return useMutation({
     mutationFn: ({ old_password, new_password }: { old_password: string; new_password: string }) =>
-      post<null>('/users/change-password', { old_password, new_password }),
+      post<null>('/users/change-password', { old_password, new_password })
   });
 }
 
@@ -179,16 +183,17 @@ export function useUpdateMyProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users.me });
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
-    },
+    }
   });
 }
 
 export function useResetPassword() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => post<{ reset: boolean; new_password: string }>(`/users/${id}/reset-password`),
+    mutationFn: (id: number) =>
+      post<{ reset: boolean; new_password: string }>(`/users/${id}/reset-password`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
-    },
+    }
   });
 }

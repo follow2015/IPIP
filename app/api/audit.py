@@ -7,12 +7,12 @@
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
-from marshmallow import Schema
 
 from app.api.base import APIResponse
 from app.services.audit_service import AuditService
-from app.openapi.doc import doc, public
-from app.utils import login_required, permission_required, rate_limit_api
+from app.openapi.doc import doc
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api
 
 logger = get_logger(__name__)
 
@@ -23,7 +23,7 @@ _audit_service = AuditService()
 
 
 
-from app.schemas.audit import AuditLogQuerySchema
+from app.schemas.audit import AuditLogQuerySchema  # noqa: E402 -- 本仓约定：Schema import 就近放在使用它的路由区（见上方注释说明）
 
 @audit_bp.route("/logs", methods=["GET"])
 @doc(summary="查询审计日志", tags=["审计"], responses={200: "AuditLogResponse", 401: "ApiError"})

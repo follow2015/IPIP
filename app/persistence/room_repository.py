@@ -42,7 +42,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return self._base_query().filter(Room.name == room_name).first()
         except SQLAlchemyError as e:
             logger.error(f"根据机房名称查找机房失败 (room_name={room_name}): {e}")
-            raise QueryExecutionError("查找机房失败", original_error=e)
+            raise QueryExecutionError("查找机房失败", original_error=e) from e
 
     def find_by_name_like(self, pattern: str) -> List[Room]:
         """按名称 ilike 匹配机房（B-44 收敛：AI 机房名解析的模糊匹配）
@@ -57,7 +57,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return self._base_query().filter(Room.name.ilike(pattern)).all()
         except SQLAlchemyError as e:
             logger.error(f"模糊匹配机房失败 (pattern={pattern}): {e}")
-            raise QueryExecutionError("查找机房失败", original_error=e)
+            raise QueryExecutionError("查找机房失败", original_error=e) from e
 
     def exists_alive(self, room_id: int) -> bool:
         """机房是否存在（B-44 收敛：扫描调度的配置校验）。
@@ -114,7 +114,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         from sqlalchemy import text
 
         result = self.session.execute(
-            text(f"DELETE FROM `{table}` WHERE `{col}` IN ({scope_sql})"),
+            text(f"DELETE FROM `{table}` WHERE `{col}` IN ({scope_sql})"),  # noqa: S608 -- 受控逃生舱：标识符正则白名单兜底 + scope 参数化（见 docstring 三重约束）
             params,
         )
         return result.rowcount or 0
@@ -153,7 +153,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return self.session.query(query.exists()).scalar()
         except SQLAlchemyError as e:
             logger.error(f"检查机房名称存在性失败 (room_name={room_name}): {e}")
-            raise QueryExecutionError("检查机房名称存在性失败", original_error=e)
+            raise QueryExecutionError("检查机房名称存在性失败", original_error=e) from e
 
     def check_room_number_exists(
         self, name: str, room_number: str, exclude_id: Optional[int] = None
@@ -180,7 +180,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return self.session.query(query.exists()).scalar()
         except SQLAlchemyError as e:
             logger.error(f"检查房间号存在性失败 (name={name}, room_number={room_number}): {e}")
-            raise QueryExecutionError("检查房间号存在性失败", original_error=e)
+            raise QueryExecutionError("检查房间号存在性失败", original_error=e) from e
 
     def find_name_options(self) -> List[Dict[str, Any]]:
         """机房名称联想选项：[{name, room_count}]（按名称分组计数，升序）
@@ -198,7 +198,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return [{"name": name, "room_count": count} for name, count in rows]
         except SQLAlchemyError as e:
             logger.error(f"查询机房名称联想选项失败: {e}")
-            raise QueryExecutionError("查询机房名称联想选项失败", original_error=e)
+            raise QueryExecutionError("查询机房名称联想选项失败", original_error=e) from e
 
 
     def check_room_dependencies(self, room_id: int) -> Dict[str, int]:
@@ -236,7 +236,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return {"switch_count": switch_count, "cabinet_count": cabinet_count}
         except SQLAlchemyError as e:
             logger.error(f"检查机房依赖关系失败 (room_id={room_id}): {e}")
-            raise QueryExecutionError("检查机房依赖关系失败", original_error=e)
+            raise QueryExecutionError("检查机房依赖关系失败", original_error=e) from e
 
     def find_distinct_buildings(self) -> List[str]:
         """已使用的 building 去重值（升序，排除空值）。
@@ -255,7 +255,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return [row[0] for row in rows]
         except SQLAlchemyError as e:
             logger.error(f"查询楼栋去重值失败: {e}")
-            raise QueryExecutionError("查询楼栋失败", original_error=e)
+            raise QueryExecutionError("查询楼栋失败", original_error=e) from e
 
     def find_distinct_floors(self, building: Optional[str] = None) -> List[str]:
         """已使用的 floor 去重值（升序，排除空值）。
@@ -279,7 +279,7 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return [row[0] for row in rows]
         except SQLAlchemyError as e:
             logger.error(f"查询楼层去重值失败: {e}")
-            raise QueryExecutionError("查询楼层失败", original_error=e)
+            raise QueryExecutionError("查询楼层失败", original_error=e) from e
 
     def get_room_statistics(self, room_id: int) -> Dict[str, int]:
         """获取单个机房统计信息（机柜数 + 交换机数）
@@ -375,4 +375,4 @@ class RoomRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             }
         except SQLAlchemyError as e:
             logger.error(f"获取机房汇总统计信息失败: {e}")
-            raise QueryExecutionError("获取机房汇总统计信息失败", original_error=e)
+            raise QueryExecutionError("获取机房汇总统计信息失败", original_error=e) from e

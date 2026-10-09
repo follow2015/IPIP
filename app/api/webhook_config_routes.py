@@ -14,7 +14,7 @@ from app.api.base import APIResponse
 from app.openapi.doc import doc
 from app.models.webhook_config import validate_webhook_url
 from app.services.webhook_config_service import webhook_config_service
-from app.utils.auth import login_required, permission_required
+from app.services.auth import login_required, permission_required
 from app.utils.http_client import post_json
 from app.utils.transactional import transactional
 from app.core.enums import ChannelType
@@ -81,7 +81,7 @@ def update_webhook_config(config_id):
         ) from e
 
     if not config:
-        return APIResponse.error("配置不存在", "NOT_FOUND", 404)
+        raise PresetResponseError("配置不存在", "NOT_FOUND", 404)
     return APIResponse.success(data=config.to_dict(), message="更新成功")
 
 
@@ -94,7 +94,7 @@ def delete_webhook_config(config_id):
     """删除 Webhook 配置（管理员）。"""
     result = webhook_config_service.delete_config(config_id)
     if not result:
-        return APIResponse.error("配置不存在", "NOT_FOUND", 404)
+        raise PresetResponseError("配置不存在", "NOT_FOUND", 404)
     return APIResponse.success(message="删除成功")
 
 

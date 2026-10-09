@@ -50,7 +50,7 @@ try:
 except Exception as e:  # noqa: BLE001
     logger.warning("celery.config_load_failed %s", e)
 
-import importlib.util
+import importlib.util  # noqa: E402 -- importlib.util 供下方 find_spec 容错探测使用，紧随其分区注释
 
 _TASK_MODULES = []
 for _mod in _ALL_TASK_MODULES:

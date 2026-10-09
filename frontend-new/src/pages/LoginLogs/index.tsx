@@ -11,7 +11,7 @@ import { serverPagination } from '@/components/DataTable/serverPagination';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAllLoginLogs, type LoginLogQueryParams, type LoginLog } from '@/services/user';
-import { useUserList } from '@/services/user';
+import { useUserOptions } from '@/services/user';
 import { getLoginTypeMeta } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '@/utils/format';
@@ -28,11 +28,7 @@ function LoginLogs() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
-  const { data: usersData } = useUserList({ per_page: 999 });
-  const userOptions = (usersData?.items ?? []).map((u) => ({
-    label: `${u.name || u.username}${u.department ? ` (${u.department})` : ''}`,
-    value: u.id
-  }));
+  const { data: userOptions = [] } = useUserOptions({ includeInactive: true });
 
   useEffect(() => {
     const uid = searchParams.get('user_id');

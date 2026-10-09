@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Tooltip } from 'antd';
+import { theme, Tooltip } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { NODE_STATUS_COLOR } from './constants';
 import type { DeviceNode } from './types';
@@ -25,6 +25,7 @@ const NodeGrid: React.FC<NodeGridProps> = ({
   onNodeDragStart,
   onNodeDrop
 }) => {
+  const { token } = theme.useToken();
   const { t } = useTranslation('asset');
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
@@ -97,8 +98,9 @@ const NodeGrid: React.FC<NodeGridProps> = ({
               onDragLeave={draggable ? () => setDragOverIdx(null) : undefined}
               style={{
                 borderRadius: 2,
-                background: dragOverIdx === idx ? 'rgba(55,138,221,0.15)' : 'rgba(0,0,0,0.04)',
-                border: dragOverIdx === idx ? '1px dashed #378ADD' : '1px dashed rgba(0,0,0,0.1)',
+                background: dragOverIdx === idx ? 'rgba(55,138,221,0.15)' : token.colorFillTertiary,
+                border:
+                  dragOverIdx === idx ? '1px dashed #378ADD' : `1px dashed ${token.colorBorder}`,
                 transition: 'background 0.1s'
               }}
             />

@@ -62,7 +62,7 @@ class ValidationManager:
             return result
         except MarshmallowValidationError as e:
             logger.warning(f"Schema验证失败: {e.messages}")
-            raise ValidationError(message="数据验证失败", errors=e.messages)
+            raise ValidationError(message="数据验证失败", errors=e.messages) from e
 
     @classmethod
     def sanitize_input(cls, value: str, allow_html: bool = False) -> str:

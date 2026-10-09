@@ -16,8 +16,8 @@ from app.api.monitor import (
 from app.exceptions.validation import ValidationError
 from app.openapi.doc import doc
 from app.services.audit_service import AuditService
-from app.utils import login_required, permission_required
-from app.utils.auth import get_current_user_id
+from app.services.auth import login_required, permission_required
+from app.services.auth import get_current_user_id
 from app.utils.transactional import transactional
 
 
@@ -47,8 +47,8 @@ def list_statuses():
     try:
         page = max(int(request.args.get("page", 1)), 1)
         per_page = min(max(int(request.args.get("per_page", 20)), 1), 100)
-    except ValueError:
-        raise ValidationError("page/per_page 必须为正整数")
+    except ValueError as e:
+        raise ValidationError("page/per_page 必须为正整数") from e
 
     keyword = (request.args.get("keyword") or "").strip() or None
 
@@ -79,7 +79,7 @@ def list_alerts():
     try:
         params = _alert_list_schema.load(raw)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"查询参数校验失败: {e.messages}")
+        raise ValidationError(f"查询参数校验失败: {e.messages}") from e
 
     if params.get("scope") == "mine":
         params["user_id"] = get_current_user_id()
@@ -156,8 +156,8 @@ def get_alert_statistics():
     if did_raw:
         try:
             device_id = int(did_raw)
-        except ValueError:
-            raise ValidationError("device_id 必须为整数")
+        except ValueError as e:
+            raise ValidationError("device_id 必须为整数") from e
 
     top_n = request.args.get("top_n", 10, type=int)
     if top_n < 1 or top_n > 50:
@@ -229,7 +229,7 @@ def ack_alert(alert_id: int):
             detail={"alert_id": alert_id, "acknowledged_by": user, "ack_note": note},
             ip_address=request.remote_addr,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 审计留痕失败不阻断业务：业务操作已成功，审计写入失败仅告警（exc_info 已留栈）
         logger.warning("告警确认审计记录失败", exc_info=True)
 
     return APIResponse.success(data=data)
@@ -267,7 +267,7 @@ def close_alert(alert_id: int):
             detail={"alert_id": alert_id, "closed_by": user, "close_reason": reason},
             ip_address=request.remote_addr,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 审计留痕失败不阻断业务：业务操作已成功，审计写入失败仅告警（exc_info 已留栈）
         logger.warning("告警关闭审计记录失败", exc_info=True)
 
     return APIResponse.success(data=data)
@@ -305,7 +305,7 @@ def batch_ack_alerts():
             detail={"alert_ids": alert_ids, "acknowledged": data["acknowledged"], "ack_note": note},
             ip_address=request.remote_addr,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 审计留痕失败不阻断业务：业务操作已成功，审计写入失败仅告警（exc_info 已留栈）
         logger.warning("批量告警确认审计记录失败", exc_info=True)
 
     return APIResponse.success(data=data)
@@ -337,7 +337,7 @@ def batch_retry_alerts():
             detail={"alert_ids": alert_ids, "retried": data["retried"], "skipped": data["skipped"]},
             ip_address=request.remote_addr,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 审计留痕失败不阻断业务：业务操作已成功，审计写入失败仅告警（exc_info 已留栈）
         logger.warning("批量告警重试审计记录失败", exc_info=True)
 
     return APIResponse.success(data=data)
@@ -375,7 +375,7 @@ def batch_close_alerts():
             detail={"alert_ids": alert_ids, "closed": data["closed"], "close_reason": reason},
             ip_address=request.remote_addr,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 审计留痕失败不阻断业务：业务操作已成功，审计写入失败仅告警（exc_info 已留栈）
         logger.warning("批量告警关闭审计记录失败", exc_info=True)
 
     return APIResponse.success(data=data)
@@ -394,7 +394,7 @@ def patch_device_monitor_enabled(device_id: int):
     try:
         data = _device_monitor_enabled_schema.load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
 
     enabled = data["enabled"]
     result = monitor_service.set_device_monitor_enabled(device_id, enabled)
@@ -415,7 +415,7 @@ def patch_batch_monitor_enabled():
     try:
         data = _batch_monitor_enabled_schema.load(body)
     except MarshmallowValidationError as e:
-        raise ValidationError(f"请求参数校验失败: {e.messages}")
+        raise ValidationError(f"请求参数校验失败: {e.messages}") from e
 
     device_ids = data["device_ids"]
     enabled = data["enabled"]
@@ -429,7 +429,7 @@ def patch_batch_monitor_enabled():
             detail={"device_ids": device_ids, "monitor_enabled": enabled, **result},
             ip_address=request.remote_addr,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 审计留痕失败不阻断业务：业务操作已成功，审计写入失败仅告警（exc_info 已留栈）
         logger.warning("批量监控启停审计记录失败", exc_info=True)
 
     return APIResponse.success(

@@ -46,12 +46,16 @@ def _sse_data(payload: dict) -> str:
 
 def _extract_fields(state: dict) -> dict:
     """L1 对齐：显式列举下发字段，不透传 user_id 等内部字段。"""
-    return {
+    fields = {
         "type": "progress",
         "status": state.get("status"),
         "progress": state.get("progress", 0),
         "total": state.get("total", 0),
     }
+    trace_id = state.get("trace_id")
+    if trace_id:
+        fields["trace_id"] = trace_id
+    return fields
 
 
 async def ai_task_event_stream(task_id: str, user_id: int | None) -> AsyncGenerator[str, None]:

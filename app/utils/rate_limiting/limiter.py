@@ -13,7 +13,11 @@ from typing import Any, Callable, Dict, Optional, Tuple
 from flask import abort, g, request
 
 from app.interfaces.rate_limiting import RateLimiter, RateLimitStorage, RateLimitStrategy
-from app.utils.rate_limiting.storages import RedisRateLimitStorage, MemoryRateLimitStorage
+from app.utils.rate_limiting.storages import (
+    FailoverRateLimitStorage,
+    MemoryRateLimitStorage,
+    RedisRateLimitStorage,
+)
 from app.utils.rate_limiting.strategies import SlidingWindowStrategy
 from config import get_config
 
@@ -54,21 +58,35 @@ class UnifiedRateLimiter(RateLimiter):
                    f"strategy={strategy.get_strategy_name()}, enabled={self.enabled}")
     
     def _create_default_storage(self) -> RateLimitStorage:
-        """创建默认存储后端
-        
-        优先使用Redis，如果不可用则降级到内存存储。
-        
+        """创建默认存储后端：Redis 为主 + 内存为备的**主备降级**组合。
+
+        旧实现在这里 ping 一次后就二选一，而本实例是模块级单例
+        （`decorators.py:16`）⇒ **运行期永不重选**。后果是：启动后 Redis
+        挂掉时，走的是「RedisRateLimitStorage 自己吞异常 → 放行」这条路径，
+        限流完全失效——而这恰恰是最需要限流的时刻。
+
+        现在无论 Redis 当前是否可用，都返回 Failover 组合：由它在**每次判定时**
+        决定走主还是走备，并能在 Redis 恢复后自动切回（见
+        `FailoverRateLimitStorage` 的冷却探测）。
+
         Returns:
-            RateLimitStorage: 存储后端实例
+            RateLimitStorage: FailoverRateLimitStorage 实例
         """
+        primary = RedisRateLimitStorage()
         try:
-            redis_storage = RedisRateLimitStorage()
-            redis_storage.redis_client.ping()
-            logger.info("统一频率限制器: 使用Redis存储")
-            return redis_storage
-        except Exception as e:
-            logger.warning(f"统一频率限制器: Redis不可用，降级到内存存储: {str(e)}")
-            return MemoryRateLimitStorage()
+            if primary.redis_client is None:
+                raise RuntimeError("Redis 客户端未初始化")
+            primary.redis_client.ping()
+            logger.info("统一频率限制器: 主存储=Redis，备存储=内存")
+        except Exception as e:  # noqa: BLE001 -- Redis 不可用不再"二选一定终身"：仍装主备组合，由 Failover 在运行期逐次判定
+            logger.warning(
+                f"统一频率限制器: Redis 当前不可用（{e}）——仍装配主备组合，"
+                f"由 FailoverRateLimitStorage 在运行期逐次探测恢复"
+            )
+        return FailoverRateLimitStorage(
+            primary=primary,
+            secondary=MemoryRateLimitStorage(),
+        )
     
     def is_allowed(self, key: str, limit: int, window: int) -> Tuple[bool, Dict[str, Any]]:
         """检查请求是否被允许

@@ -92,7 +92,7 @@ def resolve_visible_scope() -> "tuple[bool, Optional[set], str]":
     try:
         from app.services.monitoring.data_scope_service import get_visible_device_ids
         return True, get_visible_device_ids(user_id), ""
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.error(
             "ai.capability.scope_lookup_failed user=%s（fail-closed：拒绝本次查询）",
             user_id, exc_info=True,
@@ -125,7 +125,7 @@ def check_device_access(device_id: int, *, fail_closed: bool = False) -> "tuple[
         if device_id in visible:
             return True, ""
         return False, f"无权访问设备 {device_id}（数据域隔离）"
-    except Exception:  # noqa: BLE001
+    except Exception:
         if fail_closed:
             logger.error(
                 "ai.capability.device_scope_check_failed user=%s device=%s"

@@ -85,7 +85,7 @@ class ZabbixAdapter(MonitorAdapter):
                 host_data, from_cache = self._get_host_data(ckey, api_url, credential, host_ref)
             except _ZabbixEmptyHostError:
                 return ProbeResult(reachable=False, error=ProbeErrorCode.ZABBIX_EMPTY_HOST_LIST.value)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- Zabbix 缓存命中查询失败降级：转为不可达 ProbeResult，zabbix-api/网络异常类型不可枚举
                 logger.warning("Zabbix 缓存命中查询失败 %s: %s", host_ref, e)
                 return ProbeResult(reachable=False, error=ProbeErrorCode.ZABBIX_API_ERROR.value)
             elapsed_ms = int((time.monotonic() - start) * 1000)
@@ -103,7 +103,7 @@ class ZabbixAdapter(MonitorAdapter):
                 holder["from_cache"] = from_cache
             except _ZabbixEmptyHostError:
                 holder["empty"] = True
-            except Exception as e:  # 缓存重建异常 → 单设备失败不影响整轮
+            except Exception as e:  # noqa: BLE001 -- 单设备缓存重建异常隔离：err_holder 收集后由外层统一处理，单设备失败不影响整轮探测
                 err_holder["e"] = e
 
         start = time.monotonic()
@@ -195,7 +195,7 @@ class ZabbixAdapter(MonitorAdapter):
                 for t in triggers:
                     tid = t.get("triggerid")
                     trig_to_hosts[tid] = [h["hostid"] for h in t.get("hosts", [])]
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- problem.get 失败降级为空问题列表：告警采集尽力而为，API 异常类型不可枚举
             logger.warning("problem.get 失败，降级为空问题列表: %s", exc)
             problems = []
             trig_to_hosts = {}
@@ -429,7 +429,7 @@ class ZabbixAdapter(MonitorAdapter):
                 "limit": 1,
                 "output": "extend",
             }) or []
-        except Exception:
+        except Exception:  # noqa: BLE001 -- trends 查询失败降级为空列表：由调用方走"无趋势数据"分支
             trends = []
         if not trends:
             return None

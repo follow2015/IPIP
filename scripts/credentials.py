@@ -150,7 +150,7 @@ def connect_socket_root() -> pymysql.connections.Connection:
     这是重置 MySQL 密码的首选路径：**不需要知道 root 密码**，只要以 root 运行。
     """
     last = None
-    for sock in ("/var/run/mysqld/mysqld.sock", "/tmp/mysql.sock",
+    for sock in ("/var/run/mysqld/mysqld.sock", "/tmp/mysql.sock",  # noqa: S108 -- mysqld unix socket 候选路径枚举（连接目标，非创建临时文件）
                  "/var/lib/mysql/mysql.sock"):
         if not os.path.exists(sock):
             continue
@@ -264,7 +264,7 @@ def cmd_reset_mysql(args) -> int:
                 die(f"MySQL 中不存在账号 '{db_user}'")
             for host in hosts:
                 cur.execute(
-                    f"ALTER USER %s@%s IDENTIFIED BY %s", (db_user, host, new_pwd))
+                    "ALTER USER %s@%s IDENTIFIED BY %s", (db_user, host, new_pwd))
                 ok(f"已修改 MySQL 账号 '{db_user}'@'{host}' 的密码")
         conn.commit()
     finally:
@@ -299,7 +299,7 @@ def cmd_reset_mysql(args) -> int:
 def cmd_reset_secret_keys(args) -> int:
     if not args.yes:
         die("该操作会让所有用户登出、全部 JWT 立即失效。确认请输入 --yes")
-    env = read_env()
+    read_env()
     updates = {"SECRET_KEY": secrets.token_hex(32),
                "JWT_SECRET_KEY": secrets.token_hex(32)}
     blocked = sorted(NEVER_RESET & set(updates))
@@ -315,6 +315,32 @@ def cmd_reset_secret_keys(args) -> int:
     print("=" * 68)
     record_credential("reset-secret-keys",
                       [(k, v) for k, v in updates.items()])
+    return 0
+
+
+def cmd_record(args) -> int:
+    """安装收尾的凭据留档。
+
+    为什么需要单独一条命令：``show`` 只从 .env 读取展示，**不写** .credentials，
+    而 record_credential 原先只在 reset-* 时被调用 —— 全新安装因此永远不产生
+    留档文件，"装完了却没有任何凭据记录"。写入仍走 :func:`record_credential`
+    以保证格式与权限（600）单一真源。
+    """
+    items: list = []
+    for raw in getattr(args, "item", []) or []:
+        key, _, val = raw.partition("=")
+        if not key:
+            warn(f"忽略非法条目（缺键名）：{raw}")
+            continue
+        items.append((key, val))
+    if not items:
+        warn("没有可留档的条目，跳过")
+        return 0
+    record_credential(args.title, items)
+    if not getattr(args, "no_echo", False):
+        print(f"\n[{args.title}]")
+        for k, v in items:
+            print(f"  {k} = {v}")
     return 0
 
 
@@ -346,11 +372,19 @@ def main(argv=None) -> int:
     p_keys = sub.add_parser("reset-secret-keys", help="重置 SECRET_KEY / JWT_SECRET_KEY")
     p_keys.add_argument("--yes", action="store_true", help="确认执行（会让所有用户登出）")
 
+    p_rec = sub.add_parser("record", help="把本次安装生成的凭据追加留档到 .credentials（600）")
+    p_rec.add_argument("--title", required=True, help="记录标题，如 install (2026-10-04)")
+    p_rec.add_argument("--item", action="append", default=[], metavar="K=V",
+                       help="要留档的条目，可重复；如 --item admin_password=xxx")
+    p_rec.add_argument("--no-echo", action="store_true",
+                       help="不打回显（默认会把条目再打印一次便于抄录）")
+
     args = parser.parse_args(argv)
     load_dotenv(ENV_PATH)          # 兼容依赖 os.environ 的路径
     return {"show": cmd_show, "reset-admin": cmd_reset_admin,
             "reset-mysql": cmd_reset_mysql,
-            "reset-secret-keys": cmd_reset_secret_keys}[args.cmd](args)
+            "reset-secret-keys": cmd_reset_secret_keys,
+            "record": cmd_record}[args.cmd](args)
 
 
 if __name__ == "__main__":

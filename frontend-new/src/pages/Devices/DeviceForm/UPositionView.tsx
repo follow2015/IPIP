@@ -6,28 +6,39 @@
  */
 
 import { useMemo } from 'react';
-import { Tooltip } from 'antd';
+import { Tooltip, theme } from 'antd';
 import { useTranslation } from 'react-i18next';
 
 type UBlockStatus = 'available' | 'occupied' | 'current';
 
-export default function UPositionView({ layout, currentU, currentHeightU }: {
-  layout: {
-    total_u: number;
-    used_u: number;
-    u_map: Record<number, {
-      device_id: number;
-      device_name: string;
-      device_type: string;
-      is_start: boolean;
-      height_u: number;
-      power: number | null;
-    }>;
-  } | null | undefined;
+export default function UPositionView({
+  layout,
+  currentU,
+  currentHeightU
+}: {
+  layout:
+    | {
+        total_u: number;
+        used_u: number;
+        u_map: Record<
+          number,
+          {
+            device_id: number;
+            device_name: string;
+            device_type: string;
+            is_start: boolean;
+            height_u: number;
+            power: number | null;
+          }
+        >;
+      }
+    | null
+    | undefined;
   currentU?: number | null;
   currentHeightU?: number | null;
 }) {
   const { t } = useTranslation('device');
+  const { token } = theme.useToken();
   const currentUSet = useMemo(() => {
     const set = new Set<number>();
     if (currentU && currentHeightU) {
@@ -48,39 +59,78 @@ export default function UPositionView({ layout, currentU, currentHeightU }: {
   };
 
   const statusColors: Record<UBlockStatus, { bg: string; border: string; text: string }> = {
-    available: { bg: '#f6ffed', border: '#b7eb8f', text: '#52c41a' },
-    occupied: { bg: '#fff1f0', border: '#ffa39e', text: '#f5222d' },
-    current: { bg: '#fffbe6', border: '#ffe58f', text: '#faad14' },
+    available: {
+      bg: token.colorSuccessBg,
+      border: token.colorSuccessBorder,
+      text: token.colorSuccess
+    },
+    occupied: { bg: token.colorErrorBg, border: token.colorErrorBorder, text: token.colorError },
+    current: {
+      bg: token.colorWarningBg,
+      border: token.colorWarningBorder,
+      text: token.colorWarning
+    }
   };
 
   return (
-    <div style={{
-      marginTop: 8,
-      padding: '8px 12px',
-      background: '#fafafa',
-      borderRadius: 6,
-      border: '1px solid #f0f0f0',
-    }}>
+    <div
+      style={{
+        marginTop: 8,
+        padding: '8px 12px',
+        background: token.colorFillQuaternary,
+        borderRadius: 6,
+        border: `1px solid ${token.colorBorderSecondary}`
+      }}
+    >
       {/* 图例 */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 12, alignItems: 'center' }}>
-        <span style={{ color: '#8c8c8c' }}>{t('uPosition.view.title')}</span>
+      <div
+        style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 12, alignItems: 'center' }}
+      >
+        <span style={{ color: token.colorTextTertiary }}>{t('uPosition.view.title')}</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 2, background: statusColors.available.bg, border: `1px solid ${statusColors.available.border}` }} />
+          <span
+            style={{
+              display: 'inline-block',
+              width: 14,
+              height: 14,
+              borderRadius: 2,
+              background: statusColors.available.bg,
+              border: `1px solid ${statusColors.available.border}`
+            }}
+          />
           <span>{t('uPosition.legend.available')}</span>
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 2, background: statusColors.occupied.bg, border: `1px solid ${statusColors.occupied.border}` }} />
+          <span
+            style={{
+              display: 'inline-block',
+              width: 14,
+              height: 14,
+              borderRadius: 2,
+              background: statusColors.occupied.bg,
+              border: `1px solid ${statusColors.occupied.border}`
+            }}
+          />
           <span>{t('uPosition.legend.occupied')}</span>
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 2, background: statusColors.current.bg, border: `1px solid ${statusColors.current.border}` }} />
+          <span
+            style={{
+              display: 'inline-block',
+              width: 14,
+              height: 14,
+              borderRadius: 2,
+              background: statusColors.current.bg,
+              border: `1px solid ${statusColors.current.border}`
+            }}
+          />
           <span>{t('uPosition.legend.current')}</span>
         </span>
       </div>
 
       {/* 方块网格：从 U1 开始逐行排列 */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-        {Array.from({ length: total_u }, (_, i) => i + 1).map(u => {
+        {Array.from({ length: total_u }, (_, i) => i + 1).map((u) => {
           const status = getBlockStatus(u);
           const color = statusColors[status];
           const info = u_map[u];
@@ -92,20 +142,22 @@ export default function UPositionView({ layout, currentU, currentHeightU }: {
 
           return (
             <Tooltip key={u} title={tooltip}>
-              <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: 3,
-                background: color.bg,
-                border: `1px solid ${color.border}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 11,
-                fontWeight: 500,
-                color: color.text,
-                cursor: 'default',
-              }}>
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 3,
+                  background: color.bg,
+                  border: `1px solid ${color.border}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: color.text,
+                  cursor: 'default'
+                }}
+              >
                 {u}
               </div>
             </Tooltip>

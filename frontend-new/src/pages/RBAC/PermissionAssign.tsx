@@ -4,31 +4,38 @@
  * - 对齐后端 PUT /rbac/roles/<id>/permissions 接口（接收 permissions: string[] 权限编码列表）
  */
 import { useEffect, useState, useMemo } from 'react';
-import { Modal, Tree, Spin, Tag } from 'antd';
+import { Modal, Tree, Spin } from 'antd';
 import type { TreeProps } from 'antd';
-import { useRolePermissions, useSetRolePermissions } from '@/services/rbac';
+import { useRolePermissions, useSetRolePermissions, useAllPermissions } from '@/services/rbac';
 import type { Role, Permission } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
+import { useConfirm } from '@/utils/confirm';
+import { useDirtyGuard, useSnapshotDirty } from '@/hooks/useDirtyGuard';
 import { useTranslation } from 'react-i18next';
 
 interface PermissionAssignProps {
   open: boolean;
   role: Role | null;
-  permissions: Permission[];
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function PermissionAssign({ open, role, permissions, onClose, onSuccess }: PermissionAssignProps) {
+function PermissionAssign({ open, role, onClose, onSuccess }: PermissionAssignProps) {
   const { t } = useTranslation('settings');
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const { data: rolePerms, isLoading: permsLoading } = useRolePermissions(role?.id ?? 0);
+  const { data: allPermissions, isLoading: allPermsLoading } = useAllPermissions({
+    enabled: open
+  });
   const setRolePermissions = useSetRolePermissions();
   const message = useMessage();
+  const confirm = useConfirm();
+  const { t: tc } = useTranslation('common');
+  const [initialKeys, setInitialKeys] = useState<string[]>([]);
 
   const treeData = useMemo<TreeProps['treeData']>(() => {
     const categoryMap = new Map<string, Permission[]>();
-    permissions.forEach((p) => {
+    (allPermissions ?? []).forEach((p) => {
       const cat = p.category ?? t('permission.uncategorized');
       const list = categoryMap.get(cat) ?? [];
       list.push(p);
@@ -39,14 +46,14 @@ function PermissionAssign({ open, role, permissions, onClose, onSuccess }: Permi
       key: `cat-${category}`,
       children: perms.map((p) => ({
         title: `${p.name} (${p.code})`,
-        key: p.code,
-      })),
+        key: p.code
+      }))
     }));
-  }, [permissions, t]);
+  }, [allPermissions, t]);
 
   const categoryKeys = useMemo(
     () => new Set((treeData ?? []).map((n) => n.key as string)),
-    [treeData],
+    [treeData]
   );
 
   useEffect(() => {
@@ -55,10 +62,15 @@ function PermissionAssign({ open, role, permissions, onClose, onSuccess }: Permi
         ? rolePerms.map((p) => (typeof p === 'string' ? p : p.code))
         : [];
       setCheckedKeys(codes);
+      setInitialKeys(codes);
     }
   }, [open, rolePerms]);
 
-  const handleSubmit = async () => {
+  const isPending = setRolePermissions.isPending;
+  const isDirty = useSnapshotDirty(initialKeys, checkedKeys);
+  const guard = useDirtyGuard({ isPending, isDirty });
+
+  const doSubmit = async () => {
     if (!role) return;
     const permCodes = checkedKeys.filter((k) => !categoryKeys.has(k));
     try {
@@ -71,17 +83,33 @@ function PermissionAssign({ open, role, permissions, onClose, onSuccess }: Permi
     }
   };
 
+  const handleSubmit = () => {
+    const permCodes = checkedKeys.filter((k) => !categoryKeys.has(k));
+    if (permCodes.length === 0) {
+      confirm({
+        title: tc('confirm.emptyPermissionTitle'),
+        content: tc('confirm.emptyPermissionContent'),
+        okButtonProps: { danger: true },
+        onOk: doSubmit
+      });
+      return;
+    }
+    void doSubmit();
+  };
+
   return (
     <Modal
       title={t('permission.assignTitle', { name: role?.display_name ?? '' })}
       open={open}
       onOk={handleSubmit}
-      onCancel={onClose}
+      onCancel={() => guard.requestClose(onClose)}
       width={560}
-      confirmLoading={setRolePermissions.isPending}
+      confirmLoading={isPending}
+      closable={!isPending}
+      mask={{ closable: false }}
       destroyOnHidden
     >
-      {permsLoading ? (
+      {permsLoading || allPermsLoading ? (
         <Spin description={t('permission.loading')} />
       ) : (
         <Tree

@@ -11,6 +11,12 @@ Trap OID → 告警规则。规则来源（两层，后者覆盖前者）：
 
 规则解析失败（JSON 非法/字段缺失/OID 形态不对）抛 :class:`TrapRuleError`
 —— 在 trapd 服务启动期 fail-fast，宁可不起服务也不带病运行静默丢告警。
+
+``title`` / ``content`` 支持 ``{占位符}``（见 :func:`render_text`）：
+``{port}`` 端口名、``{index}`` 接口实例号、``{device}`` 设备名。
+内置的 linkDown/linkUp 规则就用 ``{port}`` —— 原先是写死的「端口 LinkDown」，
+端口名明明在 varbind 里（IF-MIB::ifDescr，实测 100% 携带）却被丢掉，告警只显示
+「实例: 10」，运维看不出是哪个端口（2026-10-08 现场反馈）。
 """
 from __future__ import annotations
 
@@ -29,7 +35,7 @@ DEFAULT_TRAP_RULES: list[dict[str, Any]] = [
         "name": "link_down",
         "match_oid": f"{_TRAP_PREFIX}.3",
         "severity": "critical",
-        "title": "端口 LinkDown",
+        "title": "端口 {port} 链路中断",
         "content": "设备上报链路中断（IF-MIB::linkDown）",
         "index_varbind": "1.3.6.1.2.1.2.2.1.1",
     },
@@ -37,7 +43,7 @@ DEFAULT_TRAP_RULES: list[dict[str, Any]] = [
         "name": "link_up",
         "match_oid": f"{_TRAP_PREFIX}.4",
         "severity": "info",
-        "title": "端口 LinkUp",
+        "title": "端口 {port} 链路恢复",
         "content": "设备上报链路恢复（IF-MIB::linkUp）",
         "index_varbind": "1.3.6.1.2.1.2.2.1.1",
     },
@@ -87,6 +93,33 @@ class TrapRuleError(ValueError):
 def _normalize_oid(oid: str) -> str:
     """归一化 OID：去前导点。实例后缀（.0 等）由匹配策略处理。"""
     return oid.strip().lstrip(".")
+
+
+_PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
+
+
+def render_text(template: str, context: dict[str, Any]) -> str:
+    """填充 ``title`` / ``content`` 里的 ``{占位符}``。
+
+    用正则替换而非 :meth:`str.format`：后者遇到文案里的**裸花括号**（如
+    ``"端口 {a}"`` 之外还写了 ``"{}"``）会抛 ``KeyError``/``ValueError``，
+    而这里抛异常的代价是**整条 trap 告警丢失**（调用方只有旁路兜底）。渲染文案
+    不值得让告警链路承担这个风险。
+
+    未提供的键替换成 ``"?"`` —— 保留可见的缺口，**不静默删掉整段**：运维看到
+    「端口 ? 链路中断」会去查为什么没解析出端口；看到「链路中断」则完全不知道
+    本来该有端口名。
+
+    模板里没有占位符时原样返回（自定义规则的 ``title`` 普遍是静态串）。
+    """
+    if not template or "{" not in template:
+        return template
+
+    def _sub(match: re.Match) -> str:
+        value = context.get(match.group(1))
+        return "?" if value is None else str(value)
+
+    return _PLACEHOLDER_RE.sub(_sub, template)
 
 
 def _validate_rule(rule: Any, source: str) -> dict[str, Any]:
@@ -191,7 +224,7 @@ class TrapRuleMatcher:
         want_s = str(want).strip().lstrip(".")
         if _OID_RE.match(want_s):
             prefix = want_s
-            for oid, value in varbinds or []:
+            for oid, _value in varbinds or []:
                 oid_s = _normalize_oid(str(oid))
                 if oid_s == prefix:
                     return "0"

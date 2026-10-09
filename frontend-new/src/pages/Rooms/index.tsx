@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Button, Tag, Space } from 'antd';
+import { Button, Tag, Space, Typography } from 'antd';
 import { PlusOutlined, AppstoreOutlined } from '@ant-design/icons';
 import DataTable from '@/components/DataTable';
 import FilterBar from '@/components/FilterBar';
@@ -47,6 +47,70 @@ function Rooms() {
 
   const handleDetail = (record: Room) => {
     navigate(`/rooms/${record.id}`);
+  };
+
+  const renderRoomCard = (r: Room) => {
+    const { Text } = Typography;
+    const s = getRoomStatusMeta(r.status, td);
+    const loc = [r.building, r.floor, r.location].filter(Boolean).join(' · ');
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+        <Space wrap size={4}>
+          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleDetail(r)}>
+            <Text strong>{r.name ?? '-'}</Text>
+          </Button>
+          {s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{r.status}</Tag>}
+        </Space>
+        {/* 各字段独立成行（不拼进同一文本节点）：既便于阅读，也保证测试可精确定位单字段 */}
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.room_number ?? '-'}
+        </Text>
+        {loc ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {loc}
+          </Text>
+        ) : null}
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {td('customer.stats.cabinetCount')}: {r.cabinet_count ?? 0}
+        </Text>
+        {r.contact || r.contact_phone ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {r.contact ?? '-'}
+            {r.contact_phone ? ` · ${r.contact_phone}` : ''}
+          </Text>
+        ) : null}
+        <Space size={4} wrap>
+          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleDetail(r)}>
+            {td('room.action.floorPlan')}
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0 }}
+            onClick={() => navigate(`/cabinets?roomId=${r.id}`)}
+          >
+            {td('room.action.viewCabinets')}
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0 }}
+            onClick={() => crud.handleEdit(r)}
+          >
+            {tc('action.edit')}
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            style={{ padding: 0 }}
+            onClick={() => crud.handleDelete(r)}
+          >
+            {tc('action.delete')}
+          </Button>
+        </Space>
+      </div>
+    );
   };
 
   const columns = [
@@ -187,6 +251,8 @@ function Rooms() {
   return (
     <div>
       <DataTable<Room>
+        error={crud.error}
+        onRetry={crud.refetch}
         columns={columns}
         dataSource={crud.data?.items ?? []}
         loading={crud.isLoading}
@@ -202,6 +268,8 @@ function Rooms() {
         onSearch={crud.table.setSearch}
         onRefresh={() => crud.refetch()}
         toolbar={filterBar}
+        mobileCardMode
+        cardRender={renderRoomCard}
       />
       <RoomForm open={crud.formOpen} editRecord={crud.editRecord} onClose={crud.closeForm} />
     </div>

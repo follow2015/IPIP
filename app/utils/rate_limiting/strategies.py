@@ -4,12 +4,30 @@
 
 提供不同的频率限制算法实现，每个策略拥有独立的算法逻辑。
 存储层仅提供 KV 读写原语（get/set/incr/expire/exists/zadd/zremrangebyscore/zcard）。
+
+[WARN] **本模块当前是死代码**（2026-09-30 核实，见评审 B1 的「核实补充」）
+--------------------------------------------------------------------------
+`UnifiedRateLimiter` 的判定路径是 `limiter.is_allowed()` → `storage.check_limit()`
+（`limiter.py:100`），**不经过策略层**。`SlidingWindowStrategy` 只在
+`limiter.py:53` 被实例化一次，用途仅仅是 `get_strategy_name()` 填到
+`limit_info` 里；本模块的 `check_limit(storage, key, ...)` 全仓零调用
+（它的签名还多一个 `storage` 参数，与存储层不同）。
+
+保留理由：`RateLimitStrategy` 是 `app/interfaces/rate_limiting.py` 声明的
+接口，短期内删掉会让 `UnifiedRateLimiter(strategy=...)` 的入参失去意义。
+
+但请注意：正因为没人调用，这里的缺陷**不会暴露**。2026-09-30 已把
+`id(cache_key)` 那处 member 生成改成 uuid4（与存储层同口径），避免将来
+有人把策略层接上就复现 B1。**接上之前，本模块仍需按存储层的标准重新评审**
+（原子性、member 唯一性、降级语义）。
 """
 from app.utils.logging import get_logger
 import time
-from typing import Dict, Any, Tuple, List
+import uuid
+from typing import Dict, Any, Tuple
 
 from app.interfaces.rate_limiting import RateLimitStrategy, RateLimitStorage
+import app.utils.redis_keys as redis_keys
 
 logger = get_logger(__name__)
 
@@ -37,7 +55,7 @@ class SlidingWindowStrategy(RateLimitStrategy):
         """
         current_time = time.time()
         window_start = current_time - window
-        cache_key = f"ratelimit:sw:{key}"
+        cache_key = redis_keys.ratelimit_key("sw", key)
 
         if hasattr(storage, 'redis_client'):
             return self._check_limit_redis(storage, cache_key, limit, window, current_time, window_start)
@@ -58,14 +76,14 @@ class SlidingWindowStrategy(RateLimitStrategy):
             if current_count >= limit:
                 return False, 0
 
-            request_id = f"{current_time}:{id(cache_key)}"
+            request_id = f"{current_time}:{uuid.uuid4().hex}"
             redis.zadd(cache_key, {request_id: current_time})
             redis.expire(cache_key, window)
 
             remaining = limit - current_count - 1
             return True, remaining
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 限流器 fail-open：限流组件故障不得阻断业务请求，按"放行"处理并告警
             logger.error(f"Redis滑动窗口检查失败: key={cache_key}, error={e}")
             return True, limit
 
@@ -90,7 +108,7 @@ class SlidingWindowStrategy(RateLimitStrategy):
             remaining = limit - current_count - 1
             return True, remaining
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 限流器 fail-open：限流组件故障不得阻断业务请求，按"放行"处理并告警
             logger.error(f"内存滑动窗口检查失败: key={cache_key}, error={e}")
             return True, limit
 
@@ -127,7 +145,7 @@ class FixedWindowStrategy(RateLimitStrategy):
             Tuple[bool, int]: (是否允许, 剩余数量)
         """
         current_time = int(time.time())
-        cache_key = f"ratelimit:fw:{key}"
+        cache_key = redis_keys.ratelimit_key("fw", key)
 
         if hasattr(storage, 'redis_client'):
             return self._check_limit_redis(storage, cache_key, limit, window, current_time)
@@ -151,7 +169,7 @@ class FixedWindowStrategy(RateLimitStrategy):
             remaining = limit - count
             return True, remaining
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 限流器 fail-open：限流组件故障不得阻断业务请求，按"放行"处理并告警
             logger.error(f"Redis固定窗口检查失败: key={cache_key}, error={e}")
             return True, limit
 
@@ -184,7 +202,7 @@ class FixedWindowStrategy(RateLimitStrategy):
 
             return True, remaining
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 限流器 fail-open：限流组件故障不得阻断业务请求，按"放行"处理并告警
             logger.error(f"内存固定窗口检查失败: key={cache_key}, error={e}")
             return True, limit
 
@@ -231,7 +249,7 @@ class TokenBucketStrategy(RateLimitStrategy):
         current_time = time.time()
         bucket_size = self.bucket_size or limit
         tokens_per_second = limit / window
-        cache_key = f"ratelimit:tb:{key}"
+        cache_key = redis_keys.ratelimit_key("tb", key)
 
         if hasattr(storage, 'redis_client'):
             return self._check_limit_redis(storage, cache_key, bucket_size, tokens_per_second, current_time)
@@ -272,7 +290,7 @@ class TokenBucketStrategy(RateLimitStrategy):
 
             return True, int(new_tokens)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 限流器 fail-open：限流组件故障不得阻断业务请求，按"放行"处理并告警
             logger.error(f"Redis令牌桶检查失败: key={cache_key}, error={e}")
             return True, bucket_size
 
@@ -301,7 +319,7 @@ class TokenBucketStrategy(RateLimitStrategy):
 
             return True, int(bucket_data['tokens'])
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 限流器 fail-open：限流组件故障不得阻断业务请求，按"放行"处理并告警
             logger.error(f"内存令牌桶检查失败: key={cache_key}, error={e}")
             return True, bucket_size
 

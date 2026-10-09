@@ -8,7 +8,7 @@
 
 详见 docs/_archive/CUSTOMER_TERMINATED_PLAN.md §4.4.4。
 """
-from sqlalchemy import Column, Integer, String, JSON, LargeBinary, ForeignKey, Index, DateTime
+from sqlalchemy import Column, Integer, String, JSON, LargeBinary, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel

@@ -1,4 +1,3 @@
-from __future__ import annotations
 # -*- coding: utf-8 -*-
 """
 设备连接服务
@@ -16,6 +15,7 @@ from __future__ import annotations
 
 ③ 导入路径从 app.models.repositories 迁移至 app.persistence。
 """
+from __future__ import annotations
 from app.utils.logging import get_logger
 from typing import Dict, List, Optional
 
@@ -283,6 +283,33 @@ class DeviceConnectionService:
         logger.info("删除设备连接成功: connection_id=%d", connection_id)
         return result
 
+    @staticmethod
+    def _mark_circuit_anchor_lost(connection_ids) -> None:
+        """连接删除后，把引用它的线路分段标为"锚点已失效"（G1 / AC-C-31）。
+
+        为什么必须**显式置位**而不能依赖 `ON DELETE SET NULL`：
+        `circuit_segments.connection_id` 被置 NULL 之后，就**再也区分不开**
+        "这条分段从来没纳管过连接"（正常——未纳管跳接用 `hop_desc` 文本描述）
+        与"曾经纳管、但连接被删了"（异常——路由证据丢了，必须告警）。
+        故分段上另设 `connection_id_lost` 作为**唯一判据**，由本方法置 1，
+        参见 `app/models/circuit.py` 的列注释。
+
+        失败只记日志、不阻断：主流程是"删连接"，线路域的标记失败不应反噬
+        网络域操作（否则一条线路数据异常会让连接永远删不掉）。
+        """
+        ids = [cid for cid in (connection_ids or []) if cid is not None]
+        if not ids:
+            return
+        try:
+            from app.persistence.circuit_repository import CircuitRepository
+
+            repo = CircuitRepository()
+            total = sum(repo.mark_connection_lost(cid) for cid in ids)
+            if total:
+                logger.info("连接 %s 已删除：%d 条线路分段锚点标记为失效", ids, total)
+        except Exception:
+            logger.warning("标记线路分段锚点失效失败 conn=%s", ids, exc_info=True)
+
     def delete_network_connection(self, port_id: int) -> bool:
         """删除 N2N 连接（通过端口ID），释放两端端口
 
@@ -295,7 +322,9 @@ class DeviceConnectionService:
 
         local_port_id = conn.local_port_id
         peer_port_id  = conn.peer_port_id
+        conn_id       = conn.id
 
+        self._mark_circuit_anchor_lost([conn_id])
         self.n2n_repo.delete_connection_orm(conn)
 
         self.port_repo.release_port_and_set_link_down(local_port_id)
@@ -317,6 +346,7 @@ class DeviceConnectionService:
         local_port_id = conn.local_port_id
         peer_port_id  = conn.peer_port_id
 
+        self._mark_circuit_anchor_lost([connection_id])
         self.n2n_repo.delete_connection_orm(conn)
 
         self.port_repo.release_port_and_set_link_down(local_port_id)
@@ -349,6 +379,8 @@ class DeviceConnectionService:
                 self._release_nics_port(nics_port_id)
                 logger.info("NicsPort %d 已释放", nics_port_id)
 
+        n2n_ids = [c.get("id") for c in self.n2n_repo.find_by_device(device_id)]
+        self._mark_circuit_anchor_lost(n2n_ids)
         n2n_count = self.n2n_repo.delete_by_device(device_id)
         if n2n_count:
             ports = self.port_repo.find_occupied_ports_by_device_orm(device_id)

@@ -1,36 +1,12 @@
-/**
- * useSSEConnection — SSE 连接管理公共 Hook（CR-24）
- *
- * 封装 EventSource 创建/销毁、token 认证、回退轮询降级、失败计数等通用逻辑，
- * 供 useGlobalEvents 复用，消除重复代码。
- *
- * ⚠️ 职责边界说明：
- * 本 Hook 仅负责全局 SSE 事件流（/realtime/sse/global）的连接管理，
- * 即非设备维度的全局事件（如 room_scan_complete、scan_complete 等）。
- * 设备维度的 SSE 事件订阅由 DeviceEventBus（纯 TS 类）统一管理，
- * 两者职责不重叠：DeviceEventBus 负责设备级事件分发与缓存失效，
- * useSSEConnection 负责全局事件流的连接生命周期与降级策略。
- *
- * SSE 服务已从 Flask 迁移至独立 ASGI 推送网关（realtime_gateway/），
- * 通过反向代理 /realtime/ 路径访问，不直接暴露网关端口。
- *
- * 使用方式：
- * ```ts
- * useSSEConnection({
- *   url: '/api/switch/events',
- *   enabled: true,
- *   onMessage: (data) => { ... },
- *   onFallbackPoll: () => { ... },
- * });
- * ```
- */
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/stores/auth';
 import { fetchSSETicket } from '@/services/sseTicket';
 
 const FALLBACK_POLL_INTERVAL = 30_000;
 const SSE_MAX_FAILURES = 3;
 const SSE_DEGRADED_RETRY_INTERVAL = 5 * 60_000;
+
+export type SSEStatus = 'idle' | 'connecting' | 'live' | 'degraded';
 
 interface UseSSEConnectionOptions {
   url: string;
@@ -40,19 +16,20 @@ interface UseSSEConnectionOptions {
   label?: string;
 }
 
-/**
- * 管理 SSE EventSource 连接的公共 Hook
- *
- * @param options - 连接选项
- */
 export function useSSEConnection({
   url,
   enabled,
   onMessage,
   onFallbackPoll,
   label = 'SSE'
-}: UseSSEConnectionOptions) {
+}: UseSSEConnectionOptions): { status: SSEStatus } {
   const token = useAuthStore((s) => s.token);
+
+  const [status, setStatus] = useState<SSEStatus>('idle');
+  const setStatusSafe = useCallback(
+    (next: SSEStatus) => setStatus((prev) => (prev === next ? prev : next)),
+    []
+  );
 
   const lastTsRef = useRef<number>(0);
   const failCountRef = useRef<number>(0);
@@ -63,7 +40,11 @@ export function useSSEConnection({
   onFallbackPollRef.current = onFallbackPoll;
 
   useEffect(() => {
-    if (!enabled || !token) return;
+    if (!enabled || !token) {
+      setStatusSafe('idle');
+      return;
+    }
+    setStatusSafe('connecting');
 
     let es: EventSource | null = null;
     let cancelled = false;
@@ -93,7 +74,9 @@ export function useSSEConnection({
     };
 
     const degradeToPolling = () => {
+      if (cancelled) return;
       closeEventSource();
+      setStatusSafe('degraded');
       startFallbackPolling();
       if (retryTimer) return;
       retryTimer = setTimeout(() => {
@@ -105,8 +88,9 @@ export function useSSEConnection({
 
     async function connect() {
       const ticket = await fetchSSETicket();
-      if (cancelled || !ticket) {
-        if (ticket === null && token) degradeToPolling();
+      if (cancelled) return;
+      if (!ticket) {
+        if (token) degradeToPolling();
         return;
       }
       const sseUrl = `${url}${url.includes('?') ? '&' : '?'}ticket=${encodeURIComponent(ticket)}`;
@@ -117,6 +101,7 @@ export function useSSEConnection({
         es.onopen = () => {
           failCountRef.current = 0;
           stopFallbackPolling();
+          setStatusSafe('live');
         };
 
         es.onmessage = (e: MessageEvent) => {
@@ -126,6 +111,7 @@ export function useSSEConnection({
               if (parsed.ts && parsed.ts < lastTsRef.current) return;
               if (parsed.ts) lastTsRef.current = parsed.ts;
             }
+            setStatusSafe('live');
             onMessageRef.current(e.data);
           } catch {
           }
@@ -135,6 +121,8 @@ export function useSSEConnection({
           failCountRef.current += 1;
           if (failCountRef.current >= SSE_MAX_FAILURES) {
             degradeToPolling();
+          } else {
+            setStatusSafe('connecting');
           }
         };
       } catch {
@@ -153,5 +141,7 @@ export function useSSEConnection({
         retryTimer = null;
       }
     };
-  }, [url, enabled, token, label]);
+  }, [url, enabled, token, label, setStatusSafe]);
+
+  return { status };
 }

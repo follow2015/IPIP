@@ -235,7 +235,9 @@
       "deleteContent": "Delete subnet {{network}}?",
       "scanTitle": "Confirm Scan",
       "scanContent": "Scan subnet {{network}}? The scan runs in the background and refreshes automatically when done.",
-      "fullScanContent": "A full scan (port collection + route sync + MAC index + ARP sync + IP reconciliation + supplemental detection) will run on every switch in the current room. It may take a long time. The scan runs in the background and refreshes automatically when done."
+      "fullScanContent": "A full scan (port collection + route sync + MAC index + ARP sync + IP reconciliation + supplemental detection) will run on every switch in the current room. It may take a long time. The scan runs in the background and refreshes automatically when done.",
+      "snmpTakeoverHint": "(Note: this room contains devices collected via the SNMP channel; manual ports not discovered will be removed during scan)",
+      "fullScanSnmpTakeoverHint": "(Note: devices collected via SNMP in this room — undiscovered manual ports will be removed during scan)"
     },
     "message": {
       "missingParams": "Missing required parameters (room_id/switch_id/notes/nexthop); cannot delete",

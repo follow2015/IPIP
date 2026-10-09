@@ -11,8 +11,7 @@ import {
   Switch,
   Table,
   Tag,
-  Typography,
-  message
+  Typography
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined } from '@ant-design/icons';
@@ -24,6 +23,7 @@ import {
   useUpdateRoomChannel
 } from '@/services/room';
 import { CHANNEL_TYPE_LABEL_KEYS, SUPPLY_LABEL_KEYS, paletteKeyOf } from './palette';
+import { useMessage } from '@/hooks/useMessage';
 import type { RoomChannel } from '@/types/models';
 import type { RoomChannelCreate } from '@/types/api-bridge';
 
@@ -48,6 +48,7 @@ const SUPPLY_VALUES = ['floor', 'direct', 'none'] as const;
 export default function ChannelConfigModal({ roomId, open, onClose }: ChannelConfigModalProps) {
   const { t: ta } = useTranslation('asset');
   const { t: tc } = useTranslation('common');
+  const message = useMessage();
 
   const { data: channels = [], isLoading } = useRoomChannels(roomId);
   const createMutation = useCreateRoomChannel(roomId);
@@ -140,7 +141,7 @@ export default function ChannelConfigModal({ roomId, open, onClose }: ChannelCon
     } finally {
       setSubmitting(false);
     }
-  }, [createMutation, editing, form, ta, updateMutation]);
+  }, [createMutation, editing, form, ta, updateMutation, message]);
 
   const handleDelete = useCallback(
     async (channelId: number) => {
@@ -153,7 +154,7 @@ export default function ChannelConfigModal({ roomId, open, onClose }: ChannelCon
         );
       }
     },
-    [deleteMutation, ta]
+    [deleteMutation, ta, message]
   );
 
   const columns: ColumnsType<RoomChannel> = useMemo(

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Modal, Form, Input, Select, Tag } from 'antd';
+import { Modal, Form, Input, Select, Tag, theme } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { SwitchPortIP } from '@/types/models';
 
@@ -41,6 +41,7 @@ export function IpConfigModal({
   onSubmit
 }: IpConfigModalProps) {
   const { t } = useTranslation('device');
+  const { token } = theme.useToken();
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -92,7 +93,9 @@ export function IpConfigModal({
               {ip.prefix ? `/${ip.prefix}` : ip.subnet_mask ? `/${ip.subnet_mask}` : ''}
             </Tag>
           ))}
-          <div style={{ marginTop: 6, color: '#faad14' }}>{t('switch.ipConfig.replaceHint')}</div>
+          <div style={{ marginTop: 6, color: token.colorWarning }}>
+            {t('switch.ipConfig.replaceHint')}
+          </div>
         </div>
       )}
       <Form form={form} layout="vertical">

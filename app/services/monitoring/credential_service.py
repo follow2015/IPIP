@@ -16,9 +16,9 @@ from app.exceptions.business import BusinessLogicError
 from app.utils.logging import get_logger
 from app.utils.security.encryption import encrypt, decrypt
 
-logger = get_logger(__name__)
 from app.persistence.monitor_credential_repository import MonitorCredentialRepository
 from app.persistence.device_monitor_status_repository import DeviceMonitorStatusRepository
+logger = get_logger(__name__)
 
 
 def _canonical_payload(payload: dict) -> str:
@@ -285,7 +285,7 @@ class MonitorCredentialService:
         other_links = self._repo.list_other_protocol_links(device_id, keep_protocol)
         if not other_links:
             return
-        for link, cred in other_links:
+        for _link, cred in other_links:
             self._repo.unlink(cred.id, device_id)
         from app.persistence.device_repository import DeviceRepository
 
@@ -378,7 +378,7 @@ def list_credentials() -> list:
     for r in rows:
         try:
             r["payload_meta"] = svc.payload_meta(encrypted_payload=r.get("encrypted_payload"))
-        except Exception:
+        except Exception:  # noqa: BLE001 -- 凭证元数据解析失败降级为空：列表永不回显密文，解析失败不应阻断
             r["payload_meta"] = {}
         r.pop("encrypted_payload", None)
         r.pop("payload", None)

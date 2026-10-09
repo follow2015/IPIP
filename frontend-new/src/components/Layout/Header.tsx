@@ -18,6 +18,8 @@ import {
 } from '@ant-design/icons';
 import type { User } from '@/types/models';
 import NotificationBell from '@/components/Notification/NotificationBell';
+import SSEStatusIndicator from './SSEStatusIndicator';
+import type { SSEStatus } from '@/hooks/useSSEConnection';
 import { changeLanguage } from '@/i18n';
 import { SUPPORTED_LANGUAGES, type AppLanguage } from '@/i18n/config';
 
@@ -29,6 +31,7 @@ interface HeaderProps {
   user: User | null;
   onLogout: () => void;
   isMobile?: boolean;
+  sseStatus?: SSEStatus;
 }
 
 const { Header: AntHeader } = Layout;
@@ -40,7 +43,8 @@ function Header({
   onToggleTheme,
   user,
   onLogout,
-  isMobile = false
+  isMobile = false,
+  sseStatus = 'idle'
 }: HeaderProps) {
   const { token } = theme.useToken();
   const navigate = useNavigate();
@@ -111,6 +115,7 @@ function Header({
         />
       </Space>
       <Space size={isMobile ? 'small' : 'middle'}>
+        <SSEStatusIndicator status={sseStatus} compact={isMobile} />
         <NotificationBell />
         {!isMobile && (
           <Button

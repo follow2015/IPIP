@@ -1,4 +1,3 @@
-from __future__ import annotations
 # -*- coding: utf-8 -*-
 """扫描流程 Redis 操作统一封装
 
@@ -6,8 +5,10 @@ from __future__ import annotations
 封装 MAC 倒排索引、端口反向索引、直连网段索引、
 无权限降级映射、扫描进度等操作。
 """
+from __future__ import annotations
 import ipaddress
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -59,7 +60,7 @@ class ScanRedis:
             sw_id: 交换机 devices.id
             port: 归一化端口名
         """
-        key = f"mac_index:{scope}:{mac}"
+        key = redis_keys.scan_mac_index_key(scope, mac)
         field = f"{sw_id}:{port}"
         self.r.hset(key, field, 1)
         self.r.expire(key, self.TTL_SCAN)
@@ -75,7 +76,7 @@ class ScanRedis:
             port: 归一化端口名
             mac: 归一化 MAC 地址
         """
-        key = f"port_mac:{scope}:{sw_id}:{port}"
+        key = redis_keys.scan_port_mac_key(scope, sw_id, port)
         self.r.sadd(key, mac)
         self.r.expire(key, self.TTL_SCAN)
 
@@ -91,7 +92,7 @@ class ScanRedis:
         Returns:
             set[str]: 该端口上的 MAC 地址集合
         """
-        key = f"port_mac:{scope}:{sw_id}:{port}"
+        key = redis_keys.scan_port_mac_key(scope, sw_id, port)
         result = self.r.smembers(key)
         return result if result else set()
 
@@ -107,7 +108,7 @@ class ScanRedis:
             ip_address: 端口 IP 地址
             prefix: 子网前缀长度
         """
-        key = f"port_ip:{scope}"
+        key = redis_keys.scan_port_ip_key(scope)
         field = f"{sw_id}|{port}|{ip_address}/{prefix}"
         self.r.hset(key, field, 1)
         self.r.expire(key, self.TTL_SCAN)
@@ -125,7 +126,7 @@ class ScanRedis:
         Returns:
             tuple[int, str] | None: (sw_id, port) 或 None
         """
-        key = f"port_ip:{scope}"
+        key = redis_keys.scan_port_ip_key(scope)
         all_entries = self.r.hgetall(key)
         if not all_entries:
             return None
@@ -170,7 +171,7 @@ class ScanRedis:
         Returns:
             list[str]: 该端口上配置的 IP 地址列表（不含前缀），无结果时返回空列表
         """
-        key = f"port_ip:{scope}"
+        key = redis_keys.scan_port_ip_key(scope)
         all_entries = self.r.hgetall(key)
         if not all_entries:
             return []
@@ -187,7 +188,7 @@ class ScanRedis:
 
     def port_ip_clear(self, scope: str):
         """清除端口 IP 索引（扫描结束后调用）"""
-        key = f"port_ip:{scope}"
+        key = redis_keys.scan_port_ip_key(scope)
         self.r.delete(key)
 
 
@@ -201,7 +202,7 @@ class ScanRedis:
             upstream_sw_id: 上联交换机 devices.id
             upstream_port: 上联交换机上的端口（已归一化）
         """
-        key = f"no_auth_fallback:{scope}"
+        key = redis_keys.scan_no_auth_fallback_key(scope)
         self.r.hset(key, no_auth_sw_ip,
                     f"{upstream_sw_id}:{upstream_port}")
 
@@ -216,7 +217,7 @@ class ScanRedis:
         Returns:
             tuple[int, str] | None: (upstream_sw_id, upstream_port) 或 None
         """
-        key = f"no_auth_fallback:{scope}"
+        key = redis_keys.scan_no_auth_fallback_key(scope)
         val = self.r.hget(key, no_auth_sw_ip)
         if not val:
             return None
@@ -232,7 +233,7 @@ class ScanRedis:
             sw_ext_repo: SwitchExtRepository 实例
             sw_repo: SwitchRepository 实例
         """
-        key = f"no_auth_fallback:{scope}"
+        key = redis_keys.scan_no_auth_fallback_key(scope)
         self.r.delete(key)
         if scope.startswith("r:"):
             room_id = int(scope[2:])

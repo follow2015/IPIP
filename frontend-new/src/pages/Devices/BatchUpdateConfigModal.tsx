@@ -21,8 +21,7 @@ import {
   Card,
   Alert,
   Button,
-  Typography,
-  Space
+  theme
 } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { useBatchUpdateDeviceConfig, type BatchUpdateConfigRequest } from '@/services/device';
@@ -42,8 +41,6 @@ import type { Device, Switch } from '@/types/models';
 import { DeviceType, DeviceSubtype } from '@/types/enums';
 import { getDeviceSubtypeLabel } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
-
-const { Text } = Typography;
 
 interface BatchUpdateConfigModalProps {
   open: boolean;
@@ -71,6 +68,7 @@ const HW_FIELDS = [
 function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigModalProps) {
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
+  const { token } = theme.useToken();
   const [form] = Form.useForm();
   const batchUpdateConfig = useBatchUpdateDeviceConfig();
   const message = useMessage();
@@ -341,11 +339,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
 
         {/* 网管型网络设备：仅通用字段 */}
         {isManagedNetwork && (
-          <Alert
-            type="warning"
-            showIcon
-            message={t('batchConfig.alert.managedNetworkLimited')}
-          />
+          <Alert type="warning" showIcon message={t('batchConfig.alert.managedNetworkLimited')} />
         )}
 
         {/* 非网管型网络设备拓扑 + 端口生成 */}
@@ -446,11 +440,11 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                 style={{
                   marginBottom: 8,
                   padding: '6px 12px',
-                  background: '#fafafa',
+                  background: token.colorFillQuaternary,
                   borderRadius: 6,
                   fontSize: 12,
                   lineHeight: 1.8,
-                  color: '#595959'
+                  color: token.colorTextSecondary
                 }}
               >
                 {t('form.portGeneration.intro')}
@@ -469,7 +463,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
                         style={{
                           marginBottom: 8,
                           padding: '8px 0',
-                          borderBottom: '1px dashed #f0f0f0'
+                          borderBottom: `1px dashed ${token.colorBorderSecondary}`
                         }}
                       >
                         <Col xs={12} md={6}>
@@ -584,11 +578,7 @@ function BatchUpdateConfigModal({ open, devices, onClose }: BatchUpdateConfigMod
 
         {/* 机箱子类型：仅支持通用字段 */}
         {!isServerHw && !isNetwork && (
-          <Alert
-            type="warning"
-            showIcon
-            message={t('batchConfig.alert.chassisNotSupported')}
-          />
+          <Alert type="warning" showIcon message={t('batchConfig.alert.chassisNotSupported')} />
         )}
       </Form>
     </Modal>

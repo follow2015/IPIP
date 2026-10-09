@@ -9,16 +9,11 @@ import i18next from 'i18next';
 import apiClient, { get, post } from './api-client';
 import { createCrudHooks } from './crud-factory';
 import { queryKeys } from './query-keys';
+import { invalidateCustomerGraph } from './cache-invalidation';
 import type { Customer, CustomerAssets, Cabinet, Device } from '@/types/models';
-import type { PaginationParams, PaginatedData } from '@/types/api';
+import type { PaginatedData } from '@/types/api';
 import type { CustomerCreate, CustomerUpdate } from '@/types/api-bridge';
 import type { SelectOption } from './crud-factory';
-
-interface CustomerQueryParams extends PaginationParams {
-  search?: string;
-  customer_name?: string;
-  customer_status?: number;
-}
 
 export type CreateCustomerRequest = CustomerCreate;
 
@@ -28,6 +23,7 @@ export type UpdateCustomerRequest = CustomerUpdate & { id: number };
 const customerHooks = createCrudHooks<Customer, CreateCustomerRequest, UpdateCustomerRequest>({
   basePath: '/customers',
   queryKey: queryKeys.customers.all,
+  invalidateResource: 'customer',
   optionsConfig: {
     paginated: true,
     labelKey: 'customer_name',
@@ -198,11 +194,7 @@ export function useTerminateCustomer() {
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.networks.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.ip.all });
+      invalidateCustomerGraph(queryClient);
     }
   });
 }

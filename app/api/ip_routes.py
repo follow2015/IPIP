@@ -7,12 +7,11 @@ IP 管理 + 封禁/解封 API 路由
 import ipaddress
 from app.utils.logging import get_logger
 
-from flask import Blueprint, request, Response
+from flask import Blueprint, request
 
-from app.api.base import APIResponse, ErrorCode
-from app.api.validators import parse_ip_room
-from app.openapi.doc import doc, public
-from app.utils.auth import login_required, permission_required
+from app.api.base import APIResponse, ErrorCode, RequestValidator
+from app.openapi.doc import doc
+from app.services.auth import login_required, permission_required
 from app.core.enums import IPStatus, NotificationTypeCode
 from app.utils.transactional import transactional
 from app.exceptions.business import (
@@ -261,8 +260,7 @@ def list_ips():
     status = request.args.get("status", type=int)
     customer_id = request.args.get("customer_id", type=int)
     switch_id = request.args.get("switch_id", type=int)
-    page = request.args.get("page", 1, type=int)
-    page_size = request.args.get("per_page", 20, type=int)
+    page, page_size = RequestValidator.validate_pagination_params()
     search = request.args.get("search", type=str)
 
     repo = IPManagerRepository()
@@ -504,7 +502,7 @@ def scan_network():
                         )
                 except Exception:
                     logger.exception("IP扫描完成通知创建失败")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 后台异步任务顶层兜底：线程内异常无人接收，必须捕获并转为前端通知/清理锁
             logger.error("异步网段扫描失败: %s (room=%d): %s", network_str, room_id, e)
             try:
                 with app_ref.app_context():

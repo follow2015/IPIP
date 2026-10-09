@@ -6,7 +6,19 @@
  */
 import { useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, Descriptions, Spin, Button, Tag, Row, Col, Statistic, Result, Space } from 'antd';
+import {
+  Card,
+  Descriptions,
+  Spin,
+  Button,
+  Tag,
+  Row,
+  Col,
+  Statistic,
+  Result,
+  Space,
+  theme
+} from 'antd';
 import {
   ArrowLeftOutlined,
   DatabaseOutlined,
@@ -57,6 +69,7 @@ function RoomDetail() {
 }
 
 function RoomDetailContent({ roomId }: { roomId: number }) {
+  const { token } = theme.useToken();
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
   const { t: tm } = useTranslation('monitor');
@@ -155,7 +168,7 @@ function RoomDetailContent({ roomId }: { roomId: number }) {
               value={avgUUsage}
               suffix="%"
               prefix={<ThunderboltOutlined />}
-              styles={{ content: { color: avgUUsage > 80 ? '#cf1322' : '#3f8600' } }}
+              styles={{ content: { color: avgUUsage > 80 ? token.red7 : '#3f8600' } }}
             />
           </Col>
           <Col xs={12} md={6}>

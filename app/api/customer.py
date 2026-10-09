@@ -4,11 +4,10 @@
 
 提供客户管理的RESTful API端点。
 """
-from flask import Blueprint, request, g
-import hashlib
-from app.exceptions import PresetResponseError
+from flask import Blueprint, request
+from sqlalchemy.exc import IntegrityError
+from app.exceptions import PresetResponseError, ValidationError
 from app.utils.logging import get_logger
-from marshmallow import Schema
 from app.utils.time_utils import now_utc_naive
 
 from app.services import CustomerService
@@ -16,22 +15,18 @@ from app.services.import_export_service import ExportTooLargeError
 from app.persistence.customer_repository import CustomerRepository
 from app.core.enums import CustomerStatus
 from app.api.base import APIResponse
-from app.utils import (
-    login_required,
-    permission_required,
-    rate_limit_api,
-    validation_manager,
-)
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api, validation_manager
 from app.utils.transactional import transactional
-from app.utils.auth import get_current_user_id
-from app.openapi.doc import doc, public
+from app.services.auth import get_current_user_id
+from app.openapi.doc import doc
 
 customer_bp = Blueprint("customer", __name__)
 customer_service = CustomerService(CustomerRepository())
 logger = get_logger(__name__)
 
 
-from app.schemas.customer import CustomerCreateSchema, CustomerUpdateSchema
+from app.schemas.customer import CustomerCreateSchema, CustomerUpdateSchema  # noqa: E402 -- 本仓约定：Schema import 就近放在使用它的路由区（见上方注释说明）
 
 @customer_bp.route("/", methods=["GET"])
 @doc(summary="获取客户列表", tags=["客户"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}, {"name": "status", "in": "query", "schema": {"type": "string"}}], responses={200: "CustomerResponse", 500: "ApiError"})
@@ -79,7 +74,7 @@ def list_customers():
             total=total,
             message="获取客户列表成功",
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error(f"获取客户列表失败: {e}")
         return APIResponse.error(message="获取客户列表失败", error_code="CUSTOMER_LIST_ERROR", status_code=500)
 
@@ -130,7 +125,7 @@ def create_customer():
     """
     data = validation_manager.validate_schema(request.json, CustomerCreateSchema())
 
-    if "contact_phone" in data and data["contact_phone"]:
+    if data.get("contact_phone"):
         if not validation_manager.validate_phone(data["contact_phone"]):
             return APIResponse.error(message="联系电话格式无效", error_code="INVALID_PHONE", status_code=400)
 
@@ -189,7 +184,7 @@ def update_customer(customer_id):
             terminated = customer_service.terminate_customer(customer_id, operator_id, reason)
             return APIResponse.success(data=terminated.to_dict(), message="客户已终止")
 
-    if "contact_phone" in data and data["contact_phone"]:
+    if data.get("contact_phone"):
         if not validation_manager.validate_phone(data["contact_phone"]):
             return APIResponse.error(message="联系电话格式无效", error_code="INVALID_PHONE", status_code=400)
 
@@ -222,9 +217,9 @@ def delete_customer(customer_id):
     if not customer:
         return APIResponse.error(message="客户不存在", error_code="CUSTOMER_NOT_FOUND", status_code=404)
 
-    if customer.cabinets or customer.devices:
+    if customer.cabinets or customer.devices or customer.circuits:
         return APIResponse.error(
-            message="客户下还有机柜或设备，无法删除", error_code="CUSTOMER_HAS_RESOURCES", status_code=409
+            message="客户下还有机柜、设备或线路，无法删除", error_code="CUSTOMER_HAS_RESOURCES", status_code=409
         )
 
     customer_service.delete_customer(customer_id)
@@ -346,7 +341,7 @@ def get_customer_assets(customer_id):
             data=assets,
             message="获取客户资产统计成功"
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error(f"获取客户资产统计失败: {e}")
         return APIResponse.error(
             message="服务器内部错误",
@@ -370,7 +365,6 @@ def export_customer_assets(customer_id):
         Excel 文件下载
     """
     from flask import send_file
-    from datetime import datetime
 
     try:
         output = customer_service.generate_customer_assets_excel(customer_id)
@@ -384,7 +378,7 @@ def export_customer_assets(customer_id):
         )
     except ExportTooLargeError as e:
         return APIResponse.error(message=e.message, status_code=e.status_code)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("导出客户资源Excel失败: %s", str(e))
         return APIResponse.error(message="导出失败", status_code=500)
 
@@ -417,27 +411,38 @@ def batch_delete_customers():
     customer_service = CustomerService(CustomerRepository())
     deleted_count = 0
     failed_ids = []
-    
+    failed_details = []
+
     for customer_id in ids:
         try:
-            result = customer_service.delete_customer(customer_id)
+            result = customer_service.delete_customer_in_savepoint(customer_id)
             if result:
                 deleted_count += 1
             else:
                 failed_ids.append(customer_id)
-        except Exception as e:
+                failed_details.append({"id": customer_id, "reason": "客户不存在"})
+        except ValidationError as e:
+            failed_ids.append(customer_id)
+            failed_details.append({"id": customer_id, "reason": str(e)})
+        except IntegrityError:
+            logger.error("删除客户 %s 失败：仍被其他资源引用", customer_id)
+            failed_ids.append(customer_id)
+            failed_details.append({"id": customer_id, "reason": "客户下仍有未释放的关联资源"})
+        except Exception as e:  # noqa: BLE001 -- 批量删除内单客户失败隔离：记入 failed_ids/failed_details 继续下一个，客户级联删除涉及多表约束，异常类型不可枚举
             logger.error(f"删除客户 {customer_id} 失败: {str(e)}")
             failed_ids.append(customer_id)
-    
+            failed_details.append({"id": customer_id, "reason": "删除失败，请稍后重试"})
+
     message = f"成功删除 {deleted_count} 个客户"
     if failed_ids:
         message += f"，{len(failed_ids)} 个删除失败"
-    
+
     return APIResponse.success(
         data={
             "deleted_count": deleted_count,
             "failed_count": len(failed_ids),
-            "failed_ids": failed_ids
+            "failed_ids": failed_ids,
+            "failed_details": failed_details,
         },
         message=message
     )
@@ -502,7 +507,12 @@ def terminate_customer(customer_id):
         if isinstance(e, RecordNotFoundError):
             return APIResponse.error(message=e.message, error_code="CUSTOMER_NOT_FOUND", status_code=404)
         if isinstance(e, BusinessLogicError):
-            return APIResponse.error(message=e.message, error_code=e.code, status_code=e.status_code)
+            return APIResponse.error(
+                message=e.message,
+                error_code=e.code,
+                status_code=e.status_code,
+                details=getattr(e, "details", None),
+            )
         raise
     return APIResponse.success(data=customer.to_dict(), message="客户已终止")
 
@@ -532,7 +542,6 @@ def download_termination_archive(customer_id):
     """下载最近一份终止存档 PDF。"""
     from flask import send_file
     from io import BytesIO
-    from datetime import datetime
     from app.persistence.customer_termination_archive_repository import CustomerTerminationArchiveRepository
 
     archive_repo = CustomerTerminationArchiveRepository()

@@ -12,7 +12,8 @@ import {
   Input,
   Select,
   Modal,
-  Checkbox
+  Checkbox,
+  theme
 } from 'antd';
 import {
   CheckCircleOutlined,
@@ -25,7 +26,7 @@ import {
   ThunderboltOutlined,
   CloseCircleOutlined
 } from '@ant-design/icons';
-import type { MenuProps } from 'antd';
+import type { MenuProps, GlobalToken } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useBatchPortAction, type BatchPortActionRequest } from '@/services/switch';
@@ -150,13 +151,14 @@ const BATCH_ACTIONS: BatchActionDef[] = [
 
 const buildMenuItems = (
   actions: BatchActionDef[],
-  td: TFunction<'device'>
+  td: TFunction<'device'>,
+  token: GlobalToken
 ): MenuProps['items'] =>
   actions.map((action) => ({
     key: action.key,
     label: action.disabled ? (
       <Tooltip title={td('switch.batch.sshOnlyTip')}>
-        <span style={{ color: 'rgba(0,0,0,0.25)' }}>{td(action.labelKey)}</span>
+        <span style={{ color: token.colorTextQuaternary }}>{td(action.labelKey)}</span>
       </Tooltip>
     ) : (
       td(action.labelKey)
@@ -173,6 +175,7 @@ export default function BatchPortActions({
   hasSsh = true,
   onBatchLocalUpdate
 }: BatchPortActionsProps) {
+  const { token } = theme.useToken();
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
@@ -384,7 +387,7 @@ export default function BatchPortActions({
     }
   };
 
-  const menuItems = buildMenuItems(availableActions, td);
+  const menuItems = buildMenuItems(availableActions, td, token);
 
   if (selectedPorts.length === 0) return null;
 
@@ -451,10 +454,7 @@ export default function BatchPortActions({
               <Form.Item noStyle shouldUpdate={(prev, cur) => prev.mode !== cur.mode}>
                 {({ getFieldValue }) =>
                   getFieldValue('mode') === 'trunk' ? (
-                    <Form.Item
-                      name="allowed_vlans"
-                      label={td('switch.batch.form.allowedVlans')}
-                    >
+                    <Form.Item name="allowed_vlans" label={td('switch.batch.form.allowedVlans')}>
                       <Input placeholder={td('switch.batch.form.allowedVlansPlaceholder')} />
                     </Form.Item>
                   ) : null
@@ -478,10 +478,7 @@ export default function BatchPortActions({
       >
         <Form form={descForm} layout="vertical">
           <Form.Item name="description" label={td('switch.batch.form.description')}>
-            <Input.TextArea
-              rows={3}
-              placeholder={td('switch.batch.form.descriptionPlaceholder')}
-            />
+            <Input.TextArea rows={3} placeholder={td('switch.batch.form.descriptionPlaceholder')} />
           </Form.Item>
         </Form>
       </Modal>

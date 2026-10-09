@@ -41,8 +41,6 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-import requests
-
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT = ROOT / "instance" / "models"
 
@@ -74,7 +72,7 @@ def log(msg: str) -> None:
 
 def _get_json(url: str, timeout: int = 30) -> dict:
     """GET 并解析 JSON；失败抛异常由调用方决定是否回退镜像。"""
-    with urllib.request.urlopen(url, timeout=timeout) as resp:
+    with urllib.request.urlopen(url, timeout=timeout) as resp:  # noqa: S310 -- 模型下载脚本，URL 来自内置端点常量（ModelScope/HF），受控输入
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -131,9 +129,8 @@ def list_hf_files(repo: str) -> list:
     """
     url = (f"{HF_ENDPOINT}/api/models/{repo}?"
            + urllib.parse.urlencode({"blobs": "true"}))
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
-    siblings = resp.json().get("siblings", [])
+    resp = _get_json(url, timeout=30)
+    siblings = resp.get("siblings", [])
     out = []
     has_usable_size = False
     for item in siblings:
@@ -228,9 +225,9 @@ def download_file(url: str, dest: Path, size: int = 0, sha256: str = "") -> None
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
-    req = urllib.request.Request(url, headers={"User-Agent": "ipip-deploy/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "ipip-deploy/1.0"})  # noqa: S310 -- 同上，受控 URL
     start = time.monotonic()
-    with urllib.request.urlopen(req, timeout=120) as resp, open(tmp, "wb") as f:
+    with urllib.request.urlopen(req, timeout=120) as resp, open(tmp, "wb") as f:  # noqa: S310 -- 同上，受控 URL
         done = 0
         while True:
             chunk = resp.read(1024 * 256)

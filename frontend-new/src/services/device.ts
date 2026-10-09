@@ -4,16 +4,16 @@
  * - 批量操作、状态更新、位置更新、序列号生成、统计仍手写
  * 对齐后端 /api/devices/* 端点
  */
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, put, del } from './api-client';
 import { createCrudHooks } from './crud-factory';
 import { queryKeys } from './query-keys';
+import { invalidateDeviceGraph } from './cache-invalidation';
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import type { Device, BatchCreateResult, CloneDeviceData } from '@/types/models';
 import type { PaginatedData, PaginationParams } from '@/types/api';
-import type {
-  DeviceCreate as OpenApiDeviceCreate,
-  DeviceUpdate as OpenApiDeviceUpdate
-} from '@/types/api-bridge';
+import type { DeviceCreate as OpenApiDeviceCreate } from '@/types/api-bridge';
 
 
 export interface DeviceQueryParams extends PaginationParams {
@@ -120,7 +120,8 @@ const deviceHooks = createCrudHooks<
   DeviceQueryParams
 >({
   basePath: '/devices',
-  queryKey: queryKeys.devices.all
+  queryKey: queryKeys.devices.all,
+  invalidateResource: 'device'
 });
 
 export const useDeviceList = deviceHooks.useList;
@@ -138,12 +139,7 @@ export function useDeleteDevice() {
   return useMutation({
     mutationFn: (id: number) => del<void>(`/devices/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.monitor.statusesAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.monitor.alertsAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.monitor.metricAlertsAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.monitor.overview });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -159,8 +155,7 @@ export function useCreateDevice() {
   return useMutation({
     mutationFn: (data: CreateDeviceRequest) => post<Device, CreateDeviceRequest>('/devices', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -179,9 +174,7 @@ export function useUpdateDevice() {
       return put<Device>(`/devices/${id}`, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.monitor.metricDashboardAll });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -203,8 +196,7 @@ export function useUpdateDeviceStatus() {
     mutationFn: ({ id, status }: { id: number; status: number }) =>
       put<void>(`/devices/${id}/status`, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -220,8 +212,7 @@ export function useUpdateDeviceLocation() {
       data: { cabinet_id: number; u_position?: number | null; height_u?: number | null };
     }) => put<void>(`/devices/${id}/location`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -231,12 +222,7 @@ export function useBatchDeleteDevices() {
   return useMutation({
     mutationFn: (ids: number[]) => post<null>('/devices/batch-delete', { ids }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.monitor.statusesAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.monitor.alertsAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.monitor.metricAlertsAll });
-      queryClient.invalidateQueries({ queryKey: queryKeys.monitor.overview });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -247,8 +233,7 @@ export function useBatchUpdateDeviceStatus() {
     mutationFn: ({ ids, status }: { ids: number[]; status: number }) =>
       post<null>('/devices/batch-update-status', { device_ids: ids, status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -259,7 +244,7 @@ export function useBatchCreateDevices() {
     mutationFn: (devices: CreateDeviceRequest[]) =>
       post<BatchCreateResult>('/devices/batch-create', { devices }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -387,7 +372,7 @@ export function useSwapNodePositions(chassisId: number) {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.detail(chassisId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -448,7 +433,7 @@ export function useGenerateSerialNumber() {
     mutationFn: (params?: { prefix?: string; format_type?: string; length?: number }) =>
       post<{ serial_number: string }>('/devices/generate-serial-number', params ?? {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -486,8 +471,7 @@ export function useRestoreDevice() {
       u_position?: number;
     }) => post<Record<string, unknown>>(`/devices/${id}/restore`, { cabinet_id, u_position }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -510,8 +494,7 @@ export function useBatchRestoreDevices() {
         u_position
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cabinets.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -521,7 +504,7 @@ export function usePermanentDeleteDevice() {
   return useMutation({
     mutationFn: (id: number) => del<void>(`/devices/${id}/permanent`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -532,7 +515,7 @@ export function useBatchPermanentDeleteDevices() {
     mutationFn: (device_ids: number[]) =>
       post<Record<string, unknown>>('/devices/batch-permanent-delete', { device_ids }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices.all });
+      invalidateDeviceGraph(queryClient);
     }
   });
 }
@@ -554,4 +537,22 @@ export async function searchDevicesForLink(keyword: string): Promise<DeviceSearc
     per_page: 50
   });
   return res.data?.items ?? [];
+}
+
+
+export function useNetworkDeviceOptions(search?: string) {
+  const list = useDeviceList({
+    device_type: 'network',
+    ...(search ? { search } : {}),
+    per_page: PER_PAGE_CAP
+  });
+  const items = list.data?.items;
+  return useMemo(
+    () =>
+      (items ?? []).map((d) => ({
+        label: `${d.device_name}${d.management_ip ? ` (${d.management_ip})` : ''}`,
+        value: d.id
+      })),
+    [items]
+  );
 }

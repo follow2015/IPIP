@@ -7,7 +7,6 @@ tokenchars '-./_' 把连字符/点号/斜杠/下划线划入词内字符，
 """
 import sqlite3
 import threading
-from typing import Any
 
 from app.services.ai.rag.tokenizer import tokenize
 

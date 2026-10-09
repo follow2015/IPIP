@@ -5,6 +5,7 @@
  * 对齐后端 /api/rooms/* 端点
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { get, post, put, del } from './api-client';
 import { createCrudHooks } from './crud-factory';
 import { queryKeys } from './query-keys';
@@ -15,7 +16,6 @@ import type {
   RoomLayoutMarker,
   RoomOverviewGroup
 } from '@/types/models';
-import type { PaginationParams } from '@/types/api';
 import type {
   RoomChannelCreate,
   RoomChannelUpdate,
@@ -25,14 +25,6 @@ import type {
   RoomUpdate
 } from '@/types/api-bridge';
 
-interface RoomQueryParams extends PaginationParams {
-  search?: string;
-  name?: string;
-  building?: string;
-  floor?: string;
-  status?: number;
-}
-
 export type CreateRoomRequest = RoomCreate;
 
 export type UpdateRoomRequest = RoomUpdate & { id: number };
@@ -41,6 +33,7 @@ export type UpdateRoomRequest = RoomUpdate & { id: number };
 const roomHooks = createCrudHooks<Room, CreateRoomRequest, UpdateRoomRequest>({
   basePath: '/rooms',
   queryKey: queryKeys.rooms.all,
+  invalidateResource: 'room',
   optionsConfig: {
     path: '/rooms/all',
     labelKey: 'name',
@@ -206,6 +199,8 @@ export function useUpdateRoomLayoutMarker(roomId: number) {
   });
 }
 
+export const MAX_BATCH_ITEMS = 200;
+
 export interface RoomLayoutMarkerBatchItem {
   marker_id: number;
   expected_version: number;
@@ -218,8 +213,12 @@ export interface RoomLayoutMarkerBatchItem {
 
 export function useBatchUpdateRoomLayoutMarkers(roomId: number) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation('common');
   return useMutation({
     mutationFn: async (items: RoomLayoutMarkerBatchItem[]) => {
+      if (items.length > MAX_BATCH_ITEMS) {
+        throw new Error(t('batch.tooMany', { max: MAX_BATCH_ITEMS, submitted: items.length }));
+      }
       const res = await post<null>(`/rooms/${roomId}/layout-markers/batch`, { items });
       return res.data;
     },

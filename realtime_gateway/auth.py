@@ -65,7 +65,7 @@ def _revoked_cache_key(token: str) -> str:
     不一致，故必须镜像存储层。
     """
     if len(token) > _MD5_TOKEN_THRESHOLD:
-        token_part = hashlib.md5(token.encode("utf-8")).hexdigest()
+        token_part = hashlib.md5(token.encode("utf-8"), usedforsecurity=False).hexdigest()
     else:
         token_part = token
 

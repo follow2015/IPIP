@@ -4,7 +4,7 @@
  * 从原 DeviceForm.tsx 拆出。包含机房/机柜选择、U位录入、冲突检测告警、
  * 智能分配入口与 U 位视图。复用父级 <Form> 上下文，不持有 form 实例。
  */
-import { Form, Select, InputNumber, Row, Col, Alert, Divider, Tooltip } from 'antd';
+import { Form, Select, InputNumber, Row, Col, Alert, Divider, Tooltip, theme } from 'antd';
 import type { SelectProps } from 'antd';
 import { AimOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -49,6 +49,7 @@ export default function LocationInfoFields({
   watchedUPosition,
   watchedHeightU
 }: LocationInfoFieldsProps) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   return (
     <>
@@ -132,7 +133,7 @@ export default function LocationInfoFields({
         </Col>
         <Col xs={12} md={6} style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}>
           {availableUPositions && availableUPositions.length > 0 && (
-            <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+            <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>
               {t('form.location.availableUPositions', { count: availableUPositions.length })}
             </span>
           )}

@@ -42,7 +42,7 @@ class TaskInfo:
                 try:
                     self.future.result(timeout=DEFAULT_TASK_TIMEOUT)
                     status = "completed"
-                except Exception:
+                except Exception:  # noqa: BLE001 -- 任务状态查询兜底：异常即视为 failed，保证调用方拿到结构化状态
                     status = "failed"
         return {
             "task_id": self.task_id,
@@ -107,8 +107,8 @@ class TaskExecutor:
                         },
                         "ts": int(time.time() * 1000),
                     }, ensure_ascii=False))
-                except Exception:
-                    pass  # SSE 推送失败不影响异常传播
+                except Exception as e:  # noqa: BLE001 - SSE 推送失败不影响异常传播
+                    logger.debug("task_executor SSE push failed: %s", e)
                 raise
 
         future = self._executor.submit(_wrapped)

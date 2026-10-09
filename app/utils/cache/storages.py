@@ -65,8 +65,24 @@ class RedisCacheStorage(CacheStorage):
     def _init_redis(self):
         """初始化Redis客户端
 
+        [WARN] O1：这里**刻意**自建连接池，不复用 `app.utils.redis_client` 的统一入口
+        （尽管入口的 docstring 自称唯一）。两条理由：
+
+        1. 降级语义不同：缓存不可用的正确反应是"回源 + 记一次 warning"，事件通道
+           不可用的反应是"事件静默丢弃"。共用一池时一次 Redis 抖动会同时打掉两者，
+           且故障面变大、更难定位。
+        2. 超时与命名空间不同：缓存走 `REDIS_POOL_TIMEOUT` 与 `CACHE_KEY_PREFIX`
+           （运维按前缀清理缓存时不会误伤限流/锁），事件通道是固定 5s 且键无前缀。
+
+        现状盘点与"不得再悄悄多一套"的门禁见
+        `app/utils/redis_client.py` 模块 docstring 与
+        `tests/test_redis_pool_inventory.py`。
+
         关键配置说明：
-        - retry_on_timeout: 超时后自动重试，防止 Broken pipe
+        - [已移除] retry_on_timeout：redis-py 6.0 起该参数废弃（``TimeoutError``
+          已默认纳入重试，再传只是每次初始化多一条 DeprecationWarning，且无实际
+          作用）。同族清理见 ``app/utils/redis_client.py``；项目内最早移除处是
+          ``app/services/monitoring/monitor_worker.py``。
         - health_check_interval: 定期检测连接有效性，自动剔除失效连接
         - socket_keepalive: 启用 TCP keepalive，防止空闲连接被中间设备断开
         """
@@ -84,7 +100,6 @@ class RedisCacheStorage(CacheStorage):
                 decode_responses=True,
                 socket_connect_timeout=REDIS_POOL_TIMEOUT,
                 socket_timeout=REDIS_POOL_TIMEOUT,
-                retry_on_timeout=True,
                 health_check_interval=30,
                 socket_keepalive=True,
             )
@@ -92,7 +107,7 @@ class RedisCacheStorage(CacheStorage):
             redis_client.ping()
             logger.info("Redis客户端初始化成功")
             return redis_client
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- Redis 客户端初始化失败返回 None：调用方据此降级
             logger.warning(f"Redis客户端初始化失败: {e}")
             return None
     
@@ -121,7 +136,7 @@ class RedisCacheStorage(CacheStorage):
             return json.dumps(value, ensure_ascii=False, default=_json_default)
         except (TypeError, ValueError) as e:
             logger.warning("缓存值无法 JSON 序列化，丢弃: %s", e)
-            raise ValueError(f"缓存值不支持序列化: {type(value)}")
+            raise ValueError(f"缓存值不支持序列化: {type(value)}") from e
     
     def _deserialize_value(self, value: str) -> Any:
         """反序列化值（仅 JSON，禁用 pickle 以防 RCE）"""
@@ -231,7 +246,7 @@ class RedisCacheStorage(CacheStorage):
             values = self.redis_client.mget(full_keys)
 
             result = {}
-            for key, value in zip(keys, values):
+            for key, value in zip(keys, values, strict=False):
                 if value is not None:
                     result[key] = self._deserialize_value(value)
 

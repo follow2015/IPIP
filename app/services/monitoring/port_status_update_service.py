@@ -24,7 +24,6 @@
 from __future__ import annotations
 from app.utils.time_utils import now_utc_naive
 from app.models.network_port import NetworkPort
-from app.models.device_metric_alert_state import DeviceMetricAlertState
 
 from app.utils.logging import get_logger
 from datetime import datetime
@@ -166,7 +165,7 @@ class PortStatusUpdateService:
                 device_id, "port_updown", index, "port_status_changed",
                 breached, severity, value,
             )
-        except Exception:  # noqa: BLE001 - 告警失败不阻断状态更新
+        except Exception:  # 告警失败不阻断状态更新
             logger.warning(
                 "端口状态变化告警入箱失败 device_id=%s port=%s",
                 device_id, port_name, exc_info=True,
@@ -194,7 +193,7 @@ class PortStatusUpdateService:
                     f"采集到端口 {port_name} 但 DB 中无匹配记录",
                     breached=True,
                 )
-        except Exception:  # noqa: BLE001 - 告警失败不阻断
+        except Exception:  # 告警失败不阻断
             logger.warning(
                 "端口名不匹配告警入箱失败 device_id=%s ports=%s",
                 device_id, port_names, exc_info=True,

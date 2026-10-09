@@ -1,4 +1,4 @@
-import { Button, Tag, Descriptions, Spin, Divider, Modal, Space } from 'antd';
+import { theme, Button, Tag, Descriptions, Spin, Divider, Modal, Space } from 'antd';
 import { EyeOutlined, RedoOutlined, ClearOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { StatusTag } from '@/components/StatusTag';
@@ -37,6 +37,7 @@ export function PortDetailModal({
   onClearConfig,
   onDeleteIP
 }: PortDetailModalProps) {
+  const { token } = theme.useToken();
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
   const renderIPList = (ipList: SwitchPortIP[]) => {
@@ -192,7 +193,7 @@ export function PortDetailModal({
                 )}
                 <pre
                   style={{
-                    background: '#f5f5f5',
+                    background: token.colorFillTertiary,
                     padding: 12,
                     borderRadius: 4,
                     fontSize: 12,

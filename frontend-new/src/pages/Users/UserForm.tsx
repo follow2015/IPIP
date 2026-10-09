@@ -4,9 +4,10 @@
  * - 角色选择
  * - 编辑时密码非必填，用户名禁用
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { Modal, Form, Input, Select } from 'antd';
 import type { User } from '@/types/models';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
 import { useTranslation } from 'react-i18next';
 
 const PASSWORD_TIPS_KEY = 'user.field.passwordTips' as const;
@@ -26,8 +27,12 @@ function UserForm({ open, editRecord, onCancel, onOk, loading, roleOptions }: Us
   const [form] = Form.useForm();
   const isEdit = !!editRecord;
 
+  const isPending = loading ?? false;
+  const guard = useDirtyGuard({ form, isPending });
+
   useEffect(() => {
     if (open && editRecord) {
+      form.resetFields();
       form.setFieldsValue({
         username: editRecord.username,
         email: editRecord.email,
@@ -35,7 +40,7 @@ function UserForm({ open, editRecord, onCancel, onOk, loading, roleOptions }: Us
         department: editRecord.department,
         contact_phone: editRecord.contact_phone,
         password: undefined,
-        confirm_password: undefined,
+        confirm_password: undefined
       });
     } else if (open) {
       form.resetFields();
@@ -53,9 +58,11 @@ function UserForm({ open, editRecord, onCancel, onOk, loading, roleOptions }: Us
       title={isEdit ? t('user.modal.editTitle') : t('user.modal.createTitle')}
       open={open}
       onOk={handleSubmit}
-      onCancel={onCancel}
+      onCancel={() => guard.requestClose(onCancel)}
       width={520}
-      confirmLoading={loading}
+      confirmLoading={isPending}
+      closable={!isPending}
+      mask={{ closable: false }}
       destroyOnHidden
     >
       <Form form={form} layout="vertical">
@@ -70,17 +77,20 @@ function UserForm({ open, editRecord, onCancel, onOk, loading, roleOptions }: Us
         <Form.Item
           name="password"
           label={ta('field.password')}
-          rules={isEdit
-            ? [{ required: false }]
-            : [
-                { required: true, message: ta('validation.passwordRequired') },
-                { min: 8, message: t('user.validation.passwordMinLength') },
-              ]
+          rules={
+            isEdit
+              ? [{ required: false }]
+              : [
+                  { required: true, message: ta('validation.passwordRequired') },
+                  { min: 8, message: t('user.validation.passwordMinLength') }
+                ]
           }
           extra={!isEdit ? t(PASSWORD_TIPS_KEY) : t('user.field.passwordKeepHint')}
         >
           <Input.Password
-            placeholder={isEdit ? t('user.field.passwordKeepHint') : ta('validation.passwordRequired')}
+            placeholder={
+              isEdit ? t('user.field.passwordKeepHint') : ta('validation.passwordRequired')
+            }
           />
         </Form.Item>
 
@@ -97,8 +107,8 @@ function UserForm({ open, editRecord, onCancel, onOk, loading, roleOptions }: Us
                     return Promise.resolve();
                   }
                   return Promise.reject(new Error(t('user.validation.passwordMismatch')));
-                },
-              }),
+                }
+              })
             ]}
           >
             <Input.Password placeholder={t('user.field.passwordAgain')} />

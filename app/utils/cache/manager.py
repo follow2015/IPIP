@@ -26,6 +26,10 @@ _CACHE_MISS = object()
 
 _MAX_KEY_LOCKS = 4096
 
+_SINGLEFLIGHT_LOCK_TTL = 10        # 锁 TTL（秒）：须覆盖 callback 的最坏耗时
+_SINGLEFLIGHT_WAIT_STEPS = 10      # 抢不到锁时的自旋次数
+_SINGLEFLIGHT_WAIT_INTERVAL = 0.05  # 每次自旋间隔（秒）
+
 
 class UnifiedCacheManager(CacheManager):
     """统一缓存管理器
@@ -131,7 +135,7 @@ class UnifiedCacheManager(CacheManager):
             self._record_event('miss', key, 'unknown', execution_time)
             return default
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 缓存读取失败降级为 miss：缓存故障不得阻断业务，已通过 _record_event 留痕（异常类型涵盖 Redis/反序列化）
             execution_time = time.time() - start_time
             logger.error(f"获取缓存失败: {key}, 错误: {e}")
             self._record_event('error', key, 'unknown', execution_time, error_message=str(e))
@@ -167,7 +171,7 @@ class UnifiedCacheManager(CacheManager):
             
             return success
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 缓存写入失败非致命：数据已落 DB，写缓存失败仅记录事件
             execution_time = time.time() - start_time
             logger.error(f"设置缓存失败: {key}, 错误: {e}")
             self._record_event('error', key, level or 'unknown', execution_time, error_message=str(e))
@@ -191,14 +195,14 @@ class UnifiedCacheManager(CacheManager):
                     for inv_key in invalidation_keys:
                         try:
                             self.delete(inv_key)
-                        except Exception as e:
+                        except Exception as e:  # noqa: BLE001 -- 智能失效删除失败非致命：返回 True 保证调用方继续，已记录 warning
                             logger.warning(f"智能失效删除相关缓存失败: {inv_key}, 错误: {e}")
                 
                 return True
             
             return False
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 缓存删除失败非致命：同 149，记录事件后返回
             execution_time = time.time() - start_time
             logger.error(f"删除缓存失败: {key}, 错误: {e}")
             self._record_event('error', key, 'unknown', execution_time, error_message=str(e))
@@ -231,11 +235,33 @@ class UnifiedCacheManager(CacheManager):
                 self._key_locks.popitem(last=False)
             return lock
 
+    def _load_and_cache(self, key: str, callback: Callable, ttl: int = None) -> Any:
+        """回源并写缓存（**调用方须已持有**本 key 的互斥）。
+
+        M7：callback 的**业务异常必须原样上抛**。旧实现把它与缓存层异常一起
+        吞掉并 `return None`，于是 DB 报错被伪装成「查到空值」——调用方
+        （room_service.get_statistics 等）拿到 None 会当成"没数据"继续走，
+        静默失败且无从排查。
+        只有**缓存层**故障才允许降级：读侧 `self.get` 已在内部降级为 miss，
+        写侧失败仅影响下次命中率，不该改变本次业务返回值。
+        """
+        value = callback()
+        try:
+            self.set(key, value, ttl)
+        except Exception as e:
+            logger.warning(f"缓存写入失败，本次结果不缓存 (key={key}): {e}", exc_info=True)
+        return value
+
     def get_or_set(self, key: str, callback: Callable, ttl: int = None) -> Any:
         """获取缓存值，不存在则通过回调函数设置
 
         使用哨兵值判断缓存是否真正不存在，避免 None 值穿透。
-        使用 per-key 锁防止缓存击穿（多请求同时回源）。
+        使用两级 per-key 互斥防止缓存击穿（多请求同时回源）：
+
+        - **进程内锁**（`threading.Lock`）：挡住本进程的并发请求；
+        - **Redis 分布式锁**（M6）：挡住 gunicorn `--workers N` 的其它进程。
+          只有进程内锁时，N 个 worker 会在热点 key 失效瞬间各回源一次，
+          singleflight 实际退化成"每进程一次"，这正是评审 M6 指出的缺口。
         """
         value = self.get(key, _CACHE_MISS)
         if value is not _CACHE_MISS:
@@ -247,13 +273,47 @@ class UnifiedCacheManager(CacheManager):
             if value is not _CACHE_MISS:
                 return value
 
+            r = getattr(self.primary_storage, "redis_client", None)
+            if r is None:
+                return self._load_and_cache(key, callback, ttl)
+
+            from app.utils.concurrency.redis_lock import (
+                acquire_owner_lock,
+                release_owner_lock,
+            )
+
+            lock_key = f"{key}:sflight"
+            acquired = acquire_owner_lock(r, lock_key, _SINGLEFLIGHT_LOCK_TTL)
+            if not acquired:
+                value = self._await_peer_result(key)
+                if value is not _CACHE_MISS:
+                    return value
+                return self._load_and_cache(key, callback, ttl)
+
             try:
-                value = callback()
-                self.set(key, value, ttl)
+                value = self.get(key, _CACHE_MISS)
+                if value is not _CACHE_MISS:
+                    return value
+                return self._load_and_cache(key, callback, ttl)
+            finally:
+                try:
+                    release_owner_lock(r, lock_key)
+                except Exception:
+                    logger.warning("singleflight 锁释放失败（TTL 会兜底）key=%s",
+                                   lock_key, exc_info=True)
+
+    def _await_peer_result(self, key: str) -> Any:
+        """等别的进程回源写完，返回其值；超时返回 `_CACHE_MISS`。
+
+        **等待必须有界**：持锁进程若被 SIGKILL，它的锁要等 TTL 才自动过期，
+        无限等待会把本进程所有命中该 key 的请求全部饿死。
+        """
+        for _ in range(_SINGLEFLIGHT_WAIT_STEPS):
+            time.sleep(_SINGLEFLIGHT_WAIT_INTERVAL)
+            value = self.get(key, _CACHE_MISS)
+            if value is not _CACHE_MISS:
                 return value
-            except Exception as e:
-                logger.error(f"回调函数执行失败 (key={key}): {e}", exc_info=True)
-                return None
+        return _CACHE_MISS
     
     def remember(self, key: str, ttl: int = None):
         """缓存装饰器"""
@@ -383,7 +443,7 @@ class UnifiedCacheManager(CacheManager):
             
             self.monitor.record_event(event)
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 缓存事件记录失败非致命：统计留痕是尽力而为，记录失败不得反向影响缓存操作本身
             logger.warning(f"记录缓存事件失败: {e}")
     
     def _estimate_data_size(self, value: Any) -> int:
@@ -587,7 +647,7 @@ class UnifiedCacheManager(CacheManager):
         return self.delete(key)
 
 
-from app.utils.concurrency.locks import singleton
+from app.utils.concurrency.locks import singleton  # noqa: E402 -- singleton 装饰器需在类定义前 import
 
 @singleton
 class GlobalCacheManager(UnifiedCacheManager):

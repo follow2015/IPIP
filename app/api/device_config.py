@@ -7,14 +7,14 @@
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
-from marshmallow import Schema, validate
 
-from app.openapi.doc import doc, public
+from app.openapi.doc import doc
 from app.api.base import APIResponse, api_exception_handler
 from app.services.device_config_service import DeviceConfigService
 from app.persistence.device_config_backup_repository import DeviceConfigBackupRepository, DeviceConfigChangeRepository
-from app.utils import login_required, permission_required, rate_limit_api
-from app.utils.auth import get_current_user_id
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api
+from app.services.auth import get_current_user_id
 from app.utils.idempotency import redis_lock
 from app.utils.transactional import transactional
 from app.exceptions.validation import ValidationError
@@ -26,7 +26,7 @@ device_config_bp = Blueprint("device_config", __name__)
 _device_config_service = DeviceConfigService(DeviceConfigBackupRepository(), DeviceConfigChangeRepository())
 
 
-from app.schemas.device_config import ConfigChangeRequestSchema
+from app.schemas.device_config import ConfigChangeRequestSchema  # noqa: E402 -- 本仓约定：Schema import 就近放在使用它的路由区（见上方注释说明）
 
 @device_config_bp.route("/<int:device_id>/config", methods=["GET"])
 @doc(summary="获取设备最新配置快照", tags=["设备配置"], parameters=[{"name": "device_id", "in": "path", "required": True, "schema": {"type": "integer"}}], responses={200: "DeviceConfigBackupResponse", 404: "ApiError"})

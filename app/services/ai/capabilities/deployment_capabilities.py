@@ -30,8 +30,8 @@ def _coerce_positive_int(value: Any, field: str, default: Any = None) -> Any:
         raise ValueError(f"{field} 必填")
     try:
         return int(value)
-    except (TypeError, ValueError):
-        raise ValueError(f"{field} 须为正整数，当前: {value!r}")
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"{field} 须为正整数，当前: {value!r}") from e
 
 
 _IP_SCOPE_ALIASES = {
@@ -87,7 +87,6 @@ def _resolve_room_id(args: Dict[str, Any]) -> Any:
     if room_id not in (None, ""):
         return room_id
     if room_name:
-        from app.models.room import Room
 
         name = str(room_name).strip()
         tokens = [name]
@@ -181,4 +180,4 @@ def deployment_plan(args: Dict[str, Any]) -> dict:
             ),
         )
     except DeploymentPlanError as exc:
-        raise ValueError(str(exc))
+        raise ValueError(str(exc)) from exc

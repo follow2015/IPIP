@@ -32,6 +32,7 @@ import { useMessage } from '@/hooks/useMessage';
 import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
 import type { GlobalEvent } from '@/hooks/useGlobalEvents';
 import { useTranslation } from 'react-i18next';
+import { useMonitorConfig } from '../../services/monitor/status';
 
 function VirtualRooms() {
   const { t: td } = useTranslation('device');
@@ -42,6 +43,11 @@ function VirtualRooms() {
   const [membersRecord, setMembersRecord] = useState<VirtualRoom | null>(null);
   const [scanningId, setScanningId] = useState<number | null>(null);
   const scanVirtualRoom = useScanVirtualRoom();
+  const { data: monitorConfig } = useMonitorConfig();
+  const snmpTakeoverActive = (() => {
+    const v = String(monitorConfig?.scan_channel_enabled?.value ?? '').toLowerCase();
+    return ['1', 'true', 'yes'].includes(v);
+  })();
   const message = useMessage();
 
   const crud = useCrudPage<VirtualRoom>({
@@ -212,7 +218,9 @@ function VirtualRooms() {
               onClick={() =>
                 confirm({
                   title: td('virtualRoom.confirm.scanTitle'),
-                  content: td('virtualRoom.confirm.scanContent', { name: record.name }),
+                  content:
+                    td('virtualRoom.confirm.scanContent', { name: record.name }) +
+                    (snmpTakeoverActive ? '\n' + td('virtualRoom.confirm.snmpTakeoverHint') : ''),
                   okText: td('virtualRoom.action.startScan'),
                   cancelText: tc('action.cancel'),
                   onOk: () => handleScan(record)
@@ -245,6 +253,8 @@ function VirtualRooms() {
   return (
     <div>
       <DataTable<VirtualRoom>
+        error={crud.error}
+        onRetry={crud.refetch}
         columns={columns}
         dataSource={data?.items ?? []}
         loading={isLoading}

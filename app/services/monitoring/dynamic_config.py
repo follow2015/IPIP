@@ -27,10 +27,11 @@ from app.persistence.monitor_dynamic_config_repository import (
     MonitorDynamicConfigRepository,
 )
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
-REDIS_KEY = "monitor:dynamic_config"
+REDIS_KEY = redis_keys.MONITOR_DYNAMIC_CONFIG_KEY
 
 
 class _Entry:
@@ -140,6 +141,97 @@ _WHITELIST: Dict[str, _Entry] = {
         "SCAN_AUTO_GRACE_PERIOD", "int", 64800,
         "inactive降级宽限期（秒），默认 18 小时", True, 3600, 259200, "scan_auto_grace_period",
     ),
+    "TRAPD_ENABLED": _Entry(
+        "TRAPD_ENABLED", "bool", False,
+        "SNMP Trap 接收总开关（关闭时进程待机、不监听端口；开启后自动开始监听）",
+        True, camel="trapd_enabled",
+    ),
+    "TRAPD_LISTEN_PORT": _Entry(
+        "TRAPD_LISTEN_PORT", "int", 10162,
+        "Trap 监听 UDP 端口（1024 以下为特权端口，非 root 运行请用 10162）",
+        True, 1024, 65535, "trapd_listen_port",
+    ),
+    "TRAPD_SOURCE_ALLOWLIST": _Entry(
+        "TRAPD_SOURCE_ALLOWLIST", "string", "",
+        "Trap 源 IP 白名单（逗号分隔 CIDR）。留空=接收任意来源；UDP 源 IP 可伪造且"
+        "设备关联按源 IP 反查，建议限定为管理网段（如 10.0.0.0/8）",
+        True, camel="trapd_source_allowlist",
+    ),
+    "TRAPD_RATE_LIMIT_PER_MINUTE": _Entry(
+        "TRAPD_RATE_LIMIT_PER_MINUTE", "int", 120,
+        "单源 IP 每分钟 trap 上限（防链路抖动引起的 storm 刷库）",
+        True, 1, 100000, "trapd_rate_limit_per_minute",
+    ),
+    "TRAPD_ALLOW_WEAK_COMMUNITY": _Entry(
+        "TRAPD_ALLOW_WEAK_COMMUNITY", "bool", False,
+        "允许弱 community（public/private）。关闭时，校验到弱 community 会拒绝启动监听",
+        True, camel="trapd_allow_weak_community",
+    ),
+    "TRAPD_V3_ENABLED": _Entry(
+        "TRAPD_V3_ENABLED", "bool", False,
+        "SNMPv3 Trap 接收开关（默认关：新能力是选择开启，不是自动开启）。"
+        "关闭时 v3 报文在版本分派处即丢弃，v1/v2c 不受影响",
+        True, camel="trapd_v3_enabled",
+    ),
+    "TRAPD_V3_USERS": _Entry(
+        "TRAPD_V3_USERS", "string", "",
+        "允许的 SNMPv3 用户名白名单（逗号分隔）。留空=用凭据库里全部启用中的 v3 凭据；"
+        "显式指定则只接受这些 username（与 community 白名单同构）",
+        True, camel="trapd_v3_users",
+    ),
+    "SCAN_CHANNEL_ENABLED": _Entry(
+        "SCAN_CHANNEL_ENABLED", "bool", False,
+        "多通道采集总开关（关闭 = 100% 走改造前的 CLI 路径，灰度回退首选）",
+        True, camel="scan_channel_enabled",
+    ),
+    "SCAN_CHANNEL_PRIORITY": _Entry(
+        "SCAN_CHANNEL_PRIORITY", "string", "cli,snmp",
+        "通道优先级（逗号分隔，靠前者先试）；CLI 在前是 G6「现有行为零变更」的前提",
+        True, camel="scan_channel_priority",
+    ),
+    "SCAN_CHANNEL_SNMP_DEVICE_IDS": _Entry(
+        "SCAN_CHANNEL_SNMP_DEVICE_IDS", "string", "",
+        "SNMP 通道灰度白名单：设备ID（逗号分隔），留空 = 该维度不放行",
+        True, camel="scan_channel_snmp_device_ids",
+    ),
+    "SCAN_CHANNEL_SNMP_ROOM_IDS": _Entry(
+        "SCAN_CHANNEL_SNMP_ROOM_IDS", "string", "",
+        "SNMP 通道灰度白名单：机房ID（逗号分隔），留空 = 该维度不放行",
+        True, camel="scan_channel_snmp_room_ids",
+    ),
+    "SCAN_CHANNEL_BUDGET_SECONDS": _Entry(
+        "SCAN_CHANNEL_BUDGET_SECONDS", "int", 60,
+        "单设备采集总预算（秒）：耗尽即停止补采并标记降级（对应 R9，不是单能力超时）",
+        True, 5, 600, "scan_channel_budget_seconds",
+    ),
+    "SCAN_CHANNEL_SNMP_VR_IDS": _Entry(
+        "SCAN_CHANNEL_SNMP_VR_IDS", "string", "",
+        "SNMP 通道虚拟机房白名单（跨机房灰度维度，逗号分隔 VR ID；空 = 不启用）",
+        True, camel="scan_channel_snmp_vr_ids",
+    ),
+    "SCAN_CHANNEL_SNMP_SUBTYPES": _Entry(
+        "SCAN_CHANNEL_SNMP_SUBTYPES", "string", "",
+        "SNMP 通道设备类型白名单（逗号分隔 device_subtype：switch/router/firewall；"
+        "空 = 不按类型过滤；设备类型来自 devices.device_subtype）",
+        True, camel="scan_channel_snmp_subtypes",
+    ),
+    "SCAN_CHANNEL_CIRCUIT_THRESHOLD": _Entry(
+        "SCAN_CHANNEL_CIRCUIT_THRESHOLD", "int", 5,
+        "熔断阈值：同一通道对同一设备连续『一项都没采到』达此次数即本轮跳过",
+        True, 1, 100, "scan_channel_circuit_threshold",
+    ),
+    "SCAN_CHANNEL_SNMP_SNAPSHOT": _Entry(
+        "SCAN_CHANNEL_SNMP_SNAPSHOT", "bool", False,
+        "SNMP 通道快照注入开关（默认关：真机验收未完成不全量切）。开启后 SNMP 通道"
+        "各能力优先读 Redis 快照（当轮扫描内共享公共表，减少重复 walk）；快照不可用"
+        "自动退化为逐能力直采，不会更差",
+        True, camel="scan_channel_snmp_snapshot",
+    ),
+    "SCAN_CHANNEL_AUTO_ENABLED": _Entry(
+        "SCAN_CHANNEL_AUTO_ENABLED", "bool", False,
+        "自动扫描（入口②）是否走通道层；G3 阶段打开，此前恒 false",
+        True, camel="scan_channel_auto_enabled",
+    ),
 }
 
 _NON_EDITABLE: Dict[str, _Entry] = {
@@ -236,13 +328,13 @@ class MonitorDynamicConfig:
         r = None
         try:
             r = cls._redis(app)
-        except Exception as e:  # Redis 不可用：降级到 DB
+        except Exception as e:  # noqa: BLE001 -- 动态配置读 Redis 失败降级到 DB fallback：Redis 故障不得阻断配置读取，redis-py 异常类型不可枚举
             logger.warning("动态配置读 Redis 失败 key=%s: %s", key, e)
 
         if r is not None:
             try:
                 raw = r.hget(REDIS_KEY, key)
-            except Exception as e:  # Redis 不可达：降级到 DB fallback
+            except Exception as e:  # noqa: BLE001 -- 动态配置读 Redis 失败降级到 DB fallback：Redis 故障不得阻断配置读取，redis-py 异常类型不可枚举
                 logger.warning("动态配置读 Redis 失败 key=%s: %s", key, e)
                 raw = None
             if raw is not None:
@@ -282,20 +374,20 @@ class MonitorDynamicConfig:
         entries = all_entries()
         valid_keys = [k for k in keys if k in entries]
         if not valid_keys:
-            return {k: None for k in keys}
+            return dict.fromkeys(keys)
 
         r = None
         try:
             r = cls._redis(app)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 动态配置读 Redis 失败降级到 DB fallback：Redis 故障不得阻断配置读取，redis-py 异常类型不可枚举
             logger.warning("动态配置批量读 Redis 失败: %s", e)
 
         redis_vals: Dict[str, Optional[str]] = {}
         if r is not None:
             try:
                 raw_list = r.hmget(REDIS_KEY, valid_keys)
-                redis_vals = {k: v for k, v in zip(valid_keys, raw_list)}
-            except Exception as e:
+                redis_vals = {k: v for k, v in zip(valid_keys, raw_list, strict=False)}
+            except Exception as e:  # noqa: BLE001 -- 动态配置读 Redis 失败降级到 DB fallback：Redis 故障不得阻断配置读取，redis-py 异常类型不可枚举
                 logger.warning("动态配置批量读 Redis HMGET 失败: %s", e)
 
         result: Dict[str, Optional[Any]] = {}
@@ -351,7 +443,7 @@ class MonitorDynamicConfig:
         try:
             r = cls._redis(app)
             r.hset(REDIS_KEY, key, sval)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 动态配置写 Redis 失败不影响 DB 真源：DB 已写入成功，Redis 仅作缓存，写失败仅告警（下次读走 DB fallback）
             logger.warning("动态配置写 Redis 失败 key=%s: %s", key, e)
 
     @classmethod
@@ -377,14 +469,14 @@ class MonitorDynamicConfig:
 
         try:
             r = cls._redis(app)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 动态配置写 Redis 失败不影响 DB 真源：DB 已写入成功，Redis 仅作缓存，写失败仅告警（下次读走 DB fallback）
             logger.warning("动态配置启动加载写 Redis 失败: %s", e)
             return
         mapping = {row.config_key: row.config_value for row in rows}
         if mapping:
             try:
                 r.hset(REDIS_KEY, mapping=mapping)
-            except Exception as e:  # Redis 不可达：放弃回填，下次读走 DB fallback
+            except Exception as e:  # noqa: BLE001 -- 动态配置写 Redis 失败不影响 DB 真源：DB 已写入成功，Redis 仅作缓存，写失败仅告警（下次读走 DB fallback）
                 logger.warning("动态配置启动回填 Redis 失败: %s", e)
 
 

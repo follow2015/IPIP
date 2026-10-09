@@ -1,10 +1,10 @@
-from __future__ import annotations
 # -*- coding: utf-8 -*-
 """扫描上下文数据类
 
 统一封装每台交换机的采集结果，替代原有分散处理模式。
 包含路由、ARP、MAC 表条目及交换机元信息。
 """
+from __future__ import annotations
 from dataclasses import dataclass
 
 

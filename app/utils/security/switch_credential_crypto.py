@@ -79,7 +79,7 @@ def migrate_plaintext_switch_passwords(session, dry_run: bool = False):
             session.commit()
             logger.info("已加密 %d 条明文交换机凭据", migrated)
 
-    except Exception as e:  # noqa: BLE001 - 脚本顶层：记录并回滚，向上抛出由调用方决定
+    except Exception as e:  # 脚本顶层：记录并回滚，向上抛出由调用方决定
         logger.error("批量加密交换机凭据失败: %s", e, exc_info=True)
         if not dry_run:
             session.rollback()

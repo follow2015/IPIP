@@ -387,7 +387,7 @@ def _routing_mode() -> str:
 def _catalog_signature(merged: List[dict]) -> str:
     """catalog 内容指纹：name/title/description/triggers 任一变化即重建索引。"""
     import hashlib
-    h = hashlib.sha1()
+    h = hashlib.sha1(usedforsecurity=False)
     for c in sorted(merged, key=lambda x: x.get("name", "")):
         h.update((c.get("name", "") + "\0").encode())
         h.update((c.get("title", "") + "\0").encode())

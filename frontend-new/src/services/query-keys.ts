@@ -66,6 +66,26 @@ export const queryKeys = {
     options: ['customers', 'options'] as const
   },
 
+  circuits: {
+    all: ['circuits'] as const,
+    list: (p?: unknown) => ['circuits', 'list', p] as const,
+    detail: (id: number) => ['circuits', id] as const,
+    segments: (id: number) => ['circuits', id, 'segments'] as const,
+    devices: (id: number) => ['circuits', id, 'devices'] as const,
+    expiring: (withinDays: number) => ['circuits', 'expiring', withinDays] as const,
+    impactByConnection: (id: number) => ['circuits', 'impact', 'connection', id] as const,
+    impactByDevice: (id: number) => ['circuits', 'impact', 'device', id] as const,
+    impactByCustomer: (id: number) => ['circuits', 'impact', 'customer', id] as const,
+    options: ['circuits', 'options'] as const
+  },
+
+  carriers: {
+    all: ['carriers'] as const,
+    list: (p?: unknown) => ['carriers', 'list', p] as const,
+    detail: (id: number) => ['carriers', id] as const,
+    options: ['carriers', 'options'] as const
+  },
+
   switches: {
     all: ['switches'] as const,
     list: (p?: unknown) => ['switches', 'list', p] as const,

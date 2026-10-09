@@ -12,7 +12,8 @@ import {
   Skeleton,
   Alert,
   Tooltip,
-  Empty
+  Empty,
+  theme
 } from 'antd';
 import { SettingOutlined, SaveOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getAIConfig, updateAIConfig, type AIConfig } from '@/services/ai';
@@ -20,6 +21,7 @@ import { useMessage } from '@/hooks/useMessage';
 import { useTranslation } from 'react-i18next';
 
 export default function AIConfigPage() {
+  const { token } = theme.useToken();
   const { t } = useTranslation('ai');
   const { t: tc } = useTranslation('common');
   const [config, setConfig] = useState<AIConfig | null>(null);
@@ -149,7 +151,7 @@ export default function AIConfigPage() {
                   rules={[{ required: true }]}
                   tooltip={t('config.tooltip.provider')}
                   extra={
-                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                    <span style={{ fontSize: 12, color: token.colorTextTertiary }}>
                       {t('config.providerExample.intro')}
                       <code>https://api.deepseek.com/v1</code>
                       {t('config.providerExample.qwen')}
@@ -208,11 +210,13 @@ export default function AIConfigPage() {
                   </Form.Item>
                 </Space>
                 <Divider />
+                {/* loading 只出转圈、不阻止点击，连点会发两次写请求（P1-4 / AC-6） */}
                 <Button
                   type="primary"
                   icon={<SaveOutlined />}
                   onClick={handleSave}
                   loading={saving}
+                  disabled={saving}
                 >
                   {t('config.action.save')}
                 </Button>

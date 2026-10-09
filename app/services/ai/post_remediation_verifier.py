@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from app.services.ai.rag_store import get_rag_store
 from app.utils.logging import get_logger
@@ -128,6 +128,6 @@ class PostRemediationVerifier:
             store.ingest([case_text], domain="case", source="diagnosis_loop")
             logger.info("case ingested to RAG domain=case symptom=%s", symptom[:50])
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 案例写入 RAG 失败非致命：验证结论已产出，写入失败仅告警
             logger.warning("case to RAG failed: %s", e)
             return False

@@ -11,11 +11,13 @@
 from flask import Blueprint, request
 from marshmallow import Schema, fields, EXCLUDE
 
-from app.openapi.doc import doc, public
+from app.exceptions import PresetResponseError
+from app.openapi.doc import doc
 from app.services.device_nics_port_service import device_nics_port_service
 from app.services.port_matching_engine import PortMatchingEngine
 from app.api.base import APIResponse, api_exception_handler
-from app.utils import login_required, permission_required, rate_limit_api
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api
 from app.utils.transactional import transactional
 
 
@@ -81,7 +83,7 @@ def create_or_update_nics(device_id: int):
             data={'ports': [port.to_dict() for port in ports]},
             message=message
         )
-    return APIResponse.error(message, status_code=400)
+    raise PresetResponseError(message, status_code=400)
 
 
 @device_nics_port_bp.route("/<int:device_id>/nics/batch-create", methods=["POST"])
@@ -127,7 +129,7 @@ def batch_create_nics(device_id: int):
             data={'ports': [port.to_dict() for port in ports]},
             message=message
         )
-    return APIResponse.error(message, status_code=400)
+    raise PresetResponseError(message, status_code=400)
 
 
 @device_nics_port_bp.route("/<int:device_id>/nics", methods=["GET"])
@@ -169,7 +171,7 @@ def delete_device_nics(device_id: int):
 
     if success:
         return APIResponse.success(message=message)
-    return APIResponse.error(message, status_code=400)
+    raise PresetResponseError(message, status_code=400)
 
 
 @device_nics_port_bp.route("/<int:device_id>/available-ports", methods=["GET"])
@@ -263,7 +265,7 @@ def update_single_port(device_id: int, port_id: int):
             data=updated_port.to_dict(),
             message="端口更新成功"
         )
-    return APIResponse.error("端口更新失败", status_code=400)
+    raise PresetResponseError("端口更新失败", status_code=400)
 
 
 @device_nics_port_bp.route("/<int:device_id>/nics/<int:port_id>", methods=["DELETE"])
@@ -296,7 +298,7 @@ def delete_single_port(device_id: int, port_id: int):
     ok = device_nics_port_service.repo.delete_port(port_id)
     if ok:
         return APIResponse.success(message="端口删除成功")
-    return APIResponse.error("端口删除失败", status_code=400)
+    raise PresetResponseError("端口删除失败", status_code=400)
 
 
 @device_nics_port_bp.route("/<int:device_id>/nics/batch", methods=["DELETE"])
@@ -459,7 +461,6 @@ def batch_create_children_nics(chassis_id: int):
     替代前端 for(nodeId) { POST /nics } 串行循环，
     在单个 savepoint 内为所有子节点创建相同端口配置。
     """
-    from app.models.device import Device
 
     data = request.get_json()
     ports_template = data.get('ports', [])

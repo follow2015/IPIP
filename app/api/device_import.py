@@ -17,11 +17,8 @@ from app.utils.logging import get_logger
 from flask import Blueprint, request
 from app.openapi.doc import doc
 from app.api.base import APIResponse
-from app.utils import (
-    login_required,
-    permission_required,
-    rate_limit_api,
-)
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api
 from app.utils.idempotency import idempotent, upload_file_idempotency_key
 from app.utils.time_utils import now_utc_naive
 from app.utils.transactional import transactional
@@ -111,7 +108,6 @@ def export_devices():
         Excel文件
     """
     from flask import send_file
-    from datetime import datetime
 
     cabinet_id = request.args.get("cabinet_id", type=int)
     customer_id = request.args.get("customer_id", type=int)
@@ -134,6 +130,6 @@ def export_devices():
     except import_export_service.ExportTooLargeError as e:
         logger.warning("导出设备数据超限: %s", str(e))
         return APIResponse.error(message=e.message, status_code=e.status_code)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应
         logger.error("导出设备数据失败: %s", str(e))
         return APIResponse.error(message="操作失败", status_code=500)

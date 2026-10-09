@@ -42,7 +42,6 @@ export default function ConnectionFormModal({
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const selectedRoomId = Form.useWatch('room_id', form);
-  const selectedCabinetId = Form.useWatch('cabinet_id', form);
   const selectedSwitchId = Form.useWatch('switch_device_id', form);
 
   return (
@@ -58,7 +57,11 @@ export default function ConnectionFormModal({
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item name="link_type" label={t('connection.column.linkType')}>
-              <Select placeholder={tCommon('message.selectRequired')} options={linkTypeOptions} disabled />
+              <Select
+                placeholder={tCommon('message.selectRequired')}
+                options={linkTypeOptions}
+                disabled
+              />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>

@@ -73,7 +73,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return port.to_dict(include_relations=True) if port else None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口失败", original_error=e)
+            raise QueryExecutionError("查找端口失败", original_error=e) from e
 
     def find_ports_by_device(self, device_id: int) -> List[Dict[str, Any]]:
         """获取设备的全部端口列表
@@ -94,7 +94,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return [p.to_dict(include_relations=True) for p in ports]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口列表失败", original_error=e)
+            raise QueryExecutionError("查找端口列表失败", original_error=e) from e
 
     def find_ports_by_device_orm(self, device_id: int) -> List[DeviceNicsPort]:
         """获取设备的全部端口列表（返回ORM对象，供Service层使用）
@@ -113,7 +113,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口列表失败", original_error=e)
+            raise QueryExecutionError("查找端口列表失败", original_error=e) from e
 
     def find_by_id_orm(self, port_id: int) -> Optional[DeviceNicsPort]:
         """根据端口ID查找（返回ORM对象，find_port_by_id_orm 的别名）
@@ -142,7 +142,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口失败", original_error=e)
+            raise QueryExecutionError("查找端口失败", original_error=e) from e
 
     def find_ports_by_ids(self, port_ids: List[int]) -> List[DeviceNicsPort]:
         """根据ID列表批量查询端口（返回ORM对象，不限设备）
@@ -162,7 +162,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("批量查找端口失败", original_error=e)
+            raise QueryExecutionError("批量查找端口失败", original_error=e) from e
 
     def find_port_by_nic_port_orm(
         self,
@@ -191,7 +191,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口失败", original_error=e)
+            raise QueryExecutionError("查找端口失败", original_error=e) from e
 
     def find_ports_by_type_speed_orm(
         self,
@@ -221,7 +221,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 DeviceNicsPort.nic_number, DeviceNicsPort.port_number
             ).all()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("按类型速率查找端口失败", original_error=e)
+            raise QueryExecutionError("按类型速率查找端口失败", original_error=e) from e
 
     def find_available_ports(
         self, 
@@ -257,7 +257,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             
             return [p.to_dict() for p in ports]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找可用端口失败", original_error=e)
+            raise QueryExecutionError("查找可用端口失败", original_error=e) from e
 
     def find_active_ports(self, device_id: int) -> List[Dict[str, Any]]:
         """获取有效端口(排除disabled),用于容量计算
@@ -279,7 +279,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return [p.to_dict() for p in ports]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找有效端口失败", original_error=e)
+            raise QueryExecutionError("查找有效端口失败", original_error=e) from e
 
     def find_port_by_nic_port(
         self, 
@@ -310,7 +310,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return port.to_dict(include_relations=True) if port else None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找端口失败", original_error=e)
+            raise QueryExecutionError("查找端口失败", original_error=e) from e
 
     def count_ports_by_device(self, device_id: int, filters: Dict = None) -> int:
         """统计端口数量,可按status过滤
@@ -335,7 +335,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                     q = q.filter(DeviceNicsPort.port_speed == filters['port_speed'])
             return q.count()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("统计端口数量失败", original_error=e)
+            raise QueryExecutionError("统计端口数量失败", original_error=e) from e
 
 
     def create_ports_batch(self, device_id: int, ports: List[Dict]) -> int:
@@ -397,7 +397,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return len(objs)
         except SQLAlchemyError as e:
-            raise QueryExecutionError("批量创建端口失败", original_error=e)
+            raise QueryExecutionError("批量创建端口失败", original_error=e) from e
 
     def update_port(self, port_id: int, data: Dict[str, Any]) -> bool:
         """更新端口字段（仅 flush，由调用方统一 commit）"""
@@ -421,7 +421,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("更新端口失败", original_error=e)
+            raise QueryExecutionError("更新端口失败", original_error=e) from e
 
     def occupy_port(self, port_id: int) -> bool:
         """占用 NIC 端口（仅 flush，由调用方统一 commit）"""
@@ -435,7 +435,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("占用NIC端口失败", original_error=e)
+            raise QueryExecutionError("占用NIC端口失败", original_error=e) from e
 
     def release_port(self, port_id: int) -> bool:
         """释放 NIC 端口（仅 flush，由调用方统一 commit）"""
@@ -449,7 +449,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("释放NIC端口失败", original_error=e)
+            raise QueryExecutionError("释放NIC端口失败", original_error=e) from e
 
     def update_port_status(self, port_id: int, status: str) -> bool:
         """更新端口状态（仅 flush，由调用方统一 commit）"""
@@ -465,7 +465,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("更新端口状态失败", original_error=e)
+            raise QueryExecutionError("更新端口状态失败", original_error=e) from e
 
     def delete_port(self, port_id: int) -> bool:
         """删除单个端口（仅 flush，由调用方统一 commit）"""
@@ -481,7 +481,7 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除端口失败", original_error=e)
+            raise QueryExecutionError("删除端口失败", original_error=e) from e
 
     def delete_device_ports(self, device_id: int) -> int:
         """删除设备全部端口,返回删除数量（仅 flush，由调用方统一 commit）"""
@@ -494,4 +494,4 @@ class DeviceNicsPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return count
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除设备端口失败", original_error=e)
+            raise QueryExecutionError("删除设备端口失败", original_error=e) from e

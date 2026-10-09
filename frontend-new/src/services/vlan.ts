@@ -27,9 +27,10 @@ export type UpdateVLANRequest = VLANUpdate & { id: number };
 const vlanHooks = createCrudHooks<VLAN, CreateVLANRequest, UpdateVLANRequest, VLANQueryParams>({
   basePath: '/vlans',
   queryKey: queryKeys.vlans.all,
+  invalidateResource: 'vlan'
 });
 
-export const useVLANList   = vlanHooks.useList;
+export const useVLANList = vlanHooks.useList;
 export const useVLANDetail = vlanHooks.useDetail;
 export const useCreateVLAN = vlanHooks.useCreate;
 export const useUpdateVLAN = vlanHooks.useUpdate;
@@ -43,7 +44,7 @@ export function useVLANsByRoom(roomId: number) {
       const res = await get<VLAN[]>(`/vlans/room/${roomId}`);
       return res.data;
     },
-    enabled: roomId > 0,
+    enabled: roomId > 0
   });
 }
 
@@ -54,7 +55,7 @@ export function useVLANsByDevice(deviceId: number) {
       const res = await get<VLAN[]>(`/devices/${deviceId}/vlans`);
       return res.data;
     },
-    enabled: deviceId > 0,
+    enabled: deviceId > 0
   });
 }
 
@@ -68,7 +69,7 @@ export function useUpdateVLANMembers(deviceId: number) {
       queryClient.invalidateQueries({ queryKey: queryKeys.vlans.byDevice(deviceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(deviceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.devices.networkPorts(deviceId) });
-    },
+    }
   });
 }
 
@@ -83,9 +84,8 @@ interface CreateDeviceVLANRequest {
 
 export function useCreateDeviceVLAN(deviceId: number) {
   return useInvalidatingMutation(
-    (data: CreateDeviceVLANRequest) =>
-      post<VLAN>(`/devices/${deviceId}/vlans`, data),
-    queryKeys.vlans.byDevice(deviceId),
+    (data: CreateDeviceVLANRequest) => post<VLAN>(`/devices/${deviceId}/vlans`, data),
+    queryKeys.vlans.byDevice(deviceId)
   );
 }
 
@@ -94,10 +94,15 @@ export const useCreateVLANLegacy = vlanHooks.useCreate;
 export function useUpdateDeviceVLAN(deviceId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ vlanId, data }: { vlanId: number; data: Partial<Pick<VLAN, 'purpose' | 'name' | 'status'>> }) =>
-      put<VLAN>(`/devices/${deviceId}/vlans/${vlanId}`, data),
+    mutationFn: ({
+      vlanId,
+      data
+    }: {
+      vlanId: number;
+      data: Partial<Pick<VLAN, 'purpose' | 'name' | 'status'>>;
+    }) => put<VLAN>(`/devices/${deviceId}/vlans/${vlanId}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.vlans.byDevice(deviceId) });
-    },
+    }
   });
 }

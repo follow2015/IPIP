@@ -1,13 +1,7 @@
-/**
- * NotificationBell — 通知铃铛 + 未读红点 + 下拉面板
- *
- * 集成到 Header 右侧，使用 Ant Design Badge + Popover + List。
- * 未读数通过 TanStack Query 15s 轮询刷新，不使用 SSE 长连接。
- */
 import React, { useCallback, useMemo, useState } from 'react';
-import { Badge, Popover, List, Button, Empty, Space, Tag, Typography, theme } from 'antd';
+import { Badge, Popover, Listy, Button, Empty, Space, Tag, Typography, theme } from 'antd';
 import { useConfirm } from '@/utils/confirm';
-import { BellOutlined, CheckOutlined, DeleteOutlined, ClearOutlined } from '@ant-design/icons';
+import { BellOutlined, CheckOutlined, ClearOutlined } from '@ant-design/icons';
 import {
   useUnreadCount,
   useNotificationList,
@@ -17,7 +11,7 @@ import {
 } from '@/services/notification';
 import { useAuthStore } from '@/stores/auth';
 import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
-import { SEVERITY_COLOR_MAP } from '@/types/enums';
+import { severityColor } from '@/utils/statusColor';
 import { getSeverityLabel } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -40,8 +34,13 @@ function NotificationItemRow({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <List.Item
+    <div
+      data-testid="notification-item"
       style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 8,
         padding: '12px 16px',
         cursor: 'pointer',
         background: item.is_read ? 'transparent' : token.colorPrimaryBg,
@@ -51,19 +50,22 @@ function NotificationItemRow({
         if (!item.is_read) onRead(item.id);
       }}
     >
-      <List.Item.Meta
-        title={
-          <Space size={4}>
-            <Tag color={SEVERITY_COLOR_MAP[item.severity]} style={{ marginRight: 0 }}>
-              {getSeverityLabel(item.severity, tDevice) ?? item.severity}
-            </Tag>
-            <Text strong={!item.is_read} style={{ fontSize: 13 }}>
-              {item.title}
-            </Text>
-          </Space>
-        }
-        description={
-          item.content ? (
+      <div style={{ display: 'flex', flex: 1, alignItems: 'flex-start', minWidth: 0 }}>
+        <div style={{ flex: '1 0', minWidth: 0, color: token.colorText }}>
+          <div style={{ marginBottom: 4 }}>
+            <Space size={4}>
+              <Tag
+                color={severityColor(item.severity, token) ?? 'default'}
+                style={{ marginRight: 0 }}
+              >
+                {getSeverityLabel(item.severity, tDevice) ?? item.severity}
+              </Tag>
+              <Text strong={!item.is_read} style={{ fontSize: 13 }}>
+                {item.title}
+              </Text>
+            </Space>
+          </div>
+          {item.content ? (
             <Paragraph
               type="secondary"
               ellipsis={{
@@ -78,13 +80,13 @@ function NotificationItemRow({
             >
               {item.content}
             </Paragraph>
-          ) : null
-        }
-      />
+          ) : null}
+        </div>
+      </div>
       <Text type="secondary" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
         {formatTime(item.created_at, t)}
       </Text>
-    </List.Item>
+    </div>
   );
 }
 
@@ -232,11 +234,10 @@ function NotificationBell() {
           style={{ padding: '40px 0' }}
         />
       ) : (
-        <List
-          dataSource={sortedItems}
-          renderItem={(item) => (
-            <NotificationItemRow key={item.id} item={item} onRead={handleRead} />
-          )}
+        <Listy
+          items={sortedItems}
+          rowKey={(item) => String(item.id)}
+          itemRender={(item) => <NotificationItemRow item={item} onRead={handleRead} />}
           style={{ maxHeight: 400, overflow: 'auto' }}
         />
       )}

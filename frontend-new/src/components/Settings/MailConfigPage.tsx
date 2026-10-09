@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
 import {
   Card,
   Form,
@@ -89,6 +90,7 @@ const MailConfigPage: React.FC = () => {
   const [sslMode, setSslMode] = useState<'tls' | 'ssl' | 'none'>('tls');
   const [editing, setEditing] = useState(false);
   const testModalDisclosure = useDisclosure();
+  const { open: openTestModalDisclosure, close: closeTestModalDisclosure } = testModalDisclosure;
 
   const hasConfig = config && config.mail_server;
 
@@ -160,8 +162,11 @@ const MailConfigPage: React.FC = () => {
 
   const openTestModal = useCallback(() => {
     testForm.resetFields();
-    testModalDisclosure.open();
-  }, [testForm]);
+    openTestModalDisclosure();
+  }, [testForm, openTestModalDisclosure]);
+
+  const testPending = testMutation.isPending;
+  const testGuard = useDirtyGuard({ form: testForm, isPending: testPending });
 
   const handleTestSend = useCallback(async () => {
     try {
@@ -169,7 +174,7 @@ const MailConfigPage: React.FC = () => {
       const result = await testMutation.mutateAsync({ recipient: values.recipient });
       if (result.success) {
         messageApi.success(result.message);
-        testModalDisclosure.close();
+        closeTestModalDisclosure();
       } else {
         messageApi.error(result.message);
       }
@@ -178,7 +183,7 @@ const MailConfigPage: React.FC = () => {
         messageApi.error((err as { message: string }).message || t('testRequestFailed'));
       }
     }
-  }, [testMutation, testForm, messageApi, t]);
+  }, [testMutation, testForm, messageApi, t, closeTestModalDisclosure]);
 
   const handleEdit = useCallback(() => {
     if (config) {
@@ -203,11 +208,13 @@ const MailConfigPage: React.FC = () => {
       title={t('mail.test.modalTitle')}
       open={testModalDisclosure.isOpen}
       onOk={handleTestSend}
-      onCancel={() => testModalDisclosure.close()}
+      onCancel={() => testGuard.requestClose(() => testModalDisclosure.close())}
       okText={t('mail.action.send')}
       cancelText={tCommon('action.cancel')}
-      confirmLoading={testMutation.isPending}
-      destroyOnClose
+      confirmLoading={testPending}
+      closable={!testPending}
+      mask={{ closable: false }}
+      destroyOnHidden
     >
       <Form form={testForm} layout="vertical" style={{ marginTop: 16 }}>
         <Form.Item
@@ -511,7 +518,13 @@ const MailConfigPage: React.FC = () => {
 
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit" loading={updateMutation.isPending}>
+              {/* loading 只出转圈、不阻止点击，连点会发两次写请求（P1-4 / AC-6） */}
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={updateMutation.isPending}
+                disabled={updateMutation.isPending}
+              >
                 {t('saveConfig')}
               </Button>
               <Button onClick={openTestModal} disabled={!form.getFieldValue('mail_server')}>

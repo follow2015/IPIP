@@ -46,11 +46,13 @@ JWT_ALGORITHM: str = os.environ.get("JWT_ALGORITHM", "HS256")
 KEEPALIVE_INTERVAL: int = int(os.environ.get("SSE_KEEPALIVE_INTERVAL", "25"))  # 秒
 CLIENT_QUEUE_SIZE: int = int(os.environ.get("SSE_CLIENT_QUEUE_SIZE", "64"))
 MAX_IDLE_SECONDS: int = int(os.environ.get("SSE_MAX_IDLE_SECONDS", "300"))  # 5分钟无数据断开
-MAX_CONNECTIONS: int = int(os.environ.get("SSE_MAX_CONNECTIONS", "500"))  # G2: 全局连接数上限
+MAX_CONNECTIONS: int = int(os.environ.get("SSE_MAX_CONNECTIONS", "500"))
+AI_STREAM_MAX_CONNECTIONS: int = int(os.environ.get("SSE_AI_STREAM_MAX_CONNECTIONS", "100"))
 
 RING_BUFFER_SIZE: int = int(os.environ.get("SSE_RING_BUFFER_SIZE", "200"))
 
 RING_KEY_FMT: str = "ring:{device_id}"   # 断线重放 ring（List，发布侧写入）
+GLOBAL_RING_KEY: str = "ring:global"
 
 GLOBAL_CHANNEL: str = "events:global"
 

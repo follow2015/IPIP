@@ -26,6 +26,7 @@ import { useBatchSelection } from '@/hooks/useBatchSelection';
 import BatchActionBar from '@/components/BatchActionBar';
 import { PORT_USAGE_STATUS_MAP } from '@/types/enums';
 import type { DeviceNicPort } from '@/types/models';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface NicTabProps {
   deviceId: number;
@@ -109,7 +110,12 @@ function NicTab({ deviceId }: NicTabProps) {
       }
       formDisclosure.close();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 

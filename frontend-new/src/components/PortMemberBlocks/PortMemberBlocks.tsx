@@ -19,11 +19,12 @@ import {
   getBlockFontSize,
   getPortTypeLabel
 } from '@/utils/portType';
-import { PORT_STATUS_BG_COLOR } from '@/types/enums';
+import { portStatusBgColor } from '@/utils/statusColor';
 import { getPortUsageLegend, getPortUsageMeta, type DeviceT } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { SwitchPort } from '@/types/models';
+import type { GlobalToken } from 'antd';
 
 const FALLBACK_BAR_COLOR = PORT_TYPE_BAR_COLOR[classifyPortType('')];
 
@@ -34,7 +35,12 @@ export interface PortDetailT {
   d: DeviceT;
 }
 
-export function renderPortDetail(port: SwitchPort | undefined, portName: string, t: PortDetailT) {
+export function renderPortDetail(
+  port: SwitchPort | undefined,
+  portName: string,
+  t: PortDetailT,
+  token: GlobalToken
+) {
   const type = classifyPortType(portName);
   if (!port) {
     return (
@@ -43,7 +49,7 @@ export function renderPortDetail(port: SwitchPort | undefined, portName: string,
           <b>{portName}</b>
         </div>
         <div>{t.n('portField.type', { value: type })}</div>
-        <div style={{ color: '#8c8c8c' }}>{t.n('portMember.noDetailData')}</div>
+        <div style={{ color: token.colorTextTertiary }}>{t.n('portMember.noDetailData')}</div>
       </div>
     );
   }
@@ -139,7 +145,7 @@ export function GroupedMemberPorts({
               {groupPorts.map((portName) => {
                 const port = portMap.get(portName);
                 const usageStatus = port?.usage_status ?? 'free';
-                const bgColor = PORT_STATUS_BG_COLOR[usageStatus] ?? PORT_STATUS_BG_COLOR.free;
+                const bgColor = portStatusBgColor(usageStatus, token) ?? token.colorSuccess;
                 const shortNum = getShortPortNum(portName);
                 const width = getBlockWidth(shortNum);
                 const fontSize = getBlockFontSize(shortNum);
@@ -179,7 +185,7 @@ export function GroupedMemberPorts({
                 return (
                   <Popover
                     key={portName}
-                    content={renderPortDetail(port, portName, { n: t, d: td })}
+                    content={renderPortDetail(port, portName, { n: t, d: td }, token)}
                     title={t('portMember.detailTitle')}
                     trigger="click"
                     mouseEnterDelay={0.1}

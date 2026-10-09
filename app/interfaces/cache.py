@@ -5,7 +5,7 @@
 定义缓存管理的统一接口，支持多种缓存后端和策略。
 """
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 
 class CacheStorage(ABC):

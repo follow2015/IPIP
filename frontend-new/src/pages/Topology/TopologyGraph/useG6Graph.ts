@@ -8,23 +8,23 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useCallback,
   useState,
   useImperativeHandle,
   type ForwardedRef,
   type RefObject
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { theme, type GlobalToken } from 'antd';
 import { Graph } from '@antv/g6';
 import type { GraphData } from '@antv/g6';
 import type { TopologyNode, TopologyEdge } from '@/types/models';
+import { useUIStore } from '@/stores/ui';
 import {
   transformDataFromRefs,
-  type LayoutType,
   type TopologyGraphHandle,
   type TopologyGraphProps
 } from './graphBuilders';
-import { buildGraphOptions, type GraphT } from './graphConfig';
+import { buildGraphOptions, buildGraphPlugins, type GraphT } from './graphConfig';
 
 export interface UseG6GraphParams extends TopologyGraphProps {
   ref: ForwardedRef<TopologyGraphHandle>;
@@ -41,9 +41,16 @@ export function useG6Graph({
 }: UseG6GraphParams): { containerRef: RefObject<HTMLDivElement | null> } {
   const { t: tn } = useTranslation('network');
   const { t: td } = useTranslation('device');
+  const { token } = theme.useToken();
+  const themeMode = useUIStore((s) => s.theme);
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+
+  const tokenRef = useRef<GlobalToken>(token);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
 
   const tt = useMemo<GraphT>(() => ({ n: tn, d: td }), [tn, td]);
 
@@ -55,6 +62,15 @@ export function useG6Graph({
   useEffect(() => {
     edgesRef.current = edges;
   }, [edges]);
+
+  const onNodeClickRef = useRef(onNodeClick);
+  const onEdgeClickRef = useRef(onEdgeClick);
+  const tnRef = useRef(tn);
+  useEffect(() => {
+    onNodeClickRef.current = onNodeClick;
+    onEdgeClickRef.current = onEdgeClick;
+    tnRef.current = tn;
+  }, [onNodeClick, onEdgeClick, tn]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -112,21 +128,23 @@ export function useG6Graph({
       graphRef.current = null;
     }
 
-    const graph = new Graph(buildGraphOptions({ container, width, height, layout, t: tt }));
+    const graph = new Graph(
+      buildGraphOptions({ container, width, height, layout, t: tt, token: tokenRef.current })
+    );
 
     graph.on('node:click', (evt) => {
       const nodeId = (evt as unknown as { target?: { id?: string } }).target?.id;
-      if (nodeId && onNodeClick) {
+      if (nodeId && onNodeClickRef.current) {
         const nodeData = nodesRef.current.find((n) => String(n.id) === nodeId);
-        if (nodeData) onNodeClick(nodeData);
+        if (nodeData) onNodeClickRef.current(nodeData);
       }
     });
 
     graph.on('edge:click', (evt) => {
       const edgeId = (evt as unknown as { target?: { id?: string } }).target?.id;
-      if (edgeId && onEdgeClick) {
+      if (edgeId && onEdgeClickRef.current) {
         const edgeData = edgesRef.current.find((e) => e.id === edgeId);
-        if (edgeData) onEdgeClick(edgeData);
+        if (edgeData) onEdgeClickRef.current(edgeData);
       }
     });
 
@@ -135,7 +153,11 @@ export function useG6Graph({
     let destroyed = false;
     if (nodesRef.current.length > 0) {
       graph.setData(
-        transformDataFromRefs(nodesRef.current, edgesRef.current, tn) as unknown as GraphData
+        transformDataFromRefs(
+          nodesRef.current,
+          edgesRef.current,
+          tnRef.current
+        ) as unknown as GraphData
       );
       graph.render().catch((e: unknown) => {
         if (!destroyed) console.warn('[TopologyGraph] render error:', e);
@@ -148,6 +170,16 @@ export function useG6Graph({
       graphRef.current = null;
     };
   }, [containerSize, layout, tt]);
+
+  useEffect(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+    try {
+      graph.setOptions({ background: tokenRef.current.colorBgLayout });
+      graph.setPlugins(buildGraphPlugins(tt, tokenRef.current));
+    } catch {
+    }
+  }, [themeMode, tt]);
 
   useEffect(() => {
     const graph = graphRef.current;

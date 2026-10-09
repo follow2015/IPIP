@@ -196,7 +196,7 @@ def timeout(seconds: float):
             def target():
                 try:
                     result_container[0] = func(*args, **kwargs)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 工作线程异常收集：转入 exception_container 由调用方重新抛出（跨线程传播）
                     exception_container[0] = e
 
             worker = threading.Thread(target=target, daemon=True)
@@ -389,7 +389,7 @@ def circuit_breaker(failure_threshold: int = 5,
                     
                     return result
                     
-                except expected_exception as e:
+                except expected_exception:
                     state['failure_count'] += 1
                     state['last_failure_time'] = now
                     

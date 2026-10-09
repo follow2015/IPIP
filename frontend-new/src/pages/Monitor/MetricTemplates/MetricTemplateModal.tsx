@@ -5,6 +5,7 @@
  */
 import { Modal, Form, Input, Select, InputNumber, Switch, Row, Col, type FormInstance } from 'antd';
 import { useMessage } from '@/hooks/useMessage';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
 import { useUpsertMetricTemplate, type MetricTemplateItem } from '@/services/monitor';
 import { useTranslation } from 'react-i18next';
 import {
@@ -12,7 +13,6 @@ import {
   buildDeviceTypeOptions,
   buildMetricTypeOptions,
   buildThreshold,
-  parseThreshold,
   type MetricTemplateFormValues
 } from './shared';
 
@@ -34,6 +34,9 @@ export default function MetricTemplateModal({
   const { t } = useTranslation('monitor');
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
+
+  const isPending = upsert.isPending;
+  const guard = useDirtyGuard({ form, isPending });
 
   const deviceTypeOptions = buildDeviceTypeOptions(td);
   const metricTypeOptions = buildMetricTypeOptions(t);
@@ -72,9 +75,7 @@ export default function MetricTemplateModal({
         runbook_title: values.runbook_title || null
       });
       message.success(
-        editingRecord
-          ? t('metricTemplate.message.updated')
-          : t('metricTemplate.message.saved')
+        editingRecord ? t('metricTemplate.message.updated') : t('metricTemplate.message.saved')
       );
       onClose();
     } catch {
@@ -87,11 +88,15 @@ export default function MetricTemplateModal({
 
   return (
     <Modal
-      title={editingRecord ? t('metricTemplate.modal.editTitle') : t('metricTemplate.modal.createTitle')}
+      title={
+        editingRecord ? t('metricTemplate.modal.editTitle') : t('metricTemplate.modal.createTitle')
+      }
       open={open}
       onOk={() => form.submit()}
-      onCancel={onClose}
-      confirmLoading={upsert.isPending}
+      onCancel={() => guard.requestClose(onClose)}
+      confirmLoading={isPending}
+      closable={!isPending}
+      mask={{ closable: false }}
       width={640}
       destroyOnHidden
     >
@@ -115,7 +120,9 @@ export default function MetricTemplateModal({
             <Form.Item
               label={t('metricTemplate.field.metricKey')}
               name="metric_key"
-              rules={[{ required: true, message: t('metricTemplate.validation.metricKeyRequired') }]}
+              rules={[
+                { required: true, message: t('metricTemplate.validation.metricKeyRequired') }
+              ]}
               tooltip={t('metricTemplate.tooltip.metricKey')}
             >
               <Input placeholder={t('metricTemplate.placeholder.metricKey')} />
@@ -197,7 +204,9 @@ export default function MetricTemplateModal({
           <Form.Item
             label="Zabbix Item Key"
             name="zabbix_item_key"
-            rules={[{ required: true, message: t('metricTemplate.validation.zabbixItemKeyRequired') }]}
+            rules={[
+              { required: true, message: t('metricTemplate.validation.zabbixItemKeyRequired') }
+            ]}
             tooltip={t('metricTemplate.tooltip.zabbixItemKey')}
           >
             <Input placeholder={t('metricTemplate.placeholder.zabbixItemKey')} />

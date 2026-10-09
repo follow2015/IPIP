@@ -247,7 +247,9 @@ export default function AuditLogTable({
                   {detailRecord.action}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label={t('audit.column.resource')}>{detailRecord.resource ?? '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('audit.column.resource')}>
+                {detailRecord.resource ?? '-'}
+              </Descriptions.Item>
               <Descriptions.Item label={t('audit.column.resourceId')}>
                 {detailRecord.resource_id ?? '-'}
               </Descriptions.Item>
@@ -256,7 +258,9 @@ export default function AuditLogTable({
               </Descriptions.Item>
             </Descriptions>
             <Card size="small" title={t('audit.detailRawTitle')} type="inner">
-              <pre style={{ maxHeight: 300, overflow: 'auto', fontSize: 12, margin: 0 }}>
+              <pre
+                style={{ maxHeight: 300, overflow: 'auto', fontSize: 12, margin: 0 }}
+              >
                 {JSON.stringify(detailRecord.detail, null, 2)}
               </pre>
             </Card>

@@ -33,12 +33,6 @@ type MakeRequired<T> = {
   [K in keyof T]-?: T[K];
 };
 
-/**
- * 条件 required：将 T 中指定的 keys 收紧为 required，其余保持原样。
- * 用于部分字段后端确实可能不返回的场景（如条件追加的关联字段）。
- */
-type RequireKeys<T, K extends keyof T> = T & Required<Pick<T, K>>;
-
 
 export type ApiResp<T = unknown> = {
   success: boolean;

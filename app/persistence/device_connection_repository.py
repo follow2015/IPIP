@@ -95,7 +95,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return conn.to_dict() if conn else None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备连接失败", original_error=e)
+            raise QueryExecutionError("查找设备连接失败", original_error=e) from e
 
     def find_by_device(self, device_id: int) -> List[Dict[str, Any]]:
         """根据设备 ID 查找连接列表"""
@@ -108,7 +108,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return [c.to_dict() for c in conns]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备连接失败", original_error=e)
+            raise QueryExecutionError("查找设备连接失败", original_error=e) from e
 
     def find_by_switch_device(self, switch_device_id: int) -> List[Dict[str, Any]]:
         """根据交换机设备 ID 查找连接列表"""
@@ -121,7 +121,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return [c.to_dict() for c in conns]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备连接失败", original_error=e)
+            raise QueryExecutionError("查找设备连接失败", original_error=e) from e
 
     def list_by_device_ids(self, device_ids) -> List[DeviceConnection]:
         """按设备 ID 集合取 D2N 连接（**任一侧**命中），返回 ORM 实体。
@@ -148,7 +148,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("按设备集合查询D2N连接失败", original_error=e)
+            raise QueryExecutionError("按设备集合查询D2N连接失败", original_error=e) from e
 
     def list_by_switch_device_ids(
         self, switch_device_ids, *, with_ports: bool = False,
@@ -174,7 +174,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         try:
             return query.all()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("按交换机集合查询D2N连接失败", original_error=e)
+            raise QueryExecutionError("按交换机集合查询D2N连接失败", original_error=e) from e
 
     def find_by_switch_and_port(
         self, switch_device_id: int, switch_port_id: int
@@ -191,7 +191,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return conn.to_dict() if conn else None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备连接失败", original_error=e)
+            raise QueryExecutionError("查找设备连接失败", original_error=e) from e
 
     def exists_connection(
         self,
@@ -209,7 +209,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 q = q.filter(DeviceConnection.switch_port_id == switch_port_id)
             return self.session.query(q.exists()).scalar()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("检查连接存在性失败", original_error=e)
+            raise QueryExecutionError("检查连接存在性失败", original_error=e) from e
 
     def exists_connection_for_update(
         self,
@@ -231,7 +231,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 q = q.filter(DeviceConnection.switch_port_id == switch_port_id)
             return q.with_for_update().first() is not None
         except SQLAlchemyError as e:
-            raise QueryExecutionError("检查连接存在性失败(locked)", original_error=e)
+            raise QueryExecutionError("检查连接存在性失败(locked)", original_error=e) from e
 
     def count_by_device(self, device_id: int) -> int:
         """统计设备的连接数量"""
@@ -242,7 +242,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .count()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("统计连接数量失败", original_error=e)
+            raise QueryExecutionError("统计连接数量失败", original_error=e) from e
 
     def count_by_switch(self, switch_device_id: int) -> int:
         """统计交换机的连接数量"""
@@ -253,7 +253,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .count()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("统计连接数量失败", original_error=e)
+            raise QueryExecutionError("统计连接数量失败", original_error=e) from e
 
 
     def create_connection(self, data: Dict[str, Any]) -> int:
@@ -275,7 +275,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return conn.id
         except SQLAlchemyError as e:
-            raise QueryExecutionError("创建设备连接失败", original_error=e)
+            raise QueryExecutionError("创建设备连接失败", original_error=e) from e
 
     def update_connection(self, connection_id: int, data: Dict[str, Any]) -> bool:
         """更新设备连接，返回是否成功（flush，由 Service 统一 commit）"""
@@ -305,7 +305,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("更新设备连接失败", original_error=e)
+            raise QueryExecutionError("更新设备连接失败", original_error=e) from e
 
     def delete_connection(self, connection_id: int) -> bool:
         """删除单条连接（flush，由 Service 统一 commit）"""
@@ -321,7 +321,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除设备连接失败", original_error=e)
+            raise QueryExecutionError("删除设备连接失败", original_error=e) from e
 
     def delete_device_connections(self, device_id: int) -> int:
         """删除设备的全部连接，返回删除数量（flush，由 Service 统一 commit）
@@ -337,7 +337,7 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return count
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除设备连接失败", original_error=e)
+            raise QueryExecutionError("删除设备连接失败", original_error=e) from e
 
     def delete_switch_connections(self, switch_device_id: int) -> int:
         """删除交换机的全部连接，返回删除数量（flush，由 Service 统一 commit）
@@ -353,4 +353,4 @@ class DeviceConnectionRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return count
         except SQLAlchemyError as e:
-            raise QueryExecutionError("删除交换机连接失败", original_error=e)
+            raise QueryExecutionError("删除交换机连接失败", original_error=e) from e

@@ -12,6 +12,7 @@ import {
 } from '@/services/monitor';
 import MonitorCredentialForm from '@/components/MonitorCredentialForm';
 import { useMessage } from '@/hooks/useMessage';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
 import { useTranslation } from 'react-i18next';
 
 interface EditCredentialModalProps {
@@ -31,6 +32,9 @@ export default function EditCredentialModal({
   const msg = useMessage();
   const { t } = useTranslation('monitor');
   const { t: td } = useTranslation('device');
+
+  const isPending = updateShared.isPending;
+  const guard = useDirtyGuard({ form: editForm, isPending });
 
   const editInitialValues = (() => {
     const meta = editCred?.payload_meta || {};
@@ -85,9 +89,11 @@ export default function EditCredentialModal({
     <Modal
       title={t('credential.editSecretTitle')}
       open={open}
-      onCancel={onClose}
+      onCancel={() => guard.requestClose(onClose)}
       onOk={handleSubmitEdit}
-      confirmLoading={updateShared.isPending}
+      confirmLoading={isPending}
+      closable={!isPending}
+      mask={{ closable: false }}
       width={520}
       destroyOnHidden
     >

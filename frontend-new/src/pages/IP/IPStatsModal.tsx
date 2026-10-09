@@ -1,4 +1,4 @@
-import { Modal, Row, Col, Card, Statistic, Spin } from 'antd';
+import { Modal, Row, Col, Card, Statistic, Spin, theme } from 'antd';
 import { useTranslation } from 'react-i18next';
 
 interface IPStats {
@@ -18,20 +18,24 @@ interface IPStatsModalProps {
 
 type StatField = 'active' | 'inactive' | 'blocked' | 'unused';
 type StatLabelKey =
-  | 'ip.stats.active'
-  | 'ip.stats.inactive'
-  | 'ip.stats.blocked'
-  | 'ip.stats.unused';
+  'ip.stats.active' | 'ip.stats.inactive' | 'ip.stats.blocked' | 'ip.stats.unused';
 
-const STAT_CARDS: { key: StatField; labelKey: StatLabelKey; color: string }[] = [
-  { key: 'active', labelKey: 'ip.stats.active', color: '#52c41a' },
-  { key: 'inactive', labelKey: 'ip.stats.inactive', color: '#8c8c8c' },
-  { key: 'blocked', labelKey: 'ip.stats.blocked', color: '#ff4d4f' },
-  { key: 'unused', labelKey: 'ip.stats.unused', color: '#1890ff' }
+type SemanticColorKey = 'colorSuccess' | 'colorTextTertiary' | 'colorError' | 'colorPrimary';
+
+const STAT_CARDS: {
+  key: StatField;
+  labelKey: StatLabelKey;
+  color: SemanticColorKey;
+}[] = [
+  { key: 'active', labelKey: 'ip.stats.active', color: 'colorSuccess' },
+  { key: 'inactive', labelKey: 'ip.stats.inactive', color: 'colorTextTertiary' },
+  { key: 'blocked', labelKey: 'ip.stats.blocked', color: 'colorError' },
+  { key: 'unused', labelKey: 'ip.stats.unused', color: 'colorPrimary' }
 ];
 
 export function IPStatsModal({ open, onClose, stats, scopeLabel }: IPStatsModalProps) {
   const { t } = useTranslation('network');
+  const { token } = theme.useToken();
   return (
     <Modal
       title={t('ip.stats.title')}
@@ -65,7 +69,7 @@ export function IPStatsModal({ open, onClose, stats, scopeLabel }: IPStatsModalP
                           <span style={{ fontSize: 14, color: '#999' }}>({percent}%)</span>
                         ) : undefined
                       }
-                      styles={{ content: { color } }}
+                      styles={{ content: { color: token[color] } }}
                     />
                   </Card>
                 </Col>

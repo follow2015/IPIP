@@ -9,7 +9,7 @@ from flask import Blueprint, request, g
 from app.exceptions import PresetResponseError
 from app.api.base import APIResponse
 from app.openapi.doc import doc
-from app.utils.auth import login_required, permission_required
+from app.services.auth import login_required, permission_required
 from app.utils.transactional import transactional
 from app.utils.logging import get_logger
 
@@ -82,7 +82,7 @@ def update_voice_config():
         return APIResponse.success(data=VoiceSetting.get_all(), message="配置已保存")
     except ValueError as exc:
         raise PresetResponseError(message=str(exc), status_code=400) from exc
-    except Exception as exc:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+    except Exception as exc:  # 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.exception("语音配置更新失败")
         raise PresetResponseError(
             message="配置保存失败", status_code=500

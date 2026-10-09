@@ -127,7 +127,7 @@ def count_pending(conn, table, column, before, lower=None):
     cur = conn.cursor()
     try:
         cur.execute(
-            f"SELECT COUNT(*) FROM `{table}` WHERE " + " AND ".join(conditions),
+            f"SELECT COUNT(*) FROM `{table}` WHERE " + " AND ".join(conditions),  # noqa: S608 -- 运维脚本，SQL 标识符为脚本内置常量，值走参数绑定或受控输入
             tuple(params),
         )
         row = cur.fetchone()
@@ -170,7 +170,7 @@ def get_watermark(conn, table, column):
     cur = conn.cursor()
     try:
         cur.execute(
-            f"SELECT applied_before FROM `{STATE_TABLE}` "
+            f"SELECT applied_before FROM `{STATE_TABLE}` "  # noqa: S608 -- 运维脚本，SQL 标识符为脚本内置常量，值走参数绑定或受控输入
             f"WHERE table_name = %s AND column_name = %s",
             (table, column),
         )
@@ -205,7 +205,7 @@ def record_watermark(conn, table, column, before, source_tz, rows_updated):
     cur = conn.cursor()
     try:
         cur.execute(
-            f"INSERT INTO `{STATE_TABLE}` "
+            f"INSERT INTO `{STATE_TABLE}` "  # noqa: S608 -- 运维脚本，SQL 标识符为脚本内置常量，值走参数绑定或受控输入
             f"(table_name, column_name, applied_before, source_tz, rows_updated) "
             f"VALUES (%s, %s, %s, %s, %s) "
             f"ON DUPLICATE KEY UPDATE "
@@ -256,7 +256,7 @@ def backfill_column(conn, table, column, before, batch_size, apply_changes,
             where_pk = f"AND `{pk_col}` > %s" if last_pk is not None else ""
             params = [before] + range_params + ([last_pk] if last_pk is not None else [])
             cur.execute(
-                f"SELECT MIN(`{pk_col}`), MAX(`{pk_col}`) FROM ("
+                f"SELECT MIN(`{pk_col}`), MAX(`{pk_col}`) FROM ("  # noqa: S608 -- 运维脚本，SQL 标识符为脚本内置常量，值走参数绑定或受控输入
                 f"  SELECT `{pk_col}` FROM `{table}` "
                 f"  WHERE `{column}` IS NOT NULL AND `{column}` < %s "
                 f"  {lo_clause} {where_pk} "
@@ -269,7 +269,7 @@ def backfill_column(conn, table, column, before, batch_size, apply_changes,
                 break
             lo, hi = row
             cur.execute(
-                f"UPDATE `{table}` SET `{column}` = CONVERT_TZ(`{column}`, %s, %s) "
+                f"UPDATE `{table}` SET `{column}` = CONVERT_TZ(`{column}`, %s, %s) "  # noqa: S608 -- 运维脚本，SQL 标识符为脚本内置常量，值走参数绑定或受控输入
                 f"WHERE `{pk_col}` BETWEEN %s AND %s "
                 f"AND `{column}` IS NOT NULL AND `{column}` < %s {lo_clause}",
                 [source_tz, "+00:00", lo, hi, before] + range_params,

@@ -3,7 +3,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Button, Space, Tag, Dropdown, Tooltip, Badge, Modal } from 'antd';
+import type { GlobalToken } from 'antd';
+import { theme, Button, Space, Tag, Dropdown, Tooltip, Badge, Typography } from 'antd';
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -27,10 +28,9 @@ import {
   useDeviceList,
   useDeleteDevice,
   useBatchDeleteDevices,
-  useBatchUpdateDeviceStatus,
-  useBatchResetDeviceAsset
+  useBatchUpdateDeviceStatus
 } from '@/services/device';
-import { useMessage, useModal } from '@/hooks/useMessage';
+import { useMessage } from '@/hooks/useMessage';
 import { useBatchSelection, scopeViolationMessage } from '@/hooks/useBatchSelection';
 import { BatchActionBar } from '@/components/BatchActionBar';
 import { useRoomOptions } from '@/services/room';
@@ -38,7 +38,12 @@ import { useAllocatableCustomerOptions } from '@/services/customer';
 import { useCabinetOptions } from '@/services/cabinet';
 import { useVendorBrands } from '@/services/monitor';
 import type { Device } from '@/types/models';
-import { DEVICE_SUBTYPE_MAP, DEVICE_SUBTYPE_COLORS, DeviceType, DeviceSubtype } from '@/types/enums';
+import {
+  DEVICE_SUBTYPE_MAP,
+  DEVICE_SUBTYPE_COLORS,
+  DeviceType,
+  DeviceSubtype
+} from '@/types/enums';
 import {
   getDeviceStatusMeta,
   getDeviceStatusOptions,
@@ -61,7 +66,8 @@ function buildColumns(
     onClone: (r: Device) => void;
   },
   getVendorLabel: (enterpriseNo: string | null | undefined) => string,
-  t: { d: TFunction<'device'>; c: TFunction<'common'> }
+  t: { d: TFunction<'device'>; c: TFunction<'common'> },
+  token: GlobalToken
 ): ColumnDef[] {
   return [
     {
@@ -125,7 +131,7 @@ function buildColumns(
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    background: '#d9d9d9',
+                    background: token.colorBorder,
                     marginRight: 6
                   }}
                 />
@@ -141,7 +147,7 @@ function buildColumns(
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    background: '#52c41a',
+                    background: token.colorSuccess,
                     marginRight: 6
                   }}
                 />
@@ -156,9 +162,9 @@ function buildColumns(
                   width: 8,
                   height: 8,
                   borderRadius: '50%',
-                  background: '#d9d9d9',
+                  background: token.colorBorder,
                   marginRight: 6,
-                  border: '1px solid #bfbfbf'
+                  border: `1px solid ${token.colorTextQuaternary}`
                 }}
               />
             </Tooltip>
@@ -375,7 +381,6 @@ function getSubtypeOptions(mainType: string | undefined, t: TFunction<'device'>)
   return getDeviceSubtypeOptions(subtypes, t);
 }
 
-
 const DEVICE_FILTER_RESETS = {
   device_type: ['device_subtype', 'has_ssh'],
   room_id: ['cabinet_id']
@@ -383,15 +388,18 @@ const DEVICE_FILTER_RESETS = {
 
 function Devices() {
   const confirm = useConfirm();
+  const { token } = theme.useToken();
   const { t: tDevice } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const table = useTable({ filterResets: DEVICE_FILTER_RESETS });
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const form = useDisclosure();
+  const { open: openDeviceForm } = form;
   const [editRecord, setEditRecord] = useState<Device | null>(null);
 
   const addDevices = useDisclosure();
+  const { open: openAddDevicesModal } = addDevices;
   const [addDevicesDefaultTab, setAddDevicesDefaultTab] = useState<'batch' | 'clone'>('batch');
   const [cloneTemplateId, setCloneTemplateId] = useState<number | undefined>();
   const batchAsset = useDisclosure();
@@ -401,20 +409,20 @@ function Devices() {
   const [monitorTargets, setMonitorTargets] = useState<Device[]>([]);
 
   const deleteDevice = useDeleteDevice();
+  const { mutateAsync: deleteDeviceMutate } = deleteDevice;
   const batchDelete = useBatchDeleteDevices();
   const batchUpdateStatus = useBatchUpdateDeviceStatus();
-  const batchResetAsset = useBatchResetDeviceAsset();
   const message = useMessage();
-  const modal = useModal();
   const { data: roomOptions } = useRoomOptions();
   const { data: customerOptions } = useAllocatableCustomerOptions();
 
   const urlCabinetId = searchParams.get('cabinetId');
   const urlRoomId = searchParams.get('roomId');
+  const { updateFilter } = table;
   useEffect(() => {
-    if (urlCabinetId) table.updateFilter('cabinet_id', Number(urlCabinetId));
-    if (urlRoomId) table.updateFilter('room_id', Number(urlRoomId));
-  }, [urlCabinetId, urlRoomId]);
+    if (urlCabinetId) updateFilter('cabinet_id', Number(urlCabinetId));
+    if (urlRoomId) updateFilter('room_id', Number(urlRoomId));
+  }, [urlCabinetId, urlRoomId, updateFilter]);
 
   const { data: cabinetOptions } = useCabinetOptions(
     table.filters.room_id ? Number(table.filters.room_id) : undefined,
@@ -463,42 +471,54 @@ function Devices() {
     setEditRecord(null);
     form.open();
   };
-  const handleEdit = (record: Device) => {
-    setEditRecord(record);
-    form.open();
-  };
+  const handleEdit = useCallback(
+    (record: Device) => {
+      setEditRecord(record);
+      openDeviceForm();
+    },
+    [openDeviceForm]
+  );
 
-  const handleDelete = (record: Device) => {
-    confirm({
-      title: tCommon('confirm.deleteTitle'),
-      content: tDevice('confirm.deleteContent', { name: record.device_name }),
-      okText: tCommon('action.ok'),
-      cancelText: tCommon('action.cancel'),
-      onOk: async () => {
-        try {
-          await deleteDevice.mutateAsync(record.id);
-          message.success(tCommon('message.deleteSuccess'));
-          refetch();
-        } catch (err) {
-          message.error(err instanceof Error ? err.message : tCommon('message.deleteFailed'));
+  const handleDelete = useCallback(
+    (record: Device) => {
+      confirm({
+        title: tCommon('confirm.deleteTitle'),
+        content: tDevice('confirm.deleteContent', { name: record.device_name }),
+        okText: tCommon('action.ok'),
+        cancelText: tCommon('action.cancel'),
+        onOk: async () => {
+          try {
+            await deleteDeviceMutate(record.id);
+            message.success(tCommon('message.deleteSuccess'));
+            refetch();
+          } catch (err) {
+            message.error(err instanceof Error ? err.message : tCommon('message.deleteFailed'));
+          }
         }
+      });
+    },
+    [confirm, deleteDeviceMutate, message, refetch, tCommon, tDevice]
+  );
+
+  const handleDetail = useCallback(
+    (record: Device) => {
+      if (record.device_type === DeviceType.NETWORK) {
+        navigate(`/switches/${record.id}`);
+      } else {
+        navigate(`/devices/${record.id}`);
       }
-    });
-  };
+    },
+    [navigate]
+  );
 
-  const handleDetail = (record: Device) => {
-    if (record.device_type === DeviceType.NETWORK) {
-      navigate(`/switches/${record.id}`);
-    } else {
-      navigate(`/devices/${record.id}`);
-    }
-  };
-
-  const handleClone = (record: Device) => {
-    setCloneTemplateId(record.id);
-    setAddDevicesDefaultTab('clone');
-    addDevices.open();
-  };
+  const handleClone = useCallback(
+    (record: Device) => {
+      setCloneTemplateId(record.id);
+      setAddDevicesDefaultTab('clone');
+      openAddDevicesModal();
+    },
+    [openAddDevicesModal]
+  );
 
   const openAddDevices = (tab: 'batch' | 'clone') => {
     setCloneTemplateId(undefined);
@@ -601,12 +621,12 @@ function Devices() {
       onDelete: handleDelete,
       onClone: handleClone
     }),
-    []
+    [handleDetail, handleEdit, handleDelete, handleClone]
   );
 
   const allColumns = useMemo(
-    () => buildColumns(handlers, getVendorLabel, { d: tDevice, c: tCommon }),
-    [handlers, getVendorLabel, tDevice, tCommon]
+    () => buildColumns(handlers, getVendorLabel, { d: tDevice, c: tCommon }, token),
+    [handlers, getVendorLabel, tDevice, tCommon, token]
   );
   const columns = useMemo(
     () =>
@@ -626,6 +646,67 @@ function Devices() {
   );
 
   const rowSelection = batch.rowSelection;
+
+  const renderDeviceCard = (r: Device) => {
+    const { Text } = Typography;
+    const sub = r.device_subtype as DeviceSubtype | null;
+    const subLabel = sub ? getDeviceSubtypeLabel(sub, tDevice) : null;
+    const typeLabel =
+      subLabel ?? getDeviceTypeMeta(r.device_type as DeviceType, tDevice)?.label ?? '-';
+    const typeColor = sub ? DEVICE_SUBTYPE_COLORS[sub] : undefined;
+    const statusInfo = getDeviceStatusMeta(r.status, tDevice);
+    const uPos = r.parent_u_position ?? r.u_position;
+    const location = [r.room_name, r.cabinet_number, uPos ? `U${uPos}` : null]
+      .filter(Boolean)
+      .join(' · ');
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+        <Space wrap size={4}>
+          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleDetail(r)}>
+            <Text strong>{r.device_name ?? '-'}</Text>
+          </Button>
+          {typeLabel !== '-' && <Tag color={typeColor}>{typeLabel}</Tag>}
+          <Tag color={statusInfo?.color}>{statusInfo?.label ?? tCommon('field.unknown')}</Tag>
+        </Space>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.management_ip ?? '-'}
+        </Text>
+        {r.device_model ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {r.device_model}
+          </Text>
+        ) : null}
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {location || '-'}
+        </Text>
+        {r.customer_name ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {tCommon('field.customer')}: {r.customer_name}
+          </Text>
+        ) : null}
+        <Space size={4} wrap>
+          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleDetail(r)}>
+            {tCommon('action.detail')}
+          </Button>
+          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleEdit(r)}>
+            {tCommon('action.edit')}
+          </Button>
+          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleClone(r)}>
+            {tDevice('action.clone')}
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            style={{ padding: 0 }}
+            onClick={() => handleDelete(r)}
+          >
+            {tCommon('action.delete')}
+          </Button>
+        </Space>
+      </div>
+    );
+  };
 
   const filterBar = (
     <FilterBar
@@ -760,6 +841,8 @@ function Devices() {
         onRefresh={() => refetch()}
         toolbar={filterBar}
         rowSelection={rowSelection}
+        mobileCardMode
+        cardRender={renderDeviceCard}
       />
 
       <DeviceForm

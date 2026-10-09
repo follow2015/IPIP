@@ -59,7 +59,7 @@ class NetworkService:
                             net_record.room_id, net_record.network, customer_id,
                         )
                     self._audit_network_change(net_record, customer_id, before)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 网段级联同步客户归属失败非致命：网段记录已更新，级联失败仅告警
                     logger.warning(
                         "级联同步网段 IP 客户归属失败（网段记录已更新）: network_id=%s, error=%s",
                         network_id, e,
@@ -77,7 +77,7 @@ class NetworkService:
         只记录人工操作：无请求上下文（定时任务/系统调用）时直接跳过，
         这是「系统驱动动作不记录」的结构性保证（同 IPCrudService）。
         """
-        from app.utils.auth import get_current_user_id
+        from app.services.auth import get_current_user_id
         from app.utils.transactional import on_commit
         from app.persistence.ip_audit_repository import IPAuditRepository
         from app.services.ip_audit_service import IPAuditService

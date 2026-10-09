@@ -60,7 +60,7 @@ def cleanup_notifications():
                 "通知清理完成: 删除回执=%d, 删除通知=%d",
                 deleted_receipts, deleted_notifications,
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 通知清理单批失败隔离：回滚后继续
         notif_repo.session.rollback()
         logger.warning("通知清理失败: %s", exc)
 
@@ -139,7 +139,7 @@ def _cleanup_loop():
     while not _stop_event.wait(CLEANUP_INTERVAL):
         try:
             _cleanup_tick()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 通知清理线程顶层兜底：后台线程异常无人接收
             logger.warning("通知清理线程异常: %s", exc)
 
 

@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { Form, Select, InputNumber, Button, Space, Alert, Card, Checkbox } from 'antd';
+import { Form, Select, InputNumber, Button, Space, Alert, Card, Checkbox, theme } from 'antd';
 import { PlusOutlined, AimOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import HardwareConfigFields from '@/components/HardwareConfigFields';
 import NicConfigFields from '@/components/NicConfigFields';
@@ -25,6 +25,7 @@ interface BatchAddTabProps {
 }
 
 const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const tab = useBatchAddTab(active);
@@ -107,7 +108,9 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
             style={{ marginBottom: 0, minWidth: 180 }}
           >
             <Select
-              placeholder={selectedRoomId ? t('form.select.cabinet') : t('form.hint.selectRoomFirst')}
+              placeholder={
+                selectedRoomId ? t('form.select.cabinet') : t('form.hint.selectRoomFirst')
+              }
               options={cabinetOptions}
               allowClear
               disabled={!selectedRoomId}
@@ -115,7 +118,12 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
           </Form.Item>
           {selectedCabinetId && availableUPositions != null && !isNodeMode && (
             <span
-              style={{ color: '#8c8c8c', fontSize: 12, alignSelf: 'flex-end', paddingBottom: 4 }}
+              style={{
+                color: token.colorTextTertiary,
+                fontSize: 12,
+                alignSelf: 'flex-end',
+                paddingBottom: 4
+              }}
             >
               {t('form.location.availableUPositions', { count: availableUCount })}
             </span>
@@ -136,7 +144,12 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
           )}
           {isNodeMode && selectedChassisId && selectedChassis && (
             <span
-              style={{ color: '#8c8c8c', fontSize: 12, alignSelf: 'flex-end', paddingBottom: 4 }}
+              style={{
+                color: token.colorTextTertiary,
+                fontSize: 12,
+                alignSelf: 'flex-end',
+                paddingBottom: 4
+              }}
             >
               {t('form.nodeAssoc.vacantCount', { count: freeNodeSlots })}
             </span>
@@ -214,7 +227,9 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
             />
           )}
           {!isNodeMode && (
-            <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('addModal.uGap')}</span>
+            <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>
+              {t('addModal.uGap')}
+            </span>
           )}
           {!isNodeMode && (
             <InputNumber
@@ -247,7 +262,7 @@ const BatchAddTab: React.FC<BatchAddTabProps> = ({ active, onClose }) => {
             </Button>
           )}
         </Space>
-        <span style={{ color: '#8c8c8c', fontSize: 12, lineHeight: '24px' }}>
+        <span style={{ color: token.colorTextTertiary, fontSize: 12, lineHeight: '24px' }}>
           {t('addModal.row.count', { count: rows.length })}
         </span>
       </div>

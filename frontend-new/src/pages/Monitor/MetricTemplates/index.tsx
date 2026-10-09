@@ -121,7 +121,7 @@ export default function MetricTemplatesPage() {
 
   useResetPageOnDeps(table.setPage, [search, filterDeviceType, filterSource, filterEnabled]);
 
-  const allItems: MetricTemplateItem[] = data?.items ?? [];
+  const allItems = useMemo<MetricTemplateItem[]>(() => data?.items ?? [], [data]);
 
   const batch = useBatchSelection<MetricTemplateItem>({
     dataSource: allItems,
@@ -483,7 +483,7 @@ export default function MetricTemplatesPage() {
             解析不出数字 OID 的模板表现为「采集成功、但少了几项指标、且不报错」，
             运维只能靠"某个指标怎么一直没数据"反推。这里把本地判定结果摆到台面上。
 
-            ⚠️ 审计未返回时**不渲染**（而不是渲染成绿色"正常"）：未知 ≠ 正常，
+            [WARN] 审计未返回时**不渲染**（而不是渲染成绿色"正常"）：未知 ≠ 正常，
             把"还没查"显示成"没问题"正是本仓吃过亏的假绿灯。 */}
         {oidAudit && (
           <Alert

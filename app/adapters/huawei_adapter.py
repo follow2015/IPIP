@@ -284,7 +284,7 @@ class HuaweiAdapter(BaseDeviceAdapter):
                 model = HuaweiAdapter._get_col(header, row, "MODEL")
                 version = HuaweiAdapter._get_col(header, row, "VERSION")
                 uptime = HuaweiAdapter._get_col(header, row, "UPTIME")
-        except Exception:
+        except Exception:  # noqa: BLE001 -- 设备输出格式降级匹配：多种厂商输出格式依次尝试，正则不匹配即抛异常，需捕获后试下一种（格式差异不可枚举）
             m = re.search(
                 r'(?:HUAWEI|Huawei|Quidway)\s+(\S+)\s+(?:Router\s+)?uptime\s+is',
                 version_output, re.IGNORECASE,
@@ -308,7 +308,7 @@ class HuaweiAdapter(BaseDeviceAdapter):
                 m = re.search(r'SN\s*:\s*(\S+)', esn_output)
                 if m:
                     serial = m.group(1)
-            except Exception:  # noqa: BLE001 - 解析 ESN 失败时保留 serial=None，仍返回已解析的其他字段
+            except Exception:  # noqa: BLE001, S110 - 解析 ESN 失败时保留 serial=None，仍返回已解析的其他字段
                 pass
         return ParsedDeviceInfo(model=model, version=version, serial=serial, uptime=uptime, brand="Huawei")
 
@@ -436,9 +436,9 @@ class HuaweiAdapter(BaseDeviceAdapter):
         network = f"{dest}/{prefix}" if dest and prefix else dest
 
         nexthop = HuaweiAdapter._get_col(h, row, "NEXT_HOP")
-        if nexthop in ("127.0.0.1", "0.0.0.0"):
+        if nexthop in ("127.0.0.1", "0.0.0.0"):  # noqa: S104 -- 与通配地址的比较判定，非 socket bind
             relay_nh = HuaweiAdapter._get_col(h, row, "RELAY_NEXT_HOP")
-            if relay_nh and relay_nh not in ("127.0.0.1", "0.0.0.0", ""):
+            if relay_nh and relay_nh not in ("127.0.0.1", "0.0.0.0", ""):  # noqa: S104 -- 与通配地址的比较判定，非 socket bind
                 nexthop = relay_nh
 
         return ParsedRoute(

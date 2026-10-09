@@ -4,7 +4,7 @@
 按 (device_id, metric_key) 覆盖 MonitorMetricTemplate 的全局默认阈值，
 用于个别设备需要更严格/宽松阈值的场景（如高温机房、关键设备）。
 """
-from sqlalchemy import Index, text
+from sqlalchemy import text
 
 from sqlalchemy import UniqueConstraint
 from app.models.base import BaseModel, BIGINT_UNSIGNED

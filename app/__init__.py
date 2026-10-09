@@ -7,6 +7,7 @@
 import hmac
 import ipaddress
 import os
+import sys
 
 from app.utils.logging import get_logger
 
@@ -39,7 +40,7 @@ def _monitor_rounds_text() -> str:
     """监控轮次节奏指标的 exposition 文本（旁路，失败不影响 /metrics 其余内容）。
 
     背景：锁只保证互斥、不保证限速 ⇒ 多实例各自成频、采集被放大 N 倍，而配置值
-    看着正常。本段让"实际轮次/分钟"当场可见（见 `code_review/采样节奏真值核查-20260921.md`）。
+    看着正常。本段让"实际轮次/分钟"当场可见（见 `docs/review/采样节奏真值核查-20260921.md`）。
     """
     try:
         from app.services.monitoring.round_metrics import snapshot as _rounds_snapshot
@@ -54,6 +55,44 @@ def _monitor_rounds_text() -> str:
         return ""
 
 
+_MAINTENANCE_CLI_COMMANDS = frozenset({
+    "drop-tables",
+    "create-tables",
+    "monitor-archive",
+    "monitor-manage-partitions",
+    "monitor-outbox-cleanup",
+    "monitor-backfill-value-num",
+    "snmp-mib-scan",
+    "baseline-recompute",
+    "db-status",
+    "db-upgrade",
+    "db-check",
+    "ldap-check",
+})
+
+
+def is_maintenance_cli_argv(argv) -> bool:
+    """命令行里出现任一短命 CLI 命令 ⇒ 本次进程是维护 CLI（纯函数，可单测）。"""
+    return bool(_MAINTENANCE_CLI_COMMANDS.intersection(argv))
+
+
+def should_start_monitor_worker(
+    *, is_testing_env: bool, monitor_enabled: bool, in_process: bool, argv
+) -> bool:
+    """是否应当启动 in-Flask 监控轮询线程（把 B-28/B-29 的三条防线合成一处）。
+
+    四条防线（缺一不可，各自都有实证）：
+      1. 非 testing（B-28：否则测试进程起真线程，退出时刷 4.3 万行告警）
+      2. ``MONITOR_ENABLED``
+      3. ``MONITOR_WORKER_IN_PROCESS``
+      4. **非短命 CLI**（B-29 的覆盖面补丁：cron 不读 systemd 单元 ⇒ 维护 CLI
+         会自己拉起一套采集者）
+    """
+    if is_testing_env or not monitor_enabled or not in_process:
+        return False
+    return not is_maintenance_cli_argv(argv)
+
+
 def create_app(config_name: str = None) -> Flask:
     """创建Flask应用实例（应用工厂模式）
 
@@ -63,9 +102,9 @@ def create_app(config_name: str = None) -> Flask:
     Returns:
         Flask: Flask应用实例
     """
-    app = Flask(__name__, 
+    app = Flask(__name__,
                 static_folder='../frontend-new/dist',
-                static_url_path='')
+                static_url_path='/static')
     
     app.url_map.strict_slashes = False
 
@@ -85,6 +124,12 @@ def create_app(config_name: str = None) -> Flask:
     logging_manager.init_app(app)
 
     report_netmiko_log_switch()
+
+    try:
+        from app.services.ai.sync_fallback_guard import report_at_startup
+        report_at_startup(app)
+    except Exception as e:  # noqa: BLE001 -- 启动自检失败不得阻断应用启动
+        logger.warning("ai.sync_fallback_guard_failed %s", e)
 
     if config_name != "testing":
         try:
@@ -134,7 +179,12 @@ def create_app(config_name: str = None) -> Flask:
             in_process.lower() == "true" if in_process is not None
             else app.config.get("MONITOR_WORKER_IN_PROCESS", True)
         )
-        if not is_testing_env and app.config.get("MONITOR_ENABLED", True) and in_process:
+        if should_start_monitor_worker(
+            is_testing_env=is_testing_env,
+            monitor_enabled=bool(app.config.get("MONITOR_ENABLED", True)),
+            in_process=in_process,
+            argv=sys.argv,
+        ):
             from app.services.monitoring.monitor_worker import start_monitor_worker
             monitor_threads, monitor_stop_event = start_monitor_worker(app)
             import atexit
@@ -209,6 +259,17 @@ def register_blueprints(app: Flask):
     Args:
         app: Flask应用实例
     """
+    def _frontend_page(name: str):
+        """取前端页面文件；auth.html 等旧多入口遗留缺失时回退单入口。
+
+        Vite 现为单入口（登录页并入 index.html），auth.html 已不再产出。
+        """
+        from flask import send_from_directory
+        import os
+        if os.path.exists(os.path.join(app.static_folder, name)):
+            return send_from_directory(app.static_folder, name)
+        return send_from_directory(app.static_folder, 'index.html')
+
     @app.route("/")
     def frontend_index():
         """前端首页"""
@@ -224,14 +285,12 @@ def register_blueprints(app: Flask):
     @app.route("/auth")
     def frontend_auth():
         """前端登录页"""
-        from flask import send_from_directory
-        return send_from_directory(app.static_folder, 'auth.html')
-    
+        return _frontend_page('auth.html')
+
     @app.route("/auth.html")
     def frontend_auth_html():
         """前端登录页（HTML文件）"""
-        from flask import send_from_directory
-        return send_from_directory(app.static_folder, 'auth.html')
+        return _frontend_page('auth.html')
     
     @app.route("/assets/<path:filename>")
     def frontend_assets(filename):
@@ -326,16 +385,27 @@ def register_blueprints(app: Flask):
 
     @app.route("/<path:filename>")
     def frontend_files(filename):
-        """前端静态文件（HTML、JS、CSS等）"""
+        """前端静态文件 + SPA history 路由兜底。
+
+        [WARN] 前端是 createBrowserRouter（history 模式）：/login、/dashboard
+        这类路由在**直达/刷新**时并不对应真实文件。曾经这里对不存在的路径
+        一律返回 API 风格 404 JSON —— 用户从任何子路由刷新就撞上一屏
+        "资源不存在"。判据：
+          · 路径带扩展名 = 在找静态文件，缺失照旧 404（不掩盖真缺失）
+          · 无扩展名 = 视为前端路由，回退 index.html 交给 React Router
+          · api/、metrics 等有专属蓝图/路由前缀，维持 API 404
+        """
         from flask import send_from_directory
         import os
-        
+
         file_path = os.path.join(app.static_folder, filename)
         if os.path.exists(file_path):
             return send_from_directory(app.static_folder, filename)
-        else:
-            from app.api.base import APIResponse
-            return APIResponse.error(message=f"文件不存在: {filename}", error_code="NOT_FOUND", status_code=404)
+        if ("." not in os.path.basename(filename)
+                and not filename.startswith(("api/", "metrics"))):
+            return send_from_directory(app.static_folder, 'index.html')
+        from app.api.base import APIResponse
+        return APIResponse.error(message=f"文件不存在: {filename}", error_code="NOT_FOUND", status_code=404)
     
     @app.route("/api")
     def api_index():
@@ -359,6 +429,8 @@ def register_blueprints(app: Flask):
         )
 
     from app.api import auth_bp, cabinet_bp, customer_bp, device_bp, health_bp, room_bp, user_bp
+    from app.api.circuit import circuit_bp  # 线路管理（G1）
+    from app.api.carrier import carrier_bp  # 运营商（G1）
     from app.api.wechat import wechat_bp
     from app.api.routes import api_bp  # 导入高级功能路由
     from app.api.logs import logs_bp  # 导入日志API
@@ -373,6 +445,8 @@ def register_blueprints(app: Flask):
     from app.api.switch_routes import router as switch_new_bp
 
     app.register_blueprint(health_bp, url_prefix="/api/health")
+    from app.api.security_routes import security_bp  # CSP 违规上报（OD-7 第一阶段，匿名）
+    app.register_blueprint(security_bp, url_prefix="/api/security")
     app.register_blueprint(deployment_plan_bp, url_prefix="/api/deployment")  # 上架方案查询
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(logs_bp, url_prefix="/api/logs")  # 注册日志API
@@ -386,6 +460,8 @@ def register_blueprints(app: Flask):
     from app.api.cabinet_import import cabinet_import_bp  # 机柜导入导出（从 cabinet.py 拆分）
     app.register_blueprint(cabinet_import_bp, url_prefix="/api/cabinets")
     app.register_blueprint(customer_bp, url_prefix="/api/customers")
+    app.register_blueprint(circuit_bp, url_prefix="/api/circuits")  # 线路管理（G1）
+    app.register_blueprint(carrier_bp, url_prefix="/api/carriers")  # 运营商（G1）
     from app.api.customer_import import customer_import_bp  # 客户导入导出（从 customer.py 拆分）
     app.register_blueprint(customer_import_bp, url_prefix="/api/customers")
     app.register_blueprint(device_connection_bp)  # 注册设备连接API
@@ -490,8 +566,8 @@ def create_tables(app: Flask):
         app: Flask应用实例
     """
     with app.app_context():
-        from app.models import Cabinet, Customer, Device, Room, User
-        from app.models.rbac import Role, Permission, UserRole, RolePermission
+        from app.models import Cabinet, Customer, Device, Room, User  # noqa: F401
+        from app.models.rbac import Role, Permission, UserRole, RolePermission  # noqa: F401
 
         db.create_all()
 
@@ -550,7 +626,7 @@ def _register_db_cli(app: Flask):
             drop_tables(app, confirm=confirm)
         except RuntimeError as e:
             click.echo(f"ERROR: {e}", err=True)
-            raise SystemExit(1)
+            raise SystemExit(1) from e
 
     @app.cli.command("create-tables")
     def create_tables_cmd():
@@ -569,6 +645,9 @@ def _register_monitor_cli(app: Flask):
     import click
 
     from extensions import db
+    from app.persistence.device_metric_timeseries_repository import (
+        DeviceMetricTimeseriesRepository,
+    )
     from app.persistence.monitor_timeseries_repository import MonitorTimeseriesRepository
 
     @app.cli.command("monitor-archive")
@@ -578,22 +657,51 @@ def _register_monitor_cli(app: Flask):
         架构3 分层保留：events(30s,7d) → hourly(1h,90d) → daily(1d,730d)
         """
         repo = MonitorTimeseriesRepository(db.session)
+        metric_repo = DeviceMetricTimeseriesRepository(db.session)
         try:
             repo.downsample_to_hourly()
             repo.downsample_to_daily()
+            metric_hourly = metric_repo.downsample_to_metric_hourly()
+            metric_daily = metric_repo.downsample_to_metric_daily()
             dropped = repo.drop_expired_event_partitions()
             metric_dropped = repo.drop_expired_metric_partitions()
             deleted = repo.cleanup_hourly()
             daily_deleted = repo.cleanup_daily()
-        except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
+            metric_hourly_deleted = metric_repo.cleanup_metric_hourly()
+            metric_daily_deleted = metric_repo.cleanup_metric_daily()
+        except Exception as e:  # CLI 顶层捕获并报告
             click.echo(f"ERROR: {e}", err=True)
-            raise SystemExit(1)
+            raise SystemExit(1) from e
         click.echo(
             f"monitor-archive done: "
             f"downsample_ok=1 dropped_partitions={dropped} "
             f"metric_dropped_partitions={metric_dropped} "
-            f"hourly_deleted={deleted} daily_deleted={daily_deleted}"
+            f"hourly_deleted={deleted} daily_deleted={daily_deleted} "
+            f"metric_hourly_rows={metric_hourly} metric_daily_rows={metric_daily} "
+            f"metric_hourly_deleted={metric_hourly_deleted} "
+            f"metric_daily_deleted={metric_daily_deleted}"
         )
+
+    @app.cli.command("monitor-backfill-value-num")
+    @click.option("--batch", default=5000, show_default=True,
+                  help="每批 UPDATE 的行数（22M 行分批处理，中断可续跑）")
+    def monitor_backfill_value_num_cmd(batch):
+        """回填存量明细的 value_num（**一次性**动作，迁移 0025 之后手工执行一次）
+
+        为什么必须手工跑一次而不是写进 monitor-archive：存量 22M 行，
+        首次回填要跑数千批；挂进每夜归档会把归档窗口拖垮。回填完成后
+        （value_num IS NULL 的行归零）再跑就是 no-op，成本趋零。
+
+        幂等：只挑 value_num IS NULL 的行，解析后显式写回（含 NULL）⇒
+        中断后重跑会接着走，不会死循环也不会重复解析。
+        """
+        repo = DeviceMetricTimeseriesRepository(db.session)
+        try:
+            updated = repo.backfill_value_num(batch_size=batch)
+        except Exception as e:  # CLI 顶层捕获并报告
+            click.echo(f"ERROR: {e}", err=True)
+            raise SystemExit(1) from e
+        click.echo(f"monitor-backfill-value-num done: updated_rows={updated}")
 
     @app.cli.command("monitor-manage-partitions")
     def monitor_manage_partitions_cmd():
@@ -602,9 +710,9 @@ def _register_monitor_cli(app: Flask):
         try:
             added = repo.add_future_event_partitions()
             metric_added = repo.add_future_metric_partitions()
-        except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
+        except Exception as e:  # CLI 顶层捕获并报告
             click.echo(f"ERROR: {e}", err=True)
-            raise SystemExit(1)
+            raise SystemExit(1) from e
         click.echo(
             f"monitor-manage-partitions done: added={added} metric_added={metric_added}"
         )
@@ -638,10 +746,10 @@ def _register_monitor_cli(app: Flask):
                 failed_retention_days=failed_days,
             )
             db.session.commit()
-        except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
+        except Exception as e:  # CLI 顶层捕获并报告
             db.session.rollback()
             click.echo(f"ERROR: {e}", err=True)
-            raise SystemExit(1)
+            raise SystemExit(1) from e
         click.echo(
             f"monitor-outbox-cleanup done: "
             f"sent_deleted={result['sent_deleted']}, "
@@ -667,9 +775,9 @@ def _register_monitor_cli(app: Flask):
         out_path = out or f"detected_metrics_{ip.replace('.', '_')}.json"
         try:
             scan_to_file(ip, cred, out_path)
-        except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
+        except Exception as e:  # CLI 顶层捕获并报告
             click.echo(f"ERROR: {e}", err=True)
-            raise SystemExit(1)
+            raise SystemExit(1) from e
         click.echo(f"snmp-mib-scan done: 清单已写入 {out_path}（登记 OID 到指标模板即完成接入）")
 
     @app.cli.command("baseline-recompute")
@@ -692,10 +800,10 @@ def _register_monitor_cli(app: Flask):
         try:
             service = BaselineService()
             updated = service.recompute_all_baselines(window_days=window_days)
-        except Exception as e:  # noqa: BLE001 - CLI 顶层捕获并报告
+        except Exception as e:  # CLI 顶层捕获并报告
             db.session.rollback()
             click.echo(f"ERROR: {e}", err=True)
-            raise SystemExit(1)
+            raise SystemExit(1) from e
         click.echo(f"baseline-recompute done: updated_rows={updated}")
 
 
@@ -734,7 +842,7 @@ def _register_schema_migration_cli(app: Flask):
             cur = conn.cursor()
             cur.execute("SET SESSION lock_wait_timeout = 60")
             cur.close()
-        except Exception:  # noqa: BLE001 - 非MySQL后端（如测试）无此变量，忽略
+        except Exception:  # noqa: BLE001, S110 - 非MySQL后端（如测试）无此变量，忽略
             pass
         return conn
 

@@ -4,12 +4,12 @@
  * 布局切换 / 缩放 / 适配 / 搜索定位
  */
 import React, { useMemo } from 'react';
-import { Space, Select, Button, Input, Tooltip, Segmented } from 'antd';
+import { Space, Button, Input, Tooltip, Segmented } from 'antd';
 import {
   ZoomInOutlined,
   ZoomOutOutlined,
   FullscreenOutlined,
-  SearchOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { LayoutType } from './TopologyGraph';
@@ -33,7 +33,7 @@ const LAYOUT_OPTIONS: { key: LayoutLabelKey; value: LayoutType }[] = [
   { key: 'topology.layout.force', value: 'force' },
   { key: 'topology.layout.hierarchical', value: 'dagre' },
   { key: 'topology.layout.concentric', value: 'concentric' },
-  { key: 'topology.layout.radial', value: 'radial' },
+  { key: 'topology.layout.radial', value: 'radial' }
 ];
 
 const TopologyToolbar: React.FC<TopologyToolbarProps> = ({
@@ -42,7 +42,7 @@ const TopologyToolbar: React.FC<TopologyToolbarProps> = ({
   onZoomIn,
   onZoomOut,
   onFitView,
-  onSearch,
+  onSearch
 }) => {
   const { t } = useTranslation('network');
 
@@ -60,7 +60,7 @@ const TopologyToolbar: React.FC<TopologyToolbarProps> = ({
         padding: '8px 16px',
         background: '#fff',
         borderBottom: '1px solid #f0f0f0',
-        borderRadius: '8px 8px 0 0',
+        borderRadius: '8px 8px 0 0'
       }}
     >
       <Space size="middle">

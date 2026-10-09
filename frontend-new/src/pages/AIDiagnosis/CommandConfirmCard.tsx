@@ -1,4 +1,4 @@
-import { Card, Button, Tag, Typography, Space, Alert } from 'antd';
+import { theme, Card, Button, Tag, Typography, Space, Alert } from 'antd';
 import { ExclamationCircleOutlined, ToolOutlined, RollbackOutlined } from '@ant-design/icons';
 import { useState, useRef, useEffect } from 'react';
 import {
@@ -37,6 +37,7 @@ export default function CommandConfirmCard({
 }: CommandConfirmCardProps) {
   const confirm = useConfirm();
   const message = useMessage();
+  const { token } = theme.useToken();
   const { t } = useTranslation('ai');
   const { t: tc } = useTranslation('common');
   const [loading, setLoading] = useState<number | null>(null);
@@ -62,7 +63,7 @@ export default function CommandConfirmCard({
       <Paragraph style={{ marginBottom: 4 }}>{t('command.preview.intro')}</Paragraph>
       <pre
         style={{
-          background: '#f5f5f5',
+          background: token.colorFillTertiary,
           padding: 8,
           borderRadius: 4,
           marginBottom: 8,
@@ -138,7 +139,9 @@ export default function CommandConfirmCard({
     try {
       preview = await previewRemedial(deviceId, cmd.command_key, cmd.params || {});
     } catch (e) {
-      message.error(t('command.message.unavailable', { reason: e instanceof Error ? e.message : String(e) }));
+      message.error(
+        t('command.message.unavailable', { reason: e instanceof Error ? e.message : String(e) })
+      );
       return;
     } finally {
       setPreviewing(null);

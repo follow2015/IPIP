@@ -32,7 +32,7 @@ def _device_name_of(device_id: Optional[int]) -> Optional[str]:
     快照在**写入时刻**取一次：本列不允许随设备改名而联动（它是历史值，
     故意不加外键），但也不能一直空着 —— 空着的快照列在读取面上等于
     "设备已删除的行无法自证是哪台设备"（迁移 0015 的全部意义）。
-    设备彻底删除前 ``DeviceService._dispose_monitor_trace`` 会把本列
+    设备彻底删除前 ``DeviceService.dispose_monitor_trace`` 会把本列
     **刷新为最终名**，所以"创建时写一次 + 删除时刷一次"是完整的口径。
     """
     if not device_id:
@@ -153,7 +153,7 @@ class DiagnosisSessionService:
                 incident_id, session.id, summary,
             )
             db.session.flush()
-        except Exception:  # noqa: BLE001 - 旁路：写回失败不阻断会话结束
+        except Exception:  # 旁路：写回失败不阻断会话结束
             logger.warning("写回诊断结论失败 incident=%s session=%s",
                            incident_id, getattr(session, "id", None), exc_info=True)
 
@@ -233,7 +233,7 @@ class DiagnosisSessionService:
             try:
                 from app.services.monitoring.data_scope_service import get_visible_device_ids
                 visible = get_visible_device_ids(user_id)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.error(
                     "数据域解析失败，按无限制处理（显式 fail-open，device_id 过滤本次失效）"
                     " user_id=%s", user_id, exc_info=True,

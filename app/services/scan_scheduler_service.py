@@ -14,6 +14,11 @@
 多进程/多实例下各自 Redis leader 选举（心跳续约 + token 校验主动释放）。
 续约失败时通过 lock_lost Event 联动中止主流程。
 
+**Redis 不可用时的语义（2026-09-28 明确）**：抢锁依赖 Redis，不可用时
+``_acquire_lock`` 收口为 ``got=False`` —— 即**本轮不扫描/不清理**。这是
+有意的 fail-closed：多实例下抢不到锁就不该扫，否则各实例会重复全量扫描。
+本模块只补**归因与节流告警**，不改变该语义。
+
 设计文档：docs/_archive/AUTO_SCAN_DESIGN.md（v5）、
 docs/design/多通道设备信息采集架构.md（§18 扫描调度）
 """
@@ -25,6 +30,38 @@ from app.services.monitoring.dynamic_config import MonitorDynamicConfig
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+_lock_degraded_stats: dict[str, int] = {"scan": 0, "cleanup": 0}
+_lock_warn_at = 0.0
+_lock_warn_lock = threading.Lock()
+_LOCK_WARN_INTERVAL = 60.0  # 秒
+
+
+def get_lock_degraded_stats() -> dict[str, int]:
+    """返回抢锁因 Redis 不可用而跳过的累计次数（供排障读取）。"""
+    return dict(_lock_degraded_stats)
+
+
+def _warn_lock_degraded(kind: str, exc: Exception) -> None:
+    """抢锁不可用时的节流告警（首次及每 60s 一次）。
+
+    [WARN] 语义不变：仍然是「本轮不扫描/不清理」（fail-closed）。本函数只改
+    **异常出口与日志频率**，不动调度策略。
+    """
+    global _lock_warn_at
+    _lock_degraded_stats[kind] = _lock_degraded_stats.get(kind, 0) + 1
+    now = time.monotonic()
+    with _lock_warn_lock:
+        if now - _lock_warn_at < _LOCK_WARN_INTERVAL:
+            return
+        _lock_warn_at = now
+    logger.warning(
+        "Redis 不可用，无法获取 leader 锁，本轮 %s 已跳过（scan=%d cleanup=%d 次；"
+        "本条每 60s 提醒一次）—— 自动扫描与陈旧度清理在 Redis 恢复前不会执行。"
+        "最近一次错误: %s",
+        "扫描调度" if kind == "scan" else "陈旧度清理",
+        _lock_degraded_stats["scan"], _lock_degraded_stats["cleanup"], exc,
+    )
 
 _RELEASE_LOCK_SCRIPT = """
 if redis.call('get', KEYS[1]) == ARGV[1] then
@@ -178,10 +215,20 @@ class ScanSchedulerService:
             - lock_lost: 续约失败时会被 set() 的 Event（v5 P0 B 修复，主流程检查它来中止）
             - renew_stop: 用于主动停止续约线程的 Event（v5 P1 C 修复）
             - renew_thread: 续约线程引用（v5 P1 C 修复，用于 join）
+
+        Redis 不可用时返回 ``(False, None, None, None, None)`` —— 与"锁被其他
+        实例占用"同一条出口，**本轮不扫描/不清理**（fail-closed，见模块头）。
+        归因交给 ``_warn_lock_degraded`` 节流告警，异常不再上浮到循环级
+        ``except`` 去吐完整堆栈。
         """
-        redis_client = self._get_redis()
-        token = f"{self._instance_id}:{time.time()}"
-        got = redis_client.set(key, token, nx=True, ex=self.LOCK_TTL)
+        kind = "cleanup" if key == self.CLEANUP_LEADER_KEY else "scan"
+        try:
+            redis_client = self._get_redis()
+            token = f"{self._instance_id}:{time.time()}"
+            got = redis_client.set(key, token, nx=True, ex=self.LOCK_TTL)
+        except Exception as exc:  # noqa: BLE001
+            _warn_lock_degraded(kind, exc)
+            return False, None, None, None, None
         if not got:
             return False, None, None, None, None
 
@@ -197,9 +244,19 @@ class ScanSchedulerService:
         return True, token, lock_lost, renew_stop, renew_thread
 
     def _renew_loop(self, key: str, token: str, lock_lost: threading.Event, stop_event: threading.Event):
-        """续约循环。续约失败时 set(lock_lost) 通知主流程中止（v5 P0 B 修复）。"""
-        redis_client = self._get_redis()
-        renew_script = redis_client.register_script(_RENEW_LOCK_SCRIPT)
+        """续约循环。续约失败时 set(lock_lost) 通知主流程中止（v5 P0 B 修复）。
+
+        Redis 不可用时同样 set(lock_lost)：续约拿不到连接等同于**锁已不可信**，
+        主流程应尽早在下一个检查点停下（与"锁被抢占"同一处置），而不是戴着
+        一把可能已过期的锁继续跑完整轮扫描。
+        """
+        try:
+            redis_client = self._get_redis()
+            renew_script = redis_client.register_script(_RENEW_LOCK_SCRIPT)
+        except Exception:  # noqa: BLE001 -- 锁续约线程启动失败兜底：Redis 不可用时必须置 lock_lost 并让主流程中止，否则会以为锁仍有效
+            logger.warning("锁 %s 续约线程无法启动（Redis 不可用），通知主流程中止", key)
+            lock_lost.set()
+            return
         while not stop_event.wait(self.RENEW_INTERVAL):
             if self._stop_event.is_set():
                 return

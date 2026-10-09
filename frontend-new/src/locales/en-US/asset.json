@@ -238,7 +238,8 @@
         "deleted": "Placeholder deleted",
         "saveFailed": "Failed to save the placeholder",
         "deleteFailed": "Failed to delete the placeholder",
-        "versionConflict": "Marker was modified by someone else. The list has been refreshed — please edit again"
+        "versionConflict": "Marker was modified by someone else. The list has been refreshed — please edit again",
+        "positionConflict": "That cell is already taken (possibly by someone else just now) — pick another one"
       }
     }
   },

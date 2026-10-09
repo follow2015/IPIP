@@ -49,7 +49,6 @@ def validate_docs_dir(docs_dir: str) -> str:
     Raises:
         ValueError: 类型非法、路径越界（含 `../` 穿越）或目录不存在。
     """
-    from config import Config
 
     if not isinstance(docs_dir, str) or not docs_dir:
         raise ValueError("docs_dir 必须为非空字符串")

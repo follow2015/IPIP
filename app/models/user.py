@@ -4,9 +4,7 @@
 
 定义用户数据模型。
 """
-from sqlalchemy import Index
 from sqlalchemy.orm import relationship
-from sqlalchemy import UniqueConstraint
 
 from app.models.base import BaseModel
 from app.core.enums import UserStatus
@@ -107,7 +105,7 @@ class User(BaseModel):
         Returns:
             bool: 拥有权限返回True
         """
-        from app.utils.auth import permission_manager
+        from app.services.auth import permission_manager
 
         for role in self.roles:
             if permission_manager.has_permission(role.name, permission):

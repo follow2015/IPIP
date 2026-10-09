@@ -87,6 +87,35 @@ def utc_today() -> date:
     return now_utc_naive().date()
 
 
+def utc_timestamp(dt: datetime) -> float:
+    """UTC naive datetime → POSIX 时间戳（**必须先钉 UTC 再换算**）。
+
+    为什么不能直接 `dt.timestamp()`：本模块存储口径是 **UTC naive**，而
+    `datetime.timestamp()` 对 naive 值按**服务器本地时区**解释——同一个存储值
+    在东八区机器上会比 UTC 口径小 8 小时，即数值随部署环境的 TZ 漂移。
+    参见模块 docstring 的决策记录。
+    """
+    return dt.replace(tzinfo=timezone.utc).timestamp()
+
+
+def soft_delete_token(entity_id: int, deleted_at: Optional[datetime] = None) -> str:
+    """软删占位列 `deleted_token` 的唯一值生成器（**全仓唯一实现点**）。
+
+    背景：唯一键建在 `(业务字段, deleted_token)` 上，软删时**不改写**业务字段
+    （保持原值以便追溯，如 `circuit_no` / `carrier.name`），而是把占位列写成
+    唯一值让该行"离开"唯一约束（决策日志里的「占位列分离」选型）。
+
+    * **必须带 `id`**：只用时间戳在批量删除时可能同毫秒碰撞；
+    * **必须带时间戳**：同一行理论上可多次软删（恢复后再删），时间戳让它每次不同。
+
+    G1 review（2026-09-30）前，`Circuit`（repository）与 `Carrier`（service）
+    各写了一份 `f"#{id}#{ts}"` —— 两个实现点，且时区处理已经不一致。收敛到本
+    函数后口径由这里负责，调用方只有 `(id, deleted_at)` 两个实参，无空间再漂移。
+    """
+    when = deleted_at if deleted_at is not None else now_utc_naive()
+    return f"#{entity_id}#{utc_timestamp(when)}"
+
+
 def from_ts(ts: float) -> datetime:
     """POSIX 时间戳 → 本地 aware datetime（日志/统计用）。"""
     return datetime.fromtimestamp(ts).astimezone()

@@ -7,7 +7,6 @@ IP 域 Repository
 """
 import ipaddress
 from app.utils.logging import get_logger
-from datetime import datetime
 from typing import Dict, List, Optional
 from app.utils.time_utils import now_utc_naive
 
@@ -1124,7 +1123,7 @@ class IPManagerRepository(BaseRepository):
             )
             return
         self.session.execute(text(
-            f"DELETE FROM ip_switch_info WHERE ip_address = :ip "
+            f"DELETE FROM ip_switch_info WHERE ip_address = :ip "  # noqa: S608 -- _CROSS_ROOM_PREDICATE 为类常量（非外部输入），ip/rid 全部参数绑定
             f"AND {self._CROSS_ROOM_PREDICATE}"
         ), {"ip": ip, "rid": room_id})
 
@@ -1140,7 +1139,7 @@ class IPManagerRepository(BaseRepository):
             )
             return
         self.session.execute(text(
-            f"DELETE FROM ip_addresses WHERE ip_address = :ip "
+            f"DELETE FROM ip_addresses WHERE ip_address = :ip "  # noqa: S608 -- 同上：常量谓词 + 全参数绑定
             f"AND {self._CROSS_ROOM_PREDICATE}"
         ), {"ip": ip, "rid": room_id})
 
@@ -1280,7 +1279,7 @@ class IPManagerRepository(BaseRepository):
             return set()
         rows = self.session.execute(
             text(
-                "SELECT ip_address FROM ip_addresses "
+                "SELECT ip_address FROM ip_addresses "  # noqa: S608 -- 同上：常量谓词 + expanding 参数绑定
                 f"WHERE ip_address IN :ips AND {self._CROSS_ROOM_PREDICATE}"
             ).bindparams(bindparam("ips", expanding=True)),
             {"ips": batch, "rid": room_id}
@@ -1302,11 +1301,12 @@ class IPManagerRepository(BaseRepository):
             insert_batch = [ip for ip in insert_batch if ip not in existing]
             if not insert_batch:
                 return
-        self.session.execute(text("""
-            INSERT IGNORE INTO ip_addresses (ip_address, room_id, status)
-            VALUES (:ip, :rid, :unused)
-        """), [{"ip": ip, "rid": room_id, "unused": status}
-               for ip in insert_batch])
+        insert_rows = [
+            {"ip_address": ip, "room_id": room_id, "status": status}
+            for ip in insert_batch
+        ]
+        stmt = mysql_insert(IPManager).prefix_with("IGNORE")
+        self.session.execute(stmt, insert_rows)
 
     def batch_update_active_status(self, active_ips: list[str], room_id: int) -> None:
         """将活跃 IP 标记为 ACTIVE"""
@@ -1756,17 +1756,19 @@ class IPSwitchInfoRepository(BaseRepository):
         [WARN] 保留 ``INSERT IGNORE``：并发/重跑时同 (ip,room) 可能已存在，
         IGNORE 让补全幂等（原实现即如此）。
         """
-        self.session.execute(
-            text("""
-                INSERT IGNORE INTO ip_switch_info
-                    (ip_address, mac_address, switch_id, port, room_id, updated_at)
-                VALUES (
-                    :ip, NULL, :sid, NULL,
-                    :rid, NOW()
-                )
-            """),
-            rows,
-        )
+        insert_rows = [
+            {
+                "ip_address": r["ip"],
+                "mac_address": None,
+                "switch_id": r["sid"],
+                "port": None,
+                "room_id": r["rid"],
+                "updated_at": func.now(),
+            }
+            for r in rows
+        ]
+        stmt = mysql_insert(IPSwitchInfo).prefix_with("IGNORE")
+        self.session.execute(stmt, insert_rows)
 
     def delete_by_switch(self, switch_id: int) -> int:
         """清空该交换机的 IP-交换机关联行（B-44 收敛：设备彻底删除的清理面）。"""
@@ -2406,7 +2408,7 @@ class IPBanRecordRepository(BaseRepository):
         return self.session.query(IPBanRecord).filter(
             IPBanRecord.ip_address == ip_address,
             IPBanRecord.room_id == room_id,
-            IPBanRecord.is_active == True,
+            IPBanRecord.is_active.is_(True),
         ).first()
 
     def exists_active_ban(self, ip_address: str, room_id: int) -> bool:
@@ -2424,7 +2426,7 @@ class IPBanRecordRepository(BaseRepository):
             self.session.query(IPBanRecord).filter(
                 IPBanRecord.ip_address == ip_address,
                 IPBanRecord.room_id == room_id,
-                IPBanRecord.is_active == True,
+                IPBanRecord.is_active.is_(True),
             ).exists()
         ).scalar()
 
@@ -2436,5 +2438,5 @@ class IPBanRecordRepository(BaseRepository):
         """
         from app.models.ip_model import IPBanRecord
         return self.session.query(IPBanRecord).filter(
-            IPBanRecord.is_active == True,
+            IPBanRecord.is_active.is_(True),
         ).all()

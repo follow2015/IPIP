@@ -2,7 +2,8 @@
 """AI 运行指标：Redis 聚合存储 + 进程内兜底，输出 Prometheus exposition 文本。
 
 为什么不再用进程内的 ``prometheus_client`` 指标对象：
-部署形态是 ``gunicorn -w 4`` + ``celery worker``（见 ``ipip-deploy/scripts/start.sh``），
+部署形态是 ``gunicorn -w 4`` + ``celery worker``（见 ``scripts/start.sh`` 的
+``start_flask()`` / ``start_celery()``），
 进程内内存态（含 prometheus_client 默认 registry）**无法跨进程汇总**，管理端看数
 会随命中的 worker 漂移——典型表现就是"只有 HELP/TYPE、没有样本行"，且 celery 里
 发生的 AI 调用永远不出现在 gunicorn 的输出中。故权威计数放 Redis（HINCRBY 原子
@@ -169,7 +170,7 @@ def _read() -> Optional[Dict[str, Dict[str, Dict[str, float]]]]:
         return None
 
     rows: Dict[str, Dict[str, Dict[str, float]]] = {w: {} for w in _WINDOWS}
-    for (window, name, _), raw in zip(keys, raw_list):
+    for (window, name, _), raw in zip(keys, raw_list, strict=False):
         rows[window][name] = _decode(raw)
     return rows
 
@@ -282,7 +283,7 @@ def _render(rows: Dict[str, Dict[str, Dict[str, float]]]) -> str:
                 parts = dim.split("|")
                 if len(parts) != len(labels):
                     continue  # 历史脏数据，跳过而非渲染成畸形标签
-                pairs = ",".join(f'{k}="{_escape(v)}"' for k, v in zip(labels, parts))
+                pairs = ",".join(f'{k}="{_escape(v)}"' for k, v in zip(labels, parts, strict=False))
                 samples.append(f'{metric}{{{pairs},window="{window}"}} {_num(value)}')
         if not samples:
             continue  # 无样本则不输出空壳 HELP/TYPE（这正是旧实现误导运维的根源）

@@ -40,7 +40,7 @@ class AlertInterpreter:
             try:
                 text = self.client.chat(SYSTEM, user_prompt)
                 audit_response = text
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 status = "error"
                 audit_response = {"error_type": type(e).__name__}
                 logger.error("alert.interpret_failed %s: %s",
@@ -55,6 +55,6 @@ class AlertInterpreter:
         if cache_key:
             try:
                 self.cache.set(cache_key, text, ttl=1800)
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as e:  # noqa: BLE001 - 缓存写入失败不影响返回
+                logger.debug("alert_interpreter cache set failed: %s", e)
         return text

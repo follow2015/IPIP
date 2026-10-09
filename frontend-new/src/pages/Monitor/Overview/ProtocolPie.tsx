@@ -7,7 +7,7 @@
 import { useMemo } from 'react';
 import { Card, Empty, theme } from 'antd';
 import { Pie } from '@ant-design/charts';
-import { MONITOR_PROTOCOL_PALETTE } from '@/types/enums';
+import { monitorProtocolColor } from '@/utils/statusColor';
 import { useTranslation } from 'react-i18next';
 
 const { useToken } = theme;
@@ -30,9 +30,9 @@ export default function ProtocolPie({ data, total, loading }: ProtocolPieProps) 
         .map(([name, value]) => ({
           name,
           value,
-          color: MONITOR_PROTOCOL_PALETTE[name] ?? token.colorTextSecondary
+          color: monitorProtocolColor(name, token) ?? token.colorTextSecondary
         })),
-    [data, token.colorTextSecondary]
+    [data, token]
   );
 
   const isEmpty = chartData.length === 0;

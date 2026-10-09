@@ -190,7 +190,7 @@ class IPAuditRepository:
                 UNION ALL
                 {_BAN_SELECT} {where}
             ) AS combined
-        """
+        """  # noqa: S608 -- where 由本模块内部构造（列名/占位符字面量），值走 params 绑定
         result = self.session.execute(text(sql), params)
         return int(result.scalar() or 0)
 

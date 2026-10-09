@@ -12,10 +12,10 @@ import time
 from typing import Optional
 
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
-_PREFIX = "ai:task:"
 _TTL = 3600  # 任务状态保留 1 小时
 
 _UPDATE_LUA = """
@@ -121,7 +121,7 @@ def save(task_id: str, state: dict, nx: bool = False) -> None:
             return
         _fallback_set(task_id, state)
         return
-    key = f"{_PREFIX}{task_id}"
+    key = redis_keys.ai_task_key(task_id)
     try:
         if nx:
             r.set(key, json.dumps(state, ensure_ascii=False), ex=_TTL, nx=True)
@@ -140,8 +140,8 @@ def save(task_id: str, state: dict, nx: bool = False) -> None:
                 )
                 if existing.get("user_id") is not None:
                     state = {**state, "user_id": existing["user_id"]}
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as e:  # noqa: BLE001 - 既有状态不可读则丢弃合并，不影响写入
+                logger.debug("ai.task_state merge_existing_failed %s", e)
         r.set(key, json.dumps(state, ensure_ascii=False), ex=_TTL)
     except Exception as e:  # noqa: BLE001
         logger.warning("ai.task_state.save_failed %s", e)
@@ -166,7 +166,7 @@ def update(task_id: str, **fields) -> None:
             merged["user_id"] = existing["user_id"]
         _fallback_set(task_id, merged)
         return
-    key = f"{_PREFIX}{task_id}"
+    key = redis_keys.ai_task_key(task_id)
     try:
         r.eval(_UPDATE_LUA, 1, key, json.dumps(fields, ensure_ascii=False),
                str(_TTL))
@@ -197,7 +197,7 @@ def load(task_id: str) -> Optional[dict]:
     if r is None:
         return _fallback_get(task_id)
     try:
-        val = r.get(f"{_PREFIX}{task_id}")
+        val = r.get(redis_keys.ai_task_key(task_id))
         if val is None:
             return None
         if isinstance(val, bytes):
@@ -215,6 +215,6 @@ def delete(task_id: str) -> None:
         _FALLBACK.pop(task_id, None)
         return
     try:
-        r.delete(f"{_PREFIX}{task_id}")
-    except Exception:  # noqa: BLE001
-        pass
+        r.delete(redis_keys.ai_task_key(task_id))
+    except Exception as e:  # noqa: BLE001 - 删除失败不影响调用方
+        logger.debug("ai.task_state delete_failed %s", e)

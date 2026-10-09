@@ -51,7 +51,8 @@ export default function IPAudit() {
   const userNameMap = useMemo(() => {
     const map = new Map<number, string>();
     for (const u of users ?? []) {
-      if (u.id != null) map.set(u.id, u.name || u.username || t('audit.userFallback', { id: u.id }));
+      if (u.id != null)
+        map.set(u.id, u.name || u.username || t('audit.userFallback', { id: u.id }));
     }
     return map;
   }, [users, t]);
@@ -216,7 +217,9 @@ export default function IPAudit() {
               type="inner"
               style={{ marginTop: 12 }}
             >
-              <pre style={{ maxHeight: 300, overflow: 'auto', fontSize: 12, margin: 0 }}>
+              <pre
+                style={{ maxHeight: 300, overflow: 'auto', fontSize: 12, margin: 0 }}
+              >
                 {JSON.stringify(detail.detail, null, 2)}
               </pre>
             </Card>

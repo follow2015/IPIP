@@ -18,6 +18,15 @@
   随 daemon 线程回收（与 H2 线程泄漏防护设计一致）。
 """
 
+from app.services.monitoring.adapters.base_adapter import (
+    MonitorAdapter,
+    MonitorProtocolCode,
+    ProbeResult,
+    monitor_timeout_seconds,
+    run_with_timeout,
+)
+from app.core.enums import ProbeErrorCode
+from app.services.monitoring.snmp_versions import SNMP_REQUIRED_BY_VERSION
 import asyncio
 from app.utils.logging import get_logger
 import threading
@@ -37,15 +46,6 @@ def _snmp_log_gate(ip: str, mib: str, symbol: str) -> bool:
         _SNMP_LOG_THROTTLE[key] = now
         return last is None or (now - last) >= _SNMP_TRACEBACK_COOLDOWN
 
-from app.services.monitoring.adapters.base_adapter import (
-    MonitorAdapter,
-    MonitorProtocolCode,
-    ProbeResult,
-    monitor_timeout_seconds,
-    run_with_timeout,
-)
-from app.core.enums import ProbeErrorCode
-from app.services.monitoring.snmp_versions import SNMP_REQUIRED_BY_VERSION
 
 logger = get_logger(__name__)
 
@@ -256,7 +256,7 @@ async def _snmp_get_sysuptime_async(
             except (ValueError, TypeError):
                 return False, None, "no_data"
         return False, None, "no_data"
-    except Exception as exc:  # noqa: BLE001 - 内层统一吞掉，交由外层判定
+    except Exception as exc:  # 内层统一吞掉，交由外层判定
         msg = str(exc).lower()
         if "timeout" in msg:
             return False, None, ProbeErrorCode.TIMEOUT.value
@@ -352,10 +352,17 @@ def _build_oid_identity(pysnmp_module, oid: str | None, mib: str | None, symbol:
 
 
 async def _snmp_walk_table_async(credential: dict, ip: str, mib: str, symbol: str,
-                                 timeout: int | None = None, oid: str | None = None) -> dict:
+                                 timeout: int | None = None, oid: str | None = None,
+                                 full_index: bool = False) -> dict:
     """异步 bulkwalk 采集某 MIB 表（符号）下所有实例。
 
     返回 ``{str_index: value}``（str_index 为 OID 尾缀，如端口 ifIndex / 传感器编号）。
+
+    :param full_index: 索引是否取**完整 OID 尾缀**（默认 False = 只取最后一段）。
+        [WARN] 默认的"最后一段"对**复合/多段索引**的表会塌缩 —— 例如 IP-MIB 的
+        ``ipAdEntIfIndex``（索引是 4 字节 IP）会把 ``192.168.1.10`` 记成 ``10``，
+        多条 IP 互相覆盖。这类表必须显式 ``full_index=True``。
+        默认保持 False 是为了**不改监控侧既有指标采集的索引口径**（那些表都是单段索引）。
     与 sysUptime 探测一致：内部吞掉所有异常，返回可空 dict；调用方经 run_with_timeout
     兜底，避免阻塞 worker。
 
@@ -431,7 +438,8 @@ async def _snmp_walk_table_async(credential: dict, ip: str, mib: str, symbol: st
                 oid_str = str(vb_oid)
                 if not oid_str.startswith(base_prefix):
                     return result
-                suffix = oid_str.rsplit(".", 1)[-1]
+                suffix = (oid_str[len(base_prefix):] if full_index
+                          else oid_str.rsplit(".", 1)[-1])
                 result[suffix] = val.prettyPrint() if hasattr(val, "prettyPrint") else str(val)
         return result
     except RuntimeError as e:
@@ -446,7 +454,7 @@ async def _snmp_walk_table_async(credential: dict, ip: str, mib: str, symbol: st
         else:
             logger.warning("SNMP 指标采集异常(已限频) mib=%s symbol=%s ip=%s", mib, symbol, ip)
         return {}
-    except Exception:  # noqa: BLE001 - 内层吞掉，调用方判定
+    except Exception:  # 内层吞掉，调用方判定
         if _snmp_log_gate(ip, mib, symbol):
             logger.warning("SNMP 指标采集异常 mib=%s symbol=%s ip=%s", mib, symbol, ip, exc_info=True)
         else:
@@ -466,20 +474,31 @@ async def _snmp_collect_all_async(
         metric_key = tpl.get("metric_key")
         mib, symbol = tpl.get("mib"), tpl.get("oid_symbol")
         oid = tpl.get("oid")
+        full_index = bool(tpl.get("full_index", False))
         if not metric_key or (not oid and not (mib and symbol)):
             return metric_key or "", {}
         try:
             table = await asyncio.wait_for(
-                _snmp_walk_table_async(credential, ip, mib, symbol, timeout, oid=oid),
+                _snmp_walk_table_async(credential, ip, mib, symbol, timeout,
+                                       oid=oid, full_index=full_index),
                 timeout=timeout,
             )
             return metric_key, table
-        except (asyncio.TimeoutError, Exception):  # noqa: BLE001 - 单模板失败不影响其他
+        except (asyncio.TimeoutError, Exception):  # 单模板失败不影响其他
             logger.warning("SNMP 单模板采集失败 metric_key=%s mib=%s symbol=%s oid=%s ip=%s", metric_key, mib, symbol, oid, ip, exc_info=True)
             return metric_key, {}
 
-    pairs = await asyncio.gather(*(_one(tpl) for tpl in templates), return_exceptions=False)
+    results = await asyncio.gather(
+        *(_one(tpl) for tpl in templates), return_exceptions=True
+    )
+    pairs = [r for r in results if isinstance(r, tuple)]
+    for r in results:
+        if isinstance(r, BaseException):
+            logger.warning("SNMP 模板采集异常（已隔离）: %s", r, exc_info=r)
     return {key: table for key, table in pairs if key}
+
+
+_COLLECT_OUTER_GRACE_SECONDS = 2
 
 
 def _snmp_collect_metrics(
@@ -501,11 +520,12 @@ def _snmp_collect_metrics(
     if not templates:
         return {}
     inner_timeout = timeout if timeout is not None else monitor_timeout_seconds()
+    outer_timeout = inner_timeout + _COLLECT_OUTER_GRACE_SECONDS
     try:
         return asyncio.run(
             asyncio.wait_for(
                 _snmp_collect_all_async(credential, ip, templates, inner_timeout),
-                timeout=inner_timeout,
+                timeout=outer_timeout,
             )
         )
     except asyncio.TimeoutError:

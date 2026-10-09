@@ -6,6 +6,8 @@ from sqlalchemy.sql import func
 from app.models.base import BaseModel, MEDIUMTEXT
 from extensions import db
 
+VALID_BACKUP_TYPES = ("manual", "scheduled", "pre_change", "pre_remedial")
+
 
 class DeviceConfigBackup(db.Model):
     """设备配置备份
@@ -23,7 +25,7 @@ class DeviceConfigBackup(db.Model):
     config_content = db.Column(MEDIUMTEXT, nullable=False, comment="配置内容(MEDIUMTEXT)")
     config_hash = db.Column(db.String(64), nullable=False, comment="SHA-256哈希")
     backup_type = db.Column(
-        db.Enum('manual', 'scheduled', 'pre_change'),
+        db.Enum(*VALID_BACKUP_TYPES),
         nullable=False, default='manual', comment="备份类型"
     )
     file_size = db.Column(INTEGER(unsigned=True), comment="配置文件大小(字节)")

@@ -15,8 +15,11 @@
  * - useDeviceMetricAlerts（活跃指标告警，grouped=false 时按默认分组展示）
  * - useDeviceTrafficPorts（Zabbix 端口列表 + configured 标记）
  */
-import { Card, Table, Tag, Empty, Spin, Alert, Row, Col, Space, Typography } from 'antd';
-import DataTable from '@/components/DataTable';
+import { useMemo } from 'react';
+import { Card, Table, Tag, Empty, Spin, Alert, Row, Col, Space, Typography, theme } from 'antd';
+import type { TableProps } from 'antd';
+import { severityColor } from '@/utils/statusColor';
+import DataTable, { type DataTableColumn } from '@/components/DataTable';
 import {
   FireOutlined,
   SwapOutlined,
@@ -34,6 +37,7 @@ import {
   useDeviceMetricAlerts,
   useDeviceMetricDashboard,
   useDeviceTrafficPorts,
+  type DeviceMetricAlertItem,
   type DeviceMetricDashboardItem,
   type MonitorStatusCode
 } from '@/services/monitor';
@@ -82,12 +86,42 @@ const METRIC_GROUPS: MetricGroupDef[] = [
   },
   { key: 'port_updown', labelKey: 'group.portStatus', icon: <SwapOutlined />, protocols: ['snmp'] },
   { key: 'if_status', labelKey: 'group.portStatus', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_in_errors', labelKey: 'group.ifInErrors', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_out_errors', labelKey: 'group.ifOutErrors', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_in_discards', labelKey: 'group.ifInDiscards', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_out_discards', labelKey: 'group.ifOutDiscards', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'if_utilization', labelKey: 'group.ifUtilization', icon: <SwapOutlined />, protocols: ['snmp'] },
-  { key: 'cpu_usage', labelKey: 'group.cpuUsage', icon: <ApiOutlined />, protocols: ['snmp', 'zabbix'] },
+  {
+    key: 'if_in_errors',
+    labelKey: 'group.ifInErrors',
+    icon: <SwapOutlined />,
+    protocols: ['snmp']
+  },
+  {
+    key: 'if_out_errors',
+    labelKey: 'group.ifOutErrors',
+    icon: <SwapOutlined />,
+    protocols: ['snmp']
+  },
+  {
+    key: 'if_in_discards',
+    labelKey: 'group.ifInDiscards',
+    icon: <SwapOutlined />,
+    protocols: ['snmp']
+  },
+  {
+    key: 'if_out_discards',
+    labelKey: 'group.ifOutDiscards',
+    icon: <SwapOutlined />,
+    protocols: ['snmp']
+  },
+  {
+    key: 'if_utilization',
+    labelKey: 'group.ifUtilization',
+    icon: <SwapOutlined />,
+    protocols: ['snmp']
+  },
+  {
+    key: 'cpu_usage',
+    labelKey: 'group.cpuUsage',
+    icon: <ApiOutlined />,
+    protocols: ['snmp', 'zabbix']
+  },
   {
     key: 'memory_usage',
     labelKey: 'group.memoryUsage',
@@ -154,19 +188,21 @@ const METRIC_GROUPS: MetricGroupDef[] = [
     icon: <SwapOutlined />,
     protocols: ['zabbix']
   },
-  { key: 'raid_failure', labelKey: 'group.raidFailure', icon: <DatabaseOutlined />, protocols: ['ipmi'] },
-  { key: 'disk_failure', labelKey: 'group.diskFailure', icon: <HddOutlined />, protocols: ['ipmi'] },
+  {
+    key: 'raid_failure',
+    labelKey: 'group.raidFailure',
+    icon: <DatabaseOutlined />,
+    protocols: ['ipmi']
+  },
+  {
+    key: 'disk_failure',
+    labelKey: 'group.diskFailure',
+    icon: <HddOutlined />,
+    protocols: ['ipmi']
+  },
   { key: 'monitor_interrupted', labelKey: 'group.monitorInterrupted', icon: <DisconnectOutlined /> }
 ];
 
-const SEVERITY_COLOR: Record<string, string> = {
-  crit: 'red',
-  critical: 'red',
-  warn: 'orange',
-  warning: 'orange',
-  info: 'blue',
-  ok: 'green'
-};
 
 type MetricTagKey =
   | 'metric.severity.critical'
@@ -195,7 +231,11 @@ type MetricOverallKey =
 
 const OVERALL_STATUS_META: Record<
   string,
-  { textKey: MetricOverallKey; type: 'error' | 'warning' | 'info' | 'success'; icon: React.ReactNode }
+  {
+    textKey: MetricOverallKey;
+    type: 'error' | 'warning' | 'info' | 'success';
+    icon: React.ReactNode;
+  }
 > = {
   no_credential: { textKey: 'overall.noCredential', type: 'warning', icon: <LockOutlined /> },
   not_probed: { textKey: 'overall.notProbed', type: 'info', icon: <ClockCircleOutlined /> },
@@ -238,10 +278,127 @@ interface MetricsTabProps {
 
 export default function MetricsTab({ deviceId }: MetricsTabProps) {
   const { t } = useTranslation('device');
+  const { token } = theme.useToken();
   const { data: dashboard, isLoading: dashboardLoading } = useDeviceMetricDashboard(deviceId);
   const { data: alertData, isLoading: alertsLoading } = useDeviceMetricAlerts(deviceId);
   const { data: trafficPortsData, isLoading: trafficPortsLoading } =
     useDeviceTrafficPorts(deviceId);
+
+
+  const metricStatusColumns = useMemo<DataTableColumn<DeviceMetricDashboardItem>[]>(
+    () => [
+      {
+        title: t('metric.column.name'),
+        dataIndex: 'metric_name',
+        render: (v: string, r: DeviceMetricDashboardItem) => r.metric_name || r.metric_key
+      },
+      {
+        title: t('metric.column.source'),
+        dataIndex: 'source',
+        width: 90,
+        render: (v: string | null) => (v ? v.toUpperCase() : '—')
+      },
+      {
+        title: t('metric.column.value'),
+        dataIndex: 'value',
+        width: 110,
+        render: (v: string | null) => v ?? '—'
+      },
+      {
+        title: t('metric.column.status'),
+        key: 'status',
+        width: 100,
+        render: (_: unknown, r: DeviceMetricDashboardItem) =>
+          r.breached ? (
+            <Tag color={severityColor(r.severity, token) ?? 'orange'}>
+              {t(SEVERITY_LABEL_KEY[r.severity ?? ''] ?? 'metric.column.alert')}
+            </Tag>
+          ) : r.value != null ? (
+            <Tag color="green">{t('metric.status.normal')}</Tag>
+          ) : (
+            <Tag color="default">{t('metric.status.noData')}</Tag>
+          )
+      },
+      {
+        title: t('metric.column.collectedAt'),
+        dataIndex: 'collected_at',
+        width: 160,
+        render: (v: string | null) => (v ? formatDateTime(v) : '—')
+      }
+    ],
+    [t, token]
+  );
+
+  const groupAlertColumns = useMemo<NonNullable<TableProps<DeviceMetricAlertItem>['columns']>>(
+    () => [
+      {
+        title: t('metric.column.instance'),
+        dataIndex: 'index_key',
+        render: (v: string) => v || '—',
+        ellipsis: true
+      },
+      {
+        title: t('metric.column.severity'),
+        dataIndex: 'severity',
+        width: 70,
+        render: (sev: string | null) => (
+          <Tag color={severityColor(sev, token) ?? 'default'}>
+            {SEVERITY_LABEL_KEY[sev ?? ''] ? t(SEVERITY_LABEL_KEY[sev ?? '']) : (sev ?? '—')}
+          </Tag>
+        )
+      },
+      {
+        title: t('metric.column.value'),
+        dataIndex: 'last_value',
+        width: 80,
+        render: (v: string | null) => v ?? '—'
+      }
+    ],
+    [t, token]
+  );
+
+  const activeAlertColumns = useMemo<NonNullable<TableProps<DeviceMetricAlertItem>['columns']>>(
+    () => [
+      {
+        title: t('metric.column.name'),
+        dataIndex: 'metric_key',
+        width: 100,
+        render: (key: string) => {
+          const meta = METRIC_GROUPS.find((g) => g.key === key);
+          return meta ? t(`metric.${meta.labelKey}`) : key;
+        }
+      },
+      {
+        title: t('metric.column.instance'),
+        dataIndex: 'index_key',
+        width: 160,
+        render: (v: string) => v || '—',
+        ellipsis: true
+      },
+      {
+        title: t('metric.column.severity'),
+        dataIndex: 'severity',
+        width: 70,
+        render: (sev: string | null) => (
+          <Tag color={severityColor(sev, token) ?? 'default'}>
+            {SEVERITY_LABEL_KEY[sev ?? ''] ? t(SEVERITY_LABEL_KEY[sev ?? '']) : (sev ?? '—')}
+          </Tag>
+        )
+      },
+      {
+        title: t('metric.column.value'),
+        dataIndex: 'last_value',
+        render: (v: string | null) => v ?? '—'
+      },
+      {
+        title: t('metric.column.updatedAt'),
+        dataIndex: 'updated_at',
+        width: 160,
+        render: (v: string | null) => (v ? formatDateTime(v) : '—')
+      }
+    ],
+    [t, token]
+  );
 
   if (dashboardLoading || alertsLoading || trafficPortsLoading) {
     return (
@@ -299,7 +456,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
 
   const renderMetricStatusTag = (r: DeviceMetricDashboardItem) =>
     r.breached ? (
-      <Tag color={SEVERITY_COLOR[r.severity ?? ''] ?? 'orange'}>
+      <Tag color={severityColor(r.severity, token) ?? 'orange'}>
         {t(SEVERITY_LABEL_KEY[r.severity ?? ''] ?? 'metric.column.alert')}
       </Tag>
     ) : r.value != null ? (
@@ -361,7 +518,10 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
 
           {isStatusOnly ? (
             /* 不可达 / 凭据错误 / 无数据 / 未探测 → 指标区域直接展示对应状态（灰色卡片） */
-            <Card size="small" style={{ background: '#fafafa', borderColor: '#d9d9d9' }}>
+            <Card
+              size="small"
+              style={{ background: token.colorFillQuaternary, borderColor: token.colorBorder }}
+            >
               <div style={{ textAlign: 'center', padding: 24 }}>
                 <Space direction="vertical" size={8} style={{ alignItems: 'center' }}>
                   <span style={{ fontSize: 32, color: '#999' }}>{overallMeta.icon}</span>
@@ -391,7 +551,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
             metricStatus.length > 0 ? (
               <Card
                 size="small"
-                style={{ background: '#fafafa', borderColor: '#d9d9d9' }}
+                style={{ background: token.colorFillQuaternary, borderColor: token.colorBorder }}
                 styles={{ body: { padding: 0 } }}
               >
                 <DataTable<DeviceMetricDashboardItem>
@@ -403,46 +563,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                   showCard={false}
                   mobileCardMode
                   cardRender={renderMetricCard}
-                  columns={[
-                    {
-                      title: t('metric.column.name'),
-                      dataIndex: 'metric_name',
-                      render: (v: string, r) => r.metric_name || r.metric_key
-                    },
-                    {
-                      title: t('metric.column.source'),
-                      dataIndex: 'source',
-                      width: 90,
-                      render: (v: string | null) => (v ? v.toUpperCase() : '—')
-                    },
-                    {
-                      title: t('metric.column.value'),
-                      dataIndex: 'value',
-                      width: 110,
-                      render: (v: string | null) => v ?? '—'
-                    },
-                    {
-                      title: t('metric.column.status'),
-                      key: 'status',
-                      width: 100,
-                      render: (_: unknown, r: DeviceMetricDashboardItem) =>
-                        r.breached ? (
-                          <Tag color={SEVERITY_COLOR[r.severity ?? ''] ?? 'orange'}>
-                            {t(SEVERITY_LABEL_KEY[r.severity ?? ''] ?? 'metric.column.alert')}
-                          </Tag>
-                        ) : r.value != null ? (
-                          <Tag color="green">{t('metric.status.normal')}</Tag>
-                        ) : (
-                          <Tag color="default">{t('metric.status.noData')}</Tag>
-                        )
-                    },
-                    {
-                      title: t('metric.column.collectedAt'),
-                      dataIndex: 'collected_at',
-                      width: 160,
-                      render: (v: string | null) => (v ? formatDateTime(v) : '—')
-                    }
-                  ]}
+                  columns={metricStatusColumns}
                   scroll={{ x: 'max-content' }}
                 />
               </Card>
@@ -453,7 +574,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
           metricStatus.length > 0 ? (
             <Card
               size="small"
-              style={{ background: '#fafafa', borderColor: '#d9d9d9' }}
+              style={{ background: token.colorFillQuaternary, borderColor: token.colorBorder }}
               styles={{ body: { padding: 0 } }}
             >
               <DataTable<DeviceMetricDashboardItem>
@@ -465,46 +586,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                 showCard={false}
                 mobileCardMode
                 cardRender={renderMetricCard}
-                columns={[
-                  {
-                    title: t('metric.column.name'),
-                    dataIndex: 'metric_name',
-                    render: (v: string, r) => r.metric_name || r.metric_key
-                  },
-                  {
-                    title: t('metric.column.source'),
-                    dataIndex: 'source',
-                    width: 90,
-                    render: (v: string | null) => (v ? v.toUpperCase() : '—')
-                  },
-                  {
-                    title: t('metric.column.value'),
-                    dataIndex: 'value',
-                    width: 110,
-                    render: (v: string | null) => v ?? '—'
-                  },
-                  {
-                    title: t('metric.column.status'),
-                    key: 'status',
-                    width: 100,
-                    render: (_: unknown, r: DeviceMetricDashboardItem) =>
-                      r.breached ? (
-                        <Tag color={SEVERITY_COLOR[r.severity ?? ''] ?? 'orange'}>
-                          {t(SEVERITY_LABEL_KEY[r.severity ?? ''] ?? 'metric.column.alert')}
-                        </Tag>
-                      ) : r.value != null ? (
-                        <Tag color="green">{t('metric.status.normal')}</Tag>
-                      ) : (
-                        <Tag color="default">{t('metric.status.noData')}</Tag>
-                      )
-                  },
-                  {
-                    title: t('metric.column.collectedAt'),
-                    dataIndex: 'collected_at',
-                    width: 160,
-                    render: (v: string | null) => (v ? formatDateTime(v) : '—')
-                  }
-                ]}
+                columns={metricStatusColumns}
                 scroll={{ x: 'max-content' }}
               />
             </Card>
@@ -534,7 +616,7 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                             <span style={{ marginLeft: 8 }}>{t(`metric.${group.labelKey}`)}</span>
                             {hasAlert && (
                               <Tag
-                                color={SEVERITY_COLOR[groupItems[0]?.severity ?? ''] ?? 'orange'}
+                                color={severityColor(groupItems[0]?.severity, token) ?? 'orange'}
                                 style={{ marginLeft: 8 }}
                               >
                                 {t('metric.groupAlertCount', { count: groupItems.length })}
@@ -542,7 +624,10 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                             )}
                           </span>
                         }
-                        style={{ background: '#fafafa', borderColor: '#d9d9d9' }}
+                        style={{
+                          background: token.colorFillQuaternary,
+                          borderColor: token.colorBorder
+                        }}
                       >
                         {group.key === 'monitor_interrupted' ? (
                           hasAlert ? (
@@ -553,35 +638,12 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
                             <Tag color="green">{t('metric.status.normal')}</Tag>
                           )
                         ) : groupItems.length > 0 ? (
-                          <Table
+                          <Table<DeviceMetricAlertItem>
                             dataSource={groupItems}
                             rowKey="id"
                             size="small"
                             pagination={false}
-                            columns={[
-                              {
-                                title: t('metric.column.instance'),
-                                dataIndex: 'index_key',
-                                render: (v: string) => v || '—',
-                                ellipsis: true
-                              },
-                              {
-                                title: t('metric.column.severity'),
-                                dataIndex: 'severity',
-                                width: 70,
-                                render: (sev: string | null) => (
-                                  <Tag color={SEVERITY_COLOR[sev ?? ''] ?? 'default'}>
-                                    {SEVERITY_LABEL_KEY[sev ?? ''] ? t(SEVERITY_LABEL_KEY[sev ?? '']) : sev ?? '—'}
-                                  </Tag>
-                                )
-                              },
-                              {
-                                title: t('metric.column.value'),
-                                dataIndex: 'last_value',
-                                width: 80,
-                                render: (v: string | null) => v ?? '—'
-                              }
-                            ]}
+                            columns={groupAlertColumns}
                             scroll={{ x: 'max-content' }}
                           />
                         ) : notProbedYet ? (
@@ -608,53 +670,15 @@ export default function MetricsTab({ deviceId }: MetricsTabProps) {
             </Space>
             <Card
               size="small"
-              style={{ background: '#fff7e6', borderColor: '#ffd591' }}
+              style={{ background: token.colorWarningBg, borderColor: token.colorWarningBorder }}
               styles={{ body: { padding: 0 } }}
             >
-              <Table
+              <Table<DeviceMetricAlertItem>
                 dataSource={items}
                 rowKey="id"
                 size="small"
                 pagination={items.length > 10 ? { pageSize: 10, size: 'small' } : false}
-                columns={[
-                  {
-                    title: t('metric.column.name'),
-                    dataIndex: 'metric_key',
-                    width: 100,
-                    render: (key: string) => {
-                      const meta = METRIC_GROUPS.find((g) => g.key === key);
-                      return meta ? t(`metric.${meta.labelKey}`) : key;
-                    }
-                  },
-                  {
-                    title: t('metric.column.instance'),
-                    dataIndex: 'index_key',
-                    width: 160,
-                    render: (v: string) => v || '—',
-                    ellipsis: true
-                  },
-                  {
-                    title: t('metric.column.severity'),
-                    dataIndex: 'severity',
-                    width: 70,
-                    render: (sev: string | null) => (
-                      <Tag color={SEVERITY_COLOR[sev ?? ''] ?? 'default'}>
-                        {SEVERITY_LABEL_KEY[sev ?? ''] ? t(SEVERITY_LABEL_KEY[sev ?? '']) : sev ?? '—'}
-                      </Tag>
-                    )
-                  },
-                  {
-                    title: t('metric.column.value'),
-                    dataIndex: 'last_value',
-                    render: (v: string | null) => v ?? '—'
-                  },
-                  {
-                    title: t('metric.column.updatedAt'),
-                    dataIndex: 'updated_at',
-                    width: 160,
-                    render: (v: string | null) => (v ? formatDateTime(v) : '—')
-                  }
-                ]}
+                columns={activeAlertColumns}
                 scroll={{ x: 'max-content' }}
               />
             </Card>

@@ -9,7 +9,6 @@ from sqlalchemy import distinct
 from sqlalchemy.orm import selectinload
 
 from app.models.rbac import Role, Permission, RolePermission, UserRole
-from app.models.user import User
 from app.persistence.base import BaseRepository
 
 
@@ -154,3 +153,15 @@ class PermissionRepository(BaseRepository):
             page=page, per_page=per_page, error_out=False
         )
         return pagination
+
+    def find_all_permissions(self, category: str = "") -> List[Permission]:
+        """全量权限（不分页）—— 权限分配弹窗的勾选树用（OD-13）。
+
+        勾选场景必须看到全部权限码：分页/夹紧会静默漏掉第 101+ 个，
+        导致角色编辑弹窗里部分权限根本勾不了（写操作正确性风险）。
+        与 /users 的 all=true 非分页通道同款模式。
+        """
+        query = self._base_query()
+        if category:
+            query = query.filter(Permission.category == category)
+        return query.order_by(Permission.id.desc()).all()

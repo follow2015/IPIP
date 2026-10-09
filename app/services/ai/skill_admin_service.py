@@ -11,10 +11,9 @@ from typing import Any, Dict, List
 import os
 import re
 import yaml
-from flask import current_app
 
 from app.services.ai.skills.loader import _iter_yaml, invalidate_catalog_cache
-from app.services.ai.skills.schema import SkillSpec, SkillValidationError
+from app.services.ai.skills.schema import SkillSpec
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)

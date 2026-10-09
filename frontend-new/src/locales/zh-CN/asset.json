@@ -238,7 +238,8 @@
         "deleted": "占位标记已删除",
         "saveFailed": "保存占位标记失败",
         "deleteFailed": "删除占位标记失败",
-        "versionConflict": "标记已被他人修改，列表已刷新，请重新编辑后再保存"
+        "versionConflict": "标记已被他人修改，列表已刷新，请重新编辑后再保存",
+        "positionConflict": "该位置已被占用（可能是他人刚放入的标记/机柜），请换一个格子"
       }
     }
   },

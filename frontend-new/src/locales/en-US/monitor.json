@@ -110,7 +110,9 @@
       "scopeAll": "All visible",
       "scopeMine": "Assigned to me",
       "metricKey": "Metric key (metric_key)",
-      "indexKey": "Instance key (index_key)"
+      "indexKey": "Instance key (index_key)",
+      "title": "Filters",
+      "activeCount": "Filters ({{count}} active)"
     },
     "view": {
       "list": "List view",
@@ -162,7 +164,13 @@
       "ackAt": "Acknowledged At",
       "ackNote": "Acknowledgement Note",
       "notAcknowledged": "Not acknowledged",
-      "payloadSection": "Alert Payload"
+      "payloadSection": "Alert Payload",
+      "port": "Port",
+      "portAlias": "Port Alias",
+      "portStatus": "Interface Status",
+      "portOper": "Operational: {{status}}",
+      "portShutdown": "Admin down",
+      "portNameMissing": "Index only — ifIndex={{index}} (no port name in the trap)"
     }
   },
   "history": {
@@ -296,6 +304,37 @@
       "online": "{{count}} online",
       "segments": "{{count}} network segments",
       "onlineRatio": "{{online}} / {{total}} online"
+    },
+    "monitorOverview": {
+      "title": "Monitor Overview",
+      "monitoredObjects": "Monitored",
+      "reachable": "Reachable",
+      "unreachable": "Unreachable",
+      "flapping": "Flapping",
+      "blindspot": "Blind Spot",
+      "healthScore": "Health",
+      "openIncidents": "Open Incidents",
+      "paused_one": "{{count}} paused, excluded",
+      "paused_other": "{{count}} paused, excluded"
+    },
+    "componentHealth": {
+      "title": "Component Health",
+      "services": "Services",
+      "service": {
+        "database": "Database",
+        "redis": "Redis",
+        "api": "API",
+        "gateway": "Realtime Gateway",
+        "monitor": "Traffic Collector",
+        "celery": "Task Queue"
+      },
+      "status": {
+        "running": "Running",
+        "degraded": "Degraded",
+        "down": "Down",
+        "unknown": "Unknown"
+      },
+      "heartbeat": "heartbeat"
     }
   },
   "trend": {
@@ -394,7 +433,8 @@
       "interval": "Polling Intervals",
       "alert": "Alert Rules",
       "advanced": "Advanced",
-      "scan": "Auto Scan"
+      "scan": "Auto Scan",
+      "channel": "Multi-channel Collection (Canary)"
     },
     "field": {
       "consecutiveFailuresThreshold": "Consecutive Failure Threshold",
@@ -414,7 +454,15 @@
       "scanAutoRoomIds": "Physical Room Scope",
       "scanAutoVrIds": "Virtual Room Scope",
       "scanAutoCleanupInterval": "Staleness Cleanup Interval (s)",
-      "scanAutoGracePeriod": "INACTIVE Degradation Grace Period (s)"
+      "scanAutoGracePeriod": "INACTIVE Degradation Grace Period (s)",
+      "scanChannelEnabled": "Channel Layer Master Switch",
+      "scanChannelPriority": "Channel Priority",
+      "scanChannelSnmpDeviceIds": "SNMP Canary Devices",
+      "scanChannelSnmpRoomIds": "SNMP Canary Rooms",
+      "scanChannelSnmpVrIds": "SNMP Canary Virtual Rooms",
+      "scanChannelBudgetSeconds": "Per-device Collection Budget (s)",
+      "scanChannelCircuitThreshold": "Circuit Breaker Threshold",
+      "scanChannelAutoEnabled": "Auto Scan via Channel Layer"
     },
     "loadFailed": "Unable to load the monitoring runtime configuration",
     "needRestart": "Requires restart",
@@ -1038,12 +1086,6 @@
       "selectDevice": "Select device",
       "filterOid": "Filter OID / sampled value",
       "filterType": "Filter by type"
-    },
-    "metricTypeOption": {
-      "gauge": "gauge (Instantaneous)",
-      "counter": "counter (Cumulative)",
-      "state": "state (State)",
-      "event": "event (Event)"
     },
     "message": {
       "selectDeviceFirst": "Please select a device first",

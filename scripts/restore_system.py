@@ -349,7 +349,7 @@ def _safe_extract(tar_path: Path, dest: Path, dry_run: bool) -> None:
         try:
             tar.extractall(dest, members=members, filter="data")
         except TypeError:
-            tar.extractall(dest, members=members)
+            tar.extractall(dest, members=members)  # noqa: S202
 
 
 def restore_dataface(backup_dir: Path, dry_run: bool) -> None:

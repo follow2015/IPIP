@@ -24,26 +24,15 @@ import {
   theme,
   Segmented
 } from 'antd';
+import { severityColor, deliveryStatusColor } from '@/utils/statusColor';
 import { Pie, Column } from '@ant-design/charts';
-import dayjs, { Dayjs } from 'dayjs';
+import type { Dayjs } from 'dayjs';
 import { useAlertStatistics, type MonitorAlertStatisticsQuery } from '@/services/monitor';
-import { formatDateTime } from '@/utils/format';
 import { useTranslation } from 'react-i18next';
 
 const { RangePicker } = DatePicker;
 const { useToken } = theme;
 
-const SEVERITY_COLOR: Record<string, string> = {
-  info: '#52c41a',
-  warning: '#faad14',
-  critical: '#ff4d4f'
-};
-
-const STATUS_COLOR: Record<string, string> = {
-  pending: '#d9d9d9',
-  sent: '#52c41a',
-  failed: '#ff4d4f'
-};
 
 export default function MonitorReportsPage() {
   const { t } = useTranslation('monitor');
@@ -71,7 +60,8 @@ export default function MonitorReportsPage() {
   const mttrDisplay = useMemo(() => {
     if (mttrSeconds == null) return '-';
     if (mttrSeconds < 60) return t('report.mttr.seconds', { value: mttrSeconds.toFixed(0) });
-    if (mttrSeconds < 3600) return t('report.mttr.minutes', { value: (mttrSeconds / 60).toFixed(1) });
+    if (mttrSeconds < 3600)
+      return t('report.mttr.minutes', { value: (mttrSeconds / 60).toFixed(1) });
     return t('report.mttr.hours', { value: (mttrSeconds / 3600).toFixed(2) });
   }, [mttrSeconds, t]);
 
@@ -80,7 +70,7 @@ export default function MonitorReportsPage() {
       (data?.by_severity ?? []).map((x) => ({
         name: x.severity ?? 'unknown',
         value: x.count ?? 0,
-        color: SEVERITY_COLOR[x.severity ?? ''] ?? token.colorTextSecondary
+        color: severityColor(x.severity, token) ?? token.colorTextSecondary
       })),
     [data, token]
   );
@@ -89,7 +79,7 @@ export default function MonitorReportsPage() {
       (data?.by_status ?? []).map((x) => ({
         name: x.status ?? 'unknown',
         value: x.count ?? 0,
-        color: STATUS_COLOR[x.status ?? ''] ?? token.colorTextSecondary
+        color: deliveryStatusColor(x.status, token) ?? token.colorTextSecondary
       })),
     [data, token]
   );
@@ -353,7 +343,11 @@ export default function MonitorReportsPage() {
 
       <Row gutter={16}>
         <Col xs={24} md={12}>
-          <Card title={t('report.chart.topDevices', { count: 10 })} size="small" loading={isLoading}>
+          <Card
+            title={t('report.chart.topDevices', { count: 10 })}
+            size="small"
+            loading={isLoading}
+          >
             <Table
               columns={topDeviceColumns}
               dataSource={data?.top_devices ?? []}

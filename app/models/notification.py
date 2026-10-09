@@ -149,7 +149,7 @@ class NotificationReceipt(BaseModel):
             for notification_id, user_id, keep_id in groups:
                 nid, uid, keep_id = int(notification_id), int(user_id), int(keep_id)
                 cur.execute(
-                    "SELECT id, delivered_channels, channel_status "
+                    "SELECT id, delivered_channels, channel_status "  # noqa: S608 -- nid/uid/keep_id 均经 int() 强制转换，列名与 SQL 结构为字面量
                     "FROM notification_receipts "
                     f"WHERE notification_id = {nid} AND user_id = {uid} "
                     f"AND id <> {keep_id} ORDER BY id"
@@ -168,7 +168,7 @@ class NotificationReceipt(BaseModel):
                 for start in range(0, len(bad_ids), NotificationReceipt.REPAIR_BATCH_SIZE):
                     chunk = bad_ids[start:start + NotificationReceipt.REPAIR_BATCH_SIZE]
                     cur.execute(
-                        "DELETE FROM notification_receipts "
+                        "DELETE FROM notification_receipts "  # noqa: S608 -- bad_ids 全部经 int() 转换后才拼接 IN 列表
                         f"WHERE id IN ({','.join(str(i) for i in chunk)})"
                     )
                     removed_total += cur.rowcount

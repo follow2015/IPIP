@@ -62,7 +62,6 @@ def resolve_customer(query: Any) -> Dict[str, Any]:
         {"status": "ok"|"ambiguous"|"missing",
          "customer": {...}|None, "candidates": [{id,name}...], "message": str}
     """
-    from app.models.customer import Customer
 
     q = _clean_query(query)
     if not q:
@@ -144,7 +143,6 @@ def resolve_device(query: Any, device_types: Optional[List[str]] = None) -> Dict
         {"status": "ok"|"ambiguous"|"missing",
          "device": {...}|None, "candidates": [{id,name,...}...], "message": str}
     """
-    from sqlalchemy import or_
     from app.persistence.device_repository import DeviceRepository
 
     q = _clean_query(query)

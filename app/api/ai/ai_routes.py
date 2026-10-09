@@ -12,7 +12,6 @@ from flask import Blueprint, request, Response, stream_with_context
 from app.api.base import APIResponse, api_exception_handler
 from app.openapi.doc import doc
 from app.services.ai.llm_factory import create_llm_client
-from app.services.ai.rag_store import RAGStore
 from app.services.ai.rag_ingest_async import ingest_async, get_progress
 from app.services.ai import task_state
 from app.services.ai.skill_admin_service import (
@@ -32,7 +31,7 @@ from app.services.ai.monitor_admin_service import (
     reset_circuit,
     get_metrics_summary,
 )
-from app.utils.auth import (
+from app.services.auth import (
     permission_required,
     sse_permission_required,
     get_current_user_id,
@@ -45,6 +44,19 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 bp = Blueprint("ai", __name__)  # url_prefix 在 register_blueprints 处传入
+
+
+def _trace_headers() -> dict:
+    """M10：入队时随 Celery 消息带上的关联头。
+
+    trace_id 走 message header 而不是 kwargs：它是关联元数据，混进业务参数会
+    污染 task 签名（重试计数 / 幂等键都按 kwargs 计算），也会让"两个参数完全
+    相同的请求"看起来不一样。无请求上下文（CLI / 定时触发）时返回空头。
+    """
+    from app.utils.trace_context import CELERY_TRACE_HEADER, current_trace_id
+
+    trace_id = current_trace_id()
+    return {CELERY_TRACE_HEADER: trace_id} if trace_id else {}
 
 
 def _check_device_access(device_id: int,
@@ -85,7 +97,7 @@ def _check_device_access(device_id: int,
         if device_id in visible:
             return True, ""
         return False, f"无权操作设备 {device_id}（数据域隔离）"
-    except Exception:  # noqa: BLE001
+    except Exception:
         if fail_closed:
             logger.error(
                 "ai.device_scope_check_failed user=%s device=%s（fail-closed：拒绝）",
@@ -248,7 +260,7 @@ def ask():
     })
 
 
-from app.services.ai.skills.loader import default_agentic_dirs
+from app.services.ai.skills.loader import default_agentic_dirs  # noqa: E402 -- agentic 层 import 单独成段（Phase 6 分区注释），上移会打散模块分区
 
 
 
@@ -331,6 +343,7 @@ def run_agentic_skill(name):
                 "user_perms": list(user_perms),
             },
             task_id=task_id,
+            headers=_trace_headers(),
         )
         task_state.save(task.id, {"status": "pending", "progress": 0, "total": 0,
                                   "result": None, "user_id": user_id}, nx=True)
@@ -454,7 +467,6 @@ def execute_remedial_command():
     if not ok:
         return APIResponse.error(reason, status_code=403)
 
-    from app.services.ai.service_factory import get_device_service
     device = get_device_service().get_device_by_id(dev_id)
     if not device:
         return APIResponse.error(f"设备 {dev_id} 不存在", status_code=404)
@@ -463,7 +475,6 @@ def execute_remedial_command():
     from app.services.ai.task_idempotency import (
         try_claim, IdempotencyUnavailableError,
     )
-    import os
     import uuid
 
     task_id = str(uuid.uuid4())
@@ -500,6 +511,7 @@ def execute_remedial_command():
                 "confirmed": True,
             },
             task_id=task_id,
+            headers=_trace_headers(),
         )
         task_state.save(task_id, {"status": "pending", "progress": 0, "total": 0,
                                   "result": None, "user_id": get_current_user_id()},
@@ -567,7 +579,6 @@ def rollback_remedial_command():
     if not ok:
         return APIResponse.error(reason, status_code=403)
 
-    from app.services.ai.service_factory import get_device_service
     device = get_device_service().get_device_by_id(dev_id)
     if not device:
         return APIResponse.error(f"设备 {dev_id} 不存在", status_code=404)
@@ -641,7 +652,6 @@ def verify_remediation():
     if not ok:
         return APIResponse.error(reason, status_code=403)
 
-    from app.services.ai.post_remediation_verifier import PostRemediationVerifier
     verifier = PostRemediationVerifier()
     result = verifier.verify(
         device_id=dev_id,
@@ -758,7 +768,7 @@ def _check_task_ownership(task_id: str):
     """
     from app.services.ai.ai_audit_logger import AIAuditLogger
     from app.services.user_service import user_service
-    from app.utils.auth import permission_manager
+    from app.services.auth import permission_manager
 
     state = task_state.load(task_id) or {}
     owner_id = state.get("user_id")

@@ -17,10 +17,12 @@ daemon 线程内启动一个 ``MonitorOutboxSender.run_loop``：周期性读取
 """
 import json
 import threading
+import time
 from app.utils.time_utils import now_utc_naive
 
 from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -66,6 +68,7 @@ class MonitorOutboxSender:
         self._redis = redis_client
         self._redis_resolved = redis_client is not None
         self.dead_letter_retry_hours = dead_letter_retry_hours
+        self._incident_sweep_ts = 0.0
 
     def _notify_service(self):
         if self._notify is not None:
@@ -118,7 +121,7 @@ class MonitorOutboxSender:
             from app.utils.concurrency.redis_lock import owner_token
 
             ok = bool(r.set(
-                f"monitor:lock:{self.LOCK_NAME}", owner_token(),
+                redis_keys.monitor_lock_key(self.LOCK_NAME), owner_token(),
                 nx=True, ex=self._lock_ttl(),
             ))
             if not ok:
@@ -135,7 +138,7 @@ class MonitorOutboxSender:
         try:
             from app.utils.concurrency.redis_lock import release_owner_lock
 
-            release_owner_lock(self._redis, f"monitor:lock:{self.LOCK_NAME}")
+            release_owner_lock(self._redis, redis_keys.monitor_lock_key(self.LOCK_NAME))
         except Exception:
             logger.warning("outbox 互斥锁释放失败（TTL 兜底过期）", exc_info=True)
 
@@ -166,7 +169,7 @@ class MonitorOutboxSender:
                     try:
                         payload = json.loads(row.payload_json)
                         _invoke_notify(notify, payload)
-                    except Exception as e:  # 单条失败不影响其余行
+                    except Exception as e:  # noqa: BLE001 -- 单条 outbox 失败隔离：标记 failed 后隔离提交，不影响其余行
                         try:
                             repo.mark_failed(row.id, str(e)[:500], self.max_attempts)
                             session.commit()  # 隔离提交 failed 标记
@@ -187,8 +190,8 @@ class MonitorOutboxSender:
                     try:
                         from app.services.ai.alert_ai_push import push_alert_with_ai
                         push_alert_with_ai(payload)
-                    except Exception:  # noqa: BLE001
-                        pass
+                    except Exception as e:  # 附带的 AI 解读推送失败不影响告警投递
+                        logger.warning("alert_ai_push failed: %s", e, exc_info=True)
                     if sent % commit_every == 0:
                         try:
                             session.commit()
@@ -222,6 +225,20 @@ class MonitorOutboxSender:
                 except Exception:
                     logger.warning("告警升级扫描失败", exc_info=True)
                     session.rollback()
+
+                try:
+                    from app.services.monitoring.incident_aggregator import (
+                        incident_sweep_due,
+                        sweep_stale_incidents,
+                    )
+
+                    if incident_sweep_due(self._incident_sweep_ts):
+                        self._incident_sweep_ts = time.time()
+                        sweep_stale_incidents()
+                        session.commit()
+                except Exception:
+                    logger.warning("事件停滞清扫失败", exc_info=True)
+                    session.rollback()
             finally:
                 self._release_round_lock()
                 try:
@@ -239,7 +256,7 @@ class MonitorOutboxSender:
         while not stop_event.is_set():
             try:
                 self.send_pending(app)
-            except Exception:
+            except Exception:  # noqa: BLE001 -- outbox 发送循环级兜底：error() 默认 exc_info=True 已留完整栈
                 logger.error("监控告警 outbox 发送循环异常")
                 try:
                     if self._repo is not None:

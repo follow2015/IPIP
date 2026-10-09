@@ -135,7 +135,7 @@ async def _ensure_redis_subscribed(device_id: int) -> None:
         return  # 订阅循环未就绪：意图已记录，重连后 start_subscriber 统一补订
     try:
         await _pubsub.subscribe(f"sw:{device_id}")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 订阅失败保留意图：断线重连后 start_subscriber 会统一补订，此处仅告警
         logger.warning("Redis 层订阅设备频道失败 device=%d: %s", device_id, exc)
         return
     _redis_subscribed.add(device_id)
@@ -149,7 +149,7 @@ async def _redis_unsubscribe_now(device_id: int) -> None:
     try:
         await _pubsub.unsubscribe(f"sw:{device_id}")
         logger.info("Redis 层退订设备频道 device=%d", device_id)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 退订失败容错：同 147 语义，连接重建时订阅集合会整体重算
         logger.warning("Redis 层退订设备频道失败 device=%d: %s", device_id, exc)
 
 
@@ -179,7 +179,7 @@ async def close_redis() -> None:
     client, _redis = _redis, None
     try:
         await client.aclose()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 关闭 Redis 客户端失败容错：进程退出路径，清理失败不影响退出
         logger.warning("关闭 Redis 客户端失败: %s", exc)
 
 
@@ -206,19 +206,19 @@ async def get_redis() -> aioredis.Redis:
 
 
 
-async def get_events_since(device_id: int, since_seq: int) -> list[dict]:
-    """从 Redis 共享 ring 取出 seq > since_seq 的事件（供断线重放）。
+async def _read_ring_since(ring_key: str, since_seq: int, log_tag: str) -> list[dict]:
+    """从 Redis ring 取出 seq > since_seq 的事件，按 seq **升序**返回。
 
-    ring 由发布侧 switch_events.py 维护（LPUSH 头插，LRANGE 返回新→旧），
-    这里统一按 seq 升序返回，与迁移前进程内 deque（旧→新）的语义一致。
+    设备流与全局流（M1）共用：ring 由发布侧 switch_events.py 维护（LPUSH 头插，
+    LRANGE 返回新→旧），这里统一排序，与迁移前进程内 deque（旧→新）语义一致。
 
     Redis 异常时返回空列表（重放是 best-effort，不阻断连接建立）。
     """
     try:
         r = await get_redis()
-        raw_events = await r.lrange(config.RING_KEY_FMT.format(device_id=device_id), 0, -1)
-    except Exception as exc:
-        logger.warning("读取 ring 失败 device=%d: %s", device_id, exc)
+        raw_events = await r.lrange(ring_key, 0, -1)
+    except Exception as exc:  # noqa: BLE001 -- 读取 ring 失败降级返回空列表：网关侧缓冲区可能尚未创建或已过期，不得因 Redis 异常中断数据读取
+        logger.warning("读取 ring 失败 %s key=%s: %s", log_tag, ring_key, exc)
         return []
 
     events: list[dict] = []
@@ -226,12 +226,54 @@ async def get_events_since(device_id: int, since_seq: int) -> list[dict]:
         try:
             e = json.loads(raw)
         except json.JSONDecodeError:
-            logger.warning("ring 内存在无效 JSON 事件，跳过 device=%d", device_id)
+            logger.warning("ring 内存在无效 JSON 事件，跳过 %s key=%s", log_tag, ring_key)
             continue
         if e.get("seq", 0) > since_seq:
             events.append(e)
     events.sort(key=lambda e: e.get("seq", 0))
     return events
+
+
+async def get_events_since(device_id: int, since_seq: int) -> list[dict]:
+    """从 Redis 共享 ring 取出 seq > since_seq 的设备事件（供断线重放）。
+
+    Args:
+        device_id: 交换机 devices.id。
+        since_seq: 客户端最后收到的序列号。
+
+    Returns:
+        按 seq 升序的事件列表；ring 不可读时为空列表。
+    """
+    return await _read_ring_since(
+        config.RING_KEY_FMT.format(device_id=device_id), since_seq,
+        log_tag=f"device={device_id}",
+    )
+
+
+async def get_global_events_since(since_seq: int,
+                                  user_id: int | None = None) -> list[dict]:
+    """从全局 ring 取出 seq > since_seq 的事件（M1：全局流断线重放）。
+
+    与设备流的关键差异：**必须按 `target_user_ids` 过滤**。全局流有定向事件
+    （`emit_global_event_with_targets`），实时路径由 `_handle_global_event` 过滤；
+    重放若不过滤，会把定向给别人的事件补发给本连接——绕过了实时路径的权限判断。
+
+    Args:
+        since_seq: 客户端最后收到的全局序列号。
+        user_id: 本连接绑定的用户 id；None 时只收全局广播事件。
+
+    Returns:
+        按 seq 升序、且本用户可见的事件列表。
+    """
+    events = await _read_ring_since(
+        config.GLOBAL_RING_KEY, since_seq, log_tag="global",
+    )
+    visible = []
+    for e in events:
+        targets = e.get("target_user_ids")
+        if targets is None or (user_id is not None and user_id in targets):
+            visible.append(e)
+    return visible
 
 
 
@@ -255,12 +297,13 @@ def _handle_device_event(device_id: int, raw_data: str) -> None:
         event_dict["seq"] = 0
         raw_data = json.dumps(event_dict, ensure_ascii=False)
 
+    seq = event_dict.get("seq")
     queues = list(_subscribers.get(device_id, []))
     for q in queues:
         try:
-            q.put_nowait(raw_data)
+            q.put_nowait((seq, raw_data))
         except asyncio.QueueFull:
-            _record_drop("device", f"device={device_id} seq={event_dict.get('seq')}")
+            _record_drop("device", f"device={device_id} seq={seq}")
 
 
 def _handle_global_event(raw_data: str) -> None:
@@ -276,10 +319,11 @@ def _handle_global_event(raw_data: str) -> None:
         return
 
     targets = event.get("target_user_ids")
+    seq = event.get("seq")
     for q, uid in list(_global_subscribers):
         if targets is None or (uid is not None and uid in targets):
             try:
-                q.put_nowait(raw_data)
+                q.put_nowait((seq, raw_data))
             except asyncio.QueueFull:
                 _record_drop("global", "global")
 
@@ -332,7 +376,7 @@ async def start_subscriber() -> None:
         except asyncio.CancelledError:
             logger.info("网关 Redis 订阅被取消，正在关闭")
             break
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 订阅循环顶层兜底：Redis 断连后 5s 重连是设计行为，收窄会漏掉连接类异常导致网关进程退出
             logger.warning("网关 Redis 订阅异常，5s 后重连: %s", exc)
             await asyncio.sleep(5)
         finally:
@@ -340,5 +384,5 @@ async def start_subscriber() -> None:
             if pubsub is not None:
                 try:
                     await pubsub.aclose()
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 -- 关闭 pubsub 失败容错：同 194
                     logger.warning("关闭 pubsub 失败: %s", exc)

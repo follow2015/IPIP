@@ -114,7 +114,7 @@ class CustomerRepository(SQLAlchemyRepository):
             return self._base_query().filter(Customer.customer_name == customer_name).first()
         except SQLAlchemyError as e:
             self.logger.error(f"根据客户名称查找客户失败 (customer_name={customer_name}): {e}")
-            raise QueryExecutionError(f"查找客户失败", original_error=e)
+            raise QueryExecutionError("查找客户失败", original_error=e) from e
     
     def check_customer_name_exists(self, customer_name: str, exclude_id: int = None) -> bool:
         """检查客户名称是否已存在
@@ -141,7 +141,7 @@ class CustomerRepository(SQLAlchemyRepository):
             return self.session.query(query.exists()).scalar()
         except SQLAlchemyError as e:
             self.logger.error(f"检查客户名称存在性失败 (customer_name={customer_name}): {e}")
-            raise QueryExecutionError(f"检查客户名称存在性失败", original_error=e)
+            raise QueryExecutionError("检查客户名称存在性失败", original_error=e) from e
     
     def get_customer_statistics(self) -> Dict[str, Any]:
         """获取客户统计信息
@@ -175,7 +175,7 @@ class CustomerRepository(SQLAlchemyRepository):
             }
         except SQLAlchemyError as e:
             self.logger.error(f"获取客户统计信息失败: {e}")
-            raise QueryExecutionError(f"获取客户统计信息失败", original_error=e)
+            raise QueryExecutionError("获取客户统计信息失败", original_error=e) from e
 
     def get_all_customers_with_counts(self) -> List[Dict[str, Any]]:
         """获取所有客户列表（含机柜数和设备数聚合）
@@ -193,7 +193,7 @@ class CustomerRepository(SQLAlchemyRepository):
             return [self._map_customer_row(r) for r in rows]
         except SQLAlchemyError as e:
             self.logger.error(f"获取客户列表(含计数)失败: {e}")
-            raise QueryExecutionError("获取客户列表失败", original_error=e)
+            raise QueryExecutionError("获取客户列表失败", original_error=e) from e
 
     def get_customer_with_counts(self, customer_id: int) -> Optional[Dict[str, Any]]:
         """根据客户ID获取客户信息（含机柜数和设备数）
@@ -215,7 +215,7 @@ class CustomerRepository(SQLAlchemyRepository):
             return self._map_customer_row(row)
         except SQLAlchemyError as e:
             self.logger.error(f"获取客户信息(含计数)失败 (id={customer_id}): {e}")
-            raise QueryExecutionError("获取客户信息失败", original_error=e)
+            raise QueryExecutionError("获取客户信息失败", original_error=e) from e
 
     def soft_delete(self, customer_id: int) -> bool:
         """软删除客户（设置customer_status为非空表示停用）
@@ -235,16 +235,20 @@ class CustomerRepository(SQLAlchemyRepository):
             return True
         except SQLAlchemyError as e:
             self.logger.error(f"软删除客户失败 (id={customer_id}): {e}")
-            raise QueryExecutionError("软删除客户失败", original_error=e)
+            raise QueryExecutionError("软删除客户失败", original_error=e) from e
 
     def check_customer_has_resources(self, customer_id: int) -> Dict[str, int]:
-        """检查客户下是否有资源（机柜/设备）
+        """检查客户下是否有资源（机柜/设备/线路）
+
+        G1（2026-09-28）：新增 `circuit_count`。`circuits.customer_id` 是
+        `ON DELETE RESTRICT`，客户硬删时若有线路会直接 `IntegrityError` → 500；
+        计数前置到本方法后，`delete_customer` 才能在服务层给出 400 而非 500。
 
         Args:
             customer_id: 客户ID
 
         Returns:
-            Dict[str, int]: {"cabinet_count": int, "device_count": int}
+            Dict[str, int]: {"cabinet_count": int, "device_count": int, "circuit_count": int}
         """
         try:
             cabinet_count = (
@@ -259,10 +263,26 @@ class CustomerRepository(SQLAlchemyRepository):
                 .scalar()
             ) or 0
 
-            return {"cabinet_count": cabinet_count, "device_count": device_count}
+            from app.models.circuit import Circuit
+
+            circuit_count = (
+                self.session.query(func.count(Circuit.id))
+                .filter(
+                    Circuit.customer_id == customer_id,
+                    Circuit.deleted_at.is_(None),
+                    Circuit.deleted_token == '',
+                )
+                .scalar()
+            ) or 0
+
+            return {
+                "cabinet_count": cabinet_count,
+                "device_count": device_count,
+                "circuit_count": circuit_count,
+            }
         except SQLAlchemyError as e:
             self.logger.error(f"检查客户资源失败 (id={customer_id}): {e}")
-            raise QueryExecutionError("检查客户资源失败", original_error=e)
+            raise QueryExecutionError("检查客户资源失败", original_error=e) from e
 
     def get_customer_cabinets(self, customer_id: int) -> List[Dict[str, Any]]:
         """获取客户的机柜列表（含机房名和设备数）
@@ -316,7 +336,7 @@ class CustomerRepository(SQLAlchemyRepository):
             ]
         except SQLAlchemyError as e:
             self.logger.error(f"获取客户机柜列表失败 (customer_id={customer_id}): {e}")
-            raise QueryExecutionError("获取客户机柜列表失败", original_error=e)
+            raise QueryExecutionError("获取客户机柜列表失败", original_error=e) from e
 
     def get_customer_devices(self, customer_id: int) -> List[Dict[str, Any]]:
         """获取客户的设备列表（含机柜号和机房名）
@@ -376,7 +396,7 @@ class CustomerRepository(SQLAlchemyRepository):
             ]
         except SQLAlchemyError as e:
             self.logger.error(f"获取客户设备列表失败 (customer_id={customer_id}): {e}")
-            raise QueryExecutionError("获取客户设备列表失败", original_error=e)
+            raise QueryExecutionError("获取客户设备列表失败", original_error=e) from e
 
     def get_customer_resource_stats(self, customer_id: int) -> Dict[str, Any]:
         """获取客户资源使用统计
@@ -455,7 +475,7 @@ class CustomerRepository(SQLAlchemyRepository):
             }
         except SQLAlchemyError as e:
             self.logger.error(f"获取客户资源统计失败 (customer_id={customer_id}): {e}")
-            raise QueryExecutionError("获取客户资源统计失败", original_error=e)
+            raise QueryExecutionError("获取客户资源统计失败", original_error=e) from e
 
     def get_customer_asset_statistics(self, customer_id: int) -> Dict[str, Any]:
         """获取客户资产统计信息
@@ -489,7 +509,15 @@ class CustomerRepository(SQLAlchemyRepository):
                     'partial_ips': [],  # 零散IP
                     'total_networks': 0,
                     'total_ips': 0
-                }
+                },
+                'circuits': {
+                    'items': [],
+                    'total_count': 0,
+                    'total_bandwidth_mbps': 0,
+                    'by_status': {},
+                    'by_billing_mode': {},
+                    'total_monthly_fee': 0.0,
+                },
             }
             
             full_cabinets_query = (
@@ -636,7 +664,7 @@ class CustomerRepository(SQLAlchemyRepository):
                     network_obj = ipaddress.ip_network(network.network, strict=False)
                     ip_count = network_obj.num_addresses
                     mask = network_obj.prefixlen
-                except Exception:
+                except Exception:  # noqa: BLE001 -- 掩码解析失败降级为 0：报表字段容错，不因单条脏数据失败
                     ip_count = 0
                     mask = 0
                 
@@ -714,12 +742,68 @@ class CustomerRepository(SQLAlchemyRepository):
             result['networks']['total_ips'] = sum(
                 n['ip_count'] for n in result['networks']['full_networks']
             ) + len(result['networks']['partial_ips'])
-            
+
+            from app.models.carrier import Carrier
+            from app.models.circuit import Circuit
+
+            circuit_rows = (
+                self.session.query(
+                    Circuit.id,
+                    Circuit.circuit_no,
+                    Circuit.name,
+                    Circuit.status,
+                    Circuit.bandwidth_mbps,
+                    Circuit.billing_mode,
+                    Circuit.monthly_fee,
+                    Circuit.start_date,
+                    Circuit.end_date,
+                    Carrier.name.label('carrier_name'),
+                )
+                .outerjoin(Carrier, Circuit.carrier_id == Carrier.id)
+                .filter(
+                    Circuit.customer_id == customer_id,
+                    Circuit.deleted_at.is_(None),
+                    Circuit.deleted_token == '',
+                )
+                .order_by(Circuit.circuit_no)
+                .all()
+            )
+
+            monthly_fee_sum = 0.0
+
+            for c in circuit_rows:
+                fee = float(c.monthly_fee) if c.monthly_fee is not None else 0.0
+                monthly_fee_sum += fee
+                result['circuits']['items'].append({
+                    'id': c.id,
+                    'circuit_no': c.circuit_no,
+                    'name': c.name or '',
+                    'carrier_name': c.carrier_name or '',
+                    'status': c.status,
+                    'bandwidth_mbps': c.bandwidth_mbps or 0,
+                    'billing_mode': c.billing_mode,
+                    'monthly_fee': fee,
+                    'start_date': c.start_date.isoformat() if c.start_date else None,
+                    'end_date': c.end_date.isoformat() if c.end_date else None,
+                })
+                result['circuits']['by_status'][c.status] = (
+                    result['circuits']['by_status'].get(c.status, 0) + 1
+                )
+                result['circuits']['by_billing_mode'][c.billing_mode] = (
+                    result['circuits']['by_billing_mode'].get(c.billing_mode, 0) + 1
+                )
+
+            result['circuits']['total_count'] = len(circuit_rows)
+            result['circuits']['total_bandwidth_mbps'] = sum(
+                c.bandwidth_mbps or 0 for c in circuit_rows
+            )
+            result['circuits']['total_monthly_fee'] = round(monthly_fee_sum, 2)
+
             return result
             
         except SQLAlchemyError as e:
             self.logger.error(f"获取客户资产统计失败 (customer_id={customer_id}): {e}")
-            raise QueryExecutionError(f"获取客户资产统计失败", original_error=e)
+            raise QueryExecutionError("获取客户资产统计失败", original_error=e) from e
 
     def get_customer_switch_ports_data(self, customer_id: int) -> Dict[str, Any]:
         """获取客户交换机端口IP地址段原始数据
@@ -888,7 +972,7 @@ class CustomerRepository(SQLAlchemyRepository):
 
         except SQLAlchemyError as e:
             self.logger.error(f"获取客户交换机端口数据失败 (customer_id={customer_id}): {e}")
-            raise QueryExecutionError(f"获取客户交换机端口数据失败", original_error=e)
+            raise QueryExecutionError("获取客户交换机端口数据失败", original_error=e) from e
 
     def find_id_name_map_by_ids(self, customer_ids: set[int]) -> Dict[int, str]:
         """根据客户ID集合批量查询，返回 {id: customer_name} 映射
@@ -910,4 +994,4 @@ class CustomerRepository(SQLAlchemyRepository):
             return {r[0]: r[1] for r in rows}
         except SQLAlchemyError as e:
             self.logger.error(f"批量查询客户ID→名称映射失败: {e}")
-            raise QueryExecutionError("批量查询客户ID→名称映射失败", original_error=e)
+            raise QueryExecutionError("批量查询客户ID→名称映射失败", original_error=e) from e

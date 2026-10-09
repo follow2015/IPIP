@@ -8,7 +8,7 @@
  */
 import { useState } from 'react';
 import { useConfirm } from '@/utils/confirm';
-import { Tabs, Button, Space, Tag, Modal } from 'antd';
+import { theme, Tabs, Button, Space, Tag, Modal } from 'antd';
 import DataTable, { DENSE_PAGINATION } from '@/components/DataTable';
 import {
   PlusOutlined,
@@ -28,7 +28,11 @@ import { useTranslation } from 'react-i18next';
 import { useMessage } from '@/hooks/useMessage';
 import { formatDateTime } from '@/utils/format';
 
-type BackupTypeKey = 'config.backupType.manual' | 'config.backupType.scheduled' | 'config.backupType.preChange';
+type BackupTypeKey =
+  | 'config.backupType.manual'
+  | 'config.backupType.scheduled'
+  | 'config.backupType.preChange'
+  | 'config.backupType.preRemedial';
 
 type ChangeStatusKey =
   | 'config.changeStatus.draft'
@@ -40,7 +44,8 @@ type ChangeStatusKey =
 const BACKUP_TYPE_MAP: Record<string, { labelKey: BackupTypeKey; color: string }> = {
   manual: { labelKey: 'config.backupType.manual', color: 'blue' },
   scheduled: { labelKey: 'config.backupType.scheduled', color: 'green' },
-  pre_change: { labelKey: 'config.backupType.preChange', color: 'orange' }
+  pre_change: { labelKey: 'config.backupType.preChange', color: 'orange' },
+  pre_remedial: { labelKey: 'config.backupType.preRemedial', color: 'purple' }
 };
 
 const CHANGE_STATUS_MAP: Record<string, { labelKey: ChangeStatusKey; color: string }> = {
@@ -56,6 +61,7 @@ interface ConfigTabProps {
 }
 
 function ConfigTab({ deviceId }: ConfigTabProps) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
@@ -198,7 +204,7 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
                 type="link"
                 size="small"
                 icon={<CheckOutlined />}
-                style={{ color: '#52c41a' }}
+                style={{ color: token.colorSuccess }}
                 onClick={() =>
                   confirm({
                     title: t('config.confirmApprove'),
@@ -225,9 +231,7 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
               </Button>
             </>
           )}
-          {r.status === 'approved' && (
-            <Tag color="green">{t('config.changeStatus.approved')}</Tag>
-          )}
+          {r.status === 'approved' && <Tag color="green">{t('config.changeStatus.approved')}</Tag>}
           {r.status === 'rejected' && <Tag color="red">{t('config.changeStatus.rejected')}</Tag>}
           {r.status === 'applied' && <Tag color="blue">{t('config.changeStatus.applied')}</Tag>}
           {r.status === 'draft' && <Tag>{t('config.changeStatus.draft')}</Tag>}
@@ -300,7 +304,7 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
             maxHeight: 500,
             overflow: 'auto',
             fontSize: 12,
-            background: '#f5f5f5',
+            background: token.colorFillTertiary,
             padding: 12,
             borderRadius: 4
           }}
@@ -326,7 +330,7 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
                   maxHeight: 500,
                   overflow: 'auto',
                   fontSize: 12,
-                  background: '#fff1f0',
+                  background: token.colorErrorBg,
                   padding: 12,
                   borderRadius: 4
                 }}
@@ -341,7 +345,7 @@ function ConfigTab({ deviceId }: ConfigTabProps) {
                   maxHeight: 500,
                   overflow: 'auto',
                   fontSize: 12,
-                  background: '#f6ffed',
+                  background: token.colorSuccessBg,
                   padding: 12,
                   borderRadius: 4
                 }}

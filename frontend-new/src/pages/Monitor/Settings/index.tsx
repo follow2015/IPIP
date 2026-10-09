@@ -7,6 +7,7 @@
  *
  * 布局：Tabs 分组 [探测参数][轮询间隔][告警规则][高级]，与白名单 key 一一对应。
  */
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Card,
@@ -63,8 +64,26 @@ const getConfigGroups = (
       'scan_auto_cleanup_interval',
       'scan_auto_grace_period'
     ]
+  },
+  {
+    key: 'channel',
+    title: t('settings.group.channel'),
+    fields: [
+      'scan_channel_enabled',
+      'scan_channel_priority',
+      'scan_channel_snmp_device_ids',
+      'scan_channel_snmp_room_ids',
+      'scan_channel_snmp_vr_ids',
+      'scan_channel_budget_seconds',
+      'scan_channel_circuit_threshold',
+      'scan_channel_auto_enabled'
+    ]
   }
 ];
+
+const FIELD_MIN: Record<string, number> = {
+  scan_channel_budget_seconds: 5
+};
 
 const getFieldLabel = (key: string, t: TFunction<'monitor'>) =>
   ({
@@ -85,7 +104,14 @@ const getFieldLabel = (key: string, t: TFunction<'monitor'>) =>
     scan_auto_room_ids: t('settings.field.scanAutoRoomIds'),
     scan_auto_vr_ids: t('settings.field.scanAutoVrIds'),
     scan_auto_cleanup_interval: t('settings.field.scanAutoCleanupInterval'),
-    scan_auto_grace_period: t('settings.field.scanAutoGracePeriod')
+    scan_auto_grace_period: t('settings.field.scanAutoGracePeriod'),
+    scan_channel_enabled: t('settings.field.scanChannelEnabled'),
+    scan_channel_priority: t('settings.field.scanChannelPriority'),
+    scan_channel_snmp_device_ids: t('settings.field.scanChannelSnmpDeviceIds'),
+    scan_channel_snmp_room_ids: t('settings.field.scanChannelSnmpRoomIds'),
+    scan_channel_budget_seconds: t('settings.field.scanChannelBudgetSeconds'),
+    scan_channel_circuit_threshold: t('settings.field.scanChannelCircuitThreshold'),
+    scan_channel_auto_enabled: t('settings.field.scanChannelAutoEnabled')
   })[key] ?? key;
 
 export default function MonitorSettings() {
@@ -99,7 +125,7 @@ export default function MonitorSettings() {
   const { token } = theme.useToken();
 
   const { data: roomOptions } = useRoomOptions();
-  const { data: virtualRoomsData } = useVirtualRooms({ per_page: 200 });
+  const { data: virtualRoomsData } = useVirtualRooms({ per_page: PER_PAGE_CAP });
   const virtualRoomOptions = useMemo(
     () => (virtualRoomsData?.items ?? []).map((vr) => ({ label: vr.name, value: vr.id })),
     [virtualRoomsData]
@@ -187,15 +213,19 @@ export default function MonitorSettings() {
       control = (
         <InputNumber
           value={values[key] as number}
-          min={1}
+          min={FIELD_MIN[key] ?? 1}
           onChange={(v) => v !== null && handleChange(key, v)}
           style={{ width: 180 }}
         />
       );
     } else if (item.type === 'bool') {
       control = <Switch checked={Boolean(values[key])} onChange={(v) => handleChange(key, v)} />;
-    } else if (key === 'scan_auto_room_ids' || key === 'scan_auto_vr_ids') {
-      const opts = key === 'scan_auto_room_ids' ? (roomOptions ?? []) : virtualRoomOptions;
+    } else if (
+      key === 'scan_auto_room_ids' ||
+      key === 'scan_auto_vr_ids' ||
+      key === 'scan_channel_snmp_room_ids'
+    ) {
+      const opts = key === 'scan_auto_vr_ids' ? virtualRoomOptions : (roomOptions ?? []);
       const strVal = String(values[key] ?? '');
       const arrVal = strVal
         .split(',')

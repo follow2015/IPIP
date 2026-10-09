@@ -14,7 +14,7 @@
  * - 可选 IPMI 配置
  * - 所有配件模板按 customerId 过滤
  */
-import { Form, Input, InputNumber, Select, Row, Col, Divider, Space, Button } from 'antd';
+import { Form, Input, InputNumber, Select, Row, Col, Divider, Space, Button, theme } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -64,6 +64,7 @@ export default function HardwareConfigFields({
 }: HardwareConfigFieldsProps) {
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
+  const { token } = theme.useToken();
   const { data: cpuTemplates = [] } = useComponentTemplates('cpu', customerId);
   const { data: memoryTemplates = [] } = useComponentTemplates('memory', customerId);
   const { data: diskTemplates = [] } = useComponentTemplates('disk', customerId);
@@ -412,7 +413,7 @@ export default function HardwareConfigFields({
                   {fields.length > 1 && (
                     <MinusCircleOutlined
                       onClick={() => remove(name)}
-                      style={{ color: '#ff4d4f' }}
+                      style={{ color: token.colorError }}
                     />
                   )}
                 </Space>

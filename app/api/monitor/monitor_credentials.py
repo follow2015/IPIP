@@ -14,7 +14,7 @@ from app.api.monitor import (
     monitor_bp,
 )
 from app.openapi.doc import doc
-from app.utils import login_required, permission_required
+from app.services.auth import login_required, permission_required
 from app.utils.transactional import transactional
 
 
@@ -159,7 +159,7 @@ def batch_delete_credentials():
                 continue
             credential_service.delete_shared_credential(cred_id)
             deleted += 1
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 批量/循环内单条失败隔离：记入失败列表后继续处理下一条，单条异常不得中断整批
             failed.append({"id": cred_id, "reason": str(e)[:200]})
 
     if deleted > 0:

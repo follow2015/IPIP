@@ -28,6 +28,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from app.celery_app import celery
 from app.services.ai import task_state
 from app.utils.logging import get_logger
+from app.utils.trace_context import bind_trace_id_from_task, current_trace_id
 
 logger = get_logger(__name__)
 
@@ -131,6 +132,16 @@ def _safe_fail_session(session_id: Optional[int], reason: str) -> None:
                        session_id, e)
 
 
+def _trace_fields() -> Dict[str, Any]:
+    """M10：进度状态里随带的关联字段。
+
+    无 trace_id 时返回空 dict（不写 null 噪音）—— 直接入队（定时任务 / CLI）
+    的任务本来就没有上游可关联。
+    """
+    trace_id = current_trace_id()
+    return {"trace_id": trace_id} if trace_id else {}
+
+
 def _progress(task_id: str, status: str, progress: int, total: int,
               result: Any = None, user_id: Optional[int] = None,
               **extra) -> None:
@@ -149,7 +160,8 @@ def _progress(task_id: str, status: str, progress: int, total: int,
     """
     task_state.save(task_id, {"status": status, "progress": progress,
                               "total": total, "result": result,
-                              "user_id": user_id, **extra})
+                              "user_id": user_id, **extra,
+                              **_trace_fields()})
 
 
 
@@ -180,6 +192,7 @@ def run_agentic_diagnosis(self, name: str, question: str, user_id: int,
         {"answer": str, "session_id": int|None}，同时写入 task_state。
     """
     task_id = self.request.id
+    bind_trace_id_from_task(self)
     from app.services.ai.agentic.loader import load_agentic_skill
     from app.services.ai.agentic.runner import AgenticSkillRunner
     from app.services.ai._runtime import bind_scenario
@@ -218,12 +231,13 @@ def run_agentic_diagnosis(self, name: str, question: str, user_id: int,
                   session_id=session_id)
         raise
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         session_id = _session_id_of(runner)
 
         if _should_retry(e, self.request.retries, self.max_retries):
             _progress(task_id, "running", 0, spec.max_iterations, None,
                       user_id=user_id, session_id=session_id)
+            _safe_fail_session(session_id, "retrying")
             logger.warning(
                 "ai.task.agentic_retryable name=%s retries=%s/%s: %s",
                 name, self.request.retries, self.max_retries, e)
@@ -261,7 +275,7 @@ def rag_ingest_task(self, task_id: str, docs_dir: str,
     try:
         count = run_ingest(task_id, docs_dir, user_id)
         return {"ingested": count}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         _progress(task_id, "error", 0, 0, type(e).__name__, user_id=user_id)
         logger.warning("rag.task.failed %s", e)
         raise
@@ -306,10 +320,12 @@ def execute_remedial_task(self, task_id: str, device_id: int, command_key: str,
     """
     from app.services.ai.remedial_executor import RemedialExecutor
 
+    bind_trace_id_from_task(self)
+
     def _progress(status: str, result: Any = None):
         task_state.save(task_id, {"status": status, "progress": 0,
                                   "total": 1, "result": result,
-                                  "user_id": user_id})
+                                  "user_id": user_id, **_trace_fields()})
 
     _progress("running", None)
     if confirmed is not True:
@@ -322,6 +338,6 @@ def execute_remedial_task(self, task_id: str, device_id: int, command_key: str,
         )
         _progress("done", result)
         return result
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         _progress("error", type(e).__name__)
         raise

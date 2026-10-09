@@ -21,15 +21,42 @@
 """
 import hashlib
 import json
+import threading
+import time
 import uuid
 from functools import wraps
-from typing import Any, Callable, Optional, Tuple
+from typing import Callable, Optional
 
 from flask import g, request
 
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
+
+_redis_degraded_stats = {"idempotent": 0, "lock": 0}
+_degraded_warn_at = 0.0
+_degraded_warn_lock = threading.Lock()
+_DEGRADED_WARN_INTERVAL = 60.0  # 秒
+
+
+def _warn_redis_degraded(kind: str) -> None:
+    """幂等/锁因 Redis 不可用而跳过时的节流告警（首次及每 60s 一次）。
+
+    ``kind`` 取 ``"idempotent"`` / ``"lock"``，分别对应两个装饰器。
+    """
+    global _degraded_warn_at
+    _redis_degraded_stats[kind] += 1
+    now = time.monotonic()
+    with _degraded_warn_lock:
+        if now - _degraded_warn_at < _DEGRADED_WARN_INTERVAL:
+            return
+        _degraded_warn_at = now
+    logger.warning(
+        "Redis 不可用，幂等/分布式锁保护已跳过（idempotent=%d lock=%d 次；"
+        "本条每 60s 提醒一次）—— 故障期间重复提交与并发执行**不会被拦截**",
+        _redis_degraded_stats["idempotent"], _redis_degraded_stats["lock"],
+    )
 
 
 def _get_redis_client():
@@ -41,14 +68,14 @@ def _get_redis_client():
         from app.utils.cache import cache_manager
         if cache_manager.primary_storage and cache_manager.primary_storage.redis_client:
             return cache_manager.primary_storage.redis_client
-    except Exception:  # noqa: BLE001 - 取 cache_manager 主 Redis 客户端失败时继续尝试下一种来源
+    except Exception:  # noqa: BLE001, S110 - 取 cache_manager 主 Redis 客户端失败时继续尝试下一种来源
         pass
     try:
         from app.services.network_scanner_service import ScanOrchestrator
         client = ScanOrchestrator._get_redis_client()
         if client:
             return client
-    except Exception:  # noqa: BLE001 - 取 ScanOrchestrator Redis 客户端失败时返回 None（调用方按无幂等处理）
+    except Exception:  # noqa: BLE001, S110 - 取 ScanOrchestrator Redis 客户端失败时返回 None（调用方按无幂等处理）
         pass
     return None
 
@@ -89,7 +116,7 @@ def upload_file_idempotency_key(field: str = "file") -> str:
     finally:
         try:
             f.seek(0)
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110 - finally 里 seek 复位失败不该掩盖原始异常
             pass
     return hashlib.sha256(content).hexdigest() if content else ""
 
@@ -132,7 +159,7 @@ def idempotent(prefix: str = "idem", ttl: int = 86400,
 
             redis_client = _get_redis_client()
             if not redis_client:
-                logger.warning("Redis 不可用，跳过幂等性检查")
+                _warn_redis_degraded("idempotent")
                 return f(*args, **kwargs)
 
             current_user = getattr(g, "current_user", None)
@@ -186,7 +213,7 @@ def idempotent(prefix: str = "idem", ttl: int = 86400,
                     logger.debug(f"幂等键已缓存: key={redis_key}, ttl={ttl}")
                 else:
                     redis_client.delete(redis_key)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 幂等响应缓存写失败非致命：业务已执行成功，缓存未命中仅退化为非幂等
                 logger.warning(f"缓存幂等响应失败: key={redis_key}, error={e}")
 
             return result
@@ -250,10 +277,10 @@ def redis_lock(prefix: str, key_param: Optional[str] = None,
 
             redis_client = _get_redis_client()
             if not redis_client:
-                logger.warning("Redis 不可用，跳过分布式锁检查")
+                _warn_redis_degraded("lock")
                 return f(*args, **kwargs)
 
-            lock_key = f"ipm:lock:{prefix}:{lock_key_value}"
+            lock_key = redis_keys.ipm_lock_key(prefix, lock_key_value)
 
             lock_token = str(uuid.uuid4())
 
@@ -274,7 +301,7 @@ def redis_lock(prefix: str, key_param: Optional[str] = None,
                 try:
                     redis_client.eval(_RELEASE_LOCK_SCRIPT, 1, lock_key, lock_token)
                     logger.debug(f"分布式锁已释放: key={lock_key}")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 分布式锁释放失败非致命：锁会在 TTL 到期后自动释放
                     logger.warning(f"释放分布式锁失败: key={lock_key}, error={e}")
 
         return decorated_function

@@ -9,9 +9,9 @@
 from sqlalchemy.exc import IntegrityError
 
 from app.utils.logging import get_logger
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from app.exceptions.business import ResourceConflictError
+from app.exceptions.business import CabinetVersionConflict, ResourceConflictError
 from app.exceptions.data_access import DataAccessError, RecordNotFoundError
 from app.exceptions.validation import ValidationError
 from app.models.cabinet import Cabinet
@@ -35,6 +35,9 @@ _STRATEGY_MAP: Dict[str, UPositionStrategy] = {
     "auto_best_fit":  UPositionStrategy.AUTO_BEST_FIT,
     "best_fit":       UPositionStrategy.AUTO_BEST_FIT,
 }
+
+
+SENTINEL_ROW_BASE = -1_000_000
 
 
 def _raise_cabinet_unique_conflict(
@@ -263,6 +266,8 @@ class CabinetService:
             from app.persistence.customer_repository import CustomerRepository
             CustomerService(CustomerRepository()).assert_allocatable(new_customer_id)
 
+        payload["version"] = (old_cabinet.version or 0) + 1
+
         try:
             cabinet = self.cabinet_repository.update(cabinet_id, payload)
         except DataAccessError as e:
@@ -313,7 +318,7 @@ class CabinetService:
             `CabinetRepository.delete` → `base.py` 的 `session.delete(entity)`，
             而 `Cabinet.devices` 关系带 `cascade="all, delete-orphan"`
             ⇒ **级联物理删 `devices` 行、完全绕过设备清理链路**
-            （`DeviceService._cleanup_device_dependencies`）。后果随子表是否有行而分叉：
+            （`DeviceService.cleanup_device_dependencies`）。后果随子表是否有行而分叉：
             子表有行 ⇒ 撞外键**整体回滚**（对外 DataAccessError/500）；子表无行 ⇒
             设备被静默物理删，配置/监控/诊断等关联行全成残行，且**无任何日志**。
             （2026-09-18 用真实 fixture 实测复现，见 `.workbuddy/memory/2026-09-18.md`）
@@ -928,6 +933,144 @@ class CabinetService:
                 "请更换行列号"
             ),
         )
+
+    def batch_update_cabinet_positions(
+        self, room_id: int, items: List[Dict[str, Any]]
+    ) -> List[Cabinet]:
+        """批量换位机柜（迁移 0020：单一事务 + 乐观锁 CAS + 坐标两阶段搬迁）
+
+        两台机柜**互换格子**此前必然失败：逐条 PUT 按当前快照判占用，处理 A 时
+        目标格还站着 B（B 尚未移走）⇒ 409。第六轮评审 §三 把这条列为残留缺口
+        （标记侧已由 WP-7 解决，机柜同型补齐）。
+
+        Args:
+            room_id: 机房 ID（本批机柜必须同属该机房）
+            items: [{"cabinet_id": int, "expected_version": int,
+                     "row": int|None, "col": int|None}, ...]
+                row/col 必须成对给出；任一为 None 视为"取消定位"。
+
+        Returns:
+            更新后的机柜实例列表（version 已 +1）
+
+        Raises:
+            ValidationError: 机柜不存在 / 不属于该机房 / items 内 cabinet_id 重复
+            ResourceConflictError: 目标格被本批不会让位的机柜占用
+            CabinetVersionConflict: 任一项版本过期 ⇒ 整批不生效
+        """
+        conflicts: List[tuple] = []
+        planned: Dict[tuple, int] = {}          # 最终坐标 -> 声明它的机柜 id
+        moves: List[Tuple[int, Optional[int], Optional[int]]] = []
+        updated_ids: List[int] = []
+
+        def _norm(row, col):
+            """坐标必须成对：任一为 None 即"未设置位置"
+
+            唯一索引对 NULL 不判重，因此未定位机柜可以有任意多个，也不会与
+            任何格子冲突 —— 这正是"取消定位"无需哨兵中转的原因。
+            """
+            if row is None or col is None:
+                return (None, None)
+            return (row, col)
+
+        items_by_id: Dict[int, Dict[str, Any]] = {}
+        for item in items:
+            cid = item["cabinet_id"]
+            if cid in items_by_id:
+                raise ValidationError(f"items 中机柜 #{cid} 重复提交")
+            items_by_id[cid] = item
+
+        prefetched = {
+            c.id: c
+            for c in self.cabinet_repository.find_by_ids_in_room(
+                list(items_by_id), room_id
+            )
+        }
+
+        def _final_pos(cabinet) -> tuple:
+            """该机柜在本批结束后的最终坐标"""
+            it = items_by_id.get(cabinet.id)
+            if it is None:
+                return _norm(cabinet.row, cabinet.col)
+            return _norm(it.get("row", cabinet.row), it.get("col", cabinet.col))
+
+        for item in items:
+            cabinet_id = item["cabinet_id"]
+            expected_version = item["expected_version"]
+
+            cabinet = prefetched.get(cabinet_id)
+            if cabinet is None:
+                raise ValidationError(f"机柜 #{cabinet_id} 不存在")
+
+            current = _norm(cabinet.row, cabinet.col)
+            target = _norm(item.get("row", cabinet.row), item.get("col", cabinet.col))
+
+            owner = planned.get(target)
+            if owner is not None and owner != cabinet_id:
+                raise ResourceConflictError(
+                    resource_type="机柜位置",
+                    resource_id=f"第 {target[0]} 行 第 {target[1]} 列",
+                    conflict_reason=f"本批中机柜 #{owner} 与 #{cabinet_id} 目标位置重复",
+                    message=f"本批中机柜 #{owner} 与 #{cabinet_id} 目标位置重复"
+                            f"（第 {target[0]} 行 第 {target[1]} 列）",
+                )
+
+            if target != (None, None) and target != current:
+                occ = self.cabinet_repository.find_by_position(room_id, *target)
+                if occ is not None and occ.id != cabinet_id and _final_pos(occ) == target:
+                    raise ResourceConflictError(
+                        resource_type="机柜位置",
+                        resource_id=f"第 {target[0]} 行 第 {target[1]} 列",
+                        conflict_reason=f"已被机柜 {occ.cabinet_number} 占用",
+                        message=f"第 {target[0]} 行 第 {target[1]} 列已被机柜 "
+                                f"{occ.cabinet_number} 占用，请更换行列号",
+                    )
+            planned[target] = cabinet_id
+
+            try:
+                hit = self.cabinet_repository.update_versioned(
+                    cabinet_id, room_id, expected_version, {}
+                )
+                self.cabinet_repository.session.flush()
+            except DataAccessError as e:
+                _raise_cabinet_unique_conflict(
+                    e, cabinet.cabinet_number, target[0], target[1]
+                )
+                raise
+
+            if not hit:
+                cur = self.cabinet_repository.find_by_id(cabinet_id)
+                if not cur or cur.room_id != room_id:
+                    raise ValidationError(f"机柜 #{cabinet_id} 不存在")
+                conflicts.append((cabinet_id, expected_version, cur.version or 0))
+                continue
+
+            if target != current:
+                moves.append((cabinet_id, target[0], target[1]))
+            updated_ids.append(cabinet_id)
+
+        if conflicts:
+            raise CabinetVersionConflict(conflicts)
+
+        if moves:
+            try:
+                for cabinet_id, _, _ in moves:
+                    self.cabinet_repository.set_position(
+                        cabinet_id, room_id, SENTINEL_ROW_BASE - cabinet_id, 0
+                    )
+                self.cabinet_repository.session.flush()
+                for cabinet_id, row, col in moves:
+                    self.cabinet_repository.set_position(cabinet_id, room_id, row, col)
+                self.cabinet_repository.session.flush()
+            except DataAccessError as e:
+                _raise_cabinet_unique_conflict(e, "", None, None)
+                raise
+
+        updated = [self.cabinet_repository.find_by_id(cid) for cid in updated_ids]
+        for cabinet in updated:
+            if cabinet:
+                self._invalidate_cabinet_cache(cabinet.id, room_id)
+        logger.info(f"批量换位机柜成功 (room_id={room_id}, n={len(updated)})")
+        return updated
 
     def _normalize_cabinet_payload(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """统一字段命名（兼容旧 API 字段名 → 标准字段名）。

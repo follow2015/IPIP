@@ -9,8 +9,9 @@
  * 分组校验规则（后端强校验，前端做选项过滤）：仅允许设备类型相同、厂商相同、
  * 协议（source）相同的模板归入同一分组。
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
+import { useDirtyGuard, useSnapshotDirty } from '@/hooks/useDirtyGuard';
 import {
   Card,
   Button,
@@ -25,8 +26,10 @@ import {
   Empty,
   InputNumber,
   Divider,
-  Typography
+  Typography,
+  theme
 } from 'antd';
+import type { TableProps } from 'antd';
 import { useConfirm } from '@/utils/confirm';
 import { PlusOutlined, DeleteOutlined, EditOutlined, FolderOutlined } from '@ant-design/icons';
 import { useMessage } from '@/hooks/useMessage';
@@ -55,6 +58,7 @@ interface GroupFormValues extends Omit<MetricTemplateGroupUpsert, 'vendor'> {
 }
 
 export default function MetricTemplateGroupsSection() {
+  const { token } = theme.useToken();
   const confirm = useConfirm();
   const message = useMessage();
   const { t } = useTranslation('monitor');
@@ -144,7 +148,9 @@ export default function MetricTemplateGroupsSection() {
       await deleteGroup.mutateAsync(id);
       message.success(t('metricTemplate.group.message.deleted'));
     } catch (e) {
-      message.error(e instanceof Error ? e.message : t('metricTemplate.group.message.deleteFailed'));
+      message.error(
+        e instanceof Error ? e.message : t('metricTemplate.group.message.deleteFailed')
+      );
     }
   };
 
@@ -170,15 +176,21 @@ export default function MetricTemplateGroupsSection() {
     }
   };
 
-  const handleRemoveTemplate = async (templateId: number) => {
-    if (!manageGroupId) return;
-    try {
-      await removeTemplate.mutateAsync({ groupId: manageGroupId, templateId });
-      message.success(t('metricTemplate.group.message.removed'));
-    } catch (e) {
-      message.error(e instanceof Error ? e.message : t('metricTemplate.group.message.removeFailed'));
-    }
-  };
+  const { mutateAsync: removeTemplateMutate } = removeTemplate;
+  const handleRemoveTemplate = useCallback(
+    async (templateId: number) => {
+      if (!manageGroupId) return;
+      try {
+        await removeTemplateMutate({ groupId: manageGroupId, templateId });
+        message.success(t('metricTemplate.group.message.removed'));
+      } catch (e) {
+        message.error(
+          e instanceof Error ? e.message : t('metricTemplate.group.message.removeFailed')
+        );
+      }
+    },
+    [manageGroupId, removeTemplateMutate, message, t]
+  );
 
   const candidateTemplates = useMemo(() => {
     if (!groupDetail || !templates) return [];
@@ -193,6 +205,87 @@ export default function MetricTemplateGroupsSection() {
     });
   }, [groupDetail, templates]);
 
+  const candidateColumns = useMemo<NonNullable<TableProps<MetricTemplateItem>['columns']>>(
+    () => [
+      {
+        title: t('metricTemplate.column.metric'),
+        dataIndex: 'metric_key',
+        width: 160,
+        render: (v: string, r: MetricTemplateItem) => (
+          <Space direction="vertical" size={0} style={{ lineHeight: 1.2 }}>
+            <Text>{r.display_name ?? v}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {v}
+            </Text>
+          </Space>
+        )
+      },
+      {
+        title: t('metricTemplate.column.category'),
+        dataIndex: 'category',
+        width: 100,
+        render: (v: string) => (v ? <Tag color="geekblue">{v}</Tag> : '-')
+      },
+      {
+        title: tc('field.source'),
+        dataIndex: 'source',
+        width: 80,
+        render: (v: string) => <Tag color="blue">{SOURCE_LABEL[v] ?? v}</Tag>
+      },
+      {
+        title: t('metricTemplate.field.vendor'),
+        dataIndex: 'vendor',
+        width: 90,
+        render: (v: string | null) => v ?? <Text type="secondary">—</Text>
+      }
+    ],
+    [t, tc]
+  );
+
+  const memberColumns = useMemo<NonNullable<TableProps<MetricTemplateItem>['columns']>>(
+    () => [
+      {
+        title: t('metricTemplate.column.metric'),
+        dataIndex: 'metric_key',
+        render: (v: string, r: MetricTemplateItem) => r.display_name ?? v
+      },
+      {
+        title: tc('field.source'),
+        dataIndex: 'source',
+        width: 80,
+        render: (v: string) => <Tag color="blue">{SOURCE_LABEL[v] ?? v}</Tag>
+      },
+      {
+        title: t('metricTemplate.field.vendor'),
+        dataIndex: 'vendor',
+        width: 90,
+        render: (v: string | null) => v ?? <Text type="secondary">—</Text>
+      },
+      {
+        title: tc('field.actions'),
+        key: 'action',
+        width: 80,
+        render: (_: unknown, r: MetricTemplateItem) => (
+          <Button
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() =>
+              confirm({
+                title: t('metricTemplate.group.confirm.removeTitle'),
+                okText: t('metricTemplate.group.action.remove'),
+                cancelText: tc('action.cancel'),
+                okButtonProps: { danger: true },
+                onOk: () => handleRemoveTemplate(r.id!)
+              })
+            }
+          />
+        )
+      }
+    ],
+    [t, tc, confirm, handleRemoveTemplate]
+  );
+
   const groupColumns = [
     {
       title: tc('field.name'),
@@ -200,9 +293,11 @@ export default function MetricTemplateGroupsSection() {
       width: 160,
       render: (v: string, r: MetricTemplateGroupItem) => (
         <Space size={4}>
-          <FolderOutlined style={{ color: '#1677ff' }} />
+          <FolderOutlined style={{ color: token.colorPrimary }} />
           <Text strong>{v}</Text>
-          {r.enabled === false && <Tag color="default">{t('metricTemplate.group.status.disabled')}</Tag>}
+          {r.enabled === false && (
+            <Tag color="default">{t('metricTemplate.group.status.disabled')}</Tag>
+          )}
         </Space>
       )
     },
@@ -288,6 +383,20 @@ export default function MetricTemplateGroupsSection() {
     </div>
   );
 
+  const groupPending = createGroup.isPending || updateGroup.isPending;
+  const groupGuard = useDirtyGuard({ form: groupForm, isPending: groupPending });
+
+  const managePending = addTemplates.isPending;
+  const manageGuard = useDirtyGuard({
+    isPending: managePending,
+    isDirty: useSnapshotDirty([], selectedTemplateIds)
+  });
+
+  const closeGroupModal = () => {
+    groupModal.close();
+    groupForm.resetFields();
+  };
+
   return (
     <Card
       title={t('metricTemplate.group.title')}
@@ -327,11 +436,10 @@ export default function MetricTemplateGroupsSection() {
         }
         open={groupModal.isOpen}
         onOk={handleGroupSubmit}
-        onCancel={() => {
-          groupModal.close();
-          groupForm.resetFields();
-        }}
-        confirmLoading={createGroup.isPending || updateGroup.isPending}
+        onCancel={() => groupGuard.requestClose(closeGroupModal)}
+        confirmLoading={groupPending}
+        closable={!groupPending}
+        mask={{ closable: false }}
         destroyOnHidden
       >
         <Form form={groupForm} layout="vertical" preserve={false}>
@@ -352,7 +460,9 @@ export default function MetricTemplateGroupsSection() {
           <Form.Item
             name="source"
             label={t('metricTemplate.group.field.source')}
-            rules={[{ required: true, message: t('metricTemplate.group.validation.sourceRequired') }]}
+            rules={[
+              { required: true, message: t('metricTemplate.group.validation.sourceRequired') }
+            ]}
           >
             <Select options={SOURCE_OPTIONS} />
           </Form.Item>
@@ -374,7 +484,10 @@ export default function MetricTemplateGroupsSection() {
             <Switch />
           </Form.Item>
           <Form.Item name="description" label={tc('field.description')}>
-            <Input.TextArea rows={2} placeholder={t('metricTemplate.group.placeholder.description')} />
+            <Input.TextArea
+              rows={2}
+              placeholder={t('metricTemplate.group.placeholder.description')}
+            />
           </Form.Item>
         </Form>
       </Modal>
@@ -383,7 +496,9 @@ export default function MetricTemplateGroupsSection() {
       <Modal
         title={t('metricTemplate.group.modal.manageTitle', { name: groupDetail?.name ?? '' })}
         open={manageGroupId != null}
-        onCancel={() => setManageGroupId(null)}
+        onCancel={() => manageGuard.requestClose(() => setManageGroupId(null))}
+        closable={!managePending}
+        mask={{ closable: false }}
         footer={
           <Button
             type="primary"
@@ -414,39 +529,7 @@ export default function MetricTemplateGroupsSection() {
               selectedRowKeys: selectedTemplateIds,
               onChange: (keys) => setSelectedTemplateIds(keys as number[])
             }}
-            columns={[
-              {
-                title: t('metricTemplate.column.metric'),
-                dataIndex: 'metric_key',
-                width: 160,
-                render: (v: string, r) => (
-                  <Space direction="vertical" size={0} style={{ lineHeight: 1.2 }}>
-                    <Text>{r.display_name ?? v}</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {v}
-                    </Text>
-                  </Space>
-                )
-              },
-              {
-                title: t('metricTemplate.column.category'),
-                dataIndex: 'category',
-                width: 100,
-                render: (v: string) => (v ? <Tag color="geekblue">{v}</Tag> : '-')
-              },
-              {
-                title: tc('field.source'),
-                dataIndex: 'source',
-                width: 80,
-                render: (v: string) => <Tag color="blue">{SOURCE_LABEL[v] ?? v}</Tag>
-              },
-              {
-                title: t('metricTemplate.field.vendor'),
-                dataIndex: 'vendor',
-                width: 90,
-                render: (v: string | null) => v ?? <Text type="secondary">—</Text>
-              }
-            ]}
+            columns={candidateColumns}
             locale={{
               emptyText: <Empty description={t('metricTemplate.group.candidateEmpty')} />
             }}
@@ -466,46 +549,7 @@ export default function MetricTemplateGroupsSection() {
               rowKey={(r) => String(r.id)}
               size="small"
               pagination={false}
-              columns={[
-                {
-                  title: t('metricTemplate.column.metric'),
-                  dataIndex: 'metric_key',
-                  render: (v: string, r) => r.display_name ?? v
-                },
-                {
-                  title: tc('field.source'),
-                  dataIndex: 'source',
-                  width: 80,
-                  render: (v: string) => <Tag color="blue">{SOURCE_LABEL[v] ?? v}</Tag>
-                },
-                {
-                  title: t('metricTemplate.field.vendor'),
-                  dataIndex: 'vendor',
-                  width: 90,
-                  render: (v: string | null) => v ?? <Text type="secondary">—</Text>
-                },
-                {
-                  title: tc('field.actions'),
-                  key: 'action',
-                  width: 80,
-                  render: (_: unknown, r: MetricTemplateItem) => (
-                    <Button
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() =>
-                        confirm({
-                          title: t('metricTemplate.group.confirm.removeTitle'),
-                          okText: t('metricTemplate.group.action.remove'),
-                          cancelText: tc('action.cancel'),
-                          okButtonProps: { danger: true },
-                          onOk: () => handleRemoveTemplate(r.id!)
-                        })
-                      }
-                    />
-                  )
-                }
-              ]}
+              columns={memberColumns}
               scroll={{ x: 'max-content' }}
             />
           ) : (

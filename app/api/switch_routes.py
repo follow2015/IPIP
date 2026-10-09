@@ -9,8 +9,8 @@ import time
 
 from flask import Blueprint, g, request
 
-from app.api.base import APIResponse, ErrorCode, api_exception_handler
-from app.openapi.doc import doc, public
+from app.api.base import APIResponse, ErrorCode, api_exception_handler, RequestValidator
+from app.openapi.doc import doc
 from app.persistence.switch_repo import SwitchRepository
 from app.persistence.switch_port_repository import NetworkPortRepository
 from app.persistence.customer_repository import CustomerRepository
@@ -22,10 +22,11 @@ from app.persistence.switch_ext_repository import SwitchExtRepository
 from app.services.network_scanner_service import NetworkScannerService
 from app.services.switch_info_service import SwitchInfoService
 from app.services.switch_config_service import SwitchConfigService
-from app.utils.auth import login_required, permission_required
+from app.services.auth import login_required, permission_required
 from extensions import db
-from app.core.enums import NotificationTypeCode, SwitchDeviceTypeCode
+from app.core.enums import NotificationTypeCode
 from app.utils.transactional import transactional
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -95,7 +96,7 @@ def _notify_async_result(user_id, action_type, label, *, success, error="", devi
                     device_label = dev.management_ip
                 else:
                     device_label = str(device_id)
-            except Exception:
+            except Exception:  # noqa: BLE001 -- 设备名称回填失败容错：仅用于通知文案，取名称失败退化为 device_id 字符串，不得因装饰性信息失败影响主流程
                 device_label = str(device_id)
         if success:
             notification_service.notify(
@@ -250,8 +251,7 @@ def list_switches():
     switch_role = request.args.get("switch_role", type=int)
     search = request.args.get("search")
     device_type = request.args.get("device_type")
-    page = request.args.get("page", 1, type=int)
-    page_size = request.args.get("per_page", 20, type=int)
+    page, page_size = RequestValidator.validate_pagination_params()
 
     repo = SwitchRepository()
     result = repo.find_by_filters(
@@ -266,6 +266,26 @@ def list_switches():
         total=result["total"],
         message="获取交换机列表成功",
     )
+
+
+@router.route("/options", methods=["GET"])
+@doc(summary="获取交换机下拉选项（轻量两列，不分页）", tags=["交换机"], responses={200: "ApiResponse", 401: "ApiError"})
+@login_required
+@permission_required("switch:view")
+@api_exception_handler
+def list_switch_options():
+    """交换机下拉选项（轻量，不分页）
+
+    Query Parameters:
+        room_id: 机房 ID（可选，传则只返回该机房的交换机）
+
+    OD-8：前端下拉曾用 per_page=1000 打 /list，被 MAX_PER_PAGE=100 夹紧后静默缺项。
+    选项场景走本端点——只取 id+name 两列、上限单独设定（SwitchRepository.SWITCH_OPTIONS_MAX），
+    与列表端点的分页语义解耦。权限与 /list 保持一致（switch:view），消费面不变。
+    """
+    room_id = request.args.get("room_id", type=int)
+    options = SwitchRepository().list_options(room_id=room_id)
+    return APIResponse.success(data=options, message="获取交换机选项成功")
 
 
 @router.route("/<int:device_id>", methods=["GET"])
@@ -360,7 +380,6 @@ def create_switch():
         switch_data=data,
         ext_data=ext_data,
     )
-    device = switch.device
 
     result = switch.to_dict(exclude=["password"])
     result["ip_address"] = result.pop("ip", None)
@@ -429,37 +448,26 @@ def update_switch(device_id):
         return APIResponse.error(f"交换机 {device_id} 不存在", ErrorCode.NOT_FOUND, 404)
 
     if switch.device:
-        updated = False
         if device_name:
             switch.device.device_name = device_name
-            updated = True
         if device_model is not None:
             switch.device.device_model = device_model
-            updated = True
         if layer is not None:
             switch.device.layer = layer
-            updated = True
         if switch_role is not None:
             switch.device.switch_role = switch_role
-            updated = True
         if uplink_device_id is not None:
             switch.device.uplink_device_id = uplink_device_id
-            updated = True
         if core_device_id is not None:
             switch.device.core_device_id = core_device_id
-            updated = True
         if uplink_port_ids is not None:
             switch.device.uplink_port_ids = uplink_port_ids
-            updated = True
         if port_num is not None:
             switch.device.port_num = port_num
-            updated = True
         if hostname is not None:
             switch.device.hostname = hostname
-            updated = True
         if data.get("ip"):
             switch.device.management_ip = data["ip"]
-            updated = True
 
 
     result = switch.to_dict(exclude=["password"])
@@ -575,7 +583,7 @@ def get_switch_detail_with_ports(device_id):
                         user_id, "info_refresh", "刷新设备信息",
                         success=True, device_id=switch.device_id,
                     )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 异步采集任务顶层兜底：后台线程内异常必须捕获并转为前端通知，否则线程内异常无人接收（SSH/DB/Redis 异常不可枚举）
                 logger.error("异步采集交换机 device_id=%d 失败: %s", switch.device_id, e)
                 try:
                     with app_ref.app_context():
@@ -629,7 +637,7 @@ def sync_switch_ports(device_id):
 
     from app.utils.idempotency import _get_redis_client
     redis_client = _get_redis_client()
-    lock_key = f"ipm:lock:sync_ports:{device_id}"
+    lock_key = redis_keys.ipm_lock_key("sync_ports", device_id)
     if redis_client:
         acquired = redis_client.set(lock_key, "1", nx=True, ex=600)
         if not acquired:
@@ -658,7 +666,7 @@ def sync_switch_ports(device_id):
                         user_id, "scan_complete", "同步数据",
                         success=False, error=error_msg, device_id=switch.device_id,
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 异步同步端口任务顶层兜底：同 614
             logger.error("异步同步端口信息 device_id=%d 失败: %s", device_id, e)
             try:
                 with app_ref.app_context():
@@ -678,7 +686,7 @@ def sync_switch_ports(device_id):
             if redis_client:
                 try:
                     redis_client.delete(lock_key)
-                except Exception:  # noqa: BLE001 - 释放扫描锁失败可忽略：锁带 TTL，会自然过期
+                except Exception:  # noqa: BLE001, S110 - 释放扫描锁失败可忽略：锁带 TTL，会自然过期
                     pass
 
     from flask import current_app
@@ -706,7 +714,7 @@ def scan_switch(device_id):
 
     from app.utils.idempotency import _get_redis_client as _get_redis_client_scan
     scan_redis_client = _get_redis_client_scan()
-    scan_lock_key = f"ipm:lock:scan_switch:{device_id}"
+    scan_lock_key = redis_keys.scan_switch_lock_key(device_id)
     if scan_redis_client:
         acquired = scan_redis_client.set(scan_lock_key, "1", nx=True, ex=1800)
         if not acquired:
@@ -722,7 +730,7 @@ def scan_switch(device_id):
                 logger.info("异步扫描交换机 device_id=%d 完成", device_id)
                 from app.services.switch_events import emit_resource_change
                 emit_resource_change(switch.device_id, "scan_complete", affected_ports=[])
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 异步扫描任务顶层兜底：同 614
             logger.error("异步扫描交换机 device_id=%d 失败: %s", device_id, e)
             try:
                 with app_ref.app_context():
@@ -738,7 +746,7 @@ def scan_switch(device_id):
             if scan_redis_client:
                 try:
                     scan_redis_client.delete(scan_lock_key)
-                except Exception:  # noqa: BLE001 - 释放扫描锁失败可忽略：锁带 TTL，会自然过期
+                except Exception:  # noqa: BLE001, S110 - 释放扫描锁失败可忽略：锁带 TTL，会自然过期
                     pass
 
     from flask import current_app
@@ -794,7 +802,7 @@ def scan_room(room_id):
         sw_ids = SwitchRepository().find_room_switch_ids(room_id)
         scope = f"r:{room_id}"
         for did in sw_ids:
-            lock_key = f"scan_lock:{did}"
+            lock_key = redis_keys.scan_lock_key(did)
             if redis_client.exists(lock_key):
                 lock_scope = redis_client.get(lock_key)
                 if lock_scope:
@@ -869,7 +877,7 @@ def scan_room(room_id):
                 notification_service.notify(
                     type=NotificationTypeCode.ROOM_SCAN_COMPLETE,
                     severity="info",
-                    title=f"机房扫描完成",
+                    title="机房扫描完成",
                     content=f"机房「{_room_name}」的网络扫描已完成",
                     payload={"room_id": room_id, "scope": f"r:{room_id}"},
                     source_module="scan",
@@ -877,7 +885,7 @@ def scan_room(room_id):
 
                     idempotency_key=f"room_scan_complete:r:{room_id}:{int(time.time())}",
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 异步机房扫描任务顶层兜底：同 614
             logger.error("异步机房扫描 %d 失败: %s", room_id, e)
             try:
                 with app_ref.app_context():
@@ -887,7 +895,7 @@ def scan_room(room_id):
                     if redis_client:
                         sr = ScanRedis(redis_client)
                         for did in sw_ids:
-                            lock_key = f"scan_lock:{did}"
+                            lock_key = redis_keys.scan_lock_key(did)
                             try:
                                 redis_client.delete(lock_key)
                             except Exception:
@@ -976,7 +984,7 @@ def collect_switch_info(device_id):
                     user_id, "info_refresh", "刷新设备信息",
                     success=True, device_id=switch.device_id,
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 异步设备信息采集任务顶层兜底：同 614
             logger.error("异步采集交换机 device_id=%d 设备信息失败: %s", device_id, e)
             try:
                 with app_ref.app_context():
@@ -1101,7 +1109,7 @@ def update_port_info(device_id, port_number):
         if effective_customer_id != current_customer_id:
             try:
                 service.update_port_customer(device_id, port_number, effective_customer_id)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 单端口客户归属更新失败隔离：记入 errors 后继续下一端口，同 batch 语义
                 logger.error("更新端口客户归属失败: %s", e)
                 errors.append("客户归属更新失败")
 
@@ -1216,7 +1224,7 @@ def sync_members(device_id):
                         user_id, "sync_members", "同步成员端口",
                         success=True, device_id=switch.device_id,
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 异步同步成员端口任务顶层兜底：同 614
             logger.error("异步同步成员端口 device_id=%d 失败: %s", device_id, e)
             try:
                 with app_ref.app_context():
@@ -1947,7 +1955,6 @@ def create_switch_ext(device_id):
     路由参数 device_id 对应 devices.id（统一交换机标识）。
     """
     from app.persistence.switch_ext_repository import SwitchExtRepository
-    from app.utils.port_name_utils import normalize_port
     sw, _err = _find_switch_or_404(device_id)
     if _err:
         return _err
@@ -1991,7 +1998,6 @@ def update_switch_ext(device_id):
     路由参数 device_id 对应 devices.id（统一交换机标识）。
     """
     from app.persistence.switch_ext_repository import SwitchExtRepository
-    from app.utils.port_name_utils import normalize_port
     repo = SwitchExtRepository()
     sw, _err = _find_switch_or_404(device_id)
     if _err:
@@ -2046,7 +2052,7 @@ def update_switch_ext(device_id):
                     if uplink_device_id_for_fallback:
                         sr.fallback_set(fallback_room_id, sw.ip,
                                         uplink_device_id_for_fallback, uplink_port)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 降级映射写回非致命：写失败不影响已产出的转换结果，仅告警
             logger.warning("写入降级映射失败: %s", e)
 
     return APIResponse.success(ext.to_dict())
@@ -2129,7 +2135,7 @@ def batch_update_switches():
 
             sp.commit()
             success_ids.append(device_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 批量更新内单设备失败隔离：savepoint 回滚后记入 failed_items 继续下一台，单台 DB 异常不得中断整批
             sp.rollback()
             logger.error("批量更新交换机 device_id=%d 失败: %s", device_id, e)
             failed_items.append({"device_id": device_id, "error": str(e)})

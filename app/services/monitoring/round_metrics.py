@@ -4,7 +4,7 @@
 **为什么需要**：采样节奏会被"多实例并发"放大。锁只保证互斥、不保证限速——
 抢不到锁的实例照样按自己的 `interval` 起轮，于是聚合频率 = `interval ÷ 实例数`。
 配置值看着完全正常（`MONITOR_INTERVAL_SNMP=60`），库里却按 ≈19 s 落一行。
-旧路径只能事后查库才发现（见 `code_review/采样节奏真值核查-20260921.md`）。
+旧路径只能事后查库才发现（见 `docs/review/采样节奏真值核查-20260921.md`）。
 
 本模块把两个信号变成**可抓取**指标，让"放大"当场可见：
 
@@ -34,10 +34,11 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
-_NS = "monitor:rounds"
+_NS = redis_keys.MONITOR_ROUNDS_NS
 
 _WINDOW_SECONDS = 300
 
@@ -265,6 +266,45 @@ _SERIES = (
 )
 
 
+_PARTITION_LAG_METRIC = "ipip_monitor_partition_lag_days"
+
+
+def _partition_lag_days() -> Optional[int]:
+    """分区轮转滞后天数（只读）；不可用时返回 None，**不影响其它指标**。
+
+    为什么要它：分区预建停摆是**静默失败** —— 数据照常写进 ``p_future`` 兜底分区，
+    界面完全正常，直到某天发现 13 天 0 个分区被创建、12.6 万行积压（2026-09-07 实测）。
+    有了这个数，才是"机制"而不是"纪律"。
+
+    延迟 import：本模块刻意保持轻导入面（不拖 DB / ORM）。
+
+    [WARN] 本函数**不自己吞异常** —— 隔离统一做在调用点 ``snapshot()``。
+    放在这里会漏掉 import 之外的失败面，且让"旁路逻辑不冒泡"这条保证
+    分散在两处；集中在调用点才能保证**任何**失败都不会打挂整个 /metrics
+    （测试 ``test_partition_lag_failure_does_not_break_other_metrics`` 用
+    "让本函数直接抛异常"的变异锁死这一点）。
+    """
+    from extensions import db
+
+    from app.persistence.monitor_timeseries_repository import (
+        MonitorTimeseriesRepository,
+    )
+
+    if db.engine.dialect.name != "mysql":
+        return None  # SQLite 无分区概念
+    return MonitorTimeseriesRepository(db.session).partition_lag_days()
+
+
+def _render_partition_lag(lag: int) -> str:
+    """把滞后天数渲染成 Prometheus exposition 片段。"""
+    return (
+        f"# HELP {_PARTITION_LAG_METRIC} "
+        "最新具名日分区的覆盖日落后今天的天数（0=未落后；>0=分区预建停摆）\n"
+        f"# TYPE {_PARTITION_LAG_METRIC} gauge\n"
+        f"{_PARTITION_LAG_METRIC} {lag}\n"
+    )
+
+
 def _num(value) -> str:
     """数值格式化：整数不带小数点，小数用定点表示（避免科学计数法）。"""
     try:
@@ -306,6 +346,9 @@ def snapshot() -> Dict[str, object]:
         pid: 处理本次调用的进程号。
         loops: {loop: {rounds_total, skipped_total, rounds_per_minute, writers,
                        min_gap_seconds, too_fast_total, same_second_total, samples}}
+        partition_lag_days: 分区轮转滞后天数；非 MySQL 或查询失败时为 None
+            （**刻意不降级为 0** —— 0 表示"未落后"，与"没测出来"是两件事，
+            混在一起会让停摆重新变成静默）。
     """
     r = _redis()
     rows: Optional[Dict[str, Dict[str, object]]] = None
@@ -322,9 +365,19 @@ def snapshot() -> Dict[str, object]:
     else:
         source = "redis"
 
+    try:
+        lag = _partition_lag_days()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("monitor.round_metrics.partition_lag_failed %s", e)
+        lag = None
+    raw = _render(rows)
+    if lag is not None:
+        raw += _render_partition_lag(lag)
+
     return {
-        "raw": _render(rows),
+        "raw": raw,
         "metrics_source": source,
         "pid": _pid(),
         "loops": rows,
+        "partition_lag_days": lag,
     }

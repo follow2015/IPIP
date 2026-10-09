@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Select, InputNumber, Space, Alert, Spin, Descriptions, Tag } from 'antd';
+import { Select, InputNumber, Space, Alert, Spin, Descriptions, Tag, theme } from 'antd';
 import { getDeviceSubtypeLabel, getDeviceTypeMeta } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
 import type { Device } from '@/types/models';
@@ -48,11 +48,11 @@ const StepSource: React.FC<StepSourceProps> = ({
 }) => {
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
+  const { token } = theme.useToken();
   const templatePreviewItems = useMemo(() => {
     if (!templateDetail) return [];
     const d = templateDetail;
-    const typeLabel =
-      getDeviceTypeMeta(d.device_type, t)?.label ?? d.device_type;
+    const typeLabel = getDeviceTypeMeta(d.device_type, t)?.label ?? d.device_type;
     const subtypeLabel = d.device_subtype
       ? (getDeviceSubtypeLabel(d.device_subtype, t) ?? d.device_subtype)
       : '-';
@@ -99,7 +99,9 @@ const StepSource: React.FC<StepSourceProps> = ({
           placeholder={t('addModal.clone.searchPlaceholder')}
           style={{ width: '100%' }}
           loading={isDeviceListLoading}
-          notFoundContent={isTemplateLoading ? <Spin size="small" /> : t('addModal.clone.noMatchDevice')}
+          notFoundContent={
+            isTemplateLoading ? <Spin size="small" /> : t('addModal.clone.noMatchDevice')
+          }
         />
       </div>
 
@@ -141,14 +143,16 @@ const StepSource: React.FC<StepSourceProps> = ({
               max={50}
               style={{ width: 120 }}
             />
-            <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('addModal.clone.maxCount')}</span>
+            <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>
+              {t('addModal.clone.maxCount')}
+            </span>
           </Space>
         </div>
         {/* 节点模式：选择目标机箱；非节点模式：选择目标机柜 */}
         {isNodeTemplate ? (
           <div>
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
-              {t('addModal.clone.targetChassis')} <span style={{ color: '#ff4d4f' }}>*</span>
+              {t('addModal.clone.targetChassis')} <span style={{ color: token.colorError }}>*</span>
             </label>
             <Select
               value={cloneChassisId}
@@ -159,7 +163,7 @@ const StepSource: React.FC<StepSourceProps> = ({
               allowClear
             />
             {cloneChassisId && (
-              <span style={{ color: '#8c8c8c', fontSize: 12, marginLeft: 8 }}>
+              <span style={{ color: token.colorTextTertiary, fontSize: 12, marginLeft: 8 }}>
                 {t('form.nodeAssoc.vacantCount', { count: cloneAvailablePositions.length })}
               </span>
             )}

@@ -5,9 +5,10 @@
  */
 import { useState, useCallback, useEffect } from 'react';
 import { Modal, Select, Space, Typography } from 'antd';
-import { useLinkExistingCredential, useLinkedDevices, type LinkedDevice } from '@/services/monitor';
+import { useLinkExistingCredential, useLinkedDevices } from '@/services/monitor';
 import { searchDevicesForLink } from '@/services/device';
 import { useMessage } from '@/hooks/useMessage';
+import { useDirtyGuard, useSnapshotDirty } from '@/hooks/useDirtyGuard';
 import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
@@ -40,6 +41,10 @@ export default function LinkDeviceModal({
   const [linkDeviceIds, setLinkDeviceIds] = useState<number[]>([]);
   const [deviceOptions, setDeviceOptions] = useState<DeviceOption[]>([]);
   const [deviceSearchLoading, setDeviceSearchLoading] = useState(false);
+
+  const isPending = linkExisting.isPending;
+  const isDirty = useSnapshotDirty([], linkDeviceIds);
+  const guard = useDirtyGuard({ isPending, isDirty });
 
   const searchDevices = useCallback(async (keyword: string) => {
     setDeviceSearchLoading(true);
@@ -85,9 +90,11 @@ export default function LinkDeviceModal({
     <Modal
       title={t('credential.linkTitle')}
       open={open}
-      onCancel={onClose}
+      onCancel={() => guard.requestClose(onClose)}
       onOk={handleConfirmLink}
-      confirmLoading={linkExisting.isPending}
+      confirmLoading={isPending}
+      closable={!isPending}
+      mask={{ closable: false }}
       width={480}
       destroyOnHidden
     >

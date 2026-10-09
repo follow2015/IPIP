@@ -5,7 +5,7 @@
  * - 跳转查看该机柜下的设备
  */
 import { useEffect } from 'react';
-import { Button, Space, Tag } from 'antd';
+import { Button, Space, Tag, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import DataTable from '@/components/DataTable';
@@ -42,7 +42,6 @@ function Cabinets() {
       }) as CabinetQueryParams
   });
 
-  const initialRoomId = searchParams.get('roomId');
 
   const { filters, updateFilter } = crud.table;
 
@@ -55,6 +54,76 @@ function Cabinets() {
 
   const handleDetail = (record: Cabinet) => {
     navigate(`/cabinets/${record.id}`);
+  };
+
+  const renderCabinetCard = (r: Cabinet) => {
+    const { Text } = Typography;
+    const s = getCabinetStatusMeta(r.status, td);
+    const pos =
+      r.row != null && r.col != null
+        ? td('cabinet.field.rowCol', { row: r.row, col: r.col })
+        : (r.location ?? '-');
+    const uText =
+      r.total_u != null && r.total_u > 0
+        ? `${r.used_u ?? 0}/${r.total_u} (${formatPercent((r.used_u ?? 0) / r.total_u)})`
+        : '-';
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+        <Space wrap size={4}>
+          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleDetail(r)}>
+            <Text strong>{r.cabinet_number ?? '-'}</Text>
+          </Button>
+          {s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{r.status}</Tag>}
+        </Space>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {r.room_name || '-'}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {pos}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {td('cabinet.field.usedU')}: {uText}
+        </Text>
+        {r.customer_name ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {tc('field.customer')}: {r.customer_name}
+          </Text>
+        ) : null}
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {td('cabinet.field.deviceCount')}: {r.device_count ?? 0}
+        </Text>
+        <Space size={4} wrap>
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0 }}
+            onClick={() => navigate(`/devices?cabinetId=${r.id}`)}
+          >
+            {td('cabinet.viewDevices')}
+          </Button>
+          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleDetail(r)}>
+            {tc('action.detail')}
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0 }}
+            onClick={() => crud.handleEdit(r)}
+          >
+            {tc('action.edit')}
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            style={{ padding: 0 }}
+            onClick={() => crud.handleDelete(r)}
+          >
+            {tc('action.delete')}
+          </Button>
+        </Space>
+      </div>
+    );
   };
 
   const columns = [
@@ -106,7 +175,12 @@ function Cabinets() {
       width: 120,
       render: (v: string | null) => v ?? '-'
     },
-    { title: td('cabinet.field.deviceCount'), dataIndex: 'device_count', key: 'device_count', width: 80 },
+    {
+      title: td('cabinet.field.deviceCount'),
+      dataIndex: 'device_count',
+      key: 'device_count',
+      width: 80
+    },
     {
       title: tc('field.createdAt'),
       dataIndex: 'created_at',
@@ -143,6 +217,8 @@ function Cabinets() {
   return (
     <div>
       <DataTable<Cabinet>
+        error={crud.error}
+        onRetry={crud.refetch}
         columns={columns}
         dataSource={crud.data?.items ?? []}
         loading={crud.isLoading}
@@ -183,6 +259,8 @@ function Cabinets() {
             }
           />
         }
+        mobileCardMode
+        cardRender={renderCabinetCard}
       />
       <CabinetForm open={crud.formOpen} editRecord={crud.editRecord} onClose={crud.closeForm} />
     </div>

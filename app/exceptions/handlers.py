@@ -7,7 +7,7 @@
 from app.utils.logging import get_logger
 from typing import Any, Dict, Tuple
 
-from flask import Flask, jsonify
+from flask import Flask
 from marshmallow import ValidationError as MarshmallowValidationError
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from werkzeug.exceptions import HTTPException
@@ -62,9 +62,10 @@ def register_error_handlers(app: Flask) -> None:
     def handle_preset_response(error: PresetResponseError) -> Tuple[Dict[str, Any], int]:
         """还原 API 层预置的业务响应（审计 P0#2 收口）
 
-        与 handle_base_app_exception 的关键差别：本处理器**不把 code 兜底为类名、
-        也不输出 details**，从而与 `APIResponse.error(message, error_code, status_code)`
-        的原行为逐字段一致（error_code 仅显式提供时才出现）。
+        与 handle_base_app_exception 的关键差别：本处理器**不把 code 兜底为类名**，
+        且 details **原样透传而不包成列表**，从而与
+        `APIResponse.error(message, error_code, status_code, details)`
+        的原行为逐字段一致（error_code / details 均仅显式提供时才出现）。
 
         抛出方（端点）已负责记录日志，此处不重复记录，避免日志噪声。
 
@@ -82,6 +83,7 @@ def register_error_handlers(app: Flask) -> None:
         return _api_response().error(
             message=error.message,
             error_code=error.error_code,
+            details=error.details,
             status_code=error.status_code
         )
 

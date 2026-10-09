@@ -2,15 +2,15 @@ import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useCallback } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Tabs, Spin, Button, Space, Tag, Dropdown, Descriptions, Result } from 'antd';
+import { Tabs, Spin, Button, Space, Tag, Dropdown, Descriptions, Result, theme } from 'antd';
 import {
-  ArrowLeftOutlined,
   EditOutlined,
   DeleteOutlined,
   SwapOutlined,
   CopyOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
+import DetailActionBar from '@/components/DetailActionBar';
 import { useDeviceSuspenseDetail, useDeleteDevice, useUpdateDeviceStatus } from '@/services/device';
 import { useSwitchWithPorts, useSyncSwitchInfo } from '@/services/switch';
 
@@ -66,6 +66,7 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
   const confirm = useConfirm();
   const location = useLocation();
   const navigate = useNavigate();
+  const { token } = theme.useToken();
 
   const hashTabKey = location.hash.replace('#', '') || undefined;
   const [activeTabKey, setActiveTabKey] = useState<string>(hashTabKey ?? 'basic');
@@ -195,9 +196,7 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
         value: switchData.mac_address?.length ? switchData.mac_address.join(', ') : '-'
       })
     ].join('\n');
-    navigator.clipboard.writeText(text).then(() =>
-      message.success(td('switch.detailCopied'))
-    );
+    navigator.clipboard.writeText(text).then(() => message.success(td('switch.detailCopied')));
   };
 
   const tabItems = [];
@@ -271,7 +270,11 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
               {switchData.mac_address?.length ? switchData.mac_address.join(', ') : '-'}
             </Descriptions.Item>
             <Descriptions.Item label={td('form.network.managementAccess.label')}>
-              {hasSsh ? <Tag color="green">{td('switch.sshEnabled')}</Tag> : <Tag>{td('tooltip.recordOnly')}</Tag>}
+              {hasSsh ? (
+                <Tag color="green">{td('switch.sshEnabled')}</Tag>
+              ) : (
+                <Tag>{td('tooltip.recordOnly')}</Tag>
+              )}
             </Descriptions.Item>
           </Descriptions>
         )}
@@ -334,6 +337,18 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
     children: <CredentialTab device={device} />
   });
 
+  const portStats = (() => {
+    const ports = switchWithPorts?.ports ?? [];
+    if (!ports.length) return null;
+    let up = 0;
+    let down = 0;
+    for (const p of ports) {
+      if (p.link_status === 'up') up += 1;
+      else if (p.link_status === 'down') down += 1;
+    }
+    return { up, down, total: ports.length };
+  })();
+
   const statusInfo = getDeviceStatusMeta(device.status, td);
 
   const statusMenuItems = getDeviceStatusOptions(td)
@@ -351,66 +366,75 @@ function SwitchDetailContent({ switchId }: { switchId: number }) {
 
   return (
     <div>
-      {/* 顶部导航栏 */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 16
-        }}
-      >
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/switches')}>
-          {td('detail.backToList')}
+      {/* 顶部导航栏 —— 窄屏自动换行，避免 7 个按钮挤出视口后不可点 */}
+      <DetailActionBar backText={td('detail.backToList')} onBack={() => navigate('/switches')}>
+        <Button icon={<CopyOutlined />} onClick={handleCopyDetail}>
+          {td('switch.copyDetail')}
         </Button>
-        <Space>
-          <Button icon={<CopyOutlined />} onClick={handleCopyDetail}>
-            {td('switch.copyDetail')}
-          </Button>
-          <Dropdown
-            menu={{ items: statusMenuItems, onClick: ({ key }) => handleStatusChange(Number(key)) }}
+        <Dropdown
+          menu={{ items: statusMenuItems, onClick: ({ key }) => handleStatusChange(Number(key)) }}
+        >
+          <Button icon={<SwapOutlined />}>{td('detail.changeStatus')}</Button>
+        </Dropdown>
+        {hasSsh && (
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={handleRefreshDeviceInfo}
+            loading={syncSwitchInfo.isPending}
           >
-            <Button icon={<SwapOutlined />}>{td('detail.changeStatus')}</Button>
-          </Dropdown>
-          {hasSsh && (
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={handleRefreshDeviceInfo}
-              loading={syncSwitchInfo.isPending}
-            >
-              {td('detail.refreshInfo')}
-            </Button>
-          )}
-          {hasSsh && (
-            <Button type="primary" icon={<EditOutlined />} onClick={() => form.open()}>
-              {td('switch.remoteInfo')}
-            </Button>
-          )}
-          <Button icon={<EditOutlined />} onClick={() => deviceForm.open()}>
-            {tc('action.edit')}
+            {td('detail.refreshInfo')}
           </Button>
-          <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
-            {tc('action.delete')}
+        )}
+        {hasSsh && (
+          <Button type="primary" icon={<EditOutlined />} onClick={() => form.open()}>
+            {td('switch.remoteInfo')}
           </Button>
-        </Space>
-      </div>
+        )}
+        <Button icon={<EditOutlined />} onClick={() => deviceForm.open()}>
+          {tc('action.edit')}
+        </Button>
+        <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
+          {tc('action.delete')}
+        </Button>
+      </DetailActionBar>
 
-      {/* 设备概要 */}
+      {/* 设备概要 —— AC-P0-3：值守场景（第 145 行）「名称 → 状态 → 管理 IP →
+          位置 → 端口 up/down 计数」须首屏可见，无需切 Tab。"是不是整个交换机挂了"
+          的判据就是端口计数，故与名称/状态同区块置顶。 */}
       <Descriptions column={{ xs: 1, md: 3 }} size="small" style={{ marginBottom: 16 }}>
         <Descriptions.Item label={td('field.name')}>
           <strong style={{ fontSize: 16 }}>{device.device_name}</strong>
         </Descriptions.Item>
         <Descriptions.Item label={tc('field.type')}>
-          <Space>
+          <Space wrap size={4}>
             <Tag>
-              {getDeviceTypeMeta(device.device_type as DeviceType, td)?.label ??
-                device.device_type}
+              {getDeviceTypeMeta(device.device_type as DeviceType, td)?.label ?? device.device_type}
             </Tag>
             {subtypeTag}
           </Space>
         </Descriptions.Item>
         <Descriptions.Item label={tc('field.status')}>
           <Tag color={statusInfo?.color}>{statusInfo?.label ?? td('status.unknown')}</Tag>
+        </Descriptions.Item>
+        <Descriptions.Item label={td('field.managementIp')}>
+          {switchData?.ip_address ?? device.management_ip ?? '-'}
+        </Descriptions.Item>
+        <Descriptions.Item label={td('switch.field.portStatus')}>
+          {portStats ? (
+            <Space size={4} wrap>
+              <Tag color="success">
+                {td('linkStatus.UP')}: {portStats.up}
+              </Tag>
+              <Tag color="error">
+                {td('linkStatus.DOWN')}: {portStats.down}
+              </Tag>
+              <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>
+                / {portStats.total}
+              </span>
+            </Space>
+          ) : (
+            '-'
+          )}
         </Descriptions.Item>
       </Descriptions>
 

@@ -1,0 +1,70 @@
+/**
+ * 触摸设备点按目标（B0 从 responsive.css 拆出）
+ *
+ * 定位：只管「手指能否点准」，与布局溢出解耦。
+ * 判定用 pointer: coarse（指针精度）而非按屏宽猜触摸设备：
+ * 窄窗口的桌面浏览器不应被当成触摸设备。
+ *
+ * [2026-10-09 口径订正，见 §17.17]
+ * (1) 表格行那条 `padding-block: 10px` **已删除** —— 它是反向的。实测：antd 6.6.2
+ *     的 `--ant-table-cell-padding-block` 默认就是 **16px**，桌面数据行高 **77px**，
+ *     本就远超 44px 目标；这条规则把 16px 压成 10px，**是在缩小行高**，与
+ *     「提升值守点按准确率」的注释意图相反。B5 那版注释称「去掉后备选值退化为 0px」
+ *     未能复现，判为当时的测量口径有误（可能是量到了表头行或未数据行）。
+ * (2) 下拉项那条保留，但**限定只作用于 ≥768 的触摸设备**（平板）。手机上（<768）
+ *     四项改由 App.tsx 的 MOBILE_TOUCH_* token 下发 —— 目标是总纲 §4.3 定的
+ *     「迁到 token、告别 important」。两套口径必须互斥：若 CSS 与 token 同时作用于
+ *     手机，带 important 的 CSS 会赢（本文件 §B5 已实测），token 就白设了。
+ *     分界点 768 与 useResponsive 的 md 断点同源。
+ *
+ * 注：本文件被 src/components/Layout/layoutOverflow.gate.test.tsx 以文本方式读取并断言
+ * （只断言语义仍在，不绑 important 声明）—— 改动规则文本会触发该门禁，属预期行为。
+ */
+
+/* ========== 触摸设备：放大点按目标（对齐 iOS HIG 44px 建议） ========== */
+
+/*
+ * [B5 订正，2026-10-08] 此处原论断「4 条都缺 important」**不成立**，已逐条实测推翻：
+ *
+ *   需要 important（2 条）：
+ *   - .ant-table-tbody > tr > td   antd 的单元格规则自带 important 声明，且选择器为
+ *       .ant-table-wrapper .ant-table-tbody > tr > td，特异性高于本文件。
+ *       实测：去掉后 padding-block 由 10px 退化为 0px，行高放大意图整体失效。
+ *   - .ant-select-item-option      antd 下拉规则为
+ *       :where(hash).ant-select-dropdown .ant-select-item-option，特异性 (0,2,0)
+ *       高于本文件的 (0,1,0)。实测：去掉后 min-height 由 36px 退化为 32px。
+ *
+ *   不需要 important（2 条，本批已去除）：
+ *   - .ant-btn-sm          antd 同选择器只设 height、不设 min-height，二者非同一属性，
+ *       不构成覆盖。实测：去掉后 min-height 仍为 32px。
+ *   - .ant-pagination-item antd 顶层选择器形如 :where(hash).ant-pagination-item，
+ *       :where() 特异性为 0，与本文件同为 (0,1,0)；antd 注入早于本文件，后者胜。
+ *       CSS 层叠引擎实测：无 important 声明时仍取 36px。
+ *
+ * 另一处订正：原注释称「antd 规则在运行时注入 head 末尾」—— 实测 antd 用的是
+ * data-rc-order=prependQueue，注入位置在本文件之**前**（sheet 62 < 73），方向相反。
+ * 真正让部分规则失效的不是顺序，而是 antd 自身带的 important 声明或更高的特异性。
+ *
+ * 判据来源：真机 Chromium（viewport 390x844 + coarse 指针）实测 + antd 6.6.2 源码核对。
+ * 注：本文件注释刻意不写 important 关键字的全称写法 —— layout-ratchet 按正则计数该
+ * 关键字且**不区分注释**，写全称会把基线数字抬高，见总纲 §17.12。
+ */
+@media (pointer: coarse) {
+  .ant-btn-sm {
+    min-height: 32px;
+  }
+
+  /* 分页器可点区域放大（无需 important，理由见文件头注释） */
+  .ant-pagination-item {
+    min-width: 36px;
+  }
+}
+
+/* 仅 ≥768 的触摸设备（平板）：手机上由 App.tsx 的 token 接管，
+   两套口径互斥，避免 important 的 CSS 盖掉 token（见文件头 2026-10-09 说明） */
+@media (pointer: coarse) and (min-width: 768px) {
+  /* 下拉/选择器选项放大，便于手指点选 */
+  .ant-select-item-option {
+    min-height: 36px !important;
+  }
+}

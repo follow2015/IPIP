@@ -101,7 +101,7 @@ def _backfill(conn, table: str, column: str, source: str) -> None:
     cur = conn.cursor()
     try:
         cur.execute(
-            f"SELECT COUNT(*) FROM `{table}` WHERE `{column}` IS NULL "
+            f"SELECT COUNT(*) FROM `{table}` WHERE `{column}` IS NULL "  # noqa: S608 -- alembic 迁移的 DDL 无法参数化表/列名，标识符由迁移脚本自身硬编码
             f"AND `{source}` IS NOT NULL"
         )
         pending = int(cur.fetchone()[0])
@@ -109,7 +109,7 @@ def _backfill(conn, table: str, column: str, source: str) -> None:
             logger.info("跳过回填：%s.%s 无待回填行", table, column)
             return
         cur.execute(
-            f"UPDATE `{table}` t JOIN `devices` d ON d.id = t.`{source}` "
+            f"UPDATE `{table}` t JOIN `devices` d ON d.id = t.`{source}` "  # noqa: S608 -- alembic 迁移的 DDL 无法参数化表/列名，标识符由迁移脚本自身硬编码
             f"SET t.`{column}` = d.device_name "
             f"WHERE t.`{column}` IS NULL AND t.`{source}` IS NOT NULL"
         )

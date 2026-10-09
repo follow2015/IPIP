@@ -8,8 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from app.exceptions.business import ResourceConflictError
 from app.exceptions.validation import ValidationError
-from app.models.rbac import Role, Permission
-from app.models.user import User
+from app.models.rbac import Role
 from app.persistence.rbac_repository import RoleRepository, PermissionRepository
 from app.utils.logging import get_logger
 
@@ -22,14 +21,14 @@ def _invalidate_role_permission_cache(role_name: str):
     """角色权限变更时，清除该角色的所有权限缓存，使权限撤销实时生效"""
     try:
         from app.utils.cache import cache_manager
-        from app.utils.auth import PermissionManager
+        from app.services.auth import PermissionManager
         normalized = PermissionManager._normalize_role(role_name)
         cache_manager.delete(f"role_permissions:{normalized}")
         cache_manager.invalidate_pattern(f"permission:{normalized}:*")
         cache_manager.invalidate_pattern(f"check_permissions:{normalized}:*")
         cache_manager.invalidate_pattern("user_permissions:*")
         logger.info("已清除角色 %s 的全部权限缓存", normalized)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 角色权限缓存清理失败非致命：缓存失效会在 TTL 到期后自然收敛
         logger.warning("清除角色权限缓存失败: %s", e)
 
 
@@ -230,7 +229,7 @@ class RbacService:
                 self.role_repository.session.flush()
                 _invalidate_role_permission_cache(role_name)
                 deleted += 1
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 批量删除内单角色失败隔离：回滚后记入 failed 继续
                 self.role_repository.session.rollback()
                 failed.append({"id": role_id, "reason": str(e)})
 
@@ -293,6 +292,18 @@ class RbacService:
             "per_page": per_page,
             "total": pagination.total,
         }
+
+    def list_all_permissions(self, category: str = "") -> List[Dict[str, Any]]:
+        """获取全量权限（不分页）—— 权限分配弹窗的勾选树用（OD-13）。
+
+        勾选场景走非分页通道（与 /users 的 all=true 同款模式）：
+        前端原靠 per_page=999 拉全量，被 MAX_PER_PAGE=100 夹紧后，
+        角色编辑弹窗里第 101+ 个权限码根本勾不了（静默写操作丢失）。
+        """
+        return [
+            p.to_dict()
+            for p in self.permission_repository.find_all_permissions(category=category)
+        ]
 
     def list_permission_categories(self) -> List[str]:
         """获取权限分类列表。"""

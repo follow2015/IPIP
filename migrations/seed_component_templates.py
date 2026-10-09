@@ -263,7 +263,7 @@ def seed():
             if to_delete_ids:
                 placeholders = ",".join(["%s"] * len(to_delete_ids))
                 cur.execute(
-                    f"DELETE FROM component_templates WHERE id IN ({placeholders})",
+                    f"DELETE FROM component_templates WHERE id IN ({placeholders})",  # noqa: S608 -- alembic 迁移的 DDL 无法参数化表/列名，标识符由迁移脚本自身硬编码
                     to_delete_ids,
                 )
             dedupe_deleted = len(to_delete_ids)

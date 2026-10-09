@@ -14,7 +14,9 @@ async function fetchDashboardStats() {
 }
 
 async function fetchActivities(limit = 20) {
-  return get<{ activities: DashboardActivity[]; total: number }>(`/dashboard/activities?limit=${limit}`);
+  return get<{ activities: DashboardActivity[]; total: number }>(
+    `/dashboard/activities?limit=${limit}`
+  );
 }
 
 async function fetchSystemStatus() {
@@ -24,7 +26,7 @@ async function fetchSystemStatus() {
 export const DASHBOARD_KEYS = {
   stats: ['dashboard', 'stats'] as const,
   activities: (limit = 20) => ['dashboard', 'activities', limit] as const,
-  systemStatus: ['dashboard', 'system-status'] as const,
+  systemStatus: ['dashboard', 'system-status'] as const
 };
 
 export function useDashboardStats() {
@@ -33,7 +35,7 @@ export function useDashboardStats() {
     queryFn: async () => {
       const res = await fetchDashboardStats();
       return res.data;
-    },
+    }
   });
 }
 
@@ -43,7 +45,7 @@ export function useDashboardSuspenseStats() {
     queryFn: async () => {
       const res = await fetchDashboardStats();
       return res.data;
-    },
+    }
   });
 }
 
@@ -54,7 +56,7 @@ export function useDashboardActivities(limit = 20) {
       const res = await fetchActivities(limit);
       return res.data;
     },
-    staleTime: 60_000,
+    staleTime: 60_000
   });
 }
 
@@ -67,5 +69,6 @@ export function useSystemStatus() {
     },
     refetchInterval: 30_000,
     staleTime: 30_000,
+    refetchIntervalInBackground: true
   });
 }

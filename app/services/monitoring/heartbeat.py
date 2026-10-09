@@ -25,10 +25,11 @@ import threading
 import time
 
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
-_DEFAULT_PREFIX = "ipip:heartbeat:"
+_DEFAULT_PREFIX = redis_keys.HEARTBEAT_NS_PREFIX
 
 
 def environment() -> str:
@@ -60,7 +61,7 @@ def namespace() -> str:
     custom = _conf("HEARTBEAT_KEY_PREFIX", None)
     if custom:
         return f"{environment()}:"
-    return f"ipip:heartbeat:{environment()}:"
+    return redis_keys.heartbeat_prefix(environment())
 
 SERVICES = ("web", "monitor", "gateway", "celery-ai", "celery-voice")
 
@@ -79,7 +80,7 @@ def _conf(name: str, default):
             value = current_app.config.get(name)
             if value is not None:
                 return value
-    except Exception:  # noqa: BLE001  配置读取失败不阻断心跳
+    except Exception:  # noqa: BLE001, S110  配置读取失败不阻断心跳
         pass
     return os.getenv(name, default)
 
@@ -194,7 +195,7 @@ def read_heartbeats(services=SERVICES, client=None, now: float = None):
         logger.warning("读取心跳失败: %s", exc)
         return result
 
-    for name, raw in zip(services, values):
+    for name, raw in zip(services, values, strict=False):
         if raw is None:
             result[name]["checked"] = True  # 读到了：key 不在 → 心跳已过期
             continue

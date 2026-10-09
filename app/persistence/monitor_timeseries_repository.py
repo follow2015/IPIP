@@ -44,6 +44,30 @@ _ALLOWED_PARTITION_TABLES = frozenset({
 })
 
 
+def compute_partition_lag_days(
+    partitions: List[Tuple[str, Optional[date]]], today: date
+) -> int:
+    """纯函数：从分区清单算"轮转滞后天数"（无 I/O，可脱离 MySQL 直接测）。
+
+    [WARN] **必须排除 `p_before` / `p_future`**：它们是兜底分区，上界为 MAXVALUE
+    （本模块里表示为 ``None``），**不代表轮转进度**。把它们算进来 ⇒ 指标恒为 0
+    ⇒ 恰好复现本指标要消灭的那个假象：分区停摆 13 天、12.6 万行积压进
+    ``p_future``，而"看起来一切正常"（2026-09-07 实测）。
+
+    分区上界是 **exclusive**（``p20260913`` 覆盖 09-13，上界 = 09-14）
+    ⇒ "覆盖日" = 上界 − 1 天。
+    """
+    named = [
+        ub
+        for name, ub in partitions
+        if ub is not None and name not in ("p_before", "p_future")
+    ]
+    if not named:
+        return 0
+    covered = max(named) - timedelta(days=1)
+    return max(0, (today - covered).days)
+
+
 def _row_to_dict(r: DeviceMonitorProbeEvents) -> Dict[str, Any]:
     """历史明细单行序列化（``list_events`` 用；前端"最近探测明细"表直接吃这个）。
 
@@ -398,7 +422,7 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
         self._assert_partition_table(table)
         rows = self.session.execute(
             text(
-                "SELECT PARTITION_NAME, PARTITION_DESCRIPTION "
+                "SELECT PARTITION_NAME, PARTITION_DESCRIPTION "  # noqa: S608 -- _assert_partition_table 白名单 fail-fast（DDL 无法参数化表名）
                 "FROM information_schema.PARTITIONS "
                 f"WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{table}' "
                 "AND PARTITION_NAME IS NOT NULL"
@@ -415,8 +439,29 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
                 result.append((name, None))
         return result
 
+    def partition_lag_days(self, table: str = "device_monitor_probe_events") -> int:
+        """分区轮转滞后天数（只读）：最新具名日分区的覆盖日落后今天多少天。
+
+        0 = 未落后；N = 最新分区只覆盖到 N 天前 ⇒ **预建停摆了 N 天**。
+        """
+        if not self._is_mysql():
+            return 0  # SQLite 无分区概念，谈不上滞后
+        return compute_partition_lag_days(self._list_partitions(table), utc_today())
+
     def downsample_to_hourly(self, cutoff_days: int = DOWNSAMPLE_CUTOFF_DAYS) -> int:
-        """将 >cutoff_days 天的事件数据按小时聚合写入预聚合表（幂等 upsert）。仅 MySQL。"""
+        """将 >cutoff_days 天的事件数据按小时聚合写入预聚合表（幂等 upsert）。仅 MySQL。
+
+        [WARN] 两处 SELECT **必须** ``JOIN devices``：
+        源表 ``device_monitor_probe_events`` 是分区表（MySQL 8.4 分区表不可有外键，
+        error 1506）⇒ 设备删除后残留的孤儿事件行**没有数据库兜底**；而目标表
+        ``device_monitor_timeseries_hourly`` **有**外键 ``fk_dmth_device``。
+        只要存在**一行**孤儿，整条 INSERT 就以 1452 失败 ⇒ **归档链永久中断**
+        （2026-09-20 实测：10 台已删设备 / 812 行孤儿让 archive 跑不通）。
+        JOIN 只减少行，不会改变任何合法行的聚合结果。
+
+        [WARN] ``downsample_to_daily()`` **不需要**同款 JOIN：它的源表是 hourly
+        （有外键、设备删除时 CASCADE 回收）⇒ 孤儿在上一层就被挡掉了。
+        """
         if not self._is_mysql():
             return 0
         cutoff = now_utc_naive() - timedelta(days=cutoff_days)
@@ -427,16 +472,17 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
                 INSERT INTO device_monitor_timeseries_hourly
                     (device_id, metric, hour_bucket, avg_value, min_value, max_value, sample_count)
                 SELECT
-                    device_id,
+                    e.device_id,
                     'reachable',
-                    DATE_FORMAT(probed_at, '%Y-%m-%d %H:00:00'),
-                    AVG(CASE WHEN reachable THEN 1 ELSE 0 END),
-                    AVG(CASE WHEN reachable THEN 1 ELSE 0 END),
-                    AVG(CASE WHEN reachable THEN 1 ELSE 0 END),
+                    DATE_FORMAT(e.probed_at, '%Y-%m-%d %H:00:00'),
+                    AVG(CASE WHEN e.reachable THEN 1 ELSE 0 END),
+                    AVG(CASE WHEN e.reachable THEN 1 ELSE 0 END),
+                    AVG(CASE WHEN e.reachable THEN 1 ELSE 0 END),
                     COUNT(*)
-                FROM device_monitor_probe_events
-                WHERE probed_at < :cutoff
-                GROUP BY device_id, DATE_FORMAT(probed_at, '%Y-%m-%d %H:00:00')
+                FROM device_monitor_probe_events e
+                JOIN devices d ON d.id = e.device_id
+                WHERE e.probed_at < :cutoff
+                GROUP BY e.device_id, DATE_FORMAT(e.probed_at, '%Y-%m-%d %H:00:00')
                 ON DUPLICATE KEY UPDATE
                     avg_value = VALUES(avg_value),
                     min_value = VALUES(min_value),
@@ -452,16 +498,17 @@ class MonitorTimeseriesRepository(SQLAlchemyRepository):
                 INSERT INTO device_monitor_timeseries_hourly
                     (device_id, metric, hour_bucket, avg_value, min_value, max_value, sample_count)
                 SELECT
-                    device_id,
+                    e.device_id,
                     'latency_ms',
-                    DATE_FORMAT(probed_at, '%Y-%m-%d %H:00:00'),
-                    AVG(latency_ms),
-                    MIN(latency_ms),
-                    MAX(latency_ms),
-                    COUNT(latency_ms)
-                FROM device_monitor_probe_events
-                WHERE probed_at < :cutoff AND reachable = 1 AND latency_ms IS NOT NULL
-                GROUP BY device_id, DATE_FORMAT(probed_at, '%Y-%m-%d %H:00:00')
+                    DATE_FORMAT(e.probed_at, '%Y-%m-%d %H:00:00'),
+                    AVG(e.latency_ms),
+                    MIN(e.latency_ms),
+                    MAX(e.latency_ms),
+                    COUNT(e.latency_ms)
+                FROM device_monitor_probe_events e
+                JOIN devices d ON d.id = e.device_id
+                WHERE e.probed_at < :cutoff AND e.reachable = 1 AND e.latency_ms IS NOT NULL
+                GROUP BY e.device_id, DATE_FORMAT(e.probed_at, '%Y-%m-%d %H:00:00')
                 ON DUPLICATE KEY UPDATE
                     avg_value = VALUES(avg_value),
                     min_value = VALUES(min_value),

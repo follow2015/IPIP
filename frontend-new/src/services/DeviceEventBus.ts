@@ -84,7 +84,6 @@ class DeviceEventBus {
     };
 
     this.source.onerror = () => {
-      const readyState = this.source?.readyState;
       this.source?.close();
       this.source = null;
       if (this.destroyed) return;

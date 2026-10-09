@@ -16,7 +16,8 @@ from app.api.base import APIResponse
 from app.persistence.ip_audit_repository import IPAuditRepository
 from app.services.ip_audit_service import IPAuditService
 from app.openapi.doc import doc
-from app.utils import login_required, permission_required, rate_limit_api
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api
 
 logger = get_logger(__name__)
 

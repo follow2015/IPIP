@@ -8,7 +8,7 @@ IP交换机信息见 switch_credentials.py（IPSwitchInfo→ip_switch_info）。
 """
 
 from sqlalchemy import (
-    BigInteger, Integer, String, SmallInteger, DateTime,
+    BigInteger, Integer, String, DateTime,
     ForeignKey, UniqueConstraint, Index, func,
 )
 from sqlalchemy.orm import relationship
@@ -16,7 +16,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.mysql import INTEGER
 from app.models.base import BaseModel, TINYINT
 from app.core.enums import IPStatus
-from app.utils.ip_codec import ip_to_int  # noqa: F401 —— P1-3 收敛：全仓唯一实现，此处再导出保持旧导入路径
+from app.utils.ip_codec import ip_to_int  # P1-3 收敛：全仓唯一实现，此处再导出保持旧导入路径
 from extensions import db
 
 class IPManager(BaseModel):

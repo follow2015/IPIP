@@ -73,7 +73,7 @@ class PortSyncService:
         active_collector = collector or self.collector
         try:
             port_rows = active_collector.collect(credential, ip, timeout=timeout, device=device)
-        except Exception:  # noqa: BLE001 - 采集失败静默降级
+        except Exception:  # 采集失败静默降级
             logger.warning(
                 "端口采集失败 device_id=%s ip=%s", device_id, ip, exc_info=True,
             )

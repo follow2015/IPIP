@@ -35,7 +35,19 @@ class DeviceMetricAlertStateRepository:
         - crit_alert_devices：活跃告警中最高 severity 为 crit/critical 的设备数
         - warn_alert_devices：最高为 warn/warning 的设备数
         - interrupted_devices：处于监控中断的设备数
+
+        [WARN] 口径：**monitor_enabled=0（暂停探测）的设备一律不计入**，与
+        `DeviceMonitorStatusRepository.overview_stats` 保持同一分母 —— 这两组数字
+        在健康分里是"分子/分母"关系（可用率×60 + 告警占比×30 + 中断占比×10），
+        一边排除暂停设备、另一边不排除，会算出与实际不符的分数。
+        暂停设备不再被探测 ⇒ 其 `device_metric_alert_state.breached` 永远停在
+        最后一次采集结果上，不清掉就会永久占用"告警中"名额。
         """
+        from app.models.device_monitor_status import DeviceMonitorStatus
+
+        paused_ids = self.session.query(DeviceMonitorStatus.device_id).filter(
+            DeviceMonitorStatus.monitor_enabled.is_(False)
+        )
         rows = (
             self.session.query(
                 DeviceMetricAlertState.device_id,
@@ -43,6 +55,7 @@ class DeviceMetricAlertStateRepository:
                 DeviceMetricAlertState.severity,
             )
             .filter(DeviceMetricAlertState.breached.is_(True))
+            .filter(~DeviceMetricAlertState.device_id.in_(paused_ids))
             .all()
         )
         alerting: set = set()

@@ -4,6 +4,8 @@
 
 定义不同的缓存策略（TTL、LRU等）。
 """
+import random
+
 from app.utils.logging import get_logger
 from typing import Any, Dict, Optional
 
@@ -44,6 +46,20 @@ class TTLCacheStrategy(CacheStrategy):
     
     NULL_CACHE_TTL = 60
 
+    TTL_JITTER_RATIO = 0.1
+
+    def _apply_jitter(self, ttl: Optional[int]) -> Optional[int]:
+        """给 TTL 叠加正向随机抖动。
+
+        可注入点：把 TTL_JITTER_RATIO 置 0 即得到确定值，供单测断言使用。
+        """
+        if not ttl or ttl <= 0:
+            return ttl
+        ratio = getattr(self, "TTL_JITTER_RATIO", 0.1)
+        if ratio <= 0:
+            return ttl
+        return ttl + random.randint(0, int(ttl * ratio))  # noqa: S311
+
     def __init__(self, custom_ttl: Dict[str, int] = None):
         """初始化TTL缓存策略
 
@@ -77,18 +93,18 @@ class TTLCacheStrategy(CacheStrategy):
         空值使用短 TTL 防穿透，正常值按数据类型配置。
         """
         if self.is_null_value(value):
-            return self.NULL_CACHE_TTL
+            return self._apply_jitter(self.NULL_CACHE_TTL)
 
         key_parts = key.split(":")
         if not key_parts:
-            return self.ttl_config["default"]
+            return self._apply_jitter(self.ttl_config["default"])
 
         data_type = key_parts[0]
 
         if len(key_parts) >= 2 and key_parts[0] == "token" and key_parts[1] == "revoked":
-            return self.ttl_config["token_revoked"]
+            return self._apply_jitter(self.ttl_config["token_revoked"])
 
-        return self.ttl_config.get(data_type, self.ttl_config["default"])
+        return self._apply_jitter(self.ttl_config.get(data_type, self.ttl_config["default"]))
     
     def on_hit(self, key: str, value: Any) -> None:
         """缓存命中时的回调"""

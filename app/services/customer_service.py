@@ -197,6 +197,28 @@ class CustomerService:
         if customer.customer_status == CustomerStatus.TERMINATED.value:
             return customer
 
+        from app.core.enums import CircuitStatus
+        from app.persistence.circuit_repository import CircuitRepository
+
+        pending_circuits = [
+            c for c in CircuitRepository().list_by_customer(customer_id)
+            if c.status != CircuitStatus.TERMINATED.value
+        ]
+        if pending_circuits:
+            raise BusinessLogicError(
+                f"客户[{customer.customer_name}]名下还有 {len(pending_circuits)} 条未拆机线路"
+                f"（如 {pending_circuits[0].circuit_no}），请先拆机或转出后再终止客户",
+                code="CUSTOMER_HAS_CIRCUITS",
+                details={
+                    "circuits": [
+                        {"id": c.id, "circuit_no": c.circuit_no, "status": c.status}
+                        for c in pending_circuits[:50]
+                    ],
+                    "circuit_count": len(pending_circuits),
+                },
+                status_code=409,
+            )
+
         ip_repo = IPManagerRepository()
         ip_network_repo = IPNetworkRepository()
         device_repo = DeviceRepository()
@@ -295,7 +317,6 @@ class CustomerService:
             BytesIO: 可被 flask.send_file 消费的 PDF 缓冲
         """
         from io import BytesIO
-        from datetime import datetime
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -326,7 +347,7 @@ class CustomerService:
         cn_font = "STSong-Light"
         try:
             pdfmetrics.registerFont(UnicodeCIDFont(cn_font))
-        except Exception:
+        except Exception:  # noqa: BLE001 -- 中文字体加载失败兜底：退化为 Helvetica（中文显示为方块但不阻断 PDF 生成），字体探测异常类型不可枚举
             cn_font = "Helvetica"  # 兜底（中文将显示为方块，但不阻断生成）
 
         buf = BytesIO()
@@ -468,11 +489,13 @@ class CustomerService:
         resource_counts = self.customer_repository.check_customer_has_resources(customer_id)
         cabinet_count = resource_counts["cabinet_count"]
         device_count = resource_counts["device_count"]
+        circuit_count = resource_counts.get("circuit_count", 0)
 
-        if cabinet_count > 0 or device_count > 0:
+        if cabinet_count > 0 or device_count > 0 or circuit_count > 0:
             raise ValidationError(
-                f"客户还有 {cabinet_count} 个机柜和 {device_count} 个设备，无法删除。"
-                "请先释放/删除所有关联资源。"
+                f"客户还有 {cabinet_count} 个机柜、{device_count} 个设备和 {circuit_count} 条线路"
+                "，无法删除。请先释放/删除所有关联资源"
+                "（线路需先拆机或转给其他客户）。"
             )
 
         result = self.customer_repository.delete(customer_id)
@@ -482,6 +505,41 @@ class CustomerService:
             emit_resource_change_global("customer", "delete", ids=[customer_id])
 
         return result
+
+    def delete_customer_in_savepoint(self, customer_id: int) -> bool:
+        """删除单个客户，并把这次删除隔离在 **savepoint** 内。
+
+        与 :meth:`delete_customer` 的差别**只在事务边界**，业务规则完全一致
+        （同一套资源前置校验、同一套 FK 硬约束）。用途是「批量删除」这类
+        **逐条独立成败**的场景：单条失败只回滚该条 savepoint，外层事务继续，
+        已成功的条目得以保留。
+
+        为什么边界要落在服务层
+        ----------------------
+        最初这段 `with db.session.begin_nested()` 是写在 api 层
+        （`app/api/customer.py` 批量删除循环里，G1 评审 B-1）。语义没问题，但它
+        让 api 层直接持有 `db.session`，撞上分层门禁
+        `tests/test_api_layer_session_budget.py`（审计 A-P2-1）：台账合计 22 处是
+        **历史欠账**、预算上限就是 22，新增 1 处会同时触发「账实不符」与「超预算」。
+        服务层本来就是事务边界的归属处 —— `batch_action_service` /
+        `device_nics_port_service` / `device_service` 都在用 `begin_nested()` ——
+        故把 savepoint 下沉到这里，api 层只留 `调服务`。
+
+        Args:
+            customer_id: 客户ID
+
+        Returns:
+            bool: 删除成功返回 True；客户不存在返回 False。
+
+        Raises:
+            ValidationError: 客户仍有关联资源（机柜 / 设备 / 线路）时抛出。
+                调用方需捕获并把该条计入失败清单。
+            IntegrityError: 存在未纳入前置统计口径的关联资源（如后续新增的 FK）。
+        """
+        from extensions import db
+
+        with db.session.begin_nested():
+            return self.delete_customer(customer_id)
 
     def _normalize_customer_payload(self, data: Dict[str, Any], is_update: bool) -> Dict[str, Any]:
         """标准化客户字段，过滤模型不支持的字段。"""
@@ -744,7 +802,7 @@ class CustomerService:
                                     }
                                 )
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 网段处理循环内单条失败隔离：记日志后 continue 处理下一网段，单条数据异常不得中断整个导出
                     logger.error(f"处理网段 {ip_network_str} 失败: {e}")
                     continue
 
@@ -800,7 +858,7 @@ class CustomerService:
                             else:
                                 logger.debug(f"直接分配IP {ip_address} 所在交换机无端口，跳过处理")
 
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 直接分配 IP 处理失败隔离：continue 下一项，同 857
                         logger.error(f"处理直接分配IP {ip_address} 失败: {e}")
                         continue
 
@@ -850,7 +908,7 @@ class CustomerService:
                         }
                     )
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 网段统计单条失败隔离：continue 下一网段，同 857
                     logger.error(f"统计网段 {ip_network} 状态失败: {e}")
                     continue
 
@@ -911,7 +969,7 @@ class CustomerService:
 
             filtered_all = []
 
-            for room_id, room_networks in networks_by_room.items():
+            for _room_id, room_networks in networks_by_room.items():
                 parsed_networks = []
                 for network in room_networks:
                     try:
@@ -920,7 +978,7 @@ class CustomerService:
                         parsed_networks.append(
                             {"network_obj": network_obj, "network_data": network}
                         )
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 网段解析单条失败隔离：continue 下一网段，同 857
                         logger.error(f"解析网段 {network.get('ip_network')} 失败: {e}")
                         continue
 
@@ -942,7 +1000,7 @@ class CustomerService:
 
             return filtered_all
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 网段过滤整体失败兜底：返回已收集的 networks 而非抛错，保证调用方拿到部分结果
             logger.error(f"过滤网段失败: {e}")
             return networks
 
@@ -1009,6 +1067,9 @@ class CustomerService:
             "total_ips": assets["networks"]["total_ips"],
             "full_networks": len(assets["networks"]["full_networks"]),
             "partial_ips": len(assets["networks"]["partial_ips"]),
+            "total_circuits": assets["circuits"]["total_count"],
+            "total_circuit_bandwidth_mbps": assets["circuits"]["total_bandwidth_mbps"],
+            "total_circuit_monthly_fee": assets["circuits"]["total_monthly_fee"],
         }
 
         from app.persistence.device_repository import DeviceRepository
@@ -1050,6 +1111,8 @@ class CustomerService:
                 "speed": getattr(p, "speed", "") or "",
             })
         assets["ports"] = {"rows": port_rows, "total_count": len(port_rows)}
+
+        assets["circuits"]["detail_rows"] = assets["circuits"].get("items", [])
 
         logger.info("获取客户 %d 资产统计成功", customer_id)
         return assets

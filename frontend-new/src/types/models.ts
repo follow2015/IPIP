@@ -284,6 +284,9 @@ export interface CustomerAssets {
     total_ips: number;
     full_networks: number;
     partial_ips: number;
+    total_circuits?: number;
+    total_circuit_bandwidth_mbps?: number;
+    total_circuit_monthly_fee?: number;
   };
 }
 
@@ -369,6 +372,14 @@ export interface DashboardActivity {
   color: string;
 }
 
+export interface ComponentHealth {
+  status: 'running' | 'degraded' | 'down' | 'unknown';
+  latency_ms?: number;
+  age_seconds?: number;
+  workers?: number;
+  message?: string;
+}
+
 export interface SystemStatus {
   overall: 'healthy' | 'warning' | 'critical' | 'unknown';
   performance: {
@@ -380,11 +391,7 @@ export interface SystemStatus {
     disk_total: number;
     disk_used: number;
   };
-  services: {
-    database: string;
-    api: string;
-    frontend: string;
-  };
+  services: Record<string, ComponentHealth>;
   lastUpdated: string;
   error?: string;
 }

@@ -8,7 +8,6 @@
 """
 import ipaddress
 import os
-from datetime import datetime, timezone
 from app.utils.time_utils import now_utc_naive
 
 from flask import Blueprint, request, abort, jsonify, current_app
@@ -16,6 +15,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.services.channels.voice_providers.terminal_status import VOICE_RESULT_EVENTS
 from app.utils.logging import get_logger
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -111,7 +111,7 @@ def warn_if_callback_protection_missing(app) -> None:
             "直至预算耗尽。请配置 VOICE_*_IP_WHITELIST 或 callback_token"
             "（确认风险后可显式将 callback_verify_mode 置 off）。"
         )
-    except Exception:  # noqa: BLE001 - 启动期检测失败绝不阻断应用创建
+    except Exception:  # 启动期检测失败绝不阻断应用创建
         logger.warning("语音回调防线启动检测失败（跳过）", exc_info=True)
 
 
@@ -217,7 +217,7 @@ def voice_callback():
             continue
 
         if not receipt_id:
-            receipt_id_str = redis_client.get(f"voice:call:{call_id}")
+            receipt_id_str = redis_client.get(redis_keys.voice_call_key(call_id))
             if receipt_id_str:
                 try:
                     receipt_id = int(receipt_id_str)
@@ -233,7 +233,7 @@ def voice_callback():
         if not receipt:
             continue
 
-        if not redis_client.set(f"voice:cb:{call_id}:{event}", "1", nx=True, ex=3600):
+        if not redis_client.set(redis_keys.voice_callback_key(call_id, event), "1", nx=True, ex=3600):
             logger.debug("语音回调重复，已处理: call_id=%s event=%s", call_id, event)
             db.session.rollback()  # I-3：该分支无未决写入，立即释放行锁
             continue

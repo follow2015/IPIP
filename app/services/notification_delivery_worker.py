@@ -28,6 +28,7 @@ notify() 写入）减去 `receipt.channel_status`（已落库的投递结果）�
 from concurrent.futures import ThreadPoolExecutor
 
 from app.core.enums import ChannelType
+from app.utils import redis_keys
 from app.utils.logging import get_logger
 import queue
 import threading
@@ -35,11 +36,11 @@ import time
 
 logger = get_logger(__name__)
 
-from app.persistence.notification_repository import (
+from app.persistence.notification_repository import (  # noqa: E402 -- 仓储 import 紧随 ADR-002/B-42 决策注释，位置即文档
     NotificationReceiptRepository,
     NotificationRepository,
 )
-from app.persistence.user_repository import UserRepository
+from app.persistence.user_repository import UserRepository  # noqa: E402 -- 仓储 import 紧随 ADR-002/B-42 决策注释，位置即文档
 
 _notification_repo = NotificationRepository()
 _user_repo = UserRepository()
@@ -56,6 +57,7 @@ _DEFAULT_DELIVERY_WORKERS = 4
 
 _inflight = threading.BoundedSemaphore(_DEFAULT_DELIVERY_WORKERS * 2)
 _rate_limit_alerts_last_clear = 0.0  # 上次清空去重集合的时间戳
+_rate_limit_degraded_alerted = False
 
 
 def enqueue_delivery(notification_id: int, user_ids: list[int]) -> None:
@@ -127,7 +129,7 @@ def _should_skip_cooldown(type_: str, source_module: str | None, channel_name: s
     if redis_client is None:
         return False  # 降级：宁可多发，不可因 Redis 故障中断全部外部渠道
 
-    key = f"cooldown:{type_}:{source_module or ''}:{channel_name}"
+    key = redis_keys.notify_cooldown_key(type_, source_module, channel_name)
     try:
         return not redis_client.set(key, str(time.time()), ex=_COOLDOWN_SECONDS, nx=True)
     except Exception:
@@ -162,7 +164,8 @@ def _send_with_retry(channel, *args) -> tuple[bool, int]:
                     name, attempt, max_attempts, delay, exc,
                 )
                 time.sleep(delay)
-    assert last_exc is not None
+    if last_exc is None:  # pragma: no cover - 正常路径循环体必抛异常或提前 return
+        raise RuntimeError(f"渠道 {name} 投递循环异常退出且无异常记录")
     raise last_exc
 
 
@@ -309,6 +312,43 @@ def _process_one(app, task: dict) -> None:
         logger.exception("通知投递结果落库失败 notification_id=%s", task.get("notification_id"))
 
 
+def _bridge_rate_limit_degradation(storage) -> None:
+    """限流存储进入降级态时桥接一条运维告警（**边沿触发**，不随轮询刷屏）。
+
+    `FailoverRateLimitStorage.degraded` 是**状态位**（当前在用备机）而非事件，
+    所以不能直接"为真就发"。边沿规则：
+      进入降级（False→True）⇒ 发一次并置位；
+      探测恢复（True→False）⇒ 只复位游标，不发"恢复"通知（避免噪音翻倍）。
+
+    用 `getattr(storage, "degraded", False)` 而不是 isinstance 判定：storage 是
+    构造注入的（`UnifiedRateLimiter(storage=...)`），调用方可塞任意实现；没有该
+    属性就当"不支持观测"，静默跳过 —— 一条告警不值得为此抛异常打断轮询。
+    """
+    global _rate_limit_degraded_alerted
+
+    degraded = bool(getattr(storage, "degraded", False))
+    if degraded == _rate_limit_degraded_alerted:
+        return
+    _rate_limit_degraded_alerted = degraded
+    if not degraded:
+        return
+
+    try:
+        from app.services.ops_alert_bridge import bridge_rate_limit_degraded_alert
+    except ImportError:
+        return
+
+    try:
+        bridge_rate_limit_degraded_alert({
+            "storage": type(storage).__name__,
+            "primary": type(getattr(storage, "primary", None)).__name__,
+            "secondary": type(getattr(storage, "secondary", None)).__name__,
+            "severity": "critical",
+        })
+    except Exception:
+        logger.exception("限流降级告警桥接失败")
+
+
 def _poll_rate_limit_alerts(app) -> None:
     """RateLimitMonitor 轮询桥接
 
@@ -318,7 +358,7 @@ def _poll_rate_limit_alerts(app) -> None:
     global _rate_limit_alerts_last_clear
 
     try:
-        from app.utils.rate_limiting.limiter import UnifiedRateLimiter
+        from app.utils.rate_limiting.limiter import UnifiedRateLimiter  # noqa: F401
         from app.services.ops_alert_bridge import bridge_rate_limit_alert
     except ImportError:
         return
@@ -328,6 +368,7 @@ def _poll_rate_limit_alerts(app) -> None:
             from app.utils.rate_limiting.decorators import rate_limiter
             if not hasattr(rate_limiter, 'storage'):
                 return
+            _bridge_rate_limit_degradation(rate_limiter.storage)
             monitor = getattr(rate_limiter, '_monitor', None)
             if monitor is None or not hasattr(monitor, 'get_alerts'):
                 return
@@ -356,6 +397,9 @@ def _poll_rate_limit_alerts(app) -> None:
 _RECOVER_LOOKBACK_HOURS = 24
 _RECOVER_MAX_TASKS = 200
 
+_RECOVER_LOCK_KEY = redis_keys.NOTIFY_RECOVER_LOCK_KEY
+_RECOVER_LOCK_TTL = 600
+
 
 def _pending_channels(receipt) -> list:
     """该 receipt 中「已分配渠道」减去「已落库投递结果」的差集（排除 inbox）。
@@ -380,7 +424,40 @@ def recover_pending_deliveries(app, lookback_hours: int = _RECOVER_LOOKBACK_HOUR
     边界（避免启动瞬间的突发外部投递）：
     - 只看 `created_at` 在 `lookback_hours` 内的通知；
     - 单次最多 `max_tasks` 条；
-    - 任何异常都只记日志、不影响正常投递链路（回补是 best-effort）。
+    - 任何异常都只记日志、不影响正常投递链路（回补是 best-effort）；
+    - **全局只跑一次**（M4）：先抢 Redis 分布式锁，抢不到说明同机其他 worker
+      已经/正在回补，本进程直接跳过。
+    """
+    redis_client = _get_cooldown_redis()
+    if redis_client is None:
+        logger.warning("Redis 不可用，跳过启动回补（宁可不补，不可重复投递）")
+        return 0
+
+    from app.utils.concurrency.redis_lock import (
+        acquire_owner_lock,
+        release_owner_lock,
+    )
+
+    if not acquire_owner_lock(redis_client, _RECOVER_LOCK_KEY, _RECOVER_LOCK_TTL):
+        logger.info("启动回补已被同机其他进程持锁，本进程跳过（避免 N 个 worker 重投同一批）")
+        return 0
+
+    try:
+        return _recover_pending_deliveries_locked(app, lookback_hours, max_tasks)
+    finally:
+        try:
+            release_owner_lock(redis_client, _RECOVER_LOCK_KEY)
+        except Exception:
+            logger.warning("启动回补锁释放失败（TTL 会兜底）key=%s",
+                           _RECOVER_LOCK_KEY, exc_info=True)
+
+
+def _recover_pending_deliveries_locked(app, lookback_hours: int,
+                                       max_tasks: int) -> int:
+    """回补本体（**调用方须已持有** `notify:recover:lock`）。
+
+    从 `recover_pending_deliveries` 拆出，使「加锁 / 释放」与「怎么捞、怎么投」
+    两件事不再缠在一起——后者可单独测试，前者单独由并发用例覆盖。
     """
     from datetime import timedelta
 
@@ -407,11 +484,11 @@ def recover_pending_deliveries(app, lookback_hours: int = _RECOVER_LOOKBACK_HOUR
             try:
                 _process_one(app, {"notification_id": nid, "user_ids": user_ids})
                 recovered += 1
-            except Exception:  # noqa: BLE001 - 单条失败不影响其余回补
+            except Exception:  # 单条失败不影响其余回补
                 logger.exception("启动回补投递失败 notification_id=%s", nid)
         logger.info("启动回补投递完成: %d 条（重启/崩溃丢失的投递任务已重投）", recovered)
         return recovered
-    except Exception:  # noqa: BLE001 - 回补失败不影响正常投递
+    except Exception:  # 回补失败不影响正常投递
         logger.exception("启动回补投递失败（不影响正常投递链路）")
         return 0
 
@@ -484,7 +561,7 @@ def _handle_task(app, executor: ThreadPoolExecutor, task: dict) -> None:
     _inflight.acquire()
     try:
         executor.submit(_run_task, app, task)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 投递异常路径兜底：先释放 inflight 再走安全处理，不得让异常炸掉工作进程
         _inflight.release()
         _safe_process_one(app, task)
 

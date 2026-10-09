@@ -2,7 +2,7 @@
  * 节点详情侧边抽屉
  */
 import React from 'react';
-import { Drawer, Descriptions, Tag, Space, Button } from 'antd';
+import { theme, Drawer, Descriptions, Tag, Space, Button } from 'antd';
 import { CloudServerOutlined, SwapOutlined, LinkOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +30,7 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const { isMobile } = useResponsive();
+  const { token } = theme.useToken();
   const { t: tn } = useTranslation('network');
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
@@ -86,7 +87,9 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
           </>
         )}
         <Descriptions.Item label={tn('ip.field.room')}>{node.room_name ?? '-'}</Descriptions.Item>
-        <Descriptions.Item label={td('field.cabinet')}>{node.cabinet_name ?? '-'}</Descriptions.Item>
+        <Descriptions.Item label={td('field.cabinet')}>
+          {node.cabinet_name ?? '-'}
+        </Descriptions.Item>
         <Descriptions.Item label={tn('topology.node.connectionCount')}>
           {connectedEdges.length}
         </Descriptions.Item>
@@ -98,7 +101,6 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
           {connectedEdges.map((edge) => {
             const isSource = edge.source === node.id;
             const peerId = isSource ? edge.target : edge.source;
-            const localPort = isSource ? edge.local_port : edge.peer_port;
             const peerPort = isSource ? edge.peer_port : edge.local_port;
             const edgeTypeLabel =
               edge.edge_type === 'n2n'
@@ -118,7 +120,7 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
                   alignItems: 'center',
                   padding: '4px 8px',
                   marginBottom: 4,
-                  background: '#fafafa',
+                  background: token.colorFillQuaternary,
                   borderRadius: 4,
                   fontSize: 12
                 }}
@@ -144,17 +146,19 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({
                       onClick={() => onLocateNode(peerId)}
                     >
                       →{' '}
-                      {nodeMap[peerId]?.name ??
-                        tn('topology.node.deviceFallback', { id: peerId })}
+                      {nodeMap[peerId]?.name ?? tn('topology.node.deviceFallback', { id: peerId })}
                     </Button>
                   ) : (
                     <span>
                       →{' '}
-                      {nodeMap[peerId]?.name ??
-                        tn('topology.node.deviceFallback', { id: peerId })}
+                      {nodeMap[peerId]?.name ?? tn('topology.node.deviceFallback', { id: peerId })}
                     </span>
                   )}
-                  {peerPort && <span style={{ color: '#8c8c8c', marginLeft: 4 }}>:{peerPort}</span>}
+                  {peerPort && (
+                    <span style={{ color: token.colorTextTertiary, marginLeft: 4 }}>
+                      :{peerPort}
+                    </span>
+                  )}
                 </Space>
                 <span style={{ color: '#999' }}>{edge.bandwidth ?? '-'}</span>
               </div>

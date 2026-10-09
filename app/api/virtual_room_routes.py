@@ -4,15 +4,15 @@ from app.exceptions import PresetResponseError, ValidationError
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
-from marshmallow import Schema
 
-from app.api.base import APIResponse
+from app.api.base import APIResponse, RequestValidator
 from app.services.virtual_room_service import VirtualRoomService
 from app.persistence.virtual_room_repository import VirtualRoomRepository
 from app.openapi.doc import doc
-from app.utils.auth import login_required, permission_required
+from app.services.auth import login_required, permission_required
 from app.core.enums import NotificationTypeCode
 from app.utils.transactional import transactional
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -23,7 +23,7 @@ _service = VirtualRoomService(VirtualRoomRepository())
 
 
 
-from app.schemas.virtual_room_routes import VirtualRoomCreateSchema, VirtualRoomUpdateSchema, VirtualRoomMembersSchema
+from app.schemas.virtual_room_routes import VirtualRoomCreateSchema, VirtualRoomUpdateSchema, VirtualRoomMembersSchema  # noqa: E402 -- 本仓约定：Schema import 就近放在使用它的路由区（见上方注释说明）
 
 @virtual_room_bp.route("/", methods=["GET"])
 @doc(summary="查询虚拟机房列表", tags=["虚拟机房"], responses={200: "VirtualRoomResponse"})
@@ -31,8 +31,7 @@ from app.schemas.virtual_room_routes import VirtualRoomCreateSchema, VirtualRoom
 @permission_required("switch:view")
 def list_virtual_rooms():
     """查询虚拟机房列表"""
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    page, per_page = RequestValidator.validate_pagination_params()
     items, total = _service.get_paginated(page=page, per_page=per_page)
     return APIResponse.paginated(items, page, per_page, total)
 
@@ -65,7 +64,7 @@ def create_virtual_room():
         raise PresetResponseError(
             message=e.message, error_code="CREATE_FAILED", status_code=400
         ) from e
-    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+    except Exception as e:  # 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("创建虚拟机房失败: %s", e, exc_info=True)
         raise PresetResponseError(
             message="创建虚拟机房失败", error_code="CREATE_FAILED", status_code=500
@@ -88,7 +87,7 @@ def update_virtual_room(virtual_room_id):
         raise PresetResponseError(
             message=e.message, error_code="UPDATE_FAILED", status_code=400
         ) from e
-    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+    except Exception as e:  # 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("更新虚拟机房失败: id=%s error=%s", virtual_room_id, e, exc_info=True)
         raise PresetResponseError(
             message="更新虚拟机房失败", error_code="UPDATE_FAILED", status_code=500
@@ -109,7 +108,7 @@ def delete_virtual_room(virtual_room_id):
         raise PresetResponseError(
             message=e.message, error_code="DELETE_FAILED", status_code=400
         ) from e
-    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+    except Exception as e:  # 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("删除虚拟机房失败: id=%s error=%s", virtual_room_id, e, exc_info=True)
         raise PresetResponseError(
             message="删除虚拟机房失败", error_code="DELETE_FAILED", status_code=500
@@ -132,7 +131,7 @@ def update_virtual_room_members(virtual_room_id):
         raise PresetResponseError(
             message=e.message, error_code="UPDATE_FAILED", status_code=400
         ) from e
-    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+    except Exception as e:  # 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("更新虚拟机房成员失败: id=%s error=%s", virtual_room_id, e, exc_info=True)
         raise PresetResponseError(
             message="更新虚拟机房成员失败", error_code="UPDATE_FAILED", status_code=500
@@ -172,7 +171,7 @@ def scan_virtual_room(virtual_room_id):
     acquired_locks = []
     if redis_client:
         for did in device_ids:
-            lock_key = f"scan_lock:{did}"
+            lock_key = redis_keys.scan_lock_key(did)
             if redis_client.exists(lock_key):
                 lock_scope = redis_client.get(lock_key)
                 if lock_scope:
@@ -266,7 +265,7 @@ def scan_virtual_room(virtual_room_id):
 
                     idempotency_key=f"vr_scan_complete:{virtual_room_id}:{int(__import__('time').time())}",
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 后台异步任务顶层兜底：线程内异常无人接收，必须捕获并转为前端通知/清理锁
             logger.error("异步虚拟机房扫描 %d 失败: %s", virtual_room_id, e)
             try:
                 with app_ref.app_context():
@@ -276,7 +275,7 @@ def scan_virtual_room(virtual_room_id):
                     if redis_client:
                         sr = ScanRedis(redis_client)
                         for did in device_ids:
-                            lock_key = f"scan_lock:{did}"
+                            lock_key = redis_keys.scan_lock_key(did)
                             try:
                                 redis_client.delete(lock_key)
                             except Exception:

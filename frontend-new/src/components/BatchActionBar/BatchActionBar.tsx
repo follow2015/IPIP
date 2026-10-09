@@ -25,13 +25,7 @@ export interface BatchActionBarProps {
   className?: string;
 }
 
-export function BatchActionBar({
-  count,
-  unit,
-  onClear,
-  children,
-  className
-}: BatchActionBarProps) {
+export function BatchActionBar({ count, unit, onClear, children, className }: BatchActionBarProps) {
   const { t } = useTranslation();
   const resolvedUnit = unit ?? t('unit.item');
 
@@ -42,9 +36,9 @@ export function BatchActionBar({
       type="info"
       showIcon
       className={className}
-      style={{ marginBottom: 16 }}
+      style={{ marginBottom: 16, minWidth: 0 }}
       title={
-        <Space wrap>
+        <Space wrap style={{ minWidth: 0 }}>
           <span>
             {t('batch.selectedPrefix')} <strong>{count}</strong> {resolvedUnit}
             {t('batch.selectedSuffix')}

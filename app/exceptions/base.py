@@ -106,13 +106,20 @@ class PresetResponseError(BaseAppException):
         error_code: 响应体 ``error_code``。为 ``None`` 表示**不输出该字段**，
             与 ``APIResponse.error(error_code=None)`` 的行为一致。注意不能直接用
             ``self.code`` 判断 —— ``BaseAppException`` 会用类名兜底，故此处单独保存原值。
+        details: 响应体 ``details``；``None`` 表示不输出该字段。
+
+            早期版本把 ``details`` 硬编码为 ``None``，于是"既要自定义响应、又要回传
+            处置清单"的端点无路可走 —— 只能退回 ``return APIResponse.error(...)``，
+            而那正是本异常要消灭的吞异常写法。例如运营商软删被 AC-C-20 阻断时必须
+            回传 ``circuit_nos``，值班要照着清单去转移或终止线路。
     """
 
     def __init__(
         self,
         message: str,
         error_code: Optional[str] = None,
-        status_code: int = 500
+        status_code: int = 500,
+        details: Optional[Dict[str, Any]] = None
     ):
         """初始化预置响应异常
 
@@ -120,11 +127,12 @@ class PresetResponseError(BaseAppException):
             message: 响应体 message
             error_code: 响应体 error_code；None 表示不输出该字段
             status_code: HTTP 状态码
+            details: 响应体 details；None 表示不输出该字段（对存量调用点无变化）
         """
         self.error_code = error_code
         super().__init__(
             message=message,
             code=error_code,  # 仅用于日志可读性，响应体由 self.error_code 决定
-            details=None,
+            details=details,
             status_code=status_code
         )

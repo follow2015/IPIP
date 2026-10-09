@@ -9,7 +9,7 @@ from flask import Blueprint, request
 from app.api.base import APIResponse, api_exception_handler
 from app.utils import rate_limit_api
 from app.openapi.doc import doc
-from app.utils.auth import login_required, permission_required
+from app.services.auth import login_required, permission_required
 
 logger = get_logger(__name__)
 
@@ -65,7 +65,7 @@ def log_error():
         
         return APIResponse.success(message="错误日志已记录")
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error(f"记录前端错误日志失败: {str(e)}")
         return APIResponse.error(message="记录日志失败", status_code=500)
 
@@ -113,7 +113,7 @@ def log_info():
         
         return APIResponse.success(message="日志已记录")
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error(f"记录前端日志失败: {str(e)}")
         return APIResponse.error(message="记录日志失败", status_code=500)
 
@@ -135,7 +135,6 @@ def get_logs():
     """
     try:
         limit = request.args.get("limit", 10, type=int)
-        level = request.args.get("level", type=str)
         
         limit = min(limit, 100)
         
@@ -143,7 +142,7 @@ def get_logs():
         
         return APIResponse.success(data=logs, message="获取日志成功")
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error(f"获取日志失败: {str(e)}")
         return APIResponse.error(message="获取日志失败", status_code=500)
 
@@ -171,6 +170,6 @@ def get_log_stats():
         
         return APIResponse.success(data=stats, message="获取日志统计成功")
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error(f"获取日志统计失败: {str(e)}")
         return APIResponse.error(message="获取日志统计失败", status_code=500)

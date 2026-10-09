@@ -4,7 +4,7 @@
 每次采集后 upsert，存储指标最近一次采集值（含正常值）。
 """
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional
 from app.utils.time_utils import now_utc_naive
 

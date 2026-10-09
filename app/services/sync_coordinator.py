@@ -172,7 +172,7 @@ class SyncCoordinator:
         except SSHConnectionError as e:
             logger.warning("读取端口 %s 实际链路状态失败（连接异常）: %s", port, e)
             return None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 端口状态读取失败容错：读取阶段异常类型（netmiko/socket/解析）不可枚举，返回 None 由调用方走"期望状态兜底"分支
             logger.warning("读取端口 %s 实际链路状态失败: %s", port, e)
             return None
         if not raw or not raw.strip():
@@ -184,7 +184,7 @@ class SyncCoordinator:
                 if p.port and normalize_port(p.port).lower() == target:
                     return p.status
             logger.warning("读取端口 %s 实际链路状态：输出中未匹配到该端口", port)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 端口状态解析失败容错：同 180，解析器对异常回显的抛出类型不可枚举
             logger.warning("读取端口 %s 实际链路状态解析失败: %s", port, e)
         return None
 
@@ -222,7 +222,7 @@ class SyncCoordinator:
                         break
                 if actual_status is None:
                     logger.warning("端口 %s 实际链路状态：输出中未匹配到该端口", port)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 端口状态读取失败容错（连接复用路径）：同 180
             logger.warning("端口 %s 读取实际链路状态失败（连接复用路径）: %s", port, e)
 
         with self._db_transaction(switch.device_id, op_type, affected_ports=[port]):
@@ -238,7 +238,7 @@ class SyncCoordinator:
                     self._apply_port_config_text(
                         switch.device_id, port, config_output, switch, adapter,
                     )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 配置缓存同步失败不阻断：端口状态已更新，缓存同步失败仅告警后返回实际状态
                 logger.warning("端口 %s 配置缓存同步失败（状态已更新）: %s", port, e)
         return actual_status
 
@@ -284,10 +284,10 @@ class SyncCoordinator:
                             continue
                         self._apply_port_config_text(switch_id, port, config_output, switch, adapter)
                         succeeded.append(port)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 批量同步内单端口失败隔离：记入 failed 后继续下一端口，单端口 SSH/DB 异常不可枚举，不得中断整批
                         logger.warning("批量同步端口 %s 失败(跳过): %s", port, e)
                         failed.append((port, str(e)))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 建立 SSH 连接阶段失败兜底：连接阶段异常类型不可枚举，转为全部端口失败结果，不得冒泡到 API 层
             logger.error("批量同步建立 SSH 连接失败: %s", e)
             failed = [(p, f"SSH 连接失败: {e}") for p in ports]
 
@@ -295,7 +295,7 @@ class SyncCoordinator:
         try:
             with self._db_transaction(switch_id, op_type, affected_ports=list(ports)):
                 pass
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- SSE 广播失败不阻断：同步结果已落库，广播失败仅告警
             logger.error("批量同步广播 SSE 事件失败: %s", e)
 
         return {"succeeded": succeeded, "failed": failed}
@@ -443,7 +443,7 @@ class SyncCoordinator:
             members = re.findall(pattern, output, re.IGNORECASE)
             port_norm = re.sub(r"\s+", "", port).lower()
             return [m for m in members if re.sub(r"\s+", "", m).lower() != port_norm]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 端口成员列表读取失败容错：返回 [] 由调用方走"无成员"分支，SSH/解析异常不可枚举
             logger.warning("获取端口 %s 成员列表失败: %s", port, e)
             return []
 
@@ -512,11 +512,11 @@ class SyncCoordinator:
                             device_id, port_name, {"vlan_ports": members},
                         )
                         results["vlan_synced"] += 1
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 批量 VLAN 同步内单端口失败隔离：记入 errors 后继续，同 295
                         results["errors"].append(f"{port_name}: {e}")
             else:
                 results["errors"].append("display vlan 无输出")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 批量 VLAN 同步整体失败兜底：转为 results["errors"] 返回，同 298
             results["errors"].append(f"VLAN 批量同步失败: {e}")
 
         try:
@@ -533,11 +533,11 @@ class SyncCoordinator:
                             device_id, port_name, {"trunk_members": members},
                         )
                         results["lag_synced"] += 1
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 -- 批量链路聚合同步内单端口失败隔离：记入 errors 后继续，同 295
                         results["errors"].append(f"{port_name}: {e}")
             else:
                 results["errors"].append("display eth-trunk 无输出")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 批量链路聚合同步整体失败兜底：转为 results["errors"] 返回，同 298
             results["errors"].append(f"链路聚合批量同步失败: {e}")
 
         return results
@@ -719,7 +719,7 @@ class SyncCoordinator:
         vlan_id = vlan_info.get("pvid")
         try:
             self.switch_repo.update_port_status_vlan(switch_id, port, vlan_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 端口 VLAN 同步非致命：失败仅告警，不影响端口主配置同步
             logger.warning("同步端口 VLAN 失败（非致命）: %s", e)
 
     def _sync_port_ips_from_config(
@@ -742,7 +742,7 @@ class SyncCoordinator:
             self.switch_repo.upsert_port_info_cache(switch_id, port, {
                 "ip_address": primary_ip or "",
             })
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 端口 IP 同步非致命：失败仅告警，不影响端口主配置同步
             logger.warning("同步端口 IP 失败（非致命）: %s", e)
 
     def _sync_port_description_from_config(
@@ -758,5 +758,5 @@ class SyncCoordinator:
         description = adapter.parse_port_description(config_text or "")
         try:
             self.switch_repo.update_port_description(switch_id, port, description)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 端口描述同步非致命：失败仅告警，不影响端口主配置同步
             logger.warning("同步端口描述失败（非致命）: %s", e)

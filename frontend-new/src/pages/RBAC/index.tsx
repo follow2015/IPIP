@@ -1,14 +1,9 @@
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useState, useMemo } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
-import { Button, Space, Card, Tabs, Tag, Switch } from 'antd';
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  SafetyOutlined,
-  KeyOutlined
-} from '@ant-design/icons';
+import { useTable } from '@/hooks/useTable';
+import { Button, Space, Card, Tabs, Tag } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SafetyOutlined } from '@ant-design/icons';
 import DataTable from '@/components/DataTable';
 import RoleForm from './RoleForm';
 import PermissionAssign from './PermissionAssign';
@@ -18,12 +13,9 @@ import {
   useCreateRole,
   useUpdateRole,
   useDeleteRole,
-  useRoleDetail,
-  useRolePermissions,
-  type CreateRoleRequest,
-  type UpdateRoleRequest
+  type CreateRoleRequest
 } from '@/services/rbac';
-import type { Role, Permission, RoleDetail } from '@/types/models';
+import type { Role, Permission } from '@/types/models';
 import { useMessage } from '@/hooks/useMessage';
 import { useTranslation } from 'react-i18next';
 
@@ -37,7 +29,8 @@ function RBAC() {
   const [permAssignRole, setPermAssignRole] = useState<Role | null>(null);
 
   const { data: rolesData, isLoading: rolesLoading, refetch: refetchRoles } = useRoleList();
-  const { data: permsData, isLoading: permsLoading } = usePermissionList();
+  const permTable = useTable({ initialPerPage: 20 });
+  const { data: permsData, isLoading: permsLoading } = usePermissionList(permTable.tableParams);
   const createRole = useCreateRole();
   const updateRole = useUpdateRole();
   const deleteRole = useDeleteRole();
@@ -45,10 +38,7 @@ function RBAC() {
 
   const roles =
     (rolesData as unknown as { items?: Role[] })?.items ?? (rolesData as unknown as Role[]) ?? [];
-  const permissions =
-    (permsData as unknown as { items?: Permission[] })?.items ??
-    (permsData as unknown as Permission[]) ??
-    [];
+  const permissions = useMemo(() => permsData?.items ?? [], [permsData]);
 
   const handleAdd = () => {
     setEditRecord(null);
@@ -181,17 +171,6 @@ function RBAC() {
     </div>
   );
 
-  const permCategories = useMemo(() => {
-    const map = new Map<string, Permission[]>();
-    permissions.forEach((p) => {
-      const cat = p.category ?? t('permission.uncategorized');
-      const list = map.get(cat) ?? [];
-      list.push(p);
-      map.set(cat, list);
-    });
-    return Array.from(map.entries());
-  }, [permissions, t]);
-
   const permColumns = [
     {
       title: t('permission.field.code'),
@@ -268,11 +247,11 @@ function RBAC() {
                 rowKey="id"
                 loading={permsLoading}
                 size="small"
-                searchable={false}
                 showCard={false}
                 mobileCardMode
                 cardRender={renderPermCard}
-                pagination={{ pageSize: 20, showTotal: (t) => tc('pagination.total', { count: t }) }}
+                tableProps={permTable}
+                total={permsData?.total}
                 scroll={{ x: 'max-content' }}
               />
             )
@@ -291,7 +270,6 @@ function RBAC() {
       <PermissionAssign
         open={permAssign.isOpen}
         role={permAssignRole}
-        permissions={permissions}
         onClose={() => {
           permAssign.close();
           setPermAssignRole(null);

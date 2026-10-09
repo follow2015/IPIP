@@ -50,7 +50,7 @@ def _resolve_system_user_id() -> Optional[int]:
         configured = current_app.config.get("AI_DIAGNOSIS_SYSTEM_USER_ID")
         if configured:
             return int(configured)
-    except Exception:  # noqa: BLE001 - 无 app context 或配置非数字，走回退
+    except Exception:  # noqa: BLE001, S110 - 无 app context 或配置非数字，走回退
         pass
 
     try:
@@ -59,7 +59,7 @@ def _resolve_system_user_id() -> Optional[int]:
         with db.session.no_autoflush:
             user = UserRepository().find_first_active()
         return user.id if user else None
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("ai.incident_diag.system_user_failed", exc_info=True)
         return None
 
@@ -122,7 +122,7 @@ def _build_question(incident_id: int, device_id: Optional[int]) -> str:
                     f"该事件已有历史诊断结论：{ctx['diagnosis']['latest_summary']}"
                     "——请判断是同一根因还是新故障"
                 )
-    except Exception:  # noqa: BLE001 - 上下文是增强项，缺失不影响触发
+    except Exception:  # 上下文是增强项，缺失不影响触发
         logger.warning("ai.incident_diag.context_failed incident=%s",
                        incident_id, exc_info=True)
 
@@ -165,7 +165,7 @@ def trigger_incident_diagnosis(alert, skill_name: Optional[str] = None) -> bool:
             logger.warning("ai.incident_diag.no_system_user incident=%s", incident_id)
             return False
 
-        from app.utils.auth import get_user_permissions
+        from app.services.auth import get_user_permissions
 
         perms = sorted(get_user_permissions(user_id))
 
@@ -183,7 +183,7 @@ def trigger_incident_diagnosis(alert, skill_name: Optional[str] = None) -> bool:
                     skill_name or DEFAULT_SKILL)
         return True
 
-    except Exception as e:  # noqa: BLE001 - best-effort：绝不阻断升级扫描
+    except Exception as e:  # best-effort：绝不阻断升级扫描
         logger.error("ai.incident_diag.failed incident=%s: %s", incident_id, e,
                      exc_info=True)
         return False

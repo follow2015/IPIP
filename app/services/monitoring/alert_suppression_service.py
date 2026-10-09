@@ -24,6 +24,7 @@ from app.utils.logging import get_logger
 from app.utils.redis_client import get_redis_client
 import time
 from typing import Optional, TypedDict
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -50,7 +51,7 @@ def _load_config():
             int(cfg.get("MONITOR_SUPPRESSION_MAX", 5)),
             int(cfg.get("MONITOR_SUPPRESSION_THROTTLE", 300)),
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 -- 配置读取失败兜底：使用默认配置值，配置模块异常不可枚举
         from config import get_config
         _c = get_config()
         ci = _c() if isinstance(_c, type) else _c
@@ -106,11 +107,11 @@ def should_emit(dedup_key: str, now: Optional[float] = None) -> SuppressionDecis
         )
 
     ts = now if now is not None else time.time()
-    key = f"monitor:suppress:{dedup_key}"
+    key = redis_keys.monitor_suppress_key(dedup_key)
 
     try:
         raw = r.get(key)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 限流/抑制器 fail-open：组件故障不得阻断告警处理，按"放行"处理并告警
         logger.warning("alert_suppression Redis GET 失败，放行: %s", exc)
         return SuppressionDecision(
             suppressed=False, aggregated=False, suppressed_count=0, next_allowed_at=None
@@ -138,7 +139,7 @@ def should_emit(dedup_key: str, now: Optional[float] = None) -> SuppressionDecis
         })
         try:
             r.set(key, new_state, ex=window + throttle)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 限流/抑制器 fail-open：组件故障不得阻断告警处理，按"放行"处理并告警
             logger.warning("alert_suppression Redis SET 失败（聚合放行）: %s", exc)
         return SuppressionDecision(
             suppressed=False, aggregated=True,
@@ -158,7 +159,7 @@ def should_emit(dedup_key: str, now: Optional[float] = None) -> SuppressionDecis
     })
     try:
         r.set(key, new_state, ex=window + throttle)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 限流/抑制器 fail-open：组件故障不得阻断告警处理，按"放行"处理并告警
         logger.warning("alert_suppression Redis SET 失败（放行）: %s", exc)
     return SuppressionDecision(
         suppressed=False, aggregated=False, suppressed_count=0, next_allowed_at=None,

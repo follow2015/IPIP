@@ -5,12 +5,12 @@
 提供设备连接管理的RESTful API端点。
 """
 from flask import Blueprint, request
-from marshmallow import Schema
 
-from app.openapi.doc import doc, public
+from app.openapi.doc import doc
 from app.services.device_connection_service import device_connection_service
 from app.api.base import APIResponse, api_exception_handler
-from app.utils import login_required, permission_required, rate_limit_api
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api
 from app.utils.transactional import transactional
 
 device_connection_bp = Blueprint("device_connection", __name__, url_prefix="/api/device-connections")

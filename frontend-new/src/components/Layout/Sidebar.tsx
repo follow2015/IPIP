@@ -104,7 +104,11 @@ function Sidebar({ collapsed, onNavigate }: SidebarProps) {
         selectedKeys={[selectedKey]}
         items={menuItems}
         onClick={handleMenuClick}
-        style={{ border: 'none', flex: 1, overflowY: 'auto' }}
+        style={{
+          border: 'none',
+          flex: 1,
+          overflowY: 'auto'
+        }}
       />
 
       {/* 版本号：常驻可见，便于报障时快速核对线上版本；折叠态只留版本号 */}

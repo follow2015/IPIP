@@ -7,23 +7,23 @@
 from app.utils.logging import get_logger
 
 from flask import Blueprint, request
-from marshmallow import Schema
 
 from app.exceptions import PresetResponseError
 from app.exceptions.base import BaseAppException
 from app.exceptions.validation import ValidationError
-from app.exceptions.business import LayoutMarkerVersionConflict, ResourceConflictError
+from app.exceptions.business import (
+    BatchItemsLimitExceeded,
+    LayoutMarkerVersionConflict,
+    ResourceConflictError,
+)
+from app.core.batch_limits import ensure_batch_size_within_limit
 from app.services.room_service import RoomService
 from app.services.device_service import DeviceService
 from app.api.base import APIResponse
-from app.utils import (
-    login_required,
-    permission_required,
-    rate_limit_api,
-    validation_manager,
-)
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api, validation_manager
 from app.utils.transactional import transactional, on_commit
-from app.openapi.doc import doc, public
+from app.openapi.doc import doc
 from app.persistence.room_repository import RoomRepository
 from app.persistence.cabinet_repository import CabinetRepository
 from app.persistence.device_repository import DeviceRepository
@@ -44,7 +44,7 @@ _device_service = DeviceService(DeviceRepository())
 
 
 
-from app.schemas.room import (
+from app.schemas.room import (  # noqa: E402 -- 本仓约定：Schema import 就近放在使用它的路由区（见上方注释说明）
     RoomChannelCreateSchema,
     RoomChannelUpdateSchema,
     RoomCreateSchema,
@@ -426,7 +426,7 @@ def batch_delete_rooms():
                 cache_manager.invalidate_pattern("room:name:*"),
                 emit_resource_change_global("room", "delete", ids=[rid]),
             ))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 批量/循环内单条失败隔离：记入失败列表后继续处理下一条，单条异常不得中断整批
             logger.warning(f"批量删除机房 {room_id} 失败: {e}")
             failed.append({"id": room_id, "reason": str(e)})
 
@@ -738,6 +738,14 @@ def batch_update_room_layout_markers(room_id):
             error_code="ROOM_MARKER_BATCH_EMPTY",
             status_code=400,
         )
+    try:
+        ensure_batch_size_within_limit(len(items), endpoint="占位标记批量更新")
+    except BatchItemsLimitExceeded as e:
+        raise PresetResponseError(
+            message=e.message,
+            error_code="ROOM_MARKER_BATCH_TOO_MANY",
+            status_code=400,
+        ) from e
 
     UPDATABLE = ("row_number", "col_number", "marker_type", "label", "notes")
     normalized = []

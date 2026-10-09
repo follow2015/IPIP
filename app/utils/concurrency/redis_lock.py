@@ -52,11 +52,29 @@ def owner_token() -> str:
             if _OWNER_TOKEN is None or _OWNER_PID != pid:
                 try:
                     host = socket.gethostname()
-                except Exception:
+                except Exception:  # noqa: BLE001 -- 主机名获取失败降级为 unknown：仅用于构造 owner token，不应阻断加锁
                     host = "unknown"
                 _OWNER_TOKEN = f"{host}:{pid}:{uuid.uuid4().hex}"
                 _OWNER_PID = pid
     return _OWNER_TOKEN
+
+
+def acquire_owner_lock(r, key: str, ttl_seconds: int) -> bool:
+    """尝试抢占分布式锁（SET NX EX，单条原子命令）。
+
+    与 `release_owner_lock` 成对使用：本函数写入的 value 就是 `owner_token()`，
+    释放端靠 Lua CAS 比对它，从而不会误删「TTL 过期后被别人抢走」的锁。
+
+    Args:
+        r: Redis 客户端（调用方保证非 None）。
+        key: 完整的锁键（由调用方按各自前缀组装，如 `monitor:lock:snmp`）。
+        ttl_seconds: 锁的过期秒数。**必须为正**——不带 TTL 的锁在持锁进程
+            崩溃后会永久滞留，该任务此后再无人执行（比重复执行更糟）。
+
+    Returns:
+        True = 本进程抢到；False = 已被其他进程持有。
+    """
+    return bool(r.set(key, owner_token(), ex=int(ttl_seconds), nx=True))
 
 
 def release_owner_lock(r, key: str) -> None:

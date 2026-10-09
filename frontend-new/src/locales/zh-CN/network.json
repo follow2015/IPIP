@@ -235,7 +235,9 @@
       "deleteContent": "确定要删除网段 {{network}} 吗？",
       "scanTitle": "确认扫描",
       "scanContent": "确定要扫描网段 {{network}} 吗？扫描将在后台执行，完成后自动刷新。",
-      "fullScanContent": "将对当前机房内所有交换机执行全量扫描（端口采集+路由同步+MAC索引+ARP同步+IP对账+补充探测），可能需要较长时间。扫描在后台执行，完成后自动刷新。"
+      "fullScanContent": "将对当前机房内所有交换机执行全量扫描（端口采集+路由同步+MAC索引+ARP同步+IP对账+补充探测），可能需要较长时间。扫描在后台执行，完成后自动刷新。",
+      "snmpTakeoverHint": "（提示：本机房包含通过 SNMP 通道采集的设备，扫描时这些设备的手动端口若未被采集发现将被清理）",
+      "fullScanSnmpTakeoverHint": "（提示：机房内通过 SNMP 通道采集的设备，扫描时其未被采集发现的手动端口将被清理）"
     },
     "message": {
       "missingParams": "缺少必要参数（room_id/switch_id/notes/nexthop），无法删除",

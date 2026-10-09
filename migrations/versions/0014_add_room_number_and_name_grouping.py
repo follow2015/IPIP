@@ -142,7 +142,7 @@ def _backfill(conn) -> None:
     cur = conn.cursor()
     try:
         cur.execute(
-            f"SELECT id, name FROM `rooms` WHERE `{COLUMN_NAME}` IS NULL ORDER BY id"
+            f"SELECT id, name FROM `rooms` WHERE `{COLUMN_NAME}` IS NULL ORDER BY id"  # noqa: S608 -- alembic 迁移的 DDL 无法参数化表/列名，标识符由迁移脚本自身硬编码
         )
         rows = cur.fetchall()
         if not rows:
@@ -174,7 +174,7 @@ def _backfill(conn) -> None:
 
         for value, room_id in updates:
             cur.execute(
-                f"UPDATE `rooms` SET `{COLUMN_NAME}` = %s WHERE id = %s",
+                f"UPDATE `rooms` SET `{COLUMN_NAME}` = %s WHERE id = %s",  # noqa: S608 -- alembic 迁移的 DDL 无法参数化表/列名，标识符由迁移脚本自身硬编码
                 (value, room_id),
             )
         conn.commit()
@@ -200,7 +200,7 @@ def _repair_collation_conflicts(conn, conflicts: list) -> int:
     try:
         for name, room_number, _cnt, keep_id in conflicts:
             cur.execute(
-                f"UPDATE `rooms` SET `{COLUMN_NAME}` = CONCAT(`{COLUMN_NAME}`, '-', id) "
+                f"UPDATE `rooms` SET `{COLUMN_NAME}` = CONCAT(`{COLUMN_NAME}`, '-', id) "  # noqa: S608 -- alembic 迁移的 DDL 无法参数化表/列名，标识符由迁移脚本自身硬编码
                 f"WHERE name = %s AND `{COLUMN_NAME}` = %s AND id <> %s",
                 (name, room_number, keep_id),
             )
@@ -285,7 +285,7 @@ def _log_blocking_transactions(conn) -> None:
                 row[3],
                 (row[4] or "")[:200] or "（空闲事务）",
             )
-    except Exception:  # noqa: BLE001 —— 诊断本身绝不能掩盖原始异常
+    except Exception:  # 诊断本身绝不能掩盖原始异常
         logger.warning("打印阻塞事务信息失败", exc_info=True)
     finally:
         cur.close()

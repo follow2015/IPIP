@@ -51,7 +51,7 @@ class AliyunVoiceProvider(VoiceProvider):
 
         try:
             response = client.single_call_by_tts(request)
-        except Exception as exc:  # noqa: BLE001 - 分类后再抛，未知则原样透传
+        except Exception as exc:  # 分类后再抛，未知则原样透传
             classified = self._classify_error(exc)
             if classified is exc:      # 未知错误码：保持"交由 task 按瞬态处理"
                 raise

@@ -186,7 +186,7 @@ def get_users_with_device_access(device_id: int) -> List[int]:
         with _cache_lock:
             _users_with_device_cache[device_id] = (result, _now() + _CACHE_TTL)
         return result
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 反查可见用户失败非致命：返回空范围由上层兜底
         logger.warning(
             "data_scope 反查设备可见用户失败 device_id=%s: %s",
             device_id, exc,

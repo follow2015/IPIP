@@ -4,10 +4,9 @@ device_repository.py — 关键修复
 覆盖 BUG-2 / BUG-3 / BUG-5 / BUG-9 / BUG-12 / BUG-13
 """
 from app.utils.logging import get_logger
-import random
+import secrets
 import re
 import uuid
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
 from app.utils.time_utils import now_utc_naive
 
@@ -309,7 +308,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备失败", original_error=e)
+            raise QueryExecutionError("查找设备失败", original_error=e) from e
 
     def find_by_ids(self, device_ids: list) -> dict:
         """批量按 ID 查找设备，返回 {device_id: Device}。
@@ -327,7 +326,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
             return {d.id: d for d in rows}
         except SQLAlchemyError as e:
-            raise QueryExecutionError("批量查找设备失败", original_error=e)
+            raise QueryExecutionError("批量查找设备失败", original_error=e) from e
 
     def find_by_id_or_404(self, device_id: int) -> Device:
         """按 ID 查找设备，不存在则抛出 404（供 Task 8 手动探测路径使用）"""
@@ -378,7 +377,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备失败（含已删除）", original_error=e)
+            raise QueryExecutionError("查找设备失败（含已删除）", original_error=e) from e
 
     def find_ids_by_type(self, device_ids: List[int], device_types: set) -> List[int]:
         """批量按 id + 设备类型过滤，仅返回 id 列表（供监控 worker 减少 N 次单查）。
@@ -396,13 +395,13 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             ]
         except SQLAlchemyError as e:
-            raise QueryExecutionError("批量查询设备 ID 失败", original_error=e)
+            raise QueryExecutionError("批量查询设备 ID 失败", original_error=e) from e
 
     def find_by_device_name(self, device_name: str) -> Optional[Device]:
         try:
             return self._base_query().filter(Device.device_name == device_name).first()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备失败", original_error=e)
+            raise QueryExecutionError("查找设备失败", original_error=e) from e
 
     def find_by_serial_number(self, serial_number: str) -> Optional[Device]:
         try:
@@ -412,7 +411,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备失败", original_error=e)
+            raise QueryExecutionError("查找设备失败", original_error=e) from e
 
     def find_nodes_by_chassis(self, chassis_id: int) -> List[Device]:
         """获取机箱的所有子节点（按 node_position 排序）"""
@@ -428,7 +427,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找机箱子节点失败", original_error=e)
+            raise QueryExecutionError("查找机箱子节点失败", original_error=e) from e
 
     def find_chassis_by_id(self, device_id: int) -> Optional[Device]:
         """查找机箱设备（排除已报废和已删除）"""
@@ -442,7 +441,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .first()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找机箱失败", original_error=e)
+            raise QueryExecutionError("查找机箱失败", original_error=e) from e
 
     def find_node_by_position(
         self, chassis_id: int, position: int, exclude_id: int = None
@@ -463,7 +462,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 q = q.filter(Device.id != exclude_id)
             return q.first()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找节点位置失败", original_error=e)
+            raise QueryExecutionError("查找节点位置失败", original_error=e) from e
 
     def find_active_devices(self) -> List[Device]:
         try:
@@ -474,7 +473,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备失败", original_error=e)
+            raise QueryExecutionError("查找设备失败", original_error=e) from e
 
     def find_by_cabinet_id(self, cabinet_id: int) -> List[Device]:
         try:
@@ -488,7 +487,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备失败", original_error=e)
+            raise QueryExecutionError("查找设备失败", original_error=e) from e
 
     def find_by_customer_id_ordered(
         self, customer_id: int, limit: Optional[int] = None,
@@ -578,7 +577,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找同机柜设备失败", original_error=e)
+            raise QueryExecutionError("查找同机柜设备失败", original_error=e) from e
 
     def find_by_customer_id(self, customer_id: int) -> List[Device]:
         try:
@@ -592,7 +591,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备失败", original_error=e)
+            raise QueryExecutionError("查找设备失败", original_error=e) from e
 
     def clear_customer(self, customer_id: int) -> int:
         """批量解绑客户名下所有设备（customer_id 置 NULL）。
@@ -610,7 +609,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         try:
             return self._base_query().filter(Device.status == status).all()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备失败", original_error=e)
+            raise QueryExecutionError("查找设备失败", original_error=e) from e
 
     def find_child_devices(self, parent_device_id: int) -> List[Device]:
         try:
@@ -623,7 +622,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找子设备失败", original_error=e)
+            raise QueryExecutionError("查找子设备失败", original_error=e) from e
 
     def find_by_room_id(self, room_id: int) -> List[Device]:
         try:
@@ -640,7 +639,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查找设备失败", original_error=e)
+            raise QueryExecutionError("查找设备失败", original_error=e) from e
 
     def find_node_position_conflict(
         self, parent_device_id: int, node_position: int, exclude_device_id: int = None
@@ -709,9 +708,9 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             from app.models.switch_credentials import SwitchCredentials
             query = query.join(SwitchCredentials, SwitchCredentials.device_id == Device.id)
             if has_ssh:
-                query = query.filter(SwitchCredentials.has_ssh == True)
+                query = query.filter(SwitchCredentials.has_ssh.is_(True))
             else:
-                query = query.filter(SwitchCredentials.has_ssh == False)
+                query = query.filter(SwitchCredentials.has_ssh.is_(False))
 
         return query
 
@@ -777,7 +776,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 "page_size":   page_size,
             }
         except SQLAlchemyError as e:
-            raise QueryExecutionError("获取设备列表失败", original_error=e)
+            raise QueryExecutionError("获取设备列表失败", original_error=e) from e
 
     def list_devices_keyset(
         self,
@@ -805,7 +804,16 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
           即可支撑 ``(device_name, id)`` 有序扫描，实测 Covering index scan），
           累计 O(n)。实际是否走该索引取决于优化器对 ``status`` 过滤的代价决策；
           **重新 EXPLAIN 的触发条件 = 任一分页表 ≥ 10 万行**（WP-8/8.3 澄清，
-          2026-09-23；原"需联合索引"的说法不成立）。
+          2026-09-23；原"需联合索引"的说法不成立，故**刻意不补** ``(device_name,
+          id)`` 复合索引 —— 它在 InnoDB 上与单列索引逐字节重复）。
+
+          这条**隐式引擎依赖**已拆成两半进门禁，别再靠人肉记：
+
+          * 静态前提（主键单列 ``id`` / 引擎 InnoDB / ``device_name`` 前导索引 /
+            本方法 ORDER BY 与游标谓词的形态）→
+            ``tests/test_keyset_index_contract.py``（smoke，CI 快层）；
+          * 优化器**实际**选没选该索引 → ``tests/test_keyset_index_explain.py``
+            （``mysql_only``，需 ``IPIP_VERIFY_DB=1``）。
         - 游标是"上一页最后一条的 ``(device_name, id)``"而非页码 —— 遍历期间即使
           有并发插入/删除也不会漏行或重复行（``OFFSET`` 的经典问题）。
 
@@ -856,7 +864,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .all()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("按游标获取设备列表失败", original_error=e)
+            raise QueryExecutionError("按游标获取设备列表失败", original_error=e) from e
 
     @monitor_query_performance
     def search_devices(
@@ -922,7 +930,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
 
             return result
         except SQLAlchemyError as e:
-            raise QueryExecutionError("搜索设备失败", original_error=e)
+            raise QueryExecutionError("搜索设备失败", original_error=e) from e
 
 
     def check_u_position_conflict(
@@ -956,7 +964,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 q = q.filter(Device.id != exclude_id)
             return q.all()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("检查 U 位冲突失败", original_error=e)
+            raise QueryExecutionError("检查 U 位冲突失败", original_error=e) from e
 
 
     @monitor_query_performance
@@ -1042,7 +1050,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             }
         except SQLAlchemyError as e:
             logger.error(f"获取机房设备统计失败 (room_id={room_id}): {e}")
-            raise QueryExecutionError("获取机房设备统计失败", original_error=e)
+            raise QueryExecutionError("获取机房设备统计失败", original_error=e) from e
 
 
     def sync_chassis_nodes(self, chassis_id: int, changed_params: Dict[str, Any]) -> bool:
@@ -1076,7 +1084,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             logger.info(f"同步机箱 {chassis_id} 参数到 {len(nodes)} 个节点")
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("同步机箱节点失败", original_error=e)
+            raise QueryExecutionError("同步机箱节点失败", original_error=e) from e
 
 
     def count_active_devices(self) -> int:
@@ -1089,7 +1097,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .count()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("统计设备数量失败", original_error=e)
+            raise QueryExecutionError("统计设备数量失败", original_error=e) from e
 
     def count_by_cabinet(self, cabinet_id: int) -> int:
         try:
@@ -1102,7 +1110,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .count()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("统计设备数量失败", original_error=e)
+            raise QueryExecutionError("统计设备数量失败", original_error=e) from e
 
     def count_by_room(self, room_id: int) -> int:
         try:
@@ -1117,7 +1125,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .count()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("统计设备数量失败", original_error=e)
+            raise QueryExecutionError("统计设备数量失败", original_error=e) from e
 
     def count_by_status(self, status) -> int:
         """按设备状态统计数量。"""
@@ -1130,7 +1138,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .count()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("统计设备数量失败", original_error=e)
+            raise QueryExecutionError("统计设备数量失败", original_error=e) from e
 
     def count_switches(self) -> int:
         """统计交换机数量。
@@ -1150,7 +1158,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 .count()
             )
         except SQLAlchemyError as e:
-            raise QueryExecutionError("统计交换机数量失败", original_error=e)
+            raise QueryExecutionError("统计交换机数量失败", original_error=e) from e
 
     def create(self, data: Dict[str, Any]) -> Device:
         try:
@@ -1160,7 +1168,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return device
         except SQLAlchemyError as e:
-            raise QueryExecutionError("创建设备失败", original_error=e)
+            raise QueryExecutionError("创建设备失败", original_error=e) from e
 
     def update(self, device_id: int, data: Dict[str, Any]) -> Optional[Device]:
         try:
@@ -1173,7 +1181,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return device
         except SQLAlchemyError as e:
-            raise QueryExecutionError("更新设备失败", original_error=e)
+            raise QueryExecutionError("更新设备失败", original_error=e) from e
 
     def delete(self, device_id: int) -> bool:
         """软删除设备（遵循 __soft_delete__ = True），由调用方负责 commit"""
@@ -1191,7 +1199,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return count
         except SQLAlchemyError as e:
-            raise QueryExecutionError("批量更新状态失败", original_error=e)
+            raise QueryExecutionError("批量更新状态失败", original_error=e) from e
 
     def update_location(self, device_id: int, cabinet_id: int) -> bool:
         try:
@@ -1202,7 +1210,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.flush()
             return True
         except SQLAlchemyError as e:
-            raise QueryExecutionError("更新设备位置失败", original_error=e)
+            raise QueryExecutionError("更新设备位置失败", original_error=e) from e
 
     def check_management_ip_exists(self, ip_address: str, exclude_id: int = 0) -> bool:
         """检查管理IP是否已被其他设备占用
@@ -1222,7 +1230,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 query = query.filter(Device.id != exclude_id)
             return self.session.query(query.exists()).scalar()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("校验管理IP失败", original_error=e)
+            raise QueryExecutionError("校验管理IP失败", original_error=e) from e
 
     def check_device_name_duplicate(self, device_name: str, cabinet_id: int = None, exclude_id: int = 0) -> Optional[Device]:
         """检查同机柜内是否存在同名设备
@@ -1247,7 +1255,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 query = query.filter(Device.id != exclude_id)
             return query.first()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("校验设备名称失败", original_error=e)
+            raise QueryExecutionError("校验设备名称失败", original_error=e) from e
 
     def check_serial_number_exists(self, serial_number: str, exclude_id: int = None) -> bool:
         if not serial_number:
@@ -1260,7 +1268,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 q = q.filter(Device.id != exclude_id)
             return self.session.query(q.exists()).scalar()
         except SQLAlchemyError as e:
-            raise QueryExecutionError("校验序列号失败", original_error=e)
+            raise QueryExecutionError("校验序列号失败", original_error=e) from e
 
     def generate_unique_serial_number(
         self, prefix="SN", format_type="timestamp", length=16, max_retries=10
@@ -1268,14 +1276,14 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         for _ in range(max_retries):
             if format_type == "timestamp":
                 ts = now_utc_naive().strftime("%Y%m%d%H%M%S")
-                sn = f"{prefix}{ts}{''.join(str(random.randint(0,9)) for _ in range(4))}"
+                sn = f"{prefix}{ts}{''.join(str(secrets.randbelow(10)) for _ in range(4))}"
             elif format_type == "uuid":
                 sn = f"{prefix}{str(uuid.uuid4()).upper()}" if prefix else str(uuid.uuid4()).upper()
             elif format_type == "random":
-                sn = f"{prefix}{''.join(str(random.randint(0,9)) for _ in range(length))}"
+                sn = f"{prefix}{''.join(str(secrets.randbelow(10)) for _ in range(length))}"
             elif format_type == "custom":
                 date = now_utc_naive().strftime("%Y%m%d")
-                sn = f"{prefix}{date}{''.join(str(random.randint(0,9)) for _ in range(6))}"
+                sn = f"{prefix}{date}{''.join(str(secrets.randbelow(10)) for _ in range(6))}"
             else:
                 raise ValueError(f"不支持的 format_type: {format_type}")
             if not self.check_serial_number_exists(sn):
@@ -1333,7 +1341,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 },
             }
         except SQLAlchemyError as e:
-            raise QueryExecutionError("获取统计信息失败", original_error=e)
+            raise QueryExecutionError("获取统计信息失败", original_error=e) from e
 
 
     @monitor_query_performance
@@ -1356,7 +1364,6 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         """
         try:
             from app.models.device_hardware import DeviceHardware
-            from app.models.cabinet import Cabinet
 
             query = (
                 self.session.query(Device)
@@ -1426,7 +1433,7 @@ class DeviceRepository(SQLAlchemyRepository, QueryOptimizationMixin):
                 "page_size": page_size,
             }
         except SQLAlchemyError as e:
-            raise QueryExecutionError("查询已删除设备失败", original_error=e)
+            raise QueryExecutionError("查询已删除设备失败", original_error=e) from e
 
     def get_child_device_ids(self, parent_device_id: int) -> list[int]:
         """查询机箱的所有子节点 device_id 列表。

@@ -11,6 +11,7 @@ import json
 from app.utils.logging import get_logger
 from app.utils.redis_client import get_redis_client
 from typing import Optional
+from app.utils import redis_keys
 
 logger = get_logger(__name__)
 
@@ -18,7 +19,7 @@ _CACHE_TTL = 300  # 5 分钟
 
 
 def _cache_key(device_id: int, metric_key: str) -> str:
-    return f"monitor:threshold_override:{device_id}:{metric_key}"
+    return redis_keys.monitor_threshold_override_key(device_id, metric_key)
 
 
 def get_effective_threshold(
@@ -61,7 +62,7 @@ def get_effective_threshold(
             tpl = tpl_repo.find_by_metric_key(metric_key, device_type=device_type)
             if tpl:
                 threshold = tpl.threshold
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 阈值覆盖读取失败返回 None：由调用方回退到默认阈值
         logger.warning("get_effective_threshold 失败: %s", exc)
         return None
 
@@ -83,7 +84,7 @@ def invalidate_cache(device_id: int, metric_key: Optional[str] = None):
         if metric_key:
             r.delete(_cache_key(device_id, metric_key))
         else:
-            prefix = f"monitor:threshold_override:{device_id}:"
+            prefix = redis_keys.monitor_threshold_override_prefix(device_id)
             for key in r.scan_iter(match=f"{prefix}*", count=100):
                 r.delete(key)
     except Exception:

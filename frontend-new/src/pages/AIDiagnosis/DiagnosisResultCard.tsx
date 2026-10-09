@@ -1,4 +1,4 @@
-import { Card, Typography, Progress, Tag, Alert } from 'antd';
+import { Card, Typography, Progress, Tag, Alert, theme } from 'antd';
 import { type DiagnosisResult } from '@/services/diagnosis';
 import { useTranslation } from 'react-i18next';
 import EvidenceList from './EvidenceList';
@@ -11,9 +11,14 @@ interface DiagnosisResultCardProps {
 
 export default function DiagnosisResultCard({ result }: DiagnosisResultCardProps) {
   const { t } = useTranslation('ai');
+  const { token } = theme.useToken();
   const confidencePct = Math.round((result.confidence || 0) * 100);
   const confidenceColor =
-    confidencePct >= 70 ? '#52c41a' : confidencePct >= 40 ? '#faad14' : '#ff4d4f';
+    confidencePct >= 70
+      ? token.colorSuccess
+      : confidencePct >= 40
+        ? token.colorWarning
+        : token.colorError;
 
   return (
     <Card

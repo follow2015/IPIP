@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Card,
   Tag,
@@ -9,9 +9,11 @@ import {
   Descriptions,
   Typography,
   Tooltip,
-  Input
+  Input,
+  theme
 } from 'antd';
-import DataTable from '@/components/DataTable';
+import { severityColor, incidentStatusTagColor } from '@/utils/statusColor';
+import DataTable, { type DataTableColumn } from '@/components/DataTable';
 import { serverPagination } from '@/components/DataTable/serverPagination';
 import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -19,7 +21,9 @@ import {
   useIncidents,
   useIncidentDetail,
   type IncidentItem,
-  type IncidentListParams
+  type IncidentListParams,
+  type IncidentRelatedAlert,
+  type IncidentSuppressedLog
 } from '@/services/monitor';
 import { formatDateTime } from '@/utils/format';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -28,11 +32,6 @@ import type { TFunction } from 'i18next';
 
 const { Text } = Typography;
 
-const SEVERITY_COLOR: Record<string, string> = {
-  critical: 'red',
-  warning: 'orange',
-  info: 'blue'
-};
 
 type IncidentReasonCode = 'L1_rule' | 'L2_topology' | 'L2_manual_rule' | 'L3_change';
 type IncidentReasonKey =
@@ -52,11 +51,6 @@ const reasonLabel = (code: string | null, t: TFunction<'monitor'>): string | nul
   return key ? t(key) : code;
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  active: 'processing',
-  acknowledged: 'warning',
-  closed: 'default'
-};
 
 function renderDeviceRef(id: number | null, name: string | null, t: TFunction<'monitor'>) {
   if (!name) return id != null ? String(id) : '-';
@@ -76,6 +70,7 @@ function renderDeviceRef(id: number | null, name: string | null, t: TFunction<'m
 export default function MonitorIncidents() {
   const { t } = useTranslation('monitor');
   const { t: tc } = useTranslation('common');
+  const { token } = theme.useToken();
   const [params, setParams] = useState<IncidentListParams>({
     page: 1,
     per_page: 20
@@ -97,6 +92,47 @@ export default function MonitorIncidents() {
     setParams((p) => ({ ...p, device_name: next || undefined, page: 1 }));
   };
 
+  const relatedAlertColumns = useMemo<DataTableColumn<IncidentRelatedAlert>[]>(
+    () => [
+      { title: t('incident.column.id'), dataIndex: 'id', width: 70 },
+      { title: tc('field.type'), dataIndex: 'alert_type', width: 140 },
+      { title: tc('field.severity'), dataIndex: 'severity', width: 90 },
+      {
+        title: tc('field.time'),
+        dataIndex: 'created_at',
+        render: (v: string | null) => (v ? formatDateTime(v) : '-')
+      }
+    ],
+    [t, tc]
+  );
+
+  const suppressedLogColumns = useMemo<DataTableColumn<IncidentSuppressedLog>[]>(
+    () => [
+      {
+        title: t('thresholdOverride.column.deviceId'),
+        dataIndex: 'device_name',
+        width: 160,
+        render: (_: string | null, r: IncidentSuppressedLog) =>
+          renderDeviceRef(r.device_id, r.device_name, t)
+      },
+      { title: t('column.alertType'), dataIndex: 'alert_type', width: 140 },
+      { title: tc('field.severity'), dataIndex: 'severity', width: 90 },
+      {
+        title: t('incident.column.upstreamDevice'),
+        dataIndex: 'upstream_device_name',
+        width: 160,
+        render: (_: string | null, r: IncidentSuppressedLog) =>
+          renderDeviceRef(r.upstream_device_id, r.upstream_device_name, t)
+      },
+      {
+        title: tc('field.time'),
+        dataIndex: 'created_at',
+        render: (v: string | null) => (v ? formatDateTime(v) : '-')
+      }
+    ],
+    [t, tc]
+  );
+
   const columns: ColumnsType<IncidentItem> = [
     {
       title: t('incident.column.title'),
@@ -114,14 +150,14 @@ export default function MonitorIncidents() {
       dataIndex: 'severity',
       key: 'severity',
       width: 100,
-      render: (s: string) => <Tag color={SEVERITY_COLOR[s] ?? 'default'}>{s}</Tag>
+      render: (s: string) => <Tag color={severityColor(s, token) ?? 'default'}>{s}</Tag>
     },
     {
       title: tc('field.status'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (s: string) => <Tag color={STATUS_COLOR[s] ?? 'default'}>{s}</Tag>
+      render: (s: string) => <Tag color={incidentStatusTagColor(s)}>{s}</Tag>
     },
     {
       title: t('column.alertCount'),
@@ -139,7 +175,7 @@ export default function MonitorIncidents() {
       width: 100,
       align: 'right',
       render: (n: number) => (
-        <Text strong style={{ color: n > 1 ? '#cf1322' : undefined }}>
+        <Text strong style={{ color: n > 1 ? token.red7 : undefined }}>
           {n}
         </Text>
       )
@@ -179,8 +215,8 @@ export default function MonitorIncidents() {
         {row.title}
       </a>
       <Space size={4} wrap>
-        <Tag color={SEVERITY_COLOR[row.severity] ?? 'default'}>{row.severity}</Tag>
-        <Tag color={STATUS_COLOR[row.status] ?? 'default'}>{row.status}</Tag>
+        <Tag color={severityColor(row.severity, token) ?? 'default'}>{row.severity}</Tag>
+        <Tag color={incidentStatusTagColor(row.status)}>{row.status}</Tag>
         {row.reason_code && <Tag>{reasonLabel(row.reason_code, t)}</Tag>}
       </Space>
       <Text type="secondary" style={{ fontSize: 12 }}>
@@ -270,16 +306,18 @@ export default function MonitorIncidents() {
                 {detail.title}
               </Descriptions.Item>
               <Descriptions.Item label={tc('field.severity')}>
-                <Tag color={SEVERITY_COLOR[detail.severity] ?? 'default'}>{detail.severity}</Tag>
+                <Tag color={severityColor(detail.severity, token) ?? 'default'}>
+                  {detail.severity}
+                </Tag>
               </Descriptions.Item>
               <Descriptions.Item label={tc('field.status')}>
-                <Tag color={STATUS_COLOR[detail.status] ?? 'default'}>{detail.status}</Tag>
+                <Tag color={incidentStatusTagColor(detail.status)}>{detail.status}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label={t('column.alertCount')}>
                 {detail.alert_count}
               </Descriptions.Item>
               <Descriptions.Item label={t('incident.column.deviceCount')}>
-                <Text strong style={{ color: detail.device_count > 1 ? '#cf1322' : undefined }}>
+                <Text strong style={{ color: detail.device_count > 1 ? token.red7 : undefined }}>
                   {detail.device_count}
                 </Text>
               </Descriptions.Item>
@@ -308,16 +346,7 @@ export default function MonitorIncidents() {
                 size="small"
                 pagination={{ pageSize: 5 }}
                 dataSource={detail.related_alerts}
-                columns={[
-                  { title: t('incident.column.id'), dataIndex: 'id', width: 70 },
-                  { title: tc('field.type'), dataIndex: 'alert_type', width: 140 },
-                  { title: tc('field.severity'), dataIndex: 'severity', width: 90 },
-                  {
-                    title: tc('field.time'),
-                    dataIndex: 'created_at',
-                    render: (v: string | null) => (v ? formatDateTime(v) : '-')
-                  }
-                ]}
+                columns={relatedAlertColumns}
               />
             </Card>
 
@@ -334,28 +363,7 @@ export default function MonitorIncidents() {
                 size="small"
                 pagination={{ pageSize: 5 }}
                 dataSource={detail.suppressed_logs}
-                columns={[
-                  {
-                    title: t('thresholdOverride.column.deviceId'),
-                    dataIndex: 'device_name',
-                    width: 160,
-                    render: (_: string | null, r) => renderDeviceRef(r.device_id, r.device_name, t)
-                  },
-                  { title: t('column.alertType'), dataIndex: 'alert_type', width: 140 },
-                  { title: tc('field.severity'), dataIndex: 'severity', width: 90 },
-                  {
-                    title: t('incident.column.upstreamDevice'),
-                    dataIndex: 'upstream_device_name',
-                    width: 160,
-                    render: (_: string | null, r) =>
-                      renderDeviceRef(r.upstream_device_id, r.upstream_device_name, t)
-                  },
-                  {
-                    title: tc('field.time'),
-                    dataIndex: 'created_at',
-                    render: (v: string | null) => (v ? formatDateTime(v) : '-')
-                  }
-                ]}
+                columns={suppressedLogColumns}
               />
             </Card>
           </Space>

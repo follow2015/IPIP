@@ -39,7 +39,7 @@ _MAX_QUESTION_CHARS = 4000     # 用户输入上限（E1 修复）
 _MAX_HISTORY_ROUNDS = 4        # prompt 中保留最近 N 轮工具结果
 
 
-from app.services.ai.prompt_guard import truncate_text as _truncate
+from app.services.ai.prompt_guard import truncate_text as _truncate  # noqa: E402 -- 别名 import 紧随其策略说明注释
 
 
 def _summarize_tool_result(msg: dict) -> str:
@@ -146,7 +146,7 @@ class AgenticSkillRunner:
                 skill_name=spec.name, question=safe_question,
                 incident_id=incident_id,
             )
-        except Exception as e:  # noqa: BLE001 - 旁路持久化失败不阻断诊断
+        except Exception as e:  # 旁路持久化失败不阻断诊断
             logger.error("agentic.%s create diagnosis session failed: %s",
                          spec.name, e, exc_info=True)
             return None
@@ -169,7 +169,7 @@ class AgenticSkillRunner:
             )
             if device_id is not None:
                 self.sessions.set_device_id(session_id, device_id)
-        except Exception as e:  # noqa: BLE001 - 旁路持久化失败不阻断诊断
+        except Exception as e:  # 旁路持久化失败不阻断诊断
             logger.error("agentic.%s complete diagnosis session failed: %s",
                          spec.name, e, exc_info=True)
 
@@ -217,7 +217,7 @@ class AgenticSkillRunner:
             user_prompt = _build_prompt_payload(messages)
             try:
                 raw = get_circuit_breaker("agentic").call(
-                    lambda: self.client.chat(system_prompt, user_prompt)
+                    lambda sp=system_prompt, up=user_prompt: self.client.chat(sp, up)
                 )
             except AICircuitOpenError:
                 answer = json.dumps({
@@ -291,7 +291,7 @@ class AgenticSkillRunner:
                     duration_ms=int((time.monotonic() - run_started) * 1000),
                 )
                 raise
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.error("agentic.%s capability=%s failed: %s",
                              spec.name, call_name, e, exc_info=True)
                 self.audit.log(

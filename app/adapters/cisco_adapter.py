@@ -202,7 +202,7 @@ class CiscoAdapter(BaseDeviceAdapter):
         for m in pattern_direct.finditer(raw_output):
             flag = m.group(1)
             results.append(ParsedRoute(
-                network=m.group(2), nexthop="0.0.0.0",
+                network=m.group(2), nexthop="0.0.0.0",  # noqa: S104 -- 路由解析的默认下一跳字符串，非 socket bind
                 interface=m.group(3), flags=flag,
                 protocol=proto_map.get(flag, flag),
             ))

@@ -7,7 +7,7 @@
 import hashlib
 import json
 from app.utils.logging import get_logger
-import random
+import secrets
 import time
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse, urlunparse
@@ -65,7 +65,7 @@ class WeChatTokenManager:
                     return token_data["access_token"]
                 else:
                     logger.info("access_token即将过期，重新获取")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- access_token 缓存读失败降级：缓存不可用则直接走微信 API 重新获取，redis/网络异常类型不可枚举
             logger.error(f"从缓存获取access_token失败: {e}")
 
         return self._fetch_new_access_token(cache_key)
@@ -123,7 +123,7 @@ class WeChatTokenManager:
                 cache_expires = expires_in - 300 if expires_in > 300 else expires_in
                 self.cache.set(cache_key, json.dumps(token_data), ttl=cache_expires)
                 logger.info(f"access_token缓存成功，过期时间: {cache_expires}秒")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- access_token 缓存写失败非致命：token 已成功获取，仅缓存未生效
                 logger.error(f"缓存access_token失败: {e}")
 
             logger.info("成功获取新的access_token")
@@ -132,7 +132,7 @@ class WeChatTokenManager:
         except requests.RequestException as e:
             logger.error(f"获取access_token网络请求失败: {e}")
             return None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- access_token 获取失败兜底：微信 API 调用异常类型不可枚举，返回 None 由调用方处理
             logger.error(f"获取access_token异常: {e}")
             return None
 
@@ -160,7 +160,7 @@ class WeChatTokenManager:
                     return ticket_data["ticket"]
                 else:
                     logger.info("jsapi_ticket即将过期，重新获取")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- jsapi_ticket 缓存读失败降级：同 71
             logger.error(f"从缓存获取jsapi_ticket失败: {e}")
 
         return self._fetch_new_jsapi_ticket(access_token, cache_key)
@@ -214,7 +214,7 @@ class WeChatTokenManager:
                 cache_expires = expires_in - 300 if expires_in > 300 else expires_in
                 self.cache.set(cache_key, json.dumps(ticket_data), ttl=cache_expires)
                 logger.info(f"jsapi_ticket缓存成功，过期时间: {cache_expires}秒")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- jsapi_ticket 缓存写失败非致命：同 133
                 logger.error(f"缓存jsapi_ticket失败: {e}")
 
             logger.info("成功获取新的jsapi_ticket")
@@ -223,7 +223,7 @@ class WeChatTokenManager:
         except requests.RequestException as e:
             logger.error(f"获取jsapi_ticket网络请求失败: {e}")
             return None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- jsapi_ticket 获取失败兜底：同 142
             logger.error(f"获取jsapi_ticket异常: {e}")
             return None
 
@@ -238,7 +238,7 @@ class WeChatTokenManager:
             self.cache.invalidate_pattern("wx_jsapi_ticket:*")
 
             logger.info("微信缓存已清除")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 清除微信缓存失败非致命：清理失败仅告警，不影响主流程
             logger.error(f"清除微信缓存失败: {e}")
 
 
@@ -341,7 +341,7 @@ class WeChatService:
             随机字符串
         """
         chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        return "".join(random.choice(chars) for _ in range(length))
+        return "".join(secrets.choice(chars) for _ in range(length))
 
     @staticmethod
     def _generate_signature(jsapi_ticket: str, nonce_str: str, timestamp: int, url: str) -> str:
@@ -357,7 +357,7 @@ class WeChatService:
             SHA1签名字符串
         """
         string = f"jsapi_ticket={jsapi_ticket}&noncestr={nonce_str}&timestamp={timestamp}&url={url}"
-        return hashlib.sha1(string.encode("utf-8")).hexdigest()
+        return hashlib.sha1(string.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 _token_manager = WeChatTokenManager()

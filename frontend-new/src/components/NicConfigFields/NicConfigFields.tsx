@@ -13,7 +13,7 @@
  * - 选项显示格式：品牌 型号（端口数×速率 类型）
  * - 可选端口预览
  */
-import { Form, Select, Row, Col, Divider, Button, Tag, Alert } from 'antd';
+import { Form, Select, Row, Col, Divider, Button, Tag, Alert, theme } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -30,10 +30,6 @@ export interface NicConfigFieldsProps {
   showPreview?: boolean;
 }
 
-function prefixedName(prefix: string | undefined, field: string): string | (string | number)[] {
-  return prefix ? [prefix, field] : field;
-}
-
 export default function NicConfigFields({
   form,
   customerId,
@@ -42,6 +38,7 @@ export default function NicConfigFields({
   showPreview = true
 }: NicConfigFieldsProps) {
   const { t } = useTranslation('device');
+  const { token } = theme.useToken();
   const { data: nicTemplates = [], isLoading: nicTplLoading } = useComponentTemplates(
     'nic',
     customerId
@@ -133,7 +130,7 @@ export default function NicConfigFields({
                   {fields.length > 1 && (
                     <MinusCircleOutlined
                       onClick={() => remove(name)}
-                      style={{ color: '#ff4d4f' }}
+                      style={{ color: token.colorError }}
                     />
                   )}
                 </Col>

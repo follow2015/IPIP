@@ -1,4 +1,3 @@
-from __future__ import annotations
 # -*- coding: utf-8 -*-
 """
 网络设备端口 ORM 模型
@@ -6,6 +5,7 @@ from __future__ import annotations
 定义网络设备端口拓扑关系表（network_ports）。
 统一端口表：同时承载手动维护端口和自动采集端口数据。
 """
+from __future__ import annotations
 import json
 
 from sqlalchemy import Integer, String, DateTime, ForeignKey, Index, UniqueConstraint
@@ -54,6 +54,10 @@ class NetworkPort(BaseModel):
     ip_address = db.Column(String(45), comment="端口主IP(deprecated,权威源为switch_port_ips)")
     customer_id = db.Column(db.BigInteger, ForeignKey("customers.id"), comment="客户ID")
     raw_info = db.Column(db.JSON, comment="原始端口信息(JSON)")
+    collect_trace = db.Column(
+        db.JSON,
+        comment="采集溯源：通道/质量/时间（与 raw_info 的端口配置文本职责分开）",
+    )
     data_source = db.Column(
         db.Enum("manual", "auto", "hybrid", name="data_source_enum"),
         default="manual", comment="数据来源(manual/auto/hybrid)",
@@ -111,6 +115,15 @@ class NetworkPort(BaseModel):
             except (ValueError, TypeError):
                 return value
         return value
+
+    @staticmethod
+    def normalize_collect_trace(value):
+        """归一 ``collect_trace`` 入参（与 ``raw_info`` 同规则，JSON 列不接受空串）。
+
+        直接复用 :meth:`normalize_raw_info` 的实现而不是抄一份：两者面对的是同一种
+        列类型与同一批"dict / json.dumps 字符串混用"的历史写法，抄一份必然漂移。
+        """
+        return NetworkPort.normalize_raw_info(value)
 
     @staticmethod
     def is_logical_port(port_name: str | None) -> bool:

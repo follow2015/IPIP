@@ -74,7 +74,7 @@ def _log_blocking_transactions(conn) -> None:
                 row[0], row[1], row[2], row[3],
                 query[:200] if query else "（空闲事务：事务已开启但当前没有在执行语句）",
             )
-    except Exception:  # noqa: BLE001 —— 诊断本身绝不能掩盖原始异常
+    except Exception:  # 诊断本身绝不能掩盖原始异常
         logger.warning("打印阻塞事务信息失败", exc_info=True)
     finally:
         cur.close()

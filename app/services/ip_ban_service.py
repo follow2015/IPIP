@@ -152,7 +152,7 @@ class IPBanService:
             _verify_ban_output(output, ip_address, action="ban")
         except BanCommandFailed:
             ssh_failed = True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 封禁状态机阶段2 SSH 下发兜底：任意 SSH 异常都必须置 ssh_failed 进入回滚路径（原态 + 清理），收窄会漏掉异常类型导致状态机卡在中间态
             ssh_failed = True
             logger.warning("三层封禁 SSH 异常: %s", exc)
 
@@ -207,7 +207,7 @@ class IPBanService:
             _verify_ban_output(output, ip_address, action="ban")
         except BanCommandFailed:
             ssh_failed = True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 封禁状态机阶段2 SSH 下发兜底：同 164
             ssh_failed = True
             logger.warning("二层封禁 SSH 异常: %s", exc)
 
@@ -300,7 +300,7 @@ class IPBanService:
             logger.info("三层解封 IP %s: 交换机配置不存在，视为已解封 (%s)", ip_address, exc)
         except BanCommandFailed:
             ssh_failed = True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 解封状态机阶段2 SSH 下发兜底：任意异常都必须置 ssh_failed 回滚到 BANNED，收窄会漏掉异常类型导致 DB 与设备状态不一致
             ssh_failed = True
             logger.warning("三层解封 SSH 异常: %s", exc)
 
@@ -343,7 +343,7 @@ class IPBanService:
             logger.info("二层解封 IP %s: 交换机配置不存在，视为已解封 (%s)", ip_address, exc)
         except BanCommandFailed:
             ssh_failed = True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 解封状态机阶段2 SSH 下发兜底：同 326
             ssh_failed = True
             logger.warning("二层解封 SSH 异常: %s", exc)
 
@@ -390,7 +390,7 @@ class IPBanService:
             if new_status != IPStatus.INACTIVE:
                 self.ip_mgr_repo.update_status(ip_address, room_id, new_status)
                 self.session.commit()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 解封后探测非致命：探测失败不影响解封结论，仅告警
             logger.warning("解封后探测 IP %s 状态失败（不影响解封结果）: %s", ip_address, exc)
 
         if already_unbanned:
@@ -501,7 +501,6 @@ class IPBanService:
         Raises:
             NoCoreSwitch: 找不到网关交换机
         """
-        from app.models.switch_credentials import IPSwitchInfo
 
         isi = self.ip_sw_repo.get_by_ip_room(ip_address, room_id)
         mac_address = ""
@@ -541,7 +540,6 @@ class IPBanService:
             if switch:
                 return switch, mac_address, vlan_id
 
-        from app.models.switch_credentials import IPSwitchInfo
         switch = self._pick_core_switch(ip_address, room_id)
         isi = self.ip_sw_repo.get_by_ip_room(ip_address, room_id)
         mac = isi.mac_address if isi else ""
@@ -656,7 +654,6 @@ class IPBanService:
         Returns:
             Optional[IPManager]: 封禁状态的 IP 记录
         """
-        from app.models.ip_model import IPManager
         return self.ip_mgr_repo.find_one({"ip_address": ip_address, "status": IPStatus.BANNED})
 
     def _find_ban_switch(self, ip_address: str, room_id: int):
@@ -802,24 +799,24 @@ def ban_ip_list(
             )
             groups[(switch.device_id, actual_mode)].append((ip, adapter, cmds_obj, switch, original_status, actual_room_id))
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 批量封禁预检单条失败隔离：记入 failed 后继续下一 IP，预检涉及 DB/Redis 多种异常类型不可枚举
             logger.error("批量封禁预检 %s 失败: %s", ip, exc)
             result["failed"].append({"ip": ip, "error": str(exc)})
 
     try:
         service.session.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 阶段1 commit 失败兜底：回滚并返回已收集结果，事务异常类型（ORM/SQLAlchemy）不可枚举
         logger.error("批量封禁阶段1 commit 失败: %s", exc)
         service.session.rollback()
         return result
 
-    for (switch_id, mode), items in groups.items():
+    for (_switch_id, mode), items in groups.items():
         ip, adapter, _, switch, _, _ = items[0]
         device_model = switch.device.device_model if switch.device else ""
         is_ce = adapter.is_ce_model(device_model) if hasattr(adapter, 'is_ce_model') else False
 
         merged_cmds = []
-        for ip_addr, _, cmds_obj, _, _, _ in items:
+        for _ip_addr, _, cmds_obj, _, _, _ in items:
             merged_cmds.extend(cmds_obj.ban_cmds)
 
         if is_ce:
@@ -831,7 +828,7 @@ def ban_ip_list(
 
         ssh_ok = True
         try:
-            output = service.ssh_mgr.send_config_commands(
+            service.ssh_mgr.send_config_commands(
                 switch=switch,
                 commands=merged_cmds,
                 save_cmd="",
@@ -841,7 +838,7 @@ def ban_ip_list(
                 service.ssh_mgr.send_config_commands(
                     switch=switch, commands=[], save_cmd=save_cmd,
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 按交换机分组下发命令兜底：SSH 异常类型不可枚举，置 ssh_ok=False 让该组所有 IP 走失败分支
             logger.error("批量封禁 switch=%s 命令下发失败: %s", switch.ip, exc)
             ssh_ok = False
 
@@ -859,13 +856,13 @@ def ban_ip_list(
                     service._deactivate_ban_record(ip_addr, actual_room_id)
                     _clear_ban_pending(ip_addr, actual_room_id)
                     result["failed"].append({"ip": ip_addr, "error": "SSH 命令下发失败"})
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- 阶段3 逐条 DB 同步失败隔离：记入 failed 后继续下一 IP，同 865
                 logger.error("批量封禁 %s 数据库同步失败: %s", ip_addr, exc)
                 result["failed"].append({"ip": ip_addr, "error": str(exc)})
 
         try:
             service.session.commit()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 阶段3 commit 失败兜底：回滚后继续处理下一组（不 return），保证一组提交失败不影响其它组，异常类型不可枚举
             logger.error("批量封禁阶段3 commit 失败: %s", exc)
             service.session.rollback()
 
@@ -934,24 +931,24 @@ def unban_ip_list(
             service.ip_mgr_repo.update_status(ip, actual_room_id, IPStatus.PENDING_UNBAN)
             groups[(switch.device_id, ban_mode)].append((ip, adapter, cmds_obj, switch, actual_room_id))
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 批量解封预检单条失败隔离：同 865
             logger.error("批量解封预检 %s 失败: %s", ip, exc)
             result["failed"].append({"ip": ip, "error": str(exc)})
 
     try:
         service.session.commit()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- 解封阶段1 commit 失败兜底：同 872
         logger.error("批量解封阶段1 commit 失败: %s", exc)
         service.session.rollback()
         return result
 
-    for (switch_id, mode), items in groups.items():
+    for (_switch_id, mode), items in groups.items():
         ip, adapter, _, switch, _ = items[0]
         device_model = switch.device.device_model if switch.device else ""
         is_ce = adapter.is_ce_model(device_model) if hasattr(adapter, 'is_ce_model') else False
 
         merged_cmds = []
-        for ip_addr, _, cmds_obj, _, _ in items:
+        for _ip_addr, _, cmds_obj, _, _ in items:
             merged_cmds.extend(cmds_obj.unban_cmds)
 
         if is_ce:
@@ -963,7 +960,7 @@ def unban_ip_list(
 
         ssh_ok = True
         try:
-            output = service.ssh_mgr.send_config_commands(
+            service.ssh_mgr.send_config_commands(
                 switch=switch,
                 commands=merged_cmds,
                 save_cmd="",
@@ -973,7 +970,7 @@ def unban_ip_list(
                 service.ssh_mgr.send_config_commands(
                     switch=switch, commands=[], save_cmd=save_cmd,
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 按交换机分组下发命令兜底：同 907
             logger.error("批量解封 switch=%s 命令下发失败: %s", switch.ip, exc)
             ssh_ok = False
 
@@ -1007,13 +1004,13 @@ def unban_ip_list(
                     service.ip_mgr_repo.update_status(ip_addr, actual_room_id, IPStatus.BANNED)
                     _clear_ban_pending(ip_addr, actual_room_id)
                     result["failed"].append({"ip": ip_addr, "error": "SSH 命令下发失败"})
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- 解封阶段3 逐条 DB 同步失败隔离：同 927
                 logger.error("批量解封 %s 数据库同步失败: %s", ip_addr, exc)
                 result["failed"].append({"ip": ip_addr, "error": str(exc)})
 
         try:
             service.session.commit()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- 解封阶段3 commit 失败兜底：回滚后继续处理下一组，同 934
             logger.error("批量解封阶段3 commit 失败: %s", exc)
             service.session.rollback()
 
@@ -1023,7 +1020,7 @@ def unban_ip_list(
                 if new_status != IPStatus.INACTIVE:
                     service.ip_mgr_repo.update_status(ip_addr, actual_room_id, new_status)
                     service.session.commit()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- 批量解封后探测非致命：探测失败不影响解封结论，仅告警
                 logger.warning("批量解封后探测 IP %s 状态失败（不影响解封结果）: %s", ip_addr, exc)
 
     return result
@@ -1118,14 +1115,12 @@ def check_ban_consistency(room_id: int = None) -> dict:
     """
     import json
     from app.utils.cache import cache_manager
-    from app.models.ip_model import IPManager
     from app.persistence.ip_repositories import IPManagerRepository, IPBanRecordRepository
 
     result = {"inconsistent": [], "pending_timeout": [], "pending_stuck": []}
 
     repo = IPManagerRepository()
     ban_repo = IPBanRecordRepository()
-    session = repo.session
 
     query = ban_repo.find_all_active()
     if room_id is not None:
@@ -1178,7 +1173,7 @@ def check_ban_consistency(room_id: int = None) -> dict:
         redis_pending = False
         try:
             redis_pending = cache_manager.get(redis_key) is not None
-        except Exception:  # noqa: BLE001 - Redis 不可用时按『无 pending 记录』处理（降级为仅查库）
+        except Exception:  # noqa: BLE001, S110 - Redis 不可用时按『无 pending 记录』处理（降级为仅查库）
             pass
 
         if not redis_pending:

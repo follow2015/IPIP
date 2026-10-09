@@ -6,6 +6,8 @@
  */
 import { useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
+import { isValidationError, firstFieldError } from '@/utils/formError';
 import {
   Card,
   Button,
@@ -93,6 +95,9 @@ export default function SilenceRulesPage() {
     modal.open();
   };
 
+  const isPending = createMut.isPending || updateMut.isPending;
+  const guard = useDirtyGuard({ form, isPending });
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -125,6 +130,10 @@ export default function SilenceRulesPage() {
       }
       modal.close();
     } catch (err: unknown) {
+      if (isValidationError(err)) {
+        message.error(firstFieldError(err) ?? tc('message.formValidationFailed'));
+        return;
+      }
       if (err instanceof Error && err.message) message.error(err.message);
     }
   };
@@ -247,8 +256,10 @@ export default function SilenceRulesPage() {
         title={editing ? t('silence.modal.editTitle') : t('silence.modal.createTitle')}
         open={modal.isOpen}
         onOk={handleSubmit}
-        onCancel={() => modal.close()}
-        confirmLoading={createMut.isPending || updateMut.isPending}
+        onCancel={() => guard.requestClose(() => modal.close())}
+        confirmLoading={isPending}
+        closable={!isPending}
+        mask={{ closable: false }}
         width={560}
         destroyOnHidden
       >

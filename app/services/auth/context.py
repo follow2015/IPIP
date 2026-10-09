@@ -9,9 +9,7 @@
 无任何业务依赖，utils 层内部也要用它）；此处 re-export，使认证服务的公共 API 保持完整。
 """
 import hashlib
-from typing import Optional
 
-from flask import g
 
 from app.utils.request_context import get_current_user_id  # noqa: F401  (re-export)
 

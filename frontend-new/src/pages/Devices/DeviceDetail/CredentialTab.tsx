@@ -23,7 +23,8 @@ import {
   Form,
   Alert,
   Switch,
-  Typography
+  Typography,
+  theme
 } from 'antd';
 import { useMessage } from '@/hooks/useMessage';
 import { useTranslation } from 'react-i18next';
@@ -52,6 +53,7 @@ interface CredCandidate {
 }
 
 export default function CredentialTab({ device }: { device: Device }) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
@@ -163,7 +165,9 @@ export default function CredentialTab({ device }: { device: Device }) {
           metric_template_group_id: groupId
         });
         message.success(
-          groupId === null ? t('credential.message.groupCleared') : t('credential.message.groupUpdated')
+          groupId === null
+            ? t('credential.message.groupCleared')
+            : t('credential.message.groupUpdated')
         );
         setSelectedGroupId(undefined);
       } catch (err) {
@@ -188,7 +192,7 @@ export default function CredentialTab({ device }: { device: Device }) {
     const payload: Record<string, unknown> = {};
     if (p === 'snmp') {
       const ver = (values.snmp_version as string) || 'v2c';
-      payload.version = ver;
+      payload.snmp_version = ver;
       if (ver === 'v2c') {
         payload.community = values.community;
       } else {
@@ -302,11 +306,7 @@ export default function CredentialTab({ device }: { device: Device }) {
               <Tag color="blue">{currentGroupName ?? `#${currentGroupId}`}</Tag>
             )}
           </Space>
-          <Alert
-            type="info"
-            showIcon
-            message={t('credential.templateGroupHint')}
-          />
+          <Alert type="info" showIcon message={t('credential.templateGroupHint')} />
           <Space style={{ width: '100%' }}>
             <Select
               style={{ width: 360 }}
@@ -401,7 +401,9 @@ export default function CredentialTab({ device }: { device: Device }) {
         <Space>
           <Select
             style={{ width: 320 }}
-            placeholder={candidates.length ? t('credential.selectShared') : t('credential.noAvailable')}
+            placeholder={
+              candidates.length ? t('credential.selectShared') : t('credential.noAvailable')
+            }
             value={selectedCredId}
             onChange={setSelectedCredId}
             disabled={candidates.length === 0}
@@ -424,7 +426,9 @@ export default function CredentialTab({ device }: { device: Device }) {
           </Button>
         </Space>
         {candidates.length === 0 && (
-          <div style={{ marginTop: 8, color: 'rgba(0,0,0,0.45)' }}>{t('credential.noAvailable')}</div>
+          <div style={{ marginTop: 8, color: token.colorTextTertiary }}>
+            {t('credential.noAvailable')}
+          </div>
         )}
       </Card>
 
@@ -548,7 +552,7 @@ function NewCredentialForm({
         </Form.Item>
       </Space>
       <MonitorCredentialForm protocol={protocol} mode="create" form={form} />
-      <Button type="primary" htmlType="submit" loading={submitting}>
+      <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
         {t('credential.createAndLink')}
       </Button>
     </Form>

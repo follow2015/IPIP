@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, Tag, Button, Space, Statistic, Row, Col, Empty, Tooltip } from 'antd';
+import { theme, Card, Tag, Button, Space, Statistic, Row, Col, Empty, Tooltip } from 'antd';
 import DataTable from '@/components/DataTable';
 import {
   ReloadOutlined,
@@ -61,6 +61,7 @@ const metricLabel = (key: string, t: TFunction<'ai'>) => {
 };
 
 export default function AIMonitor() {
+  const { token } = theme.useToken();
   const { t } = useTranslation('ai');
   const { t: tc } = useTranslation('common');
   const confirm = useConfirm();
@@ -235,7 +236,7 @@ export default function AIMonitor() {
               {t('monitor.status.notConfigured')}
             </Tag>
           )}
-          <span style={{ fontSize: 13, color: 'rgba(0,0,0,0.45)' }}>
+          <span style={{ fontSize: 13, color: token.colorTextTertiary }}>
             {aiConfigured === null
               ? t('monitor.ready.hintUnknown')
               : aiConfigured
@@ -296,7 +297,7 @@ export default function AIMonitor() {
                     {isRawText ? (
                       <>
                         <Tooltip title={key}>
-                          <div style={{ fontSize: 13, color: 'rgba(0,0,0,0.45)' }}>{key}</div>
+                          <div style={{ fontSize: 13, color: token.colorTextTertiary }}>{key}</div>
                         </Tooltip>
                         <pre
                           style={{ fontSize: 12, maxHeight: 300, overflow: 'auto', marginTop: 4 }}
@@ -317,7 +318,7 @@ export default function AIMonitor() {
                     ) : (
                       <>
                         <Tooltip title={key}>
-                          <div style={{ fontSize: 13, color: 'rgba(0,0,0,0.45)' }}>{key}</div>
+                          <div style={{ fontSize: 13, color: token.colorTextTertiary }}>{key}</div>
                         </Tooltip>
                         <div style={{ fontSize: 20, marginTop: 4 }}>
                           {val === null || val === undefined

@@ -9,6 +9,7 @@ import { MONITOR_PROTOCOL_OPTIONS } from '@/types/enums';
 import { useCreateAndLinkCredential } from '@/services/monitor';
 import MonitorCredentialForm from '@/components/MonitorCredentialForm';
 import { useMessage } from '@/hooks/useMessage';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
 import { useTranslation } from 'react-i18next';
 
 interface CreateCredentialModalProps {
@@ -24,6 +25,9 @@ export default function CreateCredentialModal({ open, form, onClose }: CreateCre
   const { t } = useTranslation('monitor');
   const { t: td } = useTranslation('device');
 
+  const isPending = createLink.isPending;
+  const guard = useDirtyGuard({ form, isPending });
+
   const handleSubmitForm = async () => {
     let values: Record<string, unknown>;
     try {
@@ -37,7 +41,7 @@ export default function CreateCredentialModal({ open, form, onClose }: CreateCre
 
     if (p === 'snmp') {
       const ver = (values.snmp_version as string) || 'v2c';
-      payload.version = ver;
+      payload.snmp_version = ver;
       if (ver === 'v2c') {
         payload.community = values.community;
       } else {
@@ -76,9 +80,11 @@ export default function CreateCredentialModal({ open, form, onClose }: CreateCre
     <Modal
       title={t('credential.createTitle')}
       open={open}
-      onCancel={onClose}
+      onCancel={() => guard.requestClose(onClose)}
       onOk={handleSubmitForm}
-      confirmLoading={createLink.isPending}
+      confirmLoading={isPending}
+      closable={!isPending}
+      mask={{ closable: false }}
       width={520}
       destroyOnHidden
     >

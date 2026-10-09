@@ -58,6 +58,15 @@ class DeviceMetricTimeseries(db.Model):
         nullable=True,
         comment="指标值（字符串存储，前端按 metric_type 解析为数值/状态）",
     )
+    value_num = db.Column(
+        db.Double,
+        nullable=True,
+        comment=(
+            "value 的数值派生列（非数值指标为 NULL）。供 M1 预聚合做 AVG/MIN/MAX，"
+            "避免 CAST(value) 全表扫；填充口径见 app/utils/metric_value.py::"
+            "parse_metric_value_num（严格解析，'port 3 down' 不会被误读成 3）"
+        ),
+    )
     severity = db.Column(
         db.String(20),
         nullable=True,
@@ -88,6 +97,7 @@ class DeviceMetricTimeseries(db.Model):
             "metric_key": self.metric_key,
             "index_key": self.index_key,
             "value": self.value,
+            "value_num": self.value_num,
             "severity": self.severity,
             "breached": self.breached,
             "collected_at": self.collected_at.isoformat() if self.collected_at else None,

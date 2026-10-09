@@ -116,10 +116,10 @@ class EmailChannel(PersonalChannel):
         """构建纯文本邮件正文"""
         lines = [
             f"{notification.title}",
-            f"",
+            "",
             f"{notification.content or ''}",
-            f"",
-            f"---",
+            "",
+            "---",
             f"类型: {notification.type}",
             f"严重程度: {severity_label}",
             f"来源: {notification.source_module or '系统'}",

@@ -73,7 +73,7 @@ class DatabaseConnectionError(DataAccessError):
             try:
                 safe_connection = connection_string.split('@')[-1] if '@' in connection_string else connection_string
                 details["connection_info"] = safe_connection
-            except Exception:
+            except Exception:  # noqa: BLE001 -- 连接信息脱敏兜底：解析失败即用 *** 占位（安全优先，绝不能泄露原始串）
                 details["connection_info"] = "***"
                 
         super().__init__(

@@ -7,7 +7,6 @@
 """
 from typing import Any, Dict
 
-from sqlalchemy import Index
 from sqlalchemy.dialects.mysql import SMALLINT
 from sqlalchemy.orm import relationship
 

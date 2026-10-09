@@ -1,8 +1,10 @@
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import { useEffect } from 'react';
 import { Modal, Form, Input, Radio, Select } from 'antd';
 import type { Role } from '@/types/models';
 import { useRoomList } from '@/services/room';
 import { useDeviceList } from '@/services/device';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
 import { useTranslation } from 'react-i18next';
 
 interface RoleFormProps {
@@ -14,7 +16,6 @@ interface RoleFormProps {
 }
 
 const DATA_SCOPE_VALUES = ['all', 'responsible_person', 'room', 'custom'] as const;
-type DataScopeValue = (typeof DATA_SCOPE_VALUES)[number];
 
 function RoleForm({ open, editRecord, onCancel, onOk, loading }: RoleFormProps) {
   const { t } = useTranslation('settings');
@@ -22,15 +23,19 @@ function RoleForm({ open, editRecord, onCancel, onOk, loading }: RoleFormProps) 
   const [form] = Form.useForm();
   const isEdit = !!editRecord;
 
-  const { data: roomsData } = useRoomList({ page: 1, per_page: 500 });
-  const { data: devicesData } = useDeviceList({ page: 1, per_page: 500 });
+  const { data: roomsData } = useRoomList({ page: 1, per_page: PER_PAGE_CAP });
+  const { data: devicesData } = useDeviceList({ page: 1, per_page: PER_PAGE_CAP });
   const rooms = roomsData?.items ?? [];
   const devices = devicesData?.items ?? [];
 
   const scope = Form.useWatch('data_scope', form);
 
+  const isPending = loading ?? false;
+  const guard = useDirtyGuard({ form, isPending });
+
   useEffect(() => {
     if (open && editRecord) {
+      form.resetFields();
       form.setFieldsValue({
         name: editRecord.name,
         display_name: editRecord.display_name,
@@ -63,9 +68,11 @@ function RoleForm({ open, editRecord, onCancel, onOk, loading }: RoleFormProps) 
       title={isEdit ? t('role.modal.editTitle') : t('role.modal.createTitle')}
       open={open}
       onOk={handleSubmit}
-      onCancel={onCancel}
+      onCancel={() => guard.requestClose(onCancel)}
       width={520}
-      confirmLoading={loading}
+      confirmLoading={isPending}
+      closable={!isPending}
+      mask={{ closable: false }}
       destroyOnHidden
     >
       <Form form={form} layout="vertical">

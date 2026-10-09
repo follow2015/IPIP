@@ -22,6 +22,7 @@
  * - toUpdatePayload:  更新请求体转换（如 {id, data} → data）
  * - optionsConfig:    下拉选项的自定义路径和字段映射
  */
+import { invalidateResourceGraph, type CacheResource } from './cache-invalidation';
 import {
   useQuery,
   useSuspenseQuery,
@@ -29,7 +30,7 @@ import {
   useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
-  type UseSuspenseQueryResult,
+  type UseSuspenseQueryResult
 } from '@tanstack/react-query';
 import { get, post, put, del } from './api-client';
 import { toSelectOptions } from './service-utils';
@@ -41,12 +42,13 @@ export interface SelectOption {
   value: string | number;
 }
 
-export interface CrudConfig<T, TCreate extends object, TUpdate extends { id: number }> {
+export interface CrudConfig<T, TUpdate extends { id: number }> {
   basePath: string;
   queryKey: readonly unknown[];
   createPath?: string;
   getId?: (data: TUpdate) => number;
   toUpdatePayload?: (data: TUpdate) => object;
+  invalidateResource?: CacheResource;
   optionsConfig?: {
     path?: string;
     paginated?: boolean;
@@ -67,7 +69,7 @@ export interface CrudHooks<
   T,
   TCreate extends object,
   TUpdate extends { id: number },
-  TParams extends PaginationParams = PaginationParams,
+  TParams extends PaginationParams = PaginationParams
 > {
   useList: (params?: TParams) => UseQueryResult<PaginatedData<T>, Error>;
   useDetail: (id: number, options?: { enabled?: boolean }) => UseQueryResult<T, Error>;
@@ -110,8 +112,8 @@ export function createCrudHooks<
   T extends object,
   TCreate extends object,
   TUpdate extends { id: number },
-  TParams extends PaginationParams = PaginationParams,
->(config: CrudConfig<T, TCreate, TUpdate>): CrudHooks<T, TCreate, TUpdate, TParams> {
+  TParams extends PaginationParams = PaginationParams
+>(config: CrudConfig<T, TUpdate>): CrudHooks<T, TCreate, TUpdate, TParams> {
   const {
     basePath,
     queryKey,
@@ -119,7 +121,13 @@ export function createCrudHooks<
     getId = defaultGetId as (data: TUpdate) => number,
     toUpdatePayload = defaultToUpdatePayload as (data: TUpdate) => object,
     optionsConfig,
+    invalidateResource
   } = config;
+
+  function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
+    qc.invalidateQueries({ queryKey });
+    if (invalidateResource) invalidateResourceGraph(qc, invalidateResource);
+  }
 
   function useList(params?: TParams) {
     return useQuery({
@@ -127,7 +135,7 @@ export function createCrudHooks<
       queryFn: async () => {
         const res = await get<PaginatedData<T>>(basePath, params as Record<string, unknown>);
         return res.data;
-      },
+      }
     });
   }
 
@@ -138,7 +146,7 @@ export function createCrudHooks<
         const res = await get<T>(`${basePath}/${id}`);
         return res.data;
       },
-      enabled: options?.enabled ?? id > 0,
+      enabled: options?.enabled ?? id > 0
     });
   }
 
@@ -148,7 +156,7 @@ export function createCrudHooks<
       queryFn: async () => {
         const res = await get<T>(`${basePath}/${id}`);
         return res.data;
-      },
+      }
     });
   }
 
@@ -156,9 +164,7 @@ export function createCrudHooks<
     const queryClient = useQueryClient();
     return useMutation({
       mutationFn: (data: TCreate) => post<T, TCreate>(createPath, data),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-      },
+      onSuccess: () => invalidateAll(queryClient)
     });
   }
 
@@ -170,9 +176,7 @@ export function createCrudHooks<
         const payload = toUpdatePayload(data);
         return put<T>(`${basePath}/${id}`, payload);
       },
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-      },
+      onSuccess: () => invalidateAll(queryClient)
     });
   }
 
@@ -180,9 +184,7 @@ export function createCrudHooks<
     const queryClient = useQueryClient();
     return useMutation({
       mutationFn: (id: number) => del<void>(`${basePath}/${id}`),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-      },
+      onSuccess: () => invalidateAll(queryClient)
     });
   }
 
@@ -201,7 +203,7 @@ export function createCrudHooks<
         }
         const res = await get<T[]>(optPath);
         return toSelectOptions(res.data ?? [], labelKey, valueKey) as SelectOption[];
-      },
+      }
     });
   }
 

@@ -13,7 +13,6 @@ import {
   Button,
   Select,
   Space,
-  Alert,
   Typography,
   Steps,
   Table,
@@ -21,15 +20,14 @@ import {
   Divider,
   Row,
   Col,
-  InputNumber
+  InputNumber,
+  theme
 } from 'antd';
 import {
   UploadOutlined,
   DownloadOutlined,
   ExportOutlined,
-  InboxOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined,
   FileExcelOutlined
 } from '@ant-design/icons';
 import { useDownloadTemplate, useImportData, useExportData } from '@/services/import-export';
@@ -111,6 +109,7 @@ interface FailedRowDetail {
 function ImportPanel() {
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
+  const { token } = theme.useToken();
   const message = useMessage();
   const [importType, setImportType] = useState<ImportExportType>(ImportExportType.DEVICE);
   const [deviceTemplateType, setDeviceTemplateType] = useState<DeviceType>(DeviceType.SERVER);
@@ -312,7 +311,11 @@ function ImportPanel() {
         </Col>
 
         <Col xs={24} lg={10}>
-          <Card title={td('importExport.guide.title')} size="small" styles={{ body: { padding: 16 } }}>
+          <Card
+            title={td('importExport.guide.title')}
+            size="small"
+            styles={{ body: { padding: 16 } }}
+          >
             <Space orientation="vertical" style={{ width: '100%' }} size="small">
               <Text>{td('importExport.guide.step1')}</Text>
               <Text>{td('importExport.guide.step2')}</Text>
@@ -368,7 +371,7 @@ function ImportPanel() {
             <Row gutter={16}>
               <Col xs={12} md={6}>
                 <Card size="small" styles={{ body: { textAlign: 'center', padding: '12px 0' } }}>
-                  <Title level={3} style={{ color: '#52c41a', margin: 0 }}>
+                  <Title level={3} style={{ color: token.colorSuccess, margin: 0 }}>
                     {importResult.imported_count}
                   </Title>
                   <Text type="secondary">{td('importExport.result.success')}</Text>
@@ -379,7 +382,7 @@ function ImportPanel() {
                   <Title
                     level={3}
                     style={{
-                      color: importResult.failed_count > 0 ? '#ff4d4f' : '#52c41a',
+                      color: importResult.failed_count > 0 ? token.colorError : token.colorSuccess,
                       margin: 0
                     }}
                   >
@@ -476,7 +479,9 @@ function ExportPanel() {
                 </Text>
                 <Space>
                   <Space.Compact>
-                    <Text style={{ lineHeight: '32px' }}>{td('importExport.export.cabinetId')}</Text>
+                    <Text style={{ lineHeight: '32px' }}>
+                      {td('importExport.export.cabinetId')}
+                    </Text>
                     <InputNumber
                       placeholder={td('importExport.export.all')}
                       value={cabinetId}
@@ -520,7 +525,11 @@ function ExportPanel() {
       </Col>
 
       <Col xs={24} lg={10}>
-        <Card title={td('importExport.export.guideTitle')} size="small" styles={{ body: { padding: 16 } }}>
+        <Card
+          title={td('importExport.export.guideTitle')}
+          size="small"
+          styles={{ body: { padding: 16 } }}
+        >
           <Space orientation="vertical" style={{ width: '100%' }} size="small">
             <Text>{td('importExport.export.excelFormat')}</Text>
             {isDevice && (

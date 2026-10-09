@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { reportClientError } from '@/services/errorReport';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -22,10 +23,7 @@ function FallbackText({ k }: { k: FallbackTextKey }) {
   return <>{t(k)}</>;
 }
 
-export class ErrorBoundary extends React.Component<
-  ErrorBoundaryProps,
-  ErrorBoundaryState
-> {
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -33,6 +31,10 @@ export class ErrorBoundary extends React.Component<
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    reportClientError(error, { component_stack: info.componentStack });
   }
 
   reset = () => {

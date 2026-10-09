@@ -13,10 +13,11 @@
  *   table={table}
  * />
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Select, Space, DatePicker } from 'antd';
+import { Select, Space, DatePicker, Collapse } from 'antd';
 import type { UseTableReturn } from '@/hooks/useTable';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const { RangePicker } = DatePicker;
 
@@ -41,59 +42,104 @@ export interface FilterBarProps {
 
 function FilterBar({ filters, table, extra, prefix }: FilterBarProps) {
   const { t } = useTranslation();
+  const { isMobile } = useResponsive();
   const { filters: filterValues, updateFilter } = table;
+  const [open, setOpen] = useState(false);
+
+  const visibleFilters = filters.filter((item) => !item.visible || item.visible(filterValues));
+  const activeCount = visibleFilters.filter((item) => {
+    const v = filterValues[item.key];
+    return v !== undefined && v !== null && v !== '';
+  }).length;
+
+  const renderItem = (item: FilterItem) => {
+    const currentValue = filterValues[item.key];
+
+    if (item.type === 'select') {
+      const selectValue =
+        currentValue !== undefined
+          ? (item.options?.find((o) => String(o.value) === currentValue)?.value ?? currentValue)
+          : undefined;
+
+      return (
+        <Select
+          key={item.key}
+          placeholder={item.label}
+          options={item.options}
+          allowClear
+          showSearch={item.showSearch}
+          filterOption={
+            item.showSearch
+              ? (input, option) =>
+                  (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+              : undefined
+          }
+          onSearch={item.onSearch}
+          style={{ width: isMobile ? '100%' : (item.width ?? 150) }}
+          value={selectValue}
+          onChange={(v) => {
+            if (typeof v !== 'object') updateFilter(item.key, v);
+          }}
+        />
+      );
+    }
+
+    if (item.type === 'rangePicker') {
+      return (
+        <RangePicker
+          key={item.key}
+          style={isMobile ? { width: '100%' } : undefined}
+          placeholder={item.placeholders ?? [t('range.startDate'), t('range.endDate')]}
+          onChange={(dates) => {
+            if (dates && dates[0] && dates[1]) {
+              updateFilter(
+                item.key,
+                `${dates[0].format('YYYY-MM-DD')}~${dates[1].format('YYYY-MM-DD')}`
+              );
+            } else {
+              updateFilter(item.key, undefined);
+            }
+          }}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  if (isMobile) {
+    return (
+      <Collapse
+        ghost
+        activeKey={open ? ['filters'] : []}
+        onChange={(keys) => setOpen(keys.length > 0)}
+        items={[
+          {
+            key: 'filters',
+            forceRender: true,
+            label:
+              activeCount > 0 ? t('filter.activeCount', { count: activeCount }) : t('filter.title'),
+            extra: (
+              <>
+                {prefix}
+                {extra}
+              </>
+            ),
+            children: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {visibleFilters.map((item) => renderItem(item))}
+              </div>
+            )
+          }
+        ]}
+      />
+    );
+  }
 
   return (
-    <Space wrap>
+    <Space wrap style={{ minWidth: 0 }}>
       {prefix}
-      {filters.map((item) => {
-        if (item.visible && !item.visible(filterValues)) return null;
-
-        const currentValue = filterValues[item.key];
-
-        if (item.type === 'select') {
-          const selectValue = currentValue !== undefined
-            ? item.options?.find(o => String(o.value) === currentValue)?.value ?? currentValue
-            : undefined;
-
-          return (
-            <Select
-              key={item.key}
-              placeholder={item.label}
-              options={item.options}
-              allowClear
-              showSearch={item.showSearch}
-              filterOption={item.showSearch
-                ? (input, option) =>
-                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-                : undefined
-              }
-              onSearch={item.onSearch}
-              style={{ width: item.width ?? 150 }}
-              value={selectValue}
-              onChange={(v) => { if (typeof v !== 'object') updateFilter(item.key, v); }}
-            />
-          );
-        }
-
-        if (item.type === 'rangePicker') {
-          return (
-            <RangePicker
-              key={item.key}
-              placeholder={item.placeholders ?? [t('range.startDate'), t('range.endDate')]}
-              onChange={(dates) => {
-                if (dates && dates[0] && dates[1]) {
-                  updateFilter(item.key, `${dates[0].format('YYYY-MM-DD')}~${dates[1].format('YYYY-MM-DD')}`);
-                } else {
-                  updateFilter(item.key, undefined);
-                }
-              }}
-            />
-          );
-        }
-
-        return null;
-      })}
+      {visibleFilters.map((item) => renderItem(item))}
       {extra}
     </Space>
   );

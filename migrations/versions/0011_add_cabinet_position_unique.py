@@ -63,7 +63,7 @@ def _log_duplicates(conn) -> int:
             JOIN ({_DUPLICATE_GROUP_SQL}) dup
               ON c.room_id = dup.room_id AND c.`row` = dup.`row` AND c.`col` = dup.`col`
             WHERE c.id <> dup.keep_id
-            """
+            """  # noqa: S608 -- alembic 迁移 DDL 无法参数化表/列名，标识符由脚本硬编码
         )
         rows = cur.fetchall()
         for cabinet_id, room_id, cabinet_number, row, col in rows:
@@ -99,7 +99,7 @@ def _demote_duplicates(conn) -> int:
                 SET c.`row` = NULL, c.`col` = NULL
                 WHERE c.id <> dup.keep_id
                 LIMIT {_CLEANUP_BATCH_SIZE}
-                """
+                """  # noqa: S608 -- 同上：DDL 表/列名硬编码
             )
             affected = cur.rowcount
             conn.commit()
@@ -156,7 +156,7 @@ def _log_blocking_transactions(conn) -> None:
                 "    SELECT trx_id, trx_state, trx_query FROM information_schema.innodb_trx;",
                 idle,
             )
-    except Exception:  # noqa: BLE001 —— 诊断本身绝不能掩盖原始异常
+    except Exception:  # 诊断本身绝不能掩盖原始异常
         logger.warning("打印阻塞事务信息失败", exc_info=True)
     finally:
         cur.close()

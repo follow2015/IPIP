@@ -60,7 +60,7 @@ class InspectionService:
             try:
                 raw = self.client.chat(SYSTEM, user_prompt)
                 lines = [line.strip("0123456789.、 ") for line in raw.splitlines() if line.strip()]
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 status = "error"
                 lines = [f"（AI 巡查失败：{e}）"]
                 raise
@@ -80,7 +80,7 @@ class InspectionService:
         with bind_scenario("inspection_summarize"), CallTimer() as t:
             try:
                 summary = self.client.chat("你是巡检报告助手，汇总以下发现为一段结论。", "\n".join(findings))
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 status = "error"
                 summary = f"（AI 汇总失败：{e}）"
                 raise

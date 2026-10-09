@@ -4,9 +4,10 @@
  * - 嵌套在 AppLayout 下
  */
 import React, { Suspense } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import type { RouteObject } from 'react-router-dom';
 import { PrivateRoute, PermissionRoute } from './guards';
+import { ROUTE_PERMISSIONS } from './routePermissions';
 import PageLoading from '@/components/PageLoading';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AppLayout from '@/components/Layout/AppLayout';
@@ -69,6 +70,8 @@ const AIAuditPage = React.lazy(() => import('@/pages/AI/AIAudit'));
 const AIRAGPage = React.lazy(() => import('@/pages/AI/RAG'));
 const AIDiagnosisPage = React.lazy(() => import('@/pages/AIDiagnosis'));
 const VendorBrandsPage = React.lazy(() => import('@/pages/Asset/VendorBrands'));
+const CarriersPage = React.lazy(() => import('@/pages/Carriers'));
+const CircuitsPage = React.lazy(() => import('@/pages/Circuits'));
 const NotFound = React.lazy(() => import('@/pages/NotFound'));
 
 const withSuspense = (Component: React.LazyExoticComponent<React.ComponentType>) => (
@@ -79,6 +82,16 @@ const withSuspense = (Component: React.LazyExoticComponent<React.ComponentType>)
   </ErrorBoundary>
 );
 
+const guarded = (
+  routePath: string,
+  Component: React.LazyExoticComponent<React.ComponentType>
+): React.ReactNode => {
+  const page = withSuspense(Component);
+  const requiredPermission = ROUTE_PERMISSIONS[routePath];
+  if (!requiredPermission) return page;
+  return <PermissionRoute requiredPermission={requiredPermission}>{page}</PermissionRoute>;
+};
+
 export const routes: RouteObject[] = [
   {
     path: '/login',
@@ -86,7 +99,11 @@ export const routes: RouteObject[] = [
   },
   {
     path: '/monitor/noc-screen/fullscreen',
-    element: <PrivateRoute>{withSuspense(MonitorNocScreenFullscreen)}</PrivateRoute>
+    element: (
+      <PrivateRoute>
+        {guarded('/monitor/noc-screen/fullscreen', MonitorNocScreenFullscreen)}
+      </PrivateRoute>
+    )
   },
   {
     path: '/',
@@ -97,108 +114,44 @@ export const routes: RouteObject[] = [
     ),
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: 'dashboard', element: withSuspense(Dashboard) },
-      { path: 'rooms', element: withSuspense(Rooms) },
-      { path: 'rooms/overview', element: withSuspense(RoomOverview) },
-      { path: 'rooms/:id', element: withSuspense(RoomDetail) },
-      { path: 'cabinets', element: withSuspense(Cabinets) },
-      { path: 'cabinets/:id', element: withSuspense(CabinetDetail) },
-      { path: 'devices', element: withSuspense(Devices) },
-      { path: 'devices/:id', element: withSuspense(DeviceDetail) },
-      {
-        path: 'device-recycle-bin',
-        element: (
-          <PermissionRoute requiredPermission="device:view">
-            {withSuspense(DeviceRecycleBin)}
-          </PermissionRoute>
-        )
-      },
-      { path: 'ip', element: withSuspense(IP) },
-      { path: 'ip/audit', element: withSuspense(IPAudit) },
-      { path: 'switches', element: withSuspense(Switches) },
-      { path: 'switches/:id', element: withSuspense(SwitchDetail) },
-      { path: 'network', element: withSuspense(Network) },
-      { path: 'network/:ipNetwork', element: withSuspense(NetworkDetail) },
-      { path: 'import-export', element: withSuspense(ImportExport) },
-      { path: 'customers', element: withSuspense(Customers) },
-      { path: 'customers/:id', element: withSuspense(CustomerDetail) },
-      {
-        path: 'users',
-        element: (
-          <PermissionRoute requiredPermission="user:view">{withSuspense(Users)}</PermissionRoute>
-        )
-      },
-      { path: 'profile', element: withSuspense(Profile) },
-      {
-        path: 'rbac',
-        element: (
-          <PermissionRoute requiredPermission="rbac:view">{withSuspense(RBAC)}</PermissionRoute>
-        )
-      },
-      { path: 'login-logs', element: withSuspense(LoginLogs) },
-      { path: 'vlans', element: withSuspense(VLANsPage) },
-      { path: 'link-aggregations', element: withSuspense(LinkAggregationsPage) },
-      { path: 'topology', element: withSuspense(Topology) },
-      { path: 'virtual-rooms', element: withSuspense(VirtualRooms) },
+      { path: 'dashboard', element: guarded('dashboard', Dashboard) },
+      { path: 'rooms', element: guarded('rooms', Rooms) },
+      { path: 'rooms/overview', element: guarded('rooms/overview', RoomOverview) },
+      { path: 'rooms/:id', element: guarded('rooms/:id', RoomDetail) },
+      { path: 'cabinets', element: guarded('cabinets', Cabinets) },
+      { path: 'cabinets/:id', element: guarded('cabinets/:id', CabinetDetail) },
+      { path: 'devices', element: guarded('devices', Devices) },
+      { path: 'devices/:id', element: guarded('devices/:id', DeviceDetail) },
+      { path: 'device-recycle-bin', element: guarded('device-recycle-bin', DeviceRecycleBin) },
+      { path: 'ip', element: guarded('ip', IP) },
+      { path: 'ip/audit', element: guarded('ip/audit', IPAudit) },
+      { path: 'switches', element: guarded('switches', Switches) },
+      { path: 'switches/:id', element: guarded('switches/:id', SwitchDetail) },
+      { path: 'network', element: guarded('network', Network) },
+      { path: 'network/:ipNetwork', element: guarded('network/:ipNetwork', NetworkDetail) },
+      { path: 'import-export', element: guarded('import-export', ImportExport) },
+      { path: 'customers', element: guarded('customers', Customers) },
+      { path: 'customers/:id', element: guarded('customers/:id', CustomerDetail) },
+      { path: 'carriers', element: guarded('carriers', CarriersPage) },
+      { path: 'circuits', element: guarded('circuits', CircuitsPage) },
+      { path: 'users', element: guarded('users', Users) },
+      { path: 'profile', element: guarded('profile', Profile) },
+      { path: 'rbac', element: guarded('rbac', RBAC) },
+      { path: 'login-logs', element: guarded('login-logs', LoginLogs) },
+      { path: 'vlans', element: guarded('vlans', VLANsPage) },
+      { path: 'link-aggregations', element: guarded('link-aggregations', LinkAggregationsPage) },
+      { path: 'topology', element: guarded('topology', Topology) },
+      { path: 'virtual-rooms', element: guarded('virtual-rooms', VirtualRooms) },
       { path: 'monitor', element: <Navigate to="/monitor/overview" replace /> },
-      {
-        path: 'monitor/overview',
-        element: (
-          <PermissionRoute requiredPermission="monitor:view">
-            {withSuspense(MonitorOverview)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'monitor/credentials',
-        element: (
-          <PermissionRoute requiredPermission="monitor:view">
-            {withSuspense(MonitorCredentials)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'monitor/settings',
-        element: (
-          <PermissionRoute requiredPermission="monitor:view">
-            {withSuspense(MonitorSettings)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'monitor/alerts',
-        element: (
-          <PermissionRoute requiredPermission="monitor:view">
-            {withSuspense(MonitorAlertCenter)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'monitor/incidents',
-        element: (
-          <PermissionRoute requiredPermission="monitor:view">
-            {withSuspense(MonitorIncidents)}
-          </PermissionRoute>
-        )
-      },
+      { path: 'monitor/overview', element: guarded('monitor/overview', MonitorOverview) },
+      { path: 'monitor/credentials', element: guarded('monitor/credentials', MonitorCredentials) },
+      { path: 'monitor/settings', element: guarded('monitor/settings', MonitorSettings) },
+      { path: 'monitor/alerts', element: guarded('monitor/alerts', MonitorAlertCenter) },
+      { path: 'monitor/incidents', element: guarded('monitor/incidents', MonitorIncidents) },
       { path: 'monitor/reports', element: <Navigate to="/monitor/alerts?tab=reports" replace /> },
       { path: 'monitor/noc-screen', element: <Navigate to="/monitor/alerts?tab=noc" replace /> },
-      {
-        path: 'monitor/history',
-        element: (
-          <PermissionRoute requiredPermission="monitor:view">
-            {withSuspense(MonitorHistory)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'monitor/alert-rules',
-        element: (
-          <PermissionRoute requiredPermission="monitor:config">
-            {withSuspense(MonitorAlertRules)}
-          </PermissionRoute>
-        )
-      },
+      { path: 'monitor/history', element: guarded('monitor/history', MonitorHistory) },
+      { path: 'monitor/alert-rules', element: guarded('monitor/alert-rules', MonitorAlertRules) },
       {
         path: 'monitor/silence-rules',
         element: <Navigate to="/monitor/alert-rules?tab=silence" replace />
@@ -211,14 +164,7 @@ export const routes: RouteObject[] = [
         path: 'monitor/escalation-policies',
         element: <Navigate to="/monitor/alert-rules?tab=escalation" replace />
       },
-      {
-        path: 'monitor/thresholds',
-        element: (
-          <PermissionRoute requiredPermission="monitor:config">
-            {withSuspense(MonitorThresholds)}
-          </PermissionRoute>
-        )
-      },
+      { path: 'monitor/thresholds', element: guarded('monitor/thresholds', MonitorThresholds) },
       {
         path: 'monitor/metric-templates',
         element: <Navigate to="/monitor/thresholds?tab=templates" replace />
@@ -231,115 +177,38 @@ export const routes: RouteObject[] = [
         path: 'monitor/sla-targets',
         element: <Navigate to="/monitor/thresholds?tab=sla" replace />
       },
-      {
-        path: 'monitor/oid-tools',
-        element: (
-          <PermissionRoute requiredPermission="monitor:config">
-            {withSuspense(MonitorOidTools)}
-          </PermissionRoute>
-        )
-      },
+      { path: 'monitor/oid-tools', element: guarded('monitor/oid-tools', MonitorOidTools) },
       { path: 'monitor/mib-scan', element: <Navigate to="/monitor/oid-tools?tab=mib" replace /> },
       {
         path: 'monitor/oid-rule-config',
         element: <Navigate to="/monitor/oid-tools?tab=oid-rules" replace />
       },
       { path: 'ai', element: <Navigate to="/ai/nlq" replace /> },
+      { path: 'ai/nlq', element: guarded('ai/nlq', AIPage) },
+      { path: 'ai/skills', element: guarded('ai/skills', AISkillsPage) },
+      { path: 'ai/config', element: guarded('ai/config', AIConfigPage) },
+      { path: 'ai/monitor', element: guarded('ai/monitor', AIMonitorPage) },
+      { path: 'ai/audit', element: guarded('ai/audit', AIAuditPage) },
+      { path: 'ai/rag', element: guarded('ai/rag', AIRAGPage) },
+      { path: 'ai/diagnosis', element: guarded('ai/diagnosis', AIDiagnosisPage) },
+      { path: 'audit-logs', element: guarded('audit-logs', AuditLogsPage) },
+      { path: 'asset/vendor-brands', element: guarded('asset/vendor-brands', VendorBrandsPage) },
       {
-        path: 'ai/nlq',
-        element: (
-          <PermissionRoute requiredPermission="ai:use">{withSuspense(AIPage)}</PermissionRoute>
-        )
+        path: 'settings/component-templates',
+        element: guarded('settings/component-templates', ComponentTemplateManager)
       },
-      {
-        path: 'ai/skills',
-        element: (
-          <PermissionRoute requiredPermission="ai:admin">
-            {withSuspense(AISkillsPage)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'ai/config',
-        element: (
-          <PermissionRoute requiredPermission="ai:admin">
-            {withSuspense(AIConfigPage)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'ai/monitor',
-        element: (
-          <PermissionRoute requiredPermission="ai:admin">
-            {withSuspense(AIMonitorPage)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'ai/audit',
-        element: (
-          <PermissionRoute requiredPermission="ai:admin">
-            {withSuspense(AIAuditPage)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'ai/rag',
-        element: (
-          <PermissionRoute requiredPermission="ai:use">{withSuspense(AIRAGPage)}</PermissionRoute>
-        )
-      },
-      {
-        path: 'ai/diagnosis',
-        element: (
-          <PermissionRoute requiredPermission="ai:agentic">
-            {withSuspense(AIDiagnosisPage)}
-          </PermissionRoute>
-        )
-      },
-      { path: 'audit-logs', element: withSuspense(AuditLogsPage) },
-      {
-        path: 'asset/vendor-brands',
-        element: (
-          <PermissionRoute requiredPermission="monitor:config">
-            {withSuspense(VendorBrandsPage)}
-          </PermissionRoute>
-        )
-      },
-      { path: 'settings/component-templates', element: withSuspense(ComponentTemplateManager) },
       {
         path: 'settings/notification-preferences',
-        element: withSuspense(NotificationPreferencesPage)
+        element: guarded('settings/notification-preferences', NotificationPreferencesPage)
       },
       {
         path: 'settings/webhook-configs',
-        element: (
-          <PermissionRoute requiredPermission="user:view">
-            {withSuspense(WebhookConfigManagement)}
-          </PermissionRoute>
-        )
+        element: guarded('settings/webhook-configs', WebhookConfigManagement)
       },
-      {
-        path: 'settings/mail',
-        element: (
-          <PermissionRoute requiredPermission="user:view">
-            {withSuspense(MailSettings)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'settings/voice',
-        element: (
-          <PermissionRoute requiredPermission="user:view">
-            {withSuspense(VoiceSettings)}
-          </PermissionRoute>
-        )
-      },
-      {
-        path: 'settings/licenses',
-        element: withSuspense(Licenses)
-      },
-      { path: '*', element: withSuspense(NotFound) }
+      { path: 'settings/mail', element: guarded('settings/mail', MailSettings) },
+      { path: 'settings/voice', element: guarded('settings/voice', VoiceSettings) },
+      { path: 'settings/licenses', element: guarded('settings/licenses', Licenses) },
+      { path: '*', element: guarded('*', NotFound) }
     ]
   }
 ];

@@ -147,7 +147,7 @@ class SchemaMigrationRunner:
             return set()
         cur = self._conn.cursor()
         try:
-            cur.execute(f"SELECT version FROM {VERSION_TABLE}")
+            cur.execute(f"SELECT version FROM {VERSION_TABLE}")  # noqa: S608 -- VERSION_TABLE 为模块常量
             return {row[0] for row in cur.fetchall()}
         finally:
             cur.close()
@@ -175,7 +175,7 @@ class SchemaMigrationRunner:
             cur = self._conn.cursor()
             try:
                 cur.execute(
-                    f"INSERT INTO {VERSION_TABLE} (version, description)"
+                    f"INSERT INTO {VERSION_TABLE} (version, description)"  # noqa: S608 -- 同上：表名常量，值走 %s 参数绑定
                     " VALUES (%s, %s)",
                     (mf.version, mf.description),
                 )

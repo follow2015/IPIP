@@ -6,6 +6,8 @@
  */
 import { useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
+import { useDirtyGuard } from '@/hooks/useDirtyGuard';
+import { isValidationError, firstFieldError } from '@/utils/formError';
 import {
   Card,
   Button,
@@ -21,7 +23,8 @@ import {
   Statistic,
   Row,
   Col,
-  Progress
+  Progress,
+  theme
 } from 'antd';
 import {
   PlusOutlined,
@@ -50,6 +53,7 @@ const { Text } = Typography;
 export default function SlaTargetsPage() {
   const { t } = useTranslation('monitor');
   const { t: tc } = useTranslation('common');
+  const { token } = theme.useToken();
   const { data, isLoading } = useSlaTargets();
   const { data: achievementsData } = useSlaAchievements();
   const createMut = useCreateSlaTarget();
@@ -91,6 +95,9 @@ export default function SlaTargetsPage() {
     modal.open();
   };
 
+  const isPending = createMut.isPending || updateMut.isPending;
+  const guard = useDirtyGuard({ form, isPending });
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -119,6 +126,10 @@ export default function SlaTargetsPage() {
       }
       modal.close();
     } catch (err: unknown) {
+      if (isValidationError(err)) {
+        message.error(firstFieldError(err) ?? tc('message.formValidationFailed'));
+        return;
+      }
       if (err instanceof Error && err.message) message.error(err.message);
     }
   };
@@ -219,9 +230,9 @@ export default function SlaTargetsPage() {
                       suffix={actualPct !== null ? '%' : ''}
                       prefix={
                         a.met_sla ? (
-                          <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                          <CheckCircleOutlined style={{ color: token.colorSuccess }} />
                         ) : (
-                          <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+                          <CloseCircleOutlined style={{ color: token.colorError }} />
                         )
                       }
                     />
@@ -272,8 +283,10 @@ export default function SlaTargetsPage() {
         title={editing ? t('sla.modal.editTitle') : t('sla.modal.createTitle')}
         open={modal.isOpen}
         onOk={handleSubmit}
-        onCancel={() => modal.close()}
-        confirmLoading={createMut.isPending || updateMut.isPending}
+        onCancel={() => guard.requestClose(() => modal.close())}
+        confirmLoading={isPending}
+        closable={!isPending}
+        mask={{ closable: false }}
         width={560}
         destroyOnHidden
       >
@@ -282,7 +295,10 @@ export default function SlaTargetsPage() {
             name="name"
             label={t('sla.field.name')}
             rules={[
-              { required: true, message: tc('validation.inputRequiredField', { field: tc('field.name') }) }
+              {
+                required: true,
+                message: tc('validation.inputRequiredField', { field: tc('field.name') })
+              }
             ]}
           >
             <Input placeholder={t('sla.placeholder.name')} maxLength={128} />
@@ -290,7 +306,9 @@ export default function SlaTargetsPage() {
           <Form.Item
             name="target_device_ids"
             label={t('sla.field.targetDeviceIds')}
-            rules={[{ required: true, message: t('thresholdOverride.validation.deviceIdRequired') }]}
+            rules={[
+              { required: true, message: t('thresholdOverride.validation.deviceIdRequired') }
+            ]}
           >
             <Input placeholder={t('sla.placeholder.deviceIds')} />
           </Form.Item>
@@ -315,7 +333,11 @@ export default function SlaTargetsPage() {
             <InputNumber placeholder="30" style={{ width: '100%' }} min={1} max={365} />
           </Form.Item>
           <Form.Item name="description" label={tc('field.description')}>
-            <Input.TextArea rows={2} placeholder={t('sla.placeholder.description')} maxLength={255} />
+            <Input.TextArea
+              rows={2}
+              placeholder={t('sla.placeholder.description')}
+              maxLength={255}
+            />
           </Form.Item>
           <Form.Item name="enabled" label={tc('action.enable')} valuePropName="checked">
             <Switch />

@@ -31,7 +31,6 @@ from app.services.monitoring.adapters.base_adapter import (
 )
 from app.services.monitoring.adapters.snmp_adapter import (
     _snmp_collect_metrics,
-    _snmp_walk_table_async,
 )
 from app.utils.port_name_parser import parse_port_name
 
@@ -42,6 +41,101 @@ _IF_DESCR_OID = "1.3.6.1.2.1.2.2.1.2"          # ifDescr
 _IF_OPER_STATUS_OID = "1.3.6.1.2.1.2.2.1.8"    # ifOperStatus
 _IF_ADMIN_STATUS_OID = "1.3.6.1.2.1.2.2.1.7"   # ifAdminStatus
 _IF_SPEED_OID = "1.3.6.1.2.1.2.2.1.5"          # ifSpeed
+
+_IF_ALIAS_OID = "1.3.6.1.2.1.31.1.1.1.18"       # ifAlias → description
+_IF_PHYS_ADDRESS_OID = "1.3.6.1.2.1.2.2.1.6"    # ifPhysAddress → mac
+_DOT1Q_PVID_OID = "1.3.6.1.2.1.17.7.1.4.5.1.1"  # dot1qPvid → vlan（Q-BRIDGE-MIB）
+_IP_AD_ENT_IF_INDEX_OID = "1.3.6.1.2.1.4.20.1.2"  # ipAdEntIfIndex（索引=IP，值=ifIndex）
+_IP_AD_ENT_NET_MASK_OID = "1.3.6.1.2.1.4.20.1.3"  # ipAdEntNetMask（索引=IP，值=掩码）
+_IF_HIGH_SPEED_OID = "1.3.6.1.2.1.31.1.1.1.15"   # ifHighSpeed（Mbps，64 位，不受 ifSpeed 32 位溢出影响）
+
+
+def _normalize_mac(raw: str | None) -> str | None:
+    """``ifPhysAddress`` 归一到本项目的 MAC 格式 ``xxxx-xxxx-xxxx``。
+
+    pysnmp 对 OctetString 的 prettyPrint 给的是 ``0x001122334455``，而 CLI 侧模板
+    的 HARDWARE_ADDRESS 产出的是 ``0011-2233-4455`` —— 两条路径写同一列，
+    格式必须统一，否则前端与关联逻辑会当成两个不同的 MAC。
+    全零 MAC（设备未分配）归一为 None（列里已有 NULL 语义，不必制造 0000-0000-0000）。
+    """
+    if not raw:
+        return None
+    text = raw.strip()
+    if text.lower().startswith("0x"):
+        text = text[2:]
+    text = "".join(ch for ch in text if ch.isalnum()).lower()
+    if len(text) != 12 or any(ch not in "0123456789abcdef" for ch in text):
+        return text or None
+    if text == "0" * 12:
+        return None
+    return f"{text[0:4]}-{text[4:8]}-{text[8:12]}"
+
+
+def _high_speed_to_label(high_speed_mbps: str) -> str:
+    """``ifHighSpeed``（**Mbps**）→ 速率标签，优先于 ifSpeed。
+
+    [WARN] ifSpeed 是 32 位计数器，≥40G 的端口会溢出（4.29Gbps 封顶）——
+    真机 40GE 口因此全显示 1G（用户实测）。ifHighSpeed 单位是 Mbps 且 64 位，
+    不受溢出影响，必须优先使用；0/缺失回退 ifSpeed（老设备只实现 ifSpeed）。
+    """
+    try:
+        mbps = int(high_speed_mbps)
+    except (ValueError, TypeError):
+        return ""
+    if mbps <= 0:
+        return ""
+    gbps = mbps / 1_000
+    if gbps >= 200:
+        return "200G"
+    if gbps >= 100:
+        return "100G"
+    if gbps >= 50:
+        return "50G"
+    if gbps >= 40:
+        return "40G"
+    if gbps >= 25:
+        return "25G"
+    if gbps >= 10:
+        return "10G"
+    if gbps >= 1:
+        return "1G"
+    return f"{mbps}M"
+
+
+def _ips_by_ifindex(ifindex_table: dict, netmask_table: dict | None = None) -> dict:
+    """组装 ``{ifIndex: "10.0.0.1/24,10.0.0.2/24"}`` —— **保留全部 IP**。
+
+    [WARN] 必须保留多值，不能只取一个：CLI 侧的 ``ParsedPort.ip_address`` 是
+    ``display interface`` 的 ``INTERNET_ADDRESS``（TextFSM **List**）用 ``,`` 拼接的
+    **全部 IP**（含掩码），下游 ``_sync_port_ips`` 逐条写 ``sw_info_ip``（第一个为主 IP）。
+    只取一个会让"同一 VLAN 下配了多 IP"的端口在台账里**丢一半**（用户实测指出的缺陷）。
+
+    三张 IP-MIB 表的协作（都以 IP 为多段索引，故 walk 时需 ``full_index=True``）：
+
+    - ``ipAdEntIfIndex``：值 = ifIndex → 决定该 IP 属于哪个端口（反查的依据）
+    - ``ipAdEntNetMask``：值 = 掩码 → 拼成 ``addr/prefixlen``，与 CLI 的 ``10.0.0.1/24`` 同形态
+    - （``ipAdEntAddr`` 可选，值 = IP 本身，用于校核）
+
+    同端口多 IP 按**字典序**拼接：稳定可复现，不随 walk 返回顺序漂移。
+    """
+    import ipaddress
+
+    grouped: dict[str, list[str]] = {}
+    for ip, idx in (ifindex_table or {}).items():
+        address = str(ip).strip()
+        key = str(idx).strip()
+        if not address or not key:
+            continue
+        mask = str((netmask_table or {}).get(ip, "") or "").strip()
+        entry = address
+        if mask:
+            try:
+                prefixlen = ipaddress.IPv4Network(f"0.0.0.0/{mask}").prefixlen
+                entry = f"{address}/{prefixlen}"
+            except ValueError:
+                entry = address
+        grouped.setdefault(key, []).append(entry)
+    return {key: ",".join(sorted(values)) for key, values in grouped.items()}
 
 _OPER_STATUS_MAP = {
     "1": "up",
@@ -125,7 +219,8 @@ class SnmpPortCollector:
     列表 + 状态，输出 ``port_rows`` 供 ``incremental_update`` 消费。
     """
 
-    def collect(self, credential: dict, ip: str, timeout: int | None = None, device=None) -> list[dict]:
+    def collect(self, credential: dict, ip: str, timeout: int | None = None,
+                device=None, raw: dict | None = None) -> list[dict]:
         """采集设备端口列表，返回 port_rows（与 SSH 适配器输出对齐）。
 
         Args:
@@ -133,6 +228,8 @@ class SnmpPortCollector:
             ip: 设备管理 IP
             timeout: 采集超时（秒），缺省走 monitor_timeout_seconds()
             device: 设备 ORM 对象（SNMP 不需要，仅为统一 collector 接口）
+            raw: 快照注入（``{metric_key: {index: value}}``，步 2 同语义：
+                **有键哪怕空 = 信任，缺键 = 只补 walk 缺的那张**；None = 自己 walk）。
 
         Returns:
             list[dict]: port_rows，每个 dict 含 port_name / port_type / slot /
@@ -146,19 +243,47 @@ class SnmpPortCollector:
             {"metric_key": "ifOperStatus", "oid": _IF_OPER_STATUS_OID},
             {"metric_key": "ifAdminStatus", "oid": _IF_ADMIN_STATUS_OID},
             {"metric_key": "ifSpeed", "oid": _IF_SPEED_OID},
+            {"metric_key": "ifHighSpeed", "oid": _IF_HIGH_SPEED_OID},
+            {"metric_key": "ifAlias", "oid": _IF_ALIAS_OID},
+            {"metric_key": "ifPhysAddress", "oid": _IF_PHYS_ADDRESS_OID},
+            {"metric_key": "dot1qPvid", "oid": _DOT1Q_PVID_OID},
+            {"metric_key": "ipAdEntIfIndex", "oid": _IP_AD_ENT_IF_INDEX_OID,
+             "full_index": True},
+            {"metric_key": "ipAdEntNetMask", "oid": _IP_AD_ENT_NET_MASK_OID,
+             "full_index": True},
         ]
-        ok, raw, _elapsed = run_with_timeout(
-            lambda: _snmp_collect_metrics(credential, ip, templates, snmp_timeout),
-            snmp_timeout + 3,
-        )
-        if not ok or not isinstance(raw, dict):
-            return []
+
+        if raw is None:
+            ok, raw, _elapsed = run_with_timeout(
+                lambda: _snmp_collect_metrics(credential, ip, templates, snmp_timeout),
+                snmp_timeout + 3,
+            )
+            if not ok or not isinstance(raw, dict):
+                return []
+        else:
+            missing = [t for t in templates if t.get("metric_key") not in raw]
+            if missing:
+                ok, fetched, _elapsed = run_with_timeout(
+                    lambda: _snmp_collect_metrics(credential, ip, missing, snmp_timeout),
+                    snmp_timeout + 3,
+                )
+                if ok and isinstance(fetched, dict):
+                    merged = dict(raw)
+                    merged.update(fetched)
+                    raw = merged
 
         if_name_table = raw.get("ifName", {})
         if_descr_table = raw.get("ifDescr", {})
         if_oper_table = raw.get("ifOperStatus", {})
         if_admin_table = raw.get("ifAdminStatus", {})
         if_speed_table = raw.get("ifSpeed", {})
+        if_high_speed_table = raw.get("ifHighSpeed", {})
+        if_alias_table = raw.get("ifAlias", {})
+        if_phys_table = raw.get("ifPhysAddress", {})
+        dot1q_pvid_table = raw.get("dot1qPvid", {})
+        ips_by_index = _ips_by_ifindex(
+            raw.get("ipAdEntIfIndex", {}), raw.get("ipAdEntNetMask", {}),
+        )
 
         if not if_name_table and not if_descr_table:
             return []
@@ -184,7 +309,14 @@ class SnmpPortCollector:
             oper_status = if_oper_table.get(if_index, "")
             admin_status = if_admin_table.get(if_index, "")
             link_status = _resolve_link_status(oper_status, admin_status)
-            speed = _speed_bps_to_label(if_speed_table.get(if_index, ""))
+            high = (if_high_speed_table.get(if_index) or "").strip()
+            if high.isdigit() and int(high) > 0:
+                speed = _high_speed_to_label(high)
+            else:
+                speed = _speed_bps_to_label(if_speed_table.get(if_index, ""))
+
+            alias = (if_alias_table.get(if_index) or "").strip() or None
+            pvid = (dot1q_pvid_table.get(if_index) or "").strip()
 
             port_rows.append({
                 "port_name": port_name,
@@ -194,10 +326,26 @@ class SnmpPortCollector:
                 "port_number": parsed["port_number"],
                 "link_status": link_status,
                 "speed": speed,
-                "description": None,
-                "vlan": None,
-                "mac": None,
-                "ip_address": None,
+                "description": alias,
+                "vlan": int(pvid) if pvid.isdigit() else None,
+                "mac": _normalize_mac(if_phys_table.get(if_index)),
+                "ip_address": ips_by_index.get(if_index),
             })
 
         return port_rows
+
+
+
+SNAPSHOT_TABLES: tuple[dict, ...] = (
+    {"metric_key": "ifName", "oid": _IF_NAME_OID},
+    {"metric_key": "ifDescr", "oid": _IF_DESCR_OID},
+    {"metric_key": "ifOperStatus", "oid": _IF_OPER_STATUS_OID},
+    {"metric_key": "ifAdminStatus", "oid": _IF_ADMIN_STATUS_OID},
+    {"metric_key": "ifSpeed", "oid": _IF_SPEED_OID},
+    {"metric_key": "ifHighSpeed", "oid": _IF_HIGH_SPEED_OID},
+    {"metric_key": "ifAlias", "oid": _IF_ALIAS_OID},
+    {"metric_key": "ifPhysAddress", "oid": _IF_PHYS_ADDRESS_OID},
+    {"metric_key": "dot1qPvid", "oid": _DOT1Q_PVID_OID},
+    {"metric_key": "ipAdEntIfIndex", "oid": _IP_AD_ENT_IF_INDEX_OID, "full_index": True},
+    {"metric_key": "ipAdEntNetMask", "oid": _IP_AD_ENT_NET_MASK_OID, "full_index": True},
+)

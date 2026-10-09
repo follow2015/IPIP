@@ -5,6 +5,7 @@
  * 模式判断 / 端口预览 / 提交编排）下沉到本 hook，使组合根只负责渲染。
  */
 
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Form } from 'antd';
 
@@ -146,12 +147,12 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
   const { data: chassisData } = useDeviceList({
     is_chassis: isNodeMode ? 1 : undefined,
     room_id: isNodeMode ? selectedRoomId : undefined,
-    per_page: 200
+    per_page: PER_PAGE_CAP
   });
   const { data: batchChassisNodesData } = useDeviceList({
     device_subtype: isNodeMode ? 'node' : undefined,
     room_id: isNodeMode ? selectedRoomId : undefined,
-    per_page: 999
+    per_page: PER_PAGE_CAP
   });
   const chassisOptions = useMemo(() => {
     const list = chassisData?.items ?? [];

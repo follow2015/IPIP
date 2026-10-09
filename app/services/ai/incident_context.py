@@ -49,7 +49,7 @@ def _l3_change(root_device_id: Optional[int], at) -> Optional[Dict[str, Any]]:
         change = find_recent_change(
             int(root_device_id), within_seconds=L3_WINDOW_SECONDS, now=at,
         )
-    except Exception:  # noqa: BLE001 - 旁路，上下文缺失不应让诊断失败
+    except Exception:  # 旁路，上下文缺失不应让诊断失败
         logger.warning("ai.incident_ctx.l3_failed device=%s", root_device_id,
                        exc_info=True)
         return None
@@ -95,7 +95,7 @@ def _diagnosis_state(incident_id: int) -> Dict[str, Any]:
         repo = AIDiagnosisSessionRepository()
         running = repo.count_running(incident_id)
         latest = repo.latest_finished(incident_id)
-    except Exception:  # noqa: BLE001 - 迁移未执行时该列不存在，降级为无诊断记录
+    except Exception:  # 迁移未执行时该列不存在，降级为无诊断记录
         logger.warning("ai.incident_ctx.diagnosis_lookup_failed incident=%s",
                        incident_id, exc_info=True)
         return {"running": 0, "latest_session_id": None, "latest_summary": None}

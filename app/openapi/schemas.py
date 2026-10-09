@@ -416,6 +416,103 @@ class CustomerResponseSchema(Schema):
 
 
 
+class CircuitSegmentResponseSchema(Schema):
+    """线路分段响应（对齐 CircuitSegment.to_dict() + anchor_lost 标记）
+
+    `anchor_lost` 由 API 在序列化时按 `connection_id_lost` 显式注入（见 app/api/circuit.py），
+    不能用 `connection_id is None` 判失效（AC-C-31/32）。
+    """
+    id = fields.Int()
+    circuit_id = fields.Int()
+    seq = fields.Int()
+    connection_id = fields.Int(allow_none=True)
+    connection_id_lost = fields.Int()
+    anchor_lost = fields.Bool()
+    device_id = fields.Int(allow_none=True)
+    device_name = fields.Str(allow_none=True)
+    device_missing = fields.Bool()
+    port_id = fields.Int(allow_none=True)
+    port_name = fields.Str(allow_none=True)
+    port_missing = fields.Bool()
+    hop_desc = fields.Str(allow_none=True)
+    notes = fields.Str(allow_none=True)
+    created_at = fields.Str()
+    updated_at = fields.Str()
+
+
+class CircuitResponseSchema(Schema):
+    """线路响应（对齐 Circuit.to_dict() + _serialize 注入字段）
+
+    注入字段（见 app/api/circuit.py:_serialize）：
+    - `bandwidth_display`：格式化带宽串，前端直接展示，无需重复换算
+    - `committed_is_derived`：买断模式下保底=端口带宽为推导事实，前端据此决定可编辑性
+    `segments` 仅在详情/分段接口出现，列表接口不含——故标为可空。
+    """
+    id = fields.Int()
+    circuit_no = fields.Str()
+    deleted_token = fields.Str()
+    name = fields.Str(allow_none=True)
+    carrier_id = fields.Int(allow_none=True)
+    carrier_name = fields.Str(allow_none=True)
+    customer_id = fields.Int(allow_none=True)
+    customer_name = fields.Str(allow_none=True)
+    bandwidth_mbps = fields.Int(allow_none=True)
+    bandwidth_step = fields.Int()
+    bandwidth_display = fields.Str(allow_none=True)
+    billing_mode = fields.Str()
+    committed_mbps = fields.Int(allow_none=True)
+    committed_is_derived = fields.Bool()
+    monthly_fee = fields.Float(allow_none=True)
+    overage_unit_price = fields.Float(allow_none=True)
+    traffic_unit_price = fields.Float(allow_none=True)
+    currency = fields.Str()
+    access_type = fields.Str(allow_none=True)
+    status = fields.Str()
+    sla_level = fields.Str(allow_none=True)
+    start_date = fields.Str(allow_none=True)
+    end_date = fields.Str(allow_none=True)
+    contract_no = fields.Str(allow_none=True)
+    a_end_room_id = fields.Int(allow_none=True)
+    z_end_room_id = fields.Int(allow_none=True)
+    a_end_device_id = fields.Int(allow_none=True)
+    z_end_device_id = fields.Int(allow_none=True)
+    a_end_port_id = fields.Int(allow_none=True)
+    z_end_port_id = fields.Int(allow_none=True)
+    a_end_desc = fields.Str(allow_none=True)
+    z_end_desc = fields.Str(allow_none=True)
+    notes = fields.Str(allow_none=True)
+    deleted_at = fields.Str(allow_none=True)
+    created_at = fields.Str()
+    updated_at = fields.Str()
+    segments = fields.List(fields.Nested(CircuitSegmentResponseSchema), allow_none=True)
+
+
+class CarrierResponseSchema(Schema):
+    """运营商响应（对齐 Carrier.to_dict()）
+
+    `circuit_count` 仅在列表接口由服务层批量统计注入（避免 N+1），详情/创建/更新
+    接口不含——故标为可空。
+    """
+    id = fields.Int()
+    name = fields.Str()
+    deleted_token = fields.Str()
+    short_name = fields.Str(allow_none=True)
+    carrier_type = fields.Str(allow_none=True)
+    status = fields.Str()
+    contact_person = fields.Str(allow_none=True)
+    contact_phone = fields.Str(allow_none=True)
+    hotline = fields.Str(allow_none=True)
+    email = fields.Str(allow_none=True)
+    default_sla_level = fields.Str(allow_none=True)
+    qualification_no = fields.Str(allow_none=True)
+    notes = fields.Str(allow_none=True)
+    circuit_count = fields.Int(allow_none=True)
+    deleted_at = fields.Str(allow_none=True)
+    created_at = fields.Str()
+    updated_at = fields.Str()
+
+
+
 class IPAddressResponseSchema(Schema):
     """IP地址列表项（对齐 GET /ip_addresses — 5表JOIN扁平结果）"""
     id = fields.Int()
@@ -848,6 +945,7 @@ class MonitorOverviewResponseSchema(Schema):
     flapping = fields.Int()
     never_reachable = fields.Int()
     alert_blindspot = fields.Int()
+    paused_devices = fields.Int()
     alerting_devices = fields.Int()
     crit_alert_devices = fields.Int()
     warn_alert_devices = fields.Int()
@@ -925,7 +1023,7 @@ class MonitorConfigResponseSchema(Schema):
     字段名 = 白名单 camel 别名（与 dynamic_config.KEY_TO_CAMEL 一致）。
 
     [WARN] 本类是 `dynamic_config.all_entries()` 的**全量镜像**（含不可编辑项），按"监控运行
-    → 限流/同步 → 自动扫描 → 不可编辑项"分组排列。加配置键时**必须**同步补这里，
+    → 限流/同步 → 自动扫描 → 多通道采集 → 不可编辑项"分组排列。加配置键时**必须**同步补这里，
     否则 doc 契约静默落后于实现（曾缺整个 `SCAN_AUTO_*` 组 + 两个 MONITOR_* 键，共 9 个；
     漏了也不会有任何门禁报错 —— 故补了
     `tests/test_monitor_config_schema_parity.py` 机械比对）。
@@ -950,6 +1048,23 @@ class MonitorConfigResponseSchema(Schema):
     scan_auto_vr_ids = fields.Nested(MonitorConfigItemSchema)
     scan_auto_cleanup_interval = fields.Nested(MonitorConfigItemSchema)
     scan_auto_grace_period = fields.Nested(MonitorConfigItemSchema)
+    scan_channel_enabled = fields.Nested(MonitorConfigItemSchema)
+    scan_channel_priority = fields.Nested(MonitorConfigItemSchema)
+    scan_channel_snmp_device_ids = fields.Nested(MonitorConfigItemSchema)
+    scan_channel_snmp_room_ids = fields.Nested(MonitorConfigItemSchema)
+    scan_channel_snmp_vr_ids = fields.Nested(MonitorConfigItemSchema)
+    scan_channel_snmp_subtypes = fields.Nested(MonitorConfigItemSchema)
+    scan_channel_snmp_snapshot = fields.Nested(MonitorConfigItemSchema)
+    trapd_v3_enabled = fields.Nested(MonitorConfigItemSchema)
+    trapd_v3_users = fields.Nested(MonitorConfigItemSchema)
+    scan_channel_budget_seconds = fields.Nested(MonitorConfigItemSchema)
+    scan_channel_circuit_threshold = fields.Nested(MonitorConfigItemSchema)
+    scan_channel_auto_enabled = fields.Nested(MonitorConfigItemSchema)
+    trapd_enabled = fields.Nested(MonitorConfigItemSchema)
+    trapd_listen_port = fields.Nested(MonitorConfigItemSchema)
+    trapd_source_allowlist = fields.Nested(MonitorConfigItemSchema)
+    trapd_rate_limit_per_minute = fields.Nested(MonitorConfigItemSchema)
+    trapd_allow_weak_community = fields.Nested(MonitorConfigItemSchema)
     worker_in_process = fields.Nested(MonitorConfigItemSchema)
 
 
@@ -1024,6 +1139,7 @@ class MonitorAlertDetailSchema(Schema):
     acknowledged_by = fields.Str(allow_none=True)
     acknowledged_at = fields.Str(allow_none=True)
     ack_note = fields.Str(allow_none=True)
+    port = fields.Dict(allow_none=True)
 
 
 class MonitorAlertAckResponseSchema(Schema):

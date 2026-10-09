@@ -12,14 +12,12 @@
 """
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, Optional
 
 from app.services.ai.command_safety import (
     get_backup_command,
     render_remedial_command,
     CommandSafetyError,
-    enforce_confirmation,
 )
 from app.services.device_op_lock import device_op_lock, DeviceOperationConflict
 from app.services.ai.diagnosis_session_service import DiagnosisSessionService
@@ -96,7 +94,7 @@ class RemedialExecutor:
                 try:
                     commands = command.split("\n")
                     result = config_service._send_config(switch, commands, err_label="remedial")
-                except Exception as e:  # noqa: BLE001 - 统一转入下方失败处理
+                except Exception as e:  # 统一转入下方失败处理
                     logger.error("remedial execute raised device=%s cmd=%s: %s",
                                  device_id, command_key, e, exc_info=True)
                     result = {"success": False, "error": str(e)}
@@ -175,7 +173,7 @@ class RemedialExecutor:
                 device_id=device_id,
                 config_content=raw_config,
                 config_hash=config_hash,
-                backup_type="pre_change",
+                backup_type="pre_remedial",
                 file_size=len(raw_config.encode("utf-8")),
             )
             db.session.add(backup)
@@ -184,7 +182,7 @@ class RemedialExecutor:
             logger.info("remedial backup running-config device=%s backup_id=%s",
                         device_id, backup.id)
             return backup.id
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 备份 running-config 失败返回 None：由调用方决定是否继续修复
             logger.warning("backup running-config failed device=%s: %s", device_id, e)
             return None
 

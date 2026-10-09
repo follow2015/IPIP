@@ -117,7 +117,7 @@ class NetworkRepository(BaseRepository):
                     fallback_params[f"sid{i}"] = n.switch_id
                     fallback_params[f"rid{i}"] = n.room_id
                 fallback_sql = (
-                    "SELECT sr.* FROM switch_routes sr WHERE "
+                    "SELECT sr.* FROM switch_routes sr WHERE "  # noqa: S608 -- conditions 仅由固定字面量 + :paramN 占位符组成，值走 fallback_params
                     + " OR ".join(fallback_conditions)
                 )
                 fallback_rows = self.session.execute(text(fallback_sql), fallback_params).fetchall()

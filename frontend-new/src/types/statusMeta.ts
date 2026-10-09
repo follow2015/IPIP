@@ -68,7 +68,6 @@ import {
   ProbeErrorCode,
   RoomStatusCode,
   RouteNotesCode,
-  SwitchDeviceType,
   SwitchRoleCode,
   UserStatusCode,
   VLANStatusCode
@@ -345,7 +344,9 @@ export const getProbeErrorMeta = (
 ): StatusMeta | undefined => {
   if (code == null) return undefined;
   const entry = PROBE_ERROR_MAP[code as ProbeErrorCode];
-  return entry ? { label: (t as (k: string) => string)(entry.labelKey), color: entry.color } : undefined;
+  return entry
+    ? { label: (t as (k: string) => string)(entry.labelKey), color: entry.color }
+    : undefined;
 };
 
 export const getIPAuditActionMeta = (

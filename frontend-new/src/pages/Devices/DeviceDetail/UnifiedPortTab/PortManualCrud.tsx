@@ -65,6 +65,7 @@ export function PortManualCrud({
   const message = useMessage();
   const addModal = useDisclosure();
   const editModal = useDisclosure();
+  const { open: openEditModal } = editModal;
   const [editingPort, setEditingPort] = useState<SwitchPort | null>(null);
 
   const updatePort = useUpdateNetworkPort(deviceId);
@@ -81,9 +82,7 @@ export function PortManualCrud({
     (checked: boolean) => {
       setPortSync.mutate(checked, {
         onSuccess: () => {
-          message.success(
-            checked ? t('port.message.syncEnabled') : t('port.message.syncDisabled')
-          );
+          message.success(checked ? t('port.message.syncEnabled') : t('port.message.syncDisabled'));
         },
         onError: () => {
           message.error(t('port.message.toggleFailed'));
@@ -104,10 +103,13 @@ export function PortManualCrud({
     });
   }, [setPortSync, message, t]);
 
-  const handleEdit = useCallback((port: SwitchPort) => {
-    setEditingPort(port);
-    editModal.open();
-  }, []);
+  const handleEdit = useCallback(
+    (port: SwitchPort) => {
+      setEditingPort(port);
+      openEditModal();
+    },
+    [openEditModal]
+  );
 
   const handleDelete = useCallback(
     (port: SwitchPort) => {

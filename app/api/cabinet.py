@@ -5,36 +5,35 @@
 提供机柜管理的RESTful API端点。
 """
 from app.utils.logging import get_logger
+from app.openapi.doc import doc
 import re
-from flask import Blueprint, request, g
-import hashlib
-from marshmallow import Schema, fields, validate, EXCLUDE
-
-logger = get_logger(__name__)
-
+from flask import Blueprint, request
 from app.services import CabinetService
 from app.persistence.cabinet_repository import CabinetRepository
-from extensions import db as _db
 from app.api.base import APIResponse
-from app.utils import (
-    login_required,
-    permission_required,
-    rate_limit_api,
-    validation_manager,
-)
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api, validation_manager
 from app.utils.transactional import transactional, on_commit
 from app.exceptions import BaseAppException, PresetResponseError
 from app.exceptions.data_access import RecordNotFoundError
 from app.exceptions.validation import ValidationError
+from app.exceptions.business import (
+    BatchItemsLimitExceeded,
+    CabinetVersionConflict,
+    ResourceConflictError,
+)
+from app.core.batch_limits import ensure_batch_size_within_limit
 from app.utils.cache.manager import cache_manager
 from app.services.switch_events import emit_resource_change_global
-from app.openapi.doc import doc, public
+from app.schemas.cabinet import CabinetCreateSchema, CabinetUpdateSchema
+
+logger = get_logger(__name__)
+
 
 cabinet_bp = Blueprint("cabinet", __name__)
 cabinet_service = CabinetService(CabinetRepository())
 
 
-from app.schemas.cabinet import CabinetCreateSchema, CabinetUpdateSchema
 
 @cabinet_bp.route("/", methods=["GET"])
 @doc(summary="获取机柜列表", tags=["机柜"], parameters=[{"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}}, {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}}, {"name": "search", "in": "query", "schema": {"type": "string"}}, {"name": "room_id", "in": "query", "schema": {"type": "integer"}}, {"name": "customer_id", "in": "query", "schema": {"type": "integer"}}, {"name": "status", "in": "query", "schema": {"type": "string"}}], responses={200: "CabinetResponse", 500: "ApiError"})
@@ -94,7 +93,7 @@ def list_cabinets():
             total=total,
             message="获取机柜列表成功",
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取机柜列表失败: %s", e)
         return APIResponse.error(message="获取机柜列表失败", error_code="CABINET_LIST_ERROR", status_code=500)
 
@@ -215,7 +214,7 @@ def create_cabinet():
                     continue
                 cabinet = cabinet_service.create_cabinet(item_data)
                 created.append(cabinet.to_dict())
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 批量/循环内单条失败隔离：记入 failed/errors 后继续处理下一条，单条 DB 异常不得中断整批
                 failed.append(number)
                 errors[number] = str(e)
 
@@ -279,6 +278,135 @@ def update_cabinet(cabinet_id):
 
     updated_cabinet = cabinet_service.update_cabinet(cabinet_id, data)
     return APIResponse.success(data=updated_cabinet.to_dict(), message="机柜更新成功")
+
+
+_BATCH_POSITIONS_BODY = {
+    "content": {
+        "application/json": {
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "room_id": {"type": "integer"},
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "cabinet_id": {"type": "integer"},
+                                "expected_version": {"type": "integer"},
+                                "row": {"type": "integer", "nullable": True},
+                                "col": {"type": "integer", "nullable": True},
+                            },
+                        },
+                    },
+                },
+            }
+        }
+    }
+}
+
+
+@cabinet_bp.route("/batch-positions", methods=["POST"])
+@doc(summary="批量换位机柜", tags=["机柜"],
+     request_body=_BATCH_POSITIONS_BODY,
+     responses={200: "ApiResponse", 400: "ApiError", 404: "ApiError", 409: "ApiError"})
+@login_required
+@permission_required("cabinet:update")
+@rate_limit_api
+@transactional
+def batch_update_cabinet_positions():
+    """批量换位机柜（迁移 0020：乐观锁 CAS + 坐标两阶段搬迁）
+
+    两台机柜**互换格子**此前必然失败：逐条 PUT 按当前快照判占用，处理 A 时
+    目标格还站着 B（B 尚未移走）⇒ 409。本端点按"本批结束后的最终坐标"判冲突，
+    并把坐标更新拆成"先挪哨兵格 → 再落最终坐标"两步 —— uk_cabinet_position
+    唯一键在 MySQL 下即时检查、不可延迟，不这样搬会当场撞约束。
+
+    每项携带 expected_version（机柜列表下发的 version）。版本判据在 UPDATE
+    谓词内——MySQL RR 下先读后比会被事务快照骗过。任一项版本过期 ⇒ 整批回滚
+    并返回 409 CABINET_VERSION_CONFLICT（可编程识别，消息定位每个冲突机柜）。
+
+    Request Body: {items: [{cabinet_id, expected_version, row, col}, ...]}
+        row/col 必须成对；任一为 null 表示取消定位。
+    """
+    payload = request.get_json(silent=True) or {}
+    room_id = payload.get("room_id")
+    if not isinstance(room_id, int):
+        return APIResponse.error(
+            message="请提供合法的 room_id（本批机柜须同属该机房）",
+            error_code="CABINET_BATCH_BAD_ROOM",
+            status_code=400,
+        )
+    items = payload.get("items")
+    if not isinstance(items, list) or not items:
+        return APIResponse.error(
+            message="请提供非空 items 数组",
+            error_code="CABINET_BATCH_EMPTY",
+            status_code=400,
+        )
+    try:
+        ensure_batch_size_within_limit(len(items), endpoint="机柜批量换位")
+    except BatchItemsLimitExceeded as e:
+        raise PresetResponseError(
+            message=e.message,
+            error_code="CABINET_BATCH_TOO_MANY",
+            status_code=400,
+        ) from e
+
+    normalized = []
+    for idx, raw in enumerate(items):
+        if not isinstance(raw, dict) or not isinstance(raw.get("cabinet_id"), int):
+            return APIResponse.error(
+                message=f"items[{idx}] 缺少合法的 cabinet_id",
+                error_code="CABINET_BATCH_BAD_ITEM",
+                status_code=400,
+            )
+        expected = raw.get("expected_version")
+        if not isinstance(expected, int) or expected < 0:
+            return APIResponse.error(
+                message=f"items[{idx}] 缺少合法的 expected_version（列表下发的 version）",
+                error_code="CABINET_BATCH_BAD_ITEM",
+                status_code=400,
+            )
+        row, col = raw.get("row"), raw.get("col")
+        if not isinstance(row, int) and not isinstance(col, int):
+            row, col = None, None
+        elif not isinstance(row, int) or not isinstance(col, int):
+            return APIResponse.error(
+                message=f"items[{idx}] 的 row/col 必须成对给出（或同时为 null）",
+                error_code="CABINET_BATCH_BAD_ITEM",
+                status_code=400,
+            )
+        normalized.append(
+            {"cabinet_id": raw["cabinet_id"], "expected_version": expected,
+             "row": row, "col": col}
+        )
+
+    try:
+        updated = cabinet_service.batch_update_cabinet_positions(room_id, normalized)
+    except CabinetVersionConflict as e:
+        raise PresetResponseError(
+            message=e.message, error_code="CABINET_VERSION_CONFLICT", status_code=409
+        ) from e
+    except ResourceConflictError as e:
+        raise PresetResponseError(
+            message=e.message, error_code="CABINET_POSITION_CONFLICT", status_code=409
+        ) from e
+    except ValidationError as e:
+        raise PresetResponseError(
+            message=e.message, error_code="CABINET_NOT_FOUND", status_code=404
+        ) from e
+    except BaseAppException:
+        raise
+
+    for cabinet in updated:
+        on_commit(lambda c=cabinet: emit_resource_change_global(
+            "cabinet", "update", ids=[c.id]))
+
+    return APIResponse.success(
+        data={"updated": [c.to_dict() for c in updated if c]},
+        message="机柜批量换位成功",
+    )
 
 
 @cabinet_bp.route("/<int:cabinet_id>", methods=["DELETE"])
@@ -648,7 +776,7 @@ def get_cabinet_stats(cabinet_id):
         
         return APIResponse.success(data=stats, message="获取机柜统计信息成功")
     
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取机柜统计信息失败: %s", e)
         return APIResponse.error(
             message="服务器内部错误",
@@ -731,7 +859,7 @@ def allocate_u_position(cabinet_id):
 
         return APIResponse.success(data={'u_position': result}, message="U位分配成功")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("U位分配失败: %s", e)
         return APIResponse.error(
             message="服务器内部错误",
@@ -798,7 +926,7 @@ def validate_cabinet_capacity(cabinet_id):
         
         return APIResponse.success(data=result, message="机柜容量验证完成")
     
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("验证机柜容量失败: %s", e)
         return APIResponse.error(
             message="服务器内部错误",
@@ -842,7 +970,7 @@ def optimize_cabinet_layout(cabinet_id):
                 status_code=400
             )
     
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("优化机柜布局失败: %s", e)
         return APIResponse.error(
             message="服务器内部错误",
@@ -872,7 +1000,7 @@ def update_cabinet_customer(cabinet_id):
         data = request.get_json()
         customer_id = data.get('customer_id')
 
-        result = cabinet_service.update_cabinet_customer(cabinet_id, customer_id)
+        cabinet_service.update_cabinet_customer(cabinet_id, customer_id)
 
         return APIResponse.success(
             data={'cabinet_id': cabinet_id, 'customer_id': customer_id},
@@ -917,7 +1045,7 @@ def get_cabinets_by_room(room_id):
             message=f"获取机房 {room_id} 的机柜列表成功"
         )
     
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取机房机柜列表失败: %s", e)
         return APIResponse.error(
             message="服务器内部错误",
@@ -956,7 +1084,7 @@ def get_cabinet_count():
             message=f"获取{message}成功"
         )
     
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取机柜数量失败: %s", e)
         return APIResponse.error(
             message="服务器内部错误",
@@ -1001,7 +1129,7 @@ def batch_delete_cabinets():
                 deleted_count += 1
             else:
                 failed_ids.append(cabinet_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 批量删除内单柜失败隔离：记入 failed_ids 后继续删除下一个机柜，单柜删除涉及级联 DB 约束，异常类型不可枚举
             logger.error("删除机柜 %d 失败: %s", cabinet_id, str(e))
             failed_ids.append(cabinet_id)
     
@@ -1034,7 +1162,7 @@ def get_global_statistics():
     try:
         stats = cabinet_service.get_global_statistics()
         return APIResponse.success(data=stats, message="获取全局机柜统计成功")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取全局机柜统计失败: %s", str(e))
         return APIResponse.error(message="服务器内部错误", status_code=500)
 
@@ -1058,7 +1186,7 @@ def get_cabinet_with_devices(cabinet_id):
         if not cabinet:
             return APIResponse.error(message="机柜不存在", status_code=404)
         return APIResponse.success(data=cabinet, message="获取机柜详情成功")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("获取机柜详情失败: %s", str(e))
         return APIResponse.error(message="服务器内部错误", status_code=500)
 
@@ -1080,7 +1208,7 @@ def cabinet_exists(cabinet_id):
     try:
         exists = cabinet_service.cabinet_exists(cabinet_id)
         return APIResponse.success(data={"exists": exists}, message="检查完成")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("检查机柜是否存在失败: %s", str(e))
         return APIResponse.error(message="服务器内部错误", status_code=500)
 
@@ -1130,6 +1258,6 @@ def get_cabinet_by_number(cabinet_number):
         if not cabinet:
             return APIResponse.error(message="机柜不存在", status_code=404)
         return APIResponse.success(data=cabinet.to_dict(), message="获取机柜成功")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error("根据编号获取机柜失败: %s", str(e))
         return APIResponse.error(message="服务器内部错误", status_code=500)

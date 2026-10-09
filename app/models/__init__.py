@@ -11,6 +11,8 @@ from app.models.ai_conversation import AIConversation
 from app.models.ai_diagnosis_session import AIDiagnosisSession
 from app.models.audit_log import AuditLog
 from app.models.cabinet import Cabinet
+from app.models.carrier import Carrier
+from app.models.circuit import Circuit, CircuitSegment
 from app.models.component_template import ComponentTemplate
 from app.models.customer import Customer
 from app.models.customer_termination_archive import CustomerTerminationArchive
@@ -24,6 +26,8 @@ from app.models.device_metric_baseline import DeviceMetricBaseline
 from app.models.device_metric_latest import DeviceMetricLatest
 from app.models.device_metric_override import DeviceMetricOverride
 from app.models.device_metric_timeseries import DeviceMetricTimeseries
+from app.models.device_metric_timeseries_daily import DeviceMetricTimeseriesDaily
+from app.models.device_metric_timeseries_hourly import DeviceMetricTimeseriesHourly
 from app.models.device_monitor_probe_events import DeviceMonitorProbeEvents
 from app.models.device_monitor_status import DeviceMonitorStatus
 from app.models.device_monitor_timeseries_daily import DeviceMonitorTimeseriesDaily
@@ -60,6 +64,7 @@ from app.models.room_channel import RoomChannel
 from app.models.room_layout_marker import RoomLayoutMarker
 from app.models.switch_credentials import IPSwitchInfo, SwitchCredentials, SwitchPortIP, SwitchStatusCache
 from app.models.switch_route import IPNetwork, SwitchRoute
+from app.models.ticket import Ticket, TicketCiLink, TicketExternalBinding, UserExternalBinding
 from app.models.user import User
 from app.models.user_log import UserLog
 from app.models.virtual_room import VirtualRoom, VirtualRoomMember
@@ -74,6 +79,9 @@ __all__ = [
     "AIDiagnosisSession",
     "AuditLog",
     "Cabinet",
+    "Carrier",
+    "Circuit",
+    "CircuitSegment",
     "ComponentTemplate",
     "Customer",
     "CustomerTerminationArchive",
@@ -88,6 +96,8 @@ __all__ = [
     "DeviceMetricLatest",
     "DeviceMetricOverride",
     "DeviceMetricTimeseries",
+    "DeviceMetricTimeseriesDaily",
+    "DeviceMetricTimeseriesHourly",
     "DeviceMonitorCredential",
     "DeviceMonitorProbeEvents",
     "DeviceMonitorStatus",
@@ -134,7 +144,11 @@ __all__ = [
     "SwitchPortIP",
     "SwitchRoute",
     "SwitchStatusCache",
+    "Ticket",
+    "TicketCiLink",
+    "TicketExternalBinding",
     "User",
+    "UserExternalBinding",
     "UserLog",
     "UserRole",
     "VLAN",

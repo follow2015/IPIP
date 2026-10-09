@@ -110,7 +110,9 @@
       "scopeAll": "全部可见",
       "scopeMine": "我负责的",
       "metricKey": "指标键（metric_key）",
-      "indexKey": "实例键（index_key）"
+      "indexKey": "实例键（index_key）",
+      "title": "筛选条件",
+      "activeCount": "筛选条件（{{count}} 项生效）"
     },
     "view": {
       "list": "列表视图",
@@ -162,7 +164,13 @@
       "ackAt": "确认时间",
       "ackNote": "确认备注",
       "notAcknowledged": "未确认",
-      "payloadSection": "告警载荷"
+      "payloadSection": "告警载荷",
+      "port": "端口",
+      "portAlias": "端口备注",
+      "portStatus": "接口状态",
+      "portOper": "运行：{{status}}",
+      "portShutdown": "人为关闭",
+      "portNameMissing": "仅有索引 ifIndex={{index}}（报文未携带端口名）"
     }
   },
   "history": {
@@ -296,6 +304,37 @@
       "online": "{{count}} 在线",
       "segments": "{{count}} 网络段",
       "onlineRatio": "{{online}} / {{total}} 在线"
+    },
+    "monitorOverview": {
+      "title": "监控概览",
+      "monitoredObjects": "监控对象",
+      "reachable": "可达",
+      "unreachable": "不可达",
+      "flapping": "抖动",
+      "blindspot": "告警盲区",
+      "healthScore": "健康分",
+      "openIncidents": "未关闭事件",
+      "paused_one": "{{count}} 台暂停监控未计入",
+      "paused_other": "{{count}} 台暂停监控未计入"
+    },
+    "componentHealth": {
+      "title": "组件健康",
+      "services": "服务组件",
+      "service": {
+        "database": "数据库",
+        "redis": "Redis",
+        "api": "API 服务",
+        "gateway": "实时网关",
+        "monitor": "流量采集",
+        "celery": "任务队列"
+      },
+      "status": {
+        "running": "运行",
+        "degraded": "降级",
+        "down": "失联",
+        "unknown": "未知"
+      },
+      "heartbeat": "心跳"
     }
   },
   "trend": {
@@ -394,7 +433,8 @@
       "interval": "轮询间隔",
       "alert": "告警规则",
       "advanced": "高级",
-      "scan": "自动扫描"
+      "scan": "自动扫描",
+      "channel": "多通道采集（灰度）"
     },
     "field": {
       "consecutiveFailuresThreshold": "连续失败阈值",
@@ -414,7 +454,15 @@
       "scanAutoRoomIds": "物理机房范围",
       "scanAutoVrIds": "虚拟机房范围",
       "scanAutoCleanupInterval": "陈旧度清理间隔(秒)",
-      "scanAutoGracePeriod": "INACTIVE降级宽限期(秒)"
+      "scanAutoGracePeriod": "INACTIVE降级宽限期(秒)",
+      "scanChannelEnabled": "通道层总开关",
+      "scanChannelPriority": "通道优先级",
+      "scanChannelSnmpDeviceIds": "SNMP灰度设备",
+      "scanChannelSnmpRoomIds": "SNMP灰度机房",
+      "scanChannelSnmpVrIds": "SNMP灰度虚拟机房",
+      "scanChannelBudgetSeconds": "单设备采集预算(秒)",
+      "scanChannelCircuitThreshold": "熔断阈值(次)",
+      "scanChannelAutoEnabled": "自动扫描走通道层"
     },
     "loadFailed": "无法加载监控运行配置",
     "needRestart": "需重启",
@@ -1038,12 +1086,6 @@
       "selectDevice": "选择设备",
       "filterOid": "筛选 OID / 采样值",
       "filterType": "类型筛选"
-    },
-    "metricTypeOption": {
-      "gauge": "gauge（瞬时值）",
-      "counter": "counter（累加计数）",
-      "state": "state（状态）",
-      "event": "event（事件）"
     },
     "message": {
       "selectDeviceFirst": "请先选择设备",

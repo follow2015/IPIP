@@ -36,7 +36,6 @@
 `post_json` 的前两个参数须为**位置参数**（既有测试按 `call_args.args[1]` 取
 payload）。
 """
-import re
 from abc import abstractmethod
 from typing import Any, Dict, Optional, Tuple
 
@@ -60,7 +59,7 @@ SEVERITY_EMOJI = {
 
 DEFAULT_WEBHOOK_TIMEOUT = 10
 
-from app.utils.redaction import _CREDENTIAL_PATTERNS, redact_credentials  # noqa: F401
+from app.utils.redaction import _CREDENTIAL_PATTERNS, redact_credentials  # noqa: F401, E402
 
 
 def _is_transient_http_error(exc: BaseException) -> bool:
@@ -179,7 +178,7 @@ class BaseWebhookChannel(BroadcastChannel):
             resp = post_json(url, payload, headers=headers, timeout=self.timeout)
             resp.raise_for_status()
             ensure_webhook_success(resp, self.display_name)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- Webhook 投递异常分类兜底：需捕获任意异常做"瞬时/确定性"判别与脱敏后再上抛
             detail = redact_credentials(f"{type(exc).__name__}: {exc}")
             if _is_transient_http_error(exc):
                 raise TransientChannelError(detail) from None

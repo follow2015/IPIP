@@ -13,8 +13,9 @@
  * - legend 用 itemFormatter 显示 name
  * - color 用 colorField + 显式 color 数组
  */
-import { useEffect, useMemo, useState } from 'react';
-import { Tag, Empty, Segmented, Tooltip, Button, Space } from 'antd';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Tag, Empty, Segmented, Tooltip, Button, Space, theme } from 'antd';
+import type { GlobalToken } from 'antd';
 import { Pie, Column } from '@ant-design/charts';
 import {
   ReloadOutlined,
@@ -30,23 +31,25 @@ import { useTranslation } from 'react-i18next';
 import { getSeverityLabel } from '@/types/statusMeta';
 import type { TFunction } from 'i18next';
 
-const T = {
-  bg: '#f5f7fa',
-  cardBg: '#ffffff',
-  cardBgHover: '#fafbfc',
-  border: '#e5e7eb',
-  textPrimary: '#1f2937',
-  textSecondary: '#4b5563',
-  textTertiary: '#9ca3af',
-  accent: '#1677ff',
-  accentDeep: '#0958d9'
-};
+const makeT = (token: GlobalToken) => ({
+  bg: token.colorBgLayout,
+  cardBg: token.colorBgContainer,
+  cardBgHover: token.colorFillQuaternary,
+  border: token.colorBorderSecondary,
+  textPrimary: token.colorText,
+  textSecondary: token.colorTextSecondary,
+  textTertiary: token.colorTextTertiary,
+  accent: token.colorPrimary,
+  accentDeep: token.colorPrimaryActive
+});
 
-const SEV_COLOR: Record<string, string> = {
-  info: '#52c41a',
-  warning: '#faad14',
-  critical: '#ff4d4f'
-};
+/* statusColorExempt(NOC 大屏只有三档且无 ok 档，info 作为最低档按「无碍」取绿，
+   与 severityColor() 的 info→colorInfo 语义刻意不同；此处只做 token 化不改语义) */
+const makeSevColor = (token: GlobalToken): Record<string, string> => ({
+  info: token.colorSuccess,
+  warning: token.colorWarning,
+  critical: token.colorError
+});
 const SEV_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
 
 const getRefreshOptions = (t: TFunction<'monitor'>) => [
@@ -64,6 +67,9 @@ export default function MonitorNocScreenPage() {
   const { t } = useTranslation('monitor');
   const { t: tc } = useTranslation('common');
   const { t: td } = useTranslation('device');
+  const { token } = theme.useToken();
+  const T = useMemo(() => makeT(token), [token]);
+  const SEV_COLOR = useMemo(() => makeSevColor(token), [token]);
   const location = useLocation();
   const navigate = useNavigate();
   const isFullscreenRoute = location.pathname === '/monitor/noc-screen/fullscreen';
@@ -79,16 +85,21 @@ export default function MonitorNocScreenPage() {
   const alertsQuery = useMonitorAlerts({ status: 'pending', page: 1, per_page: 50 });
   const statsQuery = useAlertStatistics({ bucket: 'hour', top_n: 10 });
 
+  const refetchRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    refetchRef.current = () => {
+      void alertsQuery.refetch();
+      void statsQuery.refetch();
+    };
+  });
+
   useEffect(() => {
     if (refreshSec <= 0) return;
-    const t = setInterval(() => {
-      alertsQuery.refetch();
-      statsQuery.refetch();
-    }, refreshSec * 1000);
+    const t = setInterval(() => refetchRef.current(), refreshSec * 1000);
     return () => clearInterval(t);
-  }, [refreshSec, alertsQuery, statsQuery]);
+  }, [refreshSec]);
 
-  const alerts = alertsQuery.data?.items ?? [];
+  const alerts = useMemo(() => alertsQuery.data?.items ?? [], [alertsQuery.data]);
   const stats = statsQuery.data;
 
   const sortedAlerts = useMemo(
@@ -178,7 +189,7 @@ export default function MonitorNocScreenPage() {
       map[d.name] = palette[i % palette.length];
     });
     return map;
-  }, [typePieData]);
+  }, [typePieData, T]);
   const typeConfig = buildPieConfig(typePieData, typeColorMap);
 
   const densityConfig = {
@@ -394,7 +405,7 @@ export default function MonitorNocScreenPage() {
                       gridTemplateColumns: '90px 70px 1fr 130px',
                       gap: 10,
                       padding: '8px 12px',
-                      background: isCritical ? '#fff1f0' : T.cardBgHover,
+                      background: isCritical ? token.colorErrorBg : T.cardBgHover,
                       borderRadius: 6,
                       borderLeft: `3px solid ${sevColor}`,
                       animation: isCritical ? 'noc-blink 1.5s infinite' : undefined,
@@ -482,10 +493,10 @@ export default function MonitorNocScreenPage() {
           {t('noc.densityTitle')}
         </div>
         {densityData.length === 0 ? (
-            <Empty
-              description={<span style={{ color: T.textTertiary }}>{tc('message.noData')}</span>}
-              style={{ padding: '40px 0' }}
-            />
+          <Empty
+            description={<span style={{ color: T.textTertiary }}>{tc('message.noData')}</span>}
+            style={{ padding: '40px 0' }}
+          />
         ) : (
           <Column {...densityConfig} />
         )}

@@ -31,8 +31,8 @@ from app.api.base import APIResponse, ErrorCode
 from app.exceptions import PresetResponseError
 from app.exceptions.business import ResourceConflictError
 from app.services.port_management_service import port_management_service
-from app.openapi.doc import doc, public
-from app.utils.auth import login_required, permission_required
+from app.openapi.doc import doc
+from app.services.auth import login_required, permission_required
 from app.utils.transactional import transactional
 from app.persistence.vlan_repository import VLANRepository
 from app.persistence.link_aggregation_repository import LinkAggregationRepository
@@ -243,7 +243,7 @@ def delete_connection(device_id, conn_id):
     """删除连接"""
     conn_type = request.args.get("type", "d2n")
     try:
-        result = port_management_service.delete_connection(conn_id, conn_type)
+        port_management_service.delete_connection(conn_id, conn_type)
         return APIResponse.success(message="连接删除成功")
     except Exception as e:
         logger.error("删除连接失败: %s", e)
@@ -294,7 +294,6 @@ def put_port_sync_enabled(device_id: int):
     """
     from extensions import db
     from app.models.device_switch_ext import DeviceSwitchExt
-    from app.models.device import Device
 
     body = request.get_json(silent=True) or {}
     value = body.get("port_sync_enabled")

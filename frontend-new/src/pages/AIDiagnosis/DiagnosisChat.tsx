@@ -11,7 +11,8 @@ import {
   Empty,
   Tag,
   Tooltip,
-  Select
+  Select,
+  theme
 } from 'antd';
 import { SendOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -53,6 +54,7 @@ interface ChatMessage {
 export default function DiagnosisChat() {
   const confirm = useConfirm();
   const message = useMessage();
+  const { token } = theme.useToken();
   const { t } = useTranslation('ai');
   const { t: tc } = useTranslation('common');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -410,9 +412,7 @@ export default function DiagnosisChat() {
         }
       >
         <div style={{ minHeight: 400, marginBottom: 16 }}>
-          {messages.length === 0 && !loading && (
-            <Empty description={t('diagnosis.empty')} />
-          )}
+          {messages.length === 0 && !loading && <Empty description={t('diagnosis.empty')} />}
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -427,7 +427,7 @@ export default function DiagnosisChat() {
                   display: 'inline-block',
                   maxWidth: '80%',
                   textAlign: 'left',
-                  background: msg.role === 'user' ? '#e6f4ff' : '#f6ffed'
+                  background: msg.role === 'user' ? token.colorInfoBg : token.colorSuccessBg
                 }}
               >
                 <Paragraph>{msg.content}</Paragraph>

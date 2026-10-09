@@ -2,7 +2,7 @@ import { useConfirm } from '@/utils/confirm';
 import { useState, useEffect, useCallback } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import { useSearchParams } from 'react-router-dom';
-import { Button, Space, Tag, Tooltip, Modal } from 'antd';
+import { Button, Space, Tag, Tooltip, Modal, theme, Typography } from 'antd';
 import {
   CopyOutlined,
   StopOutlined,
@@ -54,6 +54,7 @@ function IP() {
   const { t: td } = useTranslation('device');
   const { t } = useTranslation('network');
   const { t: tc } = useTranslation('common');
+  const { token } = theme.useToken();
   const confirm = useConfirm();
   const table = useTable();
   const [urlParams] = useSearchParams();
@@ -434,6 +435,134 @@ function IP() {
     });
   };
 
+  const renderIPActions = (record: IPAddress) => {
+    const isPrivate = isPrivateIPv4(record.ip_address);
+    return (
+      <Space wrap>
+        <Button
+          type="link"
+          size="small"
+          style={{ padding: 0 }}
+          onClick={() => handleDetail(record)}
+        >
+          {t('ip.action.detail')}
+        </Button>
+        <Button type="link" size="small" style={{ padding: 0 }} onClick={() => handleEdit(record)}>
+          {t('ip.action.edit')}
+        </Button>
+        {isPrivate ? (
+          <Tooltip title={t('ip.tooltip.privateUnreachable')}>
+            <Button type="link" size="small" disabled>
+              Ping
+            </Button>
+          </Tooltip>
+        ) : (
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0 }}
+            onClick={() => handlePing(record)}
+            loading={pingIP.isPending && pingIP.variables === record.ip_address}
+          >
+            Ping
+          </Button>
+        )}
+        {isPrivate ? (
+          <Tooltip title={t('ip.tooltip.privateUnreachable')}>
+            <Button type="link" size="small" disabled>
+              {t('ip.action.scan')}
+            </Button>
+          </Tooltip>
+        ) : (
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0 }}
+            onClick={() => handleScan(record)}
+            loading={scanIP.isPending && scanIP.variables === record.ip_address}
+          >
+            {t('ip.action.scan')}
+          </Button>
+        )}
+        {record.status === IPStatusCode.BANNED ? (
+          <Tooltip title={t('ip.tooltip.unban')}>
+            <Button
+              type="link"
+              size="small"
+              icon={<CheckCircleOutlined />}
+              onClick={() => handleUnban(record)}
+              style={{ color: token.colorSuccess, padding: 0 }}
+            />
+          </Tooltip>
+        ) : record.status === IPStatusCode.PENDING_BAN ||
+          record.status === IPStatusCode.PENDING_UNBAN ? (
+          <Tooltip
+            title={
+              record.status === IPStatusCode.PENDING_BAN
+                ? t('ip.tooltip.banning')
+                : t('ip.tooltip.unbanning')
+            }
+          >
+            <Button type="link" size="small" icon={<StopOutlined />} disabled />
+          </Tooltip>
+        ) : (
+          <Tooltip title={t('ip.tooltip.ban')}>
+            <Button
+              type="link"
+              size="small"
+              icon={<StopOutlined />}
+              onClick={() => handleBan(record)}
+              danger
+            />
+          </Tooltip>
+        )}
+        <Button
+          type="link"
+          size="small"
+          icon={<CopyOutlined />}
+          style={{ padding: 0 }}
+          onClick={() => handleCopy(record)}
+        />
+      </Space>
+    );
+  };
+
+  const renderIPCard = (record: IPAddress) => {
+    const { Text } = Typography;
+    const info = getIPStatusMeta(record.status, td);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+        <Space wrap size={4}>
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0 }}
+            onClick={() => handleDetail(record)}
+          >
+            <Text strong>{record.ip_address ?? '-'}</Text>
+          </Button>
+          <Tag color={info?.color}>{info?.label ?? tc('field.unknown')}</Tag>
+        </Space>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {record.switch_name || '-'}
+          {record.port ? ` / ${record.port}` : ''}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {record.customer_name || '-'}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {record.room_name || '-'}
+        </Text>
+        {record.mac_address && record.mac_address !== 'N/A' ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {record.mac_address}
+          </Text>
+        ) : null}
+        {renderIPActions(record)}
+      </div>
+    );
+  };
+
   const columns = [
     { title: t('ip.field.ipAddress'), dataIndex: 'ip_address', key: 'ip_address' },
     {
@@ -484,89 +613,7 @@ function IP() {
     {
       title: t('ip.field.actions'),
       key: 'action',
-      render: (_: unknown, record: IPAddress) => {
-        const isPrivate = isPrivateIPv4(record.ip_address);
-        return (
-          <Space wrap>
-            <Button type="link" size="small" onClick={() => handleDetail(record)}>
-              {t('ip.action.detail')}
-            </Button>
-            <Button type="link" size="small" onClick={() => handleEdit(record)}>
-              {t('ip.action.edit')}
-            </Button>
-            {isPrivate ? (
-              <Tooltip title={t('ip.tooltip.privateUnreachable')}>
-                <Button type="link" size="small" disabled>
-                  Ping
-                </Button>
-              </Tooltip>
-            ) : (
-              <Button
-                type="link"
-                size="small"
-                onClick={() => handlePing(record)}
-                loading={pingIP.isPending && pingIP.variables === record.ip_address}
-              >
-                Ping
-              </Button>
-            )}
-            {isPrivate ? (
-              <Tooltip title={t('ip.tooltip.privateUnreachable')}>
-                <Button type="link" size="small" disabled>
-                  {t('ip.action.scan')}
-                </Button>
-              </Tooltip>
-            ) : (
-              <Button
-                type="link"
-                size="small"
-                onClick={() => handleScan(record)}
-                loading={scanIP.isPending && scanIP.variables === record.ip_address}
-              >
-                {t('ip.action.scan')}
-              </Button>
-            )}
-            {record.status === IPStatusCode.BANNED ? (
-              <Tooltip title={t('ip.tooltip.unban')}>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => handleUnban(record)}
-                  style={{ color: '#52c41a' }}
-                />
-              </Tooltip>
-            ) : record.status === IPStatusCode.PENDING_BAN ||
-              record.status === IPStatusCode.PENDING_UNBAN ? (
-              <Tooltip
-                title={
-                  record.status === IPStatusCode.PENDING_BAN
-                    ? t('ip.tooltip.banning')
-                    : t('ip.tooltip.unbanning')
-                }
-              >
-                <Button type="link" size="small" icon={<StopOutlined />} disabled />
-              </Tooltip>
-            ) : (
-              <Tooltip title={t('ip.tooltip.ban')}>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<StopOutlined />}
-                  onClick={() => handleBan(record)}
-                  danger
-                />
-              </Tooltip>
-            )}
-            <Button
-              type="link"
-              size="small"
-              icon={<CopyOutlined />}
-              onClick={() => handleCopy(record)}
-            />
-          </Space>
-        );
-      }
+      render: (_: unknown, record: IPAddress) => renderIPActions(record)
     }
   ];
 
@@ -585,7 +632,7 @@ function IP() {
         <Button
           size="small"
           icon={<CheckCircleOutlined />}
-          style={{ color: '#52c41a', borderColor: '#b7eb8f' }}
+          style={{ color: token.colorSuccess, borderColor: token.colorSuccessBorder }}
           onClick={handleBatchUnbanSelected}
           loading={batchUnbanIP.isPending}
         >
@@ -641,6 +688,8 @@ function IP() {
           />
         }
         rowSelection={batch.rowSelection}
+        mobileCardMode
+        cardRender={renderIPCard}
       />
 
       <IPEditModal

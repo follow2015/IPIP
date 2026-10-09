@@ -3,7 +3,7 @@
  * 自包含：内部持有 forms / 模式 / 预览 / 提交 mutation
  */
 import { useMemo, useState } from 'react';
-import { Modal, Button, Form, Input, InputNumber, Select, Tag, Space, Row, Col } from 'antd';
+import { theme, Modal, Button, Form, Input, InputNumber, Select, Tag, Space, Row, Col } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useCreateNetworkPort, useBatchCreateNetworkPorts } from '@/services/network-port';
@@ -11,6 +11,7 @@ import { useMessage } from '@/hooks/useMessage';
 import { PORT_TYPE_TEMPLATES } from '@/constants/ports';
 import { expandPortGroups, previewPortNames } from './portNameBuilder';
 import { getUsageStatusFormOptions } from './constants';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 interface PortBatchAddModalProps {
   deviceId: number;
@@ -19,6 +20,7 @@ interface PortBatchAddModalProps {
 }
 
 export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModalProps) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const message = useMessage();
@@ -45,7 +47,12 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
       message.success(t('port.message.createSuccess'));
       resetAndClose();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -67,7 +74,12 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
       }
       resetAndClose();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -107,14 +119,14 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
             style={{
               marginBottom: 12,
               padding: '8px 12px',
-              background: '#fafafa',
+              background: token.colorFillQuaternary,
               borderRadius: 6,
               fontSize: 12,
               lineHeight: 2,
-              color: '#595959'
+              color: token.colorTextSecondary
             }}
           >
-            <div style={{ fontWeight: 500, color: '#262626', marginBottom: 2 }}>
+            <div style={{ fontWeight: 500, color: token.colorText, marginBottom: 2 }}>
               {t('port.namingRule')}
             </div>
             <div>
@@ -149,7 +161,7 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
                     style={{
                       marginBottom: 12,
                       padding: '8px 12px',
-                      border: '1px dashed #d9d9d9',
+                      border: `1px dashed ${token.colorBorder}`,
                       borderRadius: 6
                     }}
                   >
@@ -254,13 +266,17 @@ export function PortBatchAddModal({ deviceId, open, onClose }: PortBatchAddModal
               style={{
                 marginTop: 8,
                 padding: '8px 12px',
-                background: '#f6f6f6',
+                background: token.colorFillTertiary,
                 borderRadius: 6,
                 maxHeight: 160,
                 overflowY: 'auto'
               }}
             >
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
+              {/* 底色已走 Token，字色必须同源：原本字色写死中灰，暗色下底色翻深后
+                  中灰字压在深底上会糊（典型半硬编码），改由 Token 派生。
+                  注意此处是 JSX children 区，只能用 {/* * /} 形式，
+                  写成 // 会被当字面文本渲染出来。 */}
+              <div style={{ fontSize: 12, color: token.colorTextSecondary, marginBottom: 4 }}>
                 {t('port.preview.count', { count: batchPreview.length })}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>

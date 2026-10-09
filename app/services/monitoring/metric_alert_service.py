@@ -204,7 +204,8 @@ class MetricAlertService:
 
         try:
             from app.services.monitoring.incident_aggregator import aggregate_alert
-            aggregate_alert(device_id, alert_type, severity, outbox_id=new_row.id)
+            aggregate_alert(device_id, alert_type, severity, outbox_id=new_row.id,
+                            resolved=not breached)
         except Exception:
             logger.warning("metric_alert 事件聚合失败 device_id=%s", device_id, exc_info=True)
 

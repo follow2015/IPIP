@@ -37,7 +37,7 @@ class RoomLayoutMarkerRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             )
         except SQLAlchemyError as e:
             logger.error(f"查询机房占位标记失败 (room_id={room_id}): {e}")
-            raise QueryExecutionError("查询机房占位标记失败", original_error=e)
+            raise QueryExecutionError("查询机房占位标记失败", original_error=e) from e
 
     def find_by_position(
         self, room_id: int, row_number: int, col_number: int
@@ -61,7 +61,39 @@ class RoomLayoutMarkerRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             logger.error(
                 f"定位机房占位标记失败 (room_id={room_id}, pos=({row_number},{col_number})): {e}"
             )
-            raise QueryExecutionError("定位机房占位标记失败", original_error=e)
+            raise QueryExecutionError("定位机房占位标记失败", original_error=e) from e
+
+    def find_by_ids_in_room(self, ids, room_id: int) -> List[RoomLayoutMarker]:
+        """批量存在性预查：一次 IN 把本批 id 查完（评审 20260924 §2.2）。
+
+        批量编辑在循环里逐条 ``find_by_id`` 就是 N 次 SELECT —— 与 WP-9a
+        「N+1 批量化」的口径正好相反，等于在"消 N+1"的同一批改动里又引入了一处。
+        本方法一次查完，调用方按 id 建索引即可。
+
+        刻意**不带**任何预加载：这里只服务"该 id 存在且属于本机房"的判定与
+        version 读取，批量场景下把关联一起拉出来才是真正的放大。
+
+        Args:
+            ids: 标记 id 集合（本批）
+            room_id: 机房 ID（过滤后调用方无需再逐个校验归属）
+
+        Raises:
+            QueryExecutionError: 查询执行失败
+        """
+        if not ids:
+            return []
+        try:
+            return (
+                self._base_query()
+                .filter(
+                    RoomLayoutMarker.id.in_(list(ids)),
+                    RoomLayoutMarker.room_id == room_id,
+                )
+                .all()
+            )
+        except SQLAlchemyError as e:
+            logger.error(f"批量预查占位标记失败 (room_id={room_id}, n={len(ids)}): {e}")
+            raise QueryExecutionError("批量预查占位标记失败", original_error=e) from e
 
     def update_versioned(
         self, marker_id: int, room_id: int, expected_version: int,
@@ -94,13 +126,50 @@ class RoomLayoutMarkerRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         )
         try:
             result = self.session.execute(stmt)
-            self.session.expire_all()
+            self.expire_instance(marker_id)
             return result.rowcount == 1
         except SQLAlchemyError as e:
             logger.error(
                 f"乐观锁更新占位标记失败 (id={marker_id}, expected_v={expected_version}): {e}"
             )
-            raise QueryExecutionError("乐观锁更新占位标记失败", original_error=e)
+            raise QueryExecutionError("乐观锁更新占位标记失败", original_error=e) from e
+
+    def set_position(self, marker_id: int, room_id: int,
+                     row_number: int, col_number: int) -> bool:
+        """只改坐标的单条 UPDATE（**不递增 version**）
+
+        供批量编辑的坐标两阶段搬迁使用：`uk_marker_position` 唯一键在 MySQL 下
+        即时检查、不可延迟，交换/轮换位置时若直接把 A 更新到 B 当前所在格（B
+        尚未让出）会当场违反约束。搬迁被拆成"先挪哨兵格 → 再落最终坐标"两步，
+        每一步都调用本方法；version 的递增与 CAS 判据统一由 `update_versioned`
+        负责，本方法不再动它，避免一次编辑把版本号加了两次。
+
+        Returns:
+            bool: True=命中 1 行；False=标记不存在或不属于该机房
+
+        Raises:
+            QueryExecutionError: SQL 执行失败（含唯一键冲突，由上层还原 409）
+        """
+        from sqlalchemy import update
+
+        stmt = (
+            update(RoomLayoutMarker)
+            .where(
+                RoomLayoutMarker.id == marker_id,
+                RoomLayoutMarker.room_id == room_id,
+            )
+            .values(row_number=row_number, col_number=col_number)
+            .execution_options(synchronize_session=False)
+        )
+        try:
+            result = self.session.execute(stmt)
+            self.expire_instance(marker_id)
+            return result.rowcount == 1
+        except SQLAlchemyError as e:
+            logger.error(
+                f"搬迁占位标记坐标失败 (id={marker_id}, pos=({row_number},{col_number})): {e}"
+            )
+            raise QueryExecutionError("搬迁占位标记坐标失败", original_error=e) from e
 
     def delete_by_room_id(self, room_id: int) -> int:
         """删除某机房的全部占位标记，返回删除条数。
@@ -118,4 +187,4 @@ class RoomLayoutMarkerRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             return int(deleted or 0)
         except SQLAlchemyError as e:
             logger.error(f"清理机房占位标记失败 (room_id={room_id}): {e}")
-            raise QueryExecutionError("清理机房占位标记失败", original_error=e)
+            raise QueryExecutionError("清理机房占位标记失败", original_error=e) from e

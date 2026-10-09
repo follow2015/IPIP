@@ -83,10 +83,12 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
   const pollTimersRef = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
 
   useEffect(() => {
+    const pending = pendingRef.current;
+    const pollTimers = pollTimersRef.current;
     return () => {
-      pendingRef.current.clear();
-      pollTimersRef.current.forEach(clearInterval);
-      pollTimersRef.current.clear();
+      pending.clear();
+      pollTimers.forEach(clearInterval);
+      pollTimers.clear();
     };
   }, []);
 
@@ -100,7 +102,7 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
 
       pending.delete(event.task_id);
 
-      queryClient.invalidateQueries({ queryKey: ['switches', switchId, 'ports'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(switchId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.vlans.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.linkAggregation.all });
       onRefresh?.();
@@ -134,7 +136,7 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
           } else {
             message.error(result?.error || t('portAction.message.failed', { action: label }));
           }
-          queryClient.invalidateQueries({ queryKey: ['switches', switchId, 'ports'] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(switchId) });
           queryClient.invalidateQueries({ queryKey: queryKeys.vlans.all });
           queryClient.invalidateQueries({ queryKey: queryKeys.linkAggregation.all });
           onRefresh?.();
@@ -158,7 +160,7 @@ export function usePortAction({ switchId, onRefresh, hasSsh = true }: UsePortAct
           let count = 0;
           const pollTimer = setInterval(() => {
             onRefresh();
-            queryClient.invalidateQueries({ queryKey: ['switches', switchId, 'ports'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.switches.withPorts(switchId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.vlans.all });
             queryClient.invalidateQueries({ queryKey: queryKeys.linkAggregation.all });
             if (++count >= FALLBACK_POLL_MAX) {

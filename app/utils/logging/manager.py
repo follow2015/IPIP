@@ -16,11 +16,12 @@ from flask import g, has_request_context, request
 
 from app.interfaces.logging import LogManager, LogLevel, StructuredLogger
 from app.utils.logging.config import LoggingConfig
+from app.utils.trace_context import TRACE_HEADER, current_trace_id
 from config import get_config
 
 config = get_config()
 
-_log_extra_var: ContextVar[Dict[str, Any]] = ContextVar('_log_extra_var', default={})
+_log_extra_var: ContextVar[Optional[Dict[str, Any]]] = ContextVar('_log_extra_var', default=None)
 
 
 class _ExtraFilter(logging.Filter):
@@ -74,10 +75,16 @@ class UnifiedLogger(StructuredLogger):
                 pass
         record_extra = {}
         
+        if not has_request_context():
+            bound_trace = current_trace_id()
+            if bound_trace:
+                record_extra['trace_id'] = bound_trace
+
         if has_request_context():
             from app.utils.request_context import get_current_user_id
             record_extra.update({
                 'request_id': getattr(g, 'request_id', None),
+                'trace_id': current_trace_id(),
                 'user_id': get_current_user_id(),
                 'ip_address': request.remote_addr,
                 'method': request.method,
@@ -302,7 +309,7 @@ class UnifiedLogger(StructuredLogger):
                 detail=audit_info.get('detail'),
                 ip_address=audit_info.get('ip_address'),
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 -- 审计写 DB 失败非致命：日志已记录，审计失败以 WARNING 留痕（exc_info 已带栈）
             self.log(LogLevel.WARNING, f"审计事件写入数据库失败: {action} | 资源: {resource}", exc_info=True)
 
 
@@ -361,6 +368,7 @@ class UnifiedLogManager(LogManager):
             """请求前处理"""
             g.start_time = time.time()
             g.request_id = self._generate_request_id()
+            g.trace_id = request.headers.get(TRACE_HEADER) or g.request_id
         
         @app.after_request
         def after_request(response):
@@ -383,6 +391,7 @@ class UnifiedLogManager(LogManager):
                 })
                 
                 response.headers['X-Request-ID'] = getattr(g, 'request_id', '')
+                response.headers[TRACE_HEADER] = getattr(g, 'trace_id', '')
                 response.headers['X-Response-Time'] = f"{duration:.3f}s"
             
             return response

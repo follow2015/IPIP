@@ -58,6 +58,37 @@ const NO_NETWORK_MESSAGE =
   '[test] real network requests are disabled: mock the target service in your test, ' +
   'or override this stub via vi.stubGlobal';
 
+
+const liveTimers = new Set<ReturnType<typeof setTimeout>>();
+const rawSetTimeout = globalThis.setTimeout;
+const rawSetInterval = globalThis.setInterval;
+const rawClearTimeout = globalThis.clearTimeout;
+const rawClearInterval = globalThis.clearInterval;
+
+globalThis.setTimeout = function (...args: Parameters<typeof rawSetTimeout>) {
+  const id = rawSetTimeout(...(args as unknown as Parameters<typeof setTimeout>));
+  liveTimers.add(id);
+  return id;
+} as typeof setTimeout;
+
+globalThis.setInterval = function (...args: Parameters<typeof rawSetInterval>) {
+  const id = rawSetInterval(...(args as unknown as Parameters<typeof setInterval>));
+  liveTimers.add(id);
+  return id;
+} as typeof setInterval;
+
+globalThis.clearTimeout = function (...args: Parameters<typeof rawClearTimeout>) {
+  const [id] = args;
+  if (id !== undefined) liveTimers.delete(id as ReturnType<typeof setTimeout>);
+  return rawClearTimeout(...args);
+} as typeof clearTimeout;
+
+globalThis.clearInterval = function (...args: Parameters<typeof rawClearInterval>) {
+  const [id] = args;
+  if (id !== undefined) liveTimers.delete(id as ReturnType<typeof setTimeout>);
+  return rawClearInterval(...args);
+} as typeof clearInterval;
+
 const pendingRejects = new Set<ReturnType<typeof setTimeout>>();
 
 const rejectOnNextTick = (makeError: () => unknown): Promise<never> =>
@@ -77,6 +108,11 @@ vi.stubGlobal('fetch', () => rejectOnNextTick(() => new Error(NO_NETWORK_MESSAGE
 afterEach(() => {
   pendingRejects.forEach(clearTimeout);
   pendingRejects.clear();
+  for (const id of liveTimers) {
+    rawClearTimeout(id);
+    rawClearInterval(id);
+  }
+  liveTimers.clear();
 });
 
 beforeAll(async () => {

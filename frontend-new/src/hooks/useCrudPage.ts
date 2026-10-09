@@ -19,6 +19,7 @@ export interface UseCrudPageOptions<
   useList: (params?: TListParams) => {
     data?: PaginatedData<T>;
     isLoading: boolean;
+    error: unknown;
     refetch: () => void;
   };
   useDelete: () => UseMutationResult<ApiResponse<unknown>, Error, number>;
@@ -31,6 +32,7 @@ export interface UseCrudPageReturn<T extends { id: number }> {
   table: UseTableReturn;
   data: PaginatedData<T> | undefined;
   isLoading: boolean;
+  error: unknown;
   refetch: () => void;
   formOpen: boolean;
   editRecord: T | null;
@@ -51,6 +53,7 @@ export function useCrudPage<
 
   const table = useTable();
   const form = useDisclosure();
+  const { open: openFormModal, close: closeFormModal } = form;
   const [editRecord, setEditRecord] = useState<T | null>(null);
   const deleteMutation = useDelete();
   const message = useMessage();
@@ -58,17 +61,17 @@ export function useCrudPage<
   const listParams: TListParams = buildListParams
     ? buildListParams(table.tableParams)
     : (table.tableParams as unknown as TListParams);
-  const { data, isLoading, refetch } = useList(listParams);
+  const { data, isLoading, error, refetch } = useList(listParams);
 
   const handleAdd = useCallback(() => {
     setEditRecord(null);
-    form.open();
-  }, []);
+    openFormModal();
+  }, [openFormModal]);
 
   const handleEdit = useCallback((record: T) => {
     setEditRecord(record);
-    form.open();
-  }, []);
+    openFormModal();
+  }, [openFormModal]);
 
   const handleDelete = useCallback(
     (record: T) => {
@@ -93,15 +96,16 @@ export function useCrudPage<
   );
 
   const closeForm = useCallback(() => {
-    form.close();
+    closeFormModal();
     setEditRecord(null);
     refetch();
-  }, [refetch]);
+  }, [refetch, closeFormModal]);
 
   return {
     table,
     data,
     isLoading,
+    error,
     refetch,
     formOpen: form.isOpen,
     editRecord,

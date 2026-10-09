@@ -118,7 +118,7 @@ class BCryptPasswordManager(PasswordManager):
             return hashed.decode('utf-8')
         except Exception as e:
             logger.error(f"密码加密失败: {e}", exc_info=True)
-            raise ValueError(f"密码加密失败: {e}")
+            raise ValueError(f"密码加密失败: {e}") from e
     
     def verify_password(self, password: str, hashed_password: str) -> bool:
         """验证密码

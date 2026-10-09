@@ -7,7 +7,7 @@
  * - 新建时交换机列表只显示非管理型
  * - 默认加载第一个机房，防止全量加载
  */
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/utils/confirm';
@@ -124,7 +124,12 @@ function LinkAggregations() {
         width: 140,
         render: (v: string | null) => v ?? '-'
       },
-      { title: td('lag.column.memberCount'), dataIndex: 'member_count', key: 'member_count', width: 80 },
+      {
+        title: td('lag.column.memberCount'),
+        dataIndex: 'member_count',
+        key: 'member_count',
+        width: 80
+      },
       {
         title: td('memberPort.column'),
         dataIndex: 'member_ports',

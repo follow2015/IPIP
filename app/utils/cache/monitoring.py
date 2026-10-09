@@ -212,7 +212,7 @@ class CacheMonitor:
         for callback in self.alert_callbacks:
             try:
                 callback(alert)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 告警回调执行失败非致命：监控回调异常不得影响缓存主流程
                 logger.error("告警回调执行失败: %s", e)
 
         logger.warning("缓存告警: %s - %s", alert.alert_type, alert.message)

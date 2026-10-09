@@ -162,7 +162,9 @@ function SchemaForm({
       {!modalProps && (
         <Form.Item>
           <Space>
-            <Button type="primary" htmlType="submit" loading={loading}>
+            {/* htmlType=submit 走原生表单提交，不经过 Button 的 onClick 拦截，
+                loading 挡不住连点，必须显式 disabled（P1-4 / AC-6） */}
+            <Button type="primary" htmlType="submit" loading={loading} disabled={loading}>
               {submitText ?? t('action.ok')}
             </Button>
             {onCancel && (

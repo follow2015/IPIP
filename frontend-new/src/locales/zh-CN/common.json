@@ -20,7 +20,8 @@
     "disable": "禁用",
     "copy": "复制",
     "retry": "重试",
-    "copyId": "点击复制 ID"
+    "copyId": "点击复制 ID",
+    "discard": "放弃修改"
   },
   "field": {
     "name": "名称",
@@ -40,6 +41,7 @@
     "unknown": "未知"
   },
   "message": {
+    "formValidationFailed": "请先修正表单中标红的项再提交",
     "createSuccess": "创建成功",
     "updateSuccess": "更新成功",
     "deleteSuccess": "删除成功",
@@ -53,12 +55,19 @@
     "selectRequired": "请选择",
     "idCopied": "ID 已复制",
     "copyFailedManual": "复制失败，请手动复制",
-    "copyUnsupported": "当前环境不支持自动复制"
+    "copyUnsupported": "当前环境不支持自动复制",
+    "noPermission": "无权限"
   },
   "confirm": {
     "deleteTitle": "确认删除",
     "deleteContent": "此操作不可撤销，是否确认删除？",
-    "deleteNamed": "确定要删除{{label}}「{{name}}」吗？"
+    "deleteNamed": "确定要删除{{label}}「{{name}}」吗？",
+    "unsavedTitle": "放弃未保存的修改？",
+    "unsavedContent": "当前表单有未保存的修改，关闭后将丢失。",
+    "emptyPermissionTitle": "确认清空全部权限？",
+    "emptyPermissionContent": "该角色的权限将被全部移除（提交空集合）。",
+    "emptyRoleTitle": "确认清空全部角色？",
+    "emptyRoleContent": "该用户的角色将被全部移除（提交空集合），此后将无任何权限。"
   },
   "validation": {
     "required": "该项为必填",
@@ -74,7 +83,8 @@
   "batch": {
     "selectedPrefix": "已选择",
     "selectedSuffix": "",
-    "clear": "取消选择"
+    "clear": "取消选择",
+    "tooMany": "批量编辑单次最多 {{max}} 条，本次提交了 {{submitted}} 条，请分批提交"
   },
   "pagination": {
     "total": "共 {{count}} 条",
@@ -117,6 +127,8 @@
     "devices": "设备管理",
     "deviceRecycleBin": "设备回收站",
     "customers": "客户管理",
+    "carriers": "运营商管理",
+    "circuits": "线路管理",
     "componentTemplates": "配件模板管理",
     "vendorBrands": "厂商品牌",
     "networkGroup": "网络管理",
@@ -162,6 +174,19 @@
     "switchDark": "切换深色模式",
     "switchLight": "切换浅色模式"
   },
+  "realtime": {
+    "status": {
+      "idle": "实时推送未启用",
+      "connecting": "正在连接实时推送",
+      "live": "实时推送已连接",
+      "degraded": "实时推送中断，已降级为 30 秒轮询",
+      "idleShort": "未启用",
+      "connectingShort": "连接中",
+      "liveShort": "实时",
+      "degradedShort": "降级轮询",
+      "hint": "降级期间数据仍会刷新，但延迟最多 30 秒，当前看到的不是实况"
+    }
+  },
   "user": {
     "profile": "用户中心",
     "notLoggedIn": "未登录"
@@ -173,5 +198,9 @@
   "version": {
     "label": "版本 v{{version}}",
     "backend": "后端版本 v{{version}}"
+  },
+  "filter": {
+    "title": "筛选条件",
+    "activeCount": "筛选条件（{{count}} 项生效）"
   }
 }

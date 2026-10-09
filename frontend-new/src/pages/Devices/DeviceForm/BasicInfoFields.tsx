@@ -9,7 +9,8 @@ import {
   Row,
   Select,
   Space,
-  Typography
+  Typography,
+  theme
 } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
 import type { SelectProps } from 'antd';
@@ -45,6 +46,7 @@ export default function BasicInfoFields({
   showNodeAssoc,
   onGenerateName
 }: BasicInfoFieldsProps) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const { data: vendorBrands } = useVendorBrands();
@@ -105,7 +107,11 @@ export default function BasicInfoFields({
       <Row gutter={16}>
         <Col xs={24} md={8}>
           <Form.Item name="device_subtype" label={t('basic.field.deviceSubtype')}>
-            <Select placeholder={tCommon('message.selectRequired')} options={subtypeOptions} allowClear />
+            <Select
+              placeholder={tCommon('message.selectRequired')}
+              options={subtypeOptions}
+              allowClear
+            />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
@@ -194,10 +200,7 @@ export default function BasicInfoFields({
           </Form.Item>
         </Col>
         <Col xs={24} md={12}>
-          <Form.Item
-            name="serial_number"
-            label={t('form.basicInfo.serialNumber.label')}
-          >
+          <Form.Item name="serial_number" label={t('form.basicInfo.serialNumber.label')}>
             <Input placeholder={t('form.basicInfo.serialNumber.placeholder')} />
           </Form.Item>
         </Col>
@@ -245,9 +248,7 @@ export default function BasicInfoFields({
               >
                 <Select
                   placeholder={
-                    selectedRoomId
-                      ? t('form.select.chassis')
-                      : t('form.hint.selectRoomFirst')
+                    selectedRoomId ? t('form.select.chassis') : t('form.hint.selectRoomFirst')
                   }
                   options={chassisOptions}
                   allowClear
@@ -285,7 +286,7 @@ export default function BasicInfoFields({
                 md={16}
                 style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}
               >
-                <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+                <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>
                   {t('form.nodeAssoc.vacantPositions', {
                     count: availablePositions.length,
                     list: availablePositions.slice(0, 10).join(', '),

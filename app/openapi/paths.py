@@ -21,6 +21,8 @@ TAG_DEFINITIONS = [
     {"name": "机柜", "description": "机柜管理 CRUD"},
     {"name": "设备", "description": "设备管理 CRUD + 批量操作"},
     {"name": "客户", "description": "客户管理 CRUD"},
+    {"name": "线路", "description": "线路资产 CRUD + 分段 + 到期 + 影响面反查"},
+    {"name": "运营商", "description": "运营商档案 CRUD"},
     {"name": "交换机", "description": "交换机管理 + 端口操作 + 扫描"},
     {"name": "IP", "description": "IP 地址管理 + 封禁/解封"},
     {"name": "网段", "description": "网段管理"},
@@ -72,7 +74,7 @@ def register_all_paths(spec: APISpec):
                     path=path,
                     operations={method: operation},
                 )
-            except Exception:  # noqa: BLE001 - 跳过重复注册等错误：同一 path 可能已被其他蓝图注册
+            except Exception:  # noqa: BLE001, S110 - 跳过重复注册等错误：同一 path 可能已被其他蓝图注册
                 pass
 
 

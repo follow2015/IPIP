@@ -3,9 +3,15 @@
 
 提供全局 APISpec 实例，注册 Marshmallow Schema 和通用响应组件。
 各路由模块通过 add_path() 注册端点信息。
+
+[WARN] `info.version` 此前是硬编码的 `"2.1.0"`，与 `config.py` 的 `VERSION`
+长期分叉而无人发现 —— 因为没有任何判据比对二者。现改为直接读 `Config.VERSION`，
+判据见 `tests/test_version_contract.py`。加硬编码字面量会让那条用例变红。
 """
 from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin
+
+from config import Config
 
 
 def create_spec() -> APISpec:
@@ -16,7 +22,7 @@ def create_spec() -> APISpec:
     """
     spec = APISpec(
         title="IPIP 管理 API",
-        version="2.1.0",
+        version=Config.VERSION,
         openapi_version="3.0.3",
         info={
             "description": "IP/IP 地址管理系统 RESTful API",
@@ -151,6 +157,13 @@ def register_marshmallow_schemas(spec: APISpec):
         CabinetCustomerUpdateSchema,
     )
     from app.schemas.customer import CustomerCreateSchema, CustomerUpdateSchema, CustomerTerminateRequestSchema
+    from app.schemas.circuit import (
+        CarrierCreateSchema,
+        CarrierUpdateSchema,
+        CircuitCreateSchema,
+        CircuitSegmentsReplaceSchema,
+        CircuitUpdateSchema,
+    )
     from app.schemas.room import (
         RoomChannelCreateSchema,
         RoomChannelUpdateSchema,
@@ -162,9 +175,7 @@ def register_marshmallow_schemas(spec: APISpec):
     from app.schemas.device_connection import DeviceConnectionCreateSchema, DeviceConnectionUpdateSchema
     from app.schemas.device_config import ConfigChangeRequestSchema
     from app.schemas.device_nics_port import NicPortBatchSchema, NicPortIncrementalBatchSchema, NicPortUpdateSchema
-    from app.api.device_nics_port import NicPortBatchDeleteSchema
     from app.schemas.device_storage import StorageAddSchema, StorageOverwriteSchema, StorageUpdateSchema, StorageSerialCheckSchema
-    from app.api.device_storage import StorageBatchDeleteSchema
     from app.schemas.auth import LoginSchema, QRCodeConfirmSchema, QRCodeCompleteSchema
     from app.schemas.audit import AuditLogQuerySchema
     from app.schemas.vlan import VLANCreateSchema, VLANUpdateSchema
@@ -174,30 +185,6 @@ def register_marshmallow_schemas(spec: APISpec):
         UserUpdateRequestSchema, ChangePasswordSchema, ResetPasswordSchema,
     )
     from app.schemas.monitor import MonitorCredentialUpsertSchema
-    from app.schemas.monitor import (
-        DeviceMetricOverrideUpsertSchema,
-        DeviceTypeRecommendUpdateSchema,
-        MibScanImportSchema,
-        MibScanPersistRuleSchema,
-        MibScanRequestSchema,
-        MonitorAlertDependencyRuleCreateSchema,
-        MonitorAlertDependencyRuleUpdateSchema,
-        MonitorBatchMonitorEnabledSchema,
-        MonitorCheckBatchSchema,
-        MonitorConfigUpdateSchema,
-        MonitorCredentialPayloadUpdateSchema,
-        MonitorDeviceMonitorEnabledSchema,
-        MonitorEscalationPolicyCreateSchema,
-        MonitorEscalationPolicyUpdateSchema,
-        MonitorSilenceRuleCreateSchema,
-        MonitorSilenceRuleUpdateSchema,
-        MonitorSlaTargetCreateSchema,
-        MonitorSlaTargetUpdateSchema,
-        OidCategoryRuleCreateSchema,
-        OidCategoryRuleUpdateSchema,
-        VendorBrandCreateSchema,
-        VendorBrandUpdateSchema,
-    )
     from app.schemas.monitor import (
         DeviceMetricOverrideUpsertSchema,
         DeviceTypeRecommendUpdateSchema,
@@ -372,6 +359,11 @@ def register_marshmallow_schemas(spec: APISpec):
         "ComponentTemplateCreateRequest": ComponentTemplateCreateRequestSchema,
         "ComponentTemplateUpdateRequest": ComponentTemplateUpdateRequestSchema,
         "CustomerTerminateRequest": CustomerTerminateRequestSchema,
+        "CircuitCreate": CircuitCreateSchema,
+        "CircuitUpdate": CircuitUpdateSchema,
+        "CircuitSegmentsReplace": CircuitSegmentsReplaceSchema,
+        "CarrierCreate": CarrierCreateSchema,
+        "CarrierUpdate": CarrierUpdateSchema,
         "ErrorReportRequest": ErrorReportRequestSchema,
         "LogErrorReportRequest": LogErrorReportRequestSchema,
         "LogInfoReportRequest": LogInfoReportRequestSchema,
@@ -431,6 +423,9 @@ def register_marshmallow_schemas(spec: APISpec):
         TopologyAutoDetectChangeSchema,
         TopologyAutoDetectResponseSchema,
         VirtualRoomResponseSchema,
+        CircuitResponseSchema,
+        CircuitSegmentResponseSchema,
+        CarrierResponseSchema,
         ApiResponseSchema,
         ApiErrorResponseSchema,
         PaginationMetaSchema,
@@ -493,7 +488,6 @@ def register_marshmallow_schemas(spec: APISpec):
         DeviceTypeRecommendItemSchema,
         DeviceTypeRecommendListResponseSchema,
         RecommendConfigResponseSchema,
-        VendorBrandItemSchema,
         VendorBrandListResponseSchema,
         VendorBrandMutationResponseSchema,
         MonitorSilenceRuleItemSchema,
@@ -604,6 +598,9 @@ def register_marshmallow_schemas(spec: APISpec):
         "TopologyAutoDetectChange": TopologyAutoDetectChangeSchema,
         "TopologyAutoDetectResponse": TopologyAutoDetectResponseSchema,
         "VirtualRoomResponse": VirtualRoomResponseSchema,
+        "CircuitResponse": CircuitResponseSchema,
+        "CircuitSegmentResponse": CircuitSegmentResponseSchema,
+        "CarrierResponse": CarrierResponseSchema,
         "ApiResponse": ApiResponseSchema,
         "ApiError": ApiErrorResponseSchema,
         "PaginationMetaResponse": PaginationMetaSchema,
@@ -739,7 +736,7 @@ def register_marshmallow_schemas(spec: APISpec):
     for name, schema_cls in response_schema_map.items():
         try:
             spec.components.schema(name, schema=schema_cls())
-        except Exception:  # noqa: BLE001 - 跳过 MarshmallowPlugin 已自动注册的同名 schema，避免重复注册报错
+        except Exception:  # noqa: BLE001, S110 - 跳过 MarshmallowPlugin 已自动注册的同名 schema，避免重复注册报错
             pass
 
     spec.components.schema("LinkedDevicesResponse", component={

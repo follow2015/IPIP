@@ -6,15 +6,11 @@
 
 import { useCallback, useMemo } from 'react';
 import { useConfirm } from '@/utils/confirm';
-import { Descriptions, Tag, Space, Typography, Button } from 'antd';
+import { Descriptions, Tag, Space, Typography, Button, theme } from 'antd';
 import { DeleteOutlined, ClearOutlined } from '@ant-design/icons';
 import type { Device } from '@/types/models';
 import { DeviceType } from '@/types/enums';
-import {
-  getDeviceStatusMeta,
-  getDeviceSubtypeLabel,
-  getDeviceTypeMeta
-} from '@/types/statusMeta';
+import { getDeviceStatusMeta, getDeviceSubtypeLabel, getDeviceTypeMeta } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '@/utils/format';
 import { parseIPAddressString, removeIPAtIndex, type ParsedIPEntry } from '@/utils/ip';
@@ -63,6 +59,7 @@ function IPEntryItem({
 }
 
 function BasicTab({ device }: BasicTabProps) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
   const confirm = useConfirm();
@@ -129,7 +126,9 @@ function BasicTab({ device }: BasicTabProps) {
       <Descriptions.Item label={t('basic.field.serialNumber')}>
         {device.serial_number ?? '-'}
       </Descriptions.Item>
-      <Descriptions.Item label={t('node.column.hostname')}>{device.hostname ?? '-'}</Descriptions.Item>
+      <Descriptions.Item label={t('node.column.hostname')}>
+        {device.hostname ?? '-'}
+      </Descriptions.Item>
       <Descriptions.Item label={t('field.managementIp')} span={2}>
         {device.management_ip ?? '-'}
       </Descriptions.Item>
@@ -190,7 +189,7 @@ function BasicTab({ device }: BasicTabProps) {
           <div>
             <div>{`${device.memory}${device.memory_dimm_count ? ` ×${device.memory_dimm_count}` : ''}`}</div>
             {device.memory_size_gb ? (
-              <div style={{ fontSize: 12, color: '#888', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 12, color: token.colorTextTertiary, lineHeight: 1.6 }}>
                 {device.memory_dimm_count
                   ? t('basic.field.memoryPerDimm', {
                       size: Math.round(device.memory_size_gb / device.memory_dimm_count),
@@ -208,7 +207,9 @@ function BasicTab({ device }: BasicTabProps) {
       <Descriptions.Item label={t('basic.field.gpu')}>
         {device.gpu ? `${device.gpu}${device.gpu_count ? ` ×${device.gpu_count}` : ''}` : '-'}
       </Descriptions.Item>
-      <Descriptions.Item label={t('hardware.os.label')}>{device.os_version ?? '-'}</Descriptions.Item>
+      <Descriptions.Item label={t('hardware.os.label')}>
+        {device.os_version ?? '-'}
+      </Descriptions.Item>
       <Descriptions.Item label={t('hardware.ipmi.address')}>
         {device.ipmi_address ?? '-'}
       </Descriptions.Item>

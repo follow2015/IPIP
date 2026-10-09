@@ -27,6 +27,8 @@ import enAsset from '@/locales/en-US/asset.json';
 import enSettings from '@/locales/en-US/settings.json';
 import zhAi from '@/locales/zh-CN/ai.json';
 import enAi from '@/locales/en-US/ai.json';
+import zhCircuit from '@/locales/zh-CN/circuit.json';
+import enCircuit from '@/locales/en-US/circuit.json';
 
 import './types';
 
@@ -39,7 +41,8 @@ const resources = {
     network: zhNetwork,
     asset: zhAsset,
     settings: zhSettings,
-    ai: zhAi
+    ai: zhAi,
+    circuit: zhCircuit
   },
   'en-US': {
     common: enCommon,
@@ -49,7 +52,8 @@ const resources = {
     network: enNetwork,
     asset: enAsset,
     settings: enSettings,
-    ai: enAi
+    ai: enAi,
+    circuit: enCircuit
   }
 };
 

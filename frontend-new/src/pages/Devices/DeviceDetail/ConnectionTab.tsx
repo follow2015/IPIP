@@ -1,3 +1,4 @@
+import { PER_PAGE_CAP } from '@/constants/pagination';
 import { useConfirm } from '@/utils/confirm';
 import { useState, useMemo, useCallback } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
@@ -39,6 +40,7 @@ import type {
 } from '@/types/models';
 import { isPhysicalPort } from '@/utils/portType';
 import { useTranslation } from 'react-i18next';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 type ConnectionTypeKey =
   | 'connection.type.ethernet'
@@ -121,6 +123,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
   useD2NConnectionSync(deviceId, d2nSwitchIds);
   const formDisclosure = useDisclosure();
   const editFormDisclosure = useDisclosure();
+  const { open: openEditFormDisclosure } = editFormDisclosure;
   const [editRecord, setEditRecord] = useState<DeviceConnection | PortLink | null>(null);
   const [editForm] = Form.useForm();
   const [form] = Form.useForm();
@@ -138,7 +141,7 @@ function ConnectionTab({ device }: ConnectionTabProps) {
   }, [cabinetList]);
 
   const switchQueryParams = useMemo(() => {
-    const params: Record<string, unknown> = { device_type: 'network', per_page: 999 };
+    const params: Record<string, unknown> = { device_type: 'network', per_page: PER_PAGE_CAP };
     if (selectedRoomId) {
       params.room_id = selectedRoomId;
     }
@@ -274,7 +277,9 @@ function ConnectionTab({ device }: ConnectionTabProps) {
             await disconnectPortLink.mutateAsync(portId);
             message.success(t('connection.message.disconnected'));
           } catch (err) {
-            message.error(err instanceof Error ? err.message : t('connection.message.disconnectFailed'));
+            message.error(
+              err instanceof Error ? err.message : t('connection.message.disconnectFailed')
+            );
           }
         }
       });
@@ -290,7 +295,12 @@ function ConnectionTab({ device }: ConnectionTabProps) {
       message.success(tCommon('message.createSuccess'));
       formDisclosure.close();
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
@@ -306,9 +316,9 @@ function ConnectionTab({ device }: ConnectionTabProps) {
         description: (record as PortLink).description ?? undefined,
         lag_group_id: (record as PortLink).lag_group_id ?? undefined
       });
-      editFormDisclosure.open();
+      openEditFormDisclosure();
     },
-    [editForm]
+    [editForm, openEditFormDisclosure]
   );
 
   const handleEditSubmit = async () => {
@@ -333,12 +343,24 @@ function ConnectionTab({ device }: ConnectionTabProps) {
       editFormDisclosure.close();
       setEditRecord(null);
     } catch (err) {
-      if (err instanceof Error) message.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) message.error(fieldError);
+      } else {
+        if (err instanceof Error) message.error(err.message);
+      }
     }
   };
 
   const columns = useMemo(
     () => [
+      {
+        title: t('connection.column.id'),
+        dataIndex: 'id',
+        key: 'id',
+        width: 80,
+        render: (v: number) => `#${v}`
+      },
       {
         title: t('connection.column.connectionType'),
         dataIndex: 'connection_type',

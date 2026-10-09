@@ -56,7 +56,7 @@ def _ipmi_get_power_status(
     """
     try:
         from pyghmi.ipmi.command import Command
-    except Exception as exc:  # pragma: no cover - 仅在依赖缺失时触发
+    except Exception as exc:  # noqa: BLE001 -- pyghmi 依赖缺失降级（已标注 pragma no cover）
         logger.debug("pyghmi 不可用: %s", exc)
         return False, None, f"import_error:{exc}"
 
@@ -68,7 +68,7 @@ def _ipmi_get_power_status(
     try:
         cmd = Command(bmc=bmc_ip, userid=username, password=password, port=port)
         result = cmd.get_power()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- IPMI 异常分类兜底：需捕获任意异常以按消息内容判别超时/鉴权
         msg = str(exc).lower()
         if "timeout" in msg:
             logger.debug("IPMI 超时 %s: %s", bmc_ip, exc)
@@ -79,7 +79,7 @@ def _ipmi_get_power_status(
         if cmd is not None:
             try:
                 cmd.ipmi_session.logout()
-            except Exception as exc:  # pragma: no cover - 兜底，logout 异常不应掩盖业务结果
+            except Exception as exc:  # noqa: BLE001 -- IPMI logout 异常容错（已标注 pragma no cover）：不得掩盖业务结果
                 logger.debug("IPMI logout 异常 %s: %s", bmc_ip, exc)
 
     state = result.get("powerstate") if isinstance(result, dict) else None
@@ -101,7 +101,7 @@ def _ipmi_collect_metrics(credential: dict, bmc_ip: str, timeout: int) -> dict:
     result: dict = {}
     try:
         from pyghmi.ipmi.command import Command
-    except Exception as exc:  # pragma: no cover - 依赖缺失  # noqa: BLE001 - pyghmi 依赖缺失时返回空结果（该适配器在无 IPMI 环境下降级）
+    except Exception:  # pragma: no cover - 依赖缺失  # noqa: BLE001 - pyghmi 依赖缺失时返回空结果（该适配器在无 IPMI 环境下降级）
         return result
 
     username = credential.get("username", "")

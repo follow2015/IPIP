@@ -35,9 +35,8 @@ from app.services.audit_service import AuditService
 from app.services.monitoring.credential_service import MonitorCredentialService
 from app.services.monitoring.monitor_service import MonitorService
 from app.services.monitoring.protocol_registry import build_adapter
-from app.utils.auth import get_current_user_id
+from app.services.auth import get_current_user_id
 from app.utils.logging import get_logger
-from app.utils.transactional import transactional
 
 logger = get_logger(__name__)
 

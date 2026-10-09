@@ -33,7 +33,6 @@ interface SshColumnDeps {
 }
 
 export function buildSshColumns({
-  deviceId,
   renderPortActions,
   refetch,
   submitAction,

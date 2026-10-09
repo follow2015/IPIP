@@ -48,7 +48,7 @@ class DeviceMetricOverrideRepository:
             .filter(
                 DeviceMetricOverride.device_id == device_id,
                 DeviceMetricOverride.metric_key == metric_key,
-                DeviceMetricOverride.enabled == True,
+                DeviceMetricOverride.enabled.is_(True),
             )
             .first()
         )

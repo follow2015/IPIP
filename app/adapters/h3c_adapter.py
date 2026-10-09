@@ -11,7 +11,7 @@ import re
 
 from app.adapters.base_adapter import (
     BaseDeviceAdapter, BanCommands, ArpBanCommands, ParsedRoute, ParsedArpEntry, ParsedMacEntry,
-    ParsedPort, ParsedDeviceInfo, ParsedLldpNeighbor,
+    ParsedPort, ParsedDeviceInfo,
 )
 
 logger = get_logger(__name__)
@@ -340,7 +340,7 @@ class H3CAdapter(BaseDeviceAdapter):
                 m = re.search(r'SN\s*[:\s]+(\S+)', sn_output)
                 if m:
                     serial = m.group(1)
-            except Exception:  # noqa: BLE001 - 解析 SN 失败时保留 serial=None，仍返回已解析的其他字段（部分成功优于整体失败）
+            except Exception:  # noqa: BLE001, S110 - 解析 SN 失败时保留 serial=None，仍返回已解析的其他字段（部分成功优于整体失败）
                 pass
         return ParsedDeviceInfo(model=model, version=version, serial=serial, uptime=uptime, brand="H3C")
 

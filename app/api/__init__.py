@@ -6,6 +6,8 @@ API蓝图包
 """
 from app.api.auth import auth_bp
 from app.api.cabinet import cabinet_bp
+from app.api.carrier import carrier_bp
+from app.api.circuit import circuit_bp
 from app.api.customer import customer_bp
 from app.api.device import device_bp
 from app.api.device_storage import device_storage_bp
@@ -26,6 +28,8 @@ __all__ = [
     "user_bp",
     "room_bp",
     "cabinet_bp",
+    "circuit_bp",
+    "carrier_bp",
     "device_bp",
     "device_storage_bp",
     "customer_bp",

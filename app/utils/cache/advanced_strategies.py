@@ -372,7 +372,7 @@ class CacheWarmupStrategy(CacheStrategy):
             priority: 优先级（数字越大优先级越高）
             schedule: 调度时机（startup, hourly, daily）
         """
-        task_id = hashlib.md5(key_pattern.encode()).hexdigest()[:8]
+        task_id = hashlib.md5(key_pattern.encode(), usedforsecurity=False).hexdigest()[:8]
         
         task = {
             'key_pattern': key_pattern,
@@ -426,7 +426,7 @@ class CacheWarmupStrategy(CacheStrategy):
                 if not task:
                     continue
                 
-                data = task['data_loader']()
+                task['data_loader']()
                 
                 cache_key = task['key_pattern'].replace('*', 'warmup')
                 
@@ -440,7 +440,7 @@ class CacheWarmupStrategy(CacheStrategy):
                 
                 logger.debug(f"预热任务成功: {task['key_pattern']}")
                 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 预热任务失败隔离：计入该任务 error_count 后继续其它任务
                 task = self.warmup_tasks.get(task_id, {})
                 task['error_count'] = task.get('error_count', 0) + 1
                 self.warmup_tasks.set(task_id, task)

@@ -6,19 +6,107 @@
 避免竞态条件导致配置乱序或事件顺序错误。
 
 - 有 Redis 时：使用分布式锁（多进程 gunicorn 下安全）
-- 无 Redis 时：使用线程锁（单进程模式）
+- 无 Redis 时：**分模式处置**（R9）
+  - ``mode="write"``（SSH 配置下发）：默认 **fail-closed** —— 抛
+    ``DeviceLockUnavailable``（503）。进程内 ``threading.Lock`` 在多 worker /
+    Celery prefork 下**不提供任何跨进程互斥**，而并发下发的后果是配置乱序，
+    宁可拒绝也不能"看起来成功"。
+  - ``mode="read"``（诊断 / 配置采集）：仍降级为进程内锁并记 warning。
+    这类调用方本就把"未获锁"当作正常降级路径（supported:false / 设备繁忙），
+    无谓拒绝只会掐断只读能力，无收益。
+
+逃生阀：确认为单进程部署时设 ``DEVICE_OP_LOCK_REQUIRE_REDIS=0``
+（或 ``app.config["DEVICE_OP_LOCK_REQUIRE_REDIS"] = False``）恢复原降级行为。
 """
 from __future__ import annotations
 
 import contextlib
+import os
+import time
 from app.utils.logging import get_logger
 import threading
 
+from app.exceptions.business import DeviceLockUnavailable
+from app.utils import redis_keys
+
 logger = get_logger(__name__)
+
+POLICY_ENV = "DEVICE_OP_LOCK_REQUIRE_REDIS"
+_TRUE_TOKENS = frozenset({"1", "true", "yes", "on", "strict", "distributed"})
+_FALSE_TOKENS = frozenset({"0", "false", "no", "off", "local", "single"})
+
+_LOG_THROTTLE_SECONDS = 60.0
+_fail_closed_stats = {"count": 0, "last_log": 0.0}
+_degrade_stats = {"count": 0, "last_log": 0.0}
 
 
 class DeviceOperationConflict(Exception):
     """设备当前有操作正在执行，无法接受新操作"""
+
+
+def _read_policy_setting():
+    """读部署形态开关（app.config > env > None 表示未声明）。"""
+    raw = None
+    try:
+        from flask import current_app, has_app_context
+
+        if has_app_context():
+            raw = current_app.config.get(POLICY_ENV)
+    except Exception:  # noqa: BLE001 —— 无 Flask / 无 app context 均属正常
+        raw = None
+    if raw is None:
+        raw = os.getenv(POLICY_ENV)
+    return raw
+
+
+def _must_fail_closed(mode: str) -> bool:
+    """无 Redis 时该模式是否必须拒绝执行。
+
+    read 模式恒为 False：其调用方本就容忍"拿不到锁"（诊断降级 supported:false、
+    配置采集报"设备繁忙"），且在单进程内的互斥仍有价值（避免与同进程写操作并发）。
+    """
+    if mode != "write":
+        return False
+
+    raw = _read_policy_setting()
+    if raw is None:
+        return True  # 未声明 ⇒ 默认 fail-closed
+    if isinstance(raw, bool):
+        return raw
+    token = str(raw).strip().lower()
+    if token in _TRUE_TOKENS:
+        return True
+    if token in _FALSE_TOKENS:
+        return False
+    logger.warning(
+        "%s=%r 无法识别，按 fail-closed 处理（可用值：%s / %s）",
+        POLICY_ENV, raw, sorted(_TRUE_TOKENS)[:3], sorted(_FALSE_TOKENS)[:3],
+    )
+    return True
+
+
+def _throttled_error(stats, message, *args):
+    """按固定间隔记一条 error/warning，避免故障期间刷屏。"""
+    stats["count"] += 1
+    now = time.monotonic()
+    if now - stats["last_log"] < _LOG_THROTTLE_SECONDS:
+        return
+    stats["last_log"] = now
+    logger.error(message, *args)
+
+
+def _log_degraded(mode: str, device_id, lock_key):
+    """read 模式降级为进程内锁的可观测留痕（旧行为完全静默）。"""
+    _degrade_stats["count"] += 1
+    now = time.monotonic()
+    if now - _degrade_stats["last_log"] < _LOG_THROTTLE_SECONDS:
+        return
+    _degrade_stats["last_log"] = now
+    logger.warning(
+        "Redis 不可用：设备 %s 的 %s 锁降级为**进程内**锁（key=%s，累计 %d 次）"
+        "—— 多 worker 部署下跨进程互斥不成立",
+        device_id, mode, lock_key, _degrade_stats["count"],
+    )
 
 
 class DeviceOpLock:
@@ -71,6 +159,7 @@ class DeviceOpLock:
 
         Raises:
             DeviceOperationConflict: 超时无法获取锁（设备繁忙）
+            DeviceLockUnavailable:   无 Redis 且未声明单进程（write 模式 fail-closed）
 
         Usage:
             with device_op_lock.acquire(switch.device_id):
@@ -81,9 +170,9 @@ class DeviceOpLock:
 
         if lock_key is None:
             if mode == "read":
-                lock_key = f"device_op_lock:ro:{device_id}"
+                lock_key = redis_keys.device_op_lock_ro_key(device_id)
             else:
-                lock_key = f"device_op_lock:{device_id}"
+                lock_key = redis_keys.device_op_lock_key(device_id)
 
         held = getattr(self._reentrant_local, "map", None)
         if held is None:
@@ -97,6 +186,15 @@ class DeviceOpLock:
             finally:
                 rec[0] -= 1
             return
+
+        if r is None and _must_fail_closed(mode):
+            _throttled_error(
+                _fail_closed_stats,
+                "Redis 不可用：设备 %s 的 write 锁无法建立跨进程互斥，"
+                "已拒绝执行（累计 %d 次）——若为单进程部署请设置 %s=0",
+                device_id, _fail_closed_stats["count"], POLICY_ENV,
+            )
+            raise DeviceLockUnavailable(device_id, lock_key)
 
         if r:
             lock = r.lock(
@@ -144,6 +242,7 @@ class DeviceOpLock:
                         device_id, lock_key, exc_info=True,
                     )
         else:
+            _log_degraded(mode, device_id, lock_key)
             lock = self._get_local_lock(lock_key)
             acquired = lock.acquire(timeout=timeout)
             if not acquired:

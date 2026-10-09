@@ -14,6 +14,23 @@ ai._runtime（AI 缓存/审计）三处各自实现「读 REDIS_URL → redis.fr
   维持 host/port fallback。N-AI-1 后其内部已按 app 弱引用缓存客户端——
   监控组件（dynamic_config / alert_ingress / outbox 等）每 app 每进程共享
   一池；测试经 monkeypatch 替换 _redis_client 符号注入 fakeredis。
+
+[WARN] O1（2026-10-02 核实）：docstring 自称"唯一公开入口"，但进程内实际**并存多套
+连接池**。这是现状而非疏漏，收敛会改变降级边界，故先把每套的存在理由写清楚，
+并由 `tests/test_redis_pool_inventory.py` 盯住"不得再悄悄多出一套"：
+
+  1. 本模块：SSE 事件通道（switch_events / 全局 ring+seq）。socket_timeout=5s，
+     Redis 不可用时事件静默丢弃（业务可容忍）。
+  2. `app/utils/cache/storages.py`：缓存。必须独立于本入口——缓存要有自己的
+     超时口径（REDIS_POOL_TIMEOUT）与 CACHE_KEY_PREFIX 命名空间，且缓存不可用时
+     要回源而不是"事件丢弃"；两者降级语义不同，共用一池会让一次 Redis 抖动同时
+     打掉实时推送与缓存。
+  3. `app/services/monitoring/monitor_worker.py`：监控锁/限速。理由见上（配置
+     property 问题 + 每 app 一池）。
+  4. `realtime_gateway/redis_bus.py`：网关是**独立进程**（uvicorn），物理上不可能
+     复用 Flask 进程内的任何池。
+
+新增建池点前先问：能不能复用上面某一套？不能则在那个测试的白名单里登记并写理由。
 """
 import threading
 
@@ -66,7 +83,6 @@ def get_redis_client():
                 decode_responses=True,
                 socket_connect_timeout=5,
                 socket_timeout=5,
-                retry_on_timeout=True,
                 health_check_interval=30,
                 socket_keepalive=True,
             )

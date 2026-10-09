@@ -69,7 +69,7 @@ class RAGService:
             try:
                 answer = self.client.chat(SYSTEM, user)
                 audit_response = answer
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 status = "degraded"
                 audit_response = {"error_type": type(e).__name__}
                 logger.error("rag.ask_failed %s: %s", type(e).__name__, e, exc_info=True)

@@ -13,7 +13,8 @@ import {
   Progress,
   Modal,
   Radio,
-  Typography
+  Typography,
+  theme
 } from 'antd';
 import {
   DeleteOutlined,
@@ -44,6 +45,7 @@ import { useRoomOptions } from '@/services/room';
 import { useAllocatableCustomerOptions } from '@/services/customer';
 import { getRouteNoteMeta, getRouteNoteOptions } from '@/types/statusMeta';
 import { useTranslation } from 'react-i18next';
+import { useMonitorConfig } from '../../services/monitor/status';
 import type { TFunction } from 'i18next';
 import { useCopyInfo } from '@/utils/clipboard';
 import { useTable } from '@/hooks/useTable';
@@ -138,6 +140,7 @@ function parseScanProgress(
 import { exportCSV } from '@/utils/csv';
 import type { IPNetwork } from '@/types/models';
 import { formatDateTime } from '@/utils/format';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 
 const DEFAULT_ROUTE = '0.0.0.0/0';
 
@@ -148,7 +151,13 @@ function isDefaultRoute(ipNetwork: string): boolean {
 }
 
 function Network() {
+  const { token } = theme.useToken();
   const { t } = useTranslation('network');
+  const { data: monitorConfig } = useMonitorConfig();
+  const snmpTakeoverActive = (() => {
+    const v = String(monitorConfig?.scan_channel_enabled?.value ?? '').toLowerCase();
+    return ['1', 'true', 'yes'].includes(v);
+  })();
   const { t: tc } = useTranslation('common');
   const { t: td } = useTranslation('device');
   const confirm = useConfirm();
@@ -282,7 +291,12 @@ function Network() {
       assign.close();
       refetch();
     } catch (err) {
-      if (err instanceof Error) msg.error(err.message);
+      if (isValidationError(err)) {
+        const fieldError = firstFieldError(err);
+        if (fieldError) msg.error(fieldError);
+      } else {
+        if (err instanceof Error) msg.error(err.message);
+      }
     }
   };
 
@@ -327,7 +341,7 @@ function Network() {
       r.updated_at ?? ''
     ]);
     exportCSV(headers, rows, { filename: 'networks' });
-  }, [data, t, tc]);
+  }, [data, t, tc, msg]);
 
   const handleScanNetwork = (record: IPNetwork) => {
     if (isDefaultRoute(record.ip_network)) {
@@ -344,7 +358,9 @@ function Network() {
     }
     confirm({
       title: t('networkList.confirm.scanTitle'),
-      content: t('networkList.confirm.scanContent', { network: record.ip_network }),
+      content:
+        t('networkList.confirm.scanContent', { network: record.ip_network }) +
+        (snmpTakeoverActive ? '\n' + t('networkList.confirm.snmpTakeoverHint') : ''),
       onOk: async () => {
         try {
           await scanNetwork.mutateAsync({ ipNetwork: record.ip_network, roomId: record.room_id! });
@@ -364,7 +380,9 @@ function Network() {
     }
     confirm({
       title: t('networkList.action.fullScan'),
-      content: t('networkList.confirm.fullScanContent'),
+      content:
+        t('networkList.confirm.fullScanContent') +
+        (snmpTakeoverActive ? '\n' + t('networkList.confirm.fullScanSnmpTakeoverHint') : ''),
       onOk: async () => {
         try {
           queryClient.removeQueries({
@@ -583,7 +601,11 @@ function Network() {
           .join(' · ') || '-'}
       </Text>
       <Text type="secondary" style={{ fontSize: 12 }}>
-        {[r.room_name, r.customer_name, r.nexthop && `${t('networkList.field.nexthop')} ${r.nexthop}`]
+        {[
+          r.room_name,
+          r.customer_name,
+          r.nexthop && `${t('networkList.field.nexthop')} ${r.nexthop}`
+        ]
           .filter(Boolean)
           .join(' · ') || '-'}
       </Text>
@@ -596,7 +618,7 @@ function Network() {
       <Space
         size={4}
         style={{
-          background: '#f6ffed',
+          background: token.colorSuccessBg,
           padding: '4px 12px',
           borderRadius: 6,
           border: '1px solid #b7eb8f'
@@ -607,10 +629,10 @@ function Network() {
           return (
             <>
               <Progress type="circle" size={28} percent={pct} />
-              <span style={{ fontSize: 12, color: '#52c41a' }}>
+              <span style={{ fontSize: 12, color: token.colorSuccess }}>
                 {label} {subText}
                 {failed ? (
-                  <span style={{ color: '#ff4d4f' }}>
+                  <span style={{ color: token.colorError }}>
                     {' '}
                     ({t('networkList.scan.failed', { count: failed })})
                   </span>

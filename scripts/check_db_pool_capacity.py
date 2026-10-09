@@ -139,7 +139,7 @@ def main() -> int:
                         help="其他会占池的进程数（trapd / realtime gateway 等；缺省 0）")
     args = parser.parse_args()
 
-    from app import create_app  # noqa: F401 - 触发应用上下文（提供 db.session）
+    from app import create_app  # 触发应用上下文（提供 db.session）
 
     pool_size, max_overflow = _pool_numbers()
     breakdown = _processes(args)

@@ -2,9 +2,9 @@
 """
 设备模型模块
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index
+from sqlalchemy import ForeignKey, Index
 from sqlalchemy.orm import relationship
 
 from app.core.enums import DeviceStatus

@@ -20,7 +20,6 @@ from app.persistence.device_repository import DeviceRepository
 from app.persistence.room_channel_repository import RoomChannelRepository
 from app.persistence.room_layout_marker_repository import RoomLayoutMarkerRepository
 from app.models.room import Room
-from app.services.switch_events import emit_resource_change_global
 from app.utils.cache import cache_manager
 
 logger = get_logger(__name__)
@@ -41,6 +40,8 @@ _FORCE_DELETE_DEVICE_SCOPED: Tuple[Tuple[str, str], ...] = (
     ("device_metric_baseline", "device_id"),
     ("device_metric_latest", "device_id"),
     ("device_metric_override", "device_id"),
+    ("device_metric_timeseries_daily", "device_id"),
+    ("device_metric_timeseries_hourly", "device_id"),
     ("device_monitor_credentials", "device_id"),
     ("device_monitor_status", "device_id"),
     ("device_monitor_timeseries_daily", "device_id"),
@@ -137,6 +138,9 @@ def _usage_rate(used: int, total: int) -> int:
     if total <= 0:
         return 0
     return round(used * 100 / total)
+
+
+SENTINEL_ROW_BASE = -1_000_000
 
 
 def _raise_position_conflict(error: DataAccessError, conflict_message: str) -> None:
@@ -538,37 +542,72 @@ class RoomService:
             ResourceConflictError: 目标位置与其他标记冲突（唯一键或前置校验）
             LayoutMarkerVersionConflict: 任一项版本过期 ⇒ 整批不生效（@transactional 回滚）
         """
-        updated: List = []
         conflicts: List[tuple] = []
-        seen_ids = set()
+        planned: Dict[tuple, int] = {}            # 最终坐标 -> 声明它的标记 id
+        moves: List[Tuple[int, int, int]] = []    # 待搬迁 (marker_id, row, col)
+        updated_ids: List[int] = []
+
+        items_by_id: Dict[int, Dict[str, Any]] = {}
+        for item in items:
+            marker_id = item["marker_id"]
+            if marker_id in items_by_id:
+                raise ValidationError(f"items 中标记 #{marker_id} 重复提交")
+            items_by_id[marker_id] = item
+
+        prefetched = {
+            m.id: m
+            for m in self.marker_repository.find_by_ids_in_room(
+                list(items_by_id), room_id
+            )
+        }
+
+        def _final_pos(marker) -> tuple:
+            """该标记在本批结束后的最终坐标：本批内以提交目标为准，否则保持原地"""
+            it = items_by_id.get(marker.id)
+            if it is None:
+                return (marker.row_number, marker.col_number)
+            f = it["fields"]
+            return (f.get("row_number", marker.row_number),
+                    f.get("col_number", marker.col_number))
 
         for item in items:
             marker_id = item["marker_id"]
             expected_version = item["expected_version"]
             fields = item["fields"]
 
-            if marker_id in seen_ids:
-                raise ValidationError(f"items 中标记 #{marker_id} 重复提交")
-            seen_ids.add(marker_id)
-
-            marker = self.marker_repository.find_by_id(marker_id)
-            if not marker or marker.room_id != room_id:
+            marker = prefetched.get(marker_id)
+            if marker is None:
                 raise ValidationError(f"占位标记 #{marker_id} 不存在")
 
             new_row = fields.get("row_number", marker.row_number)
             new_col = fields.get("col_number", marker.col_number)
-            if (new_row, new_col) != (marker.row_number, marker.col_number) and (
-                self.marker_repository.find_by_position(room_id, new_row, new_col)
-            ):
+            target = (new_row, new_col)
+            moved = target != (marker.row_number, marker.col_number)
+
+            owner = planned.get(target)
+            if owner is not None and owner != marker_id:
                 raise ResourceConflictError(
                     "占位标记",
                     f"{new_row}-{new_col}",
-                    message=f"位置（第{new_row}行 第{new_col}列）已存在占位标记",
+                    message=f"本批中标记 #{owner} 与 #{marker_id} 目标位置重复"
+                            f"（第{new_row}行 第{new_col}列）",
                 )
 
+            if moved:
+                occ = self.marker_repository.find_by_position(room_id, new_row, new_col)
+                if occ is not None and occ.id != marker_id and _final_pos(occ) == target:
+                    raise ResourceConflictError(
+                        "占位标记",
+                        f"{new_row}-{new_col}",
+                        message=f"位置（第{new_row}行 第{new_col}列）已存在占位标记",
+                    )
+            planned[target] = marker_id
+
+            non_coord = {k: v for k, v in fields.items()
+                         if k not in ("row_number", "col_number")}
             try:
                 hit = self.marker_repository.update_versioned(
-                    marker_id, room_id, expected_version, fields
+                    marker_id, room_id, expected_version, non_coord
                 )
                 self.marker_repository.session.flush()
             except DataAccessError as e:
@@ -584,10 +623,30 @@ class RoomService:
                 conflicts.append((marker_id, expected_version, current.version or 0))
                 continue
 
-            updated.append(self.marker_repository.find_by_id(marker_id))
+            if moved:
+                moves.append((marker_id, new_row, new_col))
+            updated_ids.append(marker_id)
 
         if conflicts:
             raise LayoutMarkerVersionConflict(conflicts)
+
+        if moves:
+            try:
+                for marker_id, _, _ in moves:
+                    self.marker_repository.set_position(
+                        marker_id, room_id, SENTINEL_ROW_BASE - marker_id, 0
+                    )
+                self.marker_repository.session.flush()
+                for marker_id, new_row, new_col in moves:
+                    self.marker_repository.set_position(
+                        marker_id, room_id, new_row, new_col
+                    )
+                self.marker_repository.session.flush()
+            except DataAccessError as e:
+                _raise_position_conflict(e, "批量搬迁标记位置时位置已存在占位标记")
+                raise
+
+        updated = [self.marker_repository.find_by_id(mid) for mid in updated_ids]
 
         logger.info(
             f"批量更新机房占位标记成功 (room_id={room_id}, n={len(updated)})"
@@ -809,7 +868,7 @@ class RoomService:
         counts: Dict[str, int] = {}
 
         cabinet_ids_sql = "SELECT id FROM cabinets WHERE room_id = :rid"
-        device_ids_sql = f"SELECT id FROM devices WHERE cabinet_id IN ({cabinet_ids_sql})"
+        device_ids_sql = f"SELECT id FROM devices WHERE cabinet_id IN ({cabinet_ids_sql})"  # noqa: S608 -- cabinet_ids_sql 为字面量子查询，仅作 IN 的静态组成部分
 
         from app.persistence.room_repository import RoomRepository
 
@@ -839,7 +898,7 @@ class RoomService:
 
         from app.services.device_service import DeviceService
 
-        DeviceService._dispose_monitor_trace_batch(session, room_device_ids)
+        DeviceService.dispose_monitor_trace_batch(session, room_device_ids)
 
         run("devices", "cabinet_id", cabinet_ids_sql)
         run("cabinets", "room_id", "SELECT :rid")

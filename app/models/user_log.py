@@ -10,10 +10,9 @@
 - charset utf8mb4（对应 users_log 建表 DDL），其余表为 utf8；
   建议后续统一迁移至 utf8mb4。
 """
-from datetime import datetime
 from app.utils.time_utils import now_utc_naive
 
-from sqlalchemy import Index, ForeignKey
+from sqlalchemy import ForeignKey
 
 from app.models.base import BaseModel
 from extensions import db

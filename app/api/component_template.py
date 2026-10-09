@@ -8,13 +8,12 @@
 from flask import Blueprint, request
 
 from app.api.base import APIResponse, api_exception_handler
-from app.openapi.doc import doc, public
+from app.openapi.doc import doc
 from app.services.component_template_service import component_template_service
-from app.utils import login_required, permission_required, rate_limit_api
+from app.services.auth import login_required, permission_required
+from app.utils import rate_limit_api
 from app.utils.transactional import transactional
 from app.exceptions import PresetResponseError
-from app.exceptions.validation import ValidationError
-from app.exceptions.business import ResourceConflictError
 from app.exceptions.business import ResourceConflictError
 
 component_template_bp = Blueprint(
@@ -119,7 +118,7 @@ def update_template(template_id):
         raise PresetResponseError(message=e.message, status_code=409) from e
 
     if not t:
-        return APIResponse.error(message="模板不存在", status_code=404)
+        raise PresetResponseError(message="模板不存在", status_code=404)
     return APIResponse.success(data=t.to_dict(), message="模板更新成功")
 
 
@@ -134,5 +133,5 @@ def delete_template(template_id):
     """删除配件模板"""
     result = component_template_service.delete_template(template_id)
     if not result:
-        return APIResponse.error(message="模板不存在", status_code=404)
+        raise PresetResponseError(message="模板不存在", status_code=404)
     return APIResponse.success(message="模板删除成功")

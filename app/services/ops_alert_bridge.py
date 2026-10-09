@@ -88,6 +88,46 @@ def bridge_rate_limit_alert(alert_data: dict) -> None:
         logger.exception("限流告警桥接失败（已忽略）")
 
 
+def bridge_rate_limit_degraded_alert(info: dict) -> None:
+    """限流存储**降级**告警桥接（B2 遗留项，2026-10-03 补）
+
+    与 `bridge_rate_limit_alert` 语义完全不同，**不可复用**其文案：
+      那条 = "某个键被阻止了 N 次"（限流**正在生效**，正常现象）
+      本条 = "限流器本身退回内存备机"（限流**已弱化**，安全语义降级）
+    套前者会产出「端点 unknown 在统计窗口内被阻止 0 次」这种误导性通知 ——
+    静默的误导比不报更贵。
+
+    降级的真实后果（这才是必须让运维看见的东西）：内存计数**每 worker 一份**
+    ⇒ 实际放行量 ≈ 配置值 × worker 数，且进程重启即清零。对外表现为
+    「明明配了 100/min，却被放过去 400/min」而无人察觉。
+
+    复用 `NotificationTypeCode.RATE_LIMIT_EXCEEDED` 而非新增枚举成员：
+    该枚举前后端共用并生成前端映射，新增成员会牵动前端枚举再生成，
+    而"限流类运维告警"这个分类本来就已覆盖降级场景。
+
+    Args:
+        info: 降级上下文（storage / primary / secondary 的类型名等）
+    """
+    try:
+        notification_service.notify(
+            type=NotificationTypeCode.RATE_LIMIT_EXCEEDED,
+            severity=SeverityLevel.CRITICAL,
+            title="频率限制降级: 限流已退回内存存储",
+            content=(
+                "Redis 主存储连续失败，限流当前使用内存备机运行。"
+                "内存计数按 worker 独立计算，实际放行量约为配置值的 N 倍（N = worker 数），"
+                "且进程重启即清零。请尽快检查 Redis 连通性。"
+            ),
+            payload=info,
+            source_module="rate_limiting",
+            target_type="role",
+            target_id="admin",
+            channels=AUDIT_SEVERITY_CHANNELS[SeverityLevel.CRITICAL],
+        )
+    except Exception:
+        logger.exception("限流降级告警桥接失败（已忽略）")
+
+
 def register_ops_alert_callbacks() -> None:
     """注册所有运维告警回调（在 create_app 中调用）"""
     from app.utils.cache.monitoring import cache_monitor

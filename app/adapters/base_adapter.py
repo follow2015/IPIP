@@ -413,12 +413,12 @@ class BaseDeviceAdapter(ABC):
             raise ValidationError(message=f"{field} 不能为空", field=field)
         try:
             ipaddress.ip_address(value.strip())
-        except ValueError:
+        except ValueError as e:
             raise ValidationError(
                 message=f"{field} 不是合法的 IP 地址: {value!r}",
                 field=field,
                 details={"value": value},
-            )
+            ) from e
         return value.strip()
 
     @staticmethod
@@ -445,8 +445,8 @@ class BaseDeviceAdapter(ABC):
         """校验 VLAN ID 合法范围 (1-4094)。"""
         try:
             vid = int(vlan_id)
-        except (TypeError, ValueError):
-            raise ValidationError(message=f"{field} 必须为整数", field=field)
+        except (TypeError, ValueError) as e:
+            raise ValidationError(message=f"{field} 必须为整数", field=field) from e
         if vid < 1 or vid > 4094:
             raise ValidationError(
                 message=f"{field} 超出合法范围 1-4094: {vlan_id!r}",

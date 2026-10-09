@@ -37,6 +37,7 @@ from app.persistence.device_monitor_status_repository import DeviceMonitorStatus
 from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
 from app.persistence.monitor_timeseries_repository import MonitorTimeseriesRepository
 from app.utils.transactional import transactional
+from app.utils import redis_keys
 
 
 logger = get_logger(__name__)
@@ -70,7 +71,7 @@ def shutdown_batch_executors():
     for ex in executors:
         try:
             ex.shutdown(wait=False)
-        except Exception:  # noqa: BLE001 - 退出路径不应抛出
+        except Exception:  # noqa: BLE001, S110 - 退出路径不应抛出
             pass
 
 _ROLE_ACTIVE_USER_CACHE: dict = {}
@@ -483,7 +484,7 @@ class MonitorService:
             if r is None:
                 return True
             cooldown = current_app.config.get("MONITOR_PROBE_COOLDOWN_SECONDS", 30)
-            key = f"monitor:probe:cooldown:{device_id}"
+            key = redis_keys.monitor_probe_cooldown_key(device_id)
             return bool(r.set(key, "1", nx=True, ex=int(cooldown)))
         except Exception:
             logger.warning("探测冷却限流检查失败（降级为不限流） device_id=%s", device_id, exc_info=True)
@@ -592,7 +593,7 @@ class MonitorService:
 
             collector = MetricCollector(self._template_repo, _tpl_cache=self._tpl_cache)
             collected = collector.collect(device, adapter, cred)
-        except Exception:  # noqa: BLE001 - 采集失败静默降级，不中断主探测
+        except Exception:  # 采集失败静默降级，不中断主探测
             logger.warning(
                 "设备 %s 指标采集失败（已降级跳过）",
                 getattr(device, "id", None),
@@ -642,7 +643,7 @@ class MonitorService:
             return MetricCollector(
                 self._template_repo, _tpl_cache=self._tpl_cache
             ).evaluate(raw, wanted)
-        except Exception:  # noqa: BLE001 - 质量采集失败不影响主探测
+        except Exception:  # 质量采集失败不影响主探测
             logger.warning(
                 "设备 %s ping 质量指标采集失败（已降级跳过）",
                 getattr(device, "id", None),
@@ -891,7 +892,7 @@ class MonitorService:
                                 "source": t.source,
                             })
                             seen_keys.add(t.metric_key)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.warning(
                         "dashboard 合并通用 if_* 模板失败 device_id=%s", device_id, exc_info=True
                     )
@@ -926,7 +927,7 @@ class MonitorService:
                         tpl_map[t.metric_key] = {
                             "display_name": t.display_name,
                         }
-                except Exception:  # noqa: BLE001 - 模板查询失败降级为空映射
+                except Exception:  # 模板查询失败降级为空映射
                     logger.warning(
                         "metric_status 模板映射查询失败 device_id=%s", device_id, exc_info=True
                     )
@@ -1234,6 +1235,17 @@ class MonitorService:
                 reason="auto: device recovered",
                 now=now,
             )
+            from app.services.monitoring.incident_aggregator import (
+                close_incident_for_recovery,
+            )
+            close_incident_for_recovery(
+                device.id,
+                getattr(
+                    NotificationTypeCode.DEVICE_UNREACHABLE, "value",
+                    NotificationTypeCode.DEVICE_UNREACHABLE,
+                ),
+                now=now,
+            )
             self._enqueue_alert(
                 device, NotificationTypeCode.DEVICE_RECOVERED, "info", result, tr.episode, protocol, 0,
                 resolved=None, session=repo.session, now=now,
@@ -1439,6 +1451,11 @@ def get_overview(failure_threshold: int = 2) -> dict:
     """监控总览统计（多 repo 聚合）。
 
     P1-1：读路径下沉 service，路由层不再直访 repository。
+
+    统计口径（2026-10-08 统一）：**monitor_enabled=0 的设备全部排除**，包括
+    分母 `total_monitored` 与 `alerting_devices` / `interrupted_devices` 的
+    设备集合 —— 暂停探测的设备快照永不刷新，纳入即让健康分被系统性压低且
+    无法回升。被排除台数以 `paused_devices` 回传，前端据此显式标注。
     """
     from app.persistence.device_monitor_status_repository import DeviceMonitorStatusRepository
     from app.persistence.device_metric_alert_state_repository import DeviceMetricAlertStateRepository
@@ -1534,13 +1551,21 @@ def get_alert_detail(alert_id: int) -> dict:
     """P1-6: 查询单条告警详情（含 device 展示字段 + acknowledged_* + payload 解析）。
 
     返回完整字段 dict；行不存在抛 BusinessLogicError(404)。
+
+    另附 ``port``：读取期从该条告警**自己的 payload** 还原的端口信息
+    （见 :func:`alert_port_view.resolve_alert_port`）。之所以放在服务层而不是
+    仓储层：这是"把落库数据翻译成展示语义"，属业务规则，仓储只负责取数。
+    存量行（2026-10-08 改造前入箱）没有 port_name 等键，靠这一步从 varbind
+    还原 —— 不改写落库内容，故无迁移、无并发风险。
     """
     from app.persistence.monitor_alert_outbox_repository import MonitorAlertOutboxRepository
     from app.exceptions.business import BusinessLogicError
+    from app.services.monitoring.alert_port_view import resolve_alert_port
     alert_repo = MonitorAlertOutboxRepository()
     item = alert_repo.get_by_id_with_device(alert_id)
     if item is None:
         raise BusinessLogicError("告警记录不存在", status_code=404)
+    item["port"] = resolve_alert_port(item.get("payload"))
     return item
 
 

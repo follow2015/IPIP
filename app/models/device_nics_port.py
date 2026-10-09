@@ -6,7 +6,7 @@
 """
 from typing import Any, Dict
 
-from sqlalchemy import ForeignKey, Index
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel

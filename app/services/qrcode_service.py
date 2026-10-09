@@ -7,7 +7,7 @@
 import base64
 import io
 from app.utils.logging import get_logger
-import random
+import secrets
 import string
 import time
 from typing import Dict, Optional
@@ -226,7 +226,7 @@ class QRCodeService:
             随机字符串
         """
         chars = string.ascii_letters + string.digits
-        return "".join(random.choice(chars) for _ in range(length))
+        return "".join(secrets.choice(chars) for _ in range(length))
     
     def _get_status_message(self, status: str) -> str:
         """获取状态描述

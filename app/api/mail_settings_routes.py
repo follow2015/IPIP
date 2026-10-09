@@ -15,7 +15,7 @@ from flask import Blueprint, request, g
 
 from app.api.base import APIResponse
 from app.openapi.doc import doc
-from app.utils.auth import login_required, permission_required
+from app.services.auth import login_required, permission_required
 from app.utils.transactional import transactional
 
 logger = get_logger(__name__)
@@ -51,7 +51,7 @@ def _get_smtp_params(data: dict | None = None) -> dict:
         db_values["use_ssl"] = bool(data["mail_use_ssl"])
     if data.get("mail_username"):
         db_values["username"] = data["mail_username"]
-    if data.get("mail_password") and data["mail_password"] != "****":
+    if data.get("mail_password") and data["mail_password"] != "****":  # noqa: S105
         db_values["password"] = data["mail_password"]
     if data.get("mail_default_sender"):
         db_values["sender"] = data["mail_default_sender"]
@@ -115,7 +115,7 @@ def update_mail_config():
         return APIResponse.success(data=_get_db_config(), message="配置已保存")
     except ValueError as e:
         raise PresetResponseError(message=str(e), status_code=400) from e
-    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+    except Exception as e:  # 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.exception("邮件配置更新失败")
         raise PresetResponseError(message="配置保存失败", status_code=500) from e
 
@@ -133,7 +133,7 @@ def delete_mail_config():
 
         logger.info("邮件服务器配置已删除: user_id=%s", g.current_user["user_id"])
         return APIResponse.success(message="配置已删除")
-    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+    except Exception as e:  # 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.exception("邮件配置删除失败")
         raise PresetResponseError(message="删除邮件配置失败", status_code=500) from e
 
@@ -208,7 +208,7 @@ def test_mail_config():
             f"无法连接到邮件服务器（{params['server']}:{params['port']}），"
             f"请检查服务器地址、端口是否正确"
         )
-    except Exception as e:  # noqa: BLE001 - 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
+    except Exception as e:  # 原文只进日志（见 tests/test_no_internal_detail_in_5xx.py §5）
         logger.error("邮件测试失败: %s", e, exc_info=True)
         return APIResponse.error(
             message="邮件测试失败，详情见服务端日志",

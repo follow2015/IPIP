@@ -8,7 +8,9 @@ import hashlib
 from app.utils.logging import get_logger
 from typing import Optional
 
-from app.models.device_config_backup import DeviceConfigBackup, DeviceConfigChange
+from app.models.device_config_backup import (
+    DeviceConfigBackup, DeviceConfigChange, VALID_BACKUP_TYPES
+)
 from app.persistence.device_config_backup_repository import (
     DeviceConfigBackupRepository, DeviceConfigChangeRepository
 )
@@ -35,11 +37,25 @@ class DeviceConfigService:
         Args:
             device_id: 设备ID
             config_content: 配置内容
-            backup_type: 备份类型（manual/auto）
+            backup_type: 备份类型，必须是 ``VALID_BACKUP_TYPES`` 之一：
+                ``manual`` 人工采集 / ``scheduled`` 定时采集 /
+                ``pre_change`` 人工变更前 / ``pre_remedial`` AI 自动修复变更前
 
         Returns:
             DeviceConfigBackup: 创建的备份记录
+
+        Raises:
+            ValidationError: backup_type 不在白名单内
+
+        为什么在这里**显式校验**而不是等数据库报错：WP-2 的教训正是"非法值被
+        MySQL 严格模式拒了，但异常被上层 except 吞成『备份失败』"，结果 AI 修复
+        的回滚保障缺失了整整一轮而无人察觉。白名单校验把沉默的写入失败变成
+        **即时的、带明确取值的**报错。
         """
+        if backup_type not in VALID_BACKUP_TYPES:
+            raise ValidationError(
+                f"非法的备份类型：{backup_type!r}（合法值：{'/'.join(VALID_BACKUP_TYPES)}）"
+            )
         config_hash = hashlib.sha256(config_content.encode()).hexdigest()
         file_size = len(config_content.encode('utf-8'))
         return self.backup_repo.create({
@@ -122,10 +138,10 @@ class DeviceConfigService:
                     raw_config = get_circuit_breaker("ssh").call(
                         lambda: SSHManager().send_show_command(switch, command, timeout=timeout)
                     )
-                except AICircuitOpenError:
-                    raise ValidationError("SSH 通道熔断中，请稍后重试")
-        except DeviceOperationConflict:
-            raise ValidationError("设备繁忙（存在进行中的操作），请稍后重试")
+                except AICircuitOpenError as e:
+                    raise ValidationError("SSH 通道熔断中，请稍后重试") from e
+        except DeviceOperationConflict as e:
+            raise ValidationError("设备繁忙（存在进行中的操作），请稍后重试") from e
 
         if not raw_config or not isinstance(raw_config, str):
             raise ValidationError("采集到的配置内容为空")

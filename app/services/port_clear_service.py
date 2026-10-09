@@ -79,7 +79,7 @@ class PortClearService:
                         self.dispatcher._send_config(switch, undo_cmd, err_label="剥离Trunk成员")
                     else:
                         self.dispatcher._send_config_no_save(switch, undo_cmd, err_label="剥离Trunk成员")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 -- 剥离 Trunk 成员关系失败非致命：继续执行后续 clear 命令，设备侧可能本就不存在该关系
                     logger.warning("剥离端口 %s 的 Trunk 成员关系失败: %s", port, e)
 
             steps = [
@@ -96,7 +96,7 @@ class PortClearService:
             self.ssh_mgr.send_interactive_command(
                 switch, steps, save_cmd=save_cmd,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- 清除端口配置失败兜底：转为结构化失败结果返回，netmiko/SSH 异常类型不可枚举
             logger.error("清除端口配置失败: %s", e)
             return {"success": False, "error": str(e)}
 
@@ -152,7 +152,7 @@ class PortClearService:
                 if not result.get("success"):
                     logger.warning("批量操作前清除 Eth-Trunk %s 配置失败: %s",
                                    port, result.get("error", ""))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 批量前置清除 Eth-Trunk 异常非致命：继续后续普通端口处理
                 logger.warning("批量操作前清除 Eth-Trunk %s 配置异常: %s", port, e)
 
         if normal_ports:
@@ -174,12 +174,12 @@ class PortClearService:
                 self.ssh_mgr.send_interactive_command(
                     switch, all_steps, save_cmd=save_cmd,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- 批量清除失败触发降级：异常本身即是降级信号（转逐端口模式），收窄会漏掉需要降级的范围下发失败
                 logger.error("批量清除普通端口配置失败: %s", e)
                 logger.info("降级为逐端口清除模式")
                 for port in normal_ports:
                     try:
                         self._clear_port_config_on_device(switch, port, auto_save=auto_save)
-                    except Exception as ex:
+                    except Exception as ex:  # noqa: BLE001 -- 降级逐端口清除单端口失败隔离：继续下一端口
                         logger.warning("降级清除端口 %s 失败: %s", port, ex)
 

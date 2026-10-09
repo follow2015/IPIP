@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Card,
   Form,
@@ -14,8 +14,7 @@ import {
   Typography,
   Progress,
   Tabs,
-  Alert,
-  List
+  Alert
 } from 'antd';
 import {
   DatabaseOutlined,
@@ -27,6 +26,7 @@ import {
   SendOutlined,
   ExclamationCircleOutlined
 } from '@ant-design/icons';
+import type { TableProps } from 'antd';
 import {
   getRagStatus,
   listRagDocs,
@@ -44,6 +44,7 @@ import { usePermission } from '@/hooks/usePermission';
 import { useMessage } from '@/hooks/useMessage';
 import { useConfirm } from '@/utils/confirm';
 import { ConfirmButton } from '@/components/ConfirmButton';
+import RagReferences from './RagReferences';
 import { useTranslation } from 'react-i18next';
 
 const { Paragraph, Text } = Typography;
@@ -144,6 +145,50 @@ export default function RAGPage() {
       }
     },
     [message, fetchStatus, fetchDocs, t]
+  );
+
+  const docColumns = useMemo<NonNullable<TableProps<RagDoc>['columns']>>(
+    () => [
+      {
+        title: t('rag.docs.column.docId'),
+        dataIndex: 'doc_id',
+        key: 'doc_id',
+        width: 200,
+        ellipsis: true
+      },
+      {
+        title: t('rag.docs.column.preview'),
+        dataIndex: 'preview',
+        key: 'preview',
+        ellipsis: true
+      },
+      {
+        title: tc('field.actions'),
+        key: 'action',
+        width: 80,
+        render: (_, record: RagDoc) => (
+          <ConfirmButton
+            type="link"
+            size="small"
+            icon={<DeleteOutlined />}
+            title={tc('confirm.deleteTitle')}
+            content={t('rag.docs.confirmDelete', { docId: record.doc_id })}
+            successMessage={t('rag.docs.deleteSuccess')}
+            onConfirm={async () => {
+              await deleteRagDoc(record.doc_id);
+            }}
+            afterConfirm={() => {
+              fetchStatus();
+              fetchDocs();
+            }}
+            disabled={!canAdmin}
+          >
+            {tc('action.delete')}
+          </ConfirmButton>
+        )
+      }
+    ],
+    [t, tc, canAdmin, fetchStatus, fetchDocs]
   );
 
   const handleIngest = async (docsDir: string) => {
@@ -264,28 +309,7 @@ export default function RAGPage() {
                 <Card type="inner" title={t('rag.answer.title')}>
                   <Paragraph style={{ whiteSpace: 'pre-wrap' }}>{qaResult.answer}</Paragraph>
                   {qaResult.references.length > 0 && (
-                    <>
-                      <Divider />
-                      <Paragraph type="secondary">
-                        {t('rag.answer.hitFragments', { count: qaResult.references.length })}
-                      </Paragraph>
-                      <List
-                        size="small"
-                        dataSource={qaResult.references}
-                        renderItem={(item, idx) => (
-                          <List.Item>
-                            <List.Item.Meta
-                              title={`[${idx + 1}] ${item.doc_id || '-'}`}
-                              description={
-                                <Paragraph style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
-                                  {item.text}
-                                </Paragraph>
-                              }
-                            />
-                          </List.Item>
-                        )}
-                      />
-                    </>
+                    <RagReferences references={qaResult.references} />
                   )}
                 </Card>
               )}
@@ -348,7 +372,9 @@ export default function RAGPage() {
                   {t('rag.docsRoot.dotHint')}
                   <Text code>monitoring</Text>
                   {t('rag.docsRoot.equals')}
-                  <Text code>{`${status?.docs_root || t('rag.docsRoot.rootPlaceholder')}/monitoring`}</Text>
+                  <Text
+                    code
+                  >{`${status?.docs_root || t('rag.docsRoot.rootPlaceholder')}/monitoring`}</Text>
                   {t('rag.docsRoot.envNote')}
                   <Text code>AI_DOCS_ROOT</Text>
                   {t('rag.docsRoot.restartNote')}
@@ -372,7 +398,7 @@ export default function RAGPage() {
                         htmlType="submit"
                         loading={ingesting}
                         icon={<InboxOutlined />}
-                        disabled={!canAdmin}
+                        disabled={!canAdmin || ingesting}
                       >
                         {t('rag.action.ingest')}
                       </Button>
@@ -423,50 +449,11 @@ export default function RAGPage() {
                   </Button>
                 }
               >
-                <Table
+                <Table<RagDoc>
                   rowKey="doc_id"
                   dataSource={docs}
                   pagination={{ pageSize: 10 }}
-                  columns={[
-                    {
-                      title: t('rag.docs.column.docId'),
-                      dataIndex: 'doc_id',
-                      key: 'doc_id',
-                      width: 200,
-                      ellipsis: true
-                    },
-                    {
-                      title: t('rag.docs.column.preview'),
-                      dataIndex: 'preview',
-                      key: 'preview',
-                      ellipsis: true
-                    },
-                    {
-                      title: tc('field.actions'),
-                      key: 'action',
-                      width: 80,
-                      render: (_, record) => (
-                        <ConfirmButton
-                          type="link"
-                          size="small"
-                          icon={<DeleteOutlined />}
-                          title={tc('confirm.deleteTitle')}
-                          content={t('rag.docs.confirmDelete', { docId: record.doc_id })}
-                          successMessage={t('rag.docs.deleteSuccess')}
-                          onConfirm={async () => {
-                            await deleteRagDoc(record.doc_id);
-                          }}
-                          afterConfirm={() => {
-                            fetchStatus();
-                            fetchDocs();
-                          }}
-                          disabled={!canAdmin}
-                        >
-                          {tc('action.delete')}
-                        </ConfirmButton>
-                      )
-                    }
-                  ]}
+                  columns={docColumns}
                   scroll={{ x: 'max-content' }}
                 />
               </Card>

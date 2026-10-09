@@ -22,6 +22,7 @@ import { useEffect } from 'react';
 import { Form } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useMessage } from './useMessage';
+import { firstFieldError, isValidationError } from '@/utils/formError';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { ApiResponse } from '@/types/api';
 
@@ -36,7 +37,7 @@ export interface UseCrudFormOptions<T, TCreate, TUpdate> {
   toUpdatePayload?: (id: number, values: TCreate) => TUpdate;
 }
 
-export interface UseCrudFormReturn<TCreate> {
+export interface UseCrudFormReturn {
   form: ReturnType<typeof Form.useForm>[0];
   isEdit: boolean;
   handleSubmit: () => Promise<void>;
@@ -51,18 +52,11 @@ export interface UseCrudFormReturn<TCreate> {
  * @returns 表单全套状态和操作
  */
 export function useCrudForm<T extends { id: number }, TCreate, TUpdate>(
-  options: UseCrudFormOptions<T, TCreate, TUpdate>,
-): UseCrudFormReturn<TCreate> {
+  options: UseCrudFormOptions<T, TCreate, TUpdate>
+): UseCrudFormReturn {
   const { t } = useTranslation();
-  const {
-    open,
-    editRecord,
-    onClose,
-    useCreate,
-    useUpdate,
-    toFormValues,
-    toUpdatePayload,
-  } = options;
+  const { open, editRecord, onClose, useCreate, useUpdate, toFormValues, toUpdatePayload } =
+    options;
 
   const [form] = Form.useForm();
   const message = useMessage();
@@ -73,7 +67,9 @@ export function useCrudForm<T extends { id: number }, TCreate, TUpdate>(
   useEffect(() => {
     if (open) {
       if (editRecord) {
-        form.setFieldsValue(toFormValues ? toFormValues(editRecord) : editRecord as Record<string, unknown>);
+        form.setFieldsValue(
+          toFormValues ? toFormValues(editRecord) : (editRecord as Record<string, unknown>)
+        );
       } else {
         form.resetFields();
       }
@@ -86,7 +82,7 @@ export function useCrudForm<T extends { id: number }, TCreate, TUpdate>(
       if (isEdit && editRecord) {
         const payload = toUpdatePayload
           ? toUpdatePayload(editRecord.id, values)
-          : { id: editRecord.id, ...values } as unknown as TUpdate;
+          : ({ id: editRecord.id, ...values } as unknown as TUpdate);
         await updateMutation.mutateAsync(payload);
         message.success(t('message.updateSuccess'));
       } else {
@@ -95,7 +91,11 @@ export function useCrudForm<T extends { id: number }, TCreate, TUpdate>(
       }
       onClose();
     } catch (err) {
-      if (err instanceof Error) {
+      if (isValidationError(err)) {
+        message.error(firstFieldError(err) ?? t('message.formValidationFailed'));
+        return;
+      }
+      if (err instanceof Error && err.message) {
         message.error(err.message);
       }
     }
@@ -105,6 +105,6 @@ export function useCrudForm<T extends { id: number }, TCreate, TUpdate>(
     form,
     isEdit,
     handleSubmit,
-    confirmLoading: createMutation.isPending || updateMutation.isPending,
+    confirmLoading: createMutation.isPending || updateMutation.isPending
   };
 }
