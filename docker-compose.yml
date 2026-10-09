@@ -29,11 +29,9 @@ name: ipip
 #    两条路径的 tag 语义完全一致，不会出现"本地改了但 up 用旧镜像"的错位。
 x-ipip-image: &ipip-image
   image: ghcr.io/follow2015/ipip:${IPIP_IMAGE_TAG:-main}
-  environment:
-    # ⚠️ 容器网络里 MySQL 的地址是服务名 mysql，不是 localhost（localhost 在
-    # 容器内指向自己，连不上任何东西）。显式覆盖 .env 里可能残留的 localhost
-    # —— compose 规则 environment 优先于 env_file。
-    MYSQL_HOST: mysql
+  # ⚠️ 不能把 MYSQL_HOST 放这里：YAML 的 << 是浅合并，子服务自带 environment
+  # 块时锚点的 environment 整体被丢弃（2026-10-09 实锤）。每个服务的
+  # environment 里各自声明 MYSQL_HOST: mysql。
   build:
     context: .
     dockerfile: Dockerfile
@@ -94,10 +92,9 @@ services:
 
   # ── 一次性任务 ──────────────────────────────────────────────────────────
   migrate:
-    <<: *ipip-image
-    command: ["migrate"]
-    env_file: [.env]
     environment:
+      # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
+      MYSQL_HOST: mysql
       # baseline 导入要建表/建触发器，用 root；MYSQL_PASSWORD 在这里被
       # 重定义为 **root 的口令**（MYSQL_ROOT_PASSWORD）——只对本服务生效
       MYSQL_USER: root
@@ -107,6 +104,8 @@ services:
     restart: "no"
 
   seed:
+    environment:
+      MYSQL_HOST: mysql
     <<: *ipip-image
     command: ["seed"]
     env_file: [.env]
@@ -116,10 +115,9 @@ services:
 
   # ── 常驻角色 ────────────────────────────────────────────────────────────
   web:
-    <<: *ipip-image
-    command: ["web"]
-    env_file: [.env]
     environment:
+      # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
+      MYSQL_HOST: mysql
       # ⚠️ 不是可选项：对齐 deploy/systemd/ipip-web.service 的同一行。
       # web 绝不兼职监控轮询，独占权只属于 monitor 服务；删掉会复刻
       # "多进程轮询放大"问题（实测 60s → 18.9s）。
@@ -139,10 +137,9 @@ services:
     restart: unless-stopped
 
   gateway:
-    <<: *ipip-image
-    command: ["gateway"]
-    env_file: [.env]
     environment:
+      # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
+      MYSQL_HOST: mysql
       HEARTBEAT_SERVICE_NAME: "gateway"
     # ⚠️ 刻意**不**依赖 migrate/seed：realtime_gateway 零 DB 依赖
     #    （realtime_gateway/main.py 注释），只依赖 Redis。
@@ -157,10 +154,9 @@ services:
     restart: unless-stopped
 
   celery-ai:
-    <<: *ipip-image
-    command: ["celery-ai"]
-    env_file: [.env]
     environment:
+      # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
+      MYSQL_HOST: mysql
       MONITOR_WORKER_IN_PROCESS: "false"
       AI_ASYNC_ENABLED: "1"
     depends_on:
@@ -170,10 +166,9 @@ services:
     restart: unless-stopped
 
   celery-voice:
-    <<: *ipip-image
-    command: ["celery-voice"]
-    env_file: [.env]
     environment:
+      # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
+      MYSQL_HOST: mysql
       MONITOR_WORKER_IN_PROCESS: "false"
       AI_ASYNC_ENABLED: "1"
     depends_on:
@@ -183,10 +178,9 @@ services:
     restart: unless-stopped
 
   monitor:
-    <<: *ipip-image
-    command: ["monitor"]
-    env_file: [.env]
     environment:
+      # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
+      MYSQL_HOST: mysql
       # ⚠️ 这里设 "false"，**不是** "true"：
       #    run_monitor_service.py 经 create_headless_monitor_app() 已强制把它改为 false
       #    （standalone_service.py:77-78），写 true 只会在文档层面造成误解。
@@ -229,11 +223,9 @@ services:
   #    另需确认口令与设备侧发送端一致，否则收到的 trap 全部丢弃。
   # 宿主 162/udp 被 snmptrapd 等占用时，改 .env 的 TRAPD_HOST_PORT 或直接不启用。
   trapd:
-    <<: *ipip-image
-    command: ["trapd"]
-    env_file: [.env]
-    profiles: ["trapd"]
     environment:
+      # 容器网络内 MySQL 的地址是服务名 mysql（localhost 指向容器自己）
+      MYSQL_HOST: mysql
       TRAPD_LISTEN_PORT: "10162"
       # 选了本 profile 就是"要启用"的意图表达 ⇒ 在此注入（见上方 ①）
       TRAPD_ENABLED: "true"
