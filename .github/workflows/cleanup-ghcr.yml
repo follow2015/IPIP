@@ -46,7 +46,6 @@ jobs:
           import json, os, subprocess
 
           token = os.environ["GH_TOKEN"]
-          actor = os.environ["ACTOR"]
           keep = {t.strip() for t in os.environ["KEEP"].split(",") if t.strip()}
           dry = os.environ.get("DRY", "true").lower() == "true"
           pkg = "follow2015/ipip"
