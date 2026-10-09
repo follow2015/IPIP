@@ -1,0 +1,78 @@
+# GHCR 版本清理：删除 tags 与保留清单无交集的镜像版本（dangling / 过期 tag）。
+#
+# 背景（2026-10-09）：v1.5.0 tag 曾指向被撤回的提交并构建过镜像，回撤重打后
+# 旧 version 在 GHCR 里残留为 dangling 条目；CLI 需 delete:packages scope，
+# 而 GITHUB_TOKEN 对本仓自发布的包有完整 packages 权限 —— 故走 workflow 清理。
+#
+# 用法：
+#   gh workflow run cleanup-ghcr.yml -f keep_tags="1.5.0,main"
+# 语义：只保留 keep_tags 中任一 tag 的版本，其余（含空 tag 的 dangling）全删。
+name: GHCR Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_tags:
+        description: '保留的 tag（逗号分隔），其余版本全删'
+        required: true
+        default: 'main'
+      dry_run:
+        description: 'true=只列出将删除的版本，不真删'
+        required: false
+        default: 'true'
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete stale package versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: ${{ inputs.keep_tags }}
+          DRY: ${{ inputs.dry_run }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          token = os.environ["GH_TOKEN"]
+          keep = {t.strip() for t in os.environ["KEEP"].split(",") if t.strip()}
+          dry = os.environ.get("DRY", "true").lower() == "true"
+
+          def api(url):
+              out = subprocess.run(
+                  ["curl", "-sf", "-H", f"Authorization: Bearer {token}",
+                   "-H", "Accept: application/vnd.github+json", url],
+                  capture_output=True, text=True, check=True)
+              return json.loads(out.stdout)
+
+          base = "https://api.github.com/user/packages/container/ipip/versions"
+          page = 1
+          victims = []
+          while True:
+              versions = api(f"{base}?per_page=100&page={page}")
+              if not versions:
+                  break
+              for v in versions:
+                  tags = set(v.get("metadata", {}).get("container", {}).get("tags", []))
+                  if tags & keep:
+                      continue
+                  victims.append((v["id"], sorted(tags) or ["<dangling>"],
+                                  v["created_at"]))
+              page += 1
+
+          print(f"待删除 {len(victims)} 个版本（保留 tag：{sorted(keep)}）")
+          for vid, tags, created in victims:
+              print(f"  version {vid} tags={tags} created={created}")
+          if dry:
+              print("dry_run=true，未执行删除")
+          else:
+              for vid, _, _ in victims:
+                  r = subprocess.run(
+                      ["curl", "-sf", "-X", "DELETE",
+                       "-H", f"Authorization: Bearer {token}",
+                       f"{base}/{vid}"], capture_output=True, text=True)
+                  print(f"  已删 version {vid}: rc={r.returncode}")
+              print("清理完成")
+          PY
