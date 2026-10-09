@@ -48,6 +48,10 @@ jobs:
         working-directory: frontend-new
         run: pnpm exec tsc -b
 
+      # ⚠️ no-empty 关闭：交付物经 sync 剥离注释，主仓空块的豁免注释
+      # （no-empty 默认忽略含注释的块）被剥后变成"真空块"，属剥离副作用而非
+      # 交付缺陷——空块语义主仓 CI 已把关（exhaustive-deps 等指令注释
+      # strip-comments 已保留，不受影响）。
       - name: ESLint
         working-directory: frontend-new
-        run: pnpm run lint
+        run: pnpm exec eslint . --rule '{"no-empty": "off"}'
