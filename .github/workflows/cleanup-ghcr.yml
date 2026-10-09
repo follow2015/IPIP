@@ -40,6 +40,11 @@ jobs:
           keep = {t.strip() for t in os.environ["KEEP"].split(",") if t.strip()}
           dry = os.environ.get("DRY", "true").lower() == "true"
 
+          # 安全阀：keep 为空 = 全部版本都在删除射程内，直接中止而不是全删
+          if not keep:
+              print("keep_tags 为空——拒绝执行（防止误删全部镜像版本）")
+              raise SystemExit(1)
+
           def api(url):
               out = subprocess.run(
                   ["curl", "-sf", "-H", f"Authorization: Bearer {token}",

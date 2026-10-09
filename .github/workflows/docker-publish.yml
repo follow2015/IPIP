@@ -13,6 +13,14 @@ on:
   push:
     tags: ["v*"]
     branches: [main]
+    # 非镜像内容（文档 / CI 配置）不触发构建：README 或 workflow 的改动不应
+    # 产生新的 GHCR 版本条目（每次构建都会新增一条 version，旧条目变 dangling）。
+    # 代码与依赖路径任何一处变更即构建；需要强制重建镜像时走 workflow_dispatch。
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - ".github/**"
+      - "LICENSE"
   workflow_dispatch: {}
 
 permissions:
@@ -47,7 +55,9 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
-            type=sha,prefix=sha-
+            # ⚠️ 刻意不用 type=sha：sha tag 无消费场景，且每次构建都产生一条
+            # 新 version 条目，清完 dangling 又积累（2026-10-09 清理过 38 条）。
+            # semver 版本默认附带 latest（见 metadata-action 默认行为）。
           # 显式声明 OCI labels，不依赖 metadata-action 的默认行为：
           # source 决定 GHCR 上 package 与仓库的**关联关系**（缺它则 package 页显示不出仓库），
           # description/title 决定页面信息是否完整。
