@@ -90,6 +90,14 @@ PERMISSIONS = {
     "asset:create": ("创建资产", "asset", "创建新资产"),
     "asset:update": ("更新资产", "asset", "修改资产信息"),
     "asset:delete": ("删除资产", "asset", "删除资产"),
+    "circuit:view": ("查看线路", "circuit", "查看线路与分段信息"),
+    "circuit:create": ("创建线路", "circuit", "创建新线路"),
+    "circuit:update": ("更新线路", "circuit", "修改线路信息与分段"),
+    "circuit:delete": ("删除线路", "circuit", "删除线路"),
+    "carrier:view": ("查看运营商", "carrier", "查看运营商信息"),
+    "carrier:create": ("创建运营商", "carrier", "创建新运营商"),
+    "carrier:update": ("更新运营商", "carrier", "修改运营商信息"),
+    "carrier:delete": ("删除运营商", "carrier", "删除运营商"),
     "monitor:view": ("查看监控", "monitor", "查看监控信息"),
     "monitor:config": ("配置监控", "monitor", "配置监控凭据和探测参数"),
     "monitor:alert": ("管理告警", "monitor", "管理监控告警"),
@@ -135,6 +143,8 @@ ROLE_PERMISSIONS = {
         "ip:view", "ip:update", "ip:scan",
         "system:config", "system:logs", "system:backup", "system:scan", "system:stats",
         "asset:view", "asset:create", "asset:update", "asset:delete",
+        "circuit:view", "circuit:create", "circuit:update", "circuit:delete",
+        "carrier:view", "carrier:create", "carrier:update", "carrier:delete",
         "monitor:view", "monitor:config", "monitor:alert", "monitor:report",
         "maintenance:view", "maintenance:create", "maintenance:update", "maintenance:delete",
         "security:read", "security:config", "security:session",
@@ -153,16 +163,20 @@ ROLE_PERMISSIONS = {
         "switch:view", "switch:create", "switch:update", "switch:config",
         "ip:view", "ip:update", "ip:scan",
         "system:scan", "system:stats",
+        "circuit:view", "circuit:create", "circuit:update",
+        "carrier:view", "carrier:create", "carrier:update",
         "monitor:view", "monitor:config",
         "ai:use",
     ],
     "viewer": [
         "room:view", "cabinet:view", "device:view", "customer:view", "user:view",
         "network:view", "switch:view", "ip:view", "system:stats",
+        "circuit:view", "carrier:view",
     ],
     "user": [
         "room:view", "cabinet:view", "device:view",
         "network:view", "switch:view", "ip:view", "system:stats",
+        "circuit:view", "carrier:view",
     ],
 }
 
@@ -243,8 +257,37 @@ def seed_roles(cur):
     return role_ids
 
 
-def seed_role_permissions(cur, role_ids, perm_ids):
-    """重建角色权限关联，确保与代码定义完全一致"""
+def seed_role_permissions(cur, role_ids, perm_ids, incremental: bool = False):
+    """同步角色权限关联。
+
+    - ``incremental=False``（默认，全新安装）：先清空系统角色的关联再按代码定义重建
+      —— 保证与代码定义**完全一致**；
+    - ``incremental=True``（升级模式）：**只补缺失** —— 已有关联（含管理员在界面上
+      做过的自定义调整）原样保留，代码里新增的 ``(role, code)`` 关联补进库。
+
+    [WARN] 为什么要分两档：升级时无脑重建会把管理员在界面上做过的自定义权限调整
+    一并抹掉；完全不跑又会让新增模块的权限码永远分配不到角色（升级后新功能 403）。
+    只补缺失是两者的交集解。
+    """
+    inserted = 0
+    if incremental:
+        for role_name, perm_codes in ROLE_PERMISSIONS.items():
+            rid = role_ids.get(role_name)
+            if not rid:
+                continue
+            codes = [c for c in perm_codes if c in perm_ids]
+            if not codes:
+                continue
+            cur.execute(
+                "INSERT IGNORE INTO role_permissions (role_id, permission_id) "
+                "SELECT %s, id FROM permissions WHERE code IN %s",
+                (rid, tuple(codes)),
+            )
+            inserted += cur.rowcount
+        print(f"  role_permissions: 增量补齐 {inserted} 条缺失关联（已有关联保留，"
+              "自定义调整不受影响）")
+        return
+
     system_role_ids = tuple(role_ids.values())
     cur.execute(
         "DELETE FROM role_permissions WHERE role_id IN %s",
@@ -252,7 +295,6 @@ def seed_role_permissions(cur, role_ids, perm_ids):
     )
     deleted = cur.rowcount
 
-    inserted = 0
     for role_name, perm_codes in ROLE_PERMISSIONS.items():
         rid = role_ids.get(role_name)
         if not rid:
@@ -272,17 +314,22 @@ def seed_role_permissions(cur, role_ids, perm_ids):
     print(f"  role_permissions: 清空 {deleted} 条旧关联, 新建 {inserted} 条关联")
 
 
-def seed():
-    """执行种子数据导入"""
+def seed(incremental: bool = False):
+    """执行种子数据导入。
+
+    :param incremental: 升级模式 —— 权限/角色照常幂等 UPSERT，角色权限关联
+        **只补缺失**（不重建），管理员的自定义权限调整原样保留。
+    """
     conn = pymysql.connect(**DB_CONFIG)
     try:
         with conn.cursor() as cur:
             _ensure_tables(cur)
 
-            print("=== 开始导入 RBAC 种子数据 ===")
+            print("=== 开始导入 RBAC 种子数据 ==="
+                  + ("（升级增量模式：关联只补缺失）" if incremental else ""))
             perm_ids = seed_permissions(cur)
             role_ids = seed_roles(cur)
-            seed_role_permissions(cur, role_ids, perm_ids)
+            seed_role_permissions(cur, role_ids, perm_ids, incremental=incremental)
             conn.commit()
 
             print("\n=== 当前数据汇总 ===")
@@ -314,4 +361,13 @@ def seed():
 
 
 if __name__ == "__main__":
-    seed()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="RBAC 角色/权限种子导入")
+    parser.add_argument(
+        "--incremental", action="store_true",
+        help="升级增量模式：关联只补缺失（保留界面上的自定义权限调整），"
+             "全新安装不要用（重建才保证与代码定义完全一致）",
+    )
+    args = parser.parse_args()
+    seed(incremental=args.incremental)

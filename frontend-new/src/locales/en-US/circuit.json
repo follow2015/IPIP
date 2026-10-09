@@ -1,0 +1,155 @@
+{
+  "title": "Circuits",
+  "carrier": {
+    "title": "Carriers",
+    "action": {
+      "add": "Add carrier"
+    },
+    "field": {
+      "name": "Carrier name",
+      "shortName": "Short name",
+      "type": "Type",
+      "status": "Status",
+      "contactPerson": "Contact",
+      "contactPhone": "Phone",
+      "hotline": "Fault hotline",
+      "email": "Email",
+      "sla": "Default SLA level",
+      "qualificationNo": "Qualification no.",
+      "notes": "Notes"
+    },
+    "type": {
+      "basic": "Basic carrier",
+      "isp": "Secondary ISP",
+      "idc": "Data centre",
+      "agent": "Agent"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    }
+  },
+  "field": {
+    "circuitNo": "Circuit no.",
+    "name": "Circuit name",
+    "carrier": "Carrier",
+    "customer": "Customer",
+    "status": "Status",
+    "bandwidth": "Bandwidth",
+    "committed": "Committed",
+    "billingMode": "Billing mode",
+    "monthlyFee": "Monthly fee",
+    "overagePrice": "Overage unit price (CNY/Mbps/mo)",
+    "trafficPrice": "Traffic unit price (CNY/GB)",
+    "sla": "SLA level",
+    "accessType": "Access type",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "contractNo": "Contract no.",
+    "aEnd": "A end",
+    "zEnd": "Z end",
+    "notes": "Notes"
+  },
+  "status": {
+    "pending": "Pending",
+    "active": "Active",
+    "fault": "Fault",
+    "suspended": "Suspended",
+    "terminated": "Terminated"
+  },
+  "billingMode": {
+    "flat": "Flat rate",
+    "commit_95": "Commit + 95th percentile",
+    "commit_peak": "Commit + peak",
+    "commit_avg": "Commit + average",
+    "per_gb": "Per GB"
+  },
+  "bandwidth": {
+    "mode": {
+      "pair": "Value + unit",
+      "mbps": "Absolute Mbps"
+    },
+    "valuePlaceholder": "Bandwidth value",
+    "mbpsPlaceholder": "Absolute Mbps value"
+  },
+  "action": {
+    "add": "Add circuit"
+  },
+  "filter": {
+    "byStatus": "By status",
+    "byCarrier": "By carrier",
+    "byBillingMode": "By billing mode"
+  },
+  "expiry": {
+    "expired": "Expired",
+    "daysLeft": "Expires in {{days}} day(s)"
+  },
+  "message": {
+    "createSuccess": "Circuit created",
+    "updateSuccess": "Circuit updated"
+  },
+  "searchPlaceholder": "Search circuit no. / name",
+  "detail": {
+    "title": "Circuit detail",
+    "action": {
+      "open": "Detail"
+    },
+    "tab": {
+      "segments": "Segments",
+      "devices": "Devices",
+      "impact": "Impact"
+    },
+    "hostname": "Hostname",
+    "committedDerived": "Committed = port bandwidth (flat rate)",
+    "devicesEmpty": "No associated devices"
+  },
+  "segment": {
+    "title": "Edit segments",
+    "field": {
+      "seq": "Seq",
+      "connectionId": "Route anchor",
+      "deviceId": "Hop device",
+      "portId": "Hop port",
+      "hopDesc": "Hop description"
+    },
+    "selectDevice": "Select device",
+    "selectDeviceFirst": "Select device first",
+    "deviceMissing": "Device missing",
+    "portMissing": "Port missing",
+    "anchorConnection": "Link #{{id}}",
+    "notManaged": "Not managed",
+    "legend": {
+      "label": "Legend:",
+      "managed": "Green = managed (linked to a port connection)",
+      "notManaged": "Grey = not managed (use hop description)",
+      "lost": "Red = anchor lost (connection deleted, needs action)"
+    },
+    "anchor": "Anchor",
+    "anchorLost": "Anchor lost",
+    "anchorNormal": "OK",
+    "hint": "Segments are saved as a whole batch: edit locally, then save once. Sequence numbers must be continuous and unique.",
+    "empty": "No segments yet",
+    "hopDescPlaceholder": "Describe unmanaged hops in text",
+    "action": {
+      "add": "Add hop",
+      "edit": "Edit segments",
+      "save": "Save",
+      "resort": "Resort"
+    },
+    "error": {
+      "seqDuplicate": "Duplicate sequence numbers; fix before saving",
+      "seqNotFromOne": "Sequence must start at 1",
+      "seqHole": "Sequence has gaps; use Resort to fix"
+    },
+    "message": {
+      "saveSuccess": "Segments updated",
+      "saveFailed": "Failed to save segments"
+    }
+  },
+  "impact": {
+    "pickConnection": "Pick a connection",
+    "sharedBy": "Shared by {{count}} circuits",
+    "empty": "No affected circuits found",
+    "noConnection": "No segment of this circuit is bound to a connection, so impact cannot be resolved"
+  }
+}

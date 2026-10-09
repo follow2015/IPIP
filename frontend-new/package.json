@@ -1,7 +1,7 @@
 {
   "name": "ipip-frontend",
   "private": true,
-  "version": "1.4.1",
+  "version": "1.5.0",
   "packageManager": "pnpm@10.34.5",
   "type": "module",
   "scripts": {
@@ -12,19 +12,22 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
-    "coverage": "vitest run --coverage",
+    "coverage": "vitest run --coverage --testTimeout=60000 --hookTimeout=60000",
     "check:circular": "node scripts/check-circular-deps.mjs",
     "check:circular:static": "node scripts/check-circular-deps.mjs --static-only",
+    "check:mutation": "node scripts/mutation-check.mjs",
+    "check:color-ratchet": "node scripts/color-ratchet.mjs --self-test && node scripts/color-ratchet.mjs",
     "i18n:scan": "node scripts/i18n-check.mjs scan",
     "i18n:keys": "node scripts/i18n-check.mjs keys",
     "i18n:orphan": "node scripts/i18n-check.mjs orphan",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{ts,tsx,js,cjs,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{ts,tsx,js,cjs,json,md}\"",
-    "prepare": "git config core.hooksPath .husky || true",
+    "prepare": "cd .. && husky .husky",
     "generate:types": "openapi-typescript ../openapi.json -o src/types/api-generated.ts",
     "generate:types:live": "openapi-typescript http://localhost:5000/api/openapi.json -o src/types/api-generated.ts",
     "generate:openapi": "curl -s http://localhost:5000/api/openapi.json -o ../openapi.json",
-    "generate:all": "npm run generate:openapi && npm run generate:types"
+    "generate:all": "npm run generate:openapi && npm run generate:types",
+    "check:jsx-comment": "node scripts/jsx-comment-scan.mjs --self-test && node scripts/jsx-comment-scan.mjs"
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",
@@ -45,6 +48,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

@@ -156,6 +156,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/security/csp-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/deployment/plan": {
         parameters: {
             query?: never;
@@ -5939,6 +5971,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cabinets/batch-positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        room_id?: number;
+                        items?: {
+                            cabinet_id?: number;
+                            expected_version?: number;
+                            row?: number | null;
+                            col?: number | null;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cabinets/{cabinet_id}/force": {
         parameters: {
             query?: never;
@@ -7867,6 +7969,558 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circuits/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CircuitCreate"];
+                };
+            };
+            responses: {
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CircuitResponse"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circuits/{circuit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CircuitResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CircuitUpdate"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CircuitResponse"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circuits/{circuit_id}/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CircuitSegmentsReplace"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circuits/{circuit_id}/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circuits/expiring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/circuits/impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/carriers/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CarrierCreate"];
+                };
+            };
+            responses: {
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CarrierResponse"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/carriers/{carrier_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CarrierUpdate"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CarrierResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -10443,6 +11097,48 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["SwitchResponse"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/switch/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
                 401: {
@@ -20091,6 +20787,10 @@ export interface components {
             resource: string | null;
             resource_id: number | null;
             start_time: string | null;
+            /**
+             * @description 结束时间 ISO8601
+             * @default null
+             */
             end_time: string | null;
             page: number;
             per_page: number;
@@ -20577,14 +21277,43 @@ export interface components {
             role_ids: number[];
         };
         DeploymentPlanRequest: {
+            /**
+             * @description 机房ID（可选，缺省全机房择优）
+             * @default null
+             */
             room_id: number | null;
+            /**
+             * @description 上架台数（缺省=容量模式，返回还能上多少台）
+             * @default null
+             */
             count: number | null;
+            /**
+             * @description 单台U高，默认2
+             * @default 2
+             */
             u_height: number;
+            /**
+             * @description 单台功率W，默认750（仅参考）
+             * @default 750
+             */
             power_per_unit: number;
+            /**
+             * @description 单台带宽需求Mbps（可选；缺省不给限速建议）
+             * @default null
+             */
             bandwidth_mbps: number | null;
             port_speed: string;
             ip_scope: "public" | "private" | null;
+            /**
+             * @description 额外返回的「可分配 IP 样例」数量（0=不返回样例；容量模式默认给 10 个）
+             * @default 0
+             */
             ip_examples: number;
+            /**
+             * @description 地址池口径：auto 先本机房后二层域跨机房 / room 只用本机房地址
+             * @default auto
+             * @enum {string}
+             */
             ip_pool_scope: "auto" | "room";
         };
         ComponentTemplateCreateRequest: {
@@ -20597,6 +21326,108 @@ export interface components {
         };
         CustomerTerminateRequest: {
             reason?: string | null;
+        };
+        CircuitCreate: {
+            committed_value?: number | null;
+            committed_unit?: "M" | "G" | "T" | "P" | null;
+            bandwidth_value?: number | null;
+            bandwidth_unit?: "M" | "G" | "T" | "P" | null;
+            bandwidth_mbps?: number | null;
+            bandwidth_step?: 1000 | 1024 | null;
+            circuit_no: string;
+            name?: string | null;
+            carrier_id?: number | null;
+            customer_id?: number | null;
+            billing_mode?: "flat" | "commit_95" | "commit_peak" | "commit_avg" | "per_gb" | null;
+            committed_mbps?: number | null;
+            monthly_fee?: number | null;
+            overage_unit_price?: number | null;
+            traffic_unit_price?: number | null;
+            currency?: string | null;
+            access_type?: string | null;
+            status?: "pending" | "active" | "fault" | "suspended" | "terminated" | null;
+            sla_level?: string | null;
+            start_date?: string | null;
+            end_date?: string | null;
+            contract_no?: string | null;
+            a_end_room_id?: number | null;
+            z_end_room_id?: number | null;
+            a_end_device_id?: number | null;
+            z_end_device_id?: number | null;
+            a_end_port_id?: number | null;
+            z_end_port_id?: number | null;
+            a_end_desc?: string | null;
+            z_end_desc?: string | null;
+            notes?: string | null;
+        };
+        CircuitUpdate: {
+            committed_value?: number | null;
+            committed_unit?: "M" | "G" | "T" | "P" | null;
+            bandwidth_value?: number | null;
+            bandwidth_unit?: "M" | "G" | "T" | "P" | null;
+            bandwidth_mbps?: number | null;
+            bandwidth_step?: 1000 | 1024 | null;
+            circuit_no?: string;
+            name?: string | null;
+            carrier_id?: number | null;
+            customer_id?: number | null;
+            billing_mode?: "flat" | "commit_95" | "commit_peak" | "commit_avg" | "per_gb" | null;
+            committed_mbps?: number | null;
+            monthly_fee?: number | null;
+            overage_unit_price?: number | null;
+            traffic_unit_price?: number | null;
+            currency?: string | null;
+            access_type?: string | null;
+            status?: "pending" | "active" | "fault" | "suspended" | "terminated" | null;
+            sla_level?: string | null;
+            start_date?: string | null;
+            end_date?: string | null;
+            contract_no?: string | null;
+            a_end_room_id?: number | null;
+            z_end_room_id?: number | null;
+            a_end_device_id?: number | null;
+            z_end_device_id?: number | null;
+            a_end_port_id?: number | null;
+            z_end_port_id?: number | null;
+            a_end_desc?: string | null;
+            z_end_desc?: string | null;
+            notes?: string | null;
+        };
+        CircuitSegmentItem: {
+            connection_id?: number | null;
+            device_id?: number | null;
+            port_id?: number | null;
+            hop_desc?: string | null;
+            notes?: string | null;
+        };
+        CircuitSegmentsReplace: {
+            segments: components["schemas"]["CircuitSegmentItem"][];
+        };
+        CarrierCreate: {
+            name: string;
+            short_name?: string | null;
+            carrier_type?: "basic" | "isp" | "idc" | "agent" | null;
+            status?: "active" | "inactive" | null;
+            contact_person?: string | null;
+            contact_phone?: string | null;
+            hotline?: string | null;
+            email?: string | null;
+            default_sla_level?: string | null;
+            qualification_no?: string | null;
+            notes?: string | null;
+        };
+        CarrierUpdate: {
+            name?: string;
+            short_name?: string | null;
+            carrier_type?: "basic" | "isp" | "idc" | "agent" | null;
+            status?: "active" | "inactive" | null;
+            contact_person?: string | null;
+            contact_phone?: string | null;
+            hotline?: string | null;
+            email?: string | null;
+            default_sla_level?: string | null;
+            qualification_no?: string | null;
+            notes?: string | null;
         };
         ErrorReportRequest: {
             errors: unknown[];
@@ -21303,6 +22134,82 @@ export interface components {
             last_scan_at?: string | null;
             last_scan_scope?: string | null;
         };
+        CircuitSegmentResponse: {
+            id?: number;
+            circuit_id?: number;
+            seq?: number;
+            connection_id?: number | null;
+            connection_id_lost?: number;
+            anchor_lost?: boolean;
+            device_id?: number | null;
+            device_name?: string | null;
+            device_missing?: boolean;
+            port_id?: number | null;
+            port_name?: string | null;
+            port_missing?: boolean;
+            hop_desc?: string | null;
+            notes?: string | null;
+            created_at?: string;
+            updated_at?: string;
+        };
+        CircuitResponse: {
+            id?: number;
+            circuit_no?: string;
+            deleted_token?: string;
+            name?: string | null;
+            carrier_id?: number | null;
+            carrier_name?: string | null;
+            customer_id?: number | null;
+            customer_name?: string | null;
+            bandwidth_mbps?: number | null;
+            bandwidth_step?: number;
+            bandwidth_display?: string | null;
+            billing_mode?: string;
+            committed_mbps?: number | null;
+            committed_is_derived?: boolean;
+            monthly_fee?: number | null;
+            overage_unit_price?: number | null;
+            traffic_unit_price?: number | null;
+            currency?: string;
+            access_type?: string | null;
+            status?: string;
+            sla_level?: string | null;
+            start_date?: string | null;
+            end_date?: string | null;
+            contract_no?: string | null;
+            a_end_room_id?: number | null;
+            z_end_room_id?: number | null;
+            a_end_device_id?: number | null;
+            z_end_device_id?: number | null;
+            a_end_port_id?: number | null;
+            z_end_port_id?: number | null;
+            a_end_desc?: string | null;
+            z_end_desc?: string | null;
+            notes?: string | null;
+            deleted_at?: string | null;
+            created_at?: string;
+            updated_at?: string;
+            segments?: components["schemas"]["CircuitSegmentResponse"][] | null;
+        };
+        CarrierResponse: {
+            id?: number;
+            name?: string;
+            deleted_token?: string;
+            short_name?: string | null;
+            carrier_type?: string | null;
+            status?: string;
+            contact_person?: string | null;
+            contact_phone?: string | null;
+            hotline?: string | null;
+            email?: string | null;
+            default_sla_level?: string | null;
+            qualification_no?: string | null;
+            notes?: string | null;
+            circuit_count?: number | null;
+            deleted_at?: string | null;
+            created_at?: string;
+            updated_at?: string;
+        };
         ApiResponse: {
             success?: boolean;
             message?: string;
@@ -21395,6 +22302,7 @@ export interface components {
             flapping?: number;
             never_reachable?: number;
             alert_blindspot?: number;
+            paused_devices?: number;
             alerting_devices?: number;
             crit_alert_devices?: number;
             warn_alert_devices?: number;
@@ -21459,6 +22367,23 @@ export interface components {
             scan_auto_vr_ids?: components["schemas"]["MonitorConfigItem"];
             scan_auto_cleanup_interval?: components["schemas"]["MonitorConfigItem"];
             scan_auto_grace_period?: components["schemas"]["MonitorConfigItem"];
+            scan_channel_enabled?: components["schemas"]["MonitorConfigItem"];
+            scan_channel_priority?: components["schemas"]["MonitorConfigItem"];
+            scan_channel_snmp_device_ids?: components["schemas"]["MonitorConfigItem"];
+            scan_channel_snmp_room_ids?: components["schemas"]["MonitorConfigItem"];
+            scan_channel_snmp_vr_ids?: components["schemas"]["MonitorConfigItem"];
+            scan_channel_snmp_subtypes?: components["schemas"]["MonitorConfigItem"];
+            scan_channel_snmp_snapshot?: components["schemas"]["MonitorConfigItem"];
+            trapd_v3_enabled?: components["schemas"]["MonitorConfigItem"];
+            trapd_v3_users?: components["schemas"]["MonitorConfigItem"];
+            scan_channel_budget_seconds?: components["schemas"]["MonitorConfigItem"];
+            scan_channel_circuit_threshold?: components["schemas"]["MonitorConfigItem"];
+            scan_channel_auto_enabled?: components["schemas"]["MonitorConfigItem"];
+            trapd_enabled?: components["schemas"]["MonitorConfigItem"];
+            trapd_listen_port?: components["schemas"]["MonitorConfigItem"];
+            trapd_source_allowlist?: components["schemas"]["MonitorConfigItem"];
+            trapd_rate_limit_per_minute?: components["schemas"]["MonitorConfigItem"];
+            trapd_allow_weak_community?: components["schemas"]["MonitorConfigItem"];
             worker_in_process?: components["schemas"]["MonitorConfigItem"];
         };
         MonitorConfigUpdateResponse: {
@@ -21593,6 +22518,9 @@ export interface components {
             acknowledged_by?: string | null;
             acknowledged_at?: string | null;
             ack_note?: string | null;
+            port?: {
+                [key: string]: unknown;
+            } | null;
         };
         MonitorAlertBatchAckRequest: {
             alert_ids: number[];

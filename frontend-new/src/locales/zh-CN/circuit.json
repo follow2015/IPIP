@@ -1,0 +1,155 @@
+{
+  "title": "线路管理",
+  "carrier": {
+    "title": "运营商管理",
+    "action": {
+      "add": "新增运营商"
+    },
+    "field": {
+      "name": "运营商名称",
+      "shortName": "简称",
+      "type": "类型",
+      "status": "状态",
+      "contactPerson": "联系人",
+      "contactPhone": "联系电话",
+      "hotline": "报障热线",
+      "email": "邮箱",
+      "sla": "默认 SLA 等级",
+      "qualificationNo": "资质编号",
+      "notes": "备注"
+    },
+    "type": {
+      "basic": "基础运营商",
+      "isp": "二级运营商",
+      "idc": "机房方",
+      "agent": "代理商"
+    },
+    "status": {
+      "active": "合作中",
+      "inactive": "已停用"
+    }
+  },
+  "field": {
+    "circuitNo": "电路号",
+    "name": "线路名称",
+    "carrier": "运营商",
+    "customer": "客户",
+    "status": "状态",
+    "bandwidth": "带宽",
+    "committed": "保底带宽",
+    "billingMode": "计费模式",
+    "monthlyFee": "月租",
+    "overagePrice": "超量单价（元/Mbps/月）",
+    "trafficPrice": "流量单价（元/GB）",
+    "sla": "SLA 等级",
+    "accessType": "接入类型",
+    "startDate": "起租日",
+    "endDate": "到期日",
+    "contractNo": "合同号",
+    "aEnd": "A 端",
+    "zEnd": "Z 端",
+    "notes": "备注"
+  },
+  "status": {
+    "pending": "待开通",
+    "active": "在用",
+    "fault": "故障",
+    "suspended": "已暂停",
+    "terminated": "已终止"
+  },
+  "billingMode": {
+    "flat": "端口买断",
+    "commit_95": "保底 + 95 计费",
+    "commit_peak": "保底 + 峰值计费",
+    "commit_avg": "保底 + 均值计费",
+    "per_gb": "按流量计费"
+  },
+  "bandwidth": {
+    "mode": {
+      "pair": "数值 + 单位",
+      "mbps": "绝对 Mbps"
+    },
+    "valuePlaceholder": "带宽数值",
+    "mbpsPlaceholder": "绝对 Mbps 值"
+  },
+  "action": {
+    "add": "新增线路"
+  },
+  "filter": {
+    "byStatus": "按状态",
+    "byCarrier": "按运营商",
+    "byBillingMode": "按计费模式"
+  },
+  "expiry": {
+    "expired": "已过期",
+    "daysLeft": "{{days}} 天后到期"
+  },
+  "message": {
+    "createSuccess": "线路创建成功",
+    "updateSuccess": "线路更新成功"
+  },
+  "searchPlaceholder": "搜索电路号 / 线路名称",
+  "detail": {
+    "title": "线路详情",
+    "action": {
+      "open": "详情"
+    },
+    "tab": {
+      "segments": "分段",
+      "devices": "关联设备",
+      "impact": "影响面"
+    },
+    "hostname": "主机名",
+    "committedDerived": "保底 = 端口带宽（买断）",
+    "devicesEmpty": "暂无关联设备"
+  },
+  "segment": {
+    "title": "编辑分段",
+    "field": {
+      "seq": "序号",
+      "connectionId": "路由锚点",
+      "deviceId": "跳接设备",
+      "portId": "跳接端口",
+      "hopDesc": "跳接点描述"
+    },
+    "selectDevice": "选择设备",
+    "selectDeviceFirst": "先选设备",
+    "deviceMissing": "设备已不存在",
+    "portMissing": "端口已不存在",
+    "anchorConnection": "连接 #{{id}}",
+    "notManaged": "未纳管",
+    "legend": {
+      "label": "颜色说明：",
+      "managed": "绿色 = 已纳管（已关联端口互联记录）",
+      "notManaged": "灰色 = 未纳管（用跳接点描述说明）",
+      "lost": "红色 = 锚点已失效（连接已删除，需处理）"
+    },
+    "anchor": "锚点",
+    "anchorLost": "锚点已失效",
+    "anchorNormal": "正常",
+    "hint": "分段按整批替换提交：本地改完一次性保存，不做逐条保存。序号必须连续且唯一。",
+    "empty": "暂无分段",
+    "hopDescPlaceholder": "未纳管跳接点用文字描述",
+    "action": {
+      "add": "新增跳",
+      "edit": "编辑分段",
+      "save": "保存",
+      "resort": "重排序号"
+    },
+    "error": {
+      "seqDuplicate": "序号存在重复，请修正后再保存",
+      "seqNotFromOne": "序号必须从 1 开始",
+      "seqHole": "序号不连续，请点「重排序号」归位"
+    },
+    "message": {
+      "saveSuccess": "分段已更新",
+      "saveFailed": "分段保存失败"
+    }
+  },
+  "impact": {
+    "pickConnection": "选择连接",
+    "sharedBy": "该连接被 {{count}} 条线路共享",
+    "empty": "未查到受影响线路",
+    "noConnection": "该线路的分段未绑定任何连接，无法反查影响面"
+  }
+}

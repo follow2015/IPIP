@@ -19,13 +19,13 @@ import time
 from typing import Callable, Dict, List, Optional
 
 from app.exceptions.system import ExternalServiceError
+from app.utils import redis_keys
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-_PREFIX = "ai:cb:"
-_PROBE_SUFFIX = ":probe"
-_INDEX_KEY = f"{_PREFIX}_index"
+_PREFIX = redis_keys.AI_CB_PREFIX
+_INDEX_KEY = redis_keys.AI_CB_INDEX_KEY
 
 _STATE_TTL = 3600
 
@@ -60,8 +60,8 @@ def _index_provider(r, name: str) -> None:
     """
     try:
         r.sadd(_INDEX_KEY, name)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as e:  # noqa: BLE001 - 索引只服务可观测性
+        logger.debug("circuit_breaker index sadd failed: %s", e)
 
 
 
@@ -77,15 +77,15 @@ class _RedisState:
     def __init__(self, r, name: str, ttl: int = _STATE_TTL):
         self._r = r
         self._name = name
-        self._key = f"{_PREFIX}{name}"
-        self._probe_key = f"{_PREFIX}{name}{_PROBE_SUFFIX}"
+        self._key = redis_keys.ai_cb_key(name)
+        self._probe_key = redis_keys.ai_cb_probe_key(name)
         self._ttl = ttl
 
     def _refresh_ttl(self) -> None:
         try:
             self._r.expire(self._key, self._ttl)
-        except Exception:  # noqa: BLE001
-            pass  # TTL 刷新失败不影响计数正确性
+        except Exception as e:  # noqa: BLE001 - TTL 刷新失败不影响计数正确性
+            logger.debug("circuit_breaker ttl refresh failed: %s", e)
 
     def failures(self) -> int:
         val = self._r.hget(self._key, "failures")
@@ -204,8 +204,8 @@ class CircuitBreaker:
             value = getattr(Config, key, None)
             if value is not None:
                 return int(value)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as e:  # noqa: BLE001 - 配置读取失败回落环境变量
+            logger.debug("circuit_breaker config read failed: %s", e)
         try:
             return int(os.getenv(key, default))
         except (TypeError, ValueError):
@@ -344,8 +344,8 @@ def known_providers(r=None) -> List[str]:
         configured = getattr(Config, "AI_PROVIDER", None)
         if configured:
             extras.append(configured)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as e:  # noqa: BLE001 - 配置不可读时忽略该来源
+        logger.debug("circuit_breaker provider config read failed: %s", e)
     for name in dict.fromkeys(extras):
         if name and name not in names:
             names.append(name)
