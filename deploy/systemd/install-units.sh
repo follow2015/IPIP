@@ -164,11 +164,104 @@ esac
 # 会把它拖进无限重启循环，systemctl is-active 显示 activating，极具迷惑性
 # （实测踩到：全新机直接 --with-units，5 个单元全部假死）。装之前先拦住。
 if ! id "$RUN_USER" >/dev/null 2>&1; then
+  # nologin 的路径随发行版而变：usrmerge 系统（Debian 10+ / Ubuntu 20.04+ /
+  # RHEL 8+）在 /usr/sbin/nologin，非 usrmerge 的老系统（RHEL 7、Debian 9）
+  # 只有 /sbin/nologin。写死路径会让这条建议命令在那些机器上直接失败，
+  # 而失败信息（"useradd: shell ... does not exist"）不指向根因。
+  NOLOGIN="$(command -v nologin 2>/dev/null || echo /usr/sbin/nologin)"
   die "运行账号不存在: ${RUN_USER}。先创建系统账号并归属项目目录（示例）：
-    sudo useradd -r -M -d $PROJECT_ROOT -s /usr/sbin/nologin $RUN_USER
+    sudo useradd -r -M -d $PROJECT_ROOT -s ${NOLOGIN} $RUN_USER
     sudo chown -R $RUN_USER:$RUN_GROUP $PROJECT_ROOT
   或改用既有账号：--user root --group root（项目在 /root 下时必须）"
 fi
+
+# ── systemd 版本兼容性 ────────────────────────────────────────────────────
+# 模板里用了一批加固指令（ProtectKernelTunables / ProtectControlGroups /
+# MemoryMax / StartLimitIntervalSec …）。systemd 遇到**不认识的指令**只会打一行
+# "Unknown lvalue" 警告，然后**照常加载单元** —— 也就是说在老 systemd 上这些
+# 加固会**静默失效**：装上看着好好的、systemctl status 一片绿，实际一个都没生效。
+# 这比直接报错危险得多（"以为加固了"比"知道没加固"更糟），所以显式核对版本。
+#
+# 版本门槛（该指令的引入版本）：
+#   ProtectHome / ProtectSystem …… 214（低于此整套加固都不存在，不该装）
+#   NoNewPrivileges …………………… 227
+#   StartLimitIntervalSec ………… 230（老名 StartLimitInterval）
+#   MemoryMax ……………………………… 231（老名 MemoryLimit）
+#   ProtectKernelTunables / ProtectControlGroups … 232
+SYSTEMD_MIN_ANY=214
+SYSTEMD_MIN_FULL=232
+
+check_systemd_version() {
+  command -v systemctl >/dev/null 2>&1 || return 0   # 无 systemctl 由安装末尾统一提示
+  local ver
+  ver="$(systemctl --version 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)"
+  if [ -z "$ver" ]; then
+    warn "读不到 systemd 版本，跳过加固项兼容性核对（不确认加固是否生效）"
+    return 0
+  fi
+  if [ "$ver" -lt "$SYSTEMD_MIN_ANY" ]; then
+    die "systemd 版本过低：${ver}（本套 unit 至少需要 ${SYSTEMD_MIN_ANY}）
+  ProtectHome/ProtectSystem 在该版本尚不存在 —— 装上后单元能跑，但 IPIP 依赖的
+  加固一条都不会生效。请升级系统，或改用直起模式：scripts/ipipctl.sh start"
+  fi
+  if [ "$ver" -lt "$SYSTEMD_MIN_FULL" ]; then
+    warn "systemd ${ver} < ${SYSTEMD_MIN_FULL}：以下指令该版本不识别，会被**静默忽略**"
+    warn "  （单元照常加载、status 一片绿，但加固实际不生效）："
+    warn "    · ProtectKernelTunables / ProtectControlGroups（需 232+）"
+    warn "    · MemoryMax（需 231+，老版本名为 MemoryLimit）"
+    warn "    · StartLimitIntervalSec（需 230+，老版本名为 StartLimitInterval）"
+    warn "  单元仍可运行，但请勿据此认为加固已生效。"
+  fi
+}
+
+# ── SELinux（RHEL 系默认开启）────────────────────────────────
+# CentOS / Rocky / Alma 默认 SELinux=Enforcing。此时即便 chmod 全部放开，
+# 服务进程仍可能被策略挡下，而失败形态**和权限问题几乎一模一样**
+# （status=203/EXEC、或端口监听被拒）—— 排查必然先跑偏到 chmod/chown 上，
+# 而那条路永远走不通。所以在这里先把 SELinux 这个变量点破。
+check_selinux() {
+  command -v getenforce >/dev/null 2>&1 || return 0    # 无 SELinux（Debian/Ubuntu 默认无）
+  local mode; mode="$(getenforce 2>/dev/null || true)"
+  [ "$mode" = "Enforcing" ] || return 0
+  warn "SELinux 处于 Enforcing —— 服务可能因策略被拒，且报错形态与权限问题相同。"
+  warn "  排查顺序建议（先确认是不是 SELinux，再决定放行方式）："
+  warn "    1) ausearch -m avc -ts recent        看是否被 AVC 拒绝"
+  warn "    2) 临时验证：setenforce 0 后再启服务（确认后务必改回 Enforcing）"
+  warn "  正式放行（不要长期靠 setenforce 0）："
+  warn "    · 项目部署在 /opt/ipip 或 /srv 下（这两个位置有默认策略上下文）"
+  warn "    · 或补上下文：semanage fcontext -a -t bin_t '${PROJECT_ROOT}/.venv/bin(/.*)?'"
+  warn "                  restorecon -Rv ${PROJECT_ROOT}"
+  warn "    · 非标准端口（${FLASK_PORT}/${GATEWAY_PORT}）需登记："
+  warn "                  semanage port -a -t http_port_t -p tcp ${FLASK_PORT}"
+}
+
+# ── 防火墙：装完访问不到，是最常见的"装好了但用不了" ──────────
+# 两个系的工具完全不同（Ubuntu 用 ufw，RHEL 系用 firewalld），不点名的话
+# 运维会照着另一个发行版的命令敲，然后得出"服务没起来"的错误结论。
+check_firewall() {
+  if command -v firewall-cmd >/dev/null 2>&1 \
+     && firewall-cmd --state >/dev/null 2>&1; then
+    warn "firewalld 运行中：放行端口用"
+    warn "    firewall-cmd --permanent --add-port=${FLASK_PORT}/tcp --add-port=${GATEWAY_PORT}/tcp"
+    warn "    firewall-cmd --reload"
+  elif command -v ufw >/dev/null 2>&1; then
+    # [WARN] 不能写 `ufw status | grep -qi`：`grep -q` 命中即退出会让 ufw 收
+    #        SIGPIPE(141)，pipefail 把整条管道判成失败 ⇒ 本分支永不触发。
+    #        先捕获输出，再用 shell 内建的 case 匹配（无管道）。
+    local ufw_out
+    ufw_out="$(ufw status 2>/dev/null)"
+    case "$ufw_out" in
+      *"Status: active"*)
+        warn "ufw 运行中：放行端口用"
+        warn "    ufw allow ${FLASK_PORT}/tcp && ufw allow ${GATEWAY_PORT}/tcp"
+        ;;
+    esac
+  fi
+}
+
+check_systemd_version
+check_selinux
+check_firewall
 
 # ── 渲染 ────────────────────────────────────────────────────
 # sed 替换串里 & 与 | 有特殊含义，必须转义，否则路径含 & 时会被替换成整段匹配
@@ -287,6 +380,23 @@ for u in $ALL_UNITS; do
 done
 log "已安装 $(echo $ALL_UNITS | wc -w | tr -d ' ') 个 unit 到 $SYSTEMD_DIR"
 
+# ── 备份目录 ────────────────────────────────────────────────
+# /var/backups 是 Debian 系约定（FHS）—— **RHEL/CentOS/Rocky 默认没有这个目录**。
+# 不建的话 ipip-backup.service 第一次跑就写不进去，而备份失败只在凌晨才被看见，
+# 那时已经白丢一天。属主不对同理，但比"目录不存在"更难发现。
+if [ ! -d "$BACKUP_DIR" ]; then
+  mkdir -p "$BACKUP_DIR" && chown "$RUN_USER:$RUN_GROUP" "$BACKUP_DIR"
+  log "已创建备份目录 ${BACKUP_DIR}（属主 ${RUN_USER}）"
+else
+  # stat 取属主在两边写法不同：GNU 是 -c %U，BSD（macOS 本地演练）是 -f %Su
+  owner="$(stat -c %U "$BACKUP_DIR" 2>/dev/null \
+           || stat -f %Su "$BACKUP_DIR" 2>/dev/null || echo unknown)"
+  if [ "$owner" != "$RUN_USER" ]; then
+    warn "备份目录 ${BACKUP_DIR} 属主是 ${owner}，服务账号 ${RUN_USER} 可能写不进去"
+    warn "  → 每日备份会整次失败。修复：sudo chown ${RUN_USER}:${RUN_GROUP} ${BACKUP_DIR}"
+  fi
+fi
+
 # ── /etc/ipip/ipip.env ──────────────────────────────────────
 if [ "$SKIP_ENV_FILE" = 0 ]; then
   if [ -e "$ENV_FILE" ]; then
@@ -336,7 +446,14 @@ if command -v systemctl >/dev/null 2>&1; then
   if command -v systemd-analyze >/dev/null 2>&1; then
     for u in $ALL_UNITS; do
       # 个别告警（如 Documentation= 使用 %E 占位符）不影响运行，故只提示不阻断
-      systemd-analyze verify "$SYSTEMD_DIR/$u" 2>&1 | grep -q . && \
+      #
+      # [WARN] **不能**写成 `systemd-analyze verify … 2>&1 | grep -q . && warn …`：
+      # `grep -q` 命中首行即退出并关管道 ⇒ 上游收 **SIGPIPE(141)** ⇒ 管道返回 141
+      # ⇒ `&&` 右侧不执行 ⇒ **这条提示永远不会打印**（而它恰恰是唯一能解释
+      # "unit 装了却启不来"的线索）。修法：先捕获输出再判断非空（无管道）。
+      # 同类事故另见 `deploy/ops/datastore-guard.sh`、`scripts/check-contract.sh`。
+      verify_out="$(systemd-analyze verify "$SYSTEMD_DIR/$u" 2>&1 || true)"
+      [ -n "${verify_out}" ] && \
         warn "systemd-analyze verify 对 $u 有提示（多为 Documentation 占位符，可忽略）"
     done
   fi
@@ -372,8 +489,21 @@ cat <<'NEXT'
     sudo systemctl enable --now ipip-backup.timer ipip-watchdog.timer
   或直接：sudo bash install-units.sh --project-root <路径> --enable
 
-可选能力（默认不启用，配置就绪后再开）：
-    # SNMP Trap 接收：先在 ipip.env 设 TRAPD_ENABLED=true 与 TRAPD_COMMUNITIES，
-    # 再启用（单元已随本脚本安装，但不在 --enable 清单内）
+可选能力：SNMP Trap 接收（ipip-trapd.service）
+    # ① 先把进程托管起来（开机自启）—— **这一步只是让进程常驻**，不代表开始收 trap
     sudo systemctl enable --now ipip-trapd.service
+
+    # ② 收/不收由「动态配置」决定，不再改 .env、不再 restart：
+    #    前端 监控中心 → 运行配置 → 「SNMP Trap 接收」分组，打开总开关即可
+    #    （等价 API：PUT /api/monitor/config  {"updates": {"TRAPD_ENABLED": true}}）
+    #
+    # 未开启时进程**待机**：不监听端口、不占资源、不报错。这也是它不列入
+    # ipip.target 的 Wants= 的原因——开关在动态配置里，不在 unit 启停上。
+    #
+    # community 取用顺序：TRAPD_COMMUNITIES（.env）＞ 凭据库里启用中的 SNMP 凭据。
+    # 后者已加密存储且默认不回显，故多数情况无需手工填 community。
+    #
+    # 设备侧配置（交换机）：snmp-server host <本机IP> <community> 10162
+    # （默认端口 10162；若已在 .env 配 TRAPD_LISTEN_PORT=162 且进程以 root 运行，
+    #   也可用特权端口 162，则设备侧无需指定端口号）
 NEXT
