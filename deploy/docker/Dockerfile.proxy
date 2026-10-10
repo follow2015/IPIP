@@ -1,0 +1,5 @@
+# IPIP 反向代理镜像：把 nginx.conf 烘进镜像，评估者不再需要单独拷贝配置文件。
+# 构建上下文 = 仓库根（与主镜像一致）：docker build -f deploy/docker/Dockerfile.proxy .
+# 配置文件里的上游名（web / gateway）依赖 compose 服务名，因此本镜像只面向本仓 compose。
+FROM nginx:1.27-alpine
+COPY deploy/docker/nginx.conf /etc/nginx/conf.d/default.conf

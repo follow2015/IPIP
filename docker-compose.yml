@@ -216,11 +216,15 @@ services:
     restart: unless-stopped
 
   # ── 反向代理：唯一对外入口（前端相对路径 /api 与 /realtime 靠它分流）──
+  # 配置已烘进镜像（deploy/docker/Dockerfile.proxy），无需再挂载 nginx.conf：
+  # 只下载 docker-compose.yml + .env 即可 `pull && up -d`。
+  # 改了 nginx.conf 后本地验证：docker compose build proxy && docker compose up -d proxy
   proxy:
-    image: nginx:1.27-alpine
+    image: ghcr.io/follow2015/ipip-proxy:${IPIP_IMAGE_TAG:-main}
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.proxy
     restart: unless-stopped
-    volumes:
-      - ./deploy/docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "${HTTP_PORT:-8080}:80"
     depends_on:
