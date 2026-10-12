@@ -626,48 +626,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/logs/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiResponse"];
-                    };
-                };
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/logs/stats": {
         parameters: {
             query?: never;
@@ -13955,6 +13913,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/monitor/credentials/bind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MonitorCredentialUpsert"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MonitorCredentialConfigResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/monitor/credentials/{credential_id}/devices": {
         parameters: {
             query?: never;
@@ -21934,6 +21930,11 @@ export interface components {
             description?: string | null;
             port_type?: string | null;
             slot?: number | null;
+            in_errors?: number | null;
+            out_errors?: number | null;
+            in_discards?: number | null;
+            out_discards?: number | null;
+            error_counters_at?: string | null;
         };
         PermissionResponse: {
             id?: number;

@@ -54,6 +54,8 @@ class ScanProgress:
     total_switches: int = 0
     completed: int = 0
     failed: int = 0
+    snmp_synced: int = 0     # VLAN/LAG/计数 写入条目数合计
+    snmp_failed: int = 0     # 采集失败的能力次数（ChannelSyncError）
     current_phase: str = ""
     reason: str = ""         # 失败原因（如 missing_n2n_connections）
     start_time: float = 0
@@ -74,6 +76,8 @@ class ScanProgress:
             "total": self.total_switches,
             "completed": self.completed,
             "failed": self.failed,
+            "snmp_synced": self.snmp_synced,
+            "snmp_failed": self.snmp_failed,
             "phase": self.current_phase,
             "reason": self.reason,
             "elapsed_seconds": round(elapsed, 1),
@@ -98,6 +102,28 @@ class ScanProgress:
                 sr.progress_set(self.scope or str(self.room_id), self.to_dict())
         except Exception:
             logger.warning("推送扫描进度到Redis失败: scope=%s", self.scope or self.room_id, exc_info=True)
+
+
+_SNMP_ATTEMPTED_FAILURES = frozenset(
+    {"collect_error", "collect_failed", "assemble_error"}
+)
+
+
+def _scan_status(progress: ScanProgress) -> str:
+    """扫描终态：``success`` / ``partial`` / ``failed``。
+
+    为什么需要它：原先结果摘要里没有 status，路由层只能"没抛异常就算完成" ——
+    一台都没采到时铃铛照样弹「扫描完成」（2026-10-10 实测）。三条判据：
+
+    - ``failed``：有设备但**一台都没成功**（completed==0）⇒ 这是真故障；
+    - ``partial``：有成功也有失败；
+    - ``success``：无失败。
+    """
+    if progress.total_switches > 0 and progress.completed == 0:
+        return "failed"
+    if progress.failed > 0:
+        return "partial"
+    return "success"
 
 
 def get_scan_progress(scope: str) -> Optional[dict]:
@@ -190,6 +216,49 @@ class SwitchMeta:
     uplink_port: str | None  # 上联交换机上的端口名（通过 N2N 连接从本机上行端口反查）
     room_id: int
     scope: str = ""          # 扫描范围标识
+
+
+
+
+def sync_snmp_capabilities(device_id: int) -> tuple[int, int]:
+    """逐能力跑无 SSH 设备的 VLAN / LAG / 错包计数同步，返回 ``(synced, failed)``。
+
+    [WARN] 为什么每个能力要**单独** try/except（评审 N13）：
+
+    * 三者共用一个异常处理时，任一能力抛错会让其余两个**连试都不试** —— 一个
+      设备的 VLAN 采集超时会连带 LAG / COUNTERS 整批不做；
+    * 三者失败时返回值一模一样（都是 0），于是"SNMP 子阶段整体失败"在 ``progress``
+      上没有任何痕迹 —— 运维只看到"扫描完成"，看不到这台设备的 SNMP 采集全挂了。
+
+    现在：采集失败抛 :class:`ChannelSyncError`，本函数按能力记账并返回计数，由调用方
+    写进 :class:`ScanProgress` 的 ``snmp_synced`` / ``snmp_failed``。
+    ``synced == 0 and failed == 0`` 仍是合法结果（例如通道按 R1 未放行该设备、
+    或设备确实没有 VLAN / LACP）—— 那是**确定性的空**，不是故障。
+
+    事务边界留在调用方（保持既有"与 Phase 同 checkpoint"的口径）。
+    """
+    from app.services.switch_info_service import ChannelSyncError, SwitchInfoService
+
+    svc = SwitchInfoService()
+    synced = failed = 0
+    for label, run_capability in (
+        ("VLAN", svc.sync_vlan_members_via_channel),
+        ("LAG", svc.sync_lag_members_via_channel),
+        ("COUNTERS", svc.sync_port_error_counters_via_channel),
+    ):
+        try:
+            synced += run_capability(device_id)
+        except ChannelSyncError as exc:
+            failed += 1
+            logger.error(
+                "[Phase0d-snmp] %s 采集失败 device_id=%s: %s", label, device_id, exc,
+            )
+    if synced or failed:
+        logger.info(
+            "[Phase0d-snmp] device_id=%s 通道同步: 写入 %d 条, 采集失败 %d 次",
+            device_id, synced, failed,
+        )
+    return synced, failed
 
 
 
@@ -353,15 +422,26 @@ class ScanOrchestrator:
                 logger.warning("[Scan] %d 台采集失败: %s", len(failed), failed)
 
             snmp_real_ips: set[str] = set()
+            snmp_collect_failed = 0
             for sw in [s for s in all_sw if not s.has_ssh]:
+                diag: dict = {}
                 try:
-                    ctx_snmp = self._collect_single_via_snmp(sw)
+                    ctx_snmp = self._collect_single_via_snmp(sw, diag=diag)
                 except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单台失败不得中断整轮扫描
                     logger.error("[Step1b] %s SNMP 补采异常: %s", sw.ip, e)
+                    snmp_collect_failed += 1
                     continue
                 if ctx_snmp is not None:
                     valid_ctxs.append(ctx_snmp)
                     snmp_real_ips.add(sw.ip)
+                elif diag.get("reason") in _SNMP_ATTEMPTED_FAILURES:
+                    snmp_collect_failed += 1
+            if snmp_collect_failed:
+                progress.failed += snmp_collect_failed
+                logger.warning(
+                    "[Step1b] %d 台无 SSH 设备的 SNMP 真值采集未成功（已计入 failed）",
+                    snmp_collect_failed,
+                )
             if snmp_real_ips:
                 progress.completed = len(valid_ctxs)
                 logger.info(
@@ -479,16 +559,19 @@ class ScanOrchestrator:
 
             progress.current_phase = "phase0d_snmp_vlan"
             _emit_progress()
-            from app.services.switch_info_service import SwitchInfoService
-
+            snmp_synced = snmp_failed = 0
             for sw in [s for s in all_sw if not s.has_ssh]:
                 try:
                     with transaction_checkpoint(self.sw_repo.session, f"phase0d-snmp:{sw.id}"):
-                        svc = SwitchInfoService()
-                        svc.sync_vlan_members_via_channel(sw.id)
-                        svc.sync_lag_members_via_channel(sw.id)
+                        s_ok, s_bad = sync_snmp_capabilities(sw.id)
+                        snmp_synced += s_ok
+                        snmp_failed += s_bad
                 except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描，异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
-                    logger.error("[Phase0d-snmp] %s VLAN 成员同步失败: %s", sw.ip, e)
+                    snmp_failed += 1
+                    logger.error("[Phase0d-snmp] %s 通道同步整体失败: %s", sw.ip, e)
+            progress.snmp_synced += snmp_synced
+            progress.snmp_failed += snmp_failed
+            _emit_progress()
 
             progress.current_phase = "phase1b_topology_build"
             _emit_progress()
@@ -637,7 +720,11 @@ class ScanOrchestrator:
             _emit_progress()
             try:
                 with transaction_checkpoint(self.sw_repo.session, "phase7:supplement_detect"):
-                    from app.services.ip_status_service import fast_supplement_detect, SAFE_MAX_CONCURRENT
+                    from app.services.ip_status_service import (
+                        DEFAULT_TIMEOUT,
+                        SAFE_MAX_CONCURRENT,
+                        fast_supplement_detect,
+                    )
 
                     def _phase7_progress(probed: int, total: int):
                         progress.current_phase = f"phase7_supplement_detect:{probed}/{total}"
@@ -645,7 +732,7 @@ class ScanOrchestrator:
 
                     supplement_result = fast_supplement_detect(
                         scope, probe_ips_for_phase7, self.sw_repo.session,
-                        timeout=0.1, max_concurrent=SAFE_MAX_CONCURRENT,
+                        timeout=DEFAULT_TIMEOUT, max_concurrent=SAFE_MAX_CONCURRENT,
                         progress_callback=_phase7_progress,
                     )
                     if supplement_result.get("active_found", 0) > 0:
@@ -917,7 +1004,9 @@ class ScanOrchestrator:
                 else:
                     raise RuntimeError(f"采集 {sw.ip} 失败: {e}") from e
 
-    def _collect_single_via_snmp(self, sw: SwitchMeta) -> SwitchContext | None:
+    def _collect_single_via_snmp(
+        self, sw: SwitchMeta, *, diag: dict | None = None,
+    ) -> SwitchContext | None:
         """无 SSH 设备：用 SNMP 通道采 ARP / MAC（+ L3 的路由）构造等价上下文。
 
         **为什么是"造 ctx"而不是另写一份同步**：`full_scan` 与 `scan_switch` 的
@@ -937,6 +1026,14 @@ class ScanOrchestrator:
         确实没有邻居）时返回 ``None``，交回原路径（skipped → Phase 5 兜底）——
         空 ctx 会让 Phase 3/6 把该设备既有的定位记录清掉。
 
+        Args:
+            sw: 交换机元数据。
+            diag: 可选的诊断出参 —— 写入 ``{"reason": <str>}``，说明本次为何没有返回
+                ctx：``ok`` / ``empty``（设备确实没有该表，确定答案）/ ``collect_failed``
+                （声明了能力但采集失败）/ ``collect_error`` / ``assemble_error`` /
+                ``no_channel``（通道未开、设计内跳过）/ ``device_missing``。
+                调用方据此把「尝试过但失败」与「设计内跳过」分开记账；**不传行为不变**。
+
         Returns:
             SwitchContext（``has_ssh=False``）或 ``None``（本轮不接管定位数据）。
         """
@@ -944,8 +1041,13 @@ class ScanOrchestrator:
         from app.core.enums import CollectCapability
         from app.services.collector import runtime
 
+        def _mark(reason: str) -> None:
+            if diag is not None:
+                diag["reason"] = reason
+
         switch_obj = self.sw_repo.find_by_device_id(sw.id)
         if switch_obj is None:
+            _mark("device_missing")
             return None
         try:
             selector = runtime.selector_for(
@@ -953,9 +1055,11 @@ class ScanOrchestrator:
             )
         except Exception as exc:  # noqa: BLE001 —— 装配异常不得让扫描终局失败
             logger.warning("[SNMP-ctx] %s 通道装配失败，保持原路径: %s", sw.ip, exc)
+            _mark("assemble_error")
             return None
         if selector is None:
             logger.info("[SNMP-ctx] %s 无可用通道（开关未开/不在白名单），保持原路径", sw.ip)
+            _mark("no_channel")
             return None
 
         caps = [CollectCapability.ARP, CollectCapability.MAC]
@@ -965,11 +1069,19 @@ class ScanOrchestrator:
             facts = selector.collect(sw.id, caps)
         except Exception as exc:  # noqa: BLE001 —— 同上：采集异常走回退，不终局失败
             logger.warning("[SNMP-ctx] %s 通道采集异常，保持原路径: %s", sw.ip, exc)
+            _mark("collect_error")
             return None
 
         arp_rows = facts.arps or []
         mac_rows = facts.macs or []
         if not arp_rows and not mac_rows:
+            from app.services.collector.contract import CapabilityOutcome
+
+            failed_caps = [
+                k for k, v in (facts.outcomes or {}).items()
+                if v == CapabilityOutcome.FAILED
+            ]
+            _mark("collect_failed" if failed_caps else "empty")
             logger.info(
                 "[SNMP-ctx] %s 未采到真实 ARP/MAC，交回原路径（outcomes=%s）",
                 sw.ip,
@@ -1006,6 +1118,7 @@ class ScanOrchestrator:
             room_id=sw.room_id,
             scope=sw.scope,
         )
+        _mark("ok")
         logger.info(
             "[SNMP-ctx] %s 真实数据上下文就绪：ARP=%d MAC=%d 路由=%d"
             "（has_ssh=False，复用同一套落库 Phase）",
@@ -1030,6 +1143,9 @@ class ScanOrchestrator:
             "total_switches": progress.total_switches,
             "completed": progress.completed,
             "failed": progress.failed,
+            "status": _scan_status(progress),
+            "snmp_synced": progress.snmp_synced,
+            "snmp_failed": progress.snmp_failed,
             "elapsed_seconds": round(time.time() - progress.start_time, 1),
         }
 
@@ -1096,6 +1212,7 @@ class ScanOrchestrator:
         except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
             logger.error("[scan_switch] 交换机 %s 端口采集失败: %s", sw.ip, e)
 
+        snmp_synced = snmp_failed = 0
         if meta.has_ssh is False:
             try:
                 with transaction_checkpoint(
@@ -1110,13 +1227,12 @@ class ScanOrchestrator:
                 with transaction_checkpoint(
                     self.sw_repo.session, f"scan_switch:phase0d-snmp:{device_id}"
                 ):
-                    from app.services.switch_info_service import SwitchInfoService
-
-                    svc = SwitchInfoService()
-                    svc.sync_vlan_members_via_channel(sw.device_id)
-                    svc.sync_lag_members_via_channel(sw.device_id)
+                    s_ok, s_bad = sync_snmp_capabilities(sw.device_id)
+                    snmp_synced += s_ok
+                    snmp_failed += s_bad
             except Exception as e:  # noqa: BLE001 -- 同上：Phase 隔离
-                logger.error("[scan_switch] 交换机 %s SNMP VLAN 成员同步失败: %s", sw.ip, e)
+                snmp_failed += 1
+                logger.error("[scan_switch] 交换机 %s SNMP 通道同步整体失败: %s", sw.ip, e)
         elif meta.has_ssh:
             try:
                 with transaction_checkpoint(self.sw_repo.session, f"scan_switch:phase0b:{device_id}"):
@@ -1178,7 +1294,13 @@ class ScanOrchestrator:
         except Exception as e:  # noqa: BLE001 -- 扫描 Phase 隔离：单个 Phase 失败不得中断整轮扫描（后续 Phase 仍产出可用结果），异常来源涵盖 SSH/Redis/DB/接口调用，类型不可枚举
             logger.error("[scan_switch Phase7] 补充探测失败: %s", e)
 
-        return {"device_id": device_id, "ip": meta.ip, "context": ctx}
+        return {
+            "device_id": device_id,
+            "ip": meta.ip,
+            "context": ctx,
+            "snmp_synced": snmp_synced,
+            "snmp_failed": snmp_failed,
+        }
 
 
 

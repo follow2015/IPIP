@@ -21,3 +21,6 @@ export default function MonitorCredentialForm({ protocol, mode }: MonitorCredent
 }
 
 export * from './types';
+export { buildCredentialPayload } from './buildPayload';
+export { buildDefaultCredentialName } from './defaultName';
+export type { DefaultNameDevice } from './defaultName';

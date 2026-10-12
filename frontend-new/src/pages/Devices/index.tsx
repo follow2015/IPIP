@@ -14,8 +14,10 @@ import {
   ToolOutlined,
   EyeOutlined,
   WarningOutlined,
-  EyeInvisibleOutlined
+  EyeInvisibleOutlined,
+  MoreOutlined
 } from '@ant-design/icons';
+import { useResponsive } from '@/hooks/useResponsive';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import DataTable from '@/components/DataTable';
 import FilterBar from '@/components/FilterBar';
@@ -56,6 +58,7 @@ import { useTable } from '@/hooks/useTable';
 
 
 type ShowFor = (DeviceType | 'default')[] | undefined;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ColumnDef = any & { showFor?: ShowFor };
 
 function buildColumns(
@@ -391,6 +394,7 @@ function Devices() {
   const { token } = theme.useToken();
   const { t: tDevice } = useTranslation('device');
   const { t: tCommon } = useTranslation('common');
+  const { isMobile } = useResponsive();
   const table = useTable({ filterResets: DEVICE_FILTER_RESETS });
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -647,6 +651,14 @@ function Devices() {
 
   const rowSelection = batch.rowSelection;
 
+  const batchAddMenu = {
+    items: [
+      { key: 'batch', label: tDevice('batch.manualBatchAdd'), icon: <PlusOutlined /> },
+      { key: 'clone', label: tDevice('batch.cloneCopy'), icon: <ThunderboltOutlined /> }
+    ],
+    onClick: ({ key }: { key: string }) => openAddDevices(key as 'batch' | 'clone')
+  };
+
   const renderDeviceCard = (r: Device) => {
     const { Text } = Typography;
     const sub = r.device_subtype as DeviceSubtype | null;
@@ -768,22 +780,25 @@ function Devices() {
       ]}
       table={table}
       extra={
-        <>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            {tDevice('batch.addDevice')}
-          </Button>
-          <Dropdown
-            menu={{
-              items: [
-                { key: 'batch', label: tDevice('batch.manualBatchAdd'), icon: <PlusOutlined /> },
-                { key: 'clone', label: tDevice('batch.cloneCopy'), icon: <ThunderboltOutlined /> }
-              ],
-              onClick: ({ key }) => openAddDevices(key as 'batch' | 'clone')
-            }}
-          >
-            <Button icon={<ThunderboltOutlined />}>{tDevice('batch.batchAdd')}</Button>
-          </Dropdown>
-        </>
+        isMobile ? (
+          <>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              {tDevice('batch.addDevice')}
+            </Button>
+            <Dropdown menu={batchAddMenu}>
+              <Button icon={<MoreOutlined />} aria-label={tCommon('action.more')} />
+            </Dropdown>
+          </>
+        ) : (
+          <>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              {tDevice('batch.addDevice')}
+            </Button>
+            <Dropdown menu={batchAddMenu}>
+              <Button icon={<ThunderboltOutlined />}>{tDevice('batch.batchAdd')}</Button>
+            </Dropdown>
+          </>
+        )
       }
     />
   );

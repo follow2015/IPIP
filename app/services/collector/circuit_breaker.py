@@ -62,7 +62,13 @@ def _warn_circuit_degraded(op: str, exc: Exception) -> None:
 
 
 class CircuitStore(Protocol):
-    """熔断计数存储。抽成协议是为了让单测不必起 Redis。"""
+    """熔断计数存储。抽成协议是为了让单测不必起 Redis。
+
+    ``record_failure`` 返回值语义（2026-10-10 评审 P1 修复）：正常路径返回
+    累加后的计数（>0）；**计数不可用（如 Redis 降级）返回 -1 哨兵**。
+    调用方（Selector 半开补计数循环）依赖该哨兵终止循环——历史上降级返回
+    0 曾使 ``while count < threshold`` 恒真，采集线程死循环（第七轮 P1-1）。
+    """
 
     def failures(self, channel: str, device_id: int) -> int: ...
 
@@ -159,7 +165,7 @@ class RedisCircuitStore:
             return count
         except Exception as exc:  # noqa: BLE001 -- 熔断器写降级：同 141
             _warn_circuit_degraded("write", exc)
-            return 0
+            return -1
 
     def record_success(self, channel: str, device_id: int) -> None:
         try:

@@ -34,6 +34,7 @@ const Users = React.lazy(() => import('@/pages/Users'));
 const Profile = React.lazy(() => import('@/pages/Profile'));
 const RBAC = React.lazy(() => import('@/pages/RBAC'));
 const LoginLogs = React.lazy(() => import('@/pages/LoginLogs'));
+const SecurityCenter = React.lazy(() => import('@/pages/Security'));
 const VLANsPage = React.lazy(() => import('@/pages/VLANs'));
 const LinkAggregationsPage = React.lazy(() => import('@/pages/LinkAggregations'));
 const AuditLogsPage = React.lazy(() => import('@/pages/AuditLogs'));
@@ -137,6 +138,7 @@ export const routes: RouteObject[] = [
       { path: 'users', element: guarded('users', Users) },
       { path: 'profile', element: guarded('profile', Profile) },
       { path: 'rbac', element: guarded('rbac', RBAC) },
+      { path: 'security', element: guarded('security', SecurityCenter) },
       { path: 'login-logs', element: guarded('login-logs', LoginLogs) },
       { path: 'vlans', element: guarded('vlans', VLANsPage) },
       { path: 'link-aggregations', element: guarded('link-aggregations', LinkAggregationsPage) },

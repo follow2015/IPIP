@@ -51,12 +51,15 @@ from .decorators import (
     log_security_event,
 )
 from .manager import UnifiedLogManager, UnifiedLogger, get_logger, log_manager
+from .sanitize import DEFAULT_LOG_FIELD_MAX_LENGTH, sanitize_log_text
 
 __all__ = [
     'UnifiedLogManager',
     'UnifiedLogger',
     'log_manager',
     'get_logger',
+    'sanitize_log_text',
+    'DEFAULT_LOG_FIELD_MAX_LENGTH',
     
     'LoggingConfig',
     'JSONFormatter',

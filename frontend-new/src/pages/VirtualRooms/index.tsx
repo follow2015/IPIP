@@ -23,14 +23,17 @@ import {
   useVirtualRooms,
   useDeleteVirtualRoom,
   useScanVirtualRoom,
-  useVirtualRoomScanProgress
+  useVirtualRoomScanProgress,
+  virtualRoomKeys
 } from '@/services/virtual-room';
+import { useQueryClient } from '@tanstack/react-query';
 import type { VirtualRoom } from '@/types/models';
 import { useCrudPage } from '@/hooks/useCrudPage';
 import { formatDateTime } from '@/utils/format';
 import { useMessage } from '@/hooks/useMessage';
 import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
 import type { GlobalEvent } from '@/hooks/useGlobalEvents';
+import { useAsyncScan } from '@/hooks/useAsyncScan';
 import { useTranslation } from 'react-i18next';
 import { useMonitorConfig } from '../../services/monitor/status';
 
@@ -41,7 +44,6 @@ function VirtualRooms() {
   const confirm = useConfirm();
   const members = useDisclosure();
   const [membersRecord, setMembersRecord] = useState<VirtualRoom | null>(null);
-  const [scanningId, setScanningId] = useState<number | null>(null);
   const scanVirtualRoom = useScanVirtualRoom();
   const { data: monitorConfig } = useMonitorConfig();
   const snmpTakeoverActive = (() => {
@@ -49,6 +51,7 @@ function VirtualRooms() {
     return ['1', 'true', 'yes'].includes(v);
   })();
   const message = useMessage();
+  const queryClient = useQueryClient();
 
   const crud = useCrudPage<VirtualRoom>({
     useList: useVirtualRooms,
@@ -69,6 +72,10 @@ function VirtualRooms() {
     editRecord
   } = crud;
 
+  const { scanningId, beginScan, endScan } = useAsyncScan<number>({
+    onExpire: refetch
+  });
+
   useGlobalEventListener(
     useCallback(
       (event: GlobalEvent) => {
@@ -76,12 +83,12 @@ function VirtualRooms() {
           const payload = event.payload as Record<string, unknown>;
           const vrId = payload.virtual_room_id as number | undefined;
           if (vrId && scanningId === vrId) {
-            setScanningId(null);
+            endScan();
             refetch();
           }
         }
       },
-      [scanningId, refetch]
+      [scanningId, endScan, refetch]
     )
   );
 
@@ -94,10 +101,10 @@ function VirtualRooms() {
     if (scanProgress.phase === 'failed') {
       if (lastFailedRef.current === scanningId) return;
       lastFailedRef.current = scanningId;
-      setScanningId(null);
+      endScan();
       refetch();
     }
-  }, [scanProgress, scanningId, refetch]);
+  }, [scanProgress, scanningId, endScan, refetch]);
 
   const handleMembers = (record: VirtualRoom) => {
     setMembersRecord(record);
@@ -106,8 +113,9 @@ function VirtualRooms() {
 
   const handleScan = async (record: VirtualRoom) => {
     try {
+      queryClient.removeQueries({ queryKey: virtualRoomKeys.scanProgress(record.id) });
       await scanVirtualRoom.mutateAsync(record.id);
-      setScanningId(record.id);
+      beginScan(record.id);
       message.info(td('virtualRoom.message.scanSubmitted'));
     } catch (err: unknown) {
       const errorMsg =
@@ -213,8 +221,7 @@ function VirtualRooms() {
               type="link"
               size="small"
               icon={<ThunderboltOutlined />}
-              loading={scanningId === record.id}
-              disabled={scanningId !== null && scanningId !== record.id}
+              disabled={scanningId !== null}
               onClick={() =>
                 confirm({
                   title: td('virtualRoom.confirm.scanTitle'),
@@ -269,7 +276,7 @@ function VirtualRooms() {
         searchValue={table.search}
         onSearch={table.setSearch}
         onRefresh={() => {
-          setScanningId(null);
+          endScan();
           refetch();
         }}
         searchPlaceholder={td('virtualRoom.searchPlaceholder')}

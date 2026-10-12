@@ -40,7 +40,6 @@ context；无 context 时 provider 抛 ``RuntimeError`` → 落 ``FAILED``（明
 """
 from __future__ import annotations
 
-import logging
 import threading
 import time
 from typing import Any, ClassVar
@@ -57,8 +56,9 @@ from app.services.collector.credentials.snmp_credential import (
 from app.services.collector.facts import CollectedFacts
 from app.services.monitoring.adapters.snmp_adapter import _snmp_get_sysuptime
 from app.services.monitoring.snmp_port_collector import SnmpPortCollector
+from app.utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _PROBE_TIMEOUT_SECONDS = 5
 
@@ -69,25 +69,32 @@ _SNAPSHOT_KEYS_PORTS = (
     "ifHighSpeed", "ifAlias", "ifPhysAddress", "dot1qPvid",
     "ipAdEntIfIndex", "ipAdEntNetMask",
 )
-_SNAPSHOT_KEYS_ARPS = ("arpNetAddr", "arpPhysAddr", "arpIfIndex", "ifName")
+_SNAPSHOT_KEYS_ARPS = ("arpNetAddr", "arpPhysAddr", "arpIfIndex", "ifName", "ifDescr")
+_SNAPSHOT_KEYS_COUNTERS = (
+    "ifName", "ifDescr", "ifInErrors", "ifOutErrors", "ifInDiscards", "ifOutDiscards",
+)
 _SNAPSHOT_KEYS_MACS = (
-    "qFdbPort", "qFdbStatus", "dFdbPort", "dFdbStatus", "basePortIfIndex", "ifName",
+    "qFdbPort", "qFdbStatus", "dFdbPort", "dFdbStatus", "basePortIfIndex",
+    "ifName", "ifDescr",
 )
 _SNAPSHOT_KEYS_LLDP_LOCAL = ("lldpLocPortId",)
 _SNAPSHOT_KEYS_LLDP = (
     "lldpLocalPort", "lldpChassisId", "lldpPortId", "lldpSysName",
-    "lldpManAddr", "basePortIfIndex", "ifName",
+    "lldpManAddr", "basePortIfIndex", "ifName", "ifDescr",
 )
-_SNAPSHOT_KEYS_VLANS = ("vlanName", "vlanStaticEgress", "vlanCurrentEgress", "ifName")
+_SNAPSHOT_KEYS_VLANS = (
+    "vlanName", "vlanStaticEgress", "vlanCurrentEgress", "ifName", "ifDescr",
+)
 _SNAPSHOT_KEYS_LAGS = (
-    "ifName", "attachedAggID", "actorState", "partnerState",
+    "ifName", "ifDescr", "attachedAggID", "actorState", "partnerState",
     "ifHighSpeed", "ifOperStatus", "aggPortList", "ifStack",
 )
 _SNAPSHOT_KEYS_ROUTES = (
     "cidrDest", "cidrMask", "cidrNextHop", "cidrIfIndex", "cidrProto",
     "rDest", "rNextHop", "rType", "rProto", "rMask",
+    "ifName", "ifDescr",
 )
-_SNAPSHOT_KEYS_LOGICAL_PORTS = ("ifName",)
+_SNAPSHOT_KEYS_LOGICAL_PORTS = ("ifName", "ifDescr")
 _SNAPSHOT_KEYS_DEVICE_INFO = (
     "sysDescr", "sysName", "sysUpTime", "entClass", "entSerial", "entName",
     "sysObjectID", "entModelName", "entClass2",
@@ -398,6 +405,36 @@ class SnmpChannel(BaseChannel):
             "加入 SNMP v3 读视图",
             device_id, lags[:5],
         )
+
+    @implements(CollectCapability.COUNTERS, QualityLevel.PARTIAL)
+    def collect_error_counters(self, device_id: int,
+                               timeout: float | None = None) -> list[dict]:
+        """端口错包 / 丢弃计数（IF-MIB ifTable，一次 walk 采全）。
+
+        范围**刻意收窄**到 errors 与 discards 四项：它们是定位物理层问题
+        （光衰 / 线缆 / MTU / 双工）最常用的信号，而**监控侧内置模板里没有**
+        （默认种子只有 temperature / port_updown / disk / raid 那批，要用户手动加
+        模板才有）—— 扫描即带出，不依赖有没有配监控。
+
+        PARTIAL 的依据：**不含流量速率**。ifHC*Octets 是累计计数，单次采集只能拿
+        累计值，算速率要两次采样求差；监控侧已有内置模板 `if_utilization`
+        （64 位差分、60s 轮询、阈值 80/95）且前端已展示 —— 通道层再做一遍就是
+        两套口径。
+
+        四项均为 Counter32 **累计值**（RFC 1158），`None` = 设备没上报该列。
+        """
+        cred = self._require_credential(device_id)
+        ip = self._require_management_ip(device_id)
+        payload, _version = cred.to_adapter_payload()
+        snmp_timeout = (
+            int(timeout) if timeout is not None else _DEFAULT_COLLECT_TIMEOUT_SECONDS
+        )
+        raw = self._snapshot_raw(
+            device_id, payload, ip, _SNAPSHOT_KEYS_COUNTERS, snmp_timeout,
+        )
+        rows = snmp_tables.collect_error_counters(payload, ip, snmp_timeout, raw=raw)
+        self._remember_security(device_id, cred)
+        return rows
 
     @implements(CollectCapability.ROUTES, QualityLevel.PARTIAL)
     def collect_routes(self, device_id: int, timeout: float | None = None) -> list[dict]:

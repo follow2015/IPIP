@@ -31,7 +31,7 @@ from collections import deque
 from flask import Blueprint, request
 
 from app.openapi.doc import public
-from app.utils.logging import get_logger
+from app.utils.logging import get_logger, sanitize_log_text
 
 logger = get_logger(__name__)
 
@@ -79,9 +79,9 @@ def csp_report():
     entry = report.get("csp-report", report)  # reports+json 顶层无 "csp-report" 包裹
     logger.warning(
         "CSP 违规上报: document-uri=%s violated-directive=%s blocked-uri=%s source-file=%s",
-        str(entry.get("document-uri", "?"))[:200],
-        str(entry.get("violated-directive", "?"))[:100],
-        str(entry.get("blocked-uri", "?"))[:200],
-        str(entry.get("source-file", "?"))[:200],
+        sanitize_log_text(entry.get("document-uri", "?"), 200),
+        sanitize_log_text(entry.get("violated-directive", "?"), 100),
+        sanitize_log_text(entry.get("blocked-uri", "?"), 200),
+        sanitize_log_text(entry.get("source-file", "?"), 200),
     )
     return "", 204

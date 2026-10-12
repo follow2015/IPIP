@@ -468,6 +468,48 @@ def scan_network():
     app_ref = current_app._get_current_object()
     user_id = g.current_user["user_id"] if hasattr(g, 'current_user') else None
 
+    scan_scope = f"net:{room_id}:{network_str}"
+
+    _sr = None
+    try:
+        from app.services.scan_redis import ScanRedis, get_scan_redis_client
+
+        _redis = get_scan_redis_client()
+        if _redis:
+            _sr = ScanRedis(_redis)
+            existing = _sr.progress_get(scan_scope)
+            if existing:
+                _phase = existing.get("phase")
+                _total = existing.get("total", 0)
+                _completed = existing.get("completed", 0)
+                _busy = _phase not in ("完成", "failed") and not (
+                    _total > 0 and _completed >= _total
+                )
+                if _busy:
+                    stale, reason = _sr.progress_is_stale(scan_scope)
+                    if stale:
+                        _sr.progress_mark_stale_failed(scan_scope, reason)
+                        logger.warning(
+                            "网段扫描僵死，已置 failed 并放行新扫描: %s, reason=%s",
+                            scan_scope, reason,
+                        )
+                    else:
+                        return APIResponse.error(
+                            "该网段正在扫描中", error_code="SCAN_RUNNING", status_code=400
+                        )
+            _sr.progress_set(scan_scope, {
+                "scope": scan_scope,
+                "room_id": room_id,
+                "total": 0,
+                "completed": 0,
+                "failed": 0,
+                "phase": "准备中",
+                "elapsed_seconds": 0,
+                "eta_seconds": 0,
+            })
+    except Exception:
+        logger.warning("网段扫描重入保护检查失败: %s", scan_scope, exc_info=True)
+
     def _async_scan():
         """后台执行网段扫描"""
         try:
@@ -477,6 +519,20 @@ def scan_network():
                 from extensions import db
                 db.session.commit()
                 logger.info("异步网段扫描完成: %s (room=%d)", network_str, room_id)
+                if _sr:
+                    try:
+                        _sr.progress_set(scan_scope, {
+                            "scope": scan_scope,
+                            "room_id": room_id,
+                            "total": 0,
+                            "completed": 0,
+                            "failed": 0,
+                            "phase": "完成",
+                            "elapsed_seconds": 0,
+                            "eta_seconds": 0,
+                        })
+                    except Exception:
+                        logger.warning("写入网段扫描完成态失败: %s", scan_scope, exc_info=True)
                 try:
                     from app.services.switch_events import emit_global_event
                     emit_global_event("ip_scan_complete", {
@@ -504,6 +560,20 @@ def scan_network():
                     logger.exception("IP扫描完成通知创建失败")
         except Exception as e:  # noqa: BLE001 -- 后台异步任务顶层兜底：线程内异常无人接收，必须捕获并转为前端通知/清理锁
             logger.error("异步网段扫描失败: %s (room=%d): %s", network_str, room_id, e)
+            if _sr:
+                try:
+                    _sr.progress_set(scan_scope, {
+                        "scope": scan_scope,
+                        "room_id": room_id,
+                        "total": 0,
+                        "completed": 0,
+                        "failed": 1,
+                        "phase": "failed",
+                        "elapsed_seconds": 0,
+                        "eta_seconds": 0,
+                    })
+                except Exception:
+                    logger.warning("写入网段扫描失败态失败: %s", scan_scope, exc_info=True)
             try:
                 with app_ref.app_context():
                     from app.services.switch_events import emit_global_event

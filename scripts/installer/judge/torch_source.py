@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from urllib.parse import unquote
 
-from .download import ProbeResult, available, probe
+from .download import ProbeResult, probe
 
 __all__ = [
     "wheel_filenames",
@@ -46,11 +46,11 @@ def wheel_filenames(index_url: str, *, package: str = "torch", timeout: float = 
     返回原始形态（含 ``%2B``）而不是解码后的字符串，因为要直接拼回 URL：
     解码后再拼会把 ``+`` 变成空格语义，导致 404。
     """
-    import urllib.request
+    from .._http import open_url
 
     url = index_url.rstrip("/") + "/" + package + "/"
-    req = urllib.request.Request(url, headers={"User-Agent": "ipip-installer/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with open_url(url, timeout=timeout,
+                  headers={"User-Agent": "ipip-installer/1.0"}) as resp:
         html = resp.read().decode("utf-8", "ignore")
 
     names: list[str] = []
@@ -126,7 +126,7 @@ def select_cpu_index(
 
         try:
             names = wheel_filenames(index, timeout=timeout)
-        except Exception as e:  # 索引拉取失败不能中断整体择优
+        except Exception as e:  # noqa: BLE001 —— 索引拉取失败不能中断整体择优（原因进报告）
             report.append((index, ProbeResult(index, False, reason=f"索引拉取失败: {e}")))
             continue
 

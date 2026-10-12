@@ -63,7 +63,17 @@
     "column": {
       "usageStatus": "占用状态",
       "linkStatus": "链路状态",
-      "ipAddress": "IP地址"
+      "ipAddress": "IP地址",
+      "errorCounters": "错包/丢弃"
+    },
+    "counters": {
+      "inErrors": "入向错包",
+      "outErrors": "出向错包",
+      "inDiscards": "入向丢弃",
+      "outDiscards": "出向丢弃",
+      "sampledAt": "采样时间",
+      "notCollected": "设备未上报",
+      "hint": "Counter32 累计值"
     },
     "ipRole": {
       "primary": "主",
@@ -294,13 +304,14 @@
     "linkExistingTitle": "关联已有共享凭据",
     "protocolExclusive": "协议互斥",
     "protocolExclusiveDesc": "每台设备同一时刻只能使用一种监控协议。关联新协议凭据将自动解除本机 {{protocols}} 协议的关联。",
-    "protocolExclusiveDescCreate": "每台设备同一时刻只能使用一种监控协议。新建并关联不同协议的凭据将自动解除本机 {{protocols}} 协议的关联。",
+    "protocolExclusiveDescCreate": "每台设备同一时刻只能使用一种监控协议。新建并关联不同协议的凭据将自动解除本机 {{protocols}} 协议的关联，并清除本机的指标模板组绑定与指标最新值。",
     "selectShared": "选择共享凭据",
     "noAvailable": "无可关联凭据",
     "sharedOption": "[{{protocol}}] {{name}}（已关联 {{count}} 台）",
     "linkThisDevice": "关联本机",
-    "createAndLinkTitle": "新建共享凭据并关联本机",
-    "createAndLink": "新建并关联",
+    "createAndLinkTitle": "为本设备新建凭据并绑定",
+    "createAndLink": "新建并绑定",
+    "deviceScopedHint": "仅影响本设备：新建的凭据只绑定到本机，不会改动其它设备。如需修改一条被多台设备共用的凭据，请到「监控中心 → 凭据管理」用「编辑密文」。",
     "editSecretTitle": "编辑本机凭据密文（{{protocol}}）",
     "onlyThisDevice": "仅影响本设备",
     "onlyThisDeviceDesc": "该凭据可能被其它设备共享；本次编辑只迁移本设备到独立凭据行，不影响其它设备。",
@@ -855,8 +866,8 @@
     "configCredential": "配置凭据",
     "config": "配置",
     "skip": "跳过",
-    "credentialHint": "将为所有选中设备配置相同的监控凭据（共享凭据模式）",
-    "credentialNameOptional": "凭据名称（可选）",
+    "credentialHint": "为选中的每台设备绑定该凭据（设备级，不影响未选中的设备）。若所选协议与设备当前协议不同，将解除其原协议关联，并清除该设备的指标模板组绑定与指标最新值。",
+    "credentialName": "凭据名称",
     "skipCredentialHint": "跳过凭据配置，仅修改监控开关状态",
     "configGroup": "配置指标模板组",
     "groupHint": "为所有选中设备绑定统一的指标模板组；不选择模板组则保持自动匹配规则",

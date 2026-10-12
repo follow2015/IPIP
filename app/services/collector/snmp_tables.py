@@ -26,17 +26,29 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.monitoring.adapters.snmp_adapter import _snmp_collect_metrics
+from app.utils.logging import get_logger
 
 __all__ = [
     "IP_NET_TO_MEDIA_PREFIX",
-    "collect_device_info_entry",
-    "enrich_device_identity",
-    "collect_logical_port_names",
-    "collect_route_entries",
-    "collect_lldp_entries",
+    "walk_tables",
     "collect_arp_entries",
     "collect_mac_entries",
+    "parse_lldp_man_addr_index",
+    "collect_lldp_local_port_count",
+    "collect_lldp_entries",
+    "collect_device_info_entry",
+    "collect_route_entries",
+    "collect_logical_port_names",
+    "enrich_device_identity",
+    "parse_vlan_port_bitmap",
+    "collect_vlan_entries",
+    "parse_lacp_state",
+    "collect_lag_entries",
+    "collect_error_counters",
+    "SNAPSHOT_TABLES",
 ]
+
+logger = get_logger(__name__)
 
 IP_NET_TO_MEDIA_PREFIX = "1.3.6.1.2.1.4.22.1"
 _IP_NET_IF_INDEX_OID = f"{IP_NET_TO_MEDIA_PREFIX}.1"     # ipNetToMediaIfIndex
@@ -49,6 +61,7 @@ _DOT1D_TP_FDB_PORT_OID = "1.3.6.1.2.1.17.4.3.1.2"        # 索引 = MAC，值 = 
 _DOT1D_TP_FDB_STATUS_OID = "1.3.6.1.2.1.17.4.3.1.3"
 _DOT1D_BASE_PORT_IF_INDEX_OID = "1.3.6.1.2.1.17.1.4.1.2"  # 索引 = bridge port，值 = ifIndex
 _IF_NAME_OID = "1.3.6.1.2.1.31.1.1.1.1"                   # ifIndex → 端口名
+_IF_DESCR_OID = "1.3.6.1.2.1.2.2.1.2"                     # ifIndex → 端口描述/名
 
 _FDB_STATUS_MAP = {
     "1": "static",     # other
@@ -100,21 +113,39 @@ def _resolve_raw(credential: dict, ip: str, templates: list, timeout: int,
 
 
 def _ifindex_from(raw: dict) -> dict:
-    """``raw["ifName"]`` → ``{ifIndex: 端口名}``（纯转换，零触网，注入路径复用）。"""
-    return {
-        str(k): str(v).strip()
-        for k, v in (raw.get("ifName") or {}).items() if str(v).strip()
-    }
+    """``raw`` 里的 ifDescr / ifName 两张表 → ``{ifIndex: 端口名}``（纯转换，零触网）。
+
+    口径必须与 **PORTS**（``snmp_port_collector.collect`` 的 ``name_table``）
+    逐字一致：``ifDescr`` 打底、``ifName`` 覆盖（不另行归一化，理由见下）。
+
+    [WARN] 2026-10-11 修：此前这里**只认 ifName**，而 PORTS 是 ifDescr∪ifName ⇒
+    同一台设备两处产出**两个名字**（华为部分形态 ifName 给缩写 ``GE0/0/1``、
+    ifDescr 给全称 ``GigabitEthernet0/0/1``），下游按端口名匹配时整片对不上；
+    设备不实现 ifXTable 时这里直接返回**空 dict** ⇒ ARP/MAC 的 interface/port
+    全空、VLAN 成员为空、逻辑端口名筛不到（vlans / link_aggregation_groups
+    基础记录建不出来）、错包计数因匹配不到端口而一条都写不进库。
+    这就是用户实测「SNMP 与 SSH 数据差很多」的放大器 —— 7 个调用方共用这一处。
+    """
+    merged: dict[str, str] = {}
+    for key in ("ifDescr", "ifName"):          # 顺序即优先级：后者覆盖前者
+        for k, v in (raw.get(key) or {}).items():
+            text = str(v).strip()
+            if text:
+                merged[str(k)] = text
+    return merged
 
 
 def _ifindex_to_port(credential: dict, ip: str, timeout: int,
                      raw: dict[str, dict] | None = None) -> dict:
-    """ifIndex → 端口名（ARP 的 interface / MAC 的 port 都要用）。
+    """ifIndex → 端口名（ARP/MAC/VLAN/LAG/路由/逻辑端口名共用）。
 
-    ``raw`` 提供且含 ``ifName`` 键（哪怕空）⇒ 零触网；缺键则只补 walk 这一张表。
+    ``raw`` 已含 ifDescr **且** ifName 键 ⇒ 零触网；缺哪个只补 walk 缺的那张
+    （``_resolve_raw`` 语义）。只补一张表在快照未覆盖时多一次 walk，故各能力的
+    快照键已同步带上 ``ifDescr``（见 snmp_channel._SNAPSHOT_KEYS_*）。
     """
     return _ifindex_from(_resolve_raw(credential, ip, [
         {"metric_key": "ifName", "oid": _IF_NAME_OID},
+        {"metric_key": "ifDescr", "oid": _IF_DESCR_OID},
     ], timeout, raw))
 
 
@@ -700,10 +731,12 @@ def collect_logical_port_names(credential: dict, ip: str,
     `_sync_vlan_trunk_bases` 正是靠**端口名**建 vlans / link_aggregation_groups
     基础记录的。逻辑端口名只需再筛一次 ifName 表（walk 已有开销，这里不新增请求）。
 
-    判据复用：正则直接引自 `switch_info_service.VLAN_PORT_NAME_RE` /
-    `LAG_PORT_NAME_RE` —— 与 CLI 路径同一份，不抄第二份。
+    判据复用：正则直接引自 ``app.utils.port_name_utils`` 的 ``VLAN_PORT_NAME_RE`` /
+    ``LAG_PORT_NAME_RE`` —— 与 CLI 路径同一份，不抄第二份。放 utils 叶子层（而非
+    服务层）是为了让通道层**不反向依赖** ``switch_info_service``（ADR-004 分层边界，
+    见 ``tests/test_collector_boundary_guard.py`` B3）。
     """
-    from app.services.switch_info_service import (
+    from app.utils.port_name_utils import (
         LAG_PORT_NAME_RE,
         VLAN_PORT_NAME_RE,
     )
@@ -791,9 +824,7 @@ def parse_vlan_port_bitmap(value: Any) -> list[int]:
     try:
         raw = bytes.fromhex(text)
     except ValueError:
-        import logging
-
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "VLAN 端口位图无法解析（非 hex 形态）: %r", str(value)[:48]
         )
         return []
@@ -938,6 +969,7 @@ def collect_lag_entries(credential: dict, ip: str,
     timeout = int(timeout or 0) or None
     raw = _resolve_raw(credential, ip, [
         {"metric_key": "ifName", "oid": _IF_NAME_OID},
+        {"metric_key": "ifDescr", "oid": _IF_DESCR_OID},
         {"metric_key": "attachedAggID", "oid": _DOT3AD_AGG_PORT_ATTACHED_AGG_ID_OID},
         {"metric_key": "actorState", "oid": _DOT3AD_AGG_PORT_ACTOR_OPER_STATE_OID},
         {"metric_key": "partnerState", "oid": _DOT3AD_AGG_PORT_PARTNER_OPER_STATE_OID},
@@ -949,10 +981,9 @@ def collect_lag_entries(credential: dict, ip: str,
     attached = raw.get("attachedAggID") or {}
     port_list = raw.get("aggPortList") or {}
 
-    names = {str(k): str(v).strip()
-             for k, v in (raw.get("ifName") or {}).items() if str(v).strip()}
+    names = _ifindex_from(raw)
     actor = raw.get("actorState") or {}
-    from app.services.switch_info_service import LAG_PORT_NAME_RE
+    from app.utils.port_name_utils import LAG_PORT_NAME_RE
 
     has_lag_port = any(LAG_PORT_NAME_RE.match(v) for v in names.values())
     if not attached and not port_list and not has_lag_port:
@@ -1043,8 +1074,61 @@ def collect_lag_entries(credential: dict, ip: str,
 
 
 
+_IF_IN_DISCARDS_OID = "1.3.6.1.2.1.2.2.1.13"    # ifInDiscards 入向丢弃
+_IF_IN_ERRORS_OID = "1.3.6.1.2.1.2.2.1.14"      # ifInErrors   入向错包
+_IF_OUT_DISCARDS_OID = "1.3.6.1.2.1.2.2.1.19"   # ifOutDiscards 出向丢弃
+_IF_OUT_ERRORS_OID = "1.3.6.1.2.1.2.2.1.20"     # ifOutErrors   出向错包
+
+
+def _as_counter(value: Any) -> int | None:
+    """计数列 → int。设备没上报/非数字 ⇒ ``None``（**宁缺勿错**：0 留给"确实为 0"）。"""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def collect_error_counters(credential: dict, ip: str, timeout: int | None = None,
+                           raw: dict[str, dict] | None = None) -> list[dict]:
+    """端口错包 / 丢弃计数（IF-MIB ifTable，一次 walk 采全）。
+
+    返回每行：``{"if_index", "port", "in_errors", "out_errors",
+    "in_discards", "out_discards"}``，四项均为 **Counter32 累计值**（RFC 1158），
+    ``None`` 表示设备没上报这一列。
+
+    为什么收窄到这四项：速率由监控侧差分负责（见上），这里只补**监控侧默认模板
+    里没有**、却又最常用来定位物理层问题（光衰 / 线缆 / MTU / 双工）的错包与丢弃。
+    """
+    timeout = int(timeout or 0) or None
+    got = _resolve_raw(credential, ip, [
+        {"metric_key": "ifName", "oid": _IF_NAME_OID},
+        {"metric_key": "ifDescr", "oid": _IF_DESCR_OID},
+        {"metric_key": "ifInDiscards", "oid": _IF_IN_DISCARDS_OID},
+        {"metric_key": "ifInErrors", "oid": _IF_IN_ERRORS_OID},
+        {"metric_key": "ifOutDiscards", "oid": _IF_OUT_DISCARDS_OID},
+        {"metric_key": "ifOutErrors", "oid": _IF_OUT_ERRORS_OID},
+    ], timeout or 10, raw)
+
+    names = _ifindex_from(got)
+    rows: list[dict] = []
+    for idx, port in sorted(names.items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 0):
+        rows.append({
+            "if_index": int(idx) if idx.isdigit() else None,
+            "port": port,
+            "in_errors": _as_counter((got.get("ifInErrors") or {}).get(idx)),
+            "out_errors": _as_counter((got.get("ifOutErrors") or {}).get(idx)),
+            "in_discards": _as_counter((got.get("ifInDiscards") or {}).get(idx)),
+            "out_discards": _as_counter((got.get("ifOutDiscards") or {}).get(idx)),
+        })
+    return rows
+
+
 SNAPSHOT_TABLES: tuple[dict, ...] = (
     {"metric_key": "ifName", "oid": _IF_NAME_OID},
+    {"metric_key": "ifDescr", "oid": _IF_DESCR_OID},
     {"metric_key": "arpIfIndex", "oid": _IP_NET_IF_INDEX_OID, "full_index": True},
     {"metric_key": "arpPhysAddr", "oid": _IP_NET_PHYS_ADDR_OID, "full_index": True},
     {"metric_key": "arpNetAddr", "oid": _IP_NET_NET_ADDR_OID, "full_index": True},
@@ -1079,6 +1163,10 @@ SNAPSHOT_TABLES: tuple[dict, ...] = (
     {"metric_key": "rType", "oid": _IP_ROUTE_TYPE_OID, "full_index": True},
     {"metric_key": "rProto", "oid": _IP_ROUTE_PROTO_OID, "full_index": True},
     {"metric_key": "rMask", "oid": _IP_ROUTE_MASK_OID, "full_index": True},
+    {"metric_key": "ifInErrors", "oid": _IF_IN_ERRORS_OID},
+    {"metric_key": "ifOutErrors", "oid": _IF_OUT_ERRORS_OID},
+    {"metric_key": "ifInDiscards", "oid": _IF_IN_DISCARDS_OID},
+    {"metric_key": "ifOutDiscards", "oid": _IF_OUT_DISCARDS_OID},
     {"metric_key": "sysDescr", "oid": _SYS_DESCR_OID},
     {"metric_key": "sysName", "oid": _SYS_NAME_OID},
     {"metric_key": "sysUpTime", "oid": _SYS_UPTIME_OID},

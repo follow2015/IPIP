@@ -62,6 +62,8 @@ from app.models.rbac import Permission, Role, RolePermission, UserRole
 from app.models.room import Room
 from app.models.room_channel import RoomChannel
 from app.models.room_layout_marker import RoomLayoutMarker
+from app.models.security_finding import SecurityFinding
+from app.models.security_policy import SecurityPolicy
 from app.models.switch_credentials import IPSwitchInfo, SwitchCredentials, SwitchPortIP, SwitchStatusCache
 from app.models.switch_route import IPNetwork, SwitchRoute
 from app.models.ticket import Ticket, TicketCiLink, TicketExternalBinding, UserExternalBinding
@@ -140,6 +142,8 @@ __all__ = [
     "Room",
     "RoomChannel",
     "RoomLayoutMarker",
+    "SecurityFinding",
+    "SecurityPolicy",
     "SwitchCredentials",
     "SwitchPortIP",
     "SwitchRoute",

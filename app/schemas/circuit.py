@@ -11,6 +11,7 @@ validator 看不到兄弟字段。
 """
 from marshmallow import EXCLUDE, Schema, ValidationError, fields, validate, validates_schema
 
+from app.core.batch_limits import MAX_BATCH_ITEMS
 from app.core.enums import (
     BANDWIDTH_STEP_IEC,
     BANDWIDTH_STEP_SI,
@@ -175,13 +176,17 @@ class CircuitSegmentsReplaceSchema(Schema):
 
     只提供"整批替换"一种写形态（设计文档 §5.3 决策）：有序序列的逐条 CRUD
     会产生序号空洞与重复中间态。
+
+    条数上限引用 ``MAX_BATCH_ITEMS``（2026-10-10 评审）：与 room/cabinet 批量
+    端点同一把尺子，单一真源在 ``app/core/batch_limits``——此前硬编码 200，
+    上限调整时会与其它批量端点漂移。
     """
 
     class Meta:
         unknown = EXCLUDE
 
     segments = fields.List(
-        fields.Nested(CircuitSegmentItemSchema), required=True, validate=validate.Length(max=200)
+        fields.Nested(CircuitSegmentItemSchema), required=True, validate=validate.Length(max=MAX_BATCH_ITEMS)
     )
 
 

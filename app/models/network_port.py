@@ -70,6 +70,12 @@ class NetworkPort(BaseModel):
         comment="LAG成员：所属LAG组ID，NULL=非LAG成员端口",
     )
 
+    in_errors = db.Column(db.BigInteger, comment="入向错包累计（ifInErrors）")
+    out_errors = db.Column(db.BigInteger, comment="出向错包累计（ifOutErrors）")
+    in_discards = db.Column(db.BigInteger, comment="入向丢弃累计（ifInDiscards）")
+    out_discards = db.Column(db.BigInteger, comment="出向丢弃累计（ifOutDiscards）")
+    error_counters_at = db.Column(DateTime, comment="错包/丢弃计数的最近完整采样时间")
+
     device = relationship("Device", foreign_keys=[device_id])
     connection = relationship(
         "DeviceConnection",
@@ -86,7 +92,10 @@ class NetworkPort(BaseModel):
 
     PROTECTED_FIELDS = set()
 
-    LOGICAL_PORT_KEYWORDS = {"trunk", "eth-trunk", "port-channel", "vlanif", "loopback", "vlan", "nve", "tunnel"}
+    LOGICAL_PORT_KEYWORDS = {
+        "trunk", "eth-trunk", "port-channel", "vlanif", "loopback", "vlan", "nve", "tunnel",
+        "bridge-aggregation",
+    }
 
     @staticmethod
     def normalize_raw_info(value):

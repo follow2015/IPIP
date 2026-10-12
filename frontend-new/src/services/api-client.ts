@@ -240,6 +240,7 @@ function handleUnauthorized(): void {
         router.navigate('/login');
       })
       .catch(() => {
+        // eslint-disable-next-line no-restricted-globals
         window.location.href = '/login';
       });
   });

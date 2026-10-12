@@ -14,7 +14,7 @@ from sqlalchemy import update, delete, or_, func, text, bindparam
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, contains_eager
 
-from app.exceptions.data_access import QueryExecutionError
+from app.exceptions.data_access import DataAccessError, QueryExecutionError
 
 from app.persistence.base import BaseRepository
 from app.core.pagination_limits import ensure_offset_within_limit
@@ -1165,17 +1165,15 @@ class SwitchRepository(BaseRepository):
             VLAN.vlan_id == vlan_id,
         ).first()
         if not row:
-            row = VLAN(
-                device_id=device_id,
-                vlan_id=vlan_id,
-                name=port,
-            )
+            from app.persistence.vlan_repository import VLANRepository
+            from app.services.vlan_service import VLANService
+
             try:
-                nested = self.session.begin_nested()
-                self.session.add(row)
-                self.session.flush()
-                nested.commit()
-            except IntegrityError:
+                with self.session.begin_nested():
+                    row = VLANService(VLANRepository(self.session)).ensure_vlan(
+                        device_id, vlan_id, name=port,
+                    )
+            except (IntegrityError, DataAccessError):
                 row = self.session.query(VLAN).filter(
                     VLAN.device_id == device_id,
                     VLAN.vlan_id == vlan_id,
@@ -1221,14 +1219,23 @@ class SwitchRepository(BaseRepository):
             LinkAggregationGroup.lag_name == port,
         ).first()
         if not row:
-            row = LinkAggregationGroup(
-                device_id=device_id,
-                lag_name=port,
-                member_count=0,
-                purpose='',
-            )
-            self.session.add(row)
-            self.session.flush()
+            try:
+                with self.session.begin_nested():
+                    row = LinkAggregationGroup(
+                        device_id=device_id,
+                        lag_name=port,
+                        member_count=0,
+                        purpose='',
+                    )
+                    self.session.add(row)
+                    self.session.flush()
+            except IntegrityError:
+                row = self.session.query(LinkAggregationGroup).filter(
+                    LinkAggregationGroup.device_id == device_id,
+                    LinkAggregationGroup.lag_name == port,
+                ).first()
+                if not row:
+                    raise  # 非预期：冲突后仍找不到，重新抛出
 
         self.session.query(NetworkPort).filter(
             NetworkPort.device_id == device_id,

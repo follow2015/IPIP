@@ -1,5 +1,12 @@
-import { Space, Button } from 'antd';
-import { StopOutlined, ExportOutlined, BarChartOutlined, SearchOutlined } from '@ant-design/icons';
+import { Space, Button, Dropdown } from 'antd';
+import {
+  StopOutlined,
+  ExportOutlined,
+  BarChartOutlined,
+  SearchOutlined,
+  MoreOutlined
+} from '@ant-design/icons';
+import { useResponsive } from '@/hooks/useResponsive';
 import FilterBar from '@/components/FilterBar';
 import type { SelectOption } from '@/services';
 import type { UseTableReturn } from '@/hooks/useTable';
@@ -11,7 +18,7 @@ interface IPTableToolbarProps {
   roomOptions: SelectOption[];
   customerOptions: SelectOption[];
   switchOptions: SelectOption[];
-  scanNetworkPending: boolean;
+  scanNetworkDisabled: boolean;
   onOpenBatchBan: () => void;
   onOpenStats: () => void;
   onExport: () => void;
@@ -21,12 +28,14 @@ interface IPTableToolbarProps {
 export function IPTableToolbar(props: IPTableToolbarProps) {
   const { t: td } = useTranslation('device');
   const { t } = useTranslation('network');
+  const { t: tc } = useTranslation('common');
+  const { isMobile } = useResponsive();
   const {
     table,
     roomOptions,
     customerOptions,
     switchOptions,
-    scanNetworkPending,
+    scanNetworkDisabled,
     onOpenBatchBan,
     onOpenStats,
     onExport,
@@ -68,20 +77,62 @@ export function IPTableToolbar(props: IPTableToolbarProps) {
         ]}
         table={table}
         extra={
-          <>
-            <Button icon={<ExportOutlined />} onClick={onExport}>
-              {t('ip.action.exportCsv')}
-            </Button>
-            <Button icon={<StopOutlined />} danger onClick={onOpenBatchBan}>
-              {t('ip.action.batchBan')}
-            </Button>
-            <Button icon={<BarChartOutlined />} onClick={onOpenStats}>
-              {t('ip.action.stats')}
-            </Button>
-            <Button icon={<SearchOutlined />} onClick={onScanNetwork} loading={scanNetworkPending}>
-              {t('ip.action.scanNetwork')}
-            </Button>
-          </>
+          isMobile ? (
+            <>
+              <Button
+                icon={<SearchOutlined />}
+                onClick={onScanNetwork}
+                disabled={scanNetworkDisabled}
+              >
+                {t('ip.action.scanNetwork')}
+              </Button>
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'export',
+                      icon: <ExportOutlined />,
+                      label: t('ip.action.exportCsv'),
+                      onClick: onExport
+                    },
+                    {
+                      key: 'ban',
+                      icon: <StopOutlined />,
+                      label: t('ip.action.batchBan'),
+                      onClick: onOpenBatchBan
+                    },
+                    {
+                      key: 'stats',
+                      icon: <BarChartOutlined />,
+                      label: t('ip.action.stats'),
+                      onClick: onOpenStats
+                    }
+                  ]
+                }}
+              >
+                <Button icon={<MoreOutlined />} aria-label={tc('action.more')} />
+              </Dropdown>
+            </>
+          ) : (
+            <>
+              <Button icon={<ExportOutlined />} onClick={onExport}>
+                {t('ip.action.exportCsv')}
+              </Button>
+              <Button icon={<StopOutlined />} danger onClick={onOpenBatchBan}>
+                {t('ip.action.batchBan')}
+              </Button>
+              <Button icon={<BarChartOutlined />} onClick={onOpenStats}>
+                {t('ip.action.stats')}
+              </Button>
+              <Button
+                icon={<SearchOutlined />}
+                onClick={onScanNetwork}
+                disabled={scanNetworkDisabled}
+              >
+                {t('ip.action.scanNetwork')}
+              </Button>
+            </>
+          )
         }
       />
     </Space>

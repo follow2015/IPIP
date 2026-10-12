@@ -79,8 +79,10 @@ export function useG6Graph({
         graphRef.current?.fitView();
       }
     };
+    // eslint-disable-next-line no-restricted-globals
     window.addEventListener('keydown', handleKey);
     return () => {
+      // eslint-disable-next-line no-restricted-globals
       window.removeEventListener('keydown', handleKey);
     };
   }, []);

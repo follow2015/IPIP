@@ -20,15 +20,42 @@ from app.services.collector.cli_device_info import (
 )
 from app.services.collector.facts_adapter import legacy_trace
 from app.services.port_rows import build_port_rows
+from app.utils.port_name_utils import LAG_PORT_NAME_RE, VLAN_PORT_NAME_RE
 
 logger = get_logger(__name__)
 
-__all__ = ["LAG_PORT_NAME_RE", "SwitchInfoService", "VLAN_PORT_NAME_RE"]
+__all__ = [
+    "LAG_PORT_NAME_RE",
+    "ChannelSyncError",
+    "SwitchInfoService",
+    "VLAN_PORT_NAME_RE",
+]
 
-VLAN_PORT_NAME_RE = re.compile(r"^(?:vlan|vlanif|vlan-interface)\d+$", re.IGNORECASE)
-LAG_PORT_NAME_RE = re.compile(
-    r"^(?:eth-trunk|bridge-aggregation|port-channel)\d+$", re.IGNORECASE
-)
+
+class ChannelSyncError(RuntimeError):
+    """通道层 SNMP 同步**采集失败**（评审 N13）。
+
+    为什么需要它：``sync_*_via_channel`` 系列有三种"没同步"的情形，原先一律
+    ``return 0``：
+
+    1. 设备不在台账 / 通道未放行该设备（``selector is None``）—— **不适用**，正常；
+    2. 设备没开放该 MIB 子树、本次确实没采到（``rows`` 为空）—— **空结果**，正常；
+    3. 采集过程抛错（超时 / 认证 / 解析）—— **失败**，本应可见。
+
+    前两种是确定性结论，第三种是故障，但三者返回值一模一样 ⇒ 调用方（扫描器）无法
+    区分，"SNMP 子阶段整体失败"在界面上完全不可见（``progress`` 里一个信号都没有）。
+    这个异常把第 3 种单独标记出来，由调用方**按能力分别计入进度**并记 error 日志。
+
+    语义边界：本异常只表示"这次没采到" —— 它**不**使整轮扫描失败（调用方必须
+    逐能力捕获，见 ``network_scanner_service`` 的 Phase 0d-snmp），这是既有
+    "Phase 隔离"纪律的一部分。
+    """
+
+    def __init__(self, capability: str, device_id: int, cause: object) -> None:
+        super().__init__(f"通道层 {capability} 采集失败 device_id={device_id}: {cause}")
+        self.capability = capability
+        self.device_id = device_id
+
 
 class SwitchInfoService:
     """交换机信息采集服务"""
@@ -283,8 +310,19 @@ class SwitchInfoService:
         因此永远建立不起 VLAN 成员关系。SNMP 侧 Q-BRIDGE-MIB 拿得到，这里按
         **同一个落库函数**（``sync_vlan_members``）写入，规则不与 CLI 侧漂移。
 
+        **本方法同时补齐清理**（评审 N14）：写完成员后按"在册集合"清掉设备上已
+        消失的 VLAN 残留，与 CLI 侧 ``_sync_vlan_trunk_bases`` 同口径。理由与两道
+        保险见 :meth:`_prune_stale_vlans` 的 docstring。
+
         Returns:
             写入的 VLAN 数（0 = 通道未放行 / 设备没开放 VLAN 表 / 没采到成员）。
+            **不含清理条数** —— 清理是副作用，不计入"写入"口径。
+
+        Raises:
+            ChannelSyncError: **采集失败**（区别于上面三种"确定性 0"）。由调用方
+                按能力捕获并计入进度 —— 见 :class:`ChannelSyncError` 的说明。
+                注意：**清理阶段不抛** —— 它在一个已成功采集的回合末尾执行，
+                清理失败只是"库里留了旧记录"，不该让整个能力被记成采集失败。
         """
         switch = self.sw_repo.find_by_device_id(device_id)
         if switch is None:
@@ -299,9 +337,9 @@ class SwitchInfoService:
             if selector is None:
                 return 0
             facts = selector.collect(device_id, [CollectCapability.VLANS])
-        except Exception as exc:  # noqa: BLE001 —— VLAN 同步失败不得中断整轮扫描
+        except Exception as exc:
             logger.warning("通道层 VLAN 采集失败 device_id=%s: %s", device_id, exc)
-            return 0
+            raise ChannelSyncError("VLAN", device_id, exc) from exc
 
         rows = facts.vlans or []
         if not rows:
@@ -314,27 +352,118 @@ class SwitchInfoService:
         from app.utils.port_name_utils import get_vlanif_name
 
         synced = 0
+        present_vlan_ids: set[int] = set()
         for row in rows:
-            vlan_id = row.get("vlan_id")
-            members = row.get("members") or []
-            if vlan_id is None:
+            vlan_id_raw = row.get("vlan_id")
+            if vlan_id_raw is None:
                 continue
+            try:
+                vlan_id = int(vlan_id_raw)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "通道层 VLAN 行 vlan_id 不可解析，跳过 device_id=%s: %r",
+                    device_id, vlan_id_raw,
+                )
+                continue
+            present_vlan_ids.add(vlan_id)
+            members = row.get("members") or []
             if not members:
                 continue
             try:
                 self.sw_repo.sync_vlan_members(
-                    device_id, get_vlanif_name(switch.device_type, int(vlan_id)), members,
+                    device_id, get_vlanif_name(switch.device_type, vlan_id), members,
                 )
                 synced += 1
             except Exception as exc:  # noqa: BLE001 —— 单个 VLAN 失败不影响其余
                 logger.warning(
                     "VLAN %s 成员写入失败 device_id=%s: %s", vlan_id, device_id, exc,
                 )
+        self._prune_stale_vlans(device_id, present_vlan_ids, facts)
         if synced:
             logger.info(
                 "通道层 VLAN 成员同步 device_id=%s 写入 %d 个 VLAN", device_id, synced,
             )
         return synced
+
+    def _prune_stale_vlans(self, device_id: int, present_vlan_ids: set[int],
+                           facts) -> int:
+        """清掉设备上已消失的 VLAN 残留（与 CLI 侧 ``_sync_vlan_trunk_bases`` 同口径）。
+
+
+        ``_sync_vlan_trunk_bases`` 里有一段"清理设备上已不存在的 Vlanif/Eth-Trunk 残留"，
+        但它只挂在 **CLI / 接管路径** 上；而 ``sync_vlan_members_via_channel`` 恰恰是在
+        接管路径没跑、或没产出逻辑端口名（``logical_names`` 为空 → 上面 else 分支明确
+        跳过）时被调用的**补位入口** ⇒ 该入口建的 VLAN 记录**永不清理**。
+
+
+        1. **在册集合非空**：空集等价于"设备确实没有 VLAN"**或**"采集没产出/未解析"，
+           两者无法区分，而 ``NOT IN ()`` 的语义是"全部命中" ⇒ 会把该设备所有 VLAN
+           删光。所以空集一律跳过（CLI 侧同一设计，见仓储 docstring 的调用方约定）。
+        2. **VLANS 能力 outcome 不是 FAILED**：``FAILED`` 意味着本次是**部分/失败**的
+           walk，在册集合因此是**残缺**的 —— 用它做差集删的是"没采到"而不是"已消失"。
+           判据用 ``facts.needs_fallback``（公共语义 = outcome 为 FAILED），
+           不直读 ``outcomes`` 里的字符串值（那是契约内部形态）。
+
+
+        CLI 侧的在册集合来自 ``display interface`` 里的 **Vlanif 逻辑端口名**；本侧的
+        来自 Q-BRIDGE 的 **VLAN 表**。后者是前者的**超集**（存在 VLAN 不代表配了 Vlanif，
+        而配了 Vlanif 必然存在 VLAN）⇒ 本侧的集合更大、差集更小 ⇒ 删得更少。
+        方向是安全的：不会删掉 CLI 侧会保留的记录。
+
+        Args:
+            present_vlan_ids: 在册集合（调用方须在"无成员则跳过"之前登记全部 id）。
+            facts: 本轮 ``CollectedFacts``，只用其 outcome 做保险 2。
+
+        Returns:
+            删除的残留 VLAN 条数（级联删除其成员关系）；清理失败返回 0。
+
+        [WARN] **清理是 best-effort，且用 savepoint 隔离**：本方法在成员写入**之后**
+        执行，此时本轮的主数据已落库。若清理抛错（DB 异常 / 唯一约束 / 会话态问题），
+        让它冒泡会连累同一个 ``transaction_checkpoint`` 里**已经成功的成员写入**
+        （以及随后的 LAG / COUNTERS 两个能力）被整体回滚 —— 用一个"补充清理"的失败
+        换掉"主体成功"，方向是错的。`begin_nested()` 把影响面收在 savepoint 内，
+        失败只留 warning；残留记录下一轮再清（本方法幂等）。
+        """
+        if not present_vlan_ids:
+            logger.info(
+                "通道层 VLAN 在册集合为空，跳过残留清理（避免 NOT IN 空集全删）device_id=%s",
+                device_id,
+            )
+            return 0
+
+        from app.core.enums import CollectCapability
+
+        if facts.needs_fallback(CollectCapability.VLANS):
+            logger.warning(
+                "VLANS 采集 FAILED，在册集合不完整，跳过残留清理（防误删）device_id=%s"
+                " 在册=%d 个", device_id, len(present_vlan_ids),
+            )
+            return 0
+
+        from app.persistence.vlan_repository import VLANRepository
+
+        try:
+            with self.sw_repo.session.begin_nested():
+                stale = VLANRepository(
+                    self.sw_repo.session
+                ).list_by_device_excluding_vlan_ids(device_id, present_vlan_ids)
+                for vlan in stale:
+                    logger.debug(
+                        "通道层 VLAN %s 已从设备消失，清理记录 device_id=%s",
+                        vlan.vlan_id, device_id,
+                    )
+                    self.sw_repo.session.delete(vlan)
+        except Exception as exc:  # noqa: BLE001 —— 补充清理失败不得回滚主体写入
+            logger.warning(
+                "残留 VLAN 清理失败（不影响本轮成员写入，下一轮重试）device_id=%s: %s",
+                device_id, exc,
+            )
+            return 0
+        if stale:
+            logger.info(
+                "通道层清理残留 VLAN 记录 device_id=%s count=%d", device_id, len(stale),
+            )
+        return len(stale)
 
     def sync_lag_members_via_channel(self, device_id: int) -> int:
         """无 SSH 设备：用通道层采到的链路聚合成员补上 Phase 0d（CLI 走不到）。
@@ -347,6 +476,9 @@ class SwitchInfoService:
 
         Returns:
             写入的聚合组数（0 = 通道未放行 / 设备没启用 LACP 或没开放 1.2.840 子树）。
+
+        Raises:
+            ChannelSyncError: **采集失败**（与 VLAN 同口径）。
         """
         switch = self.sw_repo.find_by_device_id(device_id)
         if switch is None:
@@ -361,9 +493,9 @@ class SwitchInfoService:
             if selector is None:
                 return 0
             facts = selector.collect(device_id, [CollectCapability.LAGS])
-        except Exception as exc:  # noqa: BLE001 —— LAG 同步失败不得中断整轮扫描
+        except Exception as exc:
             logger.warning("通道层 LAG 采集失败 device_id=%s: %s", device_id, exc)
-            return 0
+            raise ChannelSyncError("LAG", device_id, exc) from exc
 
         rows = facts.lags or []
         if not rows:
@@ -391,6 +523,63 @@ class SwitchInfoService:
                 "通道层 LAG 成员同步 device_id=%s 写入 %d 个聚合组", device_id, synced,
             )
         return synced
+
+    def sync_port_error_counters_via_channel(self, device_id: int) -> int:
+        """无 SSH 设备：把通道层采到的错包/丢弃计数写进 ``network_ports``。
+
+        范围与采集层一致：**只有 errors 与 discards 四项**，速率不在这里落库
+        （监控侧 ``if_utilization`` 模板已经负责，避免两套口径）。
+
+        写入纪律与设备身份同源：**有值才写，``None`` 不清空** —— 采集层用
+        ``None`` 表示"设备没上报这一列"，把它当 0 写下去会掩盖真实状态。
+
+        Returns:
+            更新的端口数。
+
+        Raises:
+            ChannelSyncError: **采集失败**（与 VLAN / LAG 同口径）。
+        """
+        switch = self.sw_repo.find_by_device_id(device_id)
+        if switch is None:
+            return 0
+        try:
+            from app.core.enums import CollectCapability
+            from app.services.collector import runtime
+
+            selector = runtime.selector_for_snmp_takeover(
+                switch, ssh_manager=self.ssh_mgr, switch_repo=self.sw_repo,
+            )
+            if selector is None:
+                return 0
+            facts = selector.collect(device_id, [CollectCapability.COUNTERS])
+        except Exception as exc:
+            logger.warning("通道层端口计数采集失败 device_id=%s: %s", device_id, exc)
+            raise ChannelSyncError("COUNTERS", device_id, exc) from exc
+
+        return self._apply_port_error_counters(device_id, facts.counters or [])
+
+    def _apply_port_error_counters(self, device_id: int, rows: list[dict]) -> int:
+        """按端口名把计数写回（纯落库，便于单测直测）。
+
+        **一次批量委托**（评审 N6）：此前逐端口调仓储 ⇒ 48 口设备 48 次 SELECT。
+        逐端口的写入纪律（有值才写 / ``None`` 不清空 / 白名单四列）已收在仓储的
+        ``bulk_update_error_counters`` 里，服务层只负责把 ``port`` 归一成
+        ``port_name`` 并剔掉空名行。
+        """
+        if not rows:
+            return 0
+        payload: list[dict] = []
+        for row in rows:
+            port_name = (row.get("port") or "").strip()
+            if not port_name:
+                continue
+            payload.append({**row, "port_name": port_name})
+        if not payload:
+            return 0
+        updated = self.port_repo.bulk_update_error_counters(device_id, payload)
+        if updated:
+            logger.info("端口错包/丢弃计数已写入 device_id=%s 端口 %d 个", device_id, updated)
+        return updated
 
     def _try_channel_takeover(self, switch, *, triggered_by_auto: bool,
                               virtual_room_id: int | None = None) -> dict | None:
@@ -420,7 +609,9 @@ class SwitchInfoService:
 
         try:
             facts = selector.collect(
-                switch.device_id, [CollectCapability.PORTS, CollectCapability.DEVICE_INFO]
+                switch.device_id,
+                [CollectCapability.PORTS, CollectCapability.DEVICE_INFO,
+                 CollectCapability.COUNTERS]
             )
         except Exception as exc:  # noqa: BLE001 —— 采集异常同样回退（老路径仍可能成功）
             logger.warning(
@@ -459,6 +650,12 @@ class SwitchInfoService:
             )
 
         self._apply_device_identity(switch, facts.device)
+        try:
+            self._apply_port_error_counters(switch.device_id, facts.counters or [])
+        except Exception as exc:  # noqa: BLE001 —— 附属同步失败不得回滚端口落库
+            logger.warning(
+                "端口错包/丢弃计数写入失败 device_id=%s: %s", switch.device_id, exc,
+            )
 
         snmp_channel = next(
             (ch for ch in getattr(selector, "channels", [])

@@ -80,6 +80,7 @@ export type MenuLabelKey =
   | 'menu.system'
   | 'menu.users'
   | 'menu.rbac'
+  | 'menu.security'
   | 'menu.loginLogs'
   | 'menu.auditLogs'
   | 'menu.notificationPreferences'
@@ -387,6 +388,13 @@ export const MENU_CONFIGS: MenuConfig[] = [
         icon: <SafetyOutlined />,
         path: '/rbac',
         permission: 'rbac:view'
+      },
+      {
+        key: 'security',
+        labelKey: 'menu.security',
+        icon: <SafetyCertificateOutlined />,
+        path: '/security',
+        permission: 'security:read'
       },
       {
         key: 'login-logs',

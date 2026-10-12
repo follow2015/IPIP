@@ -18,13 +18,25 @@ from app.services.auth import login_required, permission_required
 from app.utils.transactional import transactional
 
 
+
+
 @monitor_bp.route("/credentials", methods=["POST"])
-@doc(summary="批量配置共享监控凭据", tags=["监控"], responses={200: "MonitorCredentialConfigResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCredentialUpsert"}}}})
+@doc(summary="创建共享监控凭据（凭据域，不绑定设备）", tags=["监控"], responses={200: "MonitorCredentialConfigResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCredentialUpsert"}}}})
 @login_required
 @permission_required("monitor:config")
 @transactional
 def post_credentials():
-    """创建共享凭据，并可选地关联到多台设备。"""
+    """创建共享监控凭据（凭据域）。**不绑定任何设备**。
+
+    2026-10-10 语义收敛（评审 P1-3）：该端点原为**双语义**（带 `device_ids` 时
+    逐台调用旧 `upsert`，触发凭据域传播、误改他人设备）。现收敛为单一语义：
+
+    - 仅创建共享凭据 ⇒ 用本端点（不带 `device_ids`）；
+    - 创建并绑定到一批设备 ⇒ `POST /monitor/credentials/bind`；
+    - 为某一台设备新建并绑定 ⇒ `PUT /monitor/devices/<id>/credentials`。
+
+    本端点收到非空 `device_ids` 时**显式报错**，避免「以为只创建、实际改了别人设备」。
+    """
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise ValidationError("请求体必须是 JSON 对象")
@@ -34,15 +46,57 @@ def post_credentials():
         raise ValidationError(f"请求参数校验失败: {errors}")
 
     device_ids = body.get("device_ids") or []
+    if device_ids:
+        raise ValidationError(
+            "POST /monitor/credentials 仅创建共享凭据，不接受 device_ids；"
+            "如需创建并绑定设备，请改用 POST /monitor/credentials/bind"
+            "（批量）或 PUT /monitor/devices/<device_id>/credentials（单台）"
+        )
+
+    protocol = body["protocol"]
+    name = body["name"]
+    credential_service.create_shared_credential(protocol, body["payload"], name)
+
+    _audit_credential_change(
+        "monitor_credential:create_shared",
+        {"protocol": protocol, "name": name},
+    )
+    return APIResponse.success(data={"configured": True, "protocol": protocol, "linked": 0})
+
+
+@monitor_bp.route("/credentials/bind", methods=["POST"])
+@doc(summary="为多台设备新建并绑定监控凭据（设备域，只影响所列设备）", tags=["监控"], responses={200: "MonitorCredentialConfigResponse"}, request_body={"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MonitorCredentialUpsert"}}}})
+@login_required
+@permission_required("monitor:config")
+@transactional
+def bind_credentials():
+    """**设备域**：为 `device_ids` 所列的每一台设备新建（或复用同明文）凭据并绑定。
+
+    语义边界（不变量见 `credential_service.bind_device` docstring）：
+    只影响 `device_ids` 所列设备 —— 每台只增删自己的关联行，绝不解绑/迁移其它设备；
+    旧凭据行仅在无人引用时才 GC。
+
+    供「设备详情 · 新建凭据并绑定」与「批量修改监控 · 配置凭据」两处 UI 入口使用。
+    2026-10-10 之前这两处误用 `POST /credentials`（凭据域）导致「改 1 台变改 8 台」。
+    """
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        raise ValidationError("请求体必须是 JSON 对象")
+
+    errors = _credential_upsert_schema.validate(body)
+    if errors:
+        raise ValidationError(f"请求参数校验失败: {errors}")
+
+    device_ids = body.get("device_ids") or []
+    if not device_ids:
+        raise ValidationError("device_ids 不能为空；仅创建凭据请用 POST /monitor/credentials")
+
     protocol = body["protocol"]
     payload = body["payload"]
     name = body["name"]
 
-    if device_ids:
-        for did in device_ids:
-            credential_service.upsert(did, protocol, payload, name)
-    else:
-        credential_service.create_shared_credential(protocol, payload, name)
+    for did in device_ids:
+        credential_service.bind_device(did, protocol, payload, name)
 
     _audit_credential_change(
         "monitor_credential:upsert",

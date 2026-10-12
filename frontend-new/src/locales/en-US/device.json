@@ -63,7 +63,17 @@
     "column": {
       "usageStatus": "Usage Status",
       "linkStatus": "Link Status",
-      "ipAddress": "IP Address"
+      "ipAddress": "IP Address",
+      "errorCounters": "Errors/Discards"
+    },
+    "counters": {
+      "inErrors": "In errors",
+      "outErrors": "Out errors",
+      "inDiscards": "In discards",
+      "outDiscards": "Out discards",
+      "sampledAt": "Sampled at",
+      "notCollected": "Not reported",
+      "hint": "Counter32 cumulative"
     },
     "ipRole": {
       "primary": "Primary",
@@ -294,13 +304,14 @@
     "linkExistingTitle": "Link an Existing Shared Credential",
     "protocolExclusive": "Protocol Conflict",
     "protocolExclusiveDesc": "A device can use only one monitoring protocol at a time. Linking a credential with a new protocol will automatically unlink the {{protocols}} protocol from this device.",
-    "protocolExclusiveDescCreate": "A device can use only one monitoring protocol at a time. Creating and linking a credential with a different protocol will automatically unlink the {{protocols}} protocol from this device.",
+    "protocolExclusiveDescCreate": "A device can use only one monitoring protocol at a time. Creating and binding a credential with a different protocol will automatically unlink the {{protocols}} protocol from this device, and clear this device's metric template group binding and latest metric values.",
     "selectShared": "Select a shared credential",
     "noAvailable": "No credential available to link",
     "sharedOption": "[{{protocol}}] {{name}} (linked to {{count}} devices)",
     "linkThisDevice": "Link to This Device",
-    "createAndLinkTitle": "Create a Shared Credential and Link It",
-    "createAndLink": "Create and Link",
+    "createAndLinkTitle": "Create a Credential for This Device",
+    "createAndLink": "Create and Bind",
+    "deviceScopedHint": "Affects this device only: the new credential is bound to this device and does not change any other device. To edit a credential shared by multiple devices, use Monitor Center → Credentials → Edit secret.",
     "editSecretTitle": "Edit credential secret for this device ({{protocol}})",
     "onlyThisDevice": "Affects this device only",
     "onlyThisDeviceDesc": "This credential may be shared by other devices; this edit only migrates this device to a dedicated credential row and does not affect other devices.",
@@ -855,8 +866,8 @@
     "configCredential": "Configure Credential",
     "config": "Configure",
     "skip": "Skip",
-    "credentialHint": "The same monitoring credential will be configured for all selected devices (shared credential mode)",
-    "credentialNameOptional": "Credential Name (optional)",
+    "credentialHint": "Binds this credential to each selected device (device-scoped; unselected devices are unaffected). If the protocol differs from a device's current one, its previous credential link is removed and its metric template group binding and latest metric values are cleared.",
+    "credentialName": "Credential Name",
     "skipCredentialHint": "Skip credential configuration and only change the monitoring switch",
     "configGroup": "Configure Metric Template Group",
     "groupHint": "Bind a unified metric template group to all selected devices; if none is selected, the auto matching rules apply",

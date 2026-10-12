@@ -244,6 +244,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       batchCreate.reset();
     }
     prevActiveRef.current = active;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
   const prevDeviceTypeRef = useRef<string | undefined>(undefined);
@@ -257,6 +258,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       transformRows((row, i) => ({ ...row, device_name: genBatchName(deviceType, i + 1) }));
     }
     prevDeviceTypeRef.current = deviceType;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceType]);
 
   const prevRoomRef = useRef<number | undefined>(undefined);
@@ -265,6 +267,7 @@ export function useBatchAddTab(active: boolean): UseBatchAddTabResult {
       form.setFieldValue('cabinet_id', undefined);
     }
     prevRoomRef.current = selectedRoomId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoomId]);
 
 

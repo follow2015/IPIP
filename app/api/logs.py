@@ -4,7 +4,7 @@
 
 提供前端错误日志收集功能。
 """
-from app.utils.logging import get_logger
+from app.utils.logging import get_logger, sanitize_log_text
 from flask import Blueprint, request
 from app.api.base import APIResponse, api_exception_handler
 from app.utils import rate_limit_api
@@ -55,12 +55,14 @@ def log_error():
         timestamp = data.get("timestamp", "")
         
         logger.error(
-            f"前端JavaScript错误: {message} | "
-            f"URL: {url} | "
-            f"位置: {line}:{column} | "
-            f"时间: {timestamp} | "
-            f"用户代理: {user_agent} | "
-            f"堆栈: {error_stack}"
+            "前端JavaScript错误: %s | URL: %s | 位置: %s:%s | 时间: %s | "
+            "用户代理: %s | 堆栈: %s",
+            sanitize_log_text(message),
+            sanitize_log_text(url, 300),
+            line, column,
+            sanitize_log_text(timestamp, 60),
+            sanitize_log_text(user_agent, 300),
+            sanitize_log_text(error_stack),
         )
         
         return APIResponse.success(message="错误日志已记录")
@@ -102,50 +104,24 @@ def log_info():
         log_data = data.get("data", "")
         timestamp = data.get("timestamp", "")
         
-        log_message = f"前端日志: {message} | 时间: {timestamp} | 数据: {log_data}"
-        
+        log_args = (
+            sanitize_log_text(message),
+            sanitize_log_text(timestamp, 60),
+            sanitize_log_text(log_data),
+        )
+
         if level == "error":
-            logger.error(log_message)
+            logger.error("前端日志: %s | 时间: %s | 数据: %s", *log_args)
         elif level == "warning":
-            logger.warning(log_message)
+            logger.warning("前端日志: %s | 时间: %s | 数据: %s", *log_args)
         else:
-            logger.info(log_message)
+            logger.info("前端日志: %s | 时间: %s | 数据: %s", *log_args)
         
         return APIResponse.success(message="日志已记录")
         
     except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
         logger.error(f"记录前端日志失败: {str(e)}")
         return APIResponse.error(message="记录日志失败", status_code=500)
-
-@logs_bp.route("/", methods=["GET"])
-@doc(summary="获取最近日志", tags=["用户"], responses={200: "ApiResponse", 401: "ApiError"})
-@login_required
-@permission_required("audit:view")
-@rate_limit_api
-@api_exception_handler
-def get_logs():
-    """获取最近日志
-    
-    Query Parameters:
-        limit: 返回数量（默认10，最大100）
-        level: 日志级别过滤（可选）
-    
-    Returns:
-        JSON响应，包含日志列表
-    """
-    try:
-        limit = request.args.get("limit", 10, type=int)
-        
-        limit = min(limit, 100)
-        
-        logs = []
-        
-        return APIResponse.success(data=logs, message="获取日志成功")
-        
-    except Exception as e:  # noqa: BLE001 -- 路由处理器顶层兜底：Service 层异常类型不可枚举，必须转结构化错误响应；收窄会漏掉未预期异常，以未格式化 500 冒泡给前端
-        logger.error(f"获取日志失败: {str(e)}")
-        return APIResponse.error(message="获取日志失败", status_code=500)
-
 
 @logs_bp.route("/stats", methods=["GET"])
 @doc(summary="获取日志统计", tags=["用户"], responses={200: "ApiResponse", 401: "ApiError"})

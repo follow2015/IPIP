@@ -1,0 +1,108 @@
+{
+  "title": "安全中心",
+  "overview": {
+    "compliance": "合规项",
+    "violations": "违规项",
+    "rule": "检测项",
+    "severity": "级别",
+    "count": "违规数",
+    "status": "状态",
+    "tabItems": "检测项",
+    "tabFindings": "发现项"
+  },
+  "findings": {
+    "empty": "暂无发现项",
+    "subject": "对象",
+    "lastSeen": "最近发现"
+  },
+  "rules": {
+    "user": {
+      "password_expired": "密码已过期",
+      "password_never_changed": "从未修改过密码",
+      "dormant_account": "长期未登录账号"
+    },
+    "snmp": {
+      "v2c_in_use": "仍在使用 SNMP v2c",
+      "default_community": "使用默认/弱团体名"
+    },
+    "login": {
+      "remote_access": "不可信来源登录",
+      "brute_force_stats": "登录失败次数超阈值"
+    },
+    "system": {
+      "audit_retention": "审计日志留存不足"
+    }
+  },
+  "severity": {
+    "critical": "严重",
+    "high": "高",
+    "medium": "中",
+    "low": "低"
+  },
+  "status": {
+    "ok": "合规",
+    "open": "有违规"
+  },
+  "policyNames": {
+    "password": {
+      "min_length": "密码最小长度",
+      "require_classes": "密码字符类别数",
+      "max_age_days": "密码有效期",
+      "min_age_days": "改密最小间隔",
+      "expire_warn_days": "到期提前提示",
+      "force_change_on_reset": "重置后强制改密"
+    },
+    "snmp": {
+      "allowed_versions": "允许的 SNMP 版本",
+      "forbid_default_community": "禁止默认团体名",
+      "mode": "SNMP 策略模式"
+    },
+    "login": {
+      "remote_access": "异地登录模式",
+      "trusted_networks": "可信网段",
+      "brute_force_threshold": "登录失败阈值",
+      "brute_force_window_hours": "爆破统计窗口"
+    },
+    "user": {
+      "dormant_days": "账号休眠阈值"
+    },
+    "audit": {
+      "retention_days": "审计留存天数"
+    }
+  },
+  "values": {
+    "on": "开启",
+    "off": "关闭",
+    "audit": "审计",
+    "enforce": "强制"
+  },
+  "policies": {
+    "title": "安全策略",
+    "save": "保存",
+    "default": "默认值",
+    "updated": "策略已更新",
+    "saveFailed": "保存失败",
+    "impactPreview": "影响预览",
+    "impactContent": "切换后将拒绝 {{count}} 个凭据，确定继续？",
+    "scanFailed": "影响预览失败",
+    "conflict": "策略已被他人修改，请刷新后重试",
+    "notEditable": "该项不支持在页面修改"
+  },
+  "remoteLogins": {
+    "title": "异地登录记录",
+    "disabled": "异地检测未启用",
+    "user": "用户",
+    "ip": "IP",
+    "count": "次数",
+    "lastTime": "最近时间",
+    "lock": "锁定账号",
+    "unlock": "解锁",
+    "reason": "锁定原因",
+    "reasonRequired": "请填写锁定原因",
+    "locked": "账号已锁定",
+    "unlocked": "账号已解锁",
+    "lockFailed": "锁定失败",
+    "unlockFailed": "解锁失败",
+    "empty": "暂无异地登录记录"
+  }
+}

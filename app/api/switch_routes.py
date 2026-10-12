@@ -764,16 +764,35 @@ def scan_room(room_id):
     from app.services.network_scanner_service import get_scan_progress
     scope = f"r:{room_id}"
     existing_progress = get_scan_progress(scope)
+
+    sr = None
+    try:
+        from app.utils.cache import cache_manager
+        if cache_manager.primary_storage and cache_manager.primary_storage.redis_client:
+            from app.services.scan_redis import ScanRedis
+            sr = ScanRedis(cache_manager.primary_storage.redis_client)
+    except Exception:
+        logger.warning("机房扫描重入保护获取 Redis 失败: room_id=%d", room_id, exc_info=True)
+
     if existing_progress:
         phase = existing_progress.get("phase")
         completed = existing_progress.get("completed", 0)
         total = existing_progress.get("total", 0)
-        if phase == "完成" or (total > 0 and completed >= total):
+        allowed = phase in ("完成", "failed") or (total > 0 and completed >= total)
+
+        if not allowed and sr is not None:
+            stale, reason = sr.progress_is_stale(scope)
+            if stale:
+                sr.progress_mark_stale_failed(scope, reason)
+                logger.warning(
+                    "机房扫描僵死，已置 failed 并放行新扫描: room_id=%d, reason=%s",
+                    room_id, reason,
+                )
+                allowed = True
+
+        if allowed:
             try:
-                from app.utils.cache import cache_manager
-                if cache_manager.primary_storage and cache_manager.primary_storage.redis_client:
-                    from app.services.scan_redis import ScanRedis
-                    sr = ScanRedis(cache_manager.primary_storage.redis_client)
+                if sr is not None:
                     sr.progress_set(f"r:{room_id}", {
                         "scope": f"r:{room_id}",
                         "room_id": room_id,
@@ -808,10 +827,22 @@ def scan_room(room_id):
                 if lock_scope:
                     lock_scope_str = lock_scope if isinstance(lock_scope, str) else lock_scope.decode()
                     progress = get_scan_progress(lock_scope_str)
-                    if progress and progress.get("phase") != "完成" and not (
-                        progress.get("total", 0) > 0
-                        and progress.get("completed", 0) >= progress.get("total", 0)
-                    ):
+                    _phase = progress.get("phase") if progress else None
+                    _total = progress.get("total", 0) if progress else 0
+                    _completed = progress.get("completed", 0) if progress else 0
+                    _busy = bool(progress) and _phase not in ("完成", "failed") and not (
+                        _total > 0 and _completed >= _total
+                    )
+                    if _busy and sr is not None:
+                        _stale, _reason = sr.progress_is_stale(lock_scope_str)
+                        if _stale:
+                            sr.progress_mark_stale_failed(lock_scope_str, _reason)
+                            logger.warning(
+                                "交换机锁对应扫描已僵死，按残留锁清除: lock_scope=%s, reason=%s",
+                                lock_scope_str, _reason,
+                            )
+                            _busy = False
+                    if _busy:
                         for lk in acquired_locks:
                             redis_client.delete(lk)
                         return APIResponse.error(

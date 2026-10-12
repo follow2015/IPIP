@@ -347,15 +347,23 @@ class ChannelSelector:
             count = self._store.record_failure(channel.code, device_id)
             if cb_key in self._half_open_used:
                 self._half_open_used.discard(cb_key)
-                while count < self._threshold:
+                attempts = 0
+                while 0 <= count < self._threshold and attempts <= 2 * self._threshold:
                     count = self._store.record_failure(channel.code, device_id)
+                    attempts += 1
                 self._opened_at[cb_key] = time.monotonic()
             elif count >= self._threshold:
                 self._opened_at.setdefault(cb_key, time.monotonic())
-            logger.warning(
-                "通道 %s 对 device_id=%s 本轮一项未采到（连续失败 %d/%d）",
-                channel.code, device_id, count, self._threshold,
-            )
+            if count >= 0:
+                logger.warning(
+                    "通道 %s 对 device_id=%s 本轮一项未采到（连续失败 %d/%d）",
+                    channel.code, device_id, count, self._threshold,
+                )
+            else:
+                logger.warning(
+                    "通道 %s 对 device_id=%s 本轮一项未采到（熔断计数不可用，已降级）",
+                    channel.code, device_id,
+                )
             if self._threshold > 0 and count == self._threshold:
                 COLLECTOR_METRICS.record_circuit_trip(channel.code)
 

@@ -6,7 +6,7 @@
 """
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import TINYINT, BaseModel
 from app.core.enums import UserStatus
 from extensions import db
 
@@ -52,6 +52,18 @@ class User(BaseModel):
     notification_prefs = db.Column(db.JSON, nullable=True, comment="通知偏好设置")
 
     status = db.Column(db.Integer, default=0, nullable=False, comment="状态")
+
+    password_changed_at = db.Column(
+        db.DateTime, nullable=True, comment="上次改密时间（NULL=策略启用前从未记录）"
+    )
+    must_change_password = db.Column(
+        TINYINT(), nullable=False, server_default="0", comment="1=下次登录须改密"
+    )
+    locked_at = db.Column(
+        db.DateTime, nullable=True, comment="锁定时间（非空=锁定态，与 status=1 禁用解耦）"
+    )
+    lock_reason = db.Column(db.String(255), nullable=True, comment="锁定原因")
+    locked_by = db.Column(db.BigInteger, nullable=True, comment="锁定操作人 users.id")
 
     @property
     def is_active(self):

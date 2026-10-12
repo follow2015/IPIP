@@ -17,6 +17,9 @@ export type PermissionCode =
   | 'user:view'
   | 'rbac:view'
   | 'audit:view'
+  | 'security:read'
+  | 'security:config'
+  | 'security:session'
   | 'import:view';
 
 export const ROUTE_PERMISSIONS: Record<string, PermissionCode> = {
@@ -67,6 +70,7 @@ export const ROUTE_PERMISSIONS: Record<string, PermissionCode> = {
 
   users: 'user:view',
   rbac: 'rbac:view',
+  security: 'security:read',
   'login-logs': 'user:view',
   'audit-logs': 'audit:view',
   'settings/webhook-configs': 'user:view',

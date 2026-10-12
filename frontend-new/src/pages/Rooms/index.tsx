@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Button, Tag, Space, Typography } from 'antd';
 import { PlusOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { useResponsive } from '@/hooks/useResponsive';
 import DataTable from '@/components/DataTable';
 import FilterBar from '@/components/FilterBar';
 import IdCell from '@/components/IdCell';
@@ -24,6 +25,7 @@ type RoomListParams = PaginationParams & {
 function Rooms() {
   const { t: td } = useTranslation('device');
   const { t: tc } = useTranslation('common');
+  const { isMobile } = useResponsive();
   const navigate = useNavigate();
   const crud = useCrudPage<Room, RoomListParams>({
     useList: useRoomList,
@@ -236,14 +238,27 @@ function Rooms() {
         }
       ]}
       extra={
-        <Space>
-          <Button icon={<AppstoreOutlined />} onClick={() => navigate('/rooms/overview')}>
-            {td('room.overview.title')}
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={crud.handleAdd}>
-            {td('room.add')}
-          </Button>
-        </Space>
+        isMobile ? (
+          <Space wrap>
+            <Button
+              icon={<AppstoreOutlined />}
+              aria-label={td('room.overview.title')}
+              onClick={() => navigate('/rooms/overview')}
+            />
+            <Button type="primary" icon={<PlusOutlined />} onClick={crud.handleAdd}>
+              {td('room.add')}
+            </Button>
+          </Space>
+        ) : (
+          <Space>
+            <Button icon={<AppstoreOutlined />} onClick={() => navigate('/rooms/overview')}>
+              {td('room.overview.title')}
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={crud.handleAdd}>
+              {td('room.add')}
+            </Button>
+          </Space>
+        )
       }
     />
   );

@@ -32,10 +32,11 @@ ifAlias 放正文作为补充。
 """
 from __future__ import annotations
 
-import logging
 from typing import Any, Optional
 
-logger = logging.getLogger(__name__)
+from app.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 IF_INDEX_PREFIX = "1.3.6.1.2.1.2.2.1.1"
 

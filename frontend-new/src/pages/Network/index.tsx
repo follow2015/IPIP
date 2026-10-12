@@ -14,7 +14,8 @@ import {
   Modal,
   Radio,
   Typography,
-  theme
+  theme,
+  Dropdown
 } from 'antd';
 import {
   DeleteOutlined,
@@ -23,8 +24,10 @@ import {
   UserOutlined,
   SearchOutlined,
   CloudSyncOutlined,
-  ApartmentOutlined
+  ApartmentOutlined,
+  MoreOutlined
 } from '@ant-design/icons';
+import { useResponsive } from '@/hooks/useResponsive';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '@/components/DataTable';
 import FilterBar from '@/components/FilterBar';
@@ -52,6 +55,7 @@ import { useTable } from '@/hooks/useTable';
 import { useMessage } from '@/hooks/useMessage';
 import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
 import type { GlobalEvent } from '@/hooks/useGlobalEvents';
+import { useAsyncScan } from '@/hooks/useAsyncScan';
 
 type ScanPhaseKey =
   | 'networkList.scan.phase.preparing'
@@ -160,6 +164,7 @@ function Network() {
   })();
   const { t: tc } = useTranslation('common');
   const { t: td } = useTranslation('device');
+  const { isMobile } = useResponsive();
   const confirm = useConfirm();
   const table = useTable();
   const msg = useMessage();
@@ -171,10 +176,8 @@ function Network() {
   const routes = useDisclosure();
   const [assignForm] = Form.useForm();
 
-  const [scanningRoomId, setScanningRoomId] = useState<number | null>(null);
   const triggerFullScan = useTriggerFullScan();
   const queryClient = useQueryClient();
-  const { data: scanStatus } = useFullScanStatus(scanningRoomId ?? 0, scanningRoomId !== null);
 
   const { data, isLoading, refetch } = useNetworkList({
     page: table.page,
@@ -185,6 +188,20 @@ function Network() {
       table.filters.route_type !== undefined ? String(table.filters.route_type) : undefined,
     customer_id: table.filters.customer_id ? Number(table.filters.customer_id) : undefined
   });
+
+  const {
+    scanningId: scanningRoomId,
+    beginScan: beginScanRoom,
+    endScan: endScanRoom
+  } = useAsyncScan<number>({ onExpire: refetch });
+
+  const {
+    scanningId: scanningNetwork,
+    beginScan: beginScanNetwork,
+    endScan: endScanNetwork
+  } = useAsyncScan<string>({ onExpire: refetch });
+
+  const { data: scanStatus } = useFullScanStatus(scanningRoomId ?? 0, scanningRoomId !== null);
 
   const { data: routesData, isLoading: routesLoading } = useNetworkRoutes(
     routes.isOpen
@@ -206,7 +223,7 @@ function Network() {
       if (lastCompletedPhaseRef.current === scanStatus.phase) return;
       lastCompletedPhaseRef.current = scanStatus.phase;
 
-      setScanningRoomId(null);
+      endScanRoom();
       if (isComplete) {
         refetch();
       } else {
@@ -215,7 +232,7 @@ function Network() {
     } else {
       lastCompletedPhaseRef.current = null;
     }
-  }, [scanStatus, refetch]);
+  }, [scanStatus, endScanRoom, refetch]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -364,6 +381,7 @@ function Network() {
       onOk: async () => {
         try {
           await scanNetwork.mutateAsync({ ipNetwork: record.ip_network, roomId: record.room_id! });
+          beginScanNetwork(record.ip_network);
           msg.info(t('networkList.message.scanSubmitted', { network: record.ip_network }));
           setTimeout(() => refetch(), 30000);
         } catch {
@@ -390,7 +408,7 @@ function Network() {
           });
           lastCompletedPhaseRef.current = null;
           await triggerFullScan.mutateAsync(Number(table.filters.room_id));
-          setScanningRoomId(Number(table.filters.room_id));
+          beginScanRoom(Number(table.filters.room_id));
           msg.info(t('networkList.message.fullScanSubmitted'));
         } catch {
           msg.error(t('ip.message.scanNetworkFailed'));
@@ -406,19 +424,23 @@ function Network() {
           const payload = event.payload as Record<string, unknown>;
           const roomId = payload.room_id as number | undefined;
           if (roomId) {
-            setScanningRoomId(null);
+            endScanRoom();
             refetch();
           }
           return;
         }
 
         if (event.event_type === 'ip_scan_complete') {
+          const network = (event.payload as Record<string, unknown>).network;
+          if (typeof network !== 'string' || scanningNetwork === network) {
+            endScanNetwork();
+          }
           refetch();
           return;
         }
 
         if (event.event_type === 'scan_failed') {
-          setScanningRoomId(null);
+          endScanRoom();
           refetch();
           return;
         }
@@ -431,19 +453,19 @@ function Network() {
         const phase = progress.phase as string;
 
         if (phase === 'failed') {
-          setScanningRoomId(null);
+          endScanRoom();
           refetch();
           return;
         }
 
         if (phase === '完成') {
-          setScanningRoomId(null);
+          endScanRoom();
           refetch();
           return;
         }
 
       },
-      [refetch]
+      [scanningNetwork, endScanNetwork, endScanRoom, refetch]
     )
   );
 
@@ -564,7 +586,7 @@ function Network() {
             size="small"
             icon={<SearchOutlined />}
             onClick={() => handleScanNetwork(r)}
-            loading={scanNetwork.isPending}
+            disabled={scanningNetwork === r.ip_network}
           >
             {t('ip.action.scan')}
           </Button>
@@ -612,6 +634,8 @@ function Network() {
       {renderActions(r)}
     </Space>
   );
+
+  const fullScanDisabled = scanningRoomId === Number(table.filters.room_id);
 
   const scanProgressIndicator =
     scanStatus && !SCAN_TERMINAL_PHASES.has(scanStatus.phase) ? (
@@ -693,22 +717,55 @@ function Network() {
             ]}
             table={table}
             extra={
-              <>
-                <Button icon={<ApartmentOutlined />} onClick={() => routes.open()}>
-                  {t('networkList.action.routeList')}
-                </Button>
-                <Button
-                  icon={<CloudSyncOutlined />}
-                  onClick={handleFullScan}
-                  loading={triggerFullScan.isPending}
-                >
-                  {t('networkList.action.fullScan')}
-                </Button>
-                <Button icon={<ExportOutlined />} onClick={handleExport}>
-                  {t('ip.action.exportCsv')}
-                </Button>
-                {scanProgressIndicator}
-              </>
+              isMobile ? (
+                <>
+                  <Button
+                    icon={<CloudSyncOutlined />}
+                    onClick={handleFullScan}
+                    disabled={fullScanDisabled}
+                  >
+                    {t('networkList.action.fullScan')}
+                  </Button>
+                  {scanProgressIndicator}
+                  <Dropdown
+                    menu={{
+                      items: [
+                        {
+                          key: 'routes',
+                          icon: <ApartmentOutlined />,
+                          label: t('networkList.action.routeList'),
+                          onClick: () => routes.open()
+                        },
+                        {
+                          key: 'export',
+                          icon: <ExportOutlined />,
+                          label: t('ip.action.exportCsv'),
+                          onClick: handleExport
+                        }
+                      ]
+                    }}
+                  >
+                    <Button icon={<MoreOutlined />} aria-label={tc('action.more')} />
+                  </Dropdown>
+                </>
+              ) : (
+                <>
+                  <Button icon={<ApartmentOutlined />} onClick={() => routes.open()}>
+                    {t('networkList.action.routeList')}
+                  </Button>
+                  <Button
+                    icon={<CloudSyncOutlined />}
+                    onClick={handleFullScan}
+                    disabled={fullScanDisabled}
+                  >
+                    {t('networkList.action.fullScan')}
+                  </Button>
+                  <Button icon={<ExportOutlined />} onClick={handleExport}>
+                    {t('ip.action.exportCsv')}
+                  </Button>
+                  {scanProgressIndicator}
+                </>
+              )
             }
           />
         }

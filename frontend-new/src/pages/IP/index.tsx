@@ -41,6 +41,7 @@ import { useCopyInfo } from '@/utils/clipboard';
 import { exportCSV } from '@/utils/csv';
 import { useGlobalEventListener } from '@/hooks/useGlobalEvents';
 import type { GlobalEvent } from '@/hooks/useGlobalEvents';
+import { useAsyncScan } from '@/hooks/useAsyncScan';
 import { useBatchSelection } from '@/hooks/useBatchSelection';
 import { BatchActionBar } from '@/components/BatchActionBar';
 import { IPEditModal } from './IPEditModal';
@@ -72,6 +73,7 @@ function IP() {
     const roomId = urlParams.get('room_id');
     if (search) table.setSearch(search);
     if (roomId) table.updateFilter('room_id', roomId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateIPCustomer = useUpdateIPCustomer();
@@ -115,19 +117,27 @@ function IP() {
     getRowKey: (r) => `${r.ip_address}|${r.room_id ?? ''}|${r.id ?? ''}`
   });
 
+  const {
+    scanningId: scanningNetwork,
+    beginScan: beginScanNetwork,
+    endScan: endScanNetwork
+  } = useAsyncScan<boolean>();
+
   useGlobalEventListener(
     useCallback(
       (event: GlobalEvent) => {
         if (event.event_type === 'ip_scan_complete') {
+          endScanNetwork();
           refetch();
           return;
         }
         if (event.event_type === 'scan_failed') {
+          endScanNetwork();
           refetch();
           return;
         }
       },
-      [refetch]
+      [endScanNetwork, refetch]
     )
   );
 
@@ -427,6 +437,7 @@ function IP() {
             ipNetwork: table.search,
             roomId: Number(table.filters.room_id)
           });
+          beginScanNetwork(true);
           msg.info(t('ip.message.scanNetworkSubmitted'));
         } catch {
           msg.error(t('ip.message.scanNetworkFailed'));
@@ -678,7 +689,7 @@ function IP() {
             roomOptions={roomOptions ?? []}
             customerOptions={customerOptions ?? []}
             switchOptions={switchOptions ?? []}
-            scanNetworkPending={scanNetwork.isPending}
+            scanNetworkDisabled={scanningNetwork === true}
             onOpenBatchBan={() => {
               batchBan.open();
             }}

@@ -75,7 +75,7 @@ def put_credentials(device_id: int):
     device_ids = body.get("device_ids") or [device_id]
 
     for did in device_ids:
-        credential_service.upsert(did, protocol, payload, name)
+        credential_service.bind_device(did, protocol, payload, name)
     _audit_credential_change(
         "monitor_credential:upsert",
         {"protocol": protocol, "device_ids": device_ids, "count": len(device_ids), "name": name},

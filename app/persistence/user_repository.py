@@ -14,7 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from app.models.user import User
-from app.models.rbac import Role, UserRole
+from app.models.rbac import Permission, Role, RolePermission, UserRole
 from app.persistence.base import SQLAlchemyRepository, QueryOptimizationMixin
 from app.core.enums import UserStatus
 from app.exceptions.data_access import QueryExecutionError, RecordNotFoundError
@@ -162,6 +162,28 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
             self.session.query(User.id)
             .join(UserRole, UserRole.user_id == User.id)
             .filter(UserRole.role_id == role_id, User.status == UserStatus.ACTIVE)
+            .all()
+        )
+        return [r[0] for r in rows]
+
+    def list_unlocked_ids_with_permission(self, permission_code: str) -> List[int]:
+        """持指定权限码、且**未锁定**、状态正常的用户 ID（"最后一个可用管理员"判定用）。
+
+        四表 join（User → UserRole → RolePermission → Permission）不可省：
+        `security:session` 挂在**角色**上，用户能否解锁别人取决于
+        角色→权限的链路，而不是用户名或角色名。
+
+        排除已锁定与停用的账号是本方法的**用途**决定的 —— 它要回答的是
+        "锁掉这个账号后还剩几个人能操作"，把已锁定的算进来防线就形同虚设。
+        """
+        rows = (
+            self.session.query(User.id)
+            .join(UserRole, UserRole.user_id == User.id)
+            .join(RolePermission, RolePermission.role_id == UserRole.role_id)
+            .join(Permission, Permission.id == RolePermission.permission_id)
+            .filter(Permission.code == permission_code,
+                    User.locked_at.is_(None), User.status == UserStatus.ACTIVE)
+            .distinct()
             .all()
         )
         return [r[0] for r in rows]
@@ -364,6 +386,47 @@ class UserRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         except SQLAlchemyError as e:
             self.logger.error(f"查找激活用户失败: {e}")
             raise QueryExecutionError("查找用户失败", original_error=e) from e
+
+
+    def list_local_password_changed_before(self, deadline) -> List[User]:
+        """本地账号中「改密时间早于 `deadline`」的（密码过期巡检用）。
+
+        为什么只收本地账号：LDAP 账号的口令由目录服务管，不落在
+        `password_changed_at` 上；让它们参与本地有效期判定只会产生误报。
+        `auth_source` 为 `NOT NULL DEFAULT 'local'`，故等值过滤不会漏存量行。
+        """
+        try:
+            return (
+                self.session.query(User)
+                .filter(
+                    User.auth_source == "local",
+                    User.password_changed_at.isnot(None),
+                    User.password_changed_at < deadline,
+                )
+                .all()
+            )
+        except SQLAlchemyError as e:
+            self.logger.error(f"查询密码过期用户失败: {e}")
+            raise QueryExecutionError("查询密码过期用户失败", original_error=e) from e
+
+    def list_local_without_password_changed_at(self) -> List[User]:
+        """本地账号中「无改密记录」的（存量语义：策略启用前从未记录）。
+
+        与过期判定分开是刻意的：NULL 不是"过期"，是"没记录"，只能提示不能拒登
+        （迁移 0030 不回填，否则等于给全部存量账号判一次过期）。
+        """
+        try:
+            return (
+                self.session.query(User)
+                .filter(
+                    User.auth_source == "local",
+                    User.password_changed_at.is_(None),
+                )
+                .all()
+            )
+        except SQLAlchemyError as e:
+            self.logger.error(f"查询无改密记录用户失败: {e}")
+            raise QueryExecutionError("查询无改密记录用户失败", original_error=e) from e
 
     def find_recent_users(self, days: int = 7, limit: int = 10) -> List[User]:
         """查找最近注册的用户"""

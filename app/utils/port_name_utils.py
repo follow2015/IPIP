@@ -10,12 +10,16 @@ from typing import Optional
 from app.core.enums import SwitchDeviceTypeCode
 
 
+VLAN_PORT_NAME_RE = re.compile(r"^(?:vlan|vlanif|vlan-interface)\d+$", re.IGNORECASE)
+LAG_PORT_NAME_RE = re.compile(
+    r"^(?:eth-trunk|bridge-aggregation|port-channel)\d+$", re.IGNORECASE,
+)
+
+
 
 def is_trunk_interface(port: str) -> bool:
     """判断端口名称是否为链路聚合接口（Eth-Trunk10 / Bridge-Aggregation10 / Port-channel10）"""
-    return bool(re.match(
-        r"^(?:eth-trunk|bridge-aggregation|port-channel)\d+$", port, re.IGNORECASE,
-    ))
+    return bool(LAG_PORT_NAME_RE.match(port))
 
 
 def is_aggregate_interface(port: str) -> bool:
@@ -31,7 +35,7 @@ def extract_trunk_id(port: str) -> Optional[int]:
 
 def is_vlan_interface(port: str) -> bool:
     """判断端口名称是否为 VLAN 接口（Vlanif100 / Vlan100 / Vlan-interface100）"""
-    return bool(re.match(r"^(?:vlan|vlanif|vlan-interface)\d+$", port, re.IGNORECASE))
+    return bool(VLAN_PORT_NAME_RE.match(port))
 
 
 

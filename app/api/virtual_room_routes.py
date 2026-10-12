@@ -159,7 +159,31 @@ def scan_virtual_room(virtual_room_id):
         phase = existing_progress.get("phase")
         completed = existing_progress.get("completed", 0)
         total = existing_progress.get("total", 0)
-        if phase != "完成" and not (total > 0 and completed >= total):
+        busy = phase not in ("完成", "failed") and not (total > 0 and completed >= total)
+        if busy:
+            try:
+                from app.services.scan_redis import ScanRedis
+
+                _redis = (
+                    cache_manager.primary_storage.redis_client
+                    if cache_manager.primary_storage
+                    else None
+                )
+                if _redis:
+                    sr = ScanRedis(_redis)
+                    stale, reason = sr.progress_is_stale(scope)
+                    if stale:
+                        sr.progress_mark_stale_failed(scope, reason)
+                        logger.warning(
+                            "虚拟机房扫描僵死，已置 failed 并放行新扫描: vr=%d, reason=%s",
+                            virtual_room_id, reason,
+                        )
+                        busy = False
+            except Exception:
+                logger.warning(
+                    "虚拟机房扫描僵死判定失败: vr=%d", virtual_room_id, exc_info=True
+                )
+        if busy:
             return APIResponse.error("已有扫描任务在进行中", error_code="SCAN_RUNNING", status_code=400)
 
     device_ids = _service.get_member_device_ids(virtual_room_id)
@@ -199,6 +223,25 @@ def scan_virtual_room(virtual_room_id):
                     error_code="SCAN_CONFLICT",
                     status_code=400,
                 )
+
+    try:
+        from app.services.scan_redis import ScanRedis, get_scan_redis_client
+
+        pre_redis = get_scan_redis_client()
+        if pre_redis:
+            sr_pre = ScanRedis(pre_redis)
+            sr_pre.progress_set(scope, {
+                "scope": scope,
+                "room_id": 0,
+                "total": 0,
+                "completed": 0,
+                "failed": 0,
+                "phase": "准备中",
+                "elapsed_seconds": 0,
+                "eta_seconds": 0,
+            })
+    except Exception:
+        logger.warning("预写虚拟机房扫描进度失败: vr=%d", virtual_room_id, exc_info=True)
 
     from flask import current_app
     app_ref = current_app._get_current_object()
@@ -248,23 +291,48 @@ def scan_virtual_room(virtual_room_id):
                         })
                     return
                 from app.services.switch_events import emit_global_event
+                _status = (
+                    result.get("status", "success") if isinstance(result, dict) else "success"
+                )
+                _scan_failed = _status == "failed"
                 emit_global_event("room_scan_complete", {
                     "scope": scope,
                     "virtual_room_id": virtual_room_id,
                     "room_id": None,
+                    **({"reason": _status} if _scan_failed else {}),
                 })
                 from app.services.notification_service import notification_service
-                notification_service.notify(
-                    type=NotificationTypeCode.VIRTUAL_ROOM_SCAN_COMPLETE,
-                    severity="info",
-                    title="虚拟机房扫描完成",
-                    content=f"虚拟机房「{_vr_name}」的网络扫描已完成",
-                    payload={"virtual_room_id": virtual_room_id, "scope": scope},
-                    source_module="scan",
-                    target_type="broadcast",
+                _total = result.get("total_switches", 0) if isinstance(result, dict) else 0
+                _failed = result.get("failed", 0) if isinstance(result, dict) else 0
+                if _scan_failed:
+                    notification_service.notify(
+                        type=NotificationTypeCode.VIRTUAL_ROOM_SCAN_FAILED,
+                        severity="warning",
+                        title="虚拟机房扫描失败",
+                        content=(
+                            f"虚拟机房「{_vr_name}」未采集到任何设备数据"
+                            f"（成功 0 / 共 {_total} 台，失败 {_failed} 台）"
+                        ),
+                        payload={"virtual_room_id": virtual_room_id, "scope": scope,
+                                 "status": _status, "total": _total, "failed": _failed},
+                        source_module="scan",
+                        target_type="broadcast",
 
-                    idempotency_key=f"vr_scan_complete:{virtual_room_id}:{int(__import__('time').time())}",
-                )
+                        idempotency_key=f"vr_scan_failed:{virtual_room_id}:{int(__import__('time').time())}",
+                    )
+                else:
+                    notification_service.notify(
+                        type=NotificationTypeCode.VIRTUAL_ROOM_SCAN_COMPLETE,
+                        severity="info",
+                        title="虚拟机房扫描完成",
+                        content=f"虚拟机房「{_vr_name}」的网络扫描已完成",
+                        payload={"virtual_room_id": virtual_room_id, "scope": scope,
+                                 "status": _status, "total": _total, "failed": _failed},
+                        source_module="scan",
+                        target_type="broadcast",
+
+                        idempotency_key=f"vr_scan_complete:{virtual_room_id}:{int(__import__('time').time())}",
+                    )
         except Exception as e:  # noqa: BLE001 -- 后台异步任务顶层兜底：线程内异常无人接收，必须捕获并转为前端通知/清理锁
             logger.error("异步虚拟机房扫描 %d 失败: %s", virtual_room_id, e)
             try:

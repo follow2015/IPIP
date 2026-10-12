@@ -1,11 +1,22 @@
 # -*- coding: utf-8 -*-
-"""凭据加解密服务（共享凭据 + 关联 + 失效广播）
+"""凭据加解密服务（共享凭据 + 设备绑定 + 失效广播）
 
 - 监控凭据为「共享凭据」实体（app/models/monitor_credential.MonitorCredential）：
   protocol + encrypted_payload（AES-256-GCM 密文）+ payload_hash（去重键）+ name + enabled。
 - 设备关联经 device_monitor_credentials 多对多表。
-- 同一份 (protocol, payload_hash) 凭据被多台设备复用：一处改密，所有关联设备下一轮探测覆盖。
-- 凭据变更后对所有关联设备的旧快照 mark_stale，迫使重新探测。
+- 同一份 (protocol, payload_hash) 凭据可被多台设备复用。
+
+**两个正交域（勿混，见 docs/design/监控凭据语义分层与入口收敛-20261010.md）**：
+
+- **设备域**（`bind_device` / `update_payload` / `delete` / `link_existing`）：
+  只动 `(credential_id, device_id=<本机>)` 这一行的关联；旧行无人引用才 GC；
+  只 `mark_stale(本机)`。入口 = 设备详情、批量修改监控。
+- **凭据域**（`create_shared_credential` / `update_shared_payload` /
+  `patch_credential` / `delete_shared_credential`）：
+  可影响该凭据的**全部**关联设备（共享凭据的本质），前端须显式提示影响台数。
+  入口 = 凭据中心。
+
+判据：任何「用户以为只影响一台」的入口，落到的必须是设备域。
 """
 import hashlib
 import json
@@ -58,12 +69,30 @@ class MonitorCredentialService:
             self._repo.session.commit()
         return payload
 
+    @staticmethod
+    def _enforce_snmp_gate(protocol: str, payload: dict) -> None:
+        """SNMP 写入期闸门（安全中心一期强制点②）。
+
+        四条写路径（创建共享 / 设备级部分更新 / 共享级部分更新 / 设备绑定）共用此处 ——
+        分散内联 4 份很容易出现"改了 3 处漏 1 处"的静默缺口。
+
+        调用点必须在**合并 partial 之后的完整 payload** 上：只校验增量时，分两次把
+        community 改成 `public` 就能绕过（每次单看都不违规）。
+
+        非 SNMP 协议直接放行 —— 闸门只对 SNMP 版本/团体名有意见。
+        """
+        if protocol != "snmp":
+            return
+        from app.services.security.snmp_gate import validate_credential
+        validate_credential(payload)
+
     def create_shared_credential(self, protocol: str, payload: dict, name: str):
         """仅创建共享凭据（不关联设备），供 post_credentials 路由在无 device_ids 时调用。
 
         P1 修复：把原路由层直接 encrypt + 访问私有 _payload_hash 的逻辑下沉到服务层，
         路由层不再绕过服务封装。返回新建/复用的 MonitorCredential。
         """
+        self._enforce_snmp_gate(protocol, payload)
         encrypted = encrypt(json.dumps(payload, ensure_ascii=False))
         return self._repo.create_or_reuse_credential(
             protocol, encrypted, _payload_hash(payload), name, strict_name_conflict=True
@@ -122,6 +151,7 @@ class MonitorCredentialService:
         if not updated_fields:
             return [], False, cred.id, cred.protocol
 
+        self._enforce_snmp_gate(cred.protocol, merged)
         encrypted = encrypt(json.dumps(merged, ensure_ascii=False))
         payload_hash = _payload_hash(merged)
         target_name = name or cred.name
@@ -165,6 +195,7 @@ class MonitorCredentialService:
         if not updated_fields:
             return [], False, cred.id, cred.protocol
 
+        self._enforce_snmp_gate(cred.protocol, merged)
         encrypted = encrypt(json.dumps(merged, ensure_ascii=False))
         payload_hash = _payload_hash(merged)
         target_name = name or cred.name
@@ -212,62 +243,67 @@ class MonitorCredentialService:
             meta["has_community"] = True
         return meta
 
-    def upsert(self, device_id: int, protocol: str, payload: dict, name: str) -> None:
-        """按【凭据】维度配置/更新监控凭据，并传播到所有共享该凭据的设备。
+    def bind_device(self, device_id: int, protocol: str, payload: dict, name: str) -> int:
+        """设备域：为本机绑定监控凭据（整份替换语义）。**只影响本设备**。
 
-        共享凭据语义（设计如此，勿删）：一份共享凭据（相同明文 hash）关联多台设备时，
-        「一处改密 = 全部更新」——本方法会把旧共享凭据的**所有**关联设备一起迁移到新凭据
-        （L188-196），保证真正共享同一密码的设备始终一致。
+        这是「设备详情」与「批量修改监控」两个 UI 入口唯一应有的写入口。
+        不变量（设计 `docs/design/监控凭据语义分层与入口收敛-20261010.md` §2.2）：
 
-        单台设备的密码编辑（不想影响其它共享设备）应走 `update_payload()`
-        （PUT .../payload 端点），它仅把当前设备从共享凭据迁移出去、其余设备不变。
-        两者分工：upsert=共享凭据级编辑（传播）；update_payload=设备级编辑（隔离）。
+        - **I1/I3**：只增删 `(cred, device_id=<本机>)` 这一行的关联，
+          绝不解绑其它设备、绝不把其它设备迁到新凭据；
+        - **I2**：旧凭据行**仅在已无任何关联**时才 GC（唯一合法删除路径）；
+        - **I4**：只 `mark_stale(本机)`，不广播；
+        - **I5**：不抢占他人的 `name` —— 与旧行同名时先建临时名，
+          待旧行腾空被 GC 后再恢复目标名。
 
-        注意 P20 审查结论：原报告「upsert 传播过激进」为误读——传播是预期共享语义，
-        正确的单设备入口是 update_payload，不是删除 upsert 的传播逻辑。
+        「一处改密 = 全部更新」是**凭据域**语义，入口是 `update_shared_payload()`
+        （凭据中心「编辑密文」，UI 已提示「影响 N 台设备」），**不是**本方法。
+
+        历史教训（2026-10-10 事故）：本方法的前身 `upsert` 在改密时会连带把旧凭据的
+        **全部**关联设备一起迁走并删除旧行，导致「设备详情页改 1 台 = 实际改 8 台」，
+        且 community / 口令明文随行删除而**永久不可恢复**。
+        详见 `docs/review/监控凭据全链路评审-20261010.md` P0-1 / P0-3。
+
+        Returns:
+            本机最终绑定的 credential_id。
         """
+        self._enforce_snmp_gate(protocol, payload)
         encrypted = encrypt(json.dumps(payload, ensure_ascii=False))
         payload_hash = _payload_hash(payload)
         old = self._repo.find_enabled(device_id, protocol)
 
         self._cleanup_other_protocols(device_id, protocol)
 
+        target_name = name
         if old is not None and name == old.name:
-            old_linked = self._repo.linked_device_ids(old.id)
-            self._repo.delete_credential(old.id)
-        else:
-            old_linked = None
+            target_name = f"{name}#{old.id}"
 
         cred = self._repo.create_or_reuse_credential(
-            protocol, encrypted, payload_hash, name, strict_name_conflict=True
+            protocol, encrypted, payload_hash, target_name, strict_name_conflict=True
         )
-        if old_linked is not None:
-            for did in old_linked:
-                self._repo.link(cred.id, did)
-        elif old is not None and old.id != cred.id:
-            for did in self._repo.linked_device_ids(old.id):
-                self._repo.unlink(old.id, did)
-                self._repo.link(cred.id, did)
-            if not self._repo.linked_device_ids(old.id):
+
+        if old is not None and old.id != cred.id:
+            self._repo.unlink(old.id, device_id)
+            if not self._repo.linked_device_ids(old.id):  # I2：无人引用才 GC
                 self._repo.delete_credential(old.id)
-        else:
-            self._repo.link(cred.id, device_id)
-        linked_ids = self._repo.linked_device_ids(cred.id)
-        self._status_repo.mark_stale_batch(linked_ids)
-        now = now_utc_naive()
-        for did in linked_ids:
-            if not self._status_repo.find_by_device(did):
-                self._status_repo.upsert(
-                    device_id=did,
-                    protocol=protocol,
-                    reachable=False,
-                    ever_reachable=False,
-                    down_alerted=False,
-                    down_episode=0,
-                    consecutive_failures=0,
-                    last_checked_at=now,
-                    monitor_enabled=True,
-                )
+                if target_name != name:  # I5：名字腾出来了才恢复
+                    self._repo.update_credential(cred.id, name=name)
+
+        self._repo.link(cred.id, device_id)
+        self._status_repo.mark_stale(device_id)
+        if not self._status_repo.find_by_device(device_id):
+            self._status_repo.upsert(
+                device_id=device_id,
+                protocol=protocol,
+                reachable=False,
+                ever_reachable=False,
+                down_alerted=False,
+                down_episode=0,
+                consecutive_failures=0,
+                last_checked_at=now_utc_naive(),
+                monitor_enabled=True,
+            )
+        return cred.id
 
     def _cleanup_other_protocols(self, device_id: int, keep_protocol: str) -> None:
         """解除设备与 keep_protocol 以外协议的凭据关联。

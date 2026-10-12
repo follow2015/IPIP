@@ -14,7 +14,8 @@ export {
 } from './status';
 export {
   useBatchDeleteCredentials,
-  useCreateAndLinkCredential,
+  useBindDeviceCredential,
+  useCreateSharedCredential,
   useDeleteCredential,
   useLinkExistingCredential,
   useLinkedDevices,

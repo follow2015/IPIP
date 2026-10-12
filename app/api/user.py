@@ -18,6 +18,7 @@ from app.persistence.user_log_repository import UserLogRepository
 
 from app.services.auth import auth_manager, login_required, permission_required
 from app.utils import rate_limit_api, rate_limit_login
+from app.utils.security.client_ip import get_client_ip
 from app.utils.transactional import transactional
 
 
@@ -30,15 +31,13 @@ security_service = SecurityService()
 
 
 def _get_client_ip() -> str:
-    """从请求头中提取真实客户端 IP。
+    """从请求中提取真实客户端 IP。
 
-    优先读取反向代理写入的 X-Forwarded-For，取第一个非空段；
-    否则回退到 request.remote_addr。
+    委托公共实现（n7 口径，TRUSTED_PROXIES 信任边界）：仅当直连对端是可信代理时
+    才采信 X-Forwarded-For 最右段，否则用 remote_addr —— 修复前取 XFF 最左段，
+    该值由请求方自行携带、可任意伪造。
     """
-    forwarded_for = request.headers.get("X-Forwarded-For", "")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-    return request.remote_addr or ""
+    return get_client_ip()
 
 
 

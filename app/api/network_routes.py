@@ -393,7 +393,15 @@ def trigger_full_scan(room_id):
             sr = ScanRedis(cache_manager.primary_storage.redis_client)
             progress = sr.progress_get(room_id)
             if progress and progress.get("phase") not in ("完成", "failed", None):
-                return APIResponse.error("已有扫描任务进行中", status_code=400)
+                stale, reason = sr.progress_is_stale(room_id)
+                if stale:
+                    sr.progress_mark_stale_failed(room_id, reason)
+                    logger.warning(
+                        "全量扫描僵死，已置 failed 并放行新扫描: room_id=%d, reason=%s",
+                        room_id, reason,
+                    )
+                else:
+                    return APIResponse.error("已有扫描任务进行中", status_code=400)
             sr.progress_set(room_id, {
                 "room_id": room_id,
                 "total": 0,

@@ -11,6 +11,7 @@ import type { SwitchPort } from '@/types/models';
 import { getStatusLabel } from '@/utils/portStatus';
 import { StatusTag } from '@/components/StatusTag';
 import { PORT_USAGE_STATUS_MAP, LINK_STATUS_MAP } from '@/types/enums';
+import { parseServerTime } from '@/utils/format';
 import type { SubmitActionFn, RenderPortActionsFn } from '@/types/port';
 
 type ColumnType = TableProps<SwitchPort>['columns'];
@@ -22,6 +23,66 @@ interface ColumnT {
 
 function renderUsageStatus(v: string) {
   return <StatusTag status={v} statusMap={PORT_USAGE_STATUS_MAP} />;
+}
+
+function formatCounter(v: number | null | undefined, t: ColumnT) {
+  return v == null ? t.d('port.counters.notCollected') : String(v);
+}
+
+function renderErrorCounters(port: SwitchPort, t: ColumnT) {
+  const { in_errors, out_errors, in_discards, out_discards, error_counters_at } = port;
+  if (in_errors == null && out_errors == null && in_discards == null && out_discards == null) {
+    return '-';
+  }
+  const errors = (in_errors ?? 0) + (out_errors ?? 0);
+  const discards = (in_discards ?? 0) + (out_discards ?? 0);
+  const sampledAt = error_counters_at ? parseServerTime(error_counters_at) : null;
+
+  const detail = (
+    <div style={{ lineHeight: 1.7, fontSize: 12 }}>
+      <div>
+        {t.d('port.counters.inErrors')}: {formatCounter(in_errors, t)}
+      </div>
+      <div>
+        {t.d('port.counters.outErrors')}: {formatCounter(out_errors, t)}
+      </div>
+      <div>
+        {t.d('port.counters.inDiscards')}: {formatCounter(in_discards, t)}
+      </div>
+      <div>
+        {t.d('port.counters.outDiscards')}: {formatCounter(out_discards, t)}
+      </div>
+      {sampledAt && (
+        <div>
+          {t.d('port.counters.sampledAt')}: {sampledAt.toLocaleString()}
+        </div>
+      )}
+      <div style={{ opacity: 0.75 }}>{t.d('port.counters.hint')}</div>
+    </div>
+  );
+
+  return (
+    <Tooltip title={detail}>
+      {/* wrap：窄屏（该列仅 110px）不折行会把内容顶宽致横向溢出（ipip/no-bare-space） */}
+      <Space size={4} wrap>
+        {errors > 0 ? (
+          <Tag color="error" style={{ margin: 0 }}>
+            {errors}
+          </Tag>
+        ) : (
+          <span>{errors}</span>
+        )}
+        <span style={{ opacity: 0.45 }}>/</span>
+        {discards > 0 ? (
+          <Tag color="warning" style={{ margin: 0 }}>
+            {discards}
+          </Tag>
+        ) : (
+          <span>{discards}</span>
+        )}
+      </Space>
+    </Tooltip>
+  );
 }
 
 interface SshColumnDeps {
@@ -67,6 +128,12 @@ export function buildSshColumns({
       dataIndex: 'speed',
       key: 'speed',
       render: (v: string) => v || '-'
+    },
+    {
+      title: t.d('port.column.errorCounters'),
+      key: 'error_counters',
+      width: 110,
+      render: (_: unknown, port: SwitchPort) => renderErrorCounters(port, t)
     },
     {
       title: t.d('form.network.macAddress.label'),
@@ -155,6 +222,12 @@ export function buildManualColumns({
       dataIndex: 'speed',
       key: 'speed',
       render: (v: string) => v || '-'
+    },
+    {
+      title: t.d('port.column.errorCounters'),
+      key: 'error_counters',
+      width: 110,
+      render: (_: unknown, port: SwitchPort) => renderErrorCounters(port, t)
     },
     {
       title: t.d('form.network.macAddress.label'),

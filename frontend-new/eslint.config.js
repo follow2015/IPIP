@@ -60,6 +60,18 @@ const LAYOUT_GATE_SELECTORS = {
     message:
       '筛选控件的固定宽度在窄屏会溢出。请走 FilterBar 的 width prop（移动端自动转 100%），' +
       '或用相对值（% / flex）。'
+    // [WARN] 已知误报：**antd Table 的 columns 列宽**也落在这个 selector 里
+    //   （它就是 `Property[key.name="width"][value.type="Literal"]`）。列宽与
+    //   "筛选控件"不是一回事 —— 表格在移动端靠 `scroll={{ x }}` 横向滚动承载，
+    //   列宽不是溢出源。
+    //   2026-10-10 实证：COUNTERS 收窄版给 UnifiedPortTab/columns.tsx 新增两处
+    //   `width: 110`（errorCounters 列，两处 columns 定义各一）⇒ 全仓 1127 → 1129。
+    //   与该文件既有的 `width: 200`（action 列）同型，属同一种误报。
+    //
+    //   正确清理方向是**收窄 selector 到 FilterBar / 工具栏上下文**（那需要本地
+    //   规则读上下文，ESQuery 做不到，参见同表 `no-adhoc-overflow` 的同样处置），
+    //   而不是逐个去删表格列宽 —— 后者只会让表格布局抖动，且门禁判据依旧是错的。
+    //   在那之前：新增告警要先分清"筛选控件"还是"表格列宽"，后者记为误报、抬基线。
   },
   'no-segmented-in-toolbar': {
     // <Toolbar 类组件> 内部嵌 <Segmented>

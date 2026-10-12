@@ -24,6 +24,7 @@ AUDITED_RESOURCES = {
     "/api/webhook-configs": "webhook_config",
     "/api/settings/mail": "mail_setting",
     "/api/settings/voice": "voice_setting",
+    "/api/security": "security_policy",
 }
 
 METHOD_ACTION_MAP = {
@@ -34,8 +35,13 @@ METHOD_ACTION_MAP = {
 }
 
 
+_EXCLUDED_PATH_SUFFIXES = ("/csp-report",)
+
+
 def _resolve_resource(path: str) -> str | None:
-    """从请求路径解析资源类型"""
+    """从请求路径解析资源类型；排除项（匿名上报）返回 None。"""
+    if path.endswith(_EXCLUDED_PATH_SUFFIXES):
+        return None
     for prefix, resource in AUDITED_RESOURCES.items():
         if path.startswith(prefix):
             return resource

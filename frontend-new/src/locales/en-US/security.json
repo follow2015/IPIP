@@ -1,0 +1,108 @@
+{
+  "title": "Security Center",
+  "overview": {
+    "compliance": "Compliant",
+    "violations": "Violations",
+    "rule": "Rule",
+    "severity": "Severity",
+    "count": "Violations",
+    "status": "Status",
+    "tabItems": "Checks",
+    "tabFindings": "Findings"
+  },
+  "findings": {
+    "empty": "No findings",
+    "subject": "Subject",
+    "lastSeen": "Last seen"
+  },
+  "rules": {
+    "user": {
+      "password_expired": "Password expired",
+      "password_never_changed": "Password never changed",
+      "dormant_account": "Dormant account"
+    },
+    "snmp": {
+      "v2c_in_use": "SNMP v2c still in use",
+      "default_community": "Default or weak community"
+    },
+    "login": {
+      "remote_access": "Login from untrusted source",
+      "brute_force_stats": "Too many login failures"
+    },
+    "system": {
+      "audit_retention": "Insufficient audit retention"
+    }
+  },
+  "severity": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "status": {
+    "ok": "Compliant",
+    "open": "Violations"
+  },
+  "policyNames": {
+    "password": {
+      "min_length": "Min password length",
+      "require_classes": "Required character classes",
+      "max_age_days": "Password max age",
+      "min_age_days": "Min age between changes",
+      "expire_warn_days": "Expiry warning days",
+      "force_change_on_reset": "Force change after reset"
+    },
+    "snmp": {
+      "allowed_versions": "Allowed SNMP versions",
+      "forbid_default_community": "Forbid default community",
+      "mode": "SNMP policy mode"
+    },
+    "login": {
+      "remote_access": "Remote-login mode",
+      "trusted_networks": "Trusted networks",
+      "brute_force_threshold": "Login failure threshold",
+      "brute_force_window_hours": "Brute-force window"
+    },
+    "user": {
+      "dormant_days": "Dormant threshold"
+    },
+    "audit": {
+      "retention_days": "Audit retention"
+    }
+  },
+  "values": {
+    "on": "On",
+    "off": "Off",
+    "audit": "Audit",
+    "enforce": "Enforce"
+  },
+  "policies": {
+    "title": "Security Policies",
+    "save": "Save",
+    "default": "Default",
+    "updated": "Policy updated",
+    "saveFailed": "Failed to save",
+    "impactPreview": "Impact preview",
+    "impactContent": "Switching will reject {{count}} credential(s). Continue?",
+    "scanFailed": "Impact preview failed",
+    "conflict": "This policy was modified by someone else. Refresh and retry.",
+    "notEditable": "This item cannot be edited here"
+  },
+  "remoteLogins": {
+    "title": "Remote Logins",
+    "disabled": "Remote-login detection is disabled",
+    "user": "User",
+    "ip": "IP",
+    "count": "Count",
+    "lastTime": "Last seen",
+    "lock": "Lock account",
+    "unlock": "Unlock",
+    "reason": "Lock reason",
+    "reasonRequired": "Please provide a lock reason",
+    "locked": "Account locked",
+    "unlocked": "Account unlocked",
+    "lockFailed": "Failed to lock",
+    "unlockFailed": "Failed to unlock",
+    "empty": "No remote logins"
+  }
+}

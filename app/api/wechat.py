@@ -15,6 +15,7 @@ from app.services.user_service import UserService
 from app.services.wx_service import WeChatService
 from app.openapi.doc import doc, public
 from app.services.auth import auth_manager, login_required, permission_required
+from app.utils.security.client_ip import get_client_ip
 from app.utils.transactional import transactional
 from app.utils.qrcode_manager import QRCodeManager
 from config import get_config
@@ -582,8 +583,7 @@ def confirm_qrcode():
             )
         
         if new_status == 'confirmed':
-            client_ip = (request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-                         or request.remote_addr or "")
+            client_ip = get_client_ip()
             user_service.update_last_login(
                 user.id, ip=client_ip, user_agent=request.headers.get("User-Agent"),
             )
@@ -725,8 +725,7 @@ def auto_confirm_qrcode():
             openid=test_openid
         )
         
-        client_ip = (request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-                     or request.remote_addr or "")
+        client_ip = get_client_ip()
         user_service.update_last_login(
             user.id, ip=client_ip, user_agent=request.headers.get("User-Agent"),
         )

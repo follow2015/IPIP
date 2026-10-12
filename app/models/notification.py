@@ -6,16 +6,15 @@
 - Notification：通知主体（一条通知发给多人时只存一条）
 - NotificationReceipt：投递回执（每用户一条，记录已读状态）
 """
-import logging
-
 from sqlalchemy import Index
 from sqlalchemy.orm import relationship
 from sqlalchemy import UniqueConstraint
 
 from app.models.base import BaseModel
+from app.utils.logging import get_logger
 from extensions import db
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Notification(BaseModel):

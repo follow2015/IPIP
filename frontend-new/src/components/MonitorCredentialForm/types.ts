@@ -1,12 +1,9 @@
-import type { FormInstance } from 'antd';
-
 export type MonitorProtocol = 'snmp' | 'ipmi' | 'zabbix';
 
 export interface MonitorCredentialFormProps {
   protocol: string;
   mode: 'create' | 'edit';
   payloadMeta?: Record<string, unknown>;
-  form: FormInstance;
   onValuesChange?: (
     changedValues: Record<string, unknown>,
     allValues: Record<string, unknown>

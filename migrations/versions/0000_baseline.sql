@@ -1178,7 +1178,12 @@ CREATE TABLE `network_ports` (
   KEY `ix_np_customer_id` (`customer_id`),
   KEY `idx_np_lag_group` (`lag_group_id`),
   CONSTRAINT `fk_np_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `network_ports_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
+  CONSTRAINT `network_ports_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE,
+  `in_errors` bigint NULL COMMENT '入向错包累计（ifInErrors，Counter32；NULL=设备未上报）',
+  `out_errors` bigint NULL COMMENT '出向错包累计（ifOutErrors；NULL=设备未上报）',
+  `in_discards` bigint NULL COMMENT '入向丢弃累计（ifInDiscards；NULL=设备未上报）',
+  `out_discards` bigint NULL COMMENT '出向丢弃累计（ifOutDiscards；NULL=设备未上报）',
+  `error_counters_at` datetime NULL COMMENT '上述计数的最近一次采样时间'
 ) ENGINE=InnoDB AUTO_INCREMENT=1106 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='网络设备端口表';
 
 DROP TABLE IF EXISTS `notification_receipts`;

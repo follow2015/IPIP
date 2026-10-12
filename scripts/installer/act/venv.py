@@ -407,15 +407,13 @@ def _mirror_probe_seconds(base: str, *, timeout: float = 8.0) -> float | None:
     带上 UA：裸 urllib 会被部分镜像 403（这在 sha256 探测上踩过一次）。
     """
     import time
-    import urllib.request
+
+    from .._http import open_url
 
     t0 = time.monotonic()
     try:
-        req = urllib.request.Request(
-            base.rstrip("/") + "/simple/torch/",
-            headers={"User-Agent": "ipip-installer/1.0"},
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+        with open_url(base.rstrip("/") + "/simple/torch/", timeout=timeout,
+                      headers={"User-Agent": "ipip-installer/1.0"}) as resp:
             if resp.status != 200:
                 return None
             resp.read(65536)              # 读一小段，避免只测到响应头
@@ -435,8 +433,6 @@ def _pick_cuda_mirrors() -> tuple[str, ...]:
     不可达的剔除，可达的按耗时升序（快的先分到包）；全部不可达退回官方源，
     不让"选源"变成安装失败点。
     """
-    import time
-    import urllib.request
 
     scored: list[tuple[float, str]] = []
     for base in CUDA_MIRROR_POOL:

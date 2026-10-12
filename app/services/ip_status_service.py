@@ -33,7 +33,61 @@ FAST_PROBE_PORTS: tuple = tuple(Config.COMMON_PORTS)
 
 DEFAULT_TIMEOUT: float = 1.5
 
+PING_PROCESS_OVERHEAD: float = 1.0
+
+TCP_PROBE_TIMEOUT_CAP: float = 0.8
+
+OVERALL_TIMEOUT_MARGIN: float = 15.0
+
+PROBE_BUDGET_SAFETY_FACTOR: float = 1.5
+
 SAFE_MAX_CONCURRENT: int = 30
+
+
+def estimate_probe_budget(
+    total: int,
+    timeout: float = DEFAULT_TIMEOUT,
+    max_concurrent: int = SAFE_MAX_CONCURRENT,
+    tcp_port_count: int = len(FAST_PROBE_PORTS),
+) -> float:
+    """估算 ``batch_probe_ips`` 的整体超时预算（秒）。
+
+    [WARN] 本函数返回的是**上界**，不是期望值 —— 它的唯一用途是给并发等待设一道
+    "兜底"，而不是"限速"。一旦估算低于真实成本，``asyncio.wait_for`` 会在任务尚未
+    跑完时触发：已完成的任务被回收，**还没拿到信号量的 IP 一个都没探测**，调用方
+    却把"没探到"当成"离线"。2026-10-10 线上实测该缺口（1749 个 IP）：
+    ``logs/app.log`` 记 `batch_probe_ips 整体超时(80s)，已探测 980/1749` ——
+    另有 769 个 IP（43.9%）从未被探测。
+
+    真实单 IP 成本 = ping 段 + TCP 段（仅公网 IP 且 ping 不通时才走 TCP 段）：
+      · ping 段上界 = ``timeout + PING_PROCESS_OVERHEAD``（与 ``_async_ping`` 同口径）；
+      · TCP 段上界 = ``tcp_port_count × min(timeout, TCP_PROBE_TIMEOUT_CAP)``
+        （与 ``_probe_ip`` 同口径：端口串行、全部失败才走满）。
+    两者之和是"wait_for 之内的等待上界"，再乘轮数
+    ``ceil(total / max_concurrent)``（信号量保证同时最多 max_concurrent 个在跑，
+    每个占满单 IP 上界即为一轮），最后乘 ``PROBE_BUDGET_SAFETY_FACTOR``
+    （覆盖进程/套接字装配与同轮扫描的 CPU 争抢，依据见该常量注释）并加
+    ``OVERALL_TIMEOUT_MARGIN``。
+
+    旧实现写成 ``ceil(total/max_concurrent) * (timeout + 1.0) + 15``，**整整漏算
+    TCP 段** —— 1749 个 IP、timeout=0.1 时预算 79.9s，而真实成本 ≈ 144s。
+
+    Args:
+        total: 待探测 IP 数（调用方已去重）
+        timeout: 单项超时（秒）
+        max_concurrent: 并发上限
+        tcp_port_count: 每台公网 IP 串行探测的端口数
+
+    Returns:
+        float: 整体超时预算（秒）；``total <= 0`` 时返回 0.0
+    """
+    if total <= 0:
+        return 0.0
+    per_ip = (timeout + PING_PROCESS_OVERHEAD) + tcp_port_count * min(
+        timeout, TCP_PROBE_TIMEOUT_CAP
+    )
+    rounds = math.ceil(total / max(1, max_concurrent))
+    return rounds * per_ip * PROBE_BUDGET_SAFETY_FACTOR + OVERALL_TIMEOUT_MARGIN
 
 
 
@@ -238,7 +292,7 @@ async def _async_ping(ip: str, timeout: float) -> bool:
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        await asyncio.wait_for(proc.wait(), timeout=timeout + 1.0)
+        await asyncio.wait_for(proc.wait(), timeout=timeout + PING_PROCESS_OVERHEAD)
         return proc.returncode == 0
     except asyncio.TimeoutError:
         if proc and proc.returncode is None:
@@ -327,7 +381,7 @@ async def _probe_ip(
             return ip, False
 
         for port in tcp_ports:
-            if await _async_tcp_probe(ip, port, timeout=min(timeout, 0.8)):
+            if await _async_tcp_probe(ip, port, timeout=min(timeout, TCP_PROBE_TIMEOUT_CAP)):
                 return ip, True
 
         return ip, False
@@ -363,16 +417,22 @@ async def batch_probe_ips(
     probed = 0
 
     semaphore = asyncio.Semaphore(max_concurrent)
+    tcp_ports = FAST_PROBE_PORTS
 
     async def _limited(ip: str) -> tuple:
         nonlocal probed
-        result = await _probe_ip(ip, timeout, semaphore, FAST_PROBE_PORTS)
+        result = await _probe_ip(ip, timeout, semaphore, tcp_ports)
         probed += 1
         if progress_callback and (probed % 50 == 0 or probed == total):
             progress_callback(probed, total)
         return result
 
-    overall_timeout = math.ceil(total / max_concurrent) * (timeout + 1.0) + 15
+    overall_timeout = estimate_probe_budget(
+        total=total,
+        timeout=timeout,
+        max_concurrent=max_concurrent,
+        tcp_port_count=len(tcp_ports),
+    )
 
     tasks = [asyncio.create_task(_limited(ip)) for ip in unique_ips]
     try:
@@ -382,8 +442,8 @@ async def batch_probe_ips(
         )
     except asyncio.TimeoutError:
         logger.warning(
-            "batch_probe_ips 整体超时(%.0fs)，已探测 %d/%d",
-            overall_timeout, probed, total,
+            "batch_probe_ips 整体超时(%.0fs)，已探测 %d/%d（%d 个 IP 未探测，结果不完整）",
+            overall_timeout, probed, total, total - probed,
         )
         results = []
         for t in tasks:

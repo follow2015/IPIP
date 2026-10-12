@@ -91,7 +91,6 @@ from .source_build import (
     BuildJob,
     SourceBuildError,
     cpu_count_for_make,
-    download_verified,
     ensure_c_compiler,
     extract,
     fetch_first_available,
@@ -247,19 +246,22 @@ def _fetch(version: str, work: Path) -> Path:
         print(f"[build]   如需严格校验，可用 gpg 验证 sigstore 签名："
               f"{archive.url}.sigstore")
     else:
-        print(f"[build] ✓ sha256 校验通过")
+        print("[build] ✓ sha256 校验通过")
     return archive.path
 
 
 def _remote_sha256(url: str) -> str:
     """尝试取 ``<url>.sha256`` 并解析出摘要。取不到返回空串。"""
     import urllib.error
-    import urllib.request
+
+    from .._http import open_url
 
     try:
-        with urllib.request.urlopen(url + ".sha256", timeout=20) as resp:
+        with open_url(url + ".sha256", timeout=20) as resp:
             text = resp.read(4096).decode("utf-8", "replace")
     except (urllib.error.URLError, OSError):
+        return ""
+    except ValueError:
         return ""
     for token in text.replace("*", " ").split():
         token = token.strip().lower()

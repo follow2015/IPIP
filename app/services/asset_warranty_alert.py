@@ -59,6 +59,9 @@ STARTUP_DELAY = int(os.environ.get("ASSET_WARRANTY_ALERT_STARTUP_DELAY", 60))
 
 DEFAULT_LOCK_FILENAME = "asset-warranty-alert.lock"
 
+ROUND_LOCK_KEY = "asset_warranty_alert:leader"
+ROUND_LOCK_TTL = 3600
+
 _singleton_lock_handle = None
 
 
@@ -260,16 +263,67 @@ def scan_and_notify(today: date | None = None) -> int:
     return len(items)
 
 
+def _try_acquire_round_lock():
+    """尝试成为本轮扫描的执行者（Redis `SET NX EX`，模式同 notification_cleanup）。
+
+    Returns:
+        tuple[bool, object | None]：(本轮是否应执行扫描, 抢到的 Redis 客户端)。
+        第二个元素仅在**确实抢到锁**时非 None，供本轮结束释放。
+
+    取舍说明：
+    - **Redis 不可用时 fail-open（降级回 flock 单层保护）**：与 cleanup 的
+      fail-open 同理——notifications.idempotency_key 有 DB 唯一约束
+      （uk_idempotency_key），并发 check-then-insert 的输家插不进去，最坏情形
+      是一条 IntegrityError 噪音而非重复投递；反之 fail-close 会让 Redis 故障
+      期间保修到期提醒整体停摆，为"防御一个已有 DB 兜底的竞态"牺牲业务可用性
+      方向反了。flock 仍是每主机一层的既有保护，不因 Redis 故障消失。
+    - **不做心跳续约**：单轮扫描秒级，TTL 内必然结束（同 cleanup 取舍）。
+    """
+    from app.utils.concurrency.redis_lock import owner_token
+    from app.utils.redis_client import get_redis_client
+
+    r = get_redis_client()
+    if r is None:
+        logger.debug("资产到期预警：Redis 不可用，降级为仅 flock 保护，本轮照常执行")
+        return True, None
+    try:
+        acquired = r.set(ROUND_LOCK_KEY, owner_token(), nx=True, ex=ROUND_LOCK_TTL)
+    except Exception as exc:  # noqa: BLE001 - 选举失败不阻断扫描（幂等键 DB 约束兜底）
+        logger.warning("资产到期预警：Redis 选举失败，降级为仅 flock 保护: %s", exc)
+        return True, None
+    if not acquired:
+        return False, None
+    return True, r
+
+
+def _release_round_lock(redis_client) -> None:
+    """释放本轮 Redis 选举锁（Lua CAS：只删仍属于自己的锁）。"""
+    if redis_client is None:
+        return
+    from app.utils.concurrency.redis_lock import release_owner_lock
+
+    try:
+        release_owner_lock(redis_client, ROUND_LOCK_KEY)
+    except Exception as exc:  # noqa: BLE001 - 释放失败由 TTL 兜底过期
+        logger.warning("资产到期预警：Redis 选举锁释放失败（TTL 兜底过期）: %s", exc)
+
+
 def _alert_loop() -> None:
     """扫描循环（后台守护线程）：启动后先扫一次，再按间隔周期执行。"""
     time.sleep(STARTUP_DELAY)
     while True:
+        redis_client = None
         try:
-            scan_and_notify()
+            should_run, redis_client = _try_acquire_round_lock()
+            if not should_run:
+                logger.debug("资产到期预警：本轮由其他实例执行（Redis 锁被持有），跳过")
+            else:
+                scan_and_notify()
         except Exception:
             logger.warning("资产到期预警扫描失败", exc_info=True)
             _rollback_session()
         finally:
+            _release_round_lock(redis_client)
             _release_session()
         time.sleep(ALERT_INTERVAL)
 
@@ -350,6 +404,11 @@ def start_asset_warranty_alert_scheduler(app) -> None:
     一个 ``_alert_loop`` 并发扫描；而通知去重是"按 idempotency_key 先查后插"，
     并发下存在 check-then-insert 竞态→重复投递。故先抢独占文件锁，抢不到者直接
     返回（静默让位，属正常情形）。
+
+    单实例保证是**两层**的：flock 管"每主机一实例"（进程生命周期，见
+    ``_acquire_singleton_lock``）；每轮扫描再经 Redis `SET NX EX` 选举
+    （``_try_acquire_round_lock``）管"每部署单元一执行者"——容器化后容器间
+    文件系统隔离，flock 管不到跨容器并发，Redis 锁补上这一层（2026-10-10 评审）。
 
     Args:
         app: Flask 应用实例（后台线程不在请求上下文内，需显式提供 app_context）。

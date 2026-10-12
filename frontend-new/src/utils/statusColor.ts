@@ -13,12 +13,18 @@ export function severityColor(
     case 'crit':
     case 'fatal':
       return token.colorError;
+    case 'high':
+      return token.colorWarning;
     case 'warning':
     case 'warn':
       return token.colorWarning;
+    case 'medium':
+      return token.colorInfo;
     case 'info':
     case 'information':
       return token.colorInfo;
+    case 'low':
+      return token.colorTextSecondary;
     case 'ok':
     case 'normal':
       return token.colorSuccess;

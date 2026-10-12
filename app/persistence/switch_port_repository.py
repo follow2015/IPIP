@@ -24,6 +24,8 @@ logger = get_logger(__name__)
 class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
     """网络设备端口Repository"""
 
+    ERROR_COUNTER_FIELDS = ("in_errors", "out_errors", "in_discards", "out_discards")
+
     def __init__(self, session=None):
         super().__init__(NetworkPort, session)
 
@@ -467,6 +469,90 @@ class NetworkPortRepository(SQLAlchemyRepository, QueryOptimizationMixin):
         except SQLAlchemyError as e:
             raise QueryExecutionError("删除设备端口失败", original_error=e) from e
 
+
+    def update_error_counters(self, device_id: int, port_name: str,
+                              values: dict) -> bool:
+        """更新单个端口的错包/丢弃计数（COUNTERS 收窄版，迁移 0028 的列）。
+
+        单端口入口 = :meth:`bulk_update_error_counters` 的**薄委托**（同一份
+        写入纪律，不留第二份实现）。批量场景请直接调批量版。
+
+        ``error_counters_at`` 只在四项齐全时前进（N8 收窄），语义见批量版 docstring。
+
+        Returns:
+            是否命中并更新了端口（``False`` = 该端口不存在 / 无可写值）。
+        """
+        return self.bulk_update_error_counters(
+            device_id, [{**values, "port_name": port_name}],
+        ) == 1
+
+    def bulk_update_error_counters(self, device_id: int, rows: list) -> int:
+        """批量更新端口错包/丢弃计数（COUNTERS 收窄版），返回**实际写入的端口数**。
+
+        为什么批量（2026-10-10 评审 N6）：调用方原先逐端口调单条 API ⇒ 48 口设备
+        48 次 SELECT。这里一次性把该设备端口加载成 ``{port_name: 对象}`` map，
+        与 :meth:`incremental_update` 的既有批量纪律同构。
+
+        写入纪律**逐端口与单端口版逐字一致**（与设备身份回填同源）：
+
+        * **有值才写，``None`` 不清空** —— 采集层用 ``None`` 表示"设备没上报这
+          一列"，把它当 0 写下去会掩盖真实状态；
+        * 白名单四项**全** ``None`` 的端口直接跳过（不写、也不计命中 —— 空更新
+          只会白刷 ``error_counters_at``）；
+        * 只认 :attr:`ERROR_COUNTER_FIELDS`，其余键忽略（防调用方把速率之类的
+          字段混进来造成两套口径）；
+        * ``error_counters_at`` **只在四项齐全时前进**（N8 收窄，见下）—— 同一批
+          共用一个时刻。
+
+        ``error_counters_at`` 的语义（评审 N8 收窄，2026-10-10）
+        ------------------------------------------------------
+        定义为**"该端口的四项计数被完整采样的最近时刻"**。原先的口径是"写了任一
+        非空项就前进"，于是部分上报（如只拿到 ``in_errors``）也会把时间戳推到当前
+        时刻；而前端把**一个**采样时间与**四个**值并列展示（``columns.tsx``），
+        这等于替 ``NULL`` 的那几列背书"它们也是这个时刻采的" —— 与本仓"宁缺勿错"
+        （``NULL`` ≠ 0）同源纪律相悖。
+
+        收窄后：**值照写（数据不丢），时间戳不前进**。对上报不齐的设备，时间戳会
+        停在最近一次完整采样（或保持 ``NULL``），前端仍逐列显示"设备未上报"。
+
+        Args:
+            device_id: 交换机 device_id。
+            rows: 每项含 ``port_name`` 与四个计数键（键可缺省、值可为 ``None``）。
+
+        Returns:
+            写入的端口数；端口不存在 / 无可写值均不计入。
+        """
+        if not rows:
+            return 0
+        existing_map = {
+            p.port_name: p
+            for p in self.session.query(NetworkPort)
+                .filter(NetworkPort.device_id == device_id)
+                .all()
+        }
+        if not existing_map:
+            return 0
+        now = now_utc_naive()
+        updated = 0
+        for row in rows:
+            port_name = row.get("port_name")
+            if not port_name:
+                continue
+            obj = existing_map.get(port_name)
+            if obj is None:
+                continue
+            payload = [
+                (key, row.get(key)) for key in self.ERROR_COUNTER_FIELDS
+                if row.get(key) is not None
+            ]
+            if not payload:
+                continue
+            for key, value in payload:
+                setattr(obj, key, value)
+            if all(row.get(key) is not None for key in self.ERROR_COUNTER_FIELDS):
+                obj.error_counters_at = now
+            updated += 1
+        return updated
 
     def incremental_update(self, device_id: int, port_rows: list,
                            reconcile_manual: bool = False) -> None:

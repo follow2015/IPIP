@@ -113,6 +113,7 @@ function FilterBar({ filters, table, extra, prefix }: FilterBarProps) {
         ghost
         activeKey={open ? ['filters'] : []}
         onChange={(keys) => setOpen(keys.length > 0)}
+        styles={{ header: { flexWrap: 'wrap' } }}
         items={[
           {
             key: 'filters',

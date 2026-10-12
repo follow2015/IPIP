@@ -18,16 +18,18 @@
 from __future__ import annotations
 
 import json
-import logging
 
 from app.utils.redis_client import get_redis_client
 from app.utils import redis_keys
+from app.utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 SNAPSHOT_TTL_SECONDS = 300
 
-SNAPSHOT_VERSION = 2
+SNAPSHOT_VERSION = 4
+
+SNAPSHOT_MAX_BYTES = 4 * 1024 * 1024
 
 
 def snapshot_tables() -> tuple[dict, ...]:
@@ -119,16 +121,40 @@ def collect_snapshot(credential: dict, ip: str, timeout: int | None = None,
     return snapshot
 
 
-def save_snapshot(device_id: int, snapshot: dict) -> bool:
-    """写入 Redis。Redis 不可用/写入失败返回 ``False``（调用方无需处理）。"""
+def save_snapshot(device_id: int, snapshot: dict, *,
+                  max_bytes: int | None = None) -> bool:
+    """写入 Redis。**未写入一律返回 ``False``**（调用方无需处理，见下）。
+
+    返回 ``False`` 的三种情形都是"本轮不共享缓存"，调用方拿到的是**本次实采结果**
+    照常返回，因此不影响正确性，只损失本轮复用：
+
+    1. Redis 未配置（``get_redis_client()`` 返回 ``None``）；
+    2. 序列化 / 写入抛错；
+    3. **超过单键体积上限**（评审 N9，见 :data:`SNAPSHOT_MAX_BYTES`）—— 主动丢弃并
+       warning，把"Redis 被顶爆、别处莫名 OOM"换成一条可检索的日志。
+
+    Args:
+        max_bytes: 覆盖 :data:`SNAPSHOT_MAX_BYTES`（单测与将来的分层注入用）。
+            ``None`` = 用模块常量；``<= 0`` = **豁免**（不做体积判定）。
+    """
     client = get_redis_client()
     if client is None:
         return False
+    limit = SNAPSHOT_MAX_BYTES if max_bytes is None else int(max_bytes)
     try:
         payload = json.dumps(
             {"v": SNAPSHOT_VERSION, "tables": snapshot}, ensure_ascii=False,
         )
-        client.set(redis_keys.snmp_snapshot_key(device_id), payload, ex=SNAPSHOT_TTL_SECONDS)
+        size = len(payload.encode("utf-8"))
+        if limit > 0 and size > limit:
+            logger.warning(
+                "快照超单键体积上限，本轮**丢弃不写缓存**（退化为直采）device_id=%s "
+                "size=%dB limit=%dB tables=%d —— 若为常态请核对设计文档 §5.2 阈值",
+                device_id, size, limit, len(snapshot),
+            )
+            return False
+        client.set(redis_keys.snmp_snapshot_key(device_id), payload,
+                   ex=SNAPSHOT_TTL_SECONDS)
         return True
     except Exception as exc:  # noqa: BLE001 —— 缓存写失败不影响本轮采集结果
         logger.warning("快照写入 Redis 失败 device_id=%s: %s", device_id, exc)
@@ -179,24 +205,47 @@ def clear_snapshot(device_id: int) -> None:
 
 def snapshot_for(device_id: int, credential: dict, ip: str, *,
                  timeout: int | None = None, force: bool = False,
-                 keys: set[str] | frozenset[str] | tuple[str, ...] | None = None) -> dict:
-    """取快照：命中缓存直接返回，否则采集并写缓存。
+                 keys: set[str] | frozenset[str] | tuple[str, ...] | None = None,
+                 max_bytes: int | None = None) -> dict:
+    """取快照：命中缓存时**补齐本次缺的键**再返回，否则采集并写缓存。
 
     Redis 不可用（``get_redis_client()`` 返回 ``None``）时**每次现采、不写缓存** ——
     退化为改造前的逐能力直采，不会更差。
 
     Args:
         keys: 按需子集（透传给 ``collect_snapshot``）。
+        max_bytes: 单键写入上限（透传给 ``save_snapshot``；``None`` = 模块常量）。
+            **写不进去不影响返回值** —— 两条写缓存路径都紧跟 ``return``，无论
+            ``save_snapshot`` 返回 ``True``/``False``，调用方拿到的都是**本轮完整的
+            采集结果**（超限只是"下一轮不共享"，不是"本轮没数据"）。
 
-    > [WARN] **子集与缓存相遇时的正确性约束**：命中缓存时返回的是**上一次**的子集，
-    > 可能与本次要的不同。因此调用方要么整轮用同一个 keys（推荐：由扫描入口算一次
-    > 本轮需要的能力集合），要么命中后自行判断所需键是否齐全 —— 缺的按缺键回退处理。
-    > 这是"共享同一份采集结果"必须付的代价：一份快照不可能同时适配任意子集。
+    > **缺键增量合并（2026-10-10 评审 N5）**：命中缓存但本次 ``keys`` 里有缓存没有的
+    > 键时，**只补采这批缺失键**、与已有缓存合并后写回。由此得到两条性质：
+    > ① 调用方拿到的字典**一定含本次请求的全部键**（不再出现"命中缓存返回上一轮
+    > 子集 ⇒ 解析层逐表缺键回退 ⇒ 共享收益落空"）；
+    > ② **本轮内每张表最多 walk 一次**（首采写缓存，后续能力只补自己缺的那几张）。
+    >
+    > 为什么不是"由扫描入口算一次本轮能力并集再整轮复用"：同一次 ``collect()`` 里
+    > 多个能力是**线程池并发**跑的（``BaseChannel.collect``），并发下"都请求并集"
+    > 会让每个线程各采一遍全并集（N 倍放大）；而"各自只补自己缺的键"在并发下天然
+    > 近似等于并集的最优解（各能力键集基本不相交）。且该实现与调用点数量**解耦**：
+    > 新增能力/新增入口都不需要任何人记得去改并集清单。
+    >
+    > ``keys=None`` 保持历史语义（有缓存就直接用，不判完整性）：全量调用方没有
+    > "我缺什么"的判据，且缺键仍由解析层的缺键回退兜底。
     """
     if not force:
         cached = load_snapshot(device_id)
         if cached is not None:
-            return cached
+            if keys is None:
+                return cached
+            missing = frozenset(keys) - set(cached)
+            if not missing:
+                return cached
+            patch = collect_snapshot(credential, ip, timeout, keys=missing)
+            merged = {**cached, **patch}
+            save_snapshot(device_id, merged, max_bytes=max_bytes)
+            return merged
     snapshot = collect_snapshot(credential, ip, timeout, keys=keys)
-    save_snapshot(device_id, snapshot)
+    save_snapshot(device_id, snapshot, max_bytes=max_bytes)
     return snapshot

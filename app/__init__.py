@@ -68,6 +68,7 @@ _MAINTENANCE_CLI_COMMANDS = frozenset({
     "db-upgrade",
     "db-check",
     "ldap-check",
+    "security-unlock",
 })
 
 
@@ -147,6 +148,14 @@ def create_app(config_name: str = None) -> Flask:
     if config_name != "testing":
         from app.services.notification_cleanup import start_cleanup_scheduler
         start_cleanup_scheduler(app)
+
+    if config_name != "testing":
+        from app.services.security.check_scheduler import start_security_check_scheduler
+        start_security_check_scheduler(app)
+
+        from app.services.security.policy_service import load_all_from_db
+        with app.app_context():
+            load_all_from_db(app)
 
     if config_name != "testing":
         from app.services.asset_warranty_alert import start_asset_warranty_alert_scheduler
@@ -447,6 +456,9 @@ def register_blueprints(app: Flask):
     app.register_blueprint(health_bp, url_prefix="/api/health")
     from app.api.security_routes import security_bp  # CSP 违规上报（OD-7 第一阶段，匿名）
     app.register_blueprint(security_bp, url_prefix="/api/security")
+
+    from app.api.security_center_routes import security_center_bp
+    app.register_blueprint(security_center_bp, url_prefix="/api/security")
     app.register_blueprint(deployment_plan_bp, url_prefix="/api/deployment")  # 上架方案查询
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(logs_bp, url_prefix="/api/logs")  # 注册日志API
@@ -945,6 +957,27 @@ def _register_ldap_cli(app: Flask):
         for issue in issues:
             click.echo(f"ERROR: {issue}", err=True)
         raise SystemExit(1)
+
+    @app.cli.command("security-unlock")
+    @click.argument("username")
+    def security_unlock_cmd(username: str):
+        """带外解锁账号（页面登不进时的 break-glass 通道）
+
+        不需要登录态，也没有权限校验 —— 它的存在前提就是"已经没人能登进去"。
+        因此审计里 operator_id 记 None，事后靠服务器访问记录追溯操作者。
+        """
+        from app.persistence.user_repository import UserRepository
+        from app.services.security.account_lock_service import unlock_account
+
+        user = UserRepository().find_by_username(username)
+        if user is None:
+            click.echo(f"未找到用户: {username}", err=True)
+            raise SystemExit(1)
+        result = unlock_account(user.id, operator_id=None)
+        if result.get("note") == "not_locked":
+            click.echo(f"账号未处于锁定状态: {username}")
+        else:
+            click.echo(f"已解锁: {username}")
 
 
 def _warn_on_schema_drift(app: Flask) -> None:

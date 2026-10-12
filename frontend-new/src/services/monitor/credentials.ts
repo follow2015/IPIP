@@ -80,20 +80,45 @@ export function useBatchDeleteCredentials() {
   });
 }
 
-export function useCreateAndLinkCredential() {
+export function useCreateSharedCredential() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       protocol: string;
       payload: Record<string, unknown>;
-      name?: string;
-      device_ids: number[];
+      name: string;
     }) => {
-      const res = await post('/monitor/credentials', input);
+      const res = await post('/monitor/credentials', {
+        protocol: input.protocol,
+        payload: input.payload,
+        name: input.name
+      });
       return res.data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.monitor.credentials() });
+      qc.invalidateQueries({ queryKey: queryKeys.monitor.metricDashboardAll });
+    }
+  });
+}
+
+export function useBindDeviceCredential() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      protocol: string;
+      payload: Record<string, unknown>;
+      name: string;
+      device_ids: number[];
+    }) => {
+      const res = await post('/monitor/credentials/bind', input);
+      return res.data;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.monitor.credentials() });
+      vars.device_ids.forEach((id) =>
+        qc.invalidateQueries({ queryKey: queryKeys.monitor.status(id) })
+      );
       qc.invalidateQueries({ queryKey: queryKeys.monitor.metricDashboardAll });
     }
   });

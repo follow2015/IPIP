@@ -20,6 +20,13 @@ from flask import g, request
 from app.services.auth.authentication import auth_manager
 from app.services.auth.permission import permission_manager
 
+_PASSWORD_RESTRICTED_WHITELIST = frozenset({
+    "/api/users/change-password",
+    "/api/auth/profile",
+    "/api/auth/logout",
+    "/api/auth/refresh",
+})
+
 def login_required(f):
     """要求登录的装饰器
 
@@ -65,6 +72,10 @@ def login_required(f):
         else:
             g.current_user["username"] = payload.get("username")
             g.current_user["user_identifier"] = payload.get("username")
+
+        if payload.get("pwd_exp") and request.path not in _PASSWORD_RESTRICTED_WHITELIST:
+            return APIResponse.error("密码已过期，请先修改密码",
+                                     ErrorCode.AUTHORIZATION_ERROR, 403)
 
         return f(*args, **kwargs)
 

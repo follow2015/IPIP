@@ -29,6 +29,8 @@ import zhAi from '@/locales/zh-CN/ai.json';
 import enAi from '@/locales/en-US/ai.json';
 import zhCircuit from '@/locales/zh-CN/circuit.json';
 import enCircuit from '@/locales/en-US/circuit.json';
+import zhSecurity from '@/locales/zh-CN/security.json';
+import enSecurity from '@/locales/en-US/security.json';
 
 import './types';
 
@@ -42,7 +44,8 @@ const resources = {
     asset: zhAsset,
     settings: zhSettings,
     ai: zhAi,
-    circuit: zhCircuit
+    circuit: zhCircuit,
+    security: zhSecurity
   },
   'en-US': {
     common: enCommon,
@@ -53,7 +56,8 @@ const resources = {
     asset: enAsset,
     settings: enSettings,
     ai: enAi,
-    circuit: enCircuit
+    circuit: enCircuit,
+    security: enSecurity
   }
 };
 

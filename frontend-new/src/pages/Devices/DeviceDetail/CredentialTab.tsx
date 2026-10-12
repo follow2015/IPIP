@@ -1,14 +1,3 @@
-/**
- * 设备详情 - 监控凭据标签页
- *
- * 负责「共享凭据」的关联管理（计划 CredentialTab）：
- * 1. 展示本机已关联凭据，可取消某协议关联；
- * 2. 从已有共享凭据下拉选择并关联本机；
- * 3. 新建共享凭据（复用共享结构化表单 MonitorCredentialForm）并关联本机；
- * 4. 编辑本机某协议凭据密文（P0-2 设备级，只影响本设备）。
- *
- * 约束：绝不渲染凭据明文；列表只展示 name/protocol/linked_count。
- */
 import { useState } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
 import {
@@ -32,7 +21,7 @@ import { useConfirm } from '@/utils/confirm';
 import {
   useDeviceMonitorStatus,
   useMonitorCredentials,
-  useCreateAndLinkCredential,
+  useBindDeviceCredential,
   useLinkExistingCredential,
   useUnlinkCredential,
   useUpdateCredentialPayload,
@@ -41,7 +30,7 @@ import {
   type MonitorCredentialListItem
 } from '@/services/monitor';
 import { useUpdateDevice } from '@/services/device';
-import MonitorCredentialForm from '@/components/MonitorCredentialForm';
+import MonitorCredentialForm, { buildCredentialPayload } from '@/components/MonitorCredentialForm';
 import { MONITOR_PROTOCOL_OPTIONS } from '@/types/enums';
 import type { Device } from '@/types/models';
 
@@ -60,7 +49,7 @@ export default function CredentialTab({ device }: { device: Device }) {
   const deviceId = device.id;
   const { data: status } = useDeviceMonitorStatus(deviceId);
   const { data: creds = [] } = useMonitorCredentials();
-  const createLink = useCreateAndLinkCredential();
+  const createLink = useBindDeviceCredential();
   const linkExisting = useLinkExistingCredential();
   const unlink = useUnlinkCredential();
   const message = useMessage();
@@ -189,34 +178,12 @@ export default function CredentialTab({ device }: { device: Device }) {
 
   const handleCreateAndLink = async (values: Record<string, unknown>) => {
     const p = (values.protocol as string) || protocol;
-    const payload: Record<string, unknown> = {};
-    if (p === 'snmp') {
-      const ver = (values.snmp_version as string) || 'v2c';
-      payload.snmp_version = ver;
-      if (ver === 'v2c') {
-        payload.community = values.community;
-      } else {
-        payload.username = values.username;
-        payload.auth_key = values.auth_key;
-        payload.priv_key = values.priv_key;
-        payload.auth_protocol = values.auth_protocol || 'sha';
-        payload.priv_protocol = values.priv_protocol || 'aes';
-      }
-    } else if (p === 'zabbix') {
-      payload.api_url = values.api_url;
-      payload.api_token = values.api_token;
-      if (values.verify_ssl != null) payload.verify_ssl = values.verify_ssl;
-      if (values.match_by) payload.match_by = values.match_by;
-    } else {
-      payload.username = values.username;
-      payload.password = values.password;
-      if (values.verify_ssl != null) payload.verify_ssl = values.verify_ssl;
-    }
+    const payload = buildCredentialPayload(p, values);
     try {
       await createLink.mutateAsync({
         protocol: p,
         payload,
-        name: (values.name as string) || undefined,
+        name: (values.name as string) || '',
         device_ids: [deviceId]
       });
       message.success(t('credential.message.createdAndLinked'));
@@ -432,8 +399,14 @@ export default function CredentialTab({ device }: { device: Device }) {
         )}
       </Card>
 
-      {/* 3. 新建共享凭据并关联本机（复用共享结构化表单） */}
+      {/* 3. 为本设备新建凭据并绑定（设备域，只影响本机） */}
       <Card title={t('credential.createAndLinkTitle')}>
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={t('credential.deviceScopedHint')}
+        />
         {configured.length > 0 && (
           <Alert
             type="warning"
@@ -482,9 +455,7 @@ export default function CredentialTab({ device }: { device: Device }) {
           >
             <Input placeholder={t('credential.nameHint')} />
           </Form.Item>
-          {editTarget && (
-            <MonitorCredentialForm protocol={editTarget.protocol} mode="edit" form={editForm} />
-          )}
+          {editTarget && <MonitorCredentialForm protocol={editTarget.protocol} mode="edit" />}
         </Form>
       </Modal>
     </div>
@@ -551,7 +522,7 @@ function NewCredentialForm({
           <Input placeholder={t('credential.nameHint')} />
         </Form.Item>
       </Space>
-      <MonitorCredentialForm protocol={protocol} mode="create" form={form} />
+      <MonitorCredentialForm protocol={protocol} mode="create" />
       <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
         {t('credential.createAndLink')}
       </Button>

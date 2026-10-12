@@ -63,6 +63,7 @@ __all__ = [
     "create_database",
     "is_initialized",
     "import_baseline",
+    "parse_covers",
     "stamp_covers",
     "apply_pending_migrations",
     "init_database",
@@ -311,7 +312,7 @@ def is_initialized(cfg: DbConfig, venv_py: str) -> bool:
     宁可多导一次，也不要漏跑迁移。
     """
     code = (
-        "import pymysql, os, sys\n"
+        "import pymysql, os, sys\n"  # noqa: S608 —— 理由见上方注释
         "try:\n"
         f"    c = pymysql.connect(host={cfg.host!r}, port={cfg.port}, user={cfg.user!r},\n"
         "                        init_command=\"SET time_zone='+00:00'\",\n"
@@ -400,7 +401,7 @@ def verify_baseline_tables(schema: Path, cfg: DbConfig, venv_py: str) -> None:
     if expected <= 0:
         return
     code = (
-        "import pymysql, os\n"
+        "import pymysql, os\n"  # noqa: S608 —— 理由见上方注释
         f"c = pymysql.connect(host={cfg.host!r}, port={cfg.port}, user={cfg.user!r},\n"
         "                     init_command=\"SET time_zone='+00:00'\",\n"
         "                     password=os.getenv('MYSQL_PASSWORD',''), charset='utf8mb4')\n"
@@ -430,13 +431,38 @@ def verify_baseline_tables(schema: Path, cfg: DbConfig, venv_py: str) -> None:
     print(f"[db] 基线校核通过：实际 {actual} 张表 / SQL 声明 {expected} 张")
 
 
+def parse_covers(text: str) -> list[str]:
+    """解析 ``0000_baseline.covers``：**忽略空行与 ``#`` 注释行**。
+
+    [WARN] 这里修的是一个真实存在的静默缺陷（2026-10-10 评审 N11 取证）：
+    原实现是 ``[ln.strip() for ln in text.splitlines() if ln.strip()]`` ——
+    ``if ln.strip()`` 只挡空行，**注释行会被当成 version 登记进
+    ``schema_migrations``**。而该清单文件头部恰恰有 3 行说明性注释，于是每次
+    全新安装都会往迁移台账里写 3 条以 ``#`` 开头的垃圾"版本"。
+
+    为什么长期无人发现：登记走 ``INSERT IGNORE``，而注释行长度超过
+    ``version VARCHAR(64)`` ⇒ 报错被 ``IGNORE`` 降级为警告、字符串截断后照写。
+    更坏的下游效应是：真版本号若与某条截断后的垃圾值相撞，会被 ``IGNORE``
+    **静默跳过**，即明明没跑的迁移被记成已跑。
+
+    判据：``tests/migrations/test_baseline_covers_parity.py``。
+    """
+    out: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        out.append(line)
+    return out
+
+
 def stamp_covers(cfg: DbConfig, venv_py: str, project_root: Path) -> None:
     """按 covers 清单把「已体现在基线快照里」的版本登记进 schema_migrations。"""
     covers_file = project_root / "migrations" / "versions" / "0000_baseline.covers"
     if not covers_file.is_file():
         print("[db] ⚠ 无 covers 清单，跳过版本登记（后续 db-upgrade 会从链头 applying）")
         return
-    covered = [ln.strip() for ln in covers_file.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    covered = parse_covers(covers_file.read_text(encoding="utf-8"))
     if not covered:
         return
 

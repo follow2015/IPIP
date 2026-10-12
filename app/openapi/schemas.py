@@ -616,6 +616,11 @@ class SwitchPortResponseSchema(Schema):
     description = fields.Str(allow_none=True)
     port_type = fields.Str(allow_none=True)
     slot = fields.Int(allow_none=True)
+    in_errors = fields.Int(allow_none=True)
+    out_errors = fields.Int(allow_none=True)
+    in_discards = fields.Int(allow_none=True)
+    out_discards = fields.Int(allow_none=True)
+    error_counters_at = fields.Str(allow_none=True)
 
 
 

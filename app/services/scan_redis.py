@@ -7,10 +7,42 @@
 """
 from __future__ import annotations
 import ipaddress
+import os
+import time
 from app.utils.logging import get_logger
 from app.utils import redis_keys
 
 logger = get_logger(__name__)
+
+SCAN_STALE_TIMEOUT_SECONDS = 30 * 60
+
+SCAN_TERMINAL_PHASES = frozenset({"完成", "failed"})
+
+
+def _pid_alive(pid: int) -> bool:
+    """判断指定 PID 的进程是否仍然存在
+
+    用信号 0 探测：不发送任何信号，只借内核做存在性检查。
+    PID 复用会导致误判为存活（旧 PID 被系统分配给新进程），
+    概率极低且后果温和 —— 最多是继续等 SCAN_STALE_TIMEOUT_SECONDS 兜底。
+
+    Args:
+        pid: 进程号
+
+    Returns:
+        bool: 进程是否存在
+    """
+    if not hasattr(os, "kill"):
+        return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
 
 
 def get_scan_redis_client():
@@ -286,12 +318,20 @@ class ScanRedis:
     def progress_set(self, scope: str, progress_data: dict):
         """设置扫描进度（对齐 ScanProgress.to_dict() 格式）
 
+        自动附带两个「心跳」字段，供 progress_is_stale 判定僵死：
+        - updated_at：本次写入的时间戳（秒）。扫描推进时会被反复刷新，
+          所以它同时充当「任务还活着」的证据，调用方无需自己维护。
+        - pid：写入进程的 PID。进程重启后旧 PID 不再存在，可据此立即判定僵死，
+          不必空等 SCAN_STALE_TIMEOUT_SECONDS。
+
         Args:
             scope: 扫描范围标识
             progress_data: ScanProgress.to_dict() 格式的进度数据
         """
         key = f"ipm:scan_progress:{scope}"
         mapping = {k: str(v) for k, v in progress_data.items()}
+        mapping["updated_at"] = str(int(time.time()))
+        mapping["pid"] = str(os.getpid())
         self.r.hset(key, mapping=mapping)
         self.r.expire(key, 3600)
 
@@ -320,4 +360,76 @@ class ScanRedis:
                     result[k] = float(result[k])
                 except (ValueError, TypeError):
                     pass
+        for k in ("updated_at", "pid"):
+            if k in result:
+                try:
+                    result[k] = int(result[k])
+                except (ValueError, TypeError):
+                    pass
         return result
+
+    def progress_is_stale(
+        self,
+        scope: str,
+        timeout_seconds: int = SCAN_STALE_TIMEOUT_SECONDS,
+    ) -> tuple[bool, str]:
+        """判断进行中的扫描是否已「僵死」（不会再推进、也不会自己置终态）
+
+        三条判据，任一成立即判定僵死：
+
+        1. ``no_heartbeat``：进度里没有 updated_at（本次改造之前写入的老数据），
+           无法证明它还在跑。
+        2. ``heartbeat_timeout``：距上次更新已超过 timeout_seconds。
+        3. ``pid_dead``：写入进度的进程已不存在（部署重启 / 进程崩溃），
+           此时不可能还有线程在推进它 —— 这条不必等超时，可立即放行。
+
+        Args:
+            scope: 扫描范围标识
+            timeout_seconds: 心跳超时阈值，缺省 SCAN_STALE_TIMEOUT_SECONDS
+
+        Returns:
+            tuple[bool, str]: (是否僵死, 原因)。非僵死时原因为 not_stale / no_progress /
+            terminal，便于调用方按需记录。
+        """
+        progress = self.progress_get(scope)
+        if not progress:
+            return False, "no_progress"
+
+        if progress.get("phase") in SCAN_TERMINAL_PHASES:
+            return False, "terminal"
+
+        updated_at = progress.get("updated_at")
+        if updated_at is None:
+            return True, "no_heartbeat"
+
+        if time.time() - int(updated_at) > timeout_seconds:
+            return True, "heartbeat_timeout"
+
+        pid = progress.get("pid")
+        if pid is not None and not _pid_alive(int(pid)):
+            return True, "pid_dead"
+
+        return False, "not_stale"
+
+    def progress_mark_stale_failed(self, scope: str, reason: str) -> dict | None:
+        """把僵死的进度就地置为终态 failed，让前端轮询立即解锁
+
+        置终态后：① 前端轮询读到 phase=failed 会停止轮询并解锁按钮；
+        ② 重入保护看到终态自然放行，下次提交不必再等超时。
+
+        Args:
+            scope: 扫描范围标识
+            reason: 僵死原因（no_heartbeat / heartbeat_timeout / pid_dead），仅用于日志
+
+        Returns:
+            dict | None: 写入的进度字典；无进度时返回 None
+        """
+        progress = self.progress_get(scope)
+        if not progress:
+            return None
+        progress["phase"] = "failed"
+        progress["failed"] = int(progress.get("failed", 0) or 0) + 1
+        payload = {k: v for k, v in progress.items() if k not in ("updated_at", "pid")}
+        self.progress_set(scope, payload)
+        logger.warning("扫描进度判定为僵死并置 failed: scope=%s, reason=%s", scope, reason)
+        return self.progress_get(scope)

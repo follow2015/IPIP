@@ -12,7 +12,7 @@ CI 可用 `--check` 校验产物与源码是否一致。
 2) 双表 —— LITERAL 精确匹配 + PATTERNS 正则匹配（具名组回填 params）。
 3) 只查表不翻译 —— 译文在 frontend-new/src/locales/*/backend.json，与本表同源生成。
 
-覆盖：641/990 条（64%）
+覆盖：646/1022 条（63%）
 """
 from __future__ import annotations
 
@@ -279,7 +279,6 @@ LITERAL: Dict[str, str] = {
     "获取设备信息失败": "failed-to-fetch-device-information",
     "获取设备端口失败": "failed-to-fetch-device-port",
     "获取楼层列表失败": "failed-to-fetch-floor-list",
-    "获取日志失败": "failed-to-fetch-log",
     "获取日志统计失败": "failed-to-fetch-log-statistics",
     "获取名称联想选项失败": "failed-to-fetch-name-lenovo-option",
     "获取端口名称列表失败": "failed-to-fetch-port-name-list",
@@ -366,6 +365,7 @@ LITERAL: Dict[str, str] = {
     "PDF 重建失败": "pdf-rebuild-failed",
     "分页查询失败": "paginated-query-failed",
     "分页查找用户失败": "paginated-query-user-failed",
+    "缺少参数 value": "parameter-value-is-missing",
     "密码长度不能超过128个字符": "password-length-cannot-exceed-128-characters",
     "密码长度至少为4个字符": "password-length-must-be-at-least-4-characters",
     "密码必须是字符串类型": "password-must-be-a-string-type",
@@ -411,6 +411,7 @@ LITERAL: Dict[str, str] = {
     "TRAP_CUSTOM_RULES 必须是 JSON 数组": "trap-custom-rules-must-be-json-an-array",
     "找不到测试用户": "test-user-not-found",
     "该设备不是机箱": "the-device-is-not-chassis",
+    "该网段正在扫描中": "the-network-segment-is-being-scan-in-progress",
     "该角色下还有用户，无法删除": "the-role-still-has-user-cannot-be-deleted",
     "该交换机端口同步正在进行中，请稍后再试": "the-switch-port-sync-in-progress-please-try-again-later",
     "该交换机扫描正在进行中，请稍后再试": "the-switch-scan-in-progress-please-try-again-later",
@@ -454,6 +455,7 @@ LITERAL: Dict[str, str] = {
     "idempotency_key 必填": "idempotency-key-is-required",
     "ids 必须为列表": "ids-must-be-an-array",
     "items 必须为数组": "items-must-be-an-array",
+    "login.trusted_networks 必须是列表": "login-trusted-networks-must-be-list",
     "mac 必填": "mac-is-required",
     "max_groups 须在 1~200 之间": "max-groups-must-be-within-1-200",
     "metric 必须是非空字符串": "metric-must-be-a-non-empty-string",
@@ -471,6 +473,7 @@ LITERAL: Dict[str, str] = {
     "question 必填且为非空字符串": "question-is-required-and-must-be-a-non-empty-string",
     "rollback_command_key 必填": "rollback-command-key-is-required",
     "silence_from / silence_until 必须为合法 ISO datetime": "silence-from-silence-until-must-be-valid-iso-datetime",
+    "snmp.allowed_versions 必须是非空列表": "snmp-allowed-versions-must-be-a-non-empty-list",
     "source / metric_type 不合法": "source-metric-type-is-invalid",
     "source_position 与 target_position 必须为整数": "source-position-and-target-position-must-be-an-integer",
     "steps 必须是数组": "steps-must-be-an-array",
@@ -628,6 +631,7 @@ PATTERNS: List[Tuple[str, str, Tuple[str, ...]]] = [
     ("采集 {p0} 失败: {p1}", "collection-x-failed-x", ("p0", "p1",)),
     ("IP {p0} 不存在", "ip-x-not-found", ("p0",)),
     ("{p0} 必须为正整数", "x-must-be-a-positive-integer", ("p0",)),
+    ("{p0} 必须是布尔值", "x-must-be-a-boolean", ("p0",)),
     ("{p0}，请刷新后重试", "x-please-refresh-and-retry", ("p0",)),
     ("凭据 {p0} 不存在", "credential-x-not-found", ("p0",)),
     ("命令执行失败：{p0}", "command-execution-failed-x", ("p0",)),
@@ -649,6 +653,7 @@ PATTERNS: List[Tuple[str, str, Tuple[str, ...]]] = [
     ("设备 {p0} 不存在", "device-x-not-found", ("p0",)),
     ("非法线路状态：{p0}", "is-invalid-circuit-status-x", ("p0",)),
     ("{p0} 必须为整数", "x-must-be-an-integer", ("p0",)),
+    ("{p0} 必须是整数", "x-must-be-an-integer", ("p0",)),
     ("分页查询{p0}失败", "failed-to-paginate-x", ("p0",)),
     ("加密失败: {p0}", "encryption-failed-x", ("p0",)),
     ("批量创建{p0}失败", "failed-to-batch-createx", ("p0",)),
@@ -661,6 +666,7 @@ PATTERNS: List[Tuple[str, str, Tuple[str, ...]]] = [
     ("统计{p0}数量失败", "failed-to-count-x", ("p0",)),
     ("解密失败: {p0}", "decryption-failed-x", ("p0",)),
     ("{p0} 不能为空", "x-cannot-be-empty", ("p0",)),
+    ("{p0} 仅允许 {p1}", "x-only-allows-x", ("p0", "p1",)),
     ("回滚失败：{p0}", "roll-back-failed-x", ("p0",)),
     ("设备繁忙：{p0}", "device-is-busy-x", ("p0",)),
     ("保存{p0}失败", "failed-to-save-x", ("p0",)),

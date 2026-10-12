@@ -23,14 +23,15 @@
 """
 from __future__ import annotations
 
-import logging
 import os
 import re
 import ssl
 from dataclasses import dataclass
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from app.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 STATUS_OK = "ok"
 STATUS_USER_NOT_FOUND = "user_not_found"

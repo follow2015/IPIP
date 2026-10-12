@@ -1,16 +1,18 @@
 import { useConfirm } from '@/utils/confirm';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useDisclosure } from '@/hooks/useDisclosure';
-import { Button, Space, Tag, Popover, Segmented, Collapse, Card, Typography } from 'antd';
+import { Button, Space, Tag, Popover, Segmented, Collapse, Card, Typography, Dropdown } from 'antd';
 import {
   PlusOutlined,
   CopyOutlined,
   ExportOutlined,
   SearchOutlined,
   ReloadOutlined,
-  EditOutlined
+  EditOutlined,
+  MoreOutlined
 } from '@ant-design/icons';
+import { useResponsive } from '@/hooks/useResponsive';
 import { useNavigate, Link } from 'react-router-dom';
 import DataTable from '@/components/DataTable';
 import FilterBar from '@/components/FilterBar';
@@ -33,8 +35,7 @@ import { useTable } from '@/hooks/useTable';
 import { useBatchSelection, scopeViolationMessage } from '@/hooks/useBatchSelection';
 import { useMessage } from '@/hooks/useMessage';
 import { useGlobalEventListener, type GlobalEvent } from '@/hooks/useGlobalEvents';
-
-const SCAN_TIMEOUT = 5 * 60_000;
+import { useAsyncScan } from '@/hooks/useAsyncScan';
 
 const { Text } = Typography;
 
@@ -44,6 +45,7 @@ function Switches() {
   const confirm = useConfirm();
   const table = useTable();
   const navigate = useNavigate();
+  const { isMobile } = useResponsive();
 
   const form = useDisclosure();
   const [editRecord, setEditRecord] = useState<Switch | null>(null);
@@ -67,44 +69,35 @@ function Switches() {
       typeof table.filters.device_type === 'string' ? table.filters.device_type : undefined
   });
 
-  const [, setScanningRoomId] = useState<number | null>(null);
+  const {
+    scanningId: scanningRoomId,
+    beginScan: beginScanRoom,
+    endScan: endScanRoom
+  } = useAsyncScan<number>({ onExpire: refetch });
 
-  const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
-    };
-  }, []);
-
-  const handleGlobalEvent = useCallback((event: GlobalEvent) => {
-    if (event.event_type === 'room_scan_complete') {
-      const payload = event.payload as Record<string, unknown>;
-      const roomId = payload.room_id as number | undefined;
-      if (roomId) {
-        setScanningRoomId(null);
-        if (scanTimeoutRef.current) {
-          clearTimeout(scanTimeoutRef.current);
-          scanTimeoutRef.current = null;
+  const handleGlobalEvent = useCallback(
+    (event: GlobalEvent) => {
+      if (event.event_type === 'room_scan_complete') {
+        const payload = event.payload as Record<string, unknown>;
+        const roomId = payload.room_id as number | undefined;
+        if (roomId) {
+          endScanRoom();
         }
+        return;
       }
-      return;
-    }
 
-    if (event.event_type !== 'scan_progress') return;
+      if (event.event_type !== 'scan_progress') return;
 
-    const progress = event.payload as { room_id?: number; phase?: string };
-    const roomId = progress.room_id;
-    if (!roomId) return;
+      const progress = event.payload as { room_id?: number; phase?: string };
+      const roomId = progress.room_id;
+      if (!roomId) return;
 
-    if (progress.phase === 'failed' || progress.phase === '完成') {
-      setScanningRoomId(null);
-      if (scanTimeoutRef.current) {
-        clearTimeout(scanTimeoutRef.current);
-        scanTimeoutRef.current = null;
+      if (progress.phase === 'failed' || progress.phase === '完成') {
+        endScanRoom();
       }
-    }
-  }, []);
+    },
+    [endScanRoom]
+  );
 
   useGlobalEventListener(handleGlobalEvent);
 
@@ -122,12 +115,8 @@ function Switches() {
       onOk: async () => {
         try {
           await scanRoom.mutateAsync(roomId);
-          setScanningRoomId(roomId);
+          beginScanRoom(roomId);
           message.info(td('switch.message.scanSubmitted'));
-          scanTimeoutRef.current = setTimeout(() => {
-            scanTimeoutRef.current = null;
-            setScanningRoomId(null);
-          }, SCAN_TIMEOUT);
         } catch {
           message.error(td('switch.message.scanSubmitFailed'));
         }
@@ -388,6 +377,74 @@ function Switches() {
     batchUpdate.open();
   };
 
+  const viewSwitch = (
+    <Segmented
+      options={[
+        { value: 'group', label: td('switch.view.group') },
+        { value: 'flat', label: td('switch.view.flat') }
+      ]}
+      value={groupMode}
+      onChange={(v) => setGroupMode(v as 'group' | 'flat')}
+    />
+  );
+  const addButton = (
+    <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+      {td('switch.action.add')}
+    </Button>
+  );
+  const addButtonMobile = (
+    <Button
+      type="primary"
+      icon={<PlusOutlined />}
+      aria-label={td('switch.action.add')}
+      onClick={handleAdd}
+    />
+  );
+  const scanButton = (
+    <Button
+      icon={<SearchOutlined />}
+      onClick={handleScanRoom}
+      disabled={scanningRoomId === Number(table.filters.room_id)}
+    >
+      {td('switch.action.scanRoom')}
+    </Button>
+  );
+  const exportButton = (
+    <Button icon={<ExportOutlined />} onClick={handleExport}>
+      {td('switch.action.exportCsv')}
+    </Button>
+  );
+  const batchUpdateButton = (
+    <Button icon={<EditOutlined />} disabled={batch.count === 0} onClick={handleBatchUpdate}>
+      {td('switch.action.batchUpdate')}
+      {batch.count > 0 ? `(${batch.count})` : ''}
+    </Button>
+  );
+  const moreMenu = {
+    items: [
+      {
+        key: 'scan',
+        icon: <SearchOutlined />,
+        label: td('switch.action.scanRoom'),
+        disabled: scanningRoomId === Number(table.filters.room_id),
+        onClick: handleScanRoom
+      },
+      {
+        key: 'export',
+        icon: <ExportOutlined />,
+        label: td('switch.action.exportCsv'),
+        onClick: handleExport
+      },
+      {
+        key: 'batch',
+        icon: <EditOutlined />,
+        label: `${td('switch.action.batchUpdate')}${batch.count > 0 ? `(${batch.count})` : ''}`,
+        disabled: batch.count === 0,
+        onClick: handleBatchUpdate
+      }
+    ]
+  };
+
   const filterAndActions = (
     <FilterBar
       filters={[
@@ -415,29 +472,23 @@ function Switches() {
       ]}
       table={table}
       extra={
-        <>
-          <Segmented
-            options={[
-              { value: 'group', label: td('switch.view.group') },
-              { value: 'flat', label: td('switch.view.flat') }
-            ]}
-            value={groupMode}
-            onChange={(v) => setGroupMode(v as 'group' | 'flat')}
-          />
-          <Button icon={<SearchOutlined />} onClick={handleScanRoom} loading={scanRoom.isPending}>
-            {td('switch.action.scanRoom')}
-          </Button>
-          <Button icon={<ExportOutlined />} onClick={handleExport}>
-            {td('switch.action.exportCsv')}
-          </Button>
-          <Button icon={<EditOutlined />} disabled={batch.count === 0} onClick={handleBatchUpdate}>
-            {td('switch.action.batchUpdate')}
-            {batch.count > 0 ? `(${batch.count})` : ''}
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            {td('switch.action.add')}
-          </Button>
-        </>
+        isMobile ? (
+          <>
+            {viewSwitch}
+            {addButtonMobile}
+            <Dropdown menu={moreMenu}>
+              <Button icon={<MoreOutlined />} aria-label={tc('action.more')} />
+            </Dropdown>
+          </>
+        ) : (
+          <>
+            {viewSwitch}
+            {scanButton}
+            {exportButton}
+            {batchUpdateButton}
+            {addButton}
+          </>
+        )
       }
     />
   );

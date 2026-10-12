@@ -9,7 +9,10 @@ from app.core.enums import MonitorProtocolCode
 from app.services.monitoring.protocol_registry import (
     protocol_required_fields,
 )
-from app.services.monitoring.snmp_versions import SNMP_REQUIRED_BY_VERSION
+from app.services.monitoring.snmp_versions import (
+    SNMP_REQUIRED_BY_VERSION,
+    resolve_snmp_version,
+)
 
 
 def _validate_zabbix_api_url(value):
@@ -54,7 +57,7 @@ class MonitorCredentialUpsertSchema(Schema):
 
         errors: dict = {}
         if protocol == MonitorProtocolCode.SNMP.value:
-            version = payload.get("version") or payload.get("snmp_version") or "v2c"
+            version = resolve_snmp_version(payload)
             if version not in SNMP_REQUIRED_BY_VERSION:
                 errors["payload"] = "snmp 必须包含合法的 version（v2c 或 v3）"
             else:

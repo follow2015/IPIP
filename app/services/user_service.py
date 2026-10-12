@@ -265,20 +265,68 @@ class UserService:
         if not is_valid:
             raise ValidationError(msg)
 
+        self._assert_password_min_age(user)
+
         result = self.update_user(user_id, {"password": new_password})
+        self._stamp_password_changed(user_id, must_change=False)
         logger.info(f"修改密码成功: user_id={user_id}")
         return result is not None
 
     def reset_password(self, user_id: int, new_password: str) -> bool:
-        """重置密码（管理员操作）"""
+        """重置密码（管理员操作）
+
+        与自助改密的两点不同（安全中心一期）：
+        - **不受 `password.min_age_days` 冷却约束**：管理员重置正是"用户改不了/忘光了"
+          时的兜底通道，给兜底加冷却等于把兜底也锁上；
+        - 按 `password.force_change_on_reset` 决定是否打 `must_change_password` 标记。
+        """
         from app.services.security_service import SecurityService
         is_valid, msg = SecurityService.validate_password(new_password)
         if not is_valid:
             raise ValidationError(msg)
 
         result = self.update_user(user_id, {"password": new_password})
+        from app.services.security.policy_service import get_value
+        self._stamp_password_changed(
+            user_id, must_change=bool(get_value("password.force_change_on_reset")))
         logger.info(f"重置密码成功: user_id={user_id}")
         return result is not None
+
+    @staticmethod
+    def _assert_password_min_age(user) -> None:
+        """自助改密的冷却校验：距上次改密须 ≥ `password.min_age_days` 天（0 = 不限）。
+
+        该策略本意是防"改密后立刻改回去"，只对**自助改密**生效；从未记录过改密时间的
+        存量账号不受限 —— 否则老账号的第一次改密会被无端拒绝。
+        """
+        from app.services.security.policy_service import get_value
+        from app.utils.time_utils import now_utc_naive
+
+        min_age = int(get_value("password.min_age_days") or 0)
+        changed_at = getattr(user, "password_changed_at", None)
+        if min_age <= 0 or changed_at is None:
+            return
+        if (now_utc_naive() - changed_at).days < min_age:
+            raise ValidationError(f"距上次修改密码不足 {min_age} 天，请稍后再试")
+
+    @staticmethod
+    def _stamp_password_changed(user_id: int, *, must_change: bool) -> None:
+        """落 `password_changed_at`，并按需打 `must_change_password` 标记。
+
+        必须在 `update_user` **之后**单独写：`update_user` 的字段白名单不含这两列
+        （它们是安全中心一期的产物），单独写可避免影响既有更新路径与缓存失效逻辑。
+        必须 `commit()` —— 登录链读的是 DB 里的值，只改内存对象等于没改。
+        """
+        from app.utils.time_utils import now_utc_naive
+        from extensions import db
+
+        user = db.session.get(User, user_id)
+        if user is None:
+            return
+        user.password_changed_at = now_utc_naive()
+        if must_change:
+            user.must_change_password = 1
+        db.session.commit()
 
 
     @cached(key_pattern="user:statistics")

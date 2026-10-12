@@ -115,13 +115,7 @@ export default function EditCredentialModal({
         >
           <Input placeholder={td('credential.nameHint')} />
         </Form.Item>
-        {editCred && (
-          <MonitorCredentialForm
-            protocol={editCred.protocol || 'snmp'}
-            mode="edit"
-            form={editForm}
-          />
-        )}
+        {editCred && <MonitorCredentialForm protocol={editCred.protocol || 'snmp'} mode="edit" />}
       </Form>
     </Modal>
   );

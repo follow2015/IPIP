@@ -1,19 +1,8 @@
-/**
- * 批量修改监控弹窗
- *
- * 功能：
- *  1. 批量设置监控开关（启用/暂停探测）
- *  2. 批量配置监控凭据（选择协议 + 填写凭据，复用 MonitorCredentialForm）
- *  3. 批量设置指标模板组
- *  4. 批量设置端口同步开关（跟随全局 / 强制开 / 强制关）
- *
- * 调用方须保证选中的设备子类型一致（本弹窗仅做兜底提示）。
- */
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Form, Input, Select, Switch, Divider, Alert, Space, Radio } from 'antd';
 import {
   useBatchToggleDeviceMonitor,
-  useCreateAndLinkCredential,
+  useBindDeviceCredential,
   useMetricTemplateGroups,
   useBatchUpdateMetricTemplateGroup,
   useBatchUpdatePortSyncEnabled
@@ -21,7 +10,10 @@ import {
 import { useMessage } from '@/hooks/useMessage';
 import { useTranslation } from 'react-i18next';
 import { MONITOR_PROTOCOL_OPTIONS } from '@/types/enums';
-import MonitorCredentialForm from '@/components/MonitorCredentialForm';
+import MonitorCredentialForm, {
+  buildCredentialPayload,
+  buildDefaultCredentialName
+} from '@/components/MonitorCredentialForm';
 import type { Device } from '@/types/models';
 import { getDeviceSubtypeLabel } from '@/types/statusMeta';
 
@@ -37,7 +29,7 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
   const [form] = Form.useForm();
   const [protocol, setProtocol] = useState<string>('snmp');
   const batchToggle = useBatchToggleDeviceMonitor();
-  const createAndLink = useCreateAndLinkCredential();
+  const createAndLink = useBindDeviceCredential();
   const batchUpdateGroup = useBatchUpdateMetricTemplateGroup();
   const batchUpdatePortSync = useBatchUpdatePortSyncEnabled();
   const message = useMessage();
@@ -54,6 +46,30 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
   const watchConfigureCredential = Form.useWatch('configure_credential', form);
   const watchConfigureGroup = Form.useWatch('configure_group', form);
   const watchConfigurePortSync = Form.useWatch('configure_port_sync', form);
+
+  const lastAutoNameRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!open) lastAutoNameRef.current = null;
+  }, [open]);
+
+  const applyDefaultName = useCallback(
+    (protocolValue: string) => {
+      const current = (form.getFieldValue('credential_name') as string | undefined) ?? '';
+      const untouched =
+        current === lastAutoNameRef.current || (lastAutoNameRef.current === null && current === '');
+      if (!untouched) return;
+      const next = buildDefaultCredentialName(protocolValue, devices);
+      if (next === current) return; // 值未变则不写，避免无谓的表单重渲染
+      lastAutoNameRef.current = next;
+      form.setFieldValue('credential_name', next);
+    },
+    [form, devices]
+  );
+
+  useEffect(() => {
+    if (watchConfigureCredential) applyDefaultName(protocol);
+  }, [watchConfigureCredential, protocol, applyDefaultName]);
 
   const { data: groups, isLoading: groupsLoading } = useMetricTemplateGroups();
   const candidateGroups =
@@ -87,35 +103,13 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
 
     if (values.configure_credential && values.protocol) {
       const p = values.protocol as string;
-      const payload: Record<string, unknown> = {};
-
-      if (p === 'snmp') {
-        const ver = (values.snmp_version as string) || 'v2c';
-        payload.snmp_version = ver;
-        if (ver === 'v2c') {
-          payload.community = values.community;
-        } else {
-          payload.username = values.username;
-          payload.auth_key = values.auth_key;
-          payload.priv_key = values.priv_key;
-          payload.auth_protocol = values.auth_protocol || 'sha';
-          payload.priv_protocol = values.priv_protocol || 'aes';
-        }
-      } else if (p === 'zabbix') {
-        payload.api_url = values.api_url;
-        payload.api_token = values.api_token;
-        if (values.verify_ssl != null) payload.verify_ssl = values.verify_ssl;
-        if (values.match_by) payload.match_by = values.match_by;
-      } else {
-        payload.username = values.username;
-        payload.password = values.password;
-      }
+      const payload = buildCredentialPayload(p, values);
 
       try {
         await createAndLink.mutateAsync({
           protocol: p,
           payload,
-          name: (values.credential_name as string) || undefined,
+          name: (values.credential_name as string) || '',
           device_ids: deviceIds
         });
         message.success(
@@ -280,11 +274,15 @@ function BatchUpdateMonitorModal({ open, devices, onClose }: BatchUpdateMonitorM
               />
             </Form.Item>
 
-            <Form.Item label={t('batchMonitor.credentialNameOptional')} name="credential_name">
+            <Form.Item
+              label={t('batchMonitor.credentialName')}
+              name="credential_name"
+              rules={[{ required: true, message: t('credential.namePlaceholder') }]}
+            >
               <Input placeholder={t('credential.nameHint')} />
             </Form.Item>
 
-            <MonitorCredentialForm protocol={protocol} mode="create" form={form} />
+            <MonitorCredentialForm protocol={protocol} mode="create" />
           </>
         )}
 

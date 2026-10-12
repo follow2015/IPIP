@@ -26,7 +26,10 @@ from app.services.monitoring.adapters.base_adapter import (
     run_with_timeout,
 )
 from app.core.enums import ProbeErrorCode
-from app.services.monitoring.snmp_versions import SNMP_REQUIRED_BY_VERSION
+from app.services.monitoring.snmp_versions import (
+    SNMP_REQUIRED_BY_VERSION,
+    resolve_snmp_version,
+)
 import asyncio
 from app.utils.logging import get_logger
 import threading
@@ -124,17 +127,19 @@ def _get_pysnmp_async():
 
 
 def _resolve_snmp_version(credential: dict) -> str:
-    """从凭据 payload 解析 SNMP 版本键。
+    """从凭据 payload 解析 SNMP 版本键（薄封装，真源见 ``snmp_versions``）。
 
-    兼容两种键名：version（适配器约定）与 snmp_version（凭据 payload 历史键名）。
-    键存在即采用其【值】（含空串——空串会在下方白名单校验处被判为非法），
-    两者皆缺省才回退 "v2c"，避免 v3 凭据因键名不匹配被静默降级。
+    2026-10-10 修缺陷：原实现按「**键是否存在**」判（``if "version" in credential``）
+    却返回键的值，于是 ``{"version": None, "snmp_version": "v3"}`` 解析出 ``None``
+    ⇒ ``unsupported_version:None`` ⇒ 采集全失败；而校验层
+    （``schemas/monitor.py``）用的是按值判 ⇒ 同一份凭据**校验放行、运行必失败**。
+    现已把解析逻辑收敛到 ``snmp_versions.resolve_snmp_version``，两处共用一份，
+    不再各写一份各有口径。
+
+    保留本函数名：模块内 4 处调用点 + ``snmp_mib_service`` 2 处均以私有名引用，
+    且既有单测 monkeypatch 该名字。
     """
-    if "version" in credential:
-        return credential["version"]
-    if "snmp_version" in credential:
-        return credential["snmp_version"]
-    return "v2c"
+    return resolve_snmp_version(credential)
 
 
 def _build_snmp_cred(credential: dict, version: str):
@@ -219,6 +224,13 @@ async def _snmp_get_sysuptime_async(
 
     if version not in _SUPPORTED_SNMP_VERSIONS:
         return False, None, f"unsupported_version:{version}"
+
+    from app.services.security.snmp_gate import check_runtime
+    _allowed, _rule_id, _reason = check_runtime(
+        credential, version, credential_id=credential.get("_credential_id"))
+    if not _allowed:
+        logger.warning("SNMP 凭据违反安全策略，已拒绝发包: rule=%s", _rule_id)
+        return False, None, _reason
 
     _p = _get_pysnmp_async()
     ContextData = _p.ContextData
@@ -484,8 +496,17 @@ async def _snmp_collect_all_async(
                 timeout=timeout,
             )
             return metric_key, table
-        except (asyncio.TimeoutError, Exception):  # 单模板失败不影响其他
-            logger.warning("SNMP 单模板采集失败 metric_key=%s mib=%s symbol=%s oid=%s ip=%s", metric_key, mib, symbol, oid, ip, exc_info=True)
+        except (asyncio.TimeoutError, Exception) as exc:  # noqa: BLE001 -- 单模板失败不得影响其他模板：pysnmp 在传输/认证/解析各层抛出的异常类型不可枚举
+            if _snmp_log_gate(ip, mib or "", f"tpl:{metric_key}"):
+                logger.warning(
+                    "SNMP 单模板采集失败 metric_key=%s mib=%s symbol=%s oid=%s ip=%s exc=%s: %s",
+                    metric_key, mib, symbol, oid, ip, type(exc).__name__, exc,
+                )
+            else:
+                logger.debug(
+                    "SNMP 单模板采集失败(已限频) metric_key=%s ip=%s exc=%s",
+                    metric_key, ip, type(exc).__name__,
+                )
             return metric_key, {}
 
     results = await asyncio.gather(
@@ -494,7 +515,9 @@ async def _snmp_collect_all_async(
     pairs = [r for r in results if isinstance(r, tuple)]
     for r in results:
         if isinstance(r, BaseException):
-            logger.warning("SNMP 模板采集异常（已隔离）: %s", r, exc_info=r)
+            logger.warning(
+                "SNMP 模板采集异常（已隔离）: %s: %s", type(r).__name__, r,
+            )
     return {key: table for key, table in pairs if key}
 
 

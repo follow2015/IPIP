@@ -44,6 +44,7 @@ SELECT
     COUNT(*),
     SUM(POW(s.value_num, 2)),
     COUNT(s.value_num),
+    MAX(CASE WHEN s.rn_desc = 1 THEN s.value END),  -- last_value：桶内时间最晚的原始 value（状态词靠它保真）
     COALESCE(SUM(CASE WHEN s.prev_value IS NOT NULL
                       AND s.prev_value <> s.value THEN 1 ELSE 0 END), 0),
     COALESCE(SUM(CASE WHEN s.breached = 1 THEN 1 ELSE 0 END), 0),
@@ -102,6 +103,7 @@ SELECT
     COUNT(*),
     SUM(x.sum_sq),
     SUM(x.numeric_count),
+    MAX(CASE WHEN x.rn_desc = 1 THEN x.last_value END),  -- last_value：当天最晚小时桶的 last_value
     COALESCE(SUM(x.state_changes), 0),
     COALESCE(SUM(x.breach_count), 0),
     ELT(MAX(FIELD(x.worst_severity, 'ok', 'warn', 'crit')), 'ok', 'warn', 'crit')

@@ -9,6 +9,7 @@
 单例**（测试通过 `monkeypatch.setattr(auth_mod.auth_manager, ...)` /
 `setattr(auth_mod.config, ...)` 打补丁，各持一份会让补丁静默失效）。
 """
+import contextvars
 import hashlib
 import threading
 import time
@@ -24,6 +25,8 @@ from config import get_config
 
 logger = get_logger(__name__)
 config = get_config()
+
+_password_restricted = contextvars.ContextVar("password_restricted", default=False)
 
 _revoke_drop_stats = {"redis_unavailable": 0}
 _last_revoke_warn_at = 0.0
@@ -144,6 +147,9 @@ class AuthenticationManager:
                 raise ValueError("Web登录必须提供username")
             payload["username"] = username
             payload["user_identifier"] = username
+
+        if token_type == "access" and _password_restricted.get():  # noqa: S105
+            payload["pwd_exp"] = True
 
         if device_fingerprint and token_type == "refresh":  # noqa: S105
             payload["dfp"] = device_fingerprint
@@ -510,27 +516,33 @@ class AuthenticationManager:
         """
         user_roles = [role.name for role in user.roles]
 
-        access_token = self.generate_token(
-            user.id,
-            username=user.username,
-            roles=user_roles,
-            token_type="access",  # noqa: S106
-            auth_type=auth_type,
-        )
-        refresh_token = self.generate_token(
-            user.id,
-            username=user.username,
-            roles=user_roles,
-            token_type="refresh",  # noqa: S106
-            auth_type=auth_type,
-            expires_delta=(
-                timedelta(seconds=getattr(
-                    config, "JWT_REFRESH_TOKEN_REMEMBER_EXPIRES",
-                    self.refresh_token_expires))
-                if remember else None
-            ),
-            device_fingerprint=device_fingerprint,
-        )
+        password_expired, expires_in_days = self._evaluate_password_expiry(user)
+
+        _pwd_ctx = _password_restricted.set(bool(password_expired))
+        try:
+            access_token = self.generate_token(
+                user.id,
+                username=user.username,
+                roles=user_roles,
+                token_type="access",  # noqa: S106
+                auth_type=auth_type,
+            )
+            refresh_token = self.generate_token(
+                user.id,
+                username=user.username,
+                roles=user_roles,
+                token_type="refresh",  # noqa: S106
+                auth_type=auth_type,
+                expires_delta=(
+                    timedelta(seconds=getattr(
+                        config, "JWT_REFRESH_TOKEN_REMEMBER_EXPIRES",
+                        self.refresh_token_expires))
+                    if remember else None
+                ),
+                device_fingerprint=device_fingerprint,
+            )
+        finally:
+            _password_restricted.reset(_pwd_ctx)
 
         return {
             "user": user.to_dict(),
@@ -538,7 +550,43 @@ class AuthenticationManager:
             "refresh_token": refresh_token,
             "expires_in": self.access_token_expires,
             "auth_type": auth_type,
+            "password_expired": password_expired,
+            "password_expires_in_days": expires_in_days,
         }
+
+    @staticmethod
+    def _evaluate_password_expiry(user) -> tuple:
+        """评估密码是否到期（**纯函数，不碰 `_password_restricted`**）。
+
+        Returns:
+            tuple[bool, int | None]：`(是否已过期, 剩余天数)`；未启用到期策略时
+            `(False, None)`。
+
+        判定口径与检测器 `user.password_expired` **逐条对齐**（`password_checks.py`）：
+        仅 `auth_source == 'local'`（LDAP/其它来源整体豁免）；`password_changed_at`
+        为 NULL 一律视为**未过期**（那是"策略启用前从未记录"，不是过期）；`max_age_days`
+        ≤ 0 表示不启用。口径不一致会出现"页面报过期、登录却放行"或反之的自相矛盾。
+
+        容错：策略读取或时间计算出错一律判**未过期**（fail-open）——安全中心是新增的
+        旁路强制点，绝不能因为一次策略查询失败就把所有人挡在门外。
+
+        为什么由调用方（`_issue_login`）负责 set 而不是这里 set：ContextVar 必须
+        set/reset 成对，哪里 set 就得在哪里 reset —— 放在这里会让 reset 的责任
+        落到别处，正是"泄漏到后续请求"的成因。
+        """
+        try:
+            from app.services.security.policy_service import get_value
+            from app.utils.time_utils import now_utc_naive
+
+            max_age = int(get_value("password.max_age_days") or 0)
+            changed_at = getattr(user, "password_changed_at", None)
+            if max_age <= 0 or changed_at is None or getattr(user, "auth_source", None) != "local":
+                return False, None
+            age_days = (now_utc_naive() - changed_at).days
+            return bool(age_days > max_age), max(max_age - age_days, 0)
+        except Exception:
+            logger.warning("密码到期评估失败，按未过期放行", exc_info=True)
+            return False, None
 
     AUTH_ROUTE_LOCAL = "local"
     AUTH_ROUTE_LDAP = "ldap"

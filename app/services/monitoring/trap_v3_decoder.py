@@ -20,12 +20,13 @@
 任何单条失败都不得终止收包循环。
 """
 
-import logging
 from functools import lru_cache
 from typing import Any, Callable
 
 from pyasn1.codec.ber import decoder as ber_decoder
 from pyasn1.error import PyAsn1Error
+
+from app.utils.logging import get_logger
 
 from . import trap_v3_usm as usm
 from .trap_v3_spec import (
@@ -37,7 +38,7 @@ from .trap_v3_spec import (
     parse_msg_flags,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 __all__ = ["decode_v3_trap", "V3RejectReason"]
 

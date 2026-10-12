@@ -33,6 +33,7 @@ from app.services.monitoring.adapters.snmp_adapter import (
     _snmp_collect_metrics,
 )
 from app.utils.port_name_parser import parse_port_name
+from app.utils.port_name_utils import normalize_port
 
 logger = get_logger(__name__)
 
@@ -136,6 +137,8 @@ def _ips_by_ifindex(ifindex_table: dict, netmask_table: dict | None = None) -> d
                 entry = address
         grouped.setdefault(key, []).append(entry)
     return {key: ",".join(sorted(values)) for key, values in grouped.items()}
+
+_SKIPPED_PORT_TYPES = ("LOOPBACK", "NULL")
 
 _OPER_STATUS_MAP = {
     "1": "up",
@@ -292,12 +295,15 @@ class SnmpPortCollector:
         name_table.update(if_name_table)
 
         port_rows: list[dict] = []
-        for if_index, port_name in name_table.items():
+        for if_index, raw_name in name_table.items():
+            if not raw_name:
+                continue
+            port_name = normalize_port(str(raw_name).strip())
             if not port_name:
                 continue
             parsed = parse_port_name(port_name)
             port_type = parsed.get("port_type")
-            if port_type in ("VLAN", "ETH-TRUNK", "LOOPBACK", "NULL"):
+            if port_type in _SKIPPED_PORT_TYPES:
                 continue
             if not parsed.get("parsed"):
                 logger.debug(

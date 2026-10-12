@@ -29,9 +29,10 @@ from __future__ import annotations
 import socket
 import time
 import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from typing import Final
+
+from .._http import build_request, open_request
 
 __all__ = ["ProbeResult", "probe", "available", "KB", "MB"]
 
@@ -77,7 +78,7 @@ def _request(url: str, *, start: int, end: int | None, timeout: float) -> urllib
     headers = {"User-Agent": _USER_AGENT, "Accept": "*/*"}
     if end is not None:
         headers["Range"] = f"bytes={start}-{end}"
-    return urllib.request.Request(url, headers=headers, method="GET")
+    return build_request(url, headers=headers, method="GET")
 
 
 def probe(
@@ -110,7 +111,7 @@ def probe(
     overall_deadline = started_dns + timeout * 2
 
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with open_request(req, timeout=timeout) as resp:
             status = int(getattr(resp, "status", resp.getcode()))
             if status >= 400:
                 return ProbeResult(url, False, status, 0, 0.0, f"HTTP {status}")

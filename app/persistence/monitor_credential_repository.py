@@ -316,6 +316,23 @@ class MonitorCredentialRepository(SQLAlchemyRepository):
             .delete()
         )
 
+
+    def list_enabled_by_protocol(self, protocol: str) -> List[MonitorCredential]:
+        """按协议列出**启用中**的共享凭据（`encrypted_payload` 仍为密文）。
+
+        为什么只给密文：解密与安全判定是安全中心的职责（解密后逐条丢弃，
+        finding detail 不得落明文），仓储不参与明文流转 —— 密文跨层传递是
+        本仓对凭据的一贯约束（`to_dict()` 也永久排除 `encrypted_payload`）。
+        """
+        return (
+            self.session.query(MonitorCredential)
+            .filter(
+                MonitorCredential.protocol == protocol,
+                MonitorCredential.enabled.is_(True),
+            )
+            .all()
+        )
+
     def find_enabled(self, device_id: int, protocol: str) -> Optional[MonitorCredential]:
         return (
             self.session.query(MonitorCredential)

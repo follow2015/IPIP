@@ -22,10 +22,10 @@ from __future__ import annotations
 
 import json
 import re
-import urllib.request
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
+from .._http import open_url
 from .download import ProbeResult, probe
 
 __all__ = [
@@ -65,8 +65,8 @@ NPM_SOURCES: dict[str, str] = {
 
 
 def _get_json(url: str, timeout: float = 15.0) -> dict:
-    req = urllib.request.Request(url, headers={"User-Agent": "ipip-installer/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with open_url(url, timeout=timeout,
+                  headers={"User-Agent": "ipip-installer/1.0"}) as resp:
         return json.loads(resp.read().decode("utf-8", "ignore"))
 
 
@@ -78,11 +78,11 @@ def pypi_sdist_url(simple_index: str, package: str, timeout: float = 15.0) -> tu
     （真机上那次是 TLS 握手被内网代理切断）。失败原因必须能传到日志里。
     """
     url = simple_index.rstrip("/") + "/" + package + "/"
-    req = urllib.request.Request(url, headers={"User-Agent": "ipip-installer/1.0"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with open_url(url, timeout=timeout,
+                      headers={"User-Agent": "ipip-installer/1.0"}) as resp:
             html = resp.read().decode("utf-8", "ignore")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 —— 见 docstring：失败原因必须原样回传给日志
         return None, f"索引不可达: {type(e).__name__}: {str(e)[:70]}"
 
     links = re.findall(r'href="([^"]+)"', html)
@@ -98,7 +98,7 @@ def npm_tarball_url(registry: str, package: str, timeout: float = 15.0) -> tuple
     """取某个 npm 包最新版的 tarball 地址，返回 ``(url, reason)``。"""
     try:
         data = _get_json(registry.rstrip("/") + "/" + package + "/latest", timeout)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 —— 与 pypi_sdist_url 同口径：原因回传，不中断择优
         return None, f"registry 不可达: {type(e).__name__}: {str(e)[:70]}"
     tarball = data.get("dist", {}).get("tarball")
     return (tarball, "") if tarball else (None, "latest 元数据里没有 dist.tarball")

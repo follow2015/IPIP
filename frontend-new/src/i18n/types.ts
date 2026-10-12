@@ -7,6 +7,7 @@ import type asset from '@/locales/zh-CN/asset.json';
 import type settings from '@/locales/zh-CN/settings.json';
 import type ai from '@/locales/zh-CN/ai.json';
 import type circuit from '@/locales/zh-CN/circuit.json';
+import type security from '@/locales/zh-CN/security.json';
 
 declare module 'i18next' {
   interface CustomTypeOptions {
@@ -21,6 +22,7 @@ declare module 'i18next' {
       settings: typeof settings;
       ai: typeof ai;
       circuit: typeof circuit;
+      security: typeof security;
     };
   }
 }

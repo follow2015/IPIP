@@ -7,7 +7,6 @@ Phase 2.5：扩展支持 agentic skill 路由。LLM 同时看到 Tier1 catalog �
 选中 agentic skill（category=agentic）时路由到 AgenticSkillRunner，否则路由到 WorkflowEngine。
 """
 import json
-import logging
 import re
 from typing import Callable, List, Optional
 
@@ -18,8 +17,9 @@ from app.services.ai.skills.visibility import get_allowed_skill_names
 from app.services.ai.capabilities.registry import get_capability
 from app.services.ai.llm_factory import create_llm_client
 from app.services.ai.ai_errors import AINotConfiguredError
+from app.utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _skill_dirs() -> List[str]:

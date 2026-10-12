@@ -16,6 +16,7 @@ from app.api.base import APIResponse, api_exception_handler
 from app.openapi.doc import doc, public
 from app.services.qrcode_service import QRCodeService
 from app.utils import rate_limit_api
+from app.utils.security.client_ip import get_client_ip
 from app.utils.transactional import transactional
 from app.persistence.user_repository import UserRepository
 from app.persistence.user_log_repository import UserLogRepository
@@ -267,15 +268,23 @@ def login():
         if r:
             r.delete(f"login_attempts:{username}")
 
+        _login_user_id = auth_result["user"].get("id")
+        _locked_user = user_service.get_by_id(_login_user_id) if _login_user_id else None
+        if _locked_user is not None:
+            from app.services.security.account_lock_service import is_account_locked
+            if is_account_locked(_locked_user):
+                logger.warning("拒绝锁定账号登录: user_id=%s ip=%s",
+                               _login_user_id, get_client_ip())
+                return APIResponse.error(message="账号已被锁定，请联系管理员解锁", status_code=423)
+
         logger.info("用户登录成功: %s (IP=%s, UA=%s)",
-                    username, request.remote_addr,
+                    username, get_client_ip(),
                     request.headers.get('User-Agent', '')[:100])
 
-        _login_user_id = auth_result["user"].get("id")
         if _login_user_id is not None:
             user_service.update_last_login(
                 user_id=_login_user_id,
-                ip=request.remote_addr,
+                ip=get_client_ip(),
                 login_type="password",
                 user_agent=request.headers.get('User-Agent', '')[:512],
             )
@@ -294,7 +303,9 @@ def login():
                 "refresh_token": auth_result.get("refresh_token"),
                 "user": auth_result["user"],
                 "permissions": user_permissions,
-                "expires_in": auth_result.get("expires_in", 3600)
+                "expires_in": auth_result.get("expires_in", 3600),
+                "password_expired": bool(auth_result.get("password_expired")),
+                "password_expires_in_days": auth_result.get("password_expires_in_days"),
             },
             message="登录成功"
         )

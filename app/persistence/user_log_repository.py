@@ -9,8 +9,10 @@ from datetime import timedelta
 from typing import Any, Dict, List, Optional
 from app.utils.time_utils import now_utc_naive
 
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.models.user import User
 from app.models.user_log import UserLog
 from app.core.pagination_limits import ensure_offset_within_limit
 from extensions import db
@@ -150,6 +152,60 @@ class UserLogRepository:
             )
         except SQLAlchemyError as e:
             logger.error(f"查询全局登录日志失败: {e}")
+            return []
+
+
+    def login_ips_since(self, since) -> List[tuple]:
+        """`since` 之后的 `(user_id, login_ip)` 列表（异地登录检测用）。
+
+        只取 `login_ip` 非空的行：NULL/空串无法判定来源，让检测器去判反而会
+        把"没记录 IP"当成"不可信来源"刷告警。
+        """
+        try:
+            return (
+                db.session.query(UserLog.user_id, UserLog.login_ip)
+                .filter(UserLog.login_time >= since, UserLog.login_ip.isnot(None))
+                .all()
+            )
+        except SQLAlchemyError as e:
+            logger.error(f"查询登录来源 IP 失败: {e}")
+            return []
+
+    def last_login_times_by_user(self) -> List[tuple]:
+        """每个用户的最后登录时间 `(user_id, max_login_time)`（休眠账号检测用）。
+
+        从未登录过的账号**不出现**在结果里 —— 那是"从未使用"，与"长期不用"
+        是两回事，混在一起会让休眠名单里混进一批从没启用的账号。
+        """
+        try:
+            return (
+                db.session.query(UserLog.user_id, func.max(UserLog.login_time))
+                .group_by(UserLog.user_id)
+                .all()
+            )
+        except SQLAlchemyError as e:
+            logger.error(f"查询各用户最后登录时间失败: {e}")
+            return []
+
+    def remote_login_rows_since(self, since, limit: int = 5000) -> List[tuple]:
+        """`since` 之后的 `(user_id, login_ip, login_time, username)`（异地登录面板用）。
+
+        带上 `username` 是为了让前端一次拿全展示字段，避免按 user_id 逐条回查（N+1）。
+        `login_ip` 为空的行**排除**：无法判定来源，混进来只会制造噪声。
+        `limit` 是扫描上限护栏 —— 聚合在 Python 侧做，无上限时大表会把内存吃满。
+        """
+        try:
+            return (
+                db.session.query(UserLog.user_id, UserLog.login_ip, UserLog.login_time,
+                                 User.username)
+                .join(User, User.id == UserLog.user_id)
+                .filter(UserLog.login_time >= since, UserLog.login_ip.isnot(None))
+                .order_by(UserLog.login_time.desc())
+                .limit(limit)
+                .all()
+            )
+        except SQLAlchemyError as e:
+            logger.error(f"查询异地登录记录失败: {e}")
             return []
 
     def get_paginated_logs(

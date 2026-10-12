@@ -155,6 +155,7 @@ export function useCloneTab({ active, templateDeviceId, onClose }: CloneTabProps
       setTemplateId(templateDeviceId && templateDeviceId > 0 ? templateDeviceId : null);
     }
     prevActiveRef.current = active;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, templateDeviceId]);
 
   const handleNext = () => {

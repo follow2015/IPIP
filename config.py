@@ -450,8 +450,6 @@ class Config:
     RATELIMIT_DEFAULT = "1000 per minute"  # 增加默认限制
     RATELIMIT_LOGIN = "10 per minute"      # 增加登录限制
     RATELIMIT_API = "500 per minute"       # 大幅增加API限制
-    RATE_LIMIT_MAX_ATTEMPTS = _env_num("RATE_LIMIT_MAX_ATTEMPTS", 5)
-    RATE_LIMIT_WINDOW_SECONDS = _env_num("RATE_LIMIT_WINDOW_SECONDS", 300)  # 5分钟
 
     # 分页配置
     DEFAULT_PAGE_SIZE = 20
